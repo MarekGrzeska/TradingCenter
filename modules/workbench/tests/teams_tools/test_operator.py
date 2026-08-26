@@ -1,13 +1,8 @@
-"""Whose request this is, and what happens when nobody can say.
+"""Whose request this is, and what happens when nobody can say. Its own file because every other test in
+this suite puts an operator in place, and something has to check the thing being put in place.
 
-Its own file because every other test in this suite puts an operator in place through
-`signed_in`, and something has to check the thing being put in place.
-
-What is read changed with the merge and is worth stating: not a bearer token out of a
-header, but the operator's own principal out of a context variable the adapter sets. There
-is no authenticator between the chat request and these tools any more — the identity has
-already been through one, and it is the identity that travels rather than the credential.
-"""
+What is read changed with the merge: not a bearer token out of a header, but the operator's own principal
+out of a context variable — the identity travels rather than the credential."""
 
 from __future__ import annotations
 

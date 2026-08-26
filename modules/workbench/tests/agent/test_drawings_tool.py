@@ -1,14 +1,8 @@
-"""The two drawing tools against a real database: what lands, what comes back, what does not.
+"""The two drawing tools against a real database: what lands, what comes back, what does not. The
+market-mcp stand-in answers with the same JSON the real server's typed tools serialize.
 
-specs/agent-chart-drawings, "Agent stawia i kasuje rysunki narzędziem", "Agent odczytuje
-rysunki narzędziem" and "Odmowa rysowania nazywa, co poprawić". The market-mcp stand-in
-answers with the same JSON the real server's typed tools serialize, which is what
-`drawings.py` parses through `chart.read_json`.
-
-Argument validation is not here. It refuses before the pool is touched, so the two dozen
-permutations that used to sit in this file were paying for a PostgreSQL container to check
-arithmetic — they are one parameterised test in `test_drawings_refusals.py` now.
-"""
+Argument validation is not here: it refuses before the pool is touched, so the two dozen permutations that
+used to sit in this file are one parameterised test in `test_drawings_refusals.py` now."""
 
 from __future__ import annotations
 
@@ -73,8 +67,6 @@ def _draw(pool, server=None) -> DrawOnChartTool:
 def _read(pool) -> ListChartDrawingsTool:
     return ListChartDrawingsTool(pool)
 
-
-# --- what it draws -------------------------------------------------------------------
 
 
 async def test_two_levels_in_one_call_both_land(db, pool) -> None:
@@ -165,8 +157,6 @@ async def test_a_removal_and_an_addition_travel_together(db, pool) -> None:
     [standing] = await store.list_drawings(db, symbol="US100")
     assert standing.geometry.price == 21510.0  # pyright: ignore[reportAttributeAccessIssue]
 
-
-# --- what it refuses once it has reached something -----------------------------------
 
 
 async def test_a_symbol_the_archive_does_not_collect_is_refused_with_the_ones_it_does(
@@ -270,8 +260,6 @@ async def test_an_id_belonging_to_another_instrument_is_not_removable(db, pool) 
     assert len(await store.list_drawings(db, symbol="GOLD")) == 1
 
 
-# --- what it reads -------------------------------------------------------------------
-
 
 async def test_the_read_carries_ids_shapes_and_labels(db, pool) -> None:
     session = await _session(db)
@@ -332,8 +320,6 @@ async def test_read_then_remove_uses_the_same_id(db, pool) -> None:
     remaining = await store.list_drawings(db, symbol="US100")
     assert [d.id for d in remaining] == [read["drawings"][1]["id"]]
 
-
-# --- hiding, which is not removing ---------------------------------------------------
 
 
 async def test_hiding_takes_a_drawing_off_the_chart_and_keeps_it(db, pool) -> None:
@@ -414,9 +400,8 @@ async def test_hiding_does_not_touch_what_it_was_not_told_to(db, pool) -> None:
 
 
 async def test_hiding_and_drawing_travel_together(db, pool) -> None:
-    """"Hide the old resistance and put up the new one" is one move, not two — the reason
-    hiding went into this tool rather than beside it (design.md, "`hide`/`show`
-    w `draw_on_chart`, nie czwarte narzędzie do wykresu")."""
+    """"Hide the old resistance and put up the new one" is one move, not two — the reason hiding went into
+    this tool rather than beside it."""
     session = await _session(db)
     [old] = await store.add_drawings(
         db, session_id=session.id, symbol="US100", geometries=[ChartLevel(price=21500.0)]

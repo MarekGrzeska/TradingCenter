@@ -1,10 +1,5 @@
-"""The teams suite's name for the shared stand-in, plus the one thing that is its own.
-
-The harness — a FastMCP catalogue served by a real uvicorn on a real port — is
-`tests/mcp_stand_in.py` now, one copy for the process rather than one per suite. What stays
-here is `settings_for`, because each surface builds its own `Settings` class and the two
-differ in exactly the fields that make them two (`default_model_id` has no teams twin).
-"""
+"""The teams suite's name for the shared stand-in, plus the one thing that is its own. The harness is
+`tests/mcp_stand_in.py` now; what stays here is `settings_for`, because each surface builds its own class."""
 
 from __future__ import annotations
 

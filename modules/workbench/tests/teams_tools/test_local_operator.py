@@ -1,14 +1,7 @@
-"""The boundary the refusal has: what a tool does when no operator identity arrives, on a
-machine where none could have.
+"""The boundary the refusal has: what a tool does when no operator identity arrives, on a machine where none
+could have. Its own file because every other tool test supplies one, and a fixture here would leave nothing tested.
 
-Its own file because every other tool test supplies one through `signed_in`
-(`conftest.py`) — the whole point here is calling without one, and a module-level fixture
-that hands one over would leave nothing tested.
-
-The condition used to have two halves, and lost one with the merge: "an authenticator in
-front **or** a remote teams". There is no remote teams. What is left is the flag, and the
-two tests that turned on the address are gone with it.
-"""
+The condition used to have two halves and lost one with the merge: there is no remote teams."""
 
 from __future__ import annotations
 

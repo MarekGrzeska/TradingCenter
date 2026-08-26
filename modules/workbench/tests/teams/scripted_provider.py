@@ -1,9 +1,5 @@
-"""A model provider that answers from a script, and records what it was asked.
-
-Nothing here reaches OpenAI: `provider.py` is the one file that does, and it is covered by
-its own shape rather than by calls that cost money and answer differently every time. What
-the runner needs from a provider is a stream of chunks, so a test hands it exactly that.
-"""
+"""A model provider that answers from a script, and records what it was asked. Nothing here reaches OpenAI:
+what the runner needs from a provider is a stream of chunks, so a test hands it exactly that."""
 
 from __future__ import annotations
 

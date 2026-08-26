@@ -1,14 +1,8 @@
-"""What every suite in this module needs, and what pytest will only take from here.
+"""What every suite in this module needs, and what pytest will only take from here. Three suites live under
+this directory and two arrived carrying a byte-identical copy of the Docker probe below.
 
-Three suites live under this directory — the conversation's, the teams surface's and the
-team tools' — and two of them arrived carrying a byte-identical copy of the Docker probe
-below and of `_no_developer_env`. One copy now, for the ordinary reason: they were two
-modules and they are one.
-
-`pytest_addoption` had no choice in the matter. pytest reads it from the *initial*
-conftest only, so `--run-live` declared in `tests/agent/conftest.py` would silently not
-exist and `config.getoption` would raise where it is read.
-"""
+`pytest_addoption` had no choice: pytest reads it from the *initial* conftest only, so `--run-live` declared
+in a suite's own conftest would silently not exist."""
 
 from __future__ import annotations
 
@@ -82,40 +76,20 @@ def _docker_is_installed() -> bool:
 
 @pytest.fixture(autouse=True)
 def _no_developer_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Every source of settings a developer's machine has and CI does not, taken away from
-    each test that builds `Settings()` itself — which is every test going through
-    `TestClient(app)`, since the lifespan is where the settings are read. A test wanting
-    one of them sets it with `monkeypatch.setenv`, which is read after this.
+    """Every source of settings a developer's machine has and CI does not, taken away from each test that
+    builds `Settings()` itself. Two sources, and neither covers the other: the module's `.env`, switched off
+    at the class rather than name by name after a stale list cost six tests, and the process environment,
+    which is what keeps `AZURE_CLIENT_ID` away from `DefaultAzureCredential`.
 
-    Two sources, and neither is covered by handling the other:
-
-    * the module's `.env`, switched off at the class rather than name by name. An earlier
-      version of this fixture blanked a list of names instead, and the list went stale the
-      moment `TRADING_MCP_URL` was added — six tests that assert "no tool server
-      configured" passed in CI and failed on a machine with an `.env`. Blanking was itself
-      a workaround for `delenv` uncovering the file's value; with the file out of the
-      picture there is nothing left to uncover, so deletion works and no list is needed.
-    * the process environment, which is the shell's and not the file's. It is what keeps
-      `AZURE_CLIENT_ID` away from `DefaultAzureCredential`, the one consumer that reads the
-      environment itself and would take a blank value for a broken one rather than an
-      absent one.
-
-    One class is emptied rather than three: `workbench.config.Settings` is the only one
-    that reads the environment, and the two surfaces' own settings are built from its
-    fields by argument.
-    """
+    One class is emptied rather than three: `workbench.config.Settings` is the only one that reads the
+    environment, and the two surfaces' settings are built from its fields by argument."""
     monkeypatch.setitem(Settings.model_config, "env_file", None)
     for field in Settings.model_fields:
         monkeypatch.delenv(field.upper(), raising=False)
 
 
-# --- the two databases ----------------------------------------------------------------
-#
-# Two containers rather than two schemas in one, because the two chains own
-# `alembic_version` separately — which is the whole reason there are two databases in
-# production as well. They live here rather than in the suite conftests because the process
-# under test needs **both**: its lifespan migrates both chains before it serves anything,
-# so a test going through `TestClient(app)` is a test with two databases behind it.
+# Two containers rather than two schemas in one, because the two chains own `alembic_version` separately.
+# They live here because the process under test needs both: its lifespan migrates both before it serves.
 
 
 @pytest.fixture(scope="session")
@@ -137,9 +111,8 @@ def teams_postgres_url() -> Iterator[str]:
 
 @pytest.fixture(scope="session")
 def agent_migrated_url(agent_postgres_url: str) -> str:
-    """The same database with the conversation's migrations applied — through the same
-    function the process runs at startup, so the schema under test is the one a deployment
-    actually applies rather than a second arrangement that resembles it."""
+    """The same database with the conversation's migrations applied — through the same function the process
+    runs at startup, so the schema under test is the one a deployment actually applies."""
     from tc_runtime.migrate import upgrade_to_head
 
     from agent.runtime import MIGRATIONS
@@ -172,12 +145,8 @@ WORKBENCH_MODELS = (
 def workbench_env(
     agent_migrated_url: str, teams_migrated_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The smallest environment `workbench.app` will start in.
-
-    Everything the process refuses to start without, and nothing else — no tool server, no
-    authenticator — so a test adding one is visibly adding it. Requested explicitly rather
-    than autouse: most tests here never build the application at all.
-    """
+    """The smallest environment `workbench.app` will start in: everything the process refuses to start
+    without and nothing else, so a test adding one is visibly adding it."""
     monkeypatch.setenv("AGENT_DATABASE_URL", agent_migrated_url)
     monkeypatch.setenv("TEAMS_DATABASE_URL", teams_migrated_url)
     monkeypatch.setenv("AGENT_OPENAI_API_KEY", "key")

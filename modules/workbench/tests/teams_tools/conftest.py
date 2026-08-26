@@ -1,12 +1,6 @@
-"""Fixtures for the team tools, and the one thing about them that had to change.
-
-These tools reach the teams routes through `httpx.ASGITransport` now — no socket, no
-server. respx's default mocker patches httpcore, which an ASGI transport never touches, so
-every route in this suite would be bypassed and every test would hit a real application
-object. Its other mocker patches `httpx` one layer higher, above the transport, and that
-one intercepts regardless of which transport the client was built with. Selecting it here
-is what keeps the rest of this suite written the way it was.
-"""
+"""Fixtures for the team tools, and the one thing about them that had to change. These tools reach the
+routes through `httpx.ASGITransport` now, and respx's default mocker patches httpcore, which such a
+transport never touches — so the other mocker, one layer higher, is what keeps this suite as it was."""
 
 from __future__ import annotations
 

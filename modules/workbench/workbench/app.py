@@ -1,17 +1,9 @@
-"""The published surface: one FastAPI over both halves of the operator's workbench.
+"""The published surface: one FastAPI over both halves of the operator's workbench. Assembly only, and the
+only module that imports all three packages.
 
-Assembly only. Each surface says which routers it publishes and what its routes read
-(`agent/surface.py`, `teams/surface.py`); this file builds the application, runs the one
-lifespan both of them live in, and is the only module that imports all three packages
-(`tests/test_layering.py`).
-
-**The lifespan is all-or-nothing on purpose.** Two databases are brought to this image's
-revision before a single request is served, each under its own advisory lock. There is no
-mode where the process serves the conversation and calls the teams catalogue unavailable:
-a half-state nobody exercises is worse than a failure that shows, and the deploy probe
-reaches the process rather than the control plane, so a process that answers is itself the
-proof that both chains are at head.
-"""
+The lifespan is all-or-nothing on purpose: two databases are brought to this image's revision before a
+single request is served. There is no mode where the process serves one surface and calls the other
+unavailable, and the deploy probe reaches the process, so a process that answers is the proof."""
 
 from __future__ import annotations
 
@@ -99,15 +91,8 @@ async def lifespan(app: FastAPI):
         # already holds a credential when a scope is configured, and a refused start is
         # exactly the path that would otherwise leak it.
         try:
-            # Each database is brought to this image's revision before anything is built
-            # on top of it — a deployment carries its own schema, and no operator stands
-            # between a merge and a working process.
-            #
-            # One connection held for the whole of each: the advisory lock is session
-            # scoped, so it has to be released on the connection that took it, and handing
-            # that connection back to the pool in between would release it early. Two
-            # locks with two keys, on two databases: a process waiting for the
-            # conversation's chain never holds up the teams one.
+            # Each database is brought to this image's revision before anything is built on it. One
+            # connection held throughout each: the advisory lock is session scoped. Two locks, two keys.
             await _migrate(
                 conversation_pool,
                 AGENT_MIGRATIONS,
@@ -182,12 +167,8 @@ async def lifespan(app: FastAPI):
 
 
 async def _migrate(pool, migrations, lock_key: int, *, wait: float, label: str) -> None:
-    """One chain, on its own database, under its own key.
-
-    The label is in the message rather than in a second copy of this function: a start-up
-    that fails here has to say *which* of the two databases it was, and "the database" was
-    unambiguous only while there was one.
-    """
+    """One chain, on its own database, under its own key. The label is in the message rather than in a
+    second copy of this function: a start-up that fails here has to say which of the two databases it was."""
     async with pool.acquire() as conn:
         async with advisory_lock(conn, lock_key, wait=wait):
             log.info("%s: bringing the database up to this image's revision", label)

@@ -1,21 +1,9 @@
-"""The conversation's MCP client against a real MCP server, not a mock of one.
+"""The conversation's MCP client against a real MCP server, not a mock of one. `market-mcp` is not
+importable from here, so the stand-in is a FastMCP server built in this file and served by a real uvicorn.
 
-`market-mcp` is not importable from here — no cross-module imports — so the stand-in is a
-FastMCP server built in this file and served by a real uvicorn on a real port. That is
-enough to prove the three things this client owes the turn above it: a tool list it did not
-write, a refusal that arrives as a result, and an unreachable server that arrives as
-something else.
-
-The uvicorn-in-a-thread harness is `tests/mcp_stand_in.py`'s — it was pasted inline here
-and kept in the teams suite as a file, from back when the two were separate modules. The
-catalogues below stay local, because they are the point: `list_tracked_pairs` returning a
-bare string beside `list_pairs_typed` returning a typed list is the production bug this
-file exists for.
-
-Slower than the rest of this suite (a second or two, binding a port), and worth it: the one
-contract in this repository with no committed snapshot is this session, so a mocked session
-would be a test of the mock.
-"""
+The catalogues stay local because they are the point: a bare-string return beside a typed list is the
+production bug this file exists for. Slower than the rest of the suite, and worth it — the one contract
+here with no committed snapshot is this session, so a mocked session would be a test of the mock."""
 
 from __future__ import annotations
 
@@ -77,11 +65,8 @@ def _stand_in_server(port: int) -> FastMCP:
     def list_tracked_pairs() -> str:
         return "US100, EURUSD"
 
-    # market-mcp's real `list_tracked_pairs` returns `list[TrackedPairOut]`, not a
-    # string — the shape this stand-in exists to reproduce. The SDK turns a bare list
-    # return into one content block *per item* rather than one for the whole array
-    # (`_convert_to_content`), so a client reading `content` alone sees N JSON documents
-    # back to back, not the one array `structuredContent` carries.
+    # market-mcp's real `list_tracked_pairs` returns a typed list, not a string. The SDK turns a bare list
+    # into one content block *per item*, so a client reading `content` sees N JSON documents back to back.
     @mcp.tool(description="Lists pairs the typed way — the shape that broke the client.")
     def list_pairs_typed() -> list[_PairOut]:
         return [_PairOut(symbol="US100", resolution="MINUTE_5"), _PairOut(symbol="US100", resolution="HOUR")]
@@ -134,11 +119,8 @@ async def test_a_refusal_arrives_as_a_result_with_the_servers_own_words(
 
 
 async def test_a_bare_list_return_reads_back_as_one_json_array(tool_server: ToolServer) -> None:
-    """The production bug: `list_tracked_pairs` answered "something unreadable" the
-    moment more than one pair was tracked, because the SDK splits a bare-list return
-    into one content block per item and joining them is N JSON documents, not one.
-    Reading `structuredContent` instead is what `chart.py`'s `_check_pair` was already
-    written to expect (`pairs.get("result", pairs.get("pairs", []))`)."""
+    """The production bug: the answer became unreadable the moment more than one pair was tracked, because
+    joining one block per item is N JSON documents rather than one. `structuredContent` is what to read."""
     outcome = await tool_server.call("list_pairs_typed", {})
 
     assert outcome.kind is ToolOutcomeKind.OK
@@ -168,9 +150,8 @@ async def test_an_unreachable_server_is_unavailable_not_a_refusal() -> None:
 
     assert outcome.kind is ToolOutcomeKind.UNAVAILABLE
     assert "says nothing about the archive" in outcome.text
-    # Both halves of the transport run in an anyio task group, so the raw exception is
-    # "unhandled errors in a TaskGroup (1 sub-exception)" — a sentence naming nothing,
-    # which a live run handed to the model before `_describe` existed.
+    # Both halves of the transport run in an anyio task group, so the raw exception names nothing — which
+    # a live run handed to the model before `_describe` existed.
     assert "TaskGroup" not in outcome.text
     assert "connection" in outcome.text.lower()
 
@@ -220,8 +201,6 @@ async def test_no_configured_server_means_no_tools_and_no_calls() -> None:
     assert "market-mcp" in outcome.text
     assert "not configured" in outcome.text
 
-
-# --- a server whose writes land on the account (specs/agent-trading) ---
 
 
 def _trading_stand_in(port: int) -> FastMCP:
@@ -294,9 +273,8 @@ async def test_a_name_this_server_never_described_counts_as_moving_the_account(
 
 
 async def test_an_unreachable_write_is_unknown_rather_than_unavailable() -> None:
-    """The difference the fourth outcome exists for: an order that never answered is
-    either no position or one nobody knows about, and "the call was not made" is a claim
-    this module cannot make about it (specs/agent-trading)."""
+    """The difference the fourth outcome exists for: an order that never answered is either no position or
+    one nobody knows about, and "the call was not made" is a claim this module cannot make."""
     client = ToolServer(
         settings_for(None, trading_mcp_url=f"http://127.0.0.1:{_free_port()}"),
         prefix="trading_mcp",
@@ -381,14 +359,10 @@ async def test_a_slow_write_times_out_as_unknown() -> None:
     assert "may have gone through" in outcome.text
 
 
-# --- the server restarting under a call (the production failure of 17 August 2026) ---
-
 
 async def test_a_call_survives_the_server_restarting_under_it() -> None:
-    """Two real servers on one port. The session the client holds means nothing to the
-    second one, and the `404` it answers with is the only warning there is — driven
-    through the real client rather than a raised `McpError`, because the thing worth
-    pinning is that the SDK still turns that `404` into what `_session_is_gone` reads."""
+    """Two real servers on one port. The session the client holds means nothing to the second, and the
+    `404` is the only warning there is — driven through the real client, because the SDK's reading is the point."""
     port = _free_port()
     async with _serving(_stand_in_server(port).streamable_http_app(), port):
         client = ToolServer(settings_for(f"http://127.0.0.1:{port}"))
@@ -405,15 +379,11 @@ async def test_a_call_survives_the_server_restarting_under_it() -> None:
 
 
 async def test_a_write_refused_as_an_unknown_session_is_retried_rather_than_left_unknown() -> None:
-    """The one this was written for. `trading-mcp` was redeployed on 17 August 2026 and
-    the first order after it died against a session that no longer existed — which this
-    module used to answer with `UNKNOWN` and a note sending the operator to check an
-    account nothing had been sent to.
+    """The one this was written for: a redeploy on 17 August 2026 left the first order after it dying
+    against a session that no longer existed, answered as `UNKNOWN` over an account nothing reached.
 
-    The retry is safe for a write for the same reason it is safe for a read: the gate
-    that produced the refusal had not yet read which tool was asked for, so its answer
-    proves the call was not handled. Sorting by tool name here would leave an order
-    unplaced in the one case where sending it again is known to be safe."""
+    The retry is safe for a write for the read's reason: the gate that refused had not yet read which tool
+    was asked for, so its answer proves the call was not handled."""
     port = _free_port()
     trading_settings = settings_for(None, trading_mcp_url=f"http://127.0.0.1:{port}")
     async with _serving(_trading_stand_in(port).streamable_http_app(), port):
@@ -445,15 +415,8 @@ def test_describe_unwraps_nested_task_groups() -> None:
 
 
 async def test_one_session_serves_turns_that_are_separate_tasks(tool_server: ToolServer) -> None:
-    """The router runs every turn as its own `asyncio.create_task`, so the session is
-    opened inside one task and then used and closed from others.
-
-    Worth an explicit test rather than an assumption: the transport runs its halves in
-    an anyio task group, and a task group whose scope is exited by a different task than
-    entered it is a documented way to get `RuntimeError`. It holds here — this is the
-    test that says so, and the one that would fail if a future SDK version stopped
-    tolerating it.
-    """
+    """The router runs every turn as its own task, so the session is opened inside one task and then used
+    and closed from others. Worth an explicit test: a task group exited by a different task can raise."""
     first = await asyncio.create_task(tool_server.call("get_last_price", {"symbol": "US100"}))
     second = await asyncio.create_task(tool_server.call("list_tracked_pairs", {}))
 

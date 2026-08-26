@@ -37,8 +37,6 @@ def _now() -> datetime:
     return datetime(2026, 8, 16, tzinfo=UTC)
 
 
-# --- AgentDefinition ---
-
 
 def test_a_complete_agent_builds() -> None:
     agent = AgentDefinition.model_validate(_agent("analyst", tools=["get_candles"]))
@@ -57,8 +55,6 @@ def test_a_blank_tool_name_refuses() -> None:
         AgentDefinition.model_validate(_agent("analyst", tools=["  "]))
 
 
-# --- TeamEdge: the `from` alias ---
-
 
 def test_edge_accepts_the_wire_name_from() -> None:
     edge = TeamEdge.model_validate({"from": "analyst", "to": "trader"})
@@ -66,18 +62,13 @@ def test_edge_accepts_the_wire_name_from() -> None:
     assert edge.to == "trader"
 
 
-# --- CostLimits: the string a limit normalises to ---
-
 
 def test_a_limit_round_trips_as_a_normalised_string() -> None:
     assert CostLimits(run_limit="1.50").run_limit == "1.50"
 
 
-# --- TeamDefinition: the shape of the graph, which is the real logic here ---
-#
-# specs/teams-catalogue. Every refusal is one row rather than one function: they all take
-# the same two lines to write, and a table shows at a glance which shapes are rejected and
-# which are not — which is the thing a reader of this file came for.
+# Every refusal is one row rather than one function: they all take the same two lines, and a table shows at
+# a glance which shapes are rejected and which are not.
 
 
 @pytest.mark.parametrize(
@@ -163,8 +154,6 @@ def test_limits_default_when_omitted() -> None:
     assert definition.limits.daily_limit is None
 
 
-# --- CreateTeamIn ---
-
 
 def test_create_team_requires_a_name() -> None:
     with pytest.raises(ValidationError, match="blank"):
@@ -178,8 +167,6 @@ def test_create_team_collapses_whitespace_in_the_name() -> None:
     assert created.name == "Trend Desk"
 
 
-# --- Out models: the `from_row` steps that are more than a column rename ---
-#
 # A row whose fields land on the model one for one is Pydantic's own behaviour and was
 # tested here three times over; what is left is the decoding these models actually do.
 
@@ -315,10 +302,8 @@ def test_the_memory_read_says_how_much_it_did_not_hand_over() -> None:
 
 
 def test_the_entry_ceiling_is_the_same_number_in_the_module_and_on_disk() -> None:
-    """The length ceiling is stated twice on purpose — once here, once as a CHECK in
-    migration 0008, because it is the only one of the three whose breach would land on
-    disk. Two statements of one number are a drift waiting to happen, so this is the test
-    that notices."""
+    """The length ceiling is stated twice on purpose — once here, once as a CHECK in migration 0008. Two
+    statements of one number are a drift waiting to happen, so this is the test that notices."""
     migration = (
         Path(__file__).resolve().parents[2] / "migrations/teams/versions/0008_team_memories.py"
     )

@@ -1,24 +1,9 @@
-"""Two nodes and a loop between them: the model call, and the tools it asks for.
+"""Two nodes and a loop between them: the model call, and the tools it asks for. History is rebuilt from
+the database on every turn, and tool rounds live in the state for one turn only.
 
-History is rebuilt from the database on every turn — the graph itself carries no memory
-(add-agent-chat/design.md, "Własne tabele są prawdą, LangGraph nie trzyma transkryptu").
-Tool rounds live in the state for the length of one turn and are not replayed into the
-next (connect-agent-to-market-mcp/design.md, "Wynik narzędzia żyje jedną turę").
-
-Three failures are kept apart here, and conflating any two of them is the mistake this
-file exists to avoid:
-
-- the **tool** refused — market-mcp answered, and its answer names what to change. Back
-  to the model, which can act on it.
-- the tool **server** could not be reached — nothing was asked, so nothing is known
-  about the archive either way. Also back to the model, worded so it does not read as
-  missing data.
-- the server could not be reached **and the call could have landed** — only possible for
-  a tool that moves the account, and the one outcome the model must not retry on
-  (specs/agent-trading). Its row was written before the call went out.
-- the **provider** broke — nothing more will be generated. The turn ends with whatever
-  text arrived, marked incomplete.
-"""
+Four failures are kept apart, and conflating any two is the mistake this file exists to avoid: the tool
+refused, the server could not be reached, the server could not be reached *and the call could have
+landed* — the one the model must not retry on — and the provider broke mid-answer."""
 
 from __future__ import annotations
 
@@ -42,31 +27,21 @@ from .tools import ToolDescriptor, ToolOutcome, ToolOutcomeKind, ToolServer
 
 log = logging.getLogger(__name__)
 
-# A tool this module runs itself, already bound to whatever it needs beyond the model's
-# arguments (the session, the pool). The graph does not care which tools are local — it
-# looks a name up here first and falls through to the server — so the ceiling, the trace
-# and the three outcomes stay one mechanism for both kinds (specs/agent-tools, "Zestaw
-# narzędzi pochodzi z serwera, nie z tego modułu").
+# A tool this module runs itself, already bound to whatever it needs beyond the model's arguments. The
+# graph looks a name up here first and falls through to the server, so the trace stays one mechanism.
 LocalTool = Callable[[dict], Awaitable[ToolOutcome]]
 
 
 class StopSignal(Protocol):
-    """Whether the operator has asked for this turn to end. `asyncio.Event` satisfies it,
-    and the graph asks for nothing more than the question — who sets it, and how it
-    travelled from a route to here, is `routers/sessions.py`'s business."""
+    """Whether the operator has asked for this turn to end. `asyncio.Event` satisfies it; who sets it and
+    how it travelled from a route to here is `routers/sessions.py`'s business."""
 
     def is_set(self) -> bool: ...
 
 
 class AccountTrace(Protocol):
-    """The two halves of the trace a call that can move the account leaves behind: a row
-    before it is sent, and its outcome once one is known (specs/agent-trading, "Wywołanie
-    ruszające rachunek zostawia ślad przed wysłaniem").
-
-    A Protocol rather than the pool, because this file holds no connection and never has —
-    `turn.py` binds both halves to one. A call that is never settled keeps the `unknown`
-    it was begun with, which is the whole reason the row is written first.
-    """
+    """The two halves of the trace a call that can move the account leaves: a row before it is sent, and
+    its outcome once one is known. A call never settled keeps the `unknown` it was begun with."""
 
     async def begin(
         self, *, round_index: int, position: int, name: str, arguments: dict
@@ -76,16 +51,8 @@ class AccountTrace(Protocol):
         self, *, row_id: int, outcome: str, text: str, duration_ms: int
     ) -> None: ...
 
-# A number in the code, not a setting — the same choice market-mcp made for its own
-# ceilings, and for the same reason: a safety ceiling in configuration is an invitation
-# to raise it at the moment it is inconvenient. Eight, because a real analytical turn is
-# coverage, candles, indicators and levels — four or five calls — and eight leaves room
-# while still bounding a runaway loop to a known multiple of one turn's cost.
-#
-# Raising it past about ten needs a second edit, in a place nothing points at from here:
-# a turn of N rounds costs 2N+1 supersteps and LangGraph's default `recursion_limit` is
-# 25, so the graph would stop with its own error before this ceiling ever spoke. At
-# eight that is 17, with room to spare.
+# A number in the code, not a setting: a safety ceiling in configuration is an invitation to raise it at
+# the moment it is inconvenient. Past about ten a second edit is needed — LangGraph's own recursion limit.
 TOOL_CALL_CEILING = 8
 
 
@@ -98,13 +65,8 @@ class ConversationState(TypedDict):
     # Called with each fragment of text as it arrives. Not persisted or checkpointed —
     # there is none (design.md) — so a plain closure is safe to carry in state.
     on_delta: Callable[[str], Awaitable[None]]
-    # The same idea for a tool call, called once the call has resolved. A round of tools
-    # produces no text, so without this the caller sees nothing between the model's last
-    # fragment and its next one — and cannot tell a turn reading the archive from a turn
-    # that hung (specs/agent-chat, "Wywołanie narzędzia dociera w trakcie tury").
-    # Takes the call and its position within its round: `store.record_tool_calls` derives
-    # the same number from its own loop, and the two must agree or the panel and the
-    # reloaded transcript order a round differently.
+    # The same idea for a tool call, called once it has resolved: a round of tools produces no text, and
+    # without this the caller cannot tell a turn reading the archive from a turn that hung.
     on_tool_call: Callable[[RecordedCall, int], Awaitable[None]]
     tools: list[ToolDescriptor]
     rounds: list[ToolRound]
@@ -116,9 +78,8 @@ class ConversationState(TypedDict):
     tool_calls_made: int
     text: str
     failed: bool
-    # Asked between one fragment and the next, and once more before a round of tools
-    # turns into another model call. Never inside `run_tools`: a call that has been sent
-    # is finished and recorded whatever the operator has asked for (design.md, D3).
+    # Asked between one fragment and the next, and once more before a round of tools turns into another
+    # model call. Never inside `run_tools`: a call that has been sent is finished and recorded.
     stop: StopSignal | None
     stopped: bool
 
@@ -135,19 +96,16 @@ def build_graph(
         return signal is not None and signal.is_set()
 
     async def call_model(state: ConversationState) -> dict:
-        # The round after a round of tools: the calls resolved and were recorded, and
-        # this is where the turn ends rather than asking the model what to do with them
-        # (specs/agent-chat, "Zatrzymanie zastaje trwające wywołanie narzędzia").
+        # The round after a round of tools: the calls resolved and were recorded, and this is where the
+        # turn ends rather than asking the model what to do with them.
         if stop_requested(state):
             return {"pending": [], "stopped": True}
 
         parts: list[str] = []
         requests: list[ToolCallRequest] = []
         usage: UsageReport | None = None
-        # Past the ceiling the model is called with no tools at all, rather than with
-        # tools it is told not to use. A model holding a tool it may not call is being
-        # asked to obey a rule; a model holding none is simply answering
-        # (specs/agent-tools, "Tura ma sufit wywołań narzędzi").
+        # Past the ceiling the model is called with no tools at all, rather than with tools it is told
+        # not to use. A model holding none is simply answering.
         offered = state["tools"] if state["tool_calls_made"] < TOOL_CALL_CEILING else []
         try:
             async for chunk in provider.stream(
@@ -165,11 +123,8 @@ def build_graph(
                 else:
                     usage = chunk
                 if stop_requested(state):
-                    # Leaving the loop closes the provider's stream through the generator's
-                    # own context. What arrived is kept — the operator stopped the answer,
-                    # they did not ask for it to be thrown away — and the requests the
-                    # model had asked for are dropped rather than sent: a tool call that
-                    # never left is not the "already sent" the boundary protects.
+                    # Leaving the loop closes the provider's stream. What arrived is kept, and the
+                    # requests the model asked for are dropped rather than sent: they never left.
                     return {
                         "text": state["text"] + "".join(parts),
                         "usages": [*state["usages"], usage],
@@ -178,14 +133,8 @@ def build_graph(
                         "stopped": True,
                     }
         except Exception:
-            # Caught here, not by the caller: whatever text arrived before the
-            # provider broke must still be returned, not lost along with the
-            # exception (specs/agent-chat, "Model przerywa w połowie").
-            #
-            # Logged with the traceback before it is turned into a flag. Without this
-            # line the operator sees "incomplete — broke off" in the panel and there is
-            # no record anywhere of what broke: the exception dies here, and `turn.py`'s
-            # own backstop never runs because nothing propagates. Measured the hard way.
+            # Caught here, not by the caller: whatever text arrived before the provider broke must still
+            # be returned. Logged with the traceback first, or the panel says "incomplete" with no record.
             log.exception(
                 "the model call failed after %d tool call(s), %d tool(s) offered",
                 state["tool_calls_made"],
@@ -213,14 +162,8 @@ def build_graph(
         async def through_the_server(
             request: ToolCallRequest, position: int
         ) -> tuple[ToolOutcome, int | None]:
-            """One call to a tool server, with the trace it needs if it can move the
-            account. Returns the outcome and the row already written for it, if any.
-
-            The row comes first and the outcome second, so a process that dies between
-            them leaves the `unknown` behind rather than nothing. A trace that cannot be
-            written stops the call: an order nobody can prove was sent is worse than an
-            order that was never sent.
-            """
+            """One call to a tool server, with the trace it needs if it can move the account. The row comes
+            first, so a process that dies between them leaves the `unknown` behind rather than nothing."""
             assert tool_server is not None
             if account_trace is None or not tool_server.moves_the_account(request.name):
                 return (
@@ -262,10 +205,8 @@ def build_graph(
 
         for request in state["pending"]:
             if made >= TOOL_CALL_CEILING:
-                # Not executed, so neither recorded nor announced — nothing was asked of
-                # the server, and an event here would put a call in the operator's panel
-                # that never happened. The model still gets a result for its request,
-                # because a request left unanswered is a turn that never ends.
+                # Not executed, so neither recorded nor announced — an event here would put a call in the
+                # operator's panel that never happened. The model still gets a result, or the turn never ends.
                 results.append(
                     ToolCallResult(
                         id=request.id,
@@ -285,10 +226,8 @@ def build_graph(
                 try:
                     outcome = await local(request.arguments)
                 except Exception as err:  # noqa: BLE001 - a broken local tool is not a broken turn
-                    # Mirrors `ToolServer.call`'s own guard: this module's own tool can fail
-                    # (a database gone away, a malformed row) exactly as a remote one can,
-                    # and without this the exception reaches `turn.py`'s backstop, which
-                    # discards the whole turn's text rather than reporting one failed call.
+                    # Mirrors `ToolServer.call`'s own guard: a local tool can fail exactly as a remote one
+                    # can, and without this the exception reaches a backstop that discards the whole turn.
                     log.warning("local tool %s failed: %s", request.name, err)
                     outcome = ToolOutcome(
                         ToolOutcomeKind.UNAVAILABLE,
@@ -316,10 +255,8 @@ def build_graph(
                 row_id=row_id,
             )
             recorded.append(call)
-            # Announced before the loop moves on, so a round of three calls reaches the
-            # caller as three events in the order they resolved — not as three at once
-            # when the round ends. `recorded` holds this round alone, so its length is
-            # the position the store will write for the same call.
+            # Announced before the loop moves on, so a round of three calls reaches the caller as three
+            # events in the order they resolved. `recorded` holds this round alone.
             await state["on_tool_call"](call, len(recorded) - 1)
 
         return {

@@ -1,9 +1,5 @@
-"""The chart-command log: one row per accepted command, a sequence the terminal can hold
-onto, and one folded answer for whatever it missed.
-
-specs/agent-chart-control, "Ustawienie jest zapisane i ponumerowane" and "Konsument czyta
-tylko to, czego jeszcze nie zastosował".
-"""
+"""The chart-command log: one row per accepted command, a sequence the terminal can hold onto, and one
+folded answer for whatever it missed."""
 
 from __future__ import annotations
 
@@ -83,9 +79,8 @@ async def test_nothing_newer_than_the_cursor_is_nothing(db) -> None:
 
 
 async def test_missed_commands_fold_into_one_answer(db) -> None:
-    # The reason the answer is folded rather than "the newest row": the first command is
-    # the only one that says anything about indicators, and a consumer that was away must
-    # not lose them by reading only the second.
+    # The reason the answer is folded rather than "the newest row": the first command is the only one that
+    # says anything about indicators, and a consumer that was away must not lose them.
     session = await _session(db)
     start = await store.record_chart_command(
         db,

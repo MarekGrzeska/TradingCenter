@@ -1,14 +1,8 @@
-"""The transcript on the wire, field by field.
+"""The transcript on the wire, field by field. The terminal holds hand-written DTOs against this contract —
+there is no generator to fail here — so a new field would reach it as an unannounced change.
 
-`modules/terminal/src/agent/agentApi.ts` holds hand-written DTOs against this contract —
-there is no generator to fail here — so a field appearing on `MessageOut` would otherwise
-reach the terminal as an unannounced change and be caught by nothing.
-
-The previous version of this file asserted that nothing about tools reached the
-transcript, and said in as many words that the change showing tool calls in the panel
-was the one to edit it. This is that edit: the transcript now carries them, and the
-assertion moves to what their shape is and to the two paths publishing the same one.
-"""
+The previous version asserted that nothing about tools reached the transcript, and said the change showing
+them was the one to edit it. This is that edit."""
 
 from __future__ import annotations
 

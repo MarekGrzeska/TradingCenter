@@ -1,26 +1,8 @@
-"""Adds `hidden` to `chart_drawings` — whether the object is drawn — and seeds `"v9"`:
-the same prompt, with the drawings paragraph saying that hiding is reversible and
-deleting is not.
+"""Adds `hidden` to `chart_drawings` and seeds `"v9"`. Every drawing standing today comes out of this
+migration lit, and a hidden drawing is still the same drawing — same id, moment, prices and colour.
 
-`hidden boolean not null default false` means every drawing standing today comes out of
-this migration exactly as it went in: lit. A hidden drawing is still a drawing — same id,
-same moment it was made, same prices, caption and colour — which is the whole difference
-from the one operation this table had until now (specs/agent-chart-drawings, "Zapalony
-rysunek jest tym samym rysunkiem").
-
-It is a column on the row rather than a `hidden_drawings` table beside it: a join to
-carry one bit, plus a second thing to tidy up when a drawing is removed
-(design.md, "Widoczność to kolumna na rysunku"). No index — the read is already "every
-row for this symbol", and filtering happens where it is drawn, not here.
-
-The ceiling on drawings per instrument keeps counting hidden ones, so nothing in this
-migration touches `count_drawings`: a ceiling that can be walked around by hiding is not
-a ceiling.
-
-`downgrade` drops the column, so what was hidden comes back lit. That is a loss of the
-visibility state, not of drawings.
-
-The prompt paragraph is repeated whole rather than patched, for the reason `0005` gives.
+A column on the row rather than a table beside it, and no index: the read is already "every row for this
+symbol". The ceiling keeps counting hidden ones, or it is not a ceiling. `downgrade` brings them back lit.
 
 Revision ID: 0009
 Revises: 0008

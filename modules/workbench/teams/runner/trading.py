@@ -1,23 +1,9 @@
-"""The trading ceilings, and the one place a run is stopped for orders rather than for
-money or for work.
+"""The trading ceilings, and the one place a run is stopped for orders rather than for money or for work —
+a deliberate twin of `cost.py`, with the same two moments and the same reasoning.
 
-A deliberate twin of `cost.py`, with the same two moments and the same reasoning: the
-**per-run** count is checked before every write call, because that is the last moment at
-which not placing an order is still possible; the **daily** count is checked before a run
-starts (`routers/runs.py`), because a run refused halfway is a run that already traded.
-
-**Where this twin diverges, and it is the point of `teams-trading`:** every limit here is
-optional and an absent one means no limit at all. There is no default, and there is no
-number in this file an operator cannot raise — a team let loose on the whole account is an
-experiment they are entitled to run, and refusing to run it would be this module making
-that decision for them (specs/teams-trading, "Każda granica handlowa daje się wyłączyć, a
-moduł żadnej nie narzuca").
-
-What is *not* theirs to move lives in `trading-mcp`, which refuses to start against
-anything but the demo account. That is the split worth keeping in mind before adding any
-ceiling to this module: **a number the operator cannot change belongs over there, not
-here.**
-"""
+Where the twin diverges is the point: every limit here is optional and an absent one means no limit at all.
+What is not the operator's to move lives in `trading-mcp`, which refuses anything but the demo account —
+which is the split worth keeping in mind: a number the operator cannot change belongs over there."""
 
 from __future__ import annotations
 
@@ -65,17 +51,11 @@ class OrderTooLarge(TradeLimitReached):
 
 
 class TradeGuard:
-    """How many orders this run has placed, and whether it may place another.
+    """How many orders this run has placed, and whether it may place another. Counted in memory for
+    `CostGuard`'s reason: a guard reading a count mid-write acts on a number already stale.
 
-    Counted in memory rather than re-read before every call, and for the same reason
-    `CostGuard` gives: rows land as calls resolve, several agents write at once, and a
-    guard reading a count mid-write would let a call through against a number already
-    stale. The run is one process (`engine.py`), so the accumulator is the count.
-
-    An order is counted when it is **sent**, not when it comes back. An order whose reply
-    never arrived may well have reached the account, and a ceiling that forgave it would
-    be one an outage could walk through.
-    """
+    An order is counted when it is *sent*, not when it comes back: one whose reply never arrived may well
+    have reached the account, and a ceiling that forgave it is one an outage could walk through."""
 
     def __init__(self, limits: TradingLimits) -> None:
         self._per_run = limits.orders_per_run
@@ -91,19 +71,9 @@ class TradeGuard:
         self._placed += 1
 
     def check(self, arguments: dict[str, Any]) -> None:
-        """Raises before a write call is made, or returns.
-
-        Two different refusals on purpose, and the difference is whether the agent can do
-        anything about it (specs/teams-trading, "Granica jest sprawdzana przed wywołaniem
-        narzędzia zapisującego"):
-
-        - `RunOrderLimitReached` stops the run. Nothing the model does next changes the
-          count, so letting it keep working would burn tokens on a team that can no
-          longer act;
-        - `OrderTooLarge` comes back to the model as a refused call and the run goes on.
-          A size is something an agent can correct, and refusing the call says exactly
-          what to correct it to.
-        """
+        """Raises before a write call is made, or returns. Two different refusals, and the difference is
+        whether the agent can do anything about it: an exhausted count stops the run, while a size too
+        large comes back as a refused call saying exactly what to correct it to."""
         if self._per_run is not None and self._placed >= self._per_run:
             raise RunOrderLimitReached(self._placed, self._per_run)
 
@@ -115,10 +85,8 @@ class TradeGuard:
 
 
 def _decimal_or_none(value: Any) -> Decimal | None:
-    """Whatever the model or the definition put there, as a number — or `None` when it is
-    not one. A `size` this cannot read is not treated as zero and not treated as
-    enormous: the size limit simply has nothing to compare, and the call goes to
-    `trading-mcp`, which is the module that owns what a valid argument looks like."""
+    """Whatever the model or the definition put there, as a number — or `None` when it is not one. A `size`
+    this cannot read is neither zero nor enormous: the limit has nothing to compare, and the call goes on."""
     if value is None:
         return None
     try:

@@ -1,9 +1,5 @@
-"""A team's memory over HTTP — what the operator sees and what they may remove.
-
-Through `TestClient` and the real lifespan, like the catalogue's own route tests: these
-routes read the pool the lifespan puts on `app.state`, so a test assembling its own app
-would be testing a second arrangement rather than the deployed one.
-"""
+"""A team's memory over HTTP — what the operator sees and what they may remove. Through `TestClient` and
+the real lifespan, like the catalogue's own route tests."""
 
 from __future__ import annotations
 
@@ -184,9 +180,8 @@ async def test_there_is_no_route_that_writes_a_memory_entry(client: TestClient) 
 def test_a_revision_may_assign_a_tool_this_process_serves_itself(
     client: TestClient,
 ) -> None:
-    """specs/teams-tool-access, "Zapis rewizji z narzędziem z procesu". No MCP server is
-    configured in this suite, so the save is confirmed by the only source that answered —
-    and the revision carries the bare name, never a description or a parameter shape."""
+    """No MCP server is configured in this suite, so the save is confirmed by the only source that
+    answered — and the revision carries the bare name, never a description or a parameter shape."""
     definition = {
         "agents": [
             {

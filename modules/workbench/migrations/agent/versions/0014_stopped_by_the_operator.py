@@ -1,19 +1,9 @@
-"""Adds `stopped` to `messages` — whether this reply ended because the operator said so.
+"""Adds `stopped` to `messages` — whether this reply ended because the operator said so. `incomplete`
+cannot say *who* cut it, and a model that broke is something to retry where an operator meant it.
 
-`incomplete` already says "this is not the whole answer", and that stays true for a reply
-the operator cut off. What it cannot say is *who* cut it, and the two readings lead
-somewhere different: a model that broke is something to retry, and an operator who
-stopped is something they meant (specs/agent-chat, "Zatrzymana odróżnia się od urwanej
-błędem").
-
-A column beside `incomplete` rather than one replacing both with an ending enum: the enum
-is tidier on a blank page, but it rewrites the meaning of every row already written and
-changes a contract the terminal already reads (design.md, D4). `not null default false`
-means every reply standing today comes out of this migration as what it was — not stopped.
-
-The check constraint is recreated rather than added beside: an operator's message carries
-neither flag, and that rule was already spelled once in `0001`. Two constraints saying
-half of it each would be two places to keep in step.
+A column beside `incomplete` rather than an ending enum replacing both: the enum is tidier on a blank page
+and rewrites the meaning of every row already written. The check constraint is recreated rather than
+added beside, or the one rule would be spelled in two places.
 
 Revision ID: 0014
 Revises: 0013

@@ -29,19 +29,12 @@ def _env(workbench_env: None, migrated_url: str, monkeypatch: pytest.MonkeyPatch
 
 
 def test_the_module_starts_with_no_tool_server_configured() -> None:
-    """specs/teams-tool-access, "Moduł startuje bez serwera narzędzi". `_ENV` sets no
-    MARKET_MCP_URL or TRADING_MCP_URL, so this is the state a fresh deployment is in
-    before the operator's `terraform apply` hands it either — a supported state, not a
-    broken one.
-
-    The catalogue routers arrive in a later change; what this asserts today is the part
-    that would break them: the lifespan finishes and the app serves.
-    """
+    """"Moduł startuje bez serwera narzędzi": no tool-server URL is set, so this is the state a fresh
+    deployment is in before the operator's apply — a supported state, not a broken one."""
     with TestClient(app) as client:
         assert client.get("/health").status_code == 200
-        # `remote()`, not `configured()`: the registry always holds the sources this
-        # process serves itself, and "no tool server" is a claim about the ones with an
-        # address.
+        # `remote()`, not `configured()`: the registry always holds the sources this process serves
+        # itself, and "no tool server" is a claim about the ones with an address.
         assert app.state.teams.tools.remote() == []
 
 

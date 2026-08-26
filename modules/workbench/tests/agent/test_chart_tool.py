@@ -1,9 +1,5 @@
-"""The module's own tool: what it accepts, what it refuses, and what it leaves behind.
-
-specs/agent-chart-control, "Narzędzie ustawia zawartość aktywnego slotu" and "Odmowa
-narzędzia nazywa, co poprawić". The market-mcp stand-in answers with the same JSON the
-real server's typed tools serialize, which is what `chart.py` parses.
-"""
+"""The module's own tool: what it accepts, what it refuses, and what it leaves behind. The market-mcp
+stand-in answers with the same JSON the real server's typed tools serialize."""
 
 from __future__ import annotations
 

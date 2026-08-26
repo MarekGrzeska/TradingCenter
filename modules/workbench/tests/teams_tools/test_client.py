@@ -1,13 +1,8 @@
-"""The seam to the teams routes — three outcomes, one retry rule, and one identity.
+"""The seam to the teams routes — three outcomes, one retry rule, and one identity. Everything is
+intercepted above the transport, so what is checked is what the client sends and makes of what comes back.
 
-Everything here is intercepted above the transport (see `conftest.py`), so what is being
-checked is what the client sends and what it makes of what comes back — not that the routes
-behave, which is their own suite's job.
-
-Two tests went with the network: a read and a write timing out. There is no timeout to
-exceed when the call is a function call on the same event loop, and a test that arranges
-`httpx.ReadTimeout` by hand would be checking that httpx can raise.
-"""
+Two tests went with the network: there is no timeout to exceed when the call is a function call on the same
+event loop, and arranging one by hand would be checking that httpx can raise."""
 
 from __future__ import annotations
 

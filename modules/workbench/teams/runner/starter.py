@@ -1,14 +1,8 @@
-"""Starting a run on an already-resolved revision — the sequence `POST
-/teams/{id}/runs` and the schedule/trigger clock both need once a revision has been
-picked, factored out here so a schedule firing at 3am takes exactly the same checks a
-click at the terminal does (design.md, "Uruchomienie przebiegu tą samą drogą co
-router").
+"""Starting a run on an already-resolved revision — the sequence both the route and the clock need once a
+revision has been picked, factored out so a schedule firing at 3am takes exactly the same checks.
 
-Deliberately not the one to resolve *which* revision runs: a route asks for a team's
-current latest, a pinned schedule asks for one from months ago, and a schedule tracking
-"latest" asks the same question the route does but at 3am instead of on a click. Mixing
-that choice in here would make this the second place it gets made.
-"""
+Deliberately not the one to resolve *which* revision runs: mixing that choice in here would make this the
+second place it gets made."""
 
 from __future__ import annotations
 
@@ -38,25 +32,15 @@ async def start_run_on_revision(
     settings: Any,
     registry: RunRegistry,
 ) -> tuple[asyncpg.Record, asyncio.Task]:
-    """Checks, creates the run and its steps, and starts the background task — the run
-    row and that task, so a caller that cares when the run finishes (the clock does; the
-    route does not) can await it.
-
-    Raises `validation.DefinitionRefused`, `runner.cost.DailyCostLimitReached` or
-    `runner.trading.DailyOrderLimitReached` instead of starting anything — each carries a
-    message a caller can show or record as-is.
-    """
+    """Checks, creates the run and its steps, and starts the background task — the run row and that task,
+    so a caller that cares when the run finishes can await it. Raises instead of starting anything."""
     definition = TeamRevisionOut.from_row(dict(revision)).definition
-    # The saved revision, checked again now — a model dropped from the configuration
-    # since it was saved is exactly what this is for (specs/teams-models). The tool half
-    # of the same question is asked by the engine, which needs a session to ask it with.
+    # The saved revision, checked again now — a model dropped from the configuration since it was saved is
+    # exactly what this is for. The tool half is asked by the engine, which has a session to ask with.
     check_runnable(definition, model_ids=catalogue.ids())
 
-    # The daily ceiling, before anything is created — a run refused halfway is a run
-    # that already spent (specs/teams-usage, "Zespół wyczerpał granicę dobową"). Checked
-    # against what the team spent since midnight UTC: the module keeps one clock, and a
-    # limit that moved with the operator's own timezone would be a different limit in
-    # summer — the same reason specs/teams-schedules keeps the clock in UTC too.
+    # The daily ceiling, before anything is created: a run refused halfway already spent. Counted since
+    # midnight UTC, because a limit moving with the operator's timezone is a different limit in summer.
     daily_limit = limit_from(definition.limits.daily_limit)
     daily_orders = definition.trading.orders_per_day
     if daily_limit is not None or daily_orders is not None:
@@ -72,11 +56,8 @@ async def start_run_on_revision(
                 if spent >= daily_limit:
                     raise DailyCostLimitReached(spent, daily_limit)
             if daily_orders is not None:
-                # The same midnight as the cost ceiling, and checked in the same place for
-                # the same reason a schedule firing at 3am takes the route's own checks: a
-                # ceiling the clock does not read is a ceiling that holds only while the
-                # operator is watching (specs/teams-trading, "Granica dobowa jest
-                # sprawdzana przed utworzeniem przebiegu").
+                # The same midnight as the cost ceiling, checked in the same place for the same reason: a
+                # ceiling the clock does not read is one that holds only while the operator is watching.
                 placed = await store.team_trades_since(
                     conn,
                     team_id=revision["team_id"],
@@ -98,13 +79,8 @@ async def start_run_on_revision(
         execute_run(
             pool,
             run_id=run["id"],
-            # The team and the operator, carried from here rather than looked up again:
-            # anything a run leaves behind for the *next* run is anchored to the team, and
-            # a definition alone cannot say which team it is standing under
-            # (specs/teams-runs, "Przebieg niesie zespół i właściciela, a nie samą rewizję").
-            # This is also the one path a schedule takes, so the owner is the schedule's
-            # owner rather than the process — the same principal the cost ceiling above
-            # was counted against.
+            # The team and the operator, carried from here rather than looked up again: anything a run
+            # leaves for the next one is anchored to the team, and this is also the path a schedule takes.
             team_id=revision["team_id"],
             owner_principal=owner_principal,
             definition=definition,

@@ -1,11 +1,6 @@
-"""`GET /tools` — the three answers, and why the last two are not the same one.
-
-The route exists so the terminal's picker can be built from what the server announces and
-from nothing else (`terminal-teams`). What it has to get right is the difference between
-a module that announces nothing and a module that could not ask: the first is a working
-configuration, the second is an outage, and a terminal told `[]` for both would show the
-operator an empty picker while the tools are sitting there.
-"""
+"""`GET /tools` — the three answers, and why the last two are not the same one. What it has to get right is
+the difference between a module that announces nothing and a module that could not ask: a terminal told
+`[]` for both would show an empty picker while the tools are sitting there."""
 
 from __future__ import annotations
 
@@ -33,9 +28,8 @@ _ENV = {
 
 @pytest.fixture
 def _env(workbench_env: None, db: asyncpg.Connection, migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    # Neither MARKET_MCP_URL nor TRADING_MCP_URL here on purpose — `conftest`'s
-    # `_no_developer_env` is what keeps both unset, on a machine with an `.env` as much
-    # as in CI (see the note there).
+    # Neither URL here on purpose — `conftest`'s `_no_developer_env` is what keeps both unset, on a machine
+    # with an `.env` as much as in CI.
     for key, value in _ENV.items():
         monkeypatch.setenv(key, value)
 
@@ -82,10 +76,8 @@ def test_tools_from_both_servers_are_published_with_write_marked(
 def test_no_tool_server_configured_still_announces_what_this_process_serves(
     _env: None,
 ) -> None:
-    # specs/teams-tool-access, "Moduł startuje bez skonfigurowanego serwera narzędzi" — a
-    # working configuration, and no longer an empty catalogue: the picker can still offer
-    # the tools this process serves itself, which is the whole point of their not being on
-    # a network.
+    # A working configuration, and no longer an empty catalogue: the picker can still offer the tools this
+    # process serves itself, which is the whole point of their not being on a network.
     with TestClient(app) as client:
         response = client.get("/tools")
 
@@ -117,13 +109,8 @@ def test_a_configured_server_that_cannot_be_asked_is_an_outage_not_an_empty_list
 def test_the_route_does_not_need_the_run_session_and_leaves_it_alone(
     announcing: TestClient,
 ) -> None:
-    """Two reads in a row, each through sessions of their own
-    (`announced_tools_by_server`).
-
-    The one thing this asserts is that the second answers at all: a session opened inside
-    a request's task and left open corrupts anyio's scope stack, and the failure shows up
-    on the way out of some later request rather than here (`tools/client.py`).
-    """
+    """Two reads in a row, each through sessions of their own. The one thing this asserts is that the second
+    answers at all: a session left open in a request's task corrupts anyio's scope stack far from here."""
     assert announcing.get("/tools").status_code == 200
     assert announcing.get("/tools").status_code == 200
     # The long-lived registry's own sessions were never opened by either read.

@@ -1,13 +1,8 @@
-"""The teams routes, and the assembly of what they read.
+"""The teams routes, and the assembly of what they read. Split out of this package's own `app.py` when the
+two modules became one process — `agent/surface.py` is its twin, and neither imports the other.
 
-Split out of what used to be this package's own `app.py` when the two modules became one
-process — see `agent/surface.py`, its twin, for the shape and for why neither imports the
-other.
-
-**Two paths moved and the rest did not.** `GET /models` and `GET /usage` existed on both
-surfaces with different answers, so this one's are published under `/teams/`. Every other
-route is exactly where it was.
-"""
+Two paths moved and the rest did not: `GET /models` and `GET /usage` existed on both surfaces with
+different answers, so this one's are published under `/teams/`."""
 
 from __future__ import annotations
 
@@ -34,28 +29,17 @@ class State:
     catalogue: ModelCatalogue
     provider: OpenAIProvider
     tools: Any
-    # The runs this process is working on, and who is watching each. In memory on purpose:
-    # the plan runs exactly one worker (`infra/app-service.tf`), and the start-up sweep in
-    # `workbench/app.py` is what covers the case this cannot — a process that died with
-    # runs in it.
+    # The runs this process is working on, and who is watching each. In memory on purpose: the plan runs
+    # exactly one worker, and the start-up sweep is what covers what this cannot.
     runs: RunRegistry
     clock: Any = None
-    # No `announced_tools` beside `tools`, and that is the point of the session: what the
-    # tool server publishes is asked of it at the moment a definition is saved
-    # (`routers/catalogue._check`), never copied onto app state at start-up. A list kept
-    # here would be a second copy of somebody else's catalogue, stale from the first tool
-    # that server adds (specs/teams-tool-access).
+# No `announced_tools` beside `tools`, and that is the point of the session: what the tool server publishes
+# is asked of it when a definition is saved, never copied onto app state, where it would be stale.
 
 
 def include(app: FastAPI) -> None:
-    """Every route this surface publishes.
-
-    **Order is load-bearing on the first two lines.** `/teams/models` and `/teams/usage`
-    are literals that also match `/teams/{team_id}` in the catalogue router: Starlette
-    matches a path segment as `[^/]+` before FastAPI tries to read it as an `int`, so the
-    literal only wins by being registered first. `tests/test_route_collisions.py` is what
-    keeps these two lines above the third one.
-    """
+    """Every route this surface publishes. Order is load-bearing on the first two lines: `/teams/models` and
+    `/teams/usage` also match `/teams/{team_id}`, and the literal only wins by being registered first."""
     app.include_router(models.router, prefix="/teams")
     app.include_router(usage.router, prefix="/teams")
     app.include_router(catalogue.router)

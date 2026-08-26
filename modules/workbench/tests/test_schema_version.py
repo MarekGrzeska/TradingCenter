@@ -1,14 +1,8 @@
-"""The one thing about `schema_version` that is this module's rather than the library's.
+"""The one thing about `schema_version` that is this module's rather than the library's. Both surfaces used
+to carry a near-identical copy of the library's own unit tests; those live with the code they test.
 
-Both surfaces used to carry a near-identical copy of `tc_runtime.schema_version`'s own unit
-tests — a `FakeConnection` yielding a revision list, and five assertions about `verify`
-against it. Those live with the code they test, in `packages/tc-runtime/tests/`, and the
-copies here proved nothing about this module that the library's own suite did not.
-
-What is left is the pairing no library can check for us: this image's `migrations/` against
-a database they were actually run on, once per schema this process owns — and that the two
-schemas take different advisory locks.
-"""
+What is left is the pairing no library can check: this image's migrations against a database they were run
+on, once per schema — and that the two schemas take different advisory locks."""
 
 from __future__ import annotations
 
@@ -52,14 +46,8 @@ async def test_the_migrated_database_the_tests_run_against_passes(
 
 
 def test_the_two_schemas_do_not_share_an_advisory_lock() -> None:
-    """The key stopped being a constant in the file that takes the lock and became an
-    argument each surface supplies (`agent/runtime.py`, `teams/runtime.py`). That is the
-    whole risk of sharing `db.py`: one key silently equal to the other would put two
-    chains' migrations behind one lock, in databases neither can see, and the symptom would
-    be a start-up that hangs with no failing query to find it by.
-
-    `tests/agent/test_migrate.py` pins the conversation's own number; what is here is the
-    pair, which is what nothing else can see.
-    """
+    """The key stopped being a constant in the file that takes the lock and became an argument each surface
+    supplies. One key silently equal to the other would put two chains behind one lock, in databases neither
+    can see. The conversation's own number is pinned next door; what is here is the pair."""
     assert TEAMS_LOCK_KEY == 8050
     assert AGENT_LOCK_KEY != TEAMS_LOCK_KEY

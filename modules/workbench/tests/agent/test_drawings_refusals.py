@@ -1,16 +1,8 @@
-"""What `draw_on_chart` refuses before it reaches for anything.
+"""What `draw_on_chart` refuses before it reaches for anything. The whole argument object is parsed first,
+so every refusal below happens with no database and no tool server involved — a permutation that needed a
+PostgreSQL container to prove "21400 is not above 21600" was paying container time for arithmetic.
 
-`DrawOnChartTool.call` parses its whole argument object first — `_as_symbol`,
-`_as_additions`, `_as_ids`, then the three-list conflict check — and only afterwards asks
-the archive about the symbol or takes a connection out of the pool. Every refusal below
-therefore happens with no database and no tool server involved, which is why this file
-carries no `db` marker and hands the tool `None` for both: a permutation that needed a
-PostgreSQL container to prove "21400 is not above 21600" was paying container time for
-arithmetic.
-
-The behaviour that does reach the database — drawing, removing, hiding, the ceiling, the
-transaction around a call — is `test_drawings_tool.py`'s.
-"""
+The behaviour that does reach the database is `test_drawings_tool.py`'s."""
 
 from __future__ import annotations
 
@@ -48,9 +40,8 @@ def _tool() -> DrawOnChartTool:
                 ],
             },
             ["ends before it starts"],
-            # Not a `CHECK`, unlike every other shape rule: a zone's two moments are both
-            # optional, so the database has nothing to pin their order against. The
-            # terminal draws such a band as a rectangle of zero width.
+            # Not a `CHECK`, unlike every other shape rule: a zone's two moments are both optional, so the
+            # database has nothing to pin their order against.
             id="a zone that ends before it starts",
         ),
         pytest.param(
@@ -83,9 +74,8 @@ def _tool() -> DrawOnChartTool:
                 "add": [{"kind": "level", "price": 21500.0, "color": "--color-accent"}],
             },
             ["--color-accent", "--color-drawing-1"],
-            # A drawing is not an indicator, and wearing its colour is what made the two
-            # indistinguishable on one chart. The refusal names the palette so the model
-            # can correct it in the same turn.
+            # A drawing is not an indicator, and wearing its colour is what made the two indistinguishable
+            # on one chart. The refusal names the palette so the model can correct it in the same turn.
             id="an indicator colour is named along with the palette",
         ),
         pytest.param(
@@ -108,17 +98,14 @@ def _tool() -> DrawOnChartTool:
         pytest.param(
             {"symbol": "US100", "hide": [7], "show": [7]},
             ["#7", "`hide`", "`show`"],
-            # Two opposite orders about one drawing have no outcome the model could have
-            # predicted (specs/agent-chart-drawings, "Zgaszenie i zapalenie jednego
-            # rysunku naraz").
+            # Two opposite orders about one drawing have no outcome the model could have predicted.
             id="hiding and showing one id at once",
         ),
         pytest.param(
             {"symbol": "US100", "remove": [7], "hide": [7]},
             ["#7", "`remove`", "`hide`"],
-            # Without this the removal runs first and the hiding refuses as "no drawing
-            # with that id", sending the model after a wrong id rather than at its own
-            # two lists.
+            # Without this the removal runs first and the hiding refuses as "no drawing with that id",
+            # sending the model after a wrong id rather than at its own two lists.
             id="removing and hiding one id at once is refused by name",
         ),
     ],

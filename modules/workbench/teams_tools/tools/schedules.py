@@ -1,22 +1,9 @@
-"""Putting a team on a clock or on a market condition — and everything after that:
-pausing, editing and deleting what is already there.
+"""Putting a team on a clock or on a market condition — and everything after that: pausing, editing and
+deleting what is already there. The whole set, because the operator who sets a schedule with a sentence
+corrects it with a sentence too.
 
-The whole set, rather than creation alone, because the operator who sets a schedule with
-a sentence corrects it with a sentence too. A catalogue that can only be added to from
-here sends them to the terminal for every change and grows in one direction in the
-meantime (specs/teams-mcp-authorship, "Czynność dostępna w terminalu jest dostępna z
-czatu").
-
-Pausing and deleting are deliberately two tools rather than one with a flag. They differ
-in what cannot be undone: a paused schedule keeps its row and its history, a deleted one
-takes the history with it — and a model choosing between them should have to name which
-it means.
-
-`unattended_ack` used to be conspicuously absent here, and the tools said so. That
-acknowledgement no longer exists anywhere
-(`manage-schedules-and-drop-the-acknowledgement`): it was checked when a schedule was
-saved and never when one fired, so it stopped this route and not the one that mattered.
-"""
+Pausing and deleting are two tools rather than one with a flag: they differ in what cannot be undone, and a
+model choosing between them should have to name which it means."""
 
 from __future__ import annotations
 
@@ -29,10 +16,8 @@ from pydantic import BaseModel, Field
 from ..client import TeamsClient
 from ._shared import DESTRUCTIVE, READ_ONLY, WRITE, _call
 
-# Said on every schedule and trigger this module creates. It over-warns on purpose: the
-# clock's own setting is teams' and is not published on its wire, so this module cannot
-# tell a running clock from a stopped one. Warning always is wrong-but-safe; staying
-# quiet would be wrong-and-silent, which is the failure specs/teams-mcp-tools is about.
+# Said on every schedule and trigger this module creates. It over-warns on purpose: the clock's own setting
+# is teams' and is not on its wire, so this module cannot tell a running clock from a stopped one.
 _CLOCK_CAVEAT = (
     "Saved. Note that teams' clock can be switched off entirely (SCHEDULER_ENABLED), and "
     "it is off in production until the operator has watched one fire by hand — while it "
@@ -178,10 +163,8 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
             _call(teams, context, "GET", f"/teams/{team_id}/triggers"),
         )
 
-        # One history read per row, asked all at once rather than in a queue. Sequentially
-        # this is the only tool here whose cost grows with the catalogue: ten schedules
-        # would be twenty-one round trips one after another, each with its own ceiling,
-        # inside a single tool call the operator is waiting on.
+        # One history read per row, asked all at once rather than in a queue: sequentially this is the only
+        # tool here whose cost grows with the catalogue, inside a single call the operator is waiting on.
         histories = await asyncio.gather(
             *(_call(teams, context, "GET", f"/schedules/{row['id']}/fires") for row in schedules),
             *(_call(teams, context, "GET", f"/triggers/{row['id']}/fires") for row in triggers),
@@ -297,13 +280,8 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         editable here on purpose: a trigger watching a different number is a different
         trigger, and deserves to be created as one.
         """
-        # `is not None`, not `or`. Zero is falsy and every one of these is a number or a
-        # string the caller could reasonably send as zero or empty — `cooldown_seconds=0`
-        # most of all, which reads as "fire every time". Under `or` it kept the old value
-        # and answered with a success naming it, so the operator was told an impossible
-        # request had been carried out. teams refuses a non-positive cooldown with a
-        # sentence (`contract.py`, `_positive`); forwarding the value is what lets that
-        # refusal reach whoever asked.
+        # `is not None`, not `or`. Zero is falsy and `cooldown_seconds=0` reads as "fire every time"; under
+        # `or` it kept the old value and answered with a success naming it. Forwarding lets teams refuse.
         current = await _call(teams, context, "GET", f"/triggers/{trigger_id}")
         body = {
             "revision_mode": current["revision_mode"],

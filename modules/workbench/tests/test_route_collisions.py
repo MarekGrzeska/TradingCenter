@@ -1,16 +1,9 @@
-"""The three paths both surfaces published, and where they went.
+"""The three paths both surfaces published, and where they went. `/health` was identical and is one route;
+the two that answered different shapes moved under `/teams/`.
 
-`/health` was identical and is one route. `GET /models` and `GET /usage` answered different
-shapes, so the teams surface's moved under `/teams/` and the conversation's stayed.
-
-The second test is the one worth having, and it asserts behaviour rather than a list of
-routes. `/teams/models` also matches `/teams/{team_id}`: a path parameter compiles to a
-segment matcher that runs *before* FastAPI tries to read the segment as an `int`, so the
-literal wins only by being registered first — measured on FastAPI 0.141.1, where reversing
-the two lines answers `422 int_parsing` instead of the catalogue. That is two lines of
-`teams/surface.py` in the right order, which is exactly the kind of correctness that
-survives until somebody tidies the imports.
-"""
+The second test asserts behaviour rather than a list: a path parameter compiles to a segment matcher that
+runs before FastAPI reads it as an `int`, so the literal wins only by being registered first — measured on
+FastAPI 0.141.1, where reversing the two lines answers `422` instead of the catalogue."""
 
 from __future__ import annotations
 
@@ -34,16 +27,8 @@ class _Catalogue:
 
 @pytest.fixture
 def surfaces() -> TestClient:
-    """Both surfaces on one application, assembled the way `workbench/app.py` assembles
-    them — and with no lifespan, so this says nothing about a database.
-
-    State is stubbed rather than built: the routes under test here are the two that read a
-    catalogue, and what the rest of them read is other tests' subject.
-
-    `raise_server_exceptions=False` for exactly that reason — a route reached with nothing
-    behind it raises, and a raised exception is not the answer this file is asking about.
-    Turned into a 500, it says what these tests want to know: the request got past routing.
-    """
+    """Both surfaces on one application, assembled the way `workbench/app.py` assembles them — and with no
+    lifespan, so this says nothing about a database. State is stubbed rather than built."""
     app = FastAPI()
     agent.surface.include(app)
     teams.surface.include(app)

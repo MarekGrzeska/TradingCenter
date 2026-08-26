@@ -1,14 +1,8 @@
-"""`GET /usage` — what a run, or a team, cost, broken down so the cost can be attributed.
+"""`GET /usage` — what a run, or a team, cost, broken down so the cost can be attributed. The breakdown by
+agent is the one the spec asks for: a total tells nobody whether the expensive part was the four cheap
+gatherers or the one dear judge.
 
-The breakdown by **agent** is the one specs/teams-usage asks for: the module exists partly
-to measure how cost distributes between roles, and a total tells nobody whether the
-expensive part was the four cheap gatherers or the one dear judge. The breakdown by model
-rides along because a team deliberately mixes them.
-
-Nothing here computes a cost. Every number is a `SUM` over costs written when their calls
-happened — a rate changed since then moves nothing (specs/teams-usage, "Cennik zmienia się
-po przebiegu").
-"""
+Nothing here computes a cost: every number is a `SUM` over costs written when their calls happened."""
 
 from __future__ import annotations
 
@@ -38,13 +32,8 @@ async def get_usage(
     run_id: int | None = Query(None),
     team_id: int | None = Query(None),
 ) -> UsageSummaryOut:
-    """Both filters are optional and combine: no filter is everything this operator ever
-    spent, `run_id` is one run's own bill, `team_id` is one team across its revisions.
-
-    A run belonging to somebody else returns nothing rather than 404 — this is an
-    aggregate, and the difference between "no rows" and "not yours" is exactly what
-    specs/teams-browser-access says a stranger must not be able to tell.
-    """
+    """Both filters are optional and combine. A run belonging to somebody else returns nothing rather than
+    404 — this is an aggregate, and "no rows" versus "not yours" is exactly what a stranger must not tell."""
     async with request.app.state.teams.pool.acquire() as conn:
         by_agent = await store.usage_by_agent(
             conn, owner_principal=owner, run_id=run_id, team_id=team_id

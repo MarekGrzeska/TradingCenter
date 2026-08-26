@@ -1,12 +1,8 @@
-"""Runs one turn: calls the graph, forwards its deltas to a queue, and writes exactly
-one agent message plus one usage row — always, whether the call finished, failed, or
-whoever was listening to the queue went away first.
+"""Runs one turn: calls the graph, forwards its deltas to a queue, and writes exactly one agent message
+plus one usage row — always, whether the call finished, failed, or the listener went away first.
 
-The queue is `asyncio.Queue`, unbounded by default: `put_nowait` never blocks, so a
-turn this function drives never stalls on a consumer that stopped reading. That is the
-whole mechanism behind "a rozłączenie wołającego zamyka kolejkę, nie turę" — there is no
-cancellation to wire up, because nothing here depends on the queue being drained.
-"""
+The queue is unbounded, so `put_nowait` never blocks and a turn never stalls on a consumer that stopped
+reading. That is the whole mechanism behind a disconnect closing the queue rather than the turn."""
 
 from __future__ import annotations
 
@@ -46,9 +42,8 @@ class Fragment:
 
 @dataclass(frozen=True)
 class ToolCalled:
-    """One resolved tool call, on its way to whoever is listening to this turn. Carries
-    the same call the database row is built from — the panel and the transcript must not
-    be able to disagree about what was asked and what came back."""
+    """One resolved tool call, on its way to whoever is listening. Carries the same call the database row
+    is built from — the panel and the transcript must not disagree about what was asked."""
 
     call: RecordedCall
     position: int
@@ -66,34 +61,23 @@ class Failed:
 
 @dataclass(frozen=True)
 class Stopped:
-    """The operator ended this turn. A third ending rather than a flavour of either of the
-    two above: a turn that broke is something to try again, and a turn that was stopped is
-    not (specs/agent-chat, "Operator zatrzymuje turę w trakcie")."""
+    """The operator ended this turn. A third ending rather than a flavour of either of the two above: a
+    turn that broke is something to try again, and a turn that was stopped is not."""
 
 
 StreamEvent = Fragment | ToolCalled | Complete | Failed | Stopped
 
 
 class Queue(Protocol):
-    """The one method this module needs from `asyncio.Queue` — a `Protocol` so a test
-    can hand in something that also *doesn't* drain, without importing asyncio's type.
-
-    Positional-only (`/`): `asyncio.Queue.put_nowait`'s own parameter is named `item`,
-    not `event`, and a name mismatch on a keyword-usable parameter is a structural
-    mismatch to a type checker even though nothing here ever calls it by keyword.
-    """
+    """The one method this module needs from `asyncio.Queue` — a `Protocol` so a test can hand in something
+    that also doesn't drain. Positional-only, because the real parameter is named `item`, not `event`."""
 
     def put_nowait(self, event: StreamEvent, /) -> None: ...
 
 
 def _system_prompt(revision, *, has_tools: bool, chart: ChartSnapshot | None) -> str:
-    """The revision's own text, plus one line about what the caller is looking at.
-
-    Appended to the system prompt rather than pushed into the transcript: the transcript
-    is the conversation, and what was on screen when a question was asked is not part of
-    it (specs/agent-chat, "Tura wie, co terminal właśnie rysuje"). It also means the line
-    describes *this* turn only — the next one brings its own, or none.
-    """
+    """The revision's own text, plus one line about what the caller is looking at. Appended to the system
+    prompt rather than pushed into the transcript, so it describes this turn only."""
     body = prompt_text(revision, has_tools=has_tools)
     if chart is None:
         return body
@@ -101,13 +85,8 @@ def _system_prompt(revision, *, has_tools: bool, chart: ChartSnapshot | None) ->
 
 
 class _PoolAccountTrace:
-    """The two halves of a tool call's own row: written before the call goes out, settled
-    when its answer comes back (design.md, D1).
-
-    Its own connection per half, not one held for the turn: a turn spends most of its
-    time waiting on a model, and a pooled connection parked across that is a connection
-    nobody else can have. Both halves are short.
-    """
+    """The two halves of a tool call's own row: written before the call goes out, settled when its answer
+    comes back. Its own connection per half — a turn spends most of its time waiting on a model."""
 
     def __init__(self, pool: asyncpg.Pool, session_id: int) -> None:
         self._pool = pool
@@ -162,19 +141,14 @@ async def run_turn(
     async def on_tool_call(call: RecordedCall, position: int) -> None:
         queue.put_nowait(ToolCalled(call, position))
 
-    # Asked here rather than inside the graph so a turn's tool set is fixed before the
-    # first model call: a list that changed between rounds would leave the provider
-    # holding a call for a tool that had just gone away. An empty list is the whole
-    # answer to a tool server that is down (specs/agent-tool-access).
+    # Asked here rather than inside the graph, so a turn's tool set is fixed before the first model call:
+    # a list that changed between rounds would leave the provider holding a call for a tool that had gone.
     server_tools = (
         await tool_server.list_tools(operator_principal) if tool_server is not None else []
     )
 
-    # This module's own tools sit beside the server's and are announced even when the
-    # server is down — they do not need market-mcp to exist, only to check against, and
-    # they say so themselves when they cannot (specs/agent-tools, "Brak serwera
-    # narzędzi"). `list_chart_drawings` does not even need that much: it reads this
-    # module's own table and answers whatever the archive is doing.
+    # This module's own tools sit beside the server's and are announced even when the server is down —
+    # they need it to check against, not to exist, and they say so themselves when they cannot.
     chart_tool = ChartTool(pool, tool_server)
     draw_tool = DrawOnChartTool(pool, tool_server)
     list_drawings_tool = ListChartDrawingsTool(pool)
@@ -194,13 +168,8 @@ async def run_turn(
     try:
         result = await graph.ainvoke(
             initial_state(
-                # Which prompt this turn runs is a fact about the turn, not a change to
-                # the prompt: `revision` was current when this turn started, and the
-                # variant without tools is what an unreachable market-mcp degrades to
-                # (specs/agent-chat, "Agent bez narzędzi mówi, że ich nie ma"). Measured
-                # against `server_tools` rather than `tools`: the chart tool is always
-                # there, and letting it stand for "has tools" would hide the archive
-                # being down. Both prompt variants name it; only one promises the archive.
+                # Which prompt this turn runs is a fact about the turn, not a change to the prompt.
+                # Measured against `server_tools`: the chart tool is always there, and would hide the archive.
                 system_prompt=_system_prompt(revision, has_tools=bool(server_tools), chart=chart),
                 history=history,
                 model=model_entry.model,
@@ -216,9 +185,8 @@ async def run_turn(
         failed: bool = result["failed"]
         stopped: bool = result["stopped"]
     except Exception:
-        # A last-resort backstop, not the primary path: `graph.py`'s own node already
-        # catches a broken provider call so partial text survives it. Reaching here
-        # means the graph wiring itself failed, and nothing was ever generated.
+        # A last-resort backstop, not the primary path: the graph's own node already catches a broken
+        # provider call. Reaching here means the graph wiring itself failed.
         log.exception("the conversation graph failed for session %s", session_id)
         text, usages, calls, failed, stopped = "", [None], [], True, False
 
@@ -229,16 +197,13 @@ async def run_turn(
             content=text,
             model_id=model_entry.id,
             prompt_version=revision.version,
-            # A stopped reply is not the whole answer either — `incomplete` says that much
-            # and keeps saying it. `stopped` is the half `incomplete` cannot carry: who
-            # ended it (design.md, D4).
+            # A stopped reply is not the whole answer either — `incomplete` says that much. `stopped` is
+            # the half `incomplete` cannot carry: who ended it.
             incomplete=failed or stopped,
             stopped=stopped,
         )
-        # One row per model call, all pointing at this one reply. A turn that asked for
-        # a tool was billed at least twice, and the tool's own answer went into the
-        # prompt of the call after it (specs/agent-usage, "Tura z wywołaniem
-        # narzędzia").
+        # One row per model call, all pointing at this one reply. A turn that asked for a tool was billed
+        # at least twice, and the tool's answer went into the prompt of the call after it.
         for usage in usages:
             await store.record_usage(
                 conn,
@@ -252,9 +217,8 @@ async def run_turn(
                 input_rate_per_1m=model_entry.input_rate_per_1m,
                 output_rate_per_1m=model_entry.output_rate_per_1m,
             )
-        # Two halves, because a turn can now hold both kinds: the calls whose rows were
-        # written before they were sent are only joined to this reply, and everything else
-        # is inserted here as it always was (design.md, D1).
+        # Two halves, because a turn can hold both kinds: the calls whose rows were written before they
+        # were sent are only joined to this reply, and everything else is inserted here.
         await store.attach_tool_calls_to_message(
             conn,
             tool_call_ids=[call.row_id for call in calls if call.row_id is not None],

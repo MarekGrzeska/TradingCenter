@@ -1,9 +1,5 @@
-"""The catalogue over HTTP — the wire shapes, the refusals and who sees what.
-
-Through `TestClient` and the real lifespan, like `test_app.py`: the routes read the pool
-and the settings the lifespan puts on `app.state`, so a test that assembled its own app
-would be testing a second arrangement rather than the one deployed.
-"""
+"""The catalogue over HTTP — the wire shapes, the refusals and who sees what. Through `TestClient` and the
+real lifespan: a test that assembled its own app would be testing a second arrangement."""
 
 from __future__ import annotations
 
@@ -222,10 +218,8 @@ def test_a_model_outside_the_catalogue_is_refused_naming_the_agent(client: TestC
 
 
 def test_a_tool_no_server_announces_is_refused_naming_the_agent(client: TestClient) -> None:
-    # No tool server is configured in these tests, so there is no session to ask and
-    # `announced_tool_names` answers `None` — the module still serves the catalogue
-    # (specs/teams-tool-access, "Moduł startuje bez serwera narzędzi"), and refuses only
-    # the definition that would need one.
+    # No tool server is configured in these tests, so there is no session to ask. The module still serves
+    # the catalogue and refuses only the definition that would need one.
     body = {
         "name": "tooled",
         "description": "",
@@ -259,9 +253,8 @@ def test_the_refusal_writes_nothing(client: TestClient) -> None:
 
 
 def test_a_team_with_nothing_arranged_answers_with_an_empty_layout(client: TestClient) -> None:
-    # Never having been arranged is the ordinary state of a team, not a 404 — the canvas
-    # then places every agent from its dependencies (specs/terminal-teams, "Agent bez
-    # zapamiętanego miejsca").
+    # Never having been arranged is the ordinary state of a team, not a 404 — the canvas then places every
+    # agent from its dependencies.
     team_id = _create(client).json()["id"]
 
     response = client.get(f"/teams/{team_id}/layout", headers=OWNER)

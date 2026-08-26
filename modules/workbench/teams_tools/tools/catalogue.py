@@ -1,13 +1,6 @@
-"""The catalogue: what teams exist, what one looks like, how to make one, how to correct
-one.
-
-`create_team` and `revise_team` are the two tools this module exists for, and both are
-deliberately one call. `teams` needs a whole definition to save a revision — every agent,
-every edge, every limit — so a model correcting one role would otherwise have to read the
-definition, rebuild it in full and post it back, three turns in which to drop an agent by
-omission. `revise_team` does that read-modify-write on this side, from a patch naming only
-what changes (specs/teams-mcp-tools, "Poprawka nie wymaga odczytania całej definicji").
-"""
+"""The catalogue: what teams exist, what one looks like, how to make one, how to correct one. `create_team`
+and `revise_team` are both deliberately one call — a model correcting one role would otherwise read the
+definition, rebuild it in full and post it back, three turns in which to drop an agent by omission."""
 
 from __future__ import annotations
 
@@ -22,9 +15,8 @@ from ._shared import READ_ONLY, WRITE, _call
 
 
 class AgentIn(BaseModel):
-    """One role. `key` is what edges point at and what the trace records, so it is a
-    stable identifier rather than a label — renaming it in a revision makes a different
-    agent, not a renamed one."""
+    """One role. `key` is what edges point at and what the trace records, so it is a stable identifier
+    rather than a label — renaming it in a revision makes a different agent, not a renamed one."""
 
     key: str
     role: str
@@ -157,11 +149,8 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         }
         team = await _call(teams, context, "POST", "/teams", json=body)
 
-        # The team exists from here on, and that changes what a failure may say. Reading
-        # its revision back is a convenience — the id a schedule would pin — and if that
-        # read fails, answering with the failure would tell the model the team was not
-        # created. It would then create it again, which is the one mistake this module's
-        # no-retry rule exists to prevent, made by the tool instead of by the client.
+        # The team exists from here on, and that changes what a failure may say: answering with a failed
+        # read would tell the model the team was not created, and it would create it again.
         try:
             revision = await _call(teams, context, "GET", f"/teams/{team['id']}/revisions/latest")
         except ToolRefusal:

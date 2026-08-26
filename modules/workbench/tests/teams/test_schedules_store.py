@@ -1,7 +1,5 @@
-"""Schedules, triggers and the fires either one produces — `store/` against a real
-PostgreSQL, same reasoning as `test_store.py`: what is under test is the owner filter,
-exactly-once claiming, and the three-valued state a trigger's own condition carries.
-"""
+"""Schedules, triggers and the fires either one produces, against a real PostgreSQL: what is under test is
+the owner filter, exactly-once claiming, and the three-valued state a trigger's condition carries."""
 
 from __future__ import annotations
 
@@ -87,8 +85,6 @@ async def _trigger(
         next_check_at=next_check_at,
     )
 
-
-# --- schedules --------------------------------------------------------------------
 
 
 async def test_a_schedule_belongs_to_its_owner(db: asyncpg.Connection) -> None:
@@ -256,8 +252,6 @@ async def test_a_disabled_schedule_is_never_claimed_even_when_due(db: asyncpg.Co
     assert claimed is None
 
 
-# --- triggers -----------------------------------------------------------------------
-
 
 async def test_a_trigger_belongs_to_its_owner(db: asyncpg.Connection) -> None:
     trigger = await _trigger(db)
@@ -273,11 +267,8 @@ async def test_a_trigger_round_trips_its_condition(db: asyncpg.Connection) -> No
     assert trigger["field_path"] == "close"
     assert trigger["comparison"] == "gt"
     assert trigger["threshold"] == Decimal("1.10000000")
-    # asyncpg hands JSONB back as text unless a codec is registered, same as
-    # `team_revisions.definition` — contract.py is where this gets parsed back. Postgres
-    # canonicalizes jsonb key order (shorter keys first) rather than keeping insertion
-    # order, which happens to read the same here — `json.loads` below is what a real
-    # caller relies on, not this literal string.
+    # asyncpg hands JSONB back as text unless a codec is registered. Postgres canonicalizes key order rather
+    # than keeping insertion order; `json.loads` below is what a real caller relies on, not this literal.
     assert json.loads(trigger["arguments"]) == {"epic": "EURUSD", "resolution": "MINUTE_15"}
 
 
@@ -353,8 +344,6 @@ async def test_a_fire_stamps_last_fired_at_and_a_quiet_check_does_not(
     assert fired["last_result"] is True
     assert fired["last_fired_at"] is not None
 
-
-# --- fires ----------------------------------------------------------------------------
 
 
 async def test_a_fire_that_started_nothing_is_kept_with_its_reason(db: asyncpg.Connection) -> None:

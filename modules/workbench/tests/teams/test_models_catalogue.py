@@ -1,8 +1,5 @@
-"""The model catalogue — `models_catalogue.py` and what `GET /models` publishes.
-
-No database and no app here except where a route is the thing under test; the catalogue
-is built from settings and holds no state of its own.
-"""
+"""The model catalogue — `models_catalogue.py` and what `GET /models` publishes. No database and no app
+except where a route is the thing under test."""
 
 from __future__ import annotations
 

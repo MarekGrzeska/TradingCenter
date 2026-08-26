@@ -1,16 +1,7 @@
-"""One FastMCP instance, and no transport at all.
+"""One FastMCP instance, and no transport at all. `FastMCP` is kept because a transport was never what it
+was for here: it is the tool registry, the schema generator and the annotation carrier.
 
-`FastMCP` is kept even though nothing is served over a socket any more, and the reason is
-that a transport was never what it was for here: it is the tool registry, the schema
-generator and the annotation carrier. Registering with `@mcp.tool` is what turns a typed
-Python function into a description, an input schema and a `readOnlyHint` the model reads —
-and `slim_tool_schemas` is what keeps the whole of that under the ceiling this surface has
-a written one for.
-
-What went with the process: `streamable_http_app()`, `RequireCallerIdentity` (there is no
-caller across a network to identify), `/health` (`workbench/app.py` publishes the one this
-process has) and the host and port it used to bind.
-"""
+What went with the process: the HTTP app, the caller-identity check, `/health`, and the host and port."""
 
 from __future__ import annotations
 
@@ -39,28 +30,19 @@ def build_server(teams: TeamsClient) -> FastMCP:
 
     tools.register(mcp, teams)
 
-    # Every tool's schema, minus what pydantic writes for its own sake: field titles
-    # repeating field names, an `anyOf` of bare types where a type list says the same, and
-    # defaults on a reply nobody constructs. 22,6% of what this surface announces in every
-    # turn of a conversation, and not one field, type or `required` entry with it
-    # ("Powierzchnia narzędzi ma zapisany sufit").
+    # Every tool's schema, minus what pydantic writes for its own sake — 22,6% of what this surface
+    # announces in every turn of a conversation, and not one field or `required` entry with it.
     slim_tool_schemas(mcp)
 
     return mcp
 
 
 def say_whose_name_the_tools_act_in(operator_identity_optional: bool) -> None:
-    """Which of the two states this process came up in, said once, at startup.
+    """Which of the two states this process came up in, said once, at startup. The state where tools work
+    without an operator behind them MUST NOT be one an operator infers from an absence of refusals.
 
-    The state where tools work without an operator behind them MUST NOT be one an operator
-    infers from an absence of refusals ("Moduł mówi, w którym stanie wstał"). Said in a log
-    line rather than appended to every tool answer: a sentence in each result is paid for
-    in model tokens on every call, and it would make a local answer differ in content from
-    the deployed one — the one thing a local run exists to compare.
-
-    One condition rather than two: the second was whether the catalogue was reached at a
-    remote address, and there is no address now.
-    """
+    Said in a log line rather than appended to every answer: a sentence in each result is paid for in
+    tokens, and it would make a local answer differ in content from the deployed one."""
     if operator_identity_optional:
         log.info(
             "no authenticator stands in front of this process "

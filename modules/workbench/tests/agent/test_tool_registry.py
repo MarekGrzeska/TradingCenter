@@ -1,15 +1,8 @@
-"""Several sources of tools behind one door — specs/agent-tool-access.
+"""Several sources of tools behind one door. The property under test is independence: one source being
+absent, unreachable or slow costs the model that source's tools and nothing else.
 
-The property under test is independence: one source being absent, unreachable or slow costs
-the model that source's tools and nothing else. It is easy to write a registry that loses
-this by gathering everything and failing as a unit, and the failure is invisible until the
-day one of them is down.
-
-Two of the three are servers on a network; the third runs in this process and is handed in
-rather than built from settings, because building one needs the application object
-(`workbench/team_tools.py`). The stand-in below is all three — what the registry knows about
-a source is five members, and it does not ask which kind it is.
-"""
+Two of the three are servers on a network; the third runs in this process and is handed in, because
+building one needs the application object. The stand-in below is all three."""
 
 from __future__ import annotations
 
@@ -73,17 +66,14 @@ class _Server:
 
 class _UnreachableServer(_Server):
     async def list_tools(self, operator_principal: str | None = None) -> list[ToolDescriptor]:
-        # What `ToolServer` really does when it cannot be asked: an empty list, never an
-        # exception (specs/agent-tool-access, "Brak serwera narzędzi nie odbiera agentowi
-        # mowy").
+        # What `ToolServer` really does when it cannot be asked: an empty list, never an exception.
         return []
 
 
 def test_from_settings_builds_the_servers_that_are_on_a_network() -> None:
     registry = ToolServerRegistry.from_settings(_settings())
-    # Reaching inside on purpose: which sources get built is the arrangement this test
-    # pins. The team tools are not among them and cannot be — settings hold no address for
-    # something in this process.
+    # Reaching inside on purpose: which sources get built is the arrangement this test pins. The team
+    # tools cannot be among them — settings hold no address for something in this process.
     assert [server.label for server in registry._servers] == [
         "market-mcp",
         "trading-mcp",
@@ -183,9 +173,8 @@ async def test_a_call_reaches_the_source_that_announced_the_name() -> None:
 
 
 async def test_the_operators_identity_travels_to_every_source_the_registry_dispatches_to() -> None:
-    """The registry does not decide who needs it — the source does, and the one that does
-    not want it never looks at it. Keeping the decision in one place is what stops a further
-    source from being added without one."""
+    """The registry does not decide who needs it — the source does, and the one that does not want it never
+    looks at it. Keeping the decision in one place is what stops a further source being added without one."""
     market = _Server("market-mcp", ["get_candles"])
     registry = ToolServerRegistry([market])
     await registry.list_tools()

@@ -1,13 +1,8 @@
-"""The clock evaluating triggers — `scheduler/clock.py` against a real database, a
-scripted model, and a real MCP stand-in whose numeric answer a test can move between
-calls (`_register_value_tool` below) — not a mock, for the same reason
-`test_catalogue_tools.py` uses a real server: the one contract with no committed
+"""The clock evaluating triggers, against a real database, a scripted model, and a real MCP stand-in whose
+numeric answer a test can move between calls — not a mock, because the one contract with no committed
 snapshot is this session.
 
-`_check_trigger` (module-private) is used directly only where a test needs to await the
-failure-streak bookkeeping deterministically — see `test_scheduler_clock.py`'s own
-docstring for why that is the one place reaching past `Clock.tick()` is warranted.
-"""
+`_check_trigger` is used directly only where a test needs to await the failure-streak bookkeeping."""
 
 from __future__ import annotations
 
@@ -160,9 +155,8 @@ async def test_a_condition_crossing_the_threshold_fires_exactly_once(pool: async
 
         box[0] = 80.0
         await _make_due_again(pool, trigger["id"])
-        # `gather`-ed rather than left detached: `tick()` hands back the failure-streak
-        # tasks so a test can know every write this wake will make has happened before
-        # the `pool` fixture tears down underneath a still-running one.
+        # `gather`-ed rather than left detached: `tick()` hands back the failure-streak tasks so a test
+        # can know every write has happened before the `pool` fixture tears down underneath one.
         await asyncio.gather(*await clock.tick())
 
         fires = await _fires(pool, trigger_id=trigger["id"])
@@ -272,10 +266,8 @@ async def _check_directly(pool: asyncpg.Pool, trigger_id: int, *, provider, sett
     async with pool.acquire() as conn:
         row = await store.get_trigger(conn, trigger_id=trigger_id, owner_principal=OWNER)
     assert row is not None
-    # Closed when this helper is done, the way `app.py`'s lifespan closes the one it
-    # builds. A registry left open holds an MCP session that outlives the task it was
-    # opened in, and anyio reports that as "attempted to exit cancel scope in a different
-    # task" somewhere entirely unrelated (`tools/client.py`'s own note on the trap).
+    # Closed when this helper is done, the way the lifespan closes the one it builds. A registry left open
+    # holds a session that outlives the task it was opened in, reported somewhere entirely unrelated.
     tools = ToolServerRegistry.from_settings(settings)
     try:
         task = await _check_trigger(

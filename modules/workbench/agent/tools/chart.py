@@ -1,20 +1,8 @@
-"""The one tool this module owns rather than borrows.
+"""The one tool this module owns rather than borrows, and the whole of the agent's write access. It never
+touches the terminal: it records what the operator's chart should show, and the terminal applies it.
 
-Every other tool the model sees is announced by `market-mcp` and executed there
-(`client.py`). This one is written here, in this module, and writes a row in this
-module's database — it is the whole of the agent's write access, and its boundary is
-named in `specs/agent-tools`, "Agent zapisuje wyłącznie w widoku terminala".
-
-It never touches the terminal. It records what the operator's chart should show; the
-terminal reads that log and applies it, which is what keeps the terminal the owner of
-what it draws (design.md, "Polecenie jest deklaratywne i numerowane").
-
-Checking happens **here**, before the row exists, because a refusal has to reach the
-model — the only party that can correct it — inside the same turn (specs/agent-tools,
-"Odmowa narzędzia jest wynikiem, nie awarią tury"). The catalogue and the tracked pairs
-are read through `market-mcp`, the road this module already has; without that server
-there is nothing to check against and the tool refuses rather than writing blind.
-"""
+Checking happens here, before the row exists, because a refusal has to reach the model inside the same
+turn. Without the tool server there is nothing to check against, and the tool refuses rather than writing blind."""
 
 from __future__ import annotations
 
@@ -32,17 +20,13 @@ from .client import ToolDescriptor, ToolOutcome, ToolOutcomeKind, ToolServer
 
 CHART_TOOL_NAME = "set_chart"
 
-# The candle count a focus may name, either around a point or as "the newest N". Below
-# the floor a chart shows an approximation nobody could read; above the ceiling the
-# terminal would need more history reads than a single pan should cost
-# (design.md, "Granice liczby świec: 10 … 1000").
+# The candle count a focus may name. Below the floor a chart shows an approximation nobody could read;
+# above the ceiling the terminal would need more history reads than a single pan should cost.
 MIN_FOCUS_BARS = 10
 MAX_FOCUS_BARS = 1000
 
-# What the terminal offers as a palette; a colour outside it is not a colour it can draw
-# (`terminal/src/chart/theme.ts`, `INDICATOR_LINE_TOKENS`). Duplicated rather than shared
-# — there is no library between modules — and small enough that the duplication is
-# visible when it drifts.
+# What the terminal offers as a palette; a colour outside it is not one it can draw. Duplicated rather
+# than shared — there is no library between modules — and small enough that the drift is visible.
 CHART_COLORS = (
     "--color-accent",
     "--color-indicator-2",
@@ -54,14 +38,9 @@ CHART_COLORS = (
     "--color-down",
 )
 
-# What the terminal draws an operator's own objects in, and it shares no colour with the
-# list above (`terminal/src/chart/theme.ts`, `DRAWING_LINE_TOKENS`). A level somebody put
-# on the chart and a level an indicator computed are two different things, and drawn in
-# one colour they cannot be told apart exactly when it matters
-# (specs/agent-chart-drawings, "Paleta rysunków MUST być odrębna"). Four rather than
-# eight: a drawing's colour can end up beside any other drawing's, and four is where that
-# still clears the palette gates — the terminal's `index.css` carries the measurements.
-# Duplicated for the same reason `CHART_COLORS` is: there is no library between modules.
+# What the terminal draws an operator's own objects in, sharing no colour with the list above: a level
+# somebody put on the chart and one an indicator computed cannot be told apart in one colour. Four rather
+# than eight, because a drawing's colour can end up beside any other drawing's.
 DRAWING_COLORS = (
     "--color-drawing-1",
     "--color-drawing-2",
@@ -210,11 +189,8 @@ def _parse_focus_bars(raw: dict[str, Any], field: str) -> int:
 
 
 def _as_focus(raw: Any, *, now: datetime) -> ChartFocus | None:
-    """The chart's requested frame, or `None` to leave the operator looking where they
-    are. Checked without reading anything: form, ordering, candle-count bounds, and
-    whether the frame is entirely in the future — everything a consumer needs to know is
-    already in the call (design.md, "Sprawdzenie kadru nie wymaga dodatkowego odczytu z
-    archiwum")."""
+    """The chart's requested frame, or `None` to leave the operator looking where they are. Checked without
+    reading anything: everything a consumer needs to know is already in the call."""
     if raw is None:
         return None
     if not isinstance(raw, dict):
@@ -263,13 +239,8 @@ def _as_focus(raw: Any, *, now: datetime) -> ChartFocus | None:
 
 
 async def read_json(tool_server: ToolServer, name: str, arguments: dict[str, Any]) -> Any:
-    """One market-mcp call, answered as data rather than prose.
-
-    A tool that refused or never answered is not something this tool can work around: it
-    means the check cannot be made, and a command written without it would be a command
-    the terminal then refuses to draw. Both come back as `ChartRefusal` — the model is
-    told what is unknown rather than handed a chart that will not appear.
-    """
+    """One market-mcp call, answered as data rather than prose. A tool that refused or never answered means
+    the check cannot be made, and a command written without it is one the terminal then refuses to draw."""
     outcome = await tool_server.call(name, arguments)
     if outcome.kind is not ToolOutcomeKind.OK:
         raise ChartRefusal(
@@ -306,18 +277,13 @@ async def _check_pair(
             f"{symbol!r} is not collected by the archive, so the chart would be empty. "
             f"Collected symbols: {known}."
         )
-    # A symbol-only command still lands on whatever interval the chart already shows —
-    # the terminal keeps its current one rather than picking a new one — so a symbol not
-    # collected at it would draw nothing just the same as one refused outright. Checked
-    # against the snapshot taken when the operator asked, not a later read of it
-    # (`agent-chart-control`, "Kolor rozwiązywany przy rysowaniu z bieżących selekcji"
-    # applies the same way here: what mattered is what was on screen at the time).
+    # A symbol-only command still lands on whatever interval the chart already shows, so a symbol not
+    # collected at it draws nothing just the same. Checked against the snapshot taken when the operator asked.
     effective_resolution = resolution if resolution is not None else (chart.resolution if chart else None)
     if effective_resolution is None:
         return
-    # A resolution alone is checked against every collected pair: this tool does not know
-    # which symbol the chart is on, and the terminal refuses the combination it cannot
-    # draw anyway.
+    # A resolution alone is checked against every collected pair: this tool does not know which symbol the
+    # chart is on, and the terminal refuses the combination it cannot draw anyway.
     allowed = tracked.get(symbol) if symbol is not None else set().union(*tracked.values()) if tracked else set()
     if effective_resolution not in (allowed or set()):
         where = f"for {symbol}" if symbol is not None else "for any collected symbol"
@@ -403,11 +369,8 @@ def _params_text(indicator: ChartIndicator) -> str:
 
 
 class ChartTool:
-    """The tool as the turn sees it: a descriptor to announce and one call to run.
-
-    Holds the pool rather than a connection — a turn's tool call happens long after the
-    request that started it released its own.
-    """
+    """The tool as the turn sees it: a descriptor to announce and one call to run. Holds the pool rather
+    than a connection — a tool call happens long after the request that started it released its own."""
 
     name = CHART_TOOL_NAME
     descriptor = CHART_TOOL
@@ -448,10 +411,8 @@ class ChartTool:
                 "`indicators`, `focus`."
             )
 
-        # Only symbol, resolution and indicators need the archive to check — a focus is
-        # checked entirely above, without a read (design.md, "Sprawdzenie kadru nie
-        # wymaga dodatkowego odczytu z archiwum"). A call naming only a focus must not
-        # refuse for a reason that has nothing to do with what it is setting.
+        # Only symbol, resolution and indicators need the archive to check; a focus is checked entirely
+        # above. A call naming only a focus must not refuse for a reason unrelated to what it is setting.
         needs_archive = symbol is not None or resolution is not None or indicators is not None
 
         if needs_archive and (self._tool_server is None or not self._tool_server.configured):
@@ -462,13 +423,8 @@ class ChartTool:
             )
 
         if needs_archive:
-            # Independent reads, run together: neither check uses the other's answer, and
-            # sequencing them only adds one round trip's latency to every call that names
-            # both a pair and indicators. `return_exceptions=True` because `gather`
-            # otherwise abandons whichever task didn't raise first, which asyncio logs as
-            # an exception that was never retrieved — both are checked in the order they
-            # were checked before, so a refusal from the pair still wins the same way it
-            # did sequentially.
+            # Independent reads, run together: sequencing them adds a round trip to every call naming both.
+            # `return_exceptions=True`, or `gather` abandons whichever task did not raise first.
             assert self._tool_server is not None
             results = await asyncio.gather(
                 _check_pair(self._tool_server, symbol, resolution, chart),
@@ -481,9 +437,8 @@ class ChartTool:
                 if isinstance(result, BaseException):
                     raise result
 
-        # Written whole or not at all: three indicators of which one is unknown is a
-        # refusal, never two drawn (specs/agent-chart-control, "Odmowa nie zostawia
-        # śladu na wykresie").
+        # Written whole or not at all: three indicators of which one is unknown is a refusal, never two
+        # drawn.
         async with self._pool.acquire() as conn:
             await store.record_chart_command(
                 conn,

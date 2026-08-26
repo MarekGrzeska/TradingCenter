@@ -125,10 +125,8 @@ async def test_a_team_that_assigns_tools_is_refused_when_the_server_is_unreachab
 
 
 async def test_a_team_that_assigns_tools_is_refused_when_no_server_is_configured() -> None:
-    """The refusal has to name the server that is missing, and that is why it is no longer
-    decided by "is anything configured": a source this process serves itself is always
-    configured, so the question became "which *servers* have no address" (specs/
-    teams-tool-access, "Brak serwera narzędzi zatrzymuje przebieg")."""
+    """The refusal has to name the server that is missing, which is why it is no longer decided by "is
+    anything configured": a source this process serves itself is always configured."""
     definition = team(agent("reader", ["get_last_price"]))
     registry = _registry(None)
     try:
@@ -242,9 +240,6 @@ async def test_an_unknown_agent_key_is_a_programming_error() -> None:
         plan.for_agent("nobody")
 
 
-# --- more than one server (specs/teams-tool-access, "Moduł MAY być skonfigurowany
-# z więcej niż jednym serwerem narzędzi") ---
-
 
 async def test_an_unreachable_second_server_does_not_stop_a_team_that_never_needed_it() -> None:
     """specs/teams-tool-access, "Nieosiągalny jest tylko serwer, z którego nikt nic nie
@@ -287,8 +282,7 @@ async def test_a_name_two_servers_both_announce_refuses_the_run_naming_both() ->
 
 
 async def test_a_name_three_servers_announce_names_all_three() -> None:
-    """specs/teams-tool-access, "Kolizja obejmuje więcej niż dwa serwery". A message that
-    stops at two sends the operator to unconfigure one server and meet this same refusal
+    """A message that stops at two sends the operator to unconfigure one server and meet this same refusal
     again — which is what the wording said until the third server existed."""
     definition = team(agent("reader", ["get_event"]))
 

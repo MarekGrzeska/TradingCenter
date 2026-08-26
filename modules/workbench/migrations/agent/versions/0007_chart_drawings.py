@@ -1,27 +1,9 @@
-"""Adds `chart_drawings` — the levels, zones and trend lines the agent and the operator
-leave on an instrument's chart — and seeds `"v7"`: the same prompt, with the two new
-tools named in it.
+"""Adds `chart_drawings` — the levels, zones and trend lines left on an instrument's chart — and seeds
+`"v7"`. A drawing is a state of the instrument, not a log: one symbol, all its rows, always the whole set.
 
-Rysunek is a state of the instrument, not a log: unlike `chart_commands`, there is no
-cursor and no "since sequence" read. One `symbol`, all its rows, always the whole set —
-design.md, "Rysunek jest stanem, nie logiem".
-
-Geometry lives in four shared columns rather than one per shape, with a `CHECK` per
-`kind` pinning what each column means there (design.md, "Zapis: cztery kolumny geometrii
-i CHECK per kształt"):
-
-| `kind`       | `time_a`   | `price_a` | `time_b`   | `price_b`            |
-|--------------|------------|-----------|------------|----------------------|
-| `level`      | optional   | price     | —          | —                    |
-| `zone`       | optional   | bottom    | optional   | top, `> price_a`     |
-| `trendline`  | required   | price A   | required, `> time_a` | price B  |
-
-`session_id` is nullable with `ON DELETE SET NULL`: a drawing outlives the session that
-made it (`agent-chat` spec, "Operator nazywa i usuwa rozmowy" — a deleted session must
-not take its drawings down with it), the same durability chart_commands does not need
-since it is a log, not a state.
-
-The prompt paragraph is repeated whole rather than patched, for the reason `0005` gives.
+Geometry lives in four shared columns rather than one per shape, with a `CHECK` per `kind` pinning what
+each column means there. `session_id` is nullable with `ON DELETE SET NULL`: a drawing outlives the
+session that made it.
 
 Revision ID: 0007
 Revises: 0006

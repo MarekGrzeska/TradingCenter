@@ -1,25 +1,9 @@
-"""Schedules and triggers: a team's own clock and its own trip-wire on the market.
+"""Schedules and triggers: a team's own clock and its own trip-wire on the market. Creating or editing
+either resolves the revision it would run before a row is written, so it can never point at nothing.
 
-Every route takes `current_principal` and hands it to the store, which puts the owner
-into the statement itself — the same shape `catalogue.py` and `runs.py` already carry
-(specs/teams-schedules, "Harmonogram należy do operatora, który go zapisał").
-
-Creating or editing either one resolves the revision it would run — the pinned one, or the
-team's current latest — before a row is ever written, so a schedule can never point at a
-revision that is not there to point at.
-
-There is no consent check here any more, and its absence is a decision rather than an
-omission: it ran on this path alone while the firing path never asked, so a schedule saved
-over a read-only revision kept firing by itself once the team gained an order-placing tool
-(`manage-schedules-and-drop-the-acknowledgement`). What stops an irreversible order is the
-demo account the gateway enforces, the revision's own trading limits, the team's daily
-ceiling, and the trace written before each order goes out.
-
-What is deliberately *not* here: the clock that wakes on its own and claims a due fire.
-That is `scheduler/`'s job, reading `store.claim_due_schedule` and
-`store.claim_trigger_for_check` — these routes only create, read, edit and toggle the
-rows the clock will later act on.
-"""
+There is no consent check here any more, and its absence is a decision: it ran on this path alone while
+the firing path never asked. What is deliberately not here is the clock itself — that is `scheduler/`'s,
+and these routes only create, read, edit and toggle the rows it will later act on."""
 
 from __future__ import annotations
 
@@ -45,9 +29,8 @@ from ..validation import DefinitionRefused, check_trigger_tool
 
 router = APIRouter()
 
-# Bounds how far ahead a preview may reach — enough to see a daily schedule's next few
-# weeks or a five-minute one's next couple of hours, and small enough that the route
-# cannot be asked to roll a cron expression forward thousands of times.
+# Bounds how far ahead a preview may reach — enough to see a daily schedule's next few weeks, and small
+# enough that the route cannot be asked to roll a cron expression forward thousands of times.
 _MAX_NEXT_FIRES = 20
 
 
@@ -59,14 +42,8 @@ async def _revision_must_be_there(
     revision_mode: str,
     pinned_revision_id: int | None,
 ) -> None:
-    """Refuses every way the revision a schedule or trigger would run might not be there
-    to point at — a team that is not the caller's, a pinned revision belonging to another
-    team, a `latest` mode over a team with no revision at all.
-
-    Called for its refusals and nothing else. It used to hand back the definition too, for
-    the consent check that read the agents' tools; that check is gone, and a resolver whose
-    answer nobody reads is a resolver pretending to be one.
-    """
+    """Refuses every way the revision a schedule would run might not be there to point at. Called for its
+    refusals and nothing else: it used to hand back the definition too, for a consent check that is gone."""
     async with request.app.state.teams.pool.acquire() as conn:
         team = await store.get_team(conn, team_id=team_id, owner_principal=owner)
         if team is None:
@@ -91,8 +68,6 @@ async def _revision_must_be_there(
 def _first_fire_at(cron_expression: str) -> datetime:
     return next_fire_after(cron_expression, datetime.now(UTC))
 
-
-# --- schedules --------------------------------------------------------------------
 
 
 @router.post("/teams/{team_id}/schedules", status_code=201)
@@ -203,13 +178,8 @@ async def disable_schedule(
 async def delete_schedule(
     schedule_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> None:
-    """Gone, with its fire history. Disabling is the other thing and stays the other thing:
-    a disabled schedule keeps its row and its reason and can be switched back on
-    (specs/teams-schedules, "Harmonogram i wyzwalacz dają się usunąć").
-
-    The runs it started are not touched, and nothing here has to arrange that — no column
-    in `runs` points at a schedule.
-    """
+    """Gone, with its fire history. Disabling is the other thing and stays the other thing: a disabled
+    schedule keeps its row and its reason. The runs it started are not touched, and nothing arranges that."""
     async with request.app.state.teams.pool.acquire() as conn:
         deleted = await store.delete_schedule(
             conn, schedule_id=schedule_id, owner_principal=owner
@@ -239,8 +209,7 @@ async def next_fires(
     owner: str = Depends(current_principal),
     count: int = Query(default=5, ge=1, le=_MAX_NEXT_FIRES),
 ) -> NextFiresOut:
-    """specs/terminal-teams-schedules, "Terminal nie liczy czasu wyzwolenia sam" — every
-    time in the answer is rolled forward from now by this module, not the row's stored
+    """Every time in the answer is rolled forward from now by this module, not read off the row's stored
     `next_fire_at`, which only reflects the last claim."""
     async with request.app.state.teams.pool.acquire() as conn:
         row = await store.get_schedule(conn, schedule_id=schedule_id, owner_principal=owner)
@@ -254,14 +223,8 @@ async def next_fires(
 async def preview_next_fires(
     body: NextFiresIn, _: str = Depends(current_principal)
 ) -> NextFiresOut:
-    """The same answer for a timing nobody has saved (specs/teams-schedules, "Moduł liczy
-    najbliższe wyzwolenia także dla opisu, którego nie zapisano").
-
-    It touches no row, so it takes no team and no ownership check beyond being signed in —
-    what it answers about is the operator's own draft, and a cron expression is not
-    somebody's data. `NextFiresIn` is `ScheduleIn`'s own timing half, so a draft that
-    previews here is a draft the save will accept.
-    """
+    """The same answer for a timing nobody has saved. It touches no row, so it takes no team and no
+    ownership check beyond being signed in — a cron expression is not somebody's data."""
     if not 1 <= body.count <= _MAX_NEXT_FIRES:
         raise HTTPException(422, detail=f"count must be between 1 and {_MAX_NEXT_FIRES}")
     return NextFiresOut(times=_take(body.cron(), body.count))
@@ -272,20 +235,11 @@ def _take(cron_expression: str, count: int) -> list[datetime]:
     return [next(fires) for _ in range(count)]
 
 
-# --- triggers -----------------------------------------------------------------------
-
 
 def _check_trigger_tool(tool_name: str, *, announced: AnnouncedSnapshot) -> None:
-    # A trigger's condition is a reading of the world, taken with a *tool server's* tools
-    # (specs/teams-triggers, "Warunek jest czytany narzędziami serwera narzędzi"), so the
-    # tools this process serves itself are subtracted before the check. A team's memory is
-    # not the world, and it has no run to be read inside of when the clock is the caller —
-    # a trigger naming one would be a condition that could never come true.
-    #
-    # No server configured at all is passed on as `None`, which is the shape
-    # `check_trigger_tool` writes its own refusal for; a configured server that could not
-    # be asked comes back inside the snapshot under `unreachable` instead, and a name
-    # nobody announces is refused the same way whichever silence it was.
+    # A trigger's condition is a reading of the world, taken with a tool server's tools, so the tools this
+    # process serves itself are subtracted first: a team's memory is not the world, and has no run to be
+    # read inside of when the clock is the caller.
     names = (
         sorted(set(announced.by_name) - MEMORY_TOOL_NAMES)
         if announced.configured_servers

@@ -1,20 +1,8 @@
-"""Seeds `"v10"`: the same prompt, plus what to do with the teams tools.
+"""Seeds `"v10"`: the same prompt, plus what to do with the teams tools — tools a model is not told about
+are tools it uses badly. What each tool does is in the tool's own description, where it belongs.
 
-No schema change — the whole of this migration is one row, the shape `0005` set and
-`0008`/`0009` repeated.
-
-The agent gained a second tool server (`add-teams-mcp`), and tools it is not told about
-are tools it uses badly: it invents a model id rather than reading the catalogue, leaves
-the daily cost limit unset because nothing said it mattered, and describes a run's result
-a second after starting it. The paragraph says those three things and little else — what
-each tool does is in the tool's own description, where it belongs.
-
-It rides in **both** bodies, unlike the chart paragraphs' reason for being there. The two
-tool servers are configured and fail independently, so an unreachable archive says nothing
-about whether the team catalogue can be reached; a prompt that dropped the teams paragraph
+It rides in both bodies: the tool servers fail independently, so a prompt that dropped the teams paragraph
 whenever market-mcp was down would leave the model denying tools it still has.
-
-The paragraphs are repeated whole rather than patched, for the reason `0005` gives.
 
 Revision ID: 0010
 Revises: 0009

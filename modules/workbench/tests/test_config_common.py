@@ -1,16 +1,8 @@
-"""The settings rules both surfaces carry identically, checked once for both.
+"""The settings rules both surfaces carry identically, checked once for both. The two classes are separate
+on purpose — the prefixed names are what stays doubled — but two of their validator blocks were byte-identical
+apart from the word "agent" or "teams" inside a URL.
 
-`agent.config.Settings` and `teams.config.Settings` are separate classes on purpose — the
-prefixed names are what stays doubled (`AGENT_DATABASE_URL` against `TEAMS_DATABASE_URL`,
-two keys, two catalogues). Two of their validator blocks are not doubled in any meaningful
-sense: the database-mode rules and the tool-server mode switch were a byte-identical block
-in both suites apart from the word "agent" or "teams" inside a URL. A rule fixed on one
-surface could rot on the other with nothing to say so.
-
-Each surface's own `tests/*/test_config.py` keeps what is genuinely its own: its key, its
-catalogue, and — for the conversation — its default model, for teams how its several tool
-servers interact.
-"""
+Each surface's own test_config keeps what is genuinely its own: its key, its catalogue, its default model."""
 
 from __future__ import annotations
 
@@ -75,8 +67,6 @@ def test_a_complete_configuration_builds(settings: Callable[..., Any]) -> None:
     assert settings().models[0].display_name == "Luna"
 
 
-# --- database mode, same two failures as market-data/config.py ---
-
 
 def test_no_database_user_with_a_loopback_url_is_local_mode(
     settings: Callable[..., Any], surface: str
@@ -140,8 +130,6 @@ def test_a_missing_database_url_names_itself(surface: str) -> None:
     assert "database_url" in str(err.value)
 
 
-# --- every tool server's mode switch (specs/{agent,teams}-tool-access) ---
-#
 # Parameterised over the servers rather than copied per server: the rule is one
 # `_checked_server` call per configured server, so a copy per name would be the same
 # assertion three times over — and the third server, added on 22 August 2026, would have

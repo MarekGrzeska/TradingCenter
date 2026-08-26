@@ -1,16 +1,8 @@
-"""What each model call inside a run cost — one row per call, priced at write time.
+"""What each model call inside a run cost — one row per call, priced at write time and never aggregated
+there, which is what lets a read answer "how much did each agent cost" as a `GROUP BY`.
 
-A twin of agent's own `usage` table, scoped to a run step instead of a message: every
-wywołanie modelu inside a run leaves its own row, never aggregated at write time
-(specs/teams-usage, "Każde wywołanie modelu zostawia własny wiersz zużycia") — a run
-with N agents called M times each leaves N×M rows, which is what lets `GET /usage`
-answer "how much did each agent cost" as a `GROUP BY run_step_id` rather than a number
-nothing can be subtracted from.
-
-`input_rate_per_1m` / `output_rate_per_1m` are snapshotted from the model catalogue at
-write time, the same as agent's, and for the same reason: a cennik changed after a run
-MUST NOT reprice it retroactively (specs/teams-usage, "Koszt jest przypisany do wiersza
-w chwili zapisu").
+The rates are snapshotted from the catalogue, for agent's reason: a cennik changed after a run must not
+reprice it retroactively.
 
 Revision ID: 0003
 Revises: 0002

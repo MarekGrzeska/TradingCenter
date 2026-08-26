@@ -1,19 +1,9 @@
-"""Every call a run made that could change the account, and what came of it.
+"""Every call a run made that could change the account, and what came of it. A table of its own rather than
+a read over `tool_calls`, because the daily limit has to count a team's orders before a run is created, and
+counting inside another module's JSON document breaks silently when it renames a field.
 
-A table of its own rather than a read over `tool_calls`, and the reason is the daily
-limit: it has to count this team's orders *before* a run is created, and the terminal has
-to list a run's own. Both off `tool_calls` would mean querying inside a JSON document
-whose shape belongs to another module — `trading-mcp` renaming one field would break the
-counting silently (design.md, "Ślad handlowy dostaje własną tabelę").
-
-`tool_calls` does not lose anything: a write still leaves its row there, with the
-arguments and the reply verbatim. This table is the same event read as a trade rather
-than as a call.
-
-**A row exists before the call is sent.** `status` starts at `sent` and is settled
-afterwards; a row still reading `sent` after its run is over is an order whose fate this
-module does not know — which is the one thing a trace of irreversible actions must be
-able to say (specs/teams-trading, "Wywołanie, którego skutek pozostał nieznany").
+A row exists before the call is sent: `status` starts at `sent`, and a row still reading `sent` after its
+run is over is an order whose fate this module does not know.
 
 Revision ID: 0006
 Revises: 0005
@@ -31,11 +21,9 @@ down_revision: str | None = "0005"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-# sent      — the row was written and the call went out; nothing is known yet
-# settled   — the server answered with a settled result (filled, working, closed, ...)
-# unsettled — the server answered, and its answer is "not resolved yet", with a reference
-# refused   — the server answered no, and nothing reached the account
-# unknown   — the call failed in a way that says nothing about whether it arrived
+# sent — written and the call went out, nothing known yet; settled — the server answered with a settled
+# result; unsettled — answered, not resolved yet, with a reference; refused — answered no; unknown — the
+# call failed in a way that says nothing about whether it arrived.
 _STATUSES = ("sent", "settled", "unsettled", "refused", "unknown")
 
 
@@ -57,18 +45,15 @@ def upgrade() -> None:
         ),
         sa.Column("agent_key", sa.Text(), nullable=False),
         sa.Column("tool_name", sa.Text(), nullable=False),
-        # Read off the call's own arguments where they are there to read: `place_order`
-        # carries all four, `close_position` carries none of them. NULL is "this kind of
-        # order does not have one", never "we lost it" — the arguments themselves stay in
-        # `tool_calls` either way.
+        # Read off the call's own arguments where they are there to read. NULL is "this kind of order does
+        # not have one", never "we lost it" — the arguments themselves stay in `tool_calls` either way.
         sa.Column("symbol", sa.Text(), nullable=True),
         sa.Column("direction", sa.Text(), nullable=True),
         sa.Column("size", sa.Numeric(18, 8), nullable=True),
         sa.Column("level", sa.Numeric(18, 8), nullable=True),
         sa.Column("status", sa.Text(), nullable=False, server_default="sent"),
-        # What the provider called it — FILLED, WORKING, REJECTED, PENDING. Kept beside
-        # `status` rather than folded into it: that column is this module's own reading of
-        # the outcome, this one is the upstream's word for it.
+        # What the provider called it. Kept beside `status` rather than folded into it: that column is
+        # this module's own reading of the outcome, this one is the upstream's word for it.
         sa.Column("result_status", sa.Text(), nullable=True),
         sa.Column("provider_order_id", sa.Text(), nullable=True),
         sa.Column("reference", sa.Text(), nullable=True),

@@ -1,10 +1,5 @@
-"""Orders against a real database: what a run writes as it places them, what the count
-stops, and what a revision that never heard of trading limits still does.
-
-The guards themselves are `test_trading_limits.py`; this file is the half that needs
-rows — specs/teams-trading, "Każde wywołanie zapisujące zostawia własny wiersz śladu"
-and "Granica dobowa jest sprawdzana przed utworzeniem przebiegu".
-"""
+"""Orders against a real database: what a run writes as it places them, what the count stops, and what a
+revision that never heard of trading limits still does. The guards themselves are next door."""
 
 from __future__ import annotations
 
@@ -88,8 +83,6 @@ async def _trades(pool: asyncpg.Pool, run_id: int) -> list[dict]:
     async with pool.acquire() as conn:
         return [dict(row) for row in await store.get_run_trades(conn, run_id=run_id)]
 
-
-# --- the row, and what it says ---
 
 
 async def test_a_placed_order_leaves_a_row_naming_the_agent_and_the_order(
@@ -258,8 +251,6 @@ async def test_a_refused_order_is_recorded_as_refused(pool: asyncpg.Pool) -> Non
     assert row["status"] == "refused"
 
 
-# --- the run count ---
-
 
 async def test_a_run_reaching_its_order_limit_stops_and_says_orders_not_cost(
     pool: asyncpg.Pool,
@@ -375,8 +366,6 @@ async def test_a_revision_saved_before_trading_limits_existed_still_runs(
     assert definition.trading.max_order_size is None
 
 
-# --- the daily count ---
-
 
 async def test_todays_orders_are_what_the_daily_ceiling_reads(pool: asyncpg.Pool) -> None:
     definition = TeamDefinition(agents=[a_trader()])
@@ -452,8 +441,6 @@ async def test_an_unsettled_order_still_counts_against_the_day(pool: asyncpg.Poo
 
     assert placed == 1
 
-
-# --- the table itself, and what outlives a run (task 7.6) ---
 
 
 async def test_the_table_refuses_a_status_it_does_not_know(pool: asyncpg.Pool) -> None:

@@ -35,10 +35,8 @@ _SELECT_TOOL_CALLS = f"""
      ORDER BY round_index, position, id
 """
 
-# `message_id` leads the ordering so the grouping below builds each message's list in the
-# order the turn made the calls, in one pass and without sorting afterwards. A row whose
-# `message_id` is still NULL is not in this read: it belongs to a turn that never produced
-# the reply this grouping is keyed by, and it comes back from its own query below.
+# `message_id` leads the ordering so the grouping below builds each message's list in the order the turn
+# made the calls, in one pass. A row whose `message_id` is still NULL comes back from its own query.
 _SELECT_SESSION_TOOL_CALLS = f"""
     SELECT {_TOOL_CALL_COLUMNS}
       FROM tool_calls
@@ -46,9 +44,8 @@ _SELECT_SESSION_TOOL_CALLS = f"""
      ORDER BY message_id, round_index, position, id
 """
 
-# The calls that outlived their turn — sent, and never joined to a reply, because there
-# was none (specs/agent-trading, "Wywołanie ruszające rachunek zostawia ślad przed
-# wysłaniem"). Ordered oldest first, by the only thing they have: when they were made.
+# The calls that outlived their turn — sent, and never joined to a reply, because there was none. Ordered
+# oldest first, by the only thing they have: when they were made.
 _SELECT_SESSION_ORPHAN_TOOL_CALLS = f"""
     SELECT {_TOOL_CALL_COLUMNS}
       FROM tool_calls
@@ -102,16 +99,11 @@ async def begin_tool_call(
     arguments: dict,
     result_text: str,
 ) -> int:
-    """A row for a call that is about to be sent, returning its id.
+    """A row for a call that is about to be sent, returning its id. Only for calls that can change the
+    account: a read that vanished with its turn left nothing to reconcile.
 
-    Only for calls that can change the account. Everything else is written once, after the
-    turn, by `record_tool_calls` — a read that vanished with its turn left nothing behind
-    to reconcile, so paying two round trips for it would buy nothing.
-
-    `position` is the caller's here, unlike in `record_tool_calls`: the row exists before
-    the round is finished, so there is no loop to derive it from. `graph.py` counts within
-    the round and hands the same number to both.
-    """
+    `position` is the caller's here, unlike in `record_tool_calls`: the row exists before the round is
+    finished, so there is no loop to derive it from."""
     row = await fetch_one(
         conn,
         _BEGIN_TOOL_CALL,
@@ -128,23 +120,16 @@ async def begin_tool_call(
 async def settle_tool_call(
     conn: Conn, *, tool_call_id: int, outcome: str, result_text: str, duration_ms: int
 ) -> None:
-    """The second half of `begin_tool_call`: what came back, once it did.
-
-    A call that never comes back is never settled, and that is the point — the row keeps
-    the `unknown` it was written with, rather than being deleted or turned into a failure.
-    """
+    """The second half of `begin_tool_call`: what came back, once it did. A call that never comes back is
+    never settled, and the row keeps the `unknown` it was written with."""
     await conn.execute(_SETTLE_TOOL_CALL, tool_call_id, outcome, result_text, duration_ms)
 
 
 async def attach_tool_calls_to_message(
     conn: Conn, *, tool_call_ids: Sequence[int], message_id: int
 ) -> None:
-    """Joins rows written before the reply existed to the reply, once it does.
-
-    In the ordinary case this is what makes a pre-written row indistinguishable from one
-    `record_tool_calls` wrote: same `message_id`, same ordering, same read. A row this
-    never reaches is a turn that died mid-call.
-    """
+    """Joins rows written before the reply existed to the reply, once it does — which is what makes a
+    pre-written row indistinguishable from one `record_tool_calls` wrote."""
     if not tool_call_ids:
         return
     await conn.execute(_ATTACH_TOOL_CALLS, message_id, list(tool_call_ids))
@@ -157,15 +142,8 @@ async def record_tool_calls(
     message_id: int,
     calls: Sequence[RecordedCall],
 ) -> list[ToolCall]:
-    """Written after the agent message exists, like usage rows and for the same reason:
-    the id they hang off does not exist until the turn ends.
-
-    `position` comes from the loop rather than the caller — several calls in one round
-    are dispatched in the same millisecond, so a timestamp cannot order them and the
-    caller should not have to think about it. A call that already has a row is counted by
-    that loop and not inserted again: it took its position when it was begun, and skipping
-    it here without counting would shift every later call in its round.
-    """
+    """Written after the agent message exists, because the id they hang off does not exist until the turn
+    ends. `position` comes from the loop: several calls in one round are dispatched in the same millisecond."""
     written: list[ToolCall] = []
     position_in_round: dict[int, int] = {}
     for call in calls:
@@ -196,13 +174,8 @@ async def get_tool_calls(conn: Conn, *, message_id: int) -> list[ToolCall]:
 
 
 async def get_session_tool_calls(conn: Conn, *, session_id: int) -> dict[int, list[ToolCall]]:
-    """Every call in a session, grouped by the message it belongs to.
-
-    One query, not one per message: the transcript route reads a whole session at once,
-    and a rozmowa of forty exchanges would otherwise cost forty round trips to answer a
-    single request. Messages with no calls are simply absent from the mapping — the
-    caller reads it with a default, so an empty list never has to be stored.
-    """
+    """Every call in a session, grouped by the message it belongs to. One query, not one per message: a
+    rozmowa of forty exchanges would otherwise cost forty round trips to answer one request."""
     rows = await conn.fetch(_SELECT_SESSION_TOOL_CALLS, session_id)
     grouped: dict[int, list[ToolCall]] = {}
     for row in rows:
@@ -213,11 +186,7 @@ async def get_session_tool_calls(conn: Conn, *, session_id: int) -> dict[int, li
 
 
 async def get_session_orphan_tool_calls(conn: Conn, *, session_id: int) -> list[ToolCall]:
-    """The calls in this session that no reply ever claimed.
-
-    Read separately rather than folded into the grouping above, because there is no
-    message to fold them under — and dropping them would hide the one row this whole
-    mechanism exists to keep: an order whose outcome nobody knows.
-    """
+    """The calls in this session that no reply ever claimed. Read separately because there is no message to
+    fold them under — and dropping them would hide the one row this mechanism exists to keep."""
     rows = await conn.fetch(_SELECT_SESSION_ORPHAN_TOOL_CALLS, session_id)
     return [_tool_call_from_row(row) for row in rows]

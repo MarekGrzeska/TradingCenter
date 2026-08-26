@@ -1,10 +1,5 @@
-"""The conversation surface's own database fixtures.
-
-A PostgreSQL of its own rather than a second schema in the teams one: the two chains own
-`alembic_version` separately, which is the whole reason there are two databases in
-production as well. Everything not about this database — the Docker probe, `--run-live`,
-the environment a developer's machine has — is one copy in `tests/conftest.py`.
-"""
+"""The conversation surface's own database fixtures. A PostgreSQL of its own rather than a second schema in
+the teams one: the two chains own `alembic_version` separately, which is why production has two databases."""
 
 from __future__ import annotations
 
@@ -27,17 +22,15 @@ def postgres_url(agent_postgres_url: str) -> str:
 
 @pytest.fixture(scope="session")
 def migrated_url(agent_migrated_url: str) -> str:
-    """This suite's name for the conversation's database. The container and the migration
-    are `tests/conftest.py`'s, because the process needs both databases and only that file
-    can see both."""
+    """This suite's name for the conversation's database. The container and the migration are
+    `tests/conftest.py`'s, because the process needs both databases and only that file sees both."""
     return agent_migrated_url
 
 
 @pytest.fixture(scope="session")
 async def seeded_prompt_revision_max_id(migrated_url: str) -> int:
-    """Whatever id the migrations themselves left `prompt_revisions` on, captured once
-    right after they ran — so a later migration seeding another revision needs no edit
-    here, unlike a number written in by hand that this file has already had to bump once."""
+    """Whatever id the migrations left `prompt_revisions` on, captured once right after they ran — so a
+    later seeding migration needs no edit here, unlike a number written in by hand."""
     conn = await asyncpg.connect(asyncpg_dsn(migrated_url))
     try:
         return await conn.fetchval("SELECT max(id) FROM prompt_revisions")
@@ -49,17 +42,11 @@ async def seeded_prompt_revision_max_id(migrated_url: str) -> int:
 async def db(
     migrated_url: str, seeded_prompt_revision_max_id: int
 ) -> AsyncIterator[asyncpg.Connection]:
-    """A connection to the migrated database, with the tables emptied first.
+    """A connection to the migrated database, with the tables emptied first. `prompt_revisions` is not in
+    `TABLES`: the migrations themselves insert into it, and truncating would erase the seeds.
 
-    `prompt_revisions` is not in `TABLES`: unlike every other table here, the
-    migrations themselves insert into it, and `migrated_url` runs them once for the
-    whole session. Blindly truncating it would erase the seeds a test asserting on
-    their actual text depends on. Everything up to `seeded_prompt_revision_max_id` is
-    those seeds — the only things ever written to a table nothing else has touched yet
-    — so dropping everything after it undoes whatever a previous test's own
-    `create_prompt_revision` calls added, without reconstructing seeded text here a
-    second time.
-    """
+    Everything up to `seeded_prompt_revision_max_id` is those seeds, so dropping what follows undoes a
+    previous test's own writes without reconstructing seeded text here."""
     conn = await asyncpg.connect(asyncpg_dsn(migrated_url))
     try:
         await conn.execute(f"TRUNCATE {', '.join(TABLES)} RESTART IDENTITY CASCADE")

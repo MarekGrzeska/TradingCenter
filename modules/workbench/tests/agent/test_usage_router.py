@@ -22,11 +22,8 @@ _ENV = {
 
 @pytest.fixture(autouse=True)
 def _env(workbench_env: None, migrated_url: str, db, monkeypatch: pytest.MonkeyPatch) -> None:
-    # `db` is requested for its side effect, not its value: TestClient below opens its
-    # own pool against the same `migrated_url`, and without `db`'s TRUNCATE this file
-    # shares one un-reset database across every test in the session — invisible to a
-    # test that only checks its own session id, but not to one asserting an empty
-    # summary against everyone else who wrote to it first.
+    # `db` is requested for its side effect: TestClient opens its own pool against the same database, and
+    # without the TRUNCATE this file shares one un-reset database across the session.
     del db
     for key, value in _ENV.items():
         monkeypatch.setenv(key, value)

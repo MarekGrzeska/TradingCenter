@@ -26,9 +26,8 @@ log = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# How often a silent stream gets a keep-alive comment. App Service drops a connection
-# idle for 230s (design.md); well under half of that leaves room for a slow network hop
-# on top of the timer itself.
+# How often a silent stream gets a keep-alive comment. App Service drops a connection idle for 230s;
+# well under half of that leaves room for a slow network hop on top of the timer.
 _KEEPALIVE_SECONDS = 15
 
 
@@ -58,9 +57,8 @@ async def get_session(
 ) -> SessionOut:
     async with request.app.state.agent.pool.acquire() as conn:
         session = await store.get_session(conn, session_id=session_id, owner_principal=owner)
-    # A foreign session reads exactly like a missing one — specs/agent-browser-access,
-    # "Odmowa dostępu do cudzej sesji MUST być nieodróżnialna od odpowiedzi o sesji
-    # nieistniejącej".
+    # A foreign session reads exactly like a missing one — "Odmowa dostępu do cudzej sesji MUST być
+    # nieodróżnialna od odpowiedzi o sesji nieistniejącej".
     if session is None:
         raise HTTPException(404, detail="no such session")
     return SessionOut.from_session(session)
@@ -83,17 +81,11 @@ async def get_messages(
 async def get_unclaimed_tool_calls(
     session_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> list[ToolCallOut]:
-    """The calls in this session that no reply ever claimed — sent, and never answered for
-    by a turn that reached its own end (specs/agent-trading).
+    """The calls in this session that no reply ever claimed — sent, and never answered for by a turn that
+    reached its own end. A route of its own rather than a field on the transcript, whose shape is a list.
 
-    A route of its own rather than a field on the transcript above, and the reason is the
-    transcript's shape: it publishes a list, so a field would mean publishing an object
-    instead, and a terminal build from before that change calls `map` on it. The terminal
-    is deployed separately from this module, so that window is real (design.md, D1).
-
-    Empty for almost every session, and that is the point — a row here is the record of an
-    order whose fate nobody knows.
-    """
+    Empty for almost every session, and that is the point: a row here is the record of an order whose
+    fate nobody knows."""
     async with request.app.state.agent.pool.acquire() as conn:
         session = await store.get_session(conn, session_id=session_id, owner_principal=owner)
         if session is None:
@@ -116,10 +108,8 @@ async def patch_session(
         session = await store.get_session(conn, session_id=session_id, owner_principal=owner)
         if session is None:
             raise HTTPException(404, detail="no such session")
-        # Both edits go through their own statement rather than one built by hand from
-        # whichever fields arrived — two small UPDATEs on a single-operator table cost
-        # nothing, and a query assembled from a request body is the shape SQL injection
-        # arrives in.
+        # Both edits go through their own statement rather than one built by hand from whichever fields
+        # arrived: a query assembled from a request body is the shape SQL injection arrives in.
         if body.model_id is not None:
             session = await store.set_session_model(
                 conn, session_id=session_id, owner_principal=owner, model_id=body.model_id
@@ -146,18 +136,11 @@ async def delete_session(
 
 
 def _operator_principal(request: Request) -> str | None:
-    """Who this turn acts for, as the authenticator in front of this process said it.
+    """Who this turn acts for, as the authenticator in front of this process said it. Not the bearer token,
+    which needs a validator, and there is none between this line and the routes it ends up at.
 
-    Not the bearer token, which is what travelled here while the team tools stood in their
-    own process: a token needs a validator, and there is none between this line and the
-    routes it ends up at. The principal has already been through one — Easy Auth wrote
-    these headers and overwrote whatever the caller sent — so it is the identity itself
-    that is carried, for the length of a turn and never written down.
-
-    `None` where nothing authenticates, which is a developer's machine: the team tools then
-    act carrying no identity at all, and what they create belongs to the same principal the
-    local terminal gets (`teams_tools/operator.py`).
-    """
+    `None` where nothing authenticates, which is a developer's machine: the team tools then act carrying
+    no identity at all."""
     identity = (
         request.headers.get(PRINCIPAL_ID_HEADER) or request.headers.get(PRINCIPAL_NAME_HEADER) or ""
     ).strip()
@@ -177,16 +160,14 @@ async def send_message(
         session = await store.get_session(conn, session_id=session_id, owner_principal=owner)
         if session is None:
             raise HTTPException(404, detail="no such session")
-        # Written before the model is ever called — specs/agent-chat, "Wypowiedź
-        # operatora MUST być zapisana zanim moduł zawoła model": what the operator
-        # typed survives a call that never answers.
+        # Written before the model is ever called: what the operator typed survives a call that never
+        # answers.
         await store.append_operator_message(conn, session_id=session_id, content=body.content)
 
     model_entry = request.app.state.agent.catalogue.get(session.current_model_id)
     queue: asyncio.Queue = asyncio.Queue()
-    # Set by the stop route, asked by the graph between one fragment and the next. Created
-    # here rather than in `run_turn` so the route below has something to find before the
-    # turn has read its first chunk.
+    # Set by the stop route, asked by the graph between one fragment and the next. Created here so the
+    # route below has something to find before the turn has read its first chunk.
     stop = asyncio.Event()
 
     task = asyncio.create_task(
@@ -198,41 +179,28 @@ async def send_message(
             queue=queue,
             tool_server=request.app.state.agent.tool_server,
             chart=body.chart.to_snapshot() if body.chart is not None else None,
-            # The operator's own identity, taken off the request being served and carried
-            # no further than the tool sources that act in their name. Tools that create
-            # teams and spend money must belong to the person asking, not to this process.
-            # Absent — local development, where nothing authenticates — those tools act
-            # carrying no identity rather than refusing, because refusing there would take
-            # the whole surface away from a desk.
+            # The operator's own identity, carried no further than the tool sources that act in their
+            # name. Absent — local development — those tools act carrying no identity rather than refusing.
             operator_principal=_operator_principal(request),
             stop=stop,
         )
     )
-    # A task with nothing referencing it is eligible for collection mid-run — kept here
-    # so it always finishes, whether or not the stream below is still being read
-    # (design.md, "Tura modelu przeżywa rozłączenie wołającego").
+    # A task with nothing referencing it is eligible for collection mid-run — kept here so it always
+    # finishes, whether or not the stream below is still being read.
     background = request.app.state.agent.background_tasks
     background.add(task)
     task.add_done_callback(background.discard)
 
-    # Findable by rozmowa for as long as it runs. A second turn in the same rozmowa cannot
-    # start while one is in flight — the terminal disables sending, and a caller that does
-    # it anyway replaces the entry, which is the honest answer: stop then ends the turn
-    # that is actually running.
+    # Findable by rozmowa for as long as it runs. A caller that starts a second turn anyway replaces the
+    # entry, which is the honest answer: stop then ends the turn that is actually running.
     running = request.app.state.agent.running_turns
     running[session_id] = stop
     task.add_done_callback(lambda _: running.pop(session_id, None))
 
     def _close_stream_if_the_turn_died(finished: asyncio.Task) -> None:
-        """A turn that raises before its own guard leaves nothing on the queue, and the
-        stream below then waits for an event that will never come — a hang rather than an
-        error, held open by keep-alives until the client gives up.
-
-        `run_turn` guards the model call itself, but everything before it — reading the
-        prompt, asking the tool servers what they publish — is outside that guard, and
-        this is what covers it. Found by a tool server whose stub had the wrong signature;
-        the bug it exposed is older than that change.
-        """
+        """A turn that raises before its own guard leaves nothing on the queue, and the stream then waits
+        for an event that never comes — a hang rather than an error. `run_turn` guards the model call;
+        everything before it is outside that guard, and this is what covers it."""
         if finished.cancelled() or finished.exception() is None:
             return
         log.exception(
@@ -253,11 +221,8 @@ async def send_message(
             if isinstance(event, Fragment):
                 yield _sse("fragment", {"text": event.text})
             elif isinstance(event, ToolCalled):
-                # The same shape the transcript publishes for this call once it has a
-                # row, built from the same contract model — a caller that keeps what the
-                # stream gave it and a caller that reloads afterwards MUST end up holding
-                # the same thing (specs/agent-chat, "Wywołanie narzędzia dociera w
-                # trakcie tury").
+                # The same shape the transcript publishes for this call once it has a row, built from the
+                # same contract model: the stream and a reload must end up holding the same thing.
                 published = ToolCallOut.from_recorded(event.call, event.position)
                 yield _sse("tool_call", published.model_dump(mode="json"))
             elif isinstance(event, Complete):
@@ -267,9 +232,8 @@ async def send_message(
                 yield _sse("error", {"message": event.message})
                 return
             elif isinstance(event, Stopped):
-                # No payload: what there is to say is that the operator ended it, and the
-                # reply itself arrives from the transcript like every other reply
-                # (specs/agent-chat, "Operator zatrzymuje turę w trakcie").
+                # No payload: what there is to say is that the operator ended it, and the reply itself
+                # arrives from the transcript like every other reply.
                 yield _sse("stopped", {})
                 return
 
@@ -280,17 +244,11 @@ async def send_message(
 async def stop_turn(
     session_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> None:
-    """Ends the turn running in this rozmowa, at the next boundary the graph reaches.
+    """Ends the turn running in this rozmowa, at the next boundary the graph reaches. `204` whether or not
+    one was running: a stop arriving a moment late is a race, not a mistake.
 
-    `204` whether or not one was running. A stop arriving a moment after the turn wrote
-    its last fragment is a race, not a mistake — and there is nothing an operator could do
-    with an error saying they were too late (design.md, D1).
-
-    The rozmowa is read first, with the owner filter every other route here uses, so a
-    stranger's session and a session that does not exist answer the same `404`. Without
-    that read, the registry alone would tell a stranger whether somebody else's rozmowa is
-    busy right now.
-    """
+    The rozmowa is read first, with the owner filter every other route uses, or the registry alone would
+    tell a stranger whether somebody else's rozmowa is busy."""
     async with request.app.state.agent.pool.acquire() as conn:
         session = await store.get_session(conn, session_id=session_id, owner_principal=owner)
     if session is None:

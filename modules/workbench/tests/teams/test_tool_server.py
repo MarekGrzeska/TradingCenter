@@ -33,9 +33,8 @@ async def test_the_tool_list_comes_from_the_server(tool_server: ToolServer) -> N
         "list_tracked_pairs",
         "read_indicators",
     }
-    # The description is the server's, not a copy kept here — this is the assertion that
-    # would fail the day someone writes a local catalogue (specs/teams-tool-access, "Moduł
-    # nie trzyma kopii tego, co ogłasza serwer narzędzi").
+    # The description is the server's, not a copy kept here — this is the assertion that would fail the
+    # day someone writes a local catalogue.
     price = next(tool for tool in tools if tool.name == "get_last_price")
     assert "bid side" in price.description
     assert price.input_schema["properties"]["symbol"]["type"] == "string"
@@ -49,9 +48,8 @@ async def test_the_tool_list_is_read_once_per_session(tool_server: ToolServer) -
 
 
 async def test_a_reworded_tool_needs_no_revision_rewritten() -> None:
-    """specs/teams-tool-access, "Opis narzędzia zmienia się po stronie serwera": the
-    definition names tools and nothing else, so a new description arrives simply by being
-    read from the session that will use it."""
+    """The definition names tools and nothing else, so a new description arrives simply by being read from
+    the session that will use it."""
 
     def one_tool(wording: str):
         def build(mcp: FastMCP) -> None:
@@ -98,9 +96,8 @@ async def test_a_refusal_arrives_as_a_result_with_the_servers_own_words(
 
 
 async def test_a_bare_list_return_reads_back_as_one_json_array(tool_server: ToolServer) -> None:
-    """The production bug `agent` hit: the SDK splits a typed-list return into one content
-    block per item, and joining them is N JSON documents rather than one. Reading
-    `structuredContent` is what answers it."""
+    """The production bug `agent` hit: the SDK splits a typed-list return into one content block per item,
+    and joining them is N JSON documents rather than one."""
     outcome = await tool_server.call("list_tracked_pairs", {})
 
     assert outcome.kind is ToolOutcomeKind.OK
@@ -119,9 +116,8 @@ async def test_an_unknown_tool_is_a_refusal_not_an_outage(tool_server: ToolServe
 
 
 async def test_an_unreachable_server_cannot_publish_a_tool_list() -> None:
-    """The divergence from `agent`'s twin, asserted: there, this answers `[]` and the turn
-    goes on without tools. Here it raises, because a team that was assigned tools must be
-    refused rather than left guessing (specs/teams-tool-access)."""
+    """The divergence from `agent`'s twin, asserted: there this answers `[]` and the turn goes on. Here it
+    raises, because a team that was assigned tools must be refused rather than left guessing."""
     client = ToolServer(settings_for(f"http://127.0.0.1:{free_port()}"))
     try:
         with pytest.raises(ToolServerUnavailable) as raised:
@@ -151,15 +147,8 @@ async def test_an_unreachable_server_makes_a_call_unavailable_not_a_refusal() ->
 
 
 async def test_a_call_survives_the_server_restarting_under_it() -> None:
-    """specs/teams-tool-access, "Wywołanie odrzucone z powodu nieznanej sesji jest
-    ponawiane raz" — the production failure of 17 August 2026, reproduced.
-
-    Two real servers on one port, which is what a redeploy looks like from this side: the
-    session the client holds means nothing to the second one, and its `404` is the only
-    warning there is. Driven through the real client rather than a raised `McpError`,
-    because the thing worth pinning is that the SDK still turns that `404` into what
-    `_session_is_gone` recognises.
-    """
+    """The production failure of 17 August 2026, reproduced: two real servers on one port, which is what a
+    redeploy looks like from this side. Driven through the real client, because the SDK's reading is the point."""
     port = free_port()
     async with serving(port=port) as url:
         client = ToolServer(settings_for(url))
@@ -177,9 +166,8 @@ async def test_a_call_survives_the_server_restarting_under_it() -> None:
 
 
 async def test_a_write_tool_is_retried_on_the_same_terms_as_a_read() -> None:
-    """The gate that refused the first request had not read which tool was asked for, so
-    its answer carries the same proof either way. Sorting by tool name here would leave an
-    order unplaced in the one case where it is known to be safe to send."""
+    """The gate that refused the first request had not read which tool was asked for, so its answer carries
+    the same proof either way."""
     port = free_port()
     async with serving(("place_order",), port=port) as url:
         client = ToolServer(settings_for(url))
@@ -285,14 +273,8 @@ def test_describe_unwraps_nested_task_groups() -> None:
 
 
 async def test_one_session_serves_agents_that_are_separate_tasks(tool_server: ToolServer) -> None:
-    """A run works several agents at once (specs/teams-runs), so the session is opened in
-    one task and used from others.
-
-    Worth an explicit test rather than an assumption: the transport runs its halves in an
-    anyio task group, and a task group whose scope is exited by a different task than
-    entered it is a documented way to get `RuntimeError`. It holds — this is the test that
-    says so, and the one that would fail if a future SDK stopped tolerating it.
-    """
+    """A run works several agents at once, so the session is opened in one task and used from others. Worth
+    an explicit test: a task group exited by a different task is a documented way to get `RuntimeError`."""
     concurrent = await asyncio.gather(
         asyncio.create_task(tool_server.call("get_last_price", {"symbol": "US100"})),
         asyncio.create_task(tool_server.call("read_indicators", {"symbol": "US100"})),

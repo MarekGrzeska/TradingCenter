@@ -1,19 +1,8 @@
-"""`/drawings` — the objects standing on an instrument's chart, and the operator's hand
-on them.
+"""`/drawings` — the objects standing on an instrument's chart, and the operator's hand on them. Read,
+correct, remove, and no POST: drawing with the mouse is a different change.
 
-Global to the module, not scoped to an owner, for the same reason `/chart` is: there is
-one chart and one operator, and `current_principal` is asked only to refuse an
-unauthenticated request.
-
-Read, correct, remove — and no POST. The agent writes through `store` the way `ChartTool`
-does, and the operator does not place drawings in this change; drawing with the mouse is
-a different one (design.md, "Publikacja: odczyt, poprawka, usunięcie — bez POST"). An
-endpoint nobody calls is still surface to keep working.
-
-Unlike `/chart`, nothing here has a cursor: a drawing is the instrument's state, read
-whole and replaced whole by whoever draws it (design.md, "Rysunek jest stanem, nie
-logiem").
-"""
+Unlike `/chart`, nothing here has a cursor: a drawing is the instrument's state, read whole and replaced
+whole by whoever draws it."""
 
 from __future__ import annotations
 
@@ -39,13 +28,8 @@ async def list_drawings(
 
 
 def _resolve_prices(drawing: ChartDrawing, patch: PatchDrawingIn) -> tuple[float | None, float | None]:
-    """The patch's human-named prices, turned into the two columns storage keeps — and
-    refused when they name a role this drawing's shape does not have.
-
-    Checked against the drawing as it stands, not against the patch alone: a zone given
-    only a new `top` still has to end up above the `bottom` it already had, which is the
-    reason the caller holds the row locked while this runs.
-    """
+    """The patch's human-named prices, turned into the two columns storage keeps — and refused when they
+    name a role this shape does not have. Checked against the drawing as it stands, not the patch alone."""
     geometry = drawing.geometry
 
     def reject(*fields: str) -> None:
@@ -121,7 +105,6 @@ async def delete_drawing(
     async with request.app.state.agent.pool.acquire() as conn:
         removed = await store.delete_drawing(conn, drawing_id=drawing_id)
     if not removed:
-        # Not a quiet success: an object the operator saw and cannot remove is a fact
-        # they need, and a 204 over nothing hides it until the next read brings the
-        # drawing back (specs/terminal-chart, "Usunięcie się nie powiodło").
+        # Not a quiet success: an object the operator saw and cannot remove is a fact they need, and a
+        # 204 over nothing hides it until the next read brings the drawing back.
         raise HTTPException(404, f"no drawing #{drawing_id}")

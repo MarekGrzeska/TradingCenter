@@ -1,12 +1,6 @@
-"""A tool server announcing one write tool and answering without a session.
-
-Shared by the two files that need a run to place a real order — the trace tests and the
-route tests. The session itself is `test_tool_server.py`'s subject; what matters here is
-the pair the runner reads a call as an order from: `read_only=False` on the tool, and
-`can_move_the_account` on the server it came from (specs/trading-mcp-tools, "Narzędzie
-zapisujące jest oznaczone jako zmieniające stan"). Both, because the tool's annotation
-alone says nothing about whether it can reach an account.
-"""
+"""A tool server announcing one write tool and answering without a session, shared by the two files that
+need a run to place a real order. What matters is the pair the runner reads a call as an order from:
+`read_only=False` on the tool, and `can_move_the_account` on the server it came from."""
 
 from __future__ import annotations
 

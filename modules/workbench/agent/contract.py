@@ -1,8 +1,5 @@
-"""The shapes this module answers with — snake_case on the wire, same convention as
-`market_data/contract.py`. Not generated: this module's contract is hand-written on both
-sides rather than wired into `pnpm contract:generate`, which is market-data's alone
-(design.md, "Kontrakt terminala pisany ręcznie, bez generatora").
-"""
+"""The shapes this module answers with — snake_case on the wire, same convention as market-data's. Not
+generated: this module's contract is hand-written on both sides."""
 
 from __future__ import annotations
 
@@ -32,9 +29,8 @@ from .models_catalogue import ModelCatalogueEntry
 from .tools.chart import CHART_TOOL_NAME
 from .tools.drawings import DRAW_TOOL_NAME, LIST_DRAWINGS_TOOL_NAME
 
-# A name the operator types, not one derived from the first question — so it may be longer
-# than `store.derive_title`'s 60, but not unbounded: the conversation list is a narrow
-# column that truncates, and a title past this is one nothing can show.
+# A name the operator types, so it may be longer than a derived title — but not unbounded: the
+# conversation list is a narrow column, and a title past this is one nothing can show.
 TITLE_MAX_CHARS = 120
 
 # Tools this module runs itself. Imported rather than spelled again: a tool's name is
@@ -46,11 +42,8 @@ class ModelOut(BaseModel):
     id: str
     display_name: str
     cost_rank: int
-    # Per 1,000,000 tokens, the unit providers quote — published in the same unit it is
-    # configured in, so the terminal renders the string as it arrives and never rescales
-    # it. Strings, not numbers: a rate like 0.2 round-trips exactly as text, and nothing
-    # here ever sums these on the wire — the terminal reads them to render, never to
-    # compute (design.md, "terminal niczego nie przelicza").
+    # Per 1,000,000 tokens, the unit providers quote, published in the unit it is configured in. Strings,
+    # not numbers: a rate round-trips exactly as text, and the terminal reads these to render, never to compute.
     input_rate_per_1m: str
     output_rate_per_1m: str
 
@@ -88,38 +81,27 @@ def _source_of(tool_name: str) -> str:
 
 
 class ToolCallOut(BaseModel):
-    """One tool call, published in exactly one shape whether it is leaving as a stream
-    event mid-turn or hanging off a message in a reloaded transcript. Both are built here
-    on purpose: two shapes for the same call is two chances for the panel and the
-    transcript to disagree about what the agent asked and what came back.
+    """One tool call, published in exactly one shape whether it is leaving as a stream event mid-turn or
+    hanging off a message in a reloaded transcript. Two shapes would be two chances to disagree.
 
-    No `id` and no `created_at`: the live event has neither — the row does not exist yet
-    when the call resolves — and a field one of the two paths cannot fill is a field the
-    reader has to check the origin of before trusting.
-    """
+    No `id` and no `created_at`: the live event has neither, and a field one path cannot fill is a field
+    the reader has to check the origin of before trusting."""
 
-    # Which round of the turn, and where within it. The transcript arrives ordered
-    # already; these say whether three calls were one round of three or three rounds of
-    # one, which is the difference between a model surveying and a model iterating.
+    # Which round of the turn, and where within it. These say whether three calls were one round of three
+    # or three rounds of one, which is the difference between a model surveying and a model iterating.
     round_index: int
     position: int
     tool_name: str
     arguments: dict
-    # ok, refused, unavailable or unknown — `ToolOutcomeKind` in `tools/client.py`, and the
-    # four never collapse into fewer (specs/agent-tools, "Odmowa narzędzia jest wynikiem,
-    # nie awarią tury"). `unknown` is the one only a call that can move the account ever
-    # gets, and the one a reader must not soften: it means an order may be sitting there
-    # (specs/agent-trading).
+    # ok, refused, unavailable or unknown, and the four never collapse into fewer. `unknown` is the one
+    # only a call that can move the account ever gets, and it means an order may be sitting there.
     outcome: str = Field(examples=["ok", "refused", "unavailable", "unknown"])
-    # The text the model itself received, not a summary of it. A caller shown a summary
-    # cannot tell that the model was handed something else, which is the whole reason
-    # this is published (design.md, "Wynik w całości, bez własnego sufitu").
+    # The text the model itself received, not a summary of it: a caller shown a summary cannot tell that
+    # the model was handed something else.
     result_text: str
     duration_ms: int
-    # Who ran it: the tool server, or this module itself. Derived from the name rather
-    # than stored, so there is one list of the module's own tools and no column that can
-    # disagree with it (specs/agent-tools, "Narzędzie własne modułu obok narzędzi
-    # serwera").
+    # Who ran it: the tool server, or this module itself. Derived from the name rather than stored, so
+    # there is one list of the module's own tools and no column that can disagree with it.
     source: str = Field(examples=["server", "module"])
 
     @classmethod
@@ -156,16 +138,12 @@ class MessageOut(BaseModel):
     model_id: str | None
     prompt_version: str | None
     incomplete: bool
-    # Published beside `incomplete` rather than folded into it: the panel says two
-    # different things about the two, and a caller that knows only `incomplete` still
-    # reads a stopped reply correctly (specs/terminal-agent-chat, "Odpowiedź zatrzymana
-    # nie jest błędem").
+    # Published beside `incomplete` rather than folded into it: the panel says two different things about
+    # the two, and a caller that knows only `incomplete` still reads a stopped reply correctly.
     stopped: bool
     created_at: datetime
-    # Empty for an operator's message and for an agent message that asked nothing — never
-    # absent, and never null. "No calls" and "the calls were lost on the way" are two
-    # different facts, and a field that is sometimes missing collapses them
-    # (specs/agent-tools, "Wypowiedź bez narzędzi").
+    # Empty for an operator's message and for an agent message that asked nothing — never absent, never
+    # null. "No calls" and "the calls were lost on the way" are two different facts.
     tool_calls: list[ToolCallOut] = Field(default_factory=list)
 
     @classmethod
@@ -184,16 +162,14 @@ class MessageOut(BaseModel):
 
 
 class CreateSessionIn(BaseModel):
-    # Absent or null both mean "no preference" — the route resolves it to the module's
-    # default, the same as specs/agent-models requires when a session is created with
-    # no model named at all.
+    # Absent or null both mean "no preference" — the route resolves it to the module's default, the same
+    # as a session created with no model named at all.
     model_id: str | None = None
 
 
 class PatchSessionIn(BaseModel):
-    """Both fields optional, at least one required — one route for two edits that an
-    operator makes at different moments and never together: the model changes mid-thought,
-    the name once the rozmowa turned out to be about something worth finding again."""
+    """Both fields optional, at least one required — one route for two edits an operator makes at
+    different moments and never together."""
 
     model_id: str | None = None
     title: str | None = None
@@ -227,9 +203,8 @@ class ChartIndicatorIn(BaseModel):
 
 
 class ChartSnapshotIn(BaseModel):
-    """What the caller is drawing right now. Optional everywhere: a consumer without a
-    chart — every one except the terminal — has nothing to send, and a turn without this
-    behaves exactly as it did before the field existed."""
+    """What the caller is drawing right now. Optional everywhere: a consumer without a chart has nothing
+    to send, and a turn without this behaves exactly as it did before the field existed."""
 
     symbol: str | None = None
     resolution: str | None = None
@@ -283,12 +258,8 @@ class ChartFocusOut(BaseModel):
 
 
 class ChartCommandOut(BaseModel):
-    """What the chart should show now, and the sequence number that says so.
-
-    Several commands the consumer missed arrive folded into one — `sequence` is the
-    newest of them, and a field left null by every one of them is still null here,
-    meaning "leave it as it is" (specs/agent-chart-control, "Konsument czyta tylko to,
-    czego jeszcze nie zastosował")."""
+    """What the chart should show now, and the sequence number that says so. Several commands the consumer
+    missed arrive folded into one, and a field left null by every one of them is still null here."""
 
     sequence: int
     symbol: str | None
@@ -345,26 +316,16 @@ ChartGeometryOut = Annotated[
 
 
 class ChartDrawingOut(BaseModel):
-    """One object standing on an instrument's chart.
-
-    The geometry is a union discriminated by `kind`, with each shape's fields named for
-    what they are — a consumer reading `top` and `bottom` cannot mix them up the way one
-    reading the storage's `price_a`/`price_b` could (design.md, "Zapis: cztery kolumny
-    geometrii i CHECK per kształt; druty: unia po `kind`").
-
-    No `sequence` and no cursor: this is the instrument's state, read whole and replaced
-    whole, not a log a consumer catches up with (`ChartCommandOut` is the other one).
-    """
+    """One object standing on an instrument's chart. The geometry is a union discriminated by `kind`, with
+    each shape's fields named for what they are. No cursor: this is state, read whole and replaced whole."""
 
     id: int
     symbol: str
     geometry: ChartGeometryOut
     label: str | None
     color: str | None
-    # Whether the chart draws it. A hidden drawing is published like any other — the list
-    # in the terminal is the only way back to it, and a read that left it out would hide
-    # it for good (specs/terminal-chart, "Operator zarządza naniesionymi obiektami
-    # z listy").
+    # Whether the chart draws it. A hidden drawing is published like any other: the list in the terminal
+    # is the only way back to it, and a read that left it out would hide it for good.
     hidden: bool
     created_at: datetime
     updated_at: datetime
@@ -397,16 +358,8 @@ class ChartDrawingOut(BaseModel):
 
 
 class PatchDrawingIn(BaseModel):
-    """What the operator may correct by hand: the prices and the caption.
-
-    Not `kind` and not `symbol` — a level that became a zone, or a drawing that moved to
-    another instrument, is a different drawing and should be made as one
-    (specs/agent-chart-drawings, "Poprawienie MUST zachować tożsamość rysunku").
-
-    One field per price *role*, not per column: which of them a request may carry depends
-    on the drawing's `kind`, and the route refuses the ones that do not belong to it
-    rather than silently writing into a column that means something else there.
-    """
+    """What the operator may correct by hand: the prices and the caption. Not `kind` and not `symbol` — a
+    level that became a zone is a different drawing. One field per price *role*, not per column."""
 
     price: float | None = Field(default=None, description="a level's price")
     top: float | None = Field(default=None, description="a zone's upper price")
@@ -414,9 +367,8 @@ class PatchDrawingIn(BaseModel):
     a_price: float | None = Field(default=None, description="a trend line's first price")
     b_price: float | None = Field(default=None, description="a trend line's second price")
     label: str | None = None
-    # Hiding is a correction of the drawing like any other, so it rides this route rather
-    # than one of its own — and `None` keeps meaning "leave it", which is what lets a
-    # price correction travel without saying anything about visibility.
+    # Hiding is a correction of the drawing like any other, so it rides this route. `None` keeps meaning
+    # "leave it", which lets a price correction travel without saying anything about visibility.
     hidden: bool | None = None
 
     @field_validator("price", "top", "bottom", "a_price", "b_price")
@@ -431,9 +383,8 @@ class PatchDrawingIn(BaseModel):
     @field_validator("label")
     @classmethod
     def _label_is_a_caption(cls, value: str | None) -> str | None:
-        # Blank refused rather than taken as "clear it", the same way `PatchSessionIn`
-        # treats a blank title: a request that means to erase should say so in a way a
-        # dropped field cannot be mistaken for.
+        # Blank refused rather than taken as "clear it": a request that means to erase should say so in
+        # a way a dropped field cannot be mistaken for.
         if value is None:
             return None
         collapsed = " ".join(value.split())

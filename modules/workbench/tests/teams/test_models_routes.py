@@ -1,9 +1,5 @@
-"""`GET /models`, and what happens to a revision whose model is later withdrawn.
-
-Through the real lifespan like the other route tests: the catalogue the routes read is
-the one `Settings()` built, so a test assembling its own would prove nothing about the
-module that gets deployed.
-"""
+"""`GET /models`, and what happens to a revision whose model is later withdrawn. Through the real lifespan:
+the catalogue the routes read is the one `Settings()` built."""
 
 from __future__ import annotations
 
@@ -148,9 +144,8 @@ def test_a_withdrawn_model_leaves_the_catalogue_and_its_revisions_readable(
 
 
 async def test_a_revision_on_a_withdrawn_model_keeps_its_runs(db: asyncpg.Connection) -> None:
-    # The other half of the same requirement, below HTTP because a run has no route until
-    # group 7: what the model catalogue does is refuse the *next* run, and it touches
-    # neither the revision nor the trace of the runs already there.
+    # The other half of the same requirement, below HTTP: what the model catalogue does is refuse the
+    # *next* run, and it touches neither the revision nor the trace of the runs already there.
     definition = TeamDefinition.model_validate(
         {"agents": [_agent("scout", model_id=DEAR)], "edges": []}
     )

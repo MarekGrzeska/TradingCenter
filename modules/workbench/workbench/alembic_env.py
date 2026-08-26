@@ -1,15 +1,8 @@
-"""How alembic reaches a database — one copy for both chains.
+"""How alembic reaches a database — one copy for both chains, which used to be byte-identical outside their
+comments. What differs is which of the two databases is being reached, and that is an argument.
 
-`migrations/agent/env.py` and `migrations/teams/env.py` used to be byte-identical outside
-their comments and the name of the settings class they imported. They were two modules
-then. They are two directories of one module now, and a copy inside one module is a copy
-this repository removes: what differs is which of the two databases is being reached, and
-that is an argument.
-
-Alembic executes each `env.py` as a script, so the import below resolves against `sys.path`
-— which holds the module root under uvicorn (its working directory), under pytest
-(`pythonpath = ["."]`) and under the CLI (`prepend_sys_path = .` in both ini files).
-"""
+Alembic executes each `env.py` as a script, so the import below resolves against `sys.path` — which holds
+the module root under uvicorn, under pytest and under the CLI alike."""
 
 from __future__ import annotations
 

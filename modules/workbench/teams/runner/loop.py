@@ -1,23 +1,9 @@
-"""One agent's work: the model and its tools, going round until the model stops asking.
+"""One agent's work: the model and its tools, going round until the model stops asking. A plain loop rather
+than a nested graph, because the *team* graph is the LangGraph, and two frameworks' supersteps between a
+question and its answer buy nothing. The round ceiling reads as a `for` bound, which is what it is.
 
-This is the inside of a node in the team's graph. `agent/graph.py` runs the same shape as
-a two-node LangGraph with a conditional edge between them; here it is a plain loop, and
-the reason is what surrounds it: the *team* graph is the LangGraph (`graph.py` next
-door), built from the definition the operator drew, and nesting a second graph inside
-every node of it would put two frameworks' worth of supersteps between an operator's
-question and its answer. The round ceiling reads as a `for` bound, which is what it is.
-
-Three failures stay apart, exactly as they do in `agent`:
-
-- the **tool** refused — the server answered, and its answer names what to change. Back to
-  the model, which can act on it.
-- the tool **server** could not be reached — nothing was asked, so nothing is known about
-  the archive either way. Also back to the model, worded so it does not read as missing
-  data.
-- the **provider** broke — nothing more will be generated. The agent's work ends with
-  whatever text arrived, marked failed, and the run stops (specs/teams-runs, "Przebieg
-  kończy się błędem w połowie").
-"""
+Three failures stay apart, exactly as they do in `agent`: the tool refused, the server could not be reached,
+or the provider broke — and only the last ends the agent's work."""
 
 from __future__ import annotations
 
@@ -40,24 +26,15 @@ from ..tools import ToolDescriptor, ToolOutcome, ToolOutcomeKind
 
 log = logging.getLogger(__name__)
 
-# How many times one agent may go model → tools → model. A number in the code rather than
-# a setting, the same choice `agent` made for its own ceiling and for the same reason: a
-# safety ceiling in configuration is an invitation to raise it at the moment it is
-# inconvenient.
-#
-# Six, not agent's eight, and the difference is the multiplication. A conversation's
-# ceiling bounds one turn; here every agent in a team carries its own, so a six-agent team
-# is bounded at 6 × 6 model-plus-tools rounds before anyone has read a word of the result.
-# Six still covers what a real analytical role does — coverage, candles, indicators,
-# levels — with room for one retry.
+# How many times one agent may go model → tools → model. In the code rather than a setting: a safety
+# ceiling in configuration is an invitation to raise it. Six, not agent's eight, because here it multiplies.
 ROUND_CEILING = 6
 
 
 @dataclass(frozen=True)
 class RecordedCall:
-    """One resolved tool call, in the shape both the trace row and the progress event are
-    built from — a panel and a reloaded run must not be able to disagree about what was
-    asked and what came back."""
+    """One resolved tool call, in the shape both the trace row and the progress event are built from — a
+    panel and a reloaded run must not disagree about what was asked and what came back."""
 
     round_index: int
     position: int
@@ -66,10 +43,8 @@ class RecordedCall:
     outcome: str
     text: str
     duration_ms: int
-    # Whether the tool's own server declared it as changing the account. Carried on the
-    # call rather than looked up again by whoever handles it: the descriptors belong to
-    # the session this loop was handed, and a second lookup elsewhere would be a second
-    # place that could disagree (specs/teams-trading).
+    # Whether the tool's own server declared it as changing the account. Carried on the call rather than
+    # looked up again: a second lookup elsewhere would be a second place that could disagree.
     writes: bool = False
 
 
@@ -84,44 +59,29 @@ class AgentWork:
     # and every one of those calls leaves its own usage row (specs/teams-usage).
     usages: list[UsageReport | None] = field(default_factory=list)
     failed: bool = False
-    # True when the loop hit `ROUND_CEILING` and the last model call was made with no
-    # tools at all. `run_steps.rounds` carries the number; this is what says the number
-    # was a ceiling rather than a coincidence (specs/teams-runs, "ślad przebiegu pokazuje,
-    # że granica została osiągnięta").
+    # True when the loop hit `ROUND_CEILING` and the last model call was made with no tools. `rounds`
+    # carries the number; this says the number was a ceiling rather than a coincidence.
     ceiling_reached: bool = False
 
 
 ToolCaller = Callable[[str, dict[str, Any]], Awaitable[ToolOutcome]]
 OnToolCall = Callable[[RecordedCall], Awaitable[None]]
-# Called before each model call and allowed to raise — the cost ceiling's only way in
-# (`cost.py`). Called after each one with what the provider reported, which is where the
-# usage row is written.
+# Called before each model call and allowed to raise — the cost ceiling's only way in. Called after each
+# one with what the provider reported, which is where the usage row is written.
 BeforeModelCall = Callable[[], Awaitable[None]]
 OnModelCall = Callable[[UsageReport | None], Awaitable[None]]
-# Called before a call to a tool its server declared as changing the account, and only
-# for those — the trading ceiling's only way in (`trading.py`), and where the trade row
-# is written before the order is sent.
-#
-# Three things it may do, and they are three different facts: raise (a ceiling nothing
-# the model does next can move — the run stops), answer with a sentence (this one call
-# is refused and the model can correct it), or answer `None` (the order is being sent,
-# and by then its row exists).
+# Called before a call to a tool its server declared as changing the account, and only for those. Three
+# things it may do: raise (the run stops), answer with a sentence (this call is refused), or answer `None`.
 BeforeWriteCall = Callable[[str, dict[str, Any]], Awaitable[str | None]]
 
-# Whether a tool name could leave the account changed. Answered by `ToolPlan`, which
-# resolved it off the same announcement the run was admitted on — never re-derived here
-# from a descriptor, which is how this module and `agent` came to read the same
-# `readOnlyHint` in opposite directions until 18 August 2026.
+# Whether a tool name could leave the account changed. Answered by `ToolPlan` off the same announcement the
+# run was admitted on — never re-derived here, which is how two modules read one hint in opposite directions.
 MovesTheAccount = Callable[[str], bool]
 
 
 def system_prompt_for(agent: AgentDefinition, *, has_tools: bool) -> str:
-    """The agent's own role and prompt, plus its guidance and one line about tools.
-
-    Assembled here rather than stored: the definition carries what the operator wrote, and
-    the sentence about tools depends on what this run could actually reach, which is not a
-    property of the revision.
-    """
+    """The agent's own role and prompt, plus its guidance and one line about tools. Assembled here rather
+    than stored: the sentence about tools depends on what this run could reach, not on the revision."""
     parts = [f"You are the {agent.role} in a team of agents working on one question.", agent.prompt]
     if agent.guidance.strip():
         parts.append(agent.guidance.strip())
@@ -140,13 +100,8 @@ def system_prompt_for(agent: AgentDefinition, *, has_tools: bool) -> str:
 
 
 def briefing_for(agent: AgentDefinition, predecessors: Sequence[tuple[str, str]]) -> str:
-    """What this agent is told, and the whole of it.
-
-    `predecessors` is `(agent_key, output)` for the agents an edge leads *from* — nobody
-    else's work appears here, which is the requirement itself (specs/teams-runs, "Agent
-    widzi wypowiedzi poprzedników, a nie całą historię przebiegu"). An agent with no
-    predecessors starts from its own prompt alone.
-    """
+    """What this agent is told, and the whole of it. `predecessors` is `(agent_key, output)` for the agents
+    an edge leads *from* — nobody else's work appears, which is the requirement itself."""
     if not predecessors:
         return "You are starting. Nobody has worked before you in this run."
     parts = ["The agents you depend on have finished. This is their work."]
@@ -168,21 +123,11 @@ async def run_agent(
     before_write_call: BeforeWriteCall | None = None,
     moves_the_account: MovesTheAccount | None = None,
 ) -> AgentWork:
-    """Model → tools → model, until the model stops asking or the ceiling is reached.
+    """Model → tools → model, until the model stops asking or the ceiling is reached. Never raises for a
+    broken provider or a broken tool: the text produced before something broke is part of the trace.
 
-    Never raises for a broken provider or a broken tool: both come back inside `AgentWork`,
-    because the text an agent produced before something broke is part of the trace this
-    module exists to keep.
-
-    The hooks are the exception, and they are deliberately outside that guarantee.
-    `before_model_call` is what a cost ceiling raises from — a run stopped for money did
-    not fail, and the difference has to reach the status (specs/teams-usage). `on_model_call`
-    is where the usage row is written, once per call rather than once per agent: a limit
-    checked against a total that only updates when an agent finishes would let a six-round
-    agent spend six rounds past it. `before_write_call` is the same seam for orders, and
-    it fires only for tools their own server declared as changing the account
-    (specs/teams-trading).
-    """
+    The hooks are deliberately outside that guarantee: a cost ceiling raises from `before_model_call`, the
+    usage row is written per call rather than per agent, and `before_write_call` is the same seam for orders."""
     work = AgentWork()
     system_prompt = system_prompt_for(agent, has_tools=bool(tools))
     rounds: list[ToolRound] = []
@@ -191,11 +136,8 @@ async def run_agent(
         if before_model_call is not None:
             await before_model_call()
         at_ceiling = work.rounds >= ROUND_CEILING
-        # Past the ceiling the model is called with no tools at all, rather than with
-        # tools it is told not to use. A model holding a tool it may not call is being
-        # asked to obey a rule; a model holding none is simply answering
-        # (specs/teams-runs, "Po jej osiągnięciu agent MUST dokończyć pracę bez dalszego
-        # sięgania po narzędzia").
+        # Past the ceiling the model is called with no tools at all, rather than with tools it is told
+        # not to use. A model holding none is simply answering.
         offered = [] if at_ceiling else list(tools)
         parts: list[str] = []
         requests: list[ToolCallRequest] = []
@@ -240,16 +182,14 @@ async def run_agent(
 
         results: list[ToolCallResult] = []
         for position, request in enumerate(requests):
-            # Not decided here. The plan holds both the announcement and which server it
-            # came from, and answers conservatively: unannotated on a server that can
-            # send orders reads as an order (`tools/assignment.py`, `_moves_the_account`).
+            # Not decided here. The plan holds both the announcement and which server it came from, and
+            # answers conservatively: unannotated on a server that can send orders reads as an order.
             writes = moves_the_account(request.name) if moves_the_account is not None else False
 
             refusal: str | None = None
             if writes and before_write_call is not None:
-                # Raises to stop the run (an exhausted count), or answers with a sentence
-                # to refuse this one call and carry on (a size the agent can correct) —
-                # see `trading.TradeGuard.check`.
+                # Raises to stop the run (an exhausted count), or answers with a sentence to refuse this
+                # one call and carry on (a size the agent can correct).
                 refusal = await before_write_call(request.name, request.arguments)
 
             if refusal is not None:
@@ -269,9 +209,8 @@ async def run_agent(
                 writes=writes,
             )
             work.calls.append(call)
-            # Announced as it resolves, not when the round ends: a round of three calls
-            # reaches the operator as three events in the order they happened
-            # (specs/teams-runs, "Postęp przebiegu widać w trakcie").
+            # Announced as it resolves, not when the round ends: a round of three calls reaches the
+            # operator as three events in the order they happened.
             await on_tool_call(call)
 
         rounds.append(ToolRound(tuple(requests), tuple(results)))
