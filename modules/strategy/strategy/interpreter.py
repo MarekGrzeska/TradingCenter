@@ -1,26 +1,9 @@
-"""Evaluating a rule — the `evaluate` of every strategy that was clicked together.
+"""Evaluating a rule — the `evaluate` of every strategy that was clicked together. This file is a
+catalogue entry's equal, not the runtime's: it reaches nothing outside its arguments and reads no clock.
 
-This file is a catalogue entry's equal, not the runtime's: it may know the contract and
-nothing else, it reaches nothing outside its arguments and it reads no clock.
-`tests/test_layering.py` holds it to the same rules it holds `catalogue/` to, because the
-property everything downstream stands on — a unit test on facts by hand, the replay of a
-recorded decision, the backtest calling the very same function — would be lost for every
-clicked rule at once if this one function were impure.
-
-**Three-valued, and closed on refusal.** A reading the archive did not compute is neither a
-number nor a zero, so every numeric node answers `float | None` and every question answers
-`bool | None`. A missing operand makes its parent undetermined, except where the answer is
-known anyway: a conjunction with an outright false is false, a disjunction with an outright
-true is true (Kleene's rule, and the only one that does not throw away information). A
-question that came out undetermined **refuses**. That direction is not a preference — an
-unsettled average looks exactly like a crossing that did not happen, and the cost of being
-wrong in the other direction is a position.
-
-**Total.** Division by zero, an index before the series began, a parameter that is not
-there: each yields "undetermined" rather than an exception. A rule that raised would take
-the loop's whole pass with it, and the honest report of "this could not be worked out" is
-already a decision this platform knows how to record.
-"""
+Three-valued and closed on refusal: a reading the archive did not compute is neither a number nor a zero,
+and a question that came out undetermined refuses — an unsettled average looks exactly like a crossing
+that did not happen. Total, too: a rule that raised would take the loop's whole pass with it."""
 
 from __future__ import annotations
 
@@ -45,9 +28,8 @@ from .rule import (
 )
 from .spec import Decision, Fact, Facts, Param, StrategySpec
 
-# The two refusals the platform states for every rule, because they are about the reading
-# rather than about the strategy. Worded the way the hand-written entry of reference words
-# them, so a rule and its coded twin answer with the same sentence.
+# The two refusals the platform states for every rule, because they are about the reading rather than the
+# strategy. Worded as the hand-written entry of reference words them, so twins answer the same sentence.
 FACT_NOT_READ = "a fact this strategy declared was not read"
 STOP_IS_ENTRY = "the stop worked out to the entry, so there is no risk to size against"
 
@@ -65,16 +47,8 @@ class _Env:
 
 
 def interpret(rule: RuleDefinition, facts: Facts, params: Mapping[str, float]) -> Decision:
-    """One rule, one bar, one decision. The order is the whole of what a rule means.
-
-        every declared fact present  ->  none of them an error  ->  the guards, in order
-                                     ->  the features  ->  the setups, in order
-
-    The features are computed after the guards and before the setups, which is where the
-    hand-written entry of reference computes them too: a guard's refusal is about the
-    reading and carries nothing, while a refusal to find a setup is about what was seen and
-    carries what was measured.
-    """
+    """One rule, one bar, one decision. The order is the whole of what a rule means: every declared
+    fact present, none of them an error, the guards in order, the features, then the setups in order."""
     env = _Env(facts=facts, params=params)
 
     for declared in rule.facts:
@@ -127,9 +101,8 @@ def interpret(rule: RuleDefinition, facts: Facts, params: Mapping[str, float]) -
                 reason=setup.reason,
             )
         except ValueError:
-            # `Decision` refuses a trade whose stop is its entry, and it is right to: there
-            # is nothing to size against. Not knowable when the rule was saved, because both
-            # numbers come out of arithmetic on readings (design.md, decision 9).
+            # `Decision` refuses a trade whose stop is its entry, and it is right to: there is nothing
+            # to size against. Not knowable when the rule was saved, since both come out of arithmetic.
             return Decision.no_trade(STOP_IS_ENTRY, features=features)
 
     return Decision.no_trade(rule.no_setup_reason, features=features)
@@ -138,13 +111,8 @@ def interpret(rule: RuleDefinition, facts: Facts, params: Mapping[str, float]) -
 def spec_from_rule(
     *, strategy_id: str, name: str, description: str, rule: RuleDefinition
 ) -> StrategySpec:
-    """One revision as an ordinary catalogue entry.
-
-    This is the whole of what makes a clicked strategy indistinguishable downstream: the
-    loop, the gates, the record and the backtest are handed a `StrategySpec` and never learn
-    where it came from. A branch of the shape "if this one was configured" anywhere below
-    here would mean the contract had not in fact been enough.
-    """
+    """One revision as an ordinary catalogue entry. This is what makes a clicked strategy
+    indistinguishable downstream: everything below is handed a `StrategySpec` and never learns its origin."""
     return StrategySpec(
         id=strategy_id,
         name=name,
@@ -174,8 +142,6 @@ def spec_from_rule(
         candles=rule.candles,
     )
 
-
-# --- numbers ----------------------------------------------------------------------------
 
 
 def _number(node: Numeric, env: _Env) -> float | None:
@@ -258,8 +224,6 @@ def _call(node: Call, env: _Env) -> float | None:
     return round(numbers[0], int(numbers[1]))
 
 
-# --- questions ----------------------------------------------------------------------------
-
 
 def _truth(node: object, env: _Env) -> bool | None:
     if isinstance(node, Compare):
@@ -300,11 +264,8 @@ def _logic(node: Logic, env: _Env) -> bool | None:
 
 
 def _crossed(node: Crossed, env: _Env) -> bool | None:
-    """Both sides, on this bar and the one before, from the same two expressions.
-
-    One expression evaluated in two frames rather than two declarations that must agree —
-    which is the mistake this node exists to make unavailable.
-    """
+    """Both sides, on this bar and the one before, from the same two expressions — one expression in two
+    frames rather than two declarations that must agree."""
     before = env.back(1)
     now_left = _number(node.left, env)
     now_right = _number(node.right, env)

@@ -1,20 +1,9 @@
-"""One place where a strategy id becomes a `StrategySpec`, whatever it was written in.
+"""One place where a strategy id becomes a `StrategySpec`, whatever it was written in — and the only file
+that knows there are two sources. A branch of the shape "if this one was configured" anywhere else would
+mean the entry contract had not been enough.
 
-**This is the only file that knows there are two sources.** Above it — the loop, the gates,
-the record, the surfaces, the backtest — everything is handed a `StrategySpec` and never
-learns whether it came from the image or from a row. A branch of the shape "if this one was
-configured" anywhere else would mean the entry contract had not, after all, been enough
-(`strategy-catalogue`, "Strategia jest wpisem katalogu, nie zmianą platformy").
-
-**One namespace, and the image wins it.** A definition may not claim an id a coded entry
-already uses; the check lives where the definition is written, and the lookup here reads the
-image first so that a row sneaking past it can never shadow reviewed code.
-
-**A stored rule that no longer parses is a refusal, not a crash.** The vocabulary can only
-grow, but a revision written by a later image and read by an earlier one is an ordinary
-consequence of a rollback. It comes back as this module's own error, which the loop already
-knows how to skip one watch on.
-"""
+One namespace, and the image wins it. A stored rule this image can no longer parse is a refusal rather
+than a crash: a revision written by a later image is an ordinary consequence of a rollback."""
 
 from __future__ import annotations
 
@@ -84,12 +73,8 @@ async def resolve(
     revision_id: int | None = None,
     version: int | None = None,
 ) -> Resolved:
-    """The strategy behind an id, at a named revision or at its newest.
-
-    Asking for a revision of a coded entry is refused rather than ignored: it is a caller
-    that believes something untrue about which kind of strategy this is, and answering it
-    with the code anyway would leave that belief in place.
-    """
+    """The strategy behind an id, at a named revision or at its newest. Asking for a revision of a coded
+    entry is refused rather than ignored: it is a caller that believes something untrue."""
     try:
         spec = coded_entry(strategy_id)
     except UnknownStrategy:
@@ -118,22 +103,14 @@ async def resolve(
 
 
 async def resolve_watch(conn, watch: store.Watch) -> Resolved:
-    """What one watch is actually computing — its pinned revision, never the newest.
-
-    The distinction this function exists for: a definition may have moved on three times
-    since the watch was started, and none of that changes what the watch decides until
-    somebody points it at a newer one.
-    """
+    """What one watch is actually computing — its pinned revision, never the newest. A definition may have
+    moved on three times since, and none of it changes what the watch decides."""
     return await resolve(conn, watch.strategy_id, revision_id=watch.strategy_revision_id)
 
 
 async def all_available(conn) -> list[Resolved]:
-    """Every strategy this platform can run right now: the image's, then the stored ones.
-
-    A definition whose newest revision this image cannot read is left out rather than
-    raising — the rest of the catalogue is unaffected, and a caller listing strategies is
-    not the caller who should learn about it.
-    """
+    """Every strategy this platform can run right now. A definition whose newest revision this image
+    cannot read is left out rather than raising — the rest of the catalogue is unaffected."""
     from .catalogue import all_entries
 
     found = [Resolved(spec=spec) for spec in all_entries()]

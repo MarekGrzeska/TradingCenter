@@ -1,19 +1,7 @@
-"""One FastMCP instance, mounted at `/mcp` in this module's own application.
-
-The three notes below are market-data's, kept because they are the three ways this went
-wrong in production on 19 August 2026 and none of them is obvious from the library:
-
-* **The path.** `streamable_http_app()` puts its endpoint at
-  `settings.streamable_http_path`, which is `/mcp` by default. Mounted under `/mcp` that
-  becomes `/mcp/mcp`, and the address every caller was configured with answers `307` into
-  a `404`. Set to `/` here, so the mount decides the address and nothing else does.
-* **The lifespan.** A mounted application's lifespan is never run — only the outermost one
-  is — so the task group the transport dispatches into has to be started by the lifespan
-  of the app that mounted it (`tool_surface_session`, called from `app.py`).
-* **The trailing slash.** A mount matches `/mcp/...`; a request to `/mcp` itself matches
-  nothing and Starlette answers `307`. An MCP client posts to the address it was
-  configured with and does not follow a redirect on a POST (`ToolSurfaceAddress`).
-"""
+"""One FastMCP instance, mounted at `/mcp` in this module's own application. The three notes are
+market-data's, kept because they are the three ways this went wrong in production on 19 August 2026:
+the transport's path doubles under the mount, a mounted lifespan never runs, and `/mcp` without the
+trailing slash answers a 307 an MCP client will not follow on a POST."""
 
 from __future__ import annotations
 
@@ -40,12 +28,8 @@ def build_server(app) -> FastMCP:
     mcp = FastMCP(
         "strategy",
         instructions=INSTRUCTIONS,
-        # Off, explicitly, and the explicitness is the point: FastMCP turns DNS-rebinding
-        # protection *on* whenever its `host` is a loopback one, and then answers `421
-        # Invalid Host header` to every request not addressed to localhost — which,
-        # mounted inside this module, is every request there is. What the check would buy
-        # here is nothing: this surface is behind Easy Auth and behind this module's own
-        # caller record, so a page cannot mint a token for it.
+        # Off, explicitly: FastMCP turns DNS-rebinding protection on for a loopback host and then
+        # answers 421 to every request. Behind Easy Auth a page cannot mint a token, so it buys nothing.
         transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
     )
 

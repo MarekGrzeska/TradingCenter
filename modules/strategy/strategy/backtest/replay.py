@@ -1,16 +1,8 @@
-"""History, walked bar by bar through the very function the loop calls.
+"""History, walked bar by bar through the very function the loop calls. One `evaluate`, two drivers, and
+there must never be a second implementation — the look-ahead test compares this module against itself.
 
-**One `evaluate`, two drivers.** The loop's driver is the clock; this one is a cursor over
-a range. There is no second implementation of any strategy rule here, and there must never
-be — the test that catches look-ahead compares this module against itself, and it only
-works while there is one thing to compare (`strategy-backtest`).
-
-**Slicing is where look-ahead actually creeps in.** A batch read knows the whole range, and
-a fact read over the whole range carries answers about the future: a zone knows when it was
-later filled, a marker sits at a bar that has not happened yet. `slice_at` masks all of it.
-Getting that wrong is invisible in the equity curve and obvious in the incremental test,
-which is why both drivers exist.
-"""
+Slicing is where look-ahead actually creeps in: a fact read over the whole range carries answers about
+the future, and `slice_at` masks all of it. Getting that wrong is invisible in the equity curve."""
 
 from __future__ import annotations
 
@@ -38,17 +30,8 @@ class Replayed:
 
 
 def slice_at(read: FactsRead, as_of: datetime, *, candles: int) -> Facts:
-    """The facts as they would have looked at `as_of`, and nothing later.
-
-    Every truncation here answers a way the future leaks backwards:
-
-    * candles and line values after this bar are dropped, and only the last `candles` of
-      what remains are handed over — the same window the loop would have read;
-    * a marker, level or zone that begins later has not been observed yet;
-    * a zone's `touched_at`, `filled_at` and `end` are masked when they fall after this
-      bar. This is the subtle one: the zone itself existed, but what later became of it is
-      exactly the fact a strategy must not have.
-    """
+    """The facts as they would have looked at `as_of`, and nothing later. The subtle one is a zone's
+    `touched_at`/`filled_at`: the zone existed, but what later became of it is exactly what must not leak."""
     kept_candles = tuple(candle for candle in read.facts.candles if candle.time <= as_of)
     values: dict[str, FactValue] = {}
     for key, value in read.facts.values.items():
@@ -99,10 +82,8 @@ def decide_at(
     *,
     gaps: Sequence[Gap] = (),
 ) -> Replayed | None:
-    """One bar, decided the way the loop decides it — the same gates in the same order.
-
-    `None` when the bar has no candles behind it yet: warmup, not a decision.
-    """
+    """One bar, decided the way the loop decides it — the same gates in the same order. `None` when the
+    bar has no candles behind it yet: warmup, not a decision."""
     facts = slice_at(read, as_of, candles=spec.candles)
     if not facts.candles:
         return None
@@ -129,12 +110,8 @@ async def batch(
     start: datetime,
     end: datetime,
 ) -> list[Replayed]:
-    """The whole range read once, then walked.
-
-    What a backtest actually runs: one read of the archive rather than one per bar, which
-    over two years of hourly bars is the difference between a request and seventeen
-    thousand of them.
-    """
+    """The whole range read once, then walked — what a backtest actually runs. Over two years of hourly
+    bars that is the difference between a request and seventeen thousand of them."""
     read = await archive.read_facts(spec, symbol, params, as_of=end, bars_from=start)
     decided = []
     for as_of in _bars_in(read, start, end):
@@ -153,12 +130,8 @@ async def incremental(
     start: datetime,
     end: datetime,
 ) -> list[Replayed]:
-    """One read per bar, exactly as the loop would have done it, day by day.
-
-    Slow by construction and not what anybody runs over a long range. It exists to be
-    compared against `batch`: they must agree bar for bar, and a difference is look-ahead —
-    the one defect that makes a backtest profitable and a live account not.
-    """
+    """One read per bar, exactly as the loop would have done it. Slow by construction: it exists to be
+    compared against `batch`, and a difference is look-ahead."""
     outline = await archive.read_facts(spec, symbol, params, as_of=end, bars_from=start)
     decided = []
     for as_of in _bars_in(outline, start, end):

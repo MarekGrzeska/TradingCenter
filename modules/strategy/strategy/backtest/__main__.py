@@ -1,23 +1,8 @@
-"""`uv run python -m strategy.backtest` — one run, or several compared.
+"""`uv run python -m strategy.backtest` — one run, or several compared. A command rather than a route,
+and not part of any suite: a backtest over two years is minutes of somebody's afternoon.
 
-A command rather than a route, and not part of any test suite: a backtest over two years
-is minutes of somebody's afternoon, and the repository's own rule is that no performance
-work belongs in the unit suite. What *is* tested is everything it calls.
-
-    uv run python -m strategy.backtest --symbol US100 --from 2025-01-01 --to 2026-01-01
-    uv run python -m strategy.backtest --symbol US100 --from ... --to ... \\
-        --strategy baseline_ma_cross --strategy my_rule@3 --spread 1.5
-
-**`name@version` names a revision**, which is what makes comparing two revisions of one
-definition — the question this command exists for — a matter of naming it twice:
-
-    --strategy my_rule@3 --strategy my_rule@4
-
-**The database is reached only when something needs it.** Naming coded entries and nothing
-else runs against the archive alone, so the floor every strategy is measured against can
-always be recomputed with nothing else standing (`strategy-configurator`, "Wpis kodowy bez
-bazy"). A written rule, or no `--strategy` at all, needs a connection to resolve.
-"""
+`name@version` names a revision, which makes comparing two revisions of one definition a matter of naming
+it twice. The database is reached only when something needs it: coded entries run against the archive alone."""
 
 from __future__ import annotations
 
@@ -93,12 +78,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 @asynccontextmanager
 async def _pool(settings: Settings):
-    """A connection of this command's own.
-
-    Its own rather than the running module's: this is a separate process, and a backtest
-    must not need the platform to be serving to be run. What it does need, when a written
-    rule is in play, is the database the rules live in.
-    """
+    """A connection of this command's own rather than the running module's: this is a separate process,
+    and a backtest must not need the platform to be serving."""
     from tc_runtime.db import pool as make_pool
 
     async with make_pool(
@@ -161,10 +142,8 @@ async def main(argv: list[str] | None = None) -> int:
     ]
 
     if len(reports) > 1:
-        # Every run here shares a symbol, a range and a cost model by construction; the
-        # check is kept anyway, because the day this command grows a way to load a report
-        # from disk is the day it stops being true by construction. Revisions may differ
-        # freely — that comparison is the point.
+        # Every run here shares a symbol, a range and a cost model by construction; the check is kept
+        # for the day this command grows a way to load a report from disk.
         compare(reports)
 
     if args.keep:

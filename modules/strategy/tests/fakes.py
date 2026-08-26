@@ -1,10 +1,5 @@
-"""Doubles for the one thing this module reaches outward to.
-
-The archive is an HTTP contract, so most tests double it at the transport with `respx` —
-that is what `test_archive.py` does, and it is the only honest way to test the client
-itself. Above the client, where what matters is what the loop does with an answer rather
-than how the answer was parsed, this fake stands in its place.
-"""
+"""Doubles for the one thing this module reaches outward to. `respx` at the transport is the only honest
+way to test the client; above it, where the wire is no longer the question, this fake stands in."""
 
 from __future__ import annotations
 

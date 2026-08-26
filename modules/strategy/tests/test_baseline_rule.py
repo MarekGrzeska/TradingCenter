@@ -1,16 +1,8 @@
-"""The strategy of reference against its own twin, decision by decision.
+"""The strategy of reference against its own twin, decision by decision — the measurement the whole
+vocabulary rests on. A disagreement is a defect in this module, not a nuance.
 
-This is the measurement the whole vocabulary rests on. `baseline_ma_cross` is code somebody
-reviewed; `BASELINE_RULE` is the same rule written in the node vocabulary. If the two ever
-disagree, either the vocabulary cannot carry a real strategy or the interpreter does not
-compute what it appears to — and both are defects in this module, not nuances
-(`strategy-configurator`, "Strategia odniesienia pozostaje kodem i jest miarą interpretera").
-
-**One difference is intended.** The coded entry computes `extension_atr` only on the bar it
-enters; the interpreter computes features in one place for every rule, so the twin's
-refusals carry one feature more. The assertion below is written as "a superset with equal
-values" for exactly that, and for nothing else.
-"""
+One difference is intended: the interpreter computes features in one place for every rule, so the twin's
+refusals carry one feature more. The assertion is written as "a superset with equal values" for that."""
 
 from __future__ import annotations
 

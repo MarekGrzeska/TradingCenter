@@ -1,9 +1,5 @@
-"""The archive client, against its contract doubled at the transport.
-
-`respx` rather than a fake object, because what is under test here *is* the reading of the
-wire: which request goes out, and what the answer becomes. Above this layer the loop takes
-a `FakeArchive` instead, where the wire is no longer the question.
-"""
+"""The archive client, against its contract doubled at the transport. `respx` rather than a fake object,
+because what is under test here *is* the reading of the wire."""
 
 from __future__ import annotations
 
@@ -204,12 +200,8 @@ class TestWhenTheArchiveWillNotAnswer:
 class TestTheLastClosedBar:
     @respx.mock
     async def test_it_is_read_from_the_closed_candles_route(self) -> None:
-        """The whole of this module's rule about when a period ends.
-
-        `GET /candles` answers with closed bars only — the forming one has its own route,
-        `/candles/{symbol}/forming`, which nothing here calls. So the last row of a recent
-        window *is* the last closed bar, and a forming candle can never reach a strategy.
-        """
+        """The whole of this module's rule about when a period ends: `GET /candles` answers with closed
+        bars only, so the last row of a recent window *is* the last closed bar."""
         closed = respx.get(f"{BASE}/candles/US100").mock(
             return_value=httpx.Response(200, json=candles_body())
         )

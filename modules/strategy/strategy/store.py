@@ -1,24 +1,6 @@
-"""The only door to this module's tables.
-
-One place that writes, so the rules the schema states are stated once in Python too. Two
-of them are worth reading before changing anything:
-
-**Parameter sets are append-only.** Nothing updates one. A decision names the version it
-was computed under, and answering "what was this decided with" a month later requires that
-version to still read the way it read then — so a change of mind is the next version, and
-the old one stays.
-
-**A decision is keyed by its bar.** `ON CONFLICT DO NOTHING` on (strategy, symbol, as_of)
-is what makes the loop idempotent: it re-reads the last closed bar on every wake and after
-every restart, and writing a second row for that bar would turn a restart into a second
-setup.
-
-**Revisions are append-only too, and for the same reason one layer up.** A rule is data
-now, so "which parameters decided this" stopped being the whole of provenance: without the
-revision the numbers are known and the rule that weighed them is not. Nothing updates a
-revision; a change of mind is the next one, and a watch keeps pointing at the one it was
-started with until somebody moves it (`strategy-configurator`).
-"""
+"""The only door to this module's tables. Three rules the schema states are stated once here too:
+parameter sets are append-only, a decision is keyed by its bar (`ON CONFLICT DO NOTHING`, which is what
+makes the loop idempotent across a restart), and revisions are append-only for the same reason one layer up."""
 
 from __future__ import annotations
 
@@ -102,8 +84,6 @@ class RecordedDecision:
     strategy_revision: int | None = None
 
 
-# --- definitions and their revisions ----------------------------------------------------
-
 
 async def add_definition(
     conn: asyncpg.Connection,
@@ -147,12 +127,8 @@ async def add_definition(
 async def add_revision(
     conn: asyncpg.Connection, strategy_id: str, definition: Mapping[str, Any]
 ) -> StrategyRevision | None:
-    """The next revision of an existing definition, or `None` when there is no such one.
-
-    Append-only: nothing here updates a revision, and nothing may. A watch already pointing
-    at an older one keeps computing it — that is the whole point of pinning rather than
-    following (`strategy-configurator`, "Rewizja jest niezmienna, a obserwacja ją przypina").
-    """
+    """The next revision of an existing definition, or `None` when there is no such one. Append-only: a
+    watch already pointing at an older one keeps computing it, which is the whole point of pinning."""
     async with conn.transaction():
         definition_id = await conn.fetchval(
             "SELECT id FROM strategy_definitions WHERE strategy_id = $1", strategy_id
@@ -186,12 +162,8 @@ async def _insert_revision(
 async def rename_definition(
     conn: asyncpg.Connection, strategy_id: str, *, name: str, description: str
 ) -> StrategyDefinition | None:
-    """The two things about a definition that are not the rule.
-
-    Updated in place rather than minted as a revision: a revision is what a decision points
-    at, and a decision whose provenance changed because somebody fixed a typo in a title
-    would be provenance nobody could trust.
-    """
+    """The two things about a definition that are not the rule, updated in place: a decision whose
+    provenance changed because somebody fixed a typo would be provenance nobody could trust."""
     row = await conn.fetchrow(
         """
         UPDATE strategy_definitions SET name = $2, description = $3
@@ -271,8 +243,6 @@ async def read_revision_at(
     return _revision(row, strategy_id) if row else None
 
 
-# --- parameter sets -------------------------------------------------------------------
-
 
 async def add_parameter_set(
     conn: asyncpg.Connection,
@@ -281,17 +251,8 @@ async def add_parameter_set(
     *,
     strategy_revision_id: int | None = None,
 ) -> ParameterSet:
-    """The next version for this strategy, whatever the last one was.
-
-    The version is chosen inside the statement rather than read and then written: two
-    requests arriving together would otherwise both read the same last version and one
-    would lose on the unique constraint — which is the right outcome but a needlessly
-    confusing way to reach it.
-
-    `strategy_revision_id` is the declaration these values were checked against, and it is
-    part of the row rather than inferred later: which ranges a set satisfied is a fact about
-    the moment it was written (design.md, decision 6).
-    """
+    """The next version for this strategy. The version is chosen inside the statement, so two requests
+    arriving together do not both read the same last one; the revision is part of the row, not inferred later."""
     row = await conn.fetchrow(
         f"""
         INSERT INTO parameter_sets (strategy_id, version, params, strategy_revision_id)
@@ -334,8 +295,6 @@ async def list_parameter_sets(
     return [_parameter_set(row) for row in rows]
 
 
-# --- watches --------------------------------------------------------------------------
-
 
 async def put_watch(
     conn: asyncpg.Connection,
@@ -345,17 +304,8 @@ async def put_watch(
     *,
     strategy_revision_id: int | None = None,
 ) -> Watch:
-    """Start watching a pair with a strategy, or point an existing watch at new parameters.
-
-    Upsert rather than insert-or-refuse: "watch US100 with these parameters" is the whole
-    of the operator's intent, and whether a row already existed is this module's business.
-    A watch that had been deactivated comes back active — asking for it again is asking
-    for it to run.
-
-    The revision is written on the same upsert, which is what makes moving a watch to a
-    newer rule the same single, deliberate act as changing its parameters — and what makes
-    *not* asking leave it exactly where it was.
-    """
+    """Start watching a pair with a strategy, or point an existing watch at new parameters. Upsert rather
+    than insert-or-refuse, and the revision rides the same upsert — so not asking leaves it where it was."""
     row = await conn.fetchrow(
         f"""
         INSERT INTO watches (strategy_id, symbol, parameter_set_id, active, strategy_revision_id)
@@ -399,8 +349,6 @@ async def list_watches(conn: asyncpg.Connection, *, active_only: bool = False) -
     )
     return [_watch(row) for row in rows]
 
-
-# --- decisions ------------------------------------------------------------------------
 
 
 async def record_decision(
@@ -498,12 +446,8 @@ async def list_decisions(
 async def count_pending_setups(
     conn: asyncpg.Connection, strategy_id: str, *, since: datetime | None = None
 ) -> int:
-    """How many bars this strategy last answered `trade` on — the number a trigger reads.
-
-    Counted from the recorded decisions rather than kept as a running total, so the value a
-    trigger compares against a threshold is the very same fact the woken team will read
-    (`strategy-tools`).
-    """
+    """How many bars this strategy last answered `trade` on — the number a trigger reads. Counted from the
+    recorded decisions, so a trigger's threshold and the woken team read the very same fact."""
     return int(
         await conn.fetchval(
             """
@@ -517,8 +461,6 @@ async def count_pending_setups(
         or 0
     )
 
-
-# --- backtest runs --------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -594,8 +536,6 @@ async def read_backtest_run(conn: asyncpg.Connection, run_id: int) -> BacktestRu
     row = await conn.fetchrow(f"SELECT {_RUN_COLUMNS} FROM backtest_runs WHERE id = $1", run_id)
     return _run(row) if row else None
 
-
-# --- rows to objects ------------------------------------------------------------------
 
 _PARAMETER_SET_COLUMNS = (
     "id, strategy_id, version, params, created_at, strategy_revision_id"
@@ -724,13 +664,8 @@ def _decision(row: asyncpg.Record) -> RecordedDecision:
 
 
 def facts_snapshot(facts: Any, gaps: Sequence[Any] = ()) -> dict[str, Any]:
-    """The facts an evaluation stood on, as JSON that can be read back into `Facts`.
-
-    Kept in full rather than as a pointer at the archive: replay has to survive the
-    archive's retention and any later correction to it (design.md, decision 4). What is
-    stored is indicator output — lines, markers, zones — not raw candles beyond the ones
-    the strategy was handed, so the size is bounded by what the strategy asked for.
-    """
+    """The facts an evaluation stood on, as JSON that can be read back. Kept in full rather than as a
+    pointer at the archive: replay has to survive the archive's retention and any later correction."""
     return {
         "symbol": facts.symbol,
         "as_of": facts.as_of.isoformat(),
@@ -788,13 +723,8 @@ def facts_snapshot(facts: Any, gaps: Sequence[Any] = ()) -> dict[str, Any]:
 
 
 def facts_from_snapshot(snapshot: Mapping[str, Any]) -> Facts:
-    """The inverse of `facts_snapshot`, and the reason it is written in full.
-
-    A recorded decision is evidence only if it can be re-decided. This is what makes that
-    possible without asking the archive anything — the same readings go back into the same
-    `evaluate`, and the answer either matches what was written down or something is wrong
-    that nobody would otherwise have found (`strategy-runtime`).
-    """
+    """The inverse of `facts_snapshot`, and the reason it is written in full: a recorded decision is
+    evidence only if it can be re-decided, without asking the archive anything."""
     return Facts(
         symbol=str(snapshot["symbol"]),
         as_of=datetime.fromisoformat(str(snapshot["as_of"])),

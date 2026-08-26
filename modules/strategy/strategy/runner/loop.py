@@ -1,22 +1,9 @@
-"""One evaluation, and the loop that keeps asking for one.
+"""One evaluation, and the loop that keeps asking for one: the last closed bar, already decided?, read the
+facts, evaluate, the platform's gates, record.
 
-The order inside an evaluation is deliberate and is the whole of what the runtime does:
-
-    the last closed bar  ->  already decided?  ->  read the facts  ->  evaluate
-                                                ->  the platform's gates  ->  record
-
-**Only closed bars.** The archive's `/candles` answers with closed bars only, so asking it
-what the last one is *is* the rule — this module needs no opinion of its own about when a
-period ends, and a forming candle can never reach a strategy.
-
-**A failure to see is recorded, not swallowed.** An archive that will not answer produces a
-decision that says so, with its own reason kind, rather than a gap in the record. The
-operator's question three weeks later is "why did nothing happen", and silence is the one
-answer that cannot be given.
-
-**Nothing here reaches an account.** There is no client for one in this module at all
-(`strategy-runtime`, "Platforma nie ma drogi do konta").
-"""
+Only closed bars, because the archive's `/candles` answers with those alone. A failure to see is recorded
+rather than swallowed — silence is the one answer that cannot be given three weeks later. And nothing here
+reaches an account: there is no client for one in this module at all."""
 
 from __future__ import annotations
 
@@ -62,13 +49,8 @@ class Evaluated:
 
 
 async def evaluate_once(pool, archive: Archive, watch: Watch) -> Evaluated:
-    """One watch, one bar, one decision — or the reason there was not one.
-
-    **The watch's own revision, never the newest.** A definition may have moved on three
-    times since this watch was started; none of that changes what it decides until somebody
-    points it at a newer one (`strategy-configurator`, "Rewizja jest niezmienna, a
-    obserwacja ją przypina").
-    """
+    """One watch, one bar, one decision — or the reason there was not one. The watch's own revision, never
+    the newest: a definition may have moved on three times without changing what this watch decides."""
     async with pool.acquire() as conn:
         try:
             found = await resolver.resolve_watch(conn, watch)
@@ -156,13 +138,8 @@ async def _write(
 
 
 async def evaluate_all(pool, archive: Archive) -> list[Evaluated]:
-    """Every active watch, one after another.
-
-    Sequential on purpose. The archive counts its budget against the whole system, and a
-    platform that fanned out over twenty watches at once would be competing with the chart
-    the operator is looking at right now. Bars close on the scale of minutes; there is
-    nothing to be won by hurrying.
-    """
+    """Every active watch, one after another. Sequential on purpose: the archive counts its budget against
+    the whole system, and bars close on the scale of minutes."""
     async with pool.acquire() as conn:
         watches = await list_watches(conn, active_only=True)
 
@@ -181,12 +158,8 @@ async def evaluate_all(pool, archive: Archive) -> list[Evaluated]:
 
 
 class EvaluationLoop:
-    """The clock. Wakes, evaluates every active watch, sleeps.
-
-    In the module's own process rather than a scheduler outside it, for the reason the
-    teams' clock gives: a rhythm that lives outside the thing it drives is a second place
-    to deploy and a second place to be wrong about what is running.
-    """
+    """The clock. Wakes, evaluates every active watch, sleeps. In the module's own process rather than a
+    scheduler outside it: a rhythm that lives outside the thing it drives is a second place to be wrong."""
 
     def __init__(self, pool, archive: Archive, *, interval_seconds: int) -> None:
         self._pool = pool

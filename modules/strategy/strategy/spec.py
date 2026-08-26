@@ -1,20 +1,6 @@
-"""The contract of a catalogue entry: what a strategy declares, and what it returns.
-
-Everything that makes this a platform rather than one strategy with ambitions lives in this
-file. Four properties carry it, and each is enforced somewhere rather than asked for:
-
-* **A strategy declares its facts; it does not fetch them.** The platform knows what to read
-  and reads it the same way for the loop and for the backtest, which is what lets one
-  `evaluate` serve both.
-* **`evaluate` is a pure function.** No I/O, no clock, nothing outside its arguments —
-  `tests/test_layering.py` refuses a catalogue module that reaches for either. On this
-  stands the unit test that hands it facts by hand, the replay of a recorded decision, and
-  the backtest calling it directly.
-* **One shape of `Decision`.** The routes, the tool surface, the trace and the backtest's
-  report are written for the shape, never for a strategy.
-* **Parameters belong to the entry, with their ranges.** A decision names the version of the
-  parameter set it was computed under, and a version out of range never becomes one.
-"""
+"""The contract of a catalogue entry: what a strategy declares, and what it returns. Four properties carry
+it, each enforced rather than asked for — a strategy declares its facts and does not fetch them, `evaluate`
+is pure, there is one shape of `Decision`, and parameters belong to the entry with their ranges."""
 
 from __future__ import annotations
 
@@ -46,19 +32,9 @@ class Param:
 
 @dataclass(frozen=True)
 class Fact:
-    """One thing a strategy needs read on its behalf, named the archive's way.
-
-    A parameter value may be a number, or **the name of one of the strategy's own
-    parameters** — which is what lets a period be tuned without the declaration stopping
-    being a declaration. The alternative was building the fact list from a function of the
-    resolved parameters, and it costs more than it looks: the set of indicators an entry
-    depends on would then be knowable only by running that function, and the check that
-    every one of them is announced by the archive is written against exactly that set.
-
-    `bars` is how much history of this fact's own resolution to read. It belongs to the
-    entry rather than to the platform because only the strategy knows how far back its
-    answer depends on — a 200-period average needs more than a three-bar gap does.
-    """
+    """One thing a strategy needs read on its behalf, named the archive's way. A parameter value may be the
+    name of one of the strategy's own, which is what lets a period be tuned without the declaration stopping
+    being one. `bars` belongs to the entry, because only the strategy knows how far back its answer depends."""
 
     indicator: str
     resolution: str
@@ -122,12 +98,8 @@ class Level:
 
 @dataclass(frozen=True)
 class FactValue:
-    """One fact as the archive answered it, on its own time axis.
-
-    Its own axis and not a shared one: a strategy reading a daily structure under an hourly
-    decision is the ordinary case, and forcing both onto one axis is where a fact silently
-    becomes a different fact.
-    """
+    """One fact as the archive answered it, on its own time axis — not a shared one: a daily structure under
+    an hourly decision is the ordinary case, and one axis is where a fact silently becomes a different fact."""
 
     key: str
     resolution: str
@@ -181,13 +153,8 @@ class Facts:
 
 @dataclass(frozen=True)
 class Decision:
-    """What `evaluate` answers, in the one shape everything downstream is written for.
-
-    A refusal carries its reason because "the system did not trade for three weeks" has to
-    be answerable by reading rather than by guessing. A trade carries its levels because a
-    direction without them is not something anybody can act on or argue with, and its named
-    features because that is what the backtest attributes an edge to.
-    """
+    """What `evaluate` answers, in the one shape everything downstream is written for. A refusal carries its
+    reason, a trade its levels and its named features — which is what the backtest attributes an edge to."""
 
     action: Literal["trade", "no_trade"]
     reason: str | None = None
@@ -235,12 +202,8 @@ class Decision:
         features: Mapping[str, float] | None = None,
         reason: str | None = None,
     ) -> Decision:
-        """Reward over risk is computed here rather than passed in.
-
-        One implementation, at the only place that has both numbers — a strategy that had
-        to hand it in could hand in a wrong one, and the gate that reads it would then be
-        gating on the strategy's arithmetic instead of on the levels.
-        """
+        """Reward over risk is computed here rather than passed in — one implementation, at the only place
+        that has both numbers. A strategy handing it in could hand in a wrong one."""
         risk = abs(entry - stop)
         reward = abs(target - entry)
         return cls(
@@ -256,12 +219,8 @@ class Decision:
         )
 
     def refused(self, reason: str) -> Decision:
-        """This decision as a refusal, keeping what it had worked out.
-
-        A platform gate turning a trade down produces this: the levels and the score are
-        dropped because they are no longer being claimed, and the features stay because
-        what the strategy saw is still what it saw.
-        """
+        """This decision as a refusal, keeping what it had worked out: the levels and the score go,
+        being no longer claimed, and the features stay, because what the strategy saw is what it saw."""
         return Decision(action="no_trade", reason=reason, features=dict(self.features))
 
 
@@ -312,12 +271,8 @@ class StrategySpec:
             raise ValueError(f"strategy {self.id!r} asks for {self.candles} candles")
 
     def resolve_params(self, requested: Mapping[str, float] | None = None) -> dict[str, float]:
-        """Defaults filled in, every value checked against its range.
-
-        A key the entry does not declare is ignored rather than refused, the way the
-        archive's catalogue treats one: a parameter set written for a later version of a
-        strategy should not stop the earlier one from answering.
-        """
+        """Defaults filled in, every value checked against its range. A key the entry does not declare is
+        ignored: a set written for a later version should not stop the earlier one from answering."""
         given = dict(requested or {})
         return {
             param.name: param.clamp_or_raise(given.get(param.name, param.default))

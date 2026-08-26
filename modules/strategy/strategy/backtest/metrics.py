@@ -1,15 +1,8 @@
-"""What a run came to, in the numbers that mean something.
+"""What a run came to, in the numbers that mean something — everything in R, because money is
+instrument-specific and risk is not.
 
-Everything is in R — multiples of what was risked — because money is instrument-specific
-and risk is not, and because a strategy's whole claim is about the shape of its results
-rather than their size.
-
-The one metric that is not a number is the attribution. A strategy is a bundle of
-conditions, and the useful question is not "did the bundle work" but **which part of it
-carries the edge**. Splitting the trades at each feature's median and reading the two
-halves apart is the crudest honest answer, and crude is right here: anything more clever
-would be fitting a second model to explain the first.
-"""
+The one metric that is not a number is the attribution: splitting the trades at each feature's median is
+the crudest honest answer to which part of a bundle carries the edge, and crude is right here."""
 
 from __future__ import annotations
 
@@ -32,9 +25,8 @@ class Metrics:
     max_drawdown_r: float = 0.0
     longest_losing_streak: int = 0
     average_bars_held: float = 0.0
-    # How many setups the range produced but never resolved — they sat at its edge. Named
-    # rather than folded in, because a run whose trades are mostly these has not measured
-    # what it looks like it measured.
+    # How many setups the range produced but never resolved — they sat at its edge. Named rather than
+    # folded in, because a run whose trades are mostly these has not measured what it looks like.
     unresolved: int = 0
 
     def as_dict(self) -> dict[str, Any]:
@@ -89,11 +81,8 @@ def measure(outcomes: Sequence[Outcome], *, unresolved: int = 0) -> Metrics:
 
 
 def _max_drawdown(results: Sequence[float]) -> float:
-    """The deepest fall from a peak of the running total, in R.
-
-    The number that decides whether a strategy is survivable rather than whether it is
-    profitable — and the one an operator has to accept *before* starting, not discover.
-    """
+    """The deepest fall from a peak of the running total, in R — the number that decides whether a
+    strategy is survivable, and the one an operator has to accept before starting."""
     peak = running = 0.0
     worst = 0.0
     for value in results:
@@ -112,13 +101,8 @@ def _longest_losing_streak(results: Sequence[float]) -> int:
 
 
 def attribute(outcomes: Sequence[Outcome], *, minimum_per_half: int = 5) -> list[FeatureSplit]:
-    """Which of a strategy's own features tell its good trades from its bad ones.
-
-    A feature is only reported when both halves hold enough trades to mean anything;
-    `minimum_per_half` is low because the alternative is reporting nothing at all on the
-    sample sizes a first run produces, and a split of five against five is at least honest
-    about being five against five.
-    """
+    """Which of a strategy's own features tell its good trades from its bad ones. A feature is reported
+    only when both halves hold enough trades; the floor is low, because the alternative is reporting nothing."""
     names = sorted({name for outcome in outcomes for name in outcome.features})
     splits: list[FeatureSplit] = []
     for name in names:

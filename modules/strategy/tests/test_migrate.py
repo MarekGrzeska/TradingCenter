@@ -1,9 +1,5 @@
-"""The schema this module deploys, against a real PostgreSQL.
-
-The advisory lock itself is `tc-runtime`'s and is tested there; what is tested here is the
-pairing — that this module's chain reaches head and that the schema check agrees it did —
-and the constraints this module wrote itself.
-"""
+"""The schema this module deploys, against a real PostgreSQL. The advisory lock is `tc-runtime`'s and is
+tested there; what is here is the pairing, and the constraints this module wrote itself."""
 
 from __future__ import annotations
 
@@ -23,12 +19,8 @@ async def test_the_chain_reaches_head_and_the_check_agrees(db: asyncpg.Connectio
 
 
 async def test_a_trade_without_its_levels_is_refused(db: asyncpg.Connection) -> None:
-    """A trade carries direction, entry, stop and target or it is not a trade.
-
-    Stated in the row as well as in the dataclass, because a row is what a later reader
-    actually has — and a decision read back a month later has to be complete enough to
-    argue with.
-    """
+    """A trade carries direction, entry, stop and target or it is not a trade. Stated in the row as well as
+    in the dataclass, because a row is what a later reader actually has."""
     params_id = await db.fetchval(
         "INSERT INTO parameter_sets (strategy_id, version, params) "
         "VALUES ('baseline', 1, '{}'::jsonb) RETURNING id"

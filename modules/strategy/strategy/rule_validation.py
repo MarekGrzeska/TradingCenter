@@ -1,21 +1,8 @@
-"""What a rule is checked against before it is ever saved.
+"""What a rule is checked against before it is ever saved — the half that is only knowable by asking the
+archive. What `rule.py` can decide alone it decides alone, and this file never repeats it.
 
-**Everything here needs an answer from the archive.** What `rule.py` can decide alone — the
-shape of the tree, arities, names it declares and then uses, the ceilings — it decides
-alone, and this file never repeats it. What is left is the half that is only knowable by
-asking: whether an indicator exists, what it is called, what it answers, which lines it
-publishes and what range each of its parameters accepts.
-
-**Refused at the moment it is written, the way a team definition is.** A rule that cannot
-run is something the operator can still see on the screen they wrote it on; an hour later it
-is a strategy that quietly records nothing. Every refusal below names the one thing that has
-to change, because "invalid definition" sends somebody to read the whole tree.
-
-**This does not replace the check at registration.** The archive's catalogue can change
-between writing a rule and starting a watch on it, so `catalogue.check_facts_are_announced`
-stays exactly where it is. This is the earlier, friendlier half of the same question, not a
-substitute for the one that actually guards the loop (design.md, decision 8).
-"""
+Refused when it is written rather than at the first candle, and every refusal names the one thing that has
+to change. This does not replace the check at registration, which is the one that guards the loop."""
 
 from __future__ import annotations
 
@@ -72,13 +59,8 @@ def _check_fact_parameters(
 
 
 def _check_range_fits(fact: RuleFact, name: str, own, announced) -> None:
-    """A tunable pointed at an indicator's parameter may not be tunable further than it.
-
-    The check whose absence shows up as a refusal from the archive in the middle of the
-    night: everything looks right until the day somebody tunes the period to the top of the
-    range this rule declared and the archive says no to a value it never accepted
-    (`strategy-configurator`, "Definicja jest odrzucana w chwili zapisu").
-    """
+    """A tunable pointed at an indicator's parameter may not be tunable further than it. Its absence shows
+    up as a refusal from the archive in the middle of the night, on a value it never accepted."""
     if own.min < announced.min or own.max > announced.max:
         raise DefinitionRefused(
             f"parameter {own.name!r} ranges over [{own.min}, {own.max}] and drives {name!r} "

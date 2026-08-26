@@ -1,18 +1,8 @@
-"""One run's result, and the rule that keeps two of them comparable.
+"""One run's result, and the rule that keeps two of them comparable. A report names its range, its cost
+model, its parameter version and its revision, because without them it is a number somebody produced.
 
-A report names four things about itself — the range, the cost model, the parameter version
-and, for a rule that was written down, its revision — because without any of them it is not
-a result but a number somebody produced (`strategy-backtest`, "Wynik nazywa swoje koszty
-i swoje parametry"). Three of them are what `compare` refuses to look past: two runs on
-different data or different costs are two different questions, and putting their numbers
-side by side is the most convincing way to be wrong.
-
-**The revision is the exception, and deliberately.** Comparing two revisions of one
-definition is the question this command exists to answer, so differing revisions are not a
-refusal — but every report prints its own, because a comparison table that cannot say which
-rule produced which column is unreadable (`strategy-backtest`, "Zestawienie dwóch rewizji
-jednej definicji").
-"""
+The revision is the exception `compare` allows: two revisions of one definition is the question this
+command exists to answer, and every report prints its own so a table can say which is which."""
 
 from __future__ import annotations
 
@@ -43,9 +33,8 @@ class Report:
     strategy_revision: int | None = None
     strategy_revision_id: int | None = None
     attribution: list[FeatureSplit] = field(default_factory=list)
-    # Every bar the range held, and what the platform said on each. A run that refused
-    # almost everything for want of data looks identical in its metrics to one that simply
-    # found no setups, and the difference is the whole story.
+    # Every bar the range held, and what the platform said on each. A run that refused almost everything
+    # for want of data looks identical in its metrics to one that found no setups.
     bars: int = 0
     refusals: dict[str, int] = field(default_factory=dict)
     # Filled in by the caller, which is the only place a clock is allowed: nothing in the
@@ -71,11 +60,8 @@ class Report:
 
     @property
     def comparable_on(self) -> tuple:
-        """What two runs must share before their numbers may be read together.
-
-        The revision is **not** here. Two revisions of one definition on the same data and
-        the same costs are the comparison this whole command is for.
-        """
+        """What two runs must share before their numbers may be read together. The revision is not here:
+        two revisions on the same data and costs are the comparison this command is for."""
         return (self.symbol, self.resolution, self.range_from, self.range_to, self.costs)
 
     @property
@@ -113,11 +99,8 @@ class Report:
 
 
 def compare(reports: list[Report]) -> list[Report]:
-    """The same reports, once it is established they may be compared at all.
-
-    Returns them rather than a table on purpose: what to render is the caller's business,
-    and what this function is for is the refusal.
-    """
+    """The same reports, once it is established they may be compared at all. Returns them rather than a
+    table on purpose: what to render is the caller's business, and the refusal is what this is for."""
     if len(reports) < 2:
         raise NotComparable("comparing needs at least two runs")
     first = reports[0].comparable_on

@@ -1,15 +1,8 @@
-"""The REST contract: what the operator and the terminal read and write.
+"""The REST contract: what the operator and the terminal read and write. Nothing here reaches a database
+or a strategy — it is the shape of the wire and nothing else.
 
-Written as models rather than dictionaries so the published document describes it, and so
-a field added here has to be added on purpose. Nothing in this file reaches a database or
-a strategy — it is the shape of the wire and nothing else.
-
-**The rule travels as itself.** `RuleDefinition` and its node types come from `rule.py`
-rather than being restated here as a second set of models: one definition of the vocabulary
-means the wire, the stored row and the interpreter can never disagree about what a node is,
-and it is what lets the terminal generate a typed editor from this document instead of
-hand-writing the tree.
-"""
+The rule travels as itself: `RuleDefinition` comes from `rule.py` rather than being restated, so the wire,
+the stored row and the interpreter can never disagree about what a node is."""
 
 from __future__ import annotations
 
@@ -26,8 +19,6 @@ class Problem(BaseModel):
 
     detail: str
 
-
-# --- the catalogue --------------------------------------------------------------------
 
 
 class ParamOut(BaseModel):
@@ -68,8 +59,6 @@ class StrategyOut(BaseModel):
     )
 
 
-# --- definitions and their revisions ------------------------------------------------------
-
 
 class DefinitionIn(BaseModel):
     """A new clicked strategy: its identity, its name, and the first version of its rule."""
@@ -93,12 +82,8 @@ class RevisionIn(BaseModel):
 
 
 class DefinitionPatch(BaseModel):
-    """The two things about a definition that are not the rule.
-
-    Changed in place rather than minted as a revision: a decision points at a revision, and
-    provenance that shifted because somebody fixed a typo in a title is provenance nobody
-    could trust.
-    """
+    """The two things about a definition that are not the rule. Changed in place rather than minted as a
+    revision: provenance that shifted because somebody fixed a typo is provenance nobody could trust."""
 
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=2_000)
@@ -123,8 +108,6 @@ class RevisionOut(BaseModel):
     created_at: datetime
 
 
-# --- parameter sets -------------------------------------------------------------------
-
 
 class ParameterSetIn(BaseModel):
     strategy_id: str
@@ -145,8 +128,6 @@ class ParameterSetOut(BaseModel):
         "null for a coded entry, whose declaration is in the image",
     )
 
-
-# --- watches --------------------------------------------------------------------------
 
 
 class WatchIn(BaseModel):
@@ -180,8 +161,6 @@ class WatchOut(BaseModel):
         "the strategy is code in the image",
     )
 
-
-# --- decisions ------------------------------------------------------------------------
 
 
 class DecisionOut(BaseModel):
@@ -217,9 +196,8 @@ class DecisionOut(BaseModel):
 
 
 class BacktestRunOut(BaseModel):
-    """One kept report. The three fields before `report` are the ones two runs must share
-    before their numbers may be read together — as fields rather than only inside the
-    blob, so a caller can check that without parsing it."""
+    """One kept report. The three fields before `report` are the ones two runs must share before their
+    numbers may be read together — as fields, so a caller can check that without parsing the blob."""
 
     id: int
     strategy_id: str

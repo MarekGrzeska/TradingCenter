@@ -1,12 +1,5 @@
-"""Shared fixtures — chiefly the throwaway PostgreSQL the `db` tests run against.
-
-A container per test session rather than a shared development database, because the schema
-is part of what is under test: a table left behind by a previous run is indistinguishable
-from a migration that works.
-
-Docker is not assumed. Without it the `db` tests skip with a reason that says what to
-start, instead of failing with a connection error that reads like a bug in the code.
-"""
+"""Shared fixtures — chiefly the throwaway PostgreSQL the `db` tests run against, a container per session
+because the schema is part of what is under test. Without Docker they skip, saying what to start."""
 
 from __future__ import annotations
 
@@ -67,12 +60,8 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 
 def _reason_to_skip_db_tests() -> str | None:
-    """Why the `db` tests cannot run here, or `None` to let them run.
-
-    Only a machine with no Docker at all earns a skip. A daemon that is installed and
-    failing does not: a silent skip on a machine that was supposed to have Docker is
-    indistinguishable from a suite that passed.
-    """
+    """Why the `db` tests cannot run here, or `None` to let them run. Only a machine with no Docker at all
+    earns a skip: a silent skip where Docker was expected is indistinguishable from a pass."""
     try:
         import docker
     except ImportError:
@@ -105,15 +94,8 @@ def postgres_url() -> Iterator[str]:
 
 @pytest.fixture(scope="session")
 def migrated_url(postgres_url: str) -> str:
-    """The same database with this module's migrations applied.
-
-    Applied by running alembic itself rather than by a hand-written CREATE TABLE in the
-    fixture: a fixture that builds its own schema tests a schema no deployment will ever
-    have, and the migration — the thing that has to work in production — goes unrun.
-
-    Synchronous on purpose: alembic's async environment calls `asyncio.run`, which needs a
-    thread with no loop already running.
-    """
+    """The same database with this module's migrations applied — by running alembic, because a fixture that
+    builds its own schema tests one no deployment will have. Synchronous: alembic calls `asyncio.run`."""
     from tc_runtime.migrate import upgrade_to_head
 
     from strategy.runtime import MIGRATIONS
@@ -145,17 +127,8 @@ async def pool(migrated_url: str):
 
 @pytest.fixture
 def settings() -> Settings:
-    """What the application reads about itself, minus anything that reaches outward.
-
-    Every fixture that *serves* the app needs these, not only the ones that touch the
-    database: `caller_access.py` reads `require_authenticated_principal` on every request
-    and refuses when the settings are missing.
-
-    The database URL is metadata only — the pool the fixtures build is what actually
-    reaches PostgreSQL. A throwaway value that satisfies Settings' own rules (TLS
-    required, no embedded credential) rather than `migrated_url`, which as testcontainers
-    hands it out is neither.
-    """
+    """What the application reads about itself, minus anything that reaches outward. The database URL is
+    metadata only: a throwaway value satisfying Settings' rules, which `migrated_url` does not."""
     return Settings(
         database_url="postgresql://localhost:5432/test?sslmode=require",
         database_user="test-user",
@@ -171,12 +144,8 @@ def app():
 
 @pytest.fixture
 async def api(app, pool, settings):
-    """The app wired to a real database, with the lifespan bypassed.
-
-    The lifespan is not run: it would migrate (the fixture already did) and start the
-    loop, which would reach an archive that is not there. What is under test here is the
-    contract.
-    """
+    """The app wired to a real database, with the lifespan bypassed: it would migrate again and start the
+    loop, which would reach an archive that is not there."""
     app.state.pool = pool
     app.state.settings = settings
 

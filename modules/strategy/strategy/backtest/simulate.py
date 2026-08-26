@@ -1,17 +1,8 @@
-"""What became of a setup: the bars after it, walked until something happened.
+"""What became of a setup: the bars after it, walked until something happened. Three rules, each the
+pessimistic reading on purpose — a backtest that flatters itself is worse than none, because it is believed.
 
-Three rules decide every outcome here, and each is the pessimistic reading on purpose. A
-backtest that flatters itself is worse than no backtest, because it is believed.
-
-* **A bar that touches both the stop and the target is a loss.** Within one bar this module
-  cannot know which came first — the candle says only that both prices traded — and
-  assuming the good one is how a strategy's worst bars turn into its best.
-* **Entering and leaving both cost.** The archive holds one side of the market; the other
-  side is where a position actually opens and closes (`costs.py`).
-* **A setup that never resolves is closed at the last bar it was given**, at that bar's
-  close, and counted. Dropping the unresolved ones would quietly discard exactly the trades
-  that went nowhere.
-"""
+A bar touching both stop and target is a loss; entering and leaving both cost; and a setup that never
+resolves is closed at the last bar it was given and counted."""
 
 from __future__ import annotations
 
@@ -55,12 +46,8 @@ def resolve(
     following: Sequence[Candle],
     costs: CostModel,
 ) -> Outcome | None:
-    """Walk the bars after a setup until the stop or the target is touched.
-
-    `None` when there are no bars after it at all — the setup sits at the end of the range
-    and has not had a chance to be anything yet. That is not a timeout and must not be
-    counted as one.
-    """
+    """Walk the bars after a setup until the stop or the target is touched. `None` when there are no bars
+    after it at all — that is not a timeout and must not be counted as one."""
     if decision.action != "trade" or not following:
         return None
     assert decision.direction is not None
@@ -121,15 +108,8 @@ def _outcome(
 
 
 def apply_daily_stop(outcomes: Sequence[Outcome], *, limit_r: float | None) -> list[Outcome]:
-    """Drop the setups a daily loss budget would have stopped anybody taking.
-
-    Here rather than beside the platform's live gates, and the difference is not a
-    preference: a daily budget counts *realised* results, and this module records decisions
-    rather than outcomes — live, there is nothing to count. In a replay the outcomes exist,
-    so the rule can be applied honestly.
-
-    Losses are counted on the day a trade *closed*, which is when its result was known.
-    """
+    """Drop the setups a daily loss budget would have stopped anybody taking. Here rather than beside the
+    live gates: a daily budget counts realised results, and live there is nothing to count."""
     if limit_r is None:
         return list(outcomes)
     kept: list[Outcome] = []

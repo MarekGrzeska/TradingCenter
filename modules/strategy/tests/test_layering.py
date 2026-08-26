@@ -1,26 +1,9 @@
-"""The two rules that make this a platform rather than one strategy with ambitions.
+"""The two rules that make this a platform rather than one strategy with ambitions: the pure layer imports
+nothing of this module but the contract and reaches for no I/O or clock, and the runtime imports the
+catalogue and never an entry in it.
 
-    the pure layer          MUST import nothing of this module but the contract, and
-                            MUST NOT reach for I/O or a clock
-    the runtime             MUST NOT import an individual catalogue entry — only the
-                            catalogue itself
-
-The pure layer is the catalogue's entries **and** the two files that evaluate a rule written
-as data. `interpreter.py` is `evaluate` for every clicked-together strategy at once, so an
-impurity there would take the property away from all of them in one go rather than from one
-entry — which is why it is held to the entry's rule and not to the runtime's.
-
-The second is "adding a strategy changes no file of the runtime" in its enforceable form.
-The first is what makes `evaluate` a pure function, which everything downstream stands on:
-the unit tests that hand it facts by hand, the replay of a recorded decision, and the
-backtest calling the very same function the loop calls.
-
-Read from the AST rather than from the top of the file, so an import tucked inside a
-function body counts too. `importlib` would slip past this, and that is accepted:
-`importlib` is not a mistake anybody makes by accident, and this rule is here for the
-mistakes that are. The shape is `workbench/tests/test_layering.py`'s, which is the same
-rule one level up.
-"""
+Read from the AST rather than from the top of the file, so an import inside a function body counts too.
+`importlib` slips past this, and that is accepted: it is not a mistake anybody makes by accident."""
 
 from __future__ import annotations
 
@@ -31,12 +14,8 @@ import pytest
 
 PACKAGE_ROOT = Path(__file__).resolve().parent.parent / "strategy"
 
-# What the pure layer is allowed to know about this module. Anything else — the archive
-# client, the store, the loop, the surfaces, even the settings — is the runtime, and a file
-# here that reached for it would stop being a function of its arguments.
-#
-# `rule` and `periods` are contract, not runtime: the first is the vocabulary a written rule
-# is spelled in, the second is the archive's list of resolutions. Neither reaches anywhere.
+# What the pure layer is allowed to know about this module. `rule` and `periods` are contract, not
+# runtime: the vocabulary a written rule is spelled in, and the archive's list of resolutions.
 PURE_MAY_IMPORT = {"spec", "errors", "rule", "periods", "interpreter"}
 
 # The pure files that do not live under `catalogue/`.
@@ -84,13 +63,8 @@ def _pure() -> list[Path]:
 
 
 def _catalogue_module_names() -> set[str]:
-    """The entries' own module names.
-
-    Allowed as imports of one another, and deliberately: the rule-as-data twin of the
-    strategy of reference reads the fact keys the coded entry declares, and a second copy of
-    those three constants is how a twin silently stops being one. What none of them may
-    import is the runtime, which is what the rest of this file is about.
-    """
+    """The entries' own module names, allowed as imports of one another: the rule-as-data twin reads the
+    fact keys the coded entry declares, and a second copy of those constants is how a twin stops being one."""
     return {path.stem for path in _entries()}
 
 
@@ -166,13 +140,8 @@ def test_an_entry_does_not_read_a_clock(path: Path) -> None:
     )
 
 
-# Every way this module could come to touch an account. None of them appears anywhere in
-# it, and this is the test that says so rather than the README.
-#
-# Written as words that would have to appear in a URL, a setting or a call: this module
-# reaches exactly one upstream over HTTP, so an outbound address is the shape a second one
-# would arrive in. `order` and `position` cover the case where somebody wires it to the
-# account by hand rather than by configuration.
+# Every way this module could come to touch an account, written as words that would have to appear in a
+# URL, a setting or a call. `order` and `position` cover being wired to the account by hand.
 ACCOUNT_WORDS = (
     "trading_mcp",
     "trading-mcp",
@@ -187,14 +156,8 @@ ACCOUNT_WORDS = (
 
 
 def test_nothing_in_this_module_can_reach_an_account() -> None:
-    """The platform decides and records; execution belongs to the teams and their limits.
-
-    Asserted over the whole package rather than at one seam, because the claim is that
-    there is no seam: no client, no setting, no call. A strategy platform that could place
-    an order is a different module with a different review, and this test is what makes
-    growing into one a deliberate act rather than an afternoon's convenience
-    (`strategy-runtime`, "Platforma nie ma drogi do konta").
-    """
+    """The platform decides and records; execution belongs to the teams. Asserted over the whole package
+    rather than at one seam, because the claim is that there is no seam: no client, no setting, no call."""
     offences: list[str] = []
     for path in sorted(PACKAGE_ROOT.rglob("*.py")):
         text = path.read_text(encoding="utf-8")
@@ -212,12 +175,8 @@ def _runtime_sources() -> list[Path]:
 
 @pytest.mark.parametrize("path", _runtime_sources(), ids=lambda p: p.name)
 def test_the_runtime_never_names_a_strategy(path: Path) -> None:
-    """The runtime knows the catalogue and never an entry in it.
-
-    This is the whole claim of the change, in the only form a test can hold: if no file of
-    the runtime can name `catalogue.baseline`, then adding `catalogue.something_else`
-    cannot require one of them to change.
-    """
+    """The runtime knows the catalogue and never an entry in it — the whole claim of the change, in the
+    only form a test can hold."""
     offences: list[str] = []
     for node in ast.walk(_tree(path)):
         if isinstance(node, ast.ImportFrom) and node.module:

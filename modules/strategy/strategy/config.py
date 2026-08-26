@@ -1,10 +1,5 @@
-"""Settings, and the four ways this module refuses to start rather than misbehave.
-
-Three of them are the database rule every schema in this repository carries — identity or
-loopback, never both and never neither, and TLS wherever the database is off this machine.
-The fourth is this module's own: the archive is its only upstream, and a URL that is not
-one is a module that would run and decide nothing.
-"""
+"""Settings, and the four ways this module refuses to start rather than misbehave. Three are the database
+rule every schema here carries; the fourth is its own — the archive is its only upstream."""
 
 from __future__ import annotations
 
@@ -13,9 +8,8 @@ from urllib.parse import parse_qs, urlparse
 from pydantic import ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# `prefer`/`allow` still let the client fall back to plaintext if the server does not
-# offer TLS — `strategy-database-connection` requires the connection MUST be encrypted,
-# not merely offered it.
+# `prefer`/`allow` still let the client fall back to plaintext if the server offers no TLS, and the spec
+# requires the connection MUST be encrypted, not merely offered it.
 _TLS_REQUIRING_SSLMODES = {"require", "verify-ca", "verify-full"}
 
 
@@ -27,30 +21,16 @@ def _identifiers(raw: str) -> frozenset[str]:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # --- the archive, this module's only upstream ---
-    #
-    # The REST contract, not the tool surface at `/mcp`: that surface is deliberately
-    # narrowed for a model — ten indicators a call, two hundred points a series — which is
-    # right for an agent and too tight for a loop (design.md, decision 2).
+    # The REST contract, not the tool surface at `/mcp`: that surface is narrowed for a model, which is
+    # right for an agent and too tight for a loop.
     market_data_url: str = "http://localhost:8020"
-    # The archive's own audience, when this module has an identity to present to it.
-    # Absent is a working configuration and the local one: without a directory there is no
-    # token to get. Set, every request carries a bearer token for this module's identity —
-    # which market-data matches against its `REST_CALLER_APPLICATION_IDS`.
+    # The archive's own audience, when this module has an identity to present. Absent is a working
+    # configuration and the local one; set, every request carries a bearer token.
     market_data_scope: str | None = None
     market_data_request_timeout_seconds: float = 30.0
 
-    # --- this module's own storage ---
-    #
-    # `database_user` selects between the two connection modes, and it is the only switch
-    # (`strategy-database-connection`):
-    #
-    #   set    — identity mode, the remote/production shape. The value is the Postgres
-    #            role this module authenticates as; what it authenticates *with* is an
-    #            Entra token fetched at connection time. The URL must require TLS and must
-    #            not carry a credential of its own.
-    #   unset  — local mode. `DATABASE_URL` is used exactly as given, password and all,
-    #            and must point at this machine's loopback.
+    # `database_user` selects between the two connection modes and is the only switch: set means
+    # identity mode over TLS with no credential in the URL, unset means the URL as given, on loopback.
     database_url: str
     database_user: str | None = None
 
@@ -64,26 +44,16 @@ class Settings(BaseSettings):
     # twenty-five market-data allows itself is sized for an index over the candle table.
     migration_lock_wait_seconds: float = 300.0
 
-    # --- the loop ---
-    #
-    # How often the loop wakes to ask whether a new bar has closed. Not the resolution it
-    # decides on: a strategy on HOUR closes twelve of these apart, and waking more often
-    # than the bar closes costs one cheap query that finds nothing new.
+    # How often the loop wakes to ask whether a new bar has closed — not the resolution it decides on.
+    # Waking more often than the bar closes costs one cheap query that finds nothing new.
     evaluation_interval_seconds: int = 60
 
-    # --- who may reach which surface ---
-    #
-    # Whether a platform authenticator stands in front of this module. Where it does, a
-    # request arriving without an identity is refused rather than served. The module MUST
-    # NOT simply assume the layer in front is doing its job — one wrong line in Terraform
-    # would otherwise leave both surfaces open, and nothing about it would look wrong from
-    # here.
+    # Whether a platform authenticator stands in front. The module MUST NOT assume the layer in front is
+    # doing its job: one wrong line in Terraform would leave both surfaces open.
     require_authenticated_principal: bool = False
 
-    # Easy Auth authorizes an application, not a route. These two lists are what it cannot
-    # say: which callers are here for the read-only tool surface at `/mcp` — the workbench,
-    # whose triggers read `pending_setups` — and which are here for the REST contract,
-    # which is the terminal and the operator.
+    # Easy Auth authorizes an application, not a route. These two lists are what it cannot say: who is
+    # here for the read-only `/mcp` surface, and who for the REST contract.
     tool_caller_application_ids: str = ""
     rest_caller_application_ids: str = ""
 
@@ -136,17 +106,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _connection_mode_is_coherent(self) -> Settings:
-        """The two connection modes, each with its own failure to refuse.
-
-        Identity mode (`database_user` set — production's shape): the database is off this
-        machine, so the URL must require TLS and must not carry a credential that would
-        never be read anyway.
-
-        Local mode (`database_user` unset): the URL is used exactly as given, password and
-        all — and must point at loopback. Without an identity this module refuses to reach
-        beyond this machine, so a `.env` aimed at production fails here at startup instead
-        of quietly writing.
-        """
+        """The two connection modes, each with its own failure to refuse. Identity mode is off this
+        machine, so TLS and no credential; local mode is the URL as given, and must be loopback."""
         parsed = urlparse(self.database_url)
         if self.database_user is not None:
             sslmode = parse_qs(parsed.query).get("sslmode", [None])[0]

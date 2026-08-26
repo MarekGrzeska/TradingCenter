@@ -1,10 +1,5 @@
-"""The read-only tool surface, registered onto one FastMCP instance.
-
-Every tool here reads. Nothing activates a strategy, writes a parameter set, or runs a
-backtest — those are the operator's, over REST (`strategy-tools`, "Zestaw narzędzi
-wyłącznie czyta"), and `tests/test_tools_surface.py` asserts it of the announced list
-rather than trusting this sentence.
-"""
+"""The read-only tool surface, registered onto one FastMCP instance. Nothing here activates a strategy,
+writes a parameter set or runs a backtest, and the surface test asserts that of the announced list."""
 
 from __future__ import annotations
 
@@ -15,12 +10,8 @@ from mcp.server.fastmcp import FastMCP
 
 @dataclass(frozen=True)
 class ToolContext:
-    """What a tool needs to answer, held as the application rather than its state.
-
-    The state does not exist when the surface is built — the lifespan fills it, long after
-    `create_app()` has run — so a tool reaches `app.state` at call time, never at
-    registration time.
-    """
+    """What a tool needs to answer, held as the application rather than its state: the state does not exist
+    when the surface is built, so a tool reaches `app.state` at call time."""
 
     app: object
 

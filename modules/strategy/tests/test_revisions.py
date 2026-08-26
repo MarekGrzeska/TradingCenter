@@ -1,10 +1,5 @@
-"""Provenance, end to end: which rule decided, with which numbers, on which readings.
-
-The test that matters most here is the last one. A recorded decision is evidence only if it
-can be re-decided from what was written down — its revision, its parameter set and its
-snapshot — without asking the archive anything and without reading the definition's current
-wording (`strategy-runtime`, "Odtworzenie oceny po zmianie definicji").
-"""
+"""Provenance, end to end: which rule decided, with which numbers, on which readings. A recorded decision
+is evidence only if it can be re-decided from what was written down, without asking the archive anything."""
 
 from __future__ import annotations
 

@@ -1,10 +1,5 @@
-"""The backtest, and the two tests that are the whole reason it can be believed.
-
-`test_incremental_and_batch_agree` and `test_a_longer_range_does_not_change_the_common_part`
-are not two tests of the same thing. The first catches a slice that carried the future
-backwards; the second catches a read whose *answers* change when more history is added.
-Either one alone passes over the defect the other exists for.
-"""
+"""The backtest, and the two tests that are the whole reason it can be believed: one catches a slice that
+carried the future backwards, the other a read whose answers change when more history is added."""
 
 from __future__ import annotations
 
@@ -34,13 +29,8 @@ def stamps(count: int) -> list[datetime]:
 
 
 class ReplayArchive:
-    """An archive holding one generated history, answering any window out of it.
-
-    The point of generating rather than fixing the data: `read_facts` must answer a window
-    ending at bar *i* with exactly what the full read says at bar *i*, which is the archive's
-    own no-repaint guarantee. Modelling that here is what makes the incremental-versus-batch
-    comparison a test of this module rather than of the double.
-    """
+    """An archive holding one generated history, answering any window out of it. Generated rather than
+    fixed, so the double models the archive's own no-repaint guarantee rather than being tested for it."""
 
     def __init__(self, closes: list[float], fast: list[float], slow: list[float], atr: list[float]):
         self.times = stamps(len(closes))

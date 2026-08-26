@@ -1,10 +1,5 @@
-"""The half of a rule's validation that can only be had by asking the archive.
-
-Nothing here repeats what `rule.py` decides on its own. What is under test is the pairing
-between a written rule and the catalogue the archive publishes — and every refusal naming
-the one thing that has to change, because "invalid definition" sends somebody to read the
-whole tree.
-"""
+"""The half of a rule's validation that can only be had by asking the archive. Every refusal names the one
+thing that has to change, because "invalid definition" sends somebody to read the whole tree."""
 
 from __future__ import annotations
 

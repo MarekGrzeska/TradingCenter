@@ -1,9 +1,5 @@
-"""How a written rule evaluates — the three-valued part above all.
-
-The property under test throughout is the one the whole platform stands on: a reading the
-archive did not compute is neither a number nor a zero, and a question that cannot be
-answered refuses rather than passes. Everything else here is arithmetic.
-"""
+"""How a written rule evaluates — the three-valued part above all: a reading the archive did not compute
+is neither a number nor a zero, and a question that cannot be answered refuses rather than passes."""
 
 from __future__ import annotations
 
