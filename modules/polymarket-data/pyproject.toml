@@ -10,28 +10,21 @@ dependencies = [
     "pydantic-settings>=2.2",
     "asyncpg>=0.30",
     "alembic>=1.14",
-    # Alembic drives migrations through SQLAlchemy Core; this module's own queries go
-    # straight through asyncpg, so no ORM is pulled into the runtime path. The `asyncio`
-    # extra is not optional: it pulls greenlet, without which an async engine raises at
-    # its first connect — and the only driver installed here is an async one.
+    # Alembic drives migrations through SQLAlchemy Core; this module's own queries go straight through asyncpg. The
+    # `asyncio` extra pulls greenlet, without which an async engine raises at its first connect.
     "sqlalchemy[asyncio]>=2.0",
-    # The database credential: an Entra token for the module's own identity, fetched at
-    # connection time, never a stored password. `azure.identity.aio`'s async transport
-    # imports aiohttp lazily and errors at first use, not at install time, if it is
-    # missing — named explicitly here rather than left to chance.
+    # The database credential: an Entra token fetched at connection time, never a stored password. `azure.identity.aio`
+    # imports aiohttp lazily and fails at first use rather than at install, so it is named explicitly.
     "azure-identity>=1.19",
     "aiohttp>=3.10",
-    # `zoneinfo` reads the operating system's tz database and falls back to this package
-    # when there is none. `python:3.12-slim-bookworm` (the Dockerfile's runtime stage)
-    # ships none, and Windows never has.
+    # `zoneinfo` falls back to this package where the OS ships no tz database: `python:3.12-slim-bookworm` ships none,
+    # and Windows never has.
     "tzdata>=2024.1",
-    # Database, migrations, schema check, Easy Auth. Taken whole: unlike `market-data`,
-    # this module has no reason of its own to keep a `db.py` — its migrations are small
-    # and its lock wait is the ordinary one.
+    # Database, migrations, schema check, Easy Auth. Taken whole: unlike `market-data`, this module has no reason to
+    # keep a `db.py` of its own — its migrations are small and its lock wait is the ordinary one.
     "tc-runtime",
-    # Pinned exactly, unlike everything above it. 2.0.0 moved `FastMCP` out of
-    # `mcp.server.fastmcp`, so a floor here is a module that stops importing on somebody
-    # else's release day. Same pin as `market-data` on purpose.
+    # Pinned exactly, unlike everything above it: 2.0.0 moved `FastMCP` out of `mcp.server.fastmcp`, so a floor is a
+    # module that stops importing on somebody else's release day.
     "mcp==1.27.0",
     # Caller identity, upstream-refusal flattening and the schema slimmer, for the tool
     # surface this module serves at `/mcp`.
@@ -76,8 +69,7 @@ dev = [
     "pytest-asyncio>=0.24",
     "respx>=0.21",
     "ruff==0.16.2",
-    # Brings up a throwaway PostgreSQL per test session. A container rather than a shared
-    # database, because the schema is the thing under test and a leftover table from a
-    # previous run is indistinguishable from a migration that works.
+    # A throwaway PostgreSQL per test session rather than a shared database: the schema is the thing under test, and
+    # a leftover table is indistinguishable from a migration that works.
     "testcontainers[postgres]>=4.8",
 ]

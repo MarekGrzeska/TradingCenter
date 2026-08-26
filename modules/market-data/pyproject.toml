@@ -11,47 +11,30 @@ dependencies = [
     "pydantic-settings>=2.2",
     "asyncpg>=0.30",
     "alembic>=1.14",
-    # Alembic drives migrations through SQLAlchemy Core; the module's own queries go
-    # straight through asyncpg, so no ORM is pulled into the runtime path. The `asyncio`
-    # extra is not optional here: it pulls greenlet, without which an async engine raises
-    # at its first connect — and the only driver this module installs is an async one.
+    # Alembic drives migrations through SQLAlchemy Core; the module's own queries go straight through asyncpg. The
+    # `asyncio` extra pulls greenlet, without which an async engine raises at its first connect.
     "sqlalchemy[asyncio]>=2.0",
-    # The database credential: an Entra token for the module's own identity — a managed
-    # identity in Azure, a service principal (client secret) locally — fetched at
-    # connection time, never a stored password (design.md, "Do bazy — tożsamość").
-    # `azure.identity.aio`'s async transport imports aiohttp lazily and errors at first
-    # use, not at install time, if it is missing — an explicit dependency here, not a
-    # transitive one left to chance.
+    # The database credential: an Entra token fetched at connection time, never a stored password. `azure.identity.aio`
+    # imports aiohttp lazily and fails at first use rather than at install, so it is named rather than left to chance.
     "azure-identity>=1.19",
     "aiohttp>=3.10",
     # `market_data/indicators/kernel.py`'s only dependency, and deliberately its only one
     # — see that module's docstring for why it imports nothing else.
     "numpy>=2.0",
-    # `zoneinfo` reads the operating system's tz database and falls back to this package
-    # when there is none. Two of the platforms this module runs on have none: Windows
-    # never ships one, and `python:3.12-slim-bookworm` (the Dockerfile's runtime stage)
-    # drops `/usr/share/zoneinfo` with the rest of what "slim" removes. `catalogue.py`
-    # builds its session entries at import time, so a missing database is not a failed
-    # request — it is a module that will not import at all.
+    # `zoneinfo` falls back to this package where the OS ships no tz database — Windows never does and slim images
+    # drop it. `catalogue.py` builds its entries at import, so a missing one is a module that will not import at all.
     "tzdata>=2024.1",
-    # The candle-age metric the most important alert stands on (design.md, group 10) —
-    # auto-configures the OpenTelemetry SDK to export to Application Insights from
-    # APPLICATIONINSIGHTS_CONNECTION_STRING. Unset (every local run), it is a no-op:
-    # metric calls succeed against OpenTelemetry's default no-op provider instead of
-    # failing, which is why telemetry.py never checks for the variable itself.
+    # The candle-age metric the most important alert stands on, exported from APPLICATIONINSIGHTS_CONNECTION_STRING.
+    # Unset it is a no-op against OpenTelemetry's default provider, which is why telemetry.py never checks for it.
     "azure-monitor-opentelemetry>=1.6",
-    # Runtime plumbing this module shares with agent and teams. Taken partially: this
-    # module keeps its own `db.py`, which is 56.2% identical to the package's rather than
-    # a copy of it (packages-replace-the-hand-copies/design.md, D4).
+    # Runtime plumbing shared with the workbench. Taken partially: this module keeps its own `db.py`, which is 56.2%
+    # identical to the package's rather than a copy of it (packages-replace-the-hand-copies/design.md, D4).
     "tc-runtime",
-    # Pinned exactly, unlike everything above it. 2.0.0 moved `FastMCP` out of
-    # `mcp.server.fastmcp`, so a floor here is a module that stops importing on somebody
-    # else's release day.
+    # Pinned exactly, unlike everything above it: 2.0.0 moved `FastMCP` out of `mcp.server.fastmcp`, so a floor here
+    # is a module that stops importing on somebody else's release day.
     "mcp==1.27.0",
-    # Caller identity, upstream-refusal flattening and the schema slimmer, for the tool
-    # surface this module serves at `/mcp`. Its README's consumer table now names four
-    # modules rather than three; see the note there on the database it used to be true
-    # that no consumer had.
+    # Caller identity, upstream-refusal flattening and the schema slimmer, for the tool surface this module serves
+    # at `/mcp`.
     "tc-mcp-kit",
 ]
 
@@ -71,14 +54,11 @@ line-length = 100
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
 [tool.pyright]
-# What runs in production: the module and the migrations the deploy applies before it.
-# The suite is deliberately outside. Its fakes are structural on purpose — a class with
-# the three methods a caller actually uses — and satisfying a checker there would mean a
-# Protocol per seam, bought with nothing the tests do not already prove by running.
+# What runs in production: the module and the migrations the deploy applies before it. The suite is deliberately
+# outside — its fakes are structural, and satisfying a checker there would mean a Protocol per seam.
 include = ["market_data", "migrations"]
-# Basic, not strict, and that is the whole point of the step. Basic reads the code as
-# written and asks whether it holds together; strict would additionally demand an
-# annotation on everything, which is a different project with a different payoff.
+# Basic, not strict: basic reads the code as written and asks whether it holds together, where strict would also
+# demand an annotation on everything — a different project with a different payoff.
 typeCheckingMode = "basic"
 
 [tool.pytest.ini_options]
@@ -92,25 +72,19 @@ markers = [
 
 [dependency-groups]
 dev = [
-    # Pinned exactly, unlike the rest of this list. A type checker that upgrades itself
-    # decides when this repository's CI turns red, and it does so between two runs of the
-    # same commit — the one kind of failure that teaches nothing. Raised deliberately.
+    # Pinned exactly, unlike the rest of this list: a checker that upgrades itself decides when CI turns red, and
+    # does so between two runs of the same commit.
     "pyright==1.1.411",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "respx>=0.21",
-    # Pinned exactly, not a floor. `>=0.7` meant CI took whatever was newest, which today
-    # resolves to 0.16.2 with 413 rules active — a far wider set than anything 0.7 ran by
-    # default. New rules have been worth having (UP037 caught a real defect in config.py),
-    # but with a floor it is the linter's publisher who decides when a commit that was
-    # green turns red. Raised deliberately, in a commit that says which rules arrived.
+    # Pinned exactly, not a floor. New rules have been worth having — UP037 caught a real defect in config.py — but
+    # with a floor it is the linter's publisher who decides when a green commit reddens.
     "ruff==0.16.2",
-    # An independent oracle for `test_indicators_talib_comparison.py`, dev-only —
-    # `market_data/indicators` imports nothing from it (design.md, "Własne jądro
-    # na numpy, TA-Lib wyłącznie jako wyrocznia testowa").
+    # An independent oracle for `test_indicators_talib_comparison.py`, dev-only: `market_data/indicators` imports
+    # nothing from it (design.md, "Własne jądro na numpy, TA-Lib wyłącznie jako wyrocznia testowa").
     "ta-lib>=0.7.1",
-    # Brings up a throwaway PostgreSQL per test session. A container rather than a
-    # shared database, because the schema is the thing under test and a leftover
-    # table from a previous run is indistinguishable from a migration that works.
+    # A throwaway PostgreSQL per test session rather than a shared database: the schema is the thing under test, and
+    # a leftover table is indistinguishable from a migration that works.
     "testcontainers[postgres]>=4.8",
 ]

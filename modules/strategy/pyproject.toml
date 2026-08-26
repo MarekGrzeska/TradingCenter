@@ -12,21 +12,17 @@ dependencies = [
     "pydantic-settings>=2.2",
     "asyncpg>=0.30",
     "alembic>=1.14",
-    # Alembic drives migrations through SQLAlchemy Core; this module's own queries go
-    # straight through asyncpg. The `asyncio` extra pulls greenlet, without which an async
-    # engine raises at its first connect — and the only driver installed here is async.
+    # Alembic drives migrations through SQLAlchemy Core; this module's own queries go straight through asyncpg. The
+    # `asyncio` extra pulls greenlet, without which an async engine raises at its first connect.
     "sqlalchemy[asyncio]>=2.0",
-    # The database credential in identity mode: an Entra token for this module's own
-    # identity, fetched at connection time, never a stored password. `azure.identity.aio`
-    # imports aiohttp lazily and fails at first use rather than at install, so aiohttp is
-    # named here rather than left transitive.
+    # The database credential in identity mode: an Entra token fetched at connection time, never a stored password.
+    # aiohttp is named here because `azure.identity.aio` imports it lazily and fails at first use, not at install.
     "azure-identity>=1.19",
     "aiohttp>=3.10",
     # Pool, advisory lock, migrations, schema check, Easy Auth principal.
     "tc-runtime",
-    # Pinned exactly, unlike everything above it. 2.0.0 moved `FastMCP` out of
-    # `mcp.server.fastmcp`, so a floor here is a module that stops importing on somebody
-    # else's release day.
+    # Pinned exactly, unlike everything above it: 2.0.0 moved `FastMCP` out of `mcp.server.fastmcp`, so a floor is a
+    # module that stops importing on somebody else's release day.
     "mcp==1.27.0",
     # Caller identity, upstream-refusal flattening and the schema slimmer, for the
     # read-only tool surface at `/mcp`.
@@ -62,9 +58,8 @@ markers = [
 
 [dependency-groups]
 dev = [
-    # Both pinned exactly, for the reason market-data's pyproject.toml gives: a checker or
-    # a linter that upgrades itself decides when this repository's CI turns red, between
-    # two runs of the same commit.
+    # Both pinned exactly, for the reason market-data's pyproject gives: a tool that upgrades itself decides when CI
+    # turns red, between two runs of the same commit.
     "pyright==1.1.411",
     "ruff==0.16.2",
     "pytest>=8.3",

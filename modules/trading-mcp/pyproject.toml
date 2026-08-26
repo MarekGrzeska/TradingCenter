@@ -11,19 +11,15 @@ dependencies = [
     "pydantic>=2.7",
     "pydantic-settings>=2.2",
     "uvicorn[standard]>=0.29",
-    # The caller-identity middleware and the upstream-refusal helper, one copy each
-    # (packages-replace-the-hand-copies). Everything else in this module stays here:
-    # its server, its client, its settings and its error taxonomy are not copies.
+    # The caller-identity middleware and the upstream-refusal helper, one copy each. Everything else stays here: this
+    # module's server, client, settings and error taxonomy are not copies.
     "tc-mcp-kit",
     # This module's own identity, presented to capital-gateway wherever there is a
     # directory to get a token from (the-gateway-door-authenticates).
     "azure-identity>=1.19",
-    # Not transitive, and not optional: `azure.identity.aio`'s async transport imports
-    # aiohttp **lazily**, so a missing one is an `ImportError` at the first `get_token`
-    # rather than at install. market-data and tc-runtime both carry this line for the same
-    # reason, and both say so; this module shipped without it on 20 August 2026 and the
-    # container exited 1 five seconds into start-up, because the demo check is the first
-    # thing that asks for a token.
+    # Not transitive and not optional: `azure.identity.aio` imports aiohttp **lazily**, so a missing one is an
+    # ImportError at the first `get_token`. Shipped without it on 20 August 2026, and the container exited 1 in five
+    # seconds — the demo check is the first thing that asks for a token.
     "aiohttp>=3.10",
 ]
 
