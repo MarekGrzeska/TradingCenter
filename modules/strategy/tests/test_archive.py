@@ -111,9 +111,8 @@ class TestReadingFacts:
                 SPEC, "US100", SPEC.resolve_params({"fast_period": 8}), as_of=BAR
             )
 
-        # Parsed rather than matched as a substring: what matters is the value asked for,
-        # not how json.dumps spaced it. `float` is the archive's own wire type for a
-        # parameter — it converts to what an entry needs on its side.
+        # Parsed rather than matched as a substring: what matters is the value asked for, not how json.dumps spaced
+        # it. `float` is the archive's own wire type for a parameter.
         sent = json.loads(route.calls[0].request.read())
         assert [spec["params"]["period"] for spec in sent["specs"]] == [8.0, 50.0, 14.0]
 
@@ -245,9 +244,8 @@ class TestSplittingALongRead:
         assert len(_split("HOUR", BAR - timedelta(days=30), BAR)) == 1
 
     def test_a_range_over_the_ceiling_is_split_and_covered_exactly(self) -> None:
-        """The loop never reaches this; the backtest does, over years of minutes. The point
-        of it living in the client is that neither the strategy nor the caller has to know
-        the ceiling exists."""
+        """The loop never reaches this; the backtest does, over years of minutes. The point of it living in the
+        client is that neither the strategy nor the caller has to know the ceiling exists."""
         start, end = BAR - timedelta(days=400), BAR
         windows = _split("MINUTE", start, end)
 

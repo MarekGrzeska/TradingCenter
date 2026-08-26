@@ -1,6 +1,5 @@
-"""Whether the database a process reached is at the revision its code was built for — a comparison, never
-a migration. It catches the pair a migration cannot fix: a database behind the image after migrating, and
-one ahead of it after a rollback. Written after 15 August 2026, when only `GET /prompt` failed."""
+"""Whether the database a process reached is at the revision its code was built for — a comparison, never a
+migration. It catches what a migration cannot: a database behind the image, and one ahead of it after a rollback."""
 
 from __future__ import annotations
 

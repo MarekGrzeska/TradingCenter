@@ -1,9 +1,5 @@
-"""A real MCP server to test the clients against, not a mock of one. The stand-in is a FastMCP server built
-in this file and served by a real uvicorn on a real port — enough to prove what a client owes the run above
-it: a tool list it did not write, a refusal that arrives as a result, and a server that is not there.
-
-One copy at the root of `tests/`, because there is one process now. What is still per-suite is
-`settings_for`, since each surface builds its own `Settings`."""
+"""A real MCP server to test the clients against — a FastMCP server built here and served by a real uvicorn, which is
+enough to prove what a client owes the run above it. One copy at the root of `tests/`, because there is one process now."""
 
 from __future__ import annotations
 

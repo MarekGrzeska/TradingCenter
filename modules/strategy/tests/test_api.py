@@ -103,9 +103,8 @@ class TestWatches:
     async def test_a_strategy_whose_facts_the_archive_does_not_announce_is_refused(
         self, api, app
     ) -> None:
-        """Registration is where a strategy's facts are checked against what the archive
-        actually has. Refused by name, because the remedy is either a spelling fix or an
-        indicator the archive has to grow."""
+        """Registration is where a strategy's facts are checked against what the archive actually has. Refused by
+        name, because the remedy is either a spelling fix or an indicator the archive has to grow."""
         app.state.archive = FakeArchive(indicators=frozenset({"ema"}))
 
         response = await api.post(

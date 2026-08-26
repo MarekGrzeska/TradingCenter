@@ -23,10 +23,8 @@ def _root_logger_restored():
 
 
 def test_this_module_gets_somewhere_to_write(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The defect: uvicorn configures its own loggers and leaves the root alone, so every
-    line this module wrote about a room, a boundary or a refused subscription went
-    nowhere — and an hour was spent diagnosing a stalled feed from another module's
-    database."""
+    """The defect: uvicorn configures its own loggers and leaves the root alone, so every line this module
+    wrote went nowhere — and an hour was spent diagnosing a stalled feed from another module's database."""
     monkeypatch.delenv("LOG_LEVEL", raising=False)
     logging.getLogger().handlers.clear()
 

@@ -1,8 +1,5 @@
-"""Seeds `"v10"`: the same prompt, plus what to do with the teams tools — tools a model is not told about
-are tools it uses badly. What each tool does is in the tool's own description, where it belongs.
-
-It rides in both bodies: the tool servers fail independently, so a prompt that dropped the teams paragraph
-whenever market-mcp was down would leave the model denying tools it still has.
+"""Seeds `"v10"`: the same prompt plus what to do with the teams tools, since tools a model is not told about are tools
+it uses badly. It rides in both bodies, or a prompt would deny tools the model still has whenever market-mcp is down.
 
 Revision ID: 0010
 Revises: 0009

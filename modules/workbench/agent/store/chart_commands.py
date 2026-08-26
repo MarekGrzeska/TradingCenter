@@ -65,11 +65,8 @@ async def record_chart_command(
 
 
 async def chart_state_after(conn: Conn, *, sequence: int) -> ChartCommand | None:
-    """Every command newer than `sequence`, folded into one — or `None` when there is none. Folded because
-    a command that set only the indicators and a later one that set only the symbol each say something.
-
-    Unbounded on purpose: this table grows at the speed of an operator asking for things, and a cap would
-    drop exactly the older command the fold exists to keep."""
+    """Every command newer than `sequence`, folded into one, because a command that set only the indicators and a later
+    one that set only the symbol each say something. Unbounded on purpose: a cap would drop what the fold exists to keep."""
     rows = await conn.fetch(_SELECT_CHART_COMMANDS_AFTER, sequence)
     folded: ChartCommand | None = None
     for row in rows:

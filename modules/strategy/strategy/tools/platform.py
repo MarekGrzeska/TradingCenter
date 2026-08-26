@@ -1,9 +1,5 @@
-"""The four read-only tools this module announces. `pending_setups` shapes the rest: a trigger is a
-threshold on one numeric field, and a count of standing setups is exactly the shape one can watch.
-
-The number is counted from the recorded decisions, so what a trigger compares against a threshold is the
-very fact the woken team will read — a trigger reacting to one value while the team reads another is
-worse than no trigger at all."""
+"""The four read-only tools this module announces. `pending_setups` shapes the rest, and its number is counted from
+the recorded decisions, so a trigger compares against the very fact the woken team will read."""
 
 from __future__ import annotations
 

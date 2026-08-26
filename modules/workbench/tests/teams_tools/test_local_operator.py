@@ -1,7 +1,5 @@
-"""The boundary the refusal has: what a tool does when no operator identity arrives, on a machine where none
-could have. Its own file because every other tool test supplies one, and a fixture here would leave nothing tested.
-
-The condition used to have two halves and lost one with the merge: there is no remote teams."""
+"""The boundary the refusal has: what a tool does when no operator identity arrives, on a machine where none could
+have. Its own file because every other tool test supplies one, and a fixture here would leave nothing tested."""
 
 from __future__ import annotations
 
@@ -114,10 +112,8 @@ async def test_a_write_is_refused_there_too_and_reaches_nothing(guarded_server) 
 
 
 async def test_no_tool_takes_an_identity_as_an_argument_in_any_shape(server) -> None:
-    """"Tożsamość operatora jest przenoszona, a nie odgadywana" — a field a model can fill
-    is a field a model can borrow, so the argument is not ignored at runtime: it does not
-    exist. Checked against the published schemas rather than the source, because the schema
-    is what a model actually sees."""
+    """"Tożsamość operatora jest przenoszona, a nie odgadywana" — a field a model can fill is one a model can borrow,
+    so the argument does not exist rather than being ignored. Checked against the published schemas, which is what a model sees."""
     mcp, teams = server
     forbidden = ("owner", "principal", "operator", "token", "authorization", "identity")
 

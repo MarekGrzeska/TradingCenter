@@ -1,6 +1,5 @@
-"""How prices get into the archive: a tick, a backfill, and the gap a restart leaves. The tick is one
-request *per event* — measured 22 August 2026, the metadata surface's `outcomePrices` is the order
-book's midpoint to the digit, so a 128-market event costs one request here and 256 there."""
+"""How prices get into the archive: a tick, a backfill, and the gap a restart leaves. The tick is one request *per
+event* — measured, the metadata surface's `outcomePrices` is the order book's midpoint to the digit."""
 
 from __future__ import annotations
 

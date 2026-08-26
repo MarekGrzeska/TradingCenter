@@ -1,6 +1,5 @@
-"""The catalogue: what teams exist, what one looks like, how to make one, how to correct one. `create_team`
-and `revise_team` are both deliberately one call — a model correcting one role would otherwise read the
-definition, rebuild it in full and post it back, three turns in which to drop an agent by omission."""
+"""The catalogue: what teams exist, what one looks like, how to make one, how to correct one. `create_team` and
+`revise_team` are one call each — rebuilding a definition to change one role is three turns in which to drop an agent."""
 
 from __future__ import annotations
 

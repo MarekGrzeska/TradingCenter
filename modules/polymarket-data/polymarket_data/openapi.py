@@ -1,8 +1,5 @@
-"""The module's OpenAPI document, printed without starting anything, so regenerating needs no database
-and no network — which is exactly how two copies of a contract stay together.
-
-There is no consumer of these types yet, deliberately: what it buys before one exists is that
-`contract:check` fails the day this contract moves."""
+"""The module's OpenAPI document, printed without starting anything, so regenerating needs no database and no network.
+No consumer of these types exists yet, deliberately: `contract:check` still fails the day this contract moves."""
 
 from __future__ import annotations
 
@@ -25,9 +22,8 @@ def _referenced(node: Any, into: set[str]) -> None:
 
 
 def require_response_fields(schema: dict[str, Any]) -> dict[str, Any]:
-    """Mark every property of a response model as required, in place. Pydantic's reading is right for
-    something a caller sends and untrue for something this module answers with, which is serialised
-    whole — and this contract is mostly `X | None` fields that would generate as `T | undefined`."""
+    """Mark every property of a response model as required, in place: pydantic's reading is right for what a caller
+    sends and untrue for what this module answers with, which is serialised whole and mostly `X | None` fields."""
     components = schema.get("components", {}).get("schemas", {})
     from_requests: set[str] = set()
     for path in schema.get("paths", {}).values():

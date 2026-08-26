@@ -1,6 +1,5 @@
-"""The rule that a deployment's seed yields to a person, and the bug it was written from. Migrations seed
-each version one higher, and `_next_prompt_version` does the same `+1` — so the version an operator gets by
-saving once is always the one the next seeding migration will use, and the seed used to win the read."""
+"""The rule that a deployment's seed yields to a person, and the bug it was written from: migrations seed each version
+one higher and `_next_prompt_version` does the same `+1`, so the seed used to win the read after one save."""
 
 from __future__ import annotations
 

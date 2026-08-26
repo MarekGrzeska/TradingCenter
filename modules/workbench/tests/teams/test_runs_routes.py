@@ -259,10 +259,8 @@ def test_the_stream_opens_with_where_the_run_is_now(client: TestClient) -> None:
 def test_a_watcher_is_subscribed_before_the_snapshot_is_read(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Reading the snapshot first left a window with no owner: releasing the connection is a suspension
-    point, and an event published there is too late for the snapshot and too early for the queue.
-
-    The order is what is asserted, not the timing — the window is one turn of the event loop."""
+    """Reading the snapshot first left a window with no owner: releasing the connection is a suspension point, and an
+    event published there is too late for the snapshot and too early for the queue. The order is what is asserted."""
     team_id = _a_team(client)
     run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
     _wait_for_status(client, run_id, {"completed", "failed"})

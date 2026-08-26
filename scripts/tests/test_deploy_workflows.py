@@ -1,7 +1,5 @@
-"""The deploy workflows read as data, so their agreement with the shared one is testable — seven hand-copied
-ones is how the 16 August lesson reached two and not the other five. One of these is written from a bug found
-while writing it: `body_contains` interpolated into a quoted shell argument lost its quotes and matched a
-sign-in page, which would have gone green while asserting nothing."""
+"""The deploy workflows read as data, so their agreement with the shared one is testable — seven hand-copied ones is
+how the 16 August lesson reached two and not the other five. One is written from a bug found while writing it."""
 
 from __future__ import annotations
 
@@ -117,9 +115,8 @@ def test_every_app_service_module_deploys_through_the_shared_workflow() -> None:
     assert deploying == app_service_modules
 
 
-# Written from a failure on 19 August 2026: `market-data` took `tc-mcp-kit` and its Dockerfile still copied
-# only `tc-runtime`. No module job builds an image, so the first thing to notice was `deploy-market-data`
-# failing on `main` at `uv sync --frozen`. These two are the check that runs before that.
+# Written from a failure on 19 August 2026: `market-data` took `tc-mcp-kit` and its Dockerfile still copied only
+# `tc-runtime`. No module job builds an image, so `deploy-market-data` on `main` was the first thing to notice.
 
 MODULES = Path(__file__).resolve().parents[2] / "modules"
 

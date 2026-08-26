@@ -1,9 +1,5 @@
-"""The published surface: one FastAPI over both halves of the operator's workbench. Assembly only, and the
-only module that imports all three packages.
-
-The lifespan is all-or-nothing on purpose: two databases are brought to this image's revision before a
-single request is served. There is no mode where the process serves one surface and calls the other
-unavailable, and the deploy probe reaches the process, so a process that answers is the proof."""
+"""The published surface: one FastAPI over both halves of the workbench, assembly only. The lifespan is all-or-nothing,
+so a process that answers the deploy probe has already brought two databases to this image's revision."""
 
 from __future__ import annotations
 
@@ -11,9 +7,8 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-# Root logger configuration, before anything else imports and starts logging. Nothing else
-# sets a level or a destination — mirrors market_data.telemetry's reasoning: without this
-# the process writes into the void, and a silent process looks exactly like an idle one.
+# Root logger configuration, before anything else imports and starts logging: nothing else sets a level or a
+# destination, so without this the process writes into the void and a silent process looks exactly like an idle one.
 logging.basicConfig(
     level=os.environ.get("LOG_LEVEL", "INFO").upper(),
     format="%(levelname)-5.5s [%(name)s] %(message)s",
@@ -53,9 +48,8 @@ async def lifespan(app: FastAPI):
     conversation_settings = settings.for_conversation()
     teams_settings = settings.for_teams()
 
-    # Constructed, not connected: a session opens on the first turn that wants a tool.
-    # Reaching market-data at startup would make this process's health depend on another
-    # module's, and its whole answer to that module being down is to run without its tools.
+    # Constructed, not connected: a session opens on the first turn that wants a tool. Reaching market-data at startup
+    # would make this process's health depend on another module's, whose answer is to run without its tools.
     team_tools = LocalTeamsTools(
         app, operator_identity_optional=not settings.require_authenticated_principal
     )
@@ -79,17 +73,14 @@ async def lifespan(app: FastAPI):
             tenant_id=teams_settings.azure_tenant_id,
         ) as teams_pool,
     ):
-        # Built here rather than beside the conversation's, because one of the sources it
-        # holds is served by this process and reads the teams database directly. Announcing
-        # those tools does not touch the pool — the descriptors are constants — but calling
-        # them does, and this is the first point where there is a pool to give.
+        # Built here rather than beside the conversation's, because one of its sources is served by this process and
+        # reads the teams database directly: announcing needs no pool, calling does, and this is the first point with one.
         teams_tool_servers = TeamsToolServerRegistry.from_settings(
             teams_settings, pool=teams_pool
         )
 
-        # The `try` opens before the schema checks, not after them: `ToolServer.__init__`
-        # already holds a credential when a scope is configured, and a refused start is
-        # exactly the path that would otherwise leak it.
+        # The `try` opens before the schema checks, not after: `ToolServer.__init__` already holds a credential when a
+        # scope is configured, and a refused start is exactly the path that would otherwise leak it.
         try:
             # Each database is brought to this image's revision before anything is built on it. One
             # connection held throughout each: the advisory lock is session scoped. Two locks, two keys.
@@ -109,10 +100,8 @@ async def lifespan(app: FastAPI):
             )
 
             async with teams_pool.acquire() as conn:
-                # A run lives in the process that started it, so anything still `running`
-                # in the database belongs to a process that is gone — closed here, before a
-                # route can report it as work in progress that nobody is doing
-                # (specs/teams-runs).
+                # A run lives in the process that started it, so anything still `running` in the database belongs to a
+                # process that is gone — closed here, before a route can report work nobody is doing.
                 orphans = await teams_store.fail_unfinished_runs(
                     conn, reason="the module restarted while this run was in progress"
                 )
@@ -134,19 +123,16 @@ async def lifespan(app: FastAPI):
             app.state.teams = teams.surface.State(
                 settings=teams_settings,
                 pool=teams_pool,
-                # Built once, from settings that were already refused if a model carried
-                # no rate or a duplicate id (`config.py`) — so nothing downstream
-                # re-checks either.
+                # Built once, from settings already refused if a model carried no rate or a duplicate id, so nothing
+                # downstream re-checks either.
                 catalogue=TeamsCatalogue.from_settings(teams_settings),
                 provider=TeamsProvider(teams_settings),
                 tools=teams_tool_servers,
                 runs=RunRegistry(),
             )
 
-            # Started last, once everything a fire could possibly need is already on
-            # `app.state` — a schedule due the instant this process comes up MUST see the
-            # same catalogue, provider and tool session a route would. Stopped first in
-            # `finally`, before the tool session it may still be mid-call against.
+            # Started last, once everything a fire could need is on `app.state` — a schedule due the instant this
+            # process comes up MUST see what a route would. Stopped first, before the tool session it may be mid-call against.
             clock = Clock(
                 teams_pool,
                 catalogue=app.state.teams.catalogue,
@@ -173,9 +159,8 @@ async def _migrate(pool, migrations, lock_key: int, *, wait: float, label: str) 
         async with advisory_lock(conn, lock_key, wait=wait):
             log.info("%s: bringing the database up to this image's revision", label)
             await migrate.run(migrations)
-        # Still checked, and for a narrower pair of accidents than the migration itself: a
-        # migration that reported success without arriving, and an image older than the
-        # schema it found (`schema_version.py`).
+        # Still checked, and for a narrower pair of accidents than the migration itself: a migration that reported
+        # success without arriving, and an image older than the schema it found.
         await schema_version.verify(conn, migrations)
 
 
@@ -194,14 +179,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# No CORS middleware here, and adding one would break the browser rather than help it —
-# same reasoning as market_data.app: App Service's own CORS layer answers the cross-origin
-# preflight before Easy Auth would refuse it for carrying no credential.
-# See infra/app-service.tf.
+# No CORS middleware here, and adding one would break the browser rather than help it: App Service's own CORS layer
+# answers the cross-origin preflight before Easy Auth would refuse it for carrying no credential.
 
-# `app.openapi` replaced with a wrapper rather than called once at import time — FastAPI
-# caches whatever the wrapper returns on `app.openapi_schema`, so this runs once per
-# process and every later `.openapi()` call reads the same augmented dict.
+# `app.openapi` replaced with a wrapper rather than called once at import: FastAPI caches whatever the wrapper returns,
+# so this runs once per process and every later call reads the same augmented dict.
 _routes_openapi = app.openapi
 
 

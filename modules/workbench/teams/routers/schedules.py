@@ -1,9 +1,5 @@
-"""Schedules and triggers: a team's own clock and its own trip-wire on the market. Creating or editing
-either resolves the revision it would run before a row is written, so it can never point at nothing.
-
-There is no consent check here any more, and its absence is a decision: it ran on this path alone while
-the firing path never asked. What is deliberately not here is the clock itself — that is `scheduler/`'s,
-and these routes only create, read, edit and toggle the rows it will later act on."""
+"""Schedules and triggers: a team's own clock and its own trip-wire. Creating or editing either resolves the revision
+it would run before a row is written, so it can never point at nothing; the clock itself is `scheduler/`'s."""
 
 from __future__ import annotations
 
@@ -237,9 +233,8 @@ def _take(cron_expression: str, count: int) -> list[datetime]:
 
 
 def _check_trigger_tool(tool_name: str, *, announced: AnnouncedSnapshot) -> None:
-    # A trigger's condition is a reading of the world, taken with a tool server's tools, so the tools this
-    # process serves itself are subtracted first: a team's memory is not the world, and has no run to be
-    # read inside of when the clock is the caller.
+    # A trigger's condition is a reading of the world, so the tools this process serves itself are subtracted first:
+    # a team's memory is not the world, and has no run to be read inside of when the clock is the caller.
     names = (
         sorted(set(announced.by_name) - MEMORY_TOOL_NAMES)
         if announced.configured_servers

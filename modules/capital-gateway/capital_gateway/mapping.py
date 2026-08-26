@@ -78,9 +78,8 @@ def _bid(price: dict | None) -> float | None:
 
 
 def _candle_ts(p: dict) -> str:
-    """capital.com sends `snapshotTimeUTC` without a zone marker, so a consumer parsing
-    it gets local time on most platforms. The `Z` is added here rather than left for
-    every caller to remember."""
+    """capital.com sends `snapshotTimeUTC` without a zone marker, so a consumer parsing it gets local time on
+    most platforms. The `Z` is added here rather than left for every caller to remember."""
     utc = p.get("snapshotTimeUTC")
     if utc:
         return utc if utc.endswith("Z") else f"{utc}Z"
@@ -130,9 +129,8 @@ def position_from_raw(row: dict) -> Position:
 
 
 def order_from_confirm(c: dict, accepted_status: OrderStatus = OrderStatus.FILLED) -> Order:
-    """From a ``GET /confirms/{ref}`` payload. ``accepted_status`` is what ACCEPTED means for the
-    action; the cause of a refusal is ``rejectReason``, and reading ``reason`` alone gave every
-    real rejection a null cause."""
+    """From a ``GET /confirms/{ref}`` payload. ``accepted_status`` is what ACCEPTED means for the action; the
+    cause of a refusal is ``rejectReason``, and reading ``reason`` alone gave every real rejection a null cause."""
     status = accepted_status if c.get("dealStatus") == "ACCEPTED" else OrderStatus.REJECTED
     deal_id = c.get("dealId")
     affected = c.get("affectedDeals") or []

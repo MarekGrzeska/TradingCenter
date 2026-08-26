@@ -22,11 +22,8 @@ def _referenced(node: Any, into: set[str]) -> None:
 
 
 def require_response_fields(schema: dict[str, Any]) -> dict[str, Any]:
-    """Mark every property of a response model as required, in place. Pydantic's reading is right for
-    something a caller sends and untrue for something this module answers with, which is serialised whole.
-
-    This contract is mostly such fields, and the values in question are a stop and a target — where
-    "absent" and "null" reading alike is a consumer that cannot tell a missing price from an unset one."""
+    """Mark every property of a response model as required, in place: pydantic's reading is right for what a caller
+    sends and untrue for what this module answers with, which here is a stop and a target that may be null."""
     components = schema.get("components", {}).get("schemas", {})
     from_requests: set[str] = set()
     for path in schema.get("paths", {}).values():
@@ -58,9 +55,8 @@ def document() -> dict[str, Any]:
 
 
 def main() -> None:
-    # Sorted keys so the same code always prints the same bytes: the generated TypeScript is
-    # committed and compared, and a diff caused by dictionary ordering would be noise nobody
-    # can act on.
+    # Sorted keys so the same code always prints the same bytes: the generated TypeScript is committed and compared,
+    # and a diff caused by dictionary ordering would be noise nobody can act on.
     json.dump(document(), sys.stdout, indent=2, sort_keys=True, ensure_ascii=False)
     sys.stdout.write("\n")
 

@@ -1,9 +1,5 @@
-"""Every source of tools this surface knows about, behind one door — a drop-in for a single `ToolServer`,
-so nothing above this package had to learn that there is more than one source now.
-
-Most of them are servers on a network and one is not: the team tools are a layer in this same process.
-Independence is the property worth stating — one server being unreachable costs the model that server's
-tools and nothing else. A name announced by more than one source is refused rather than resolved."""
+"""Every source of tools this surface knows about, behind one door — a drop-in for a single `ToolServer`. Independence
+is the property worth stating: one unreachable source costs the model its tools and nothing else."""
 
 from __future__ import annotations
 

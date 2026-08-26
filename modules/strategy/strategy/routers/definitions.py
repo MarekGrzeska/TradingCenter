@@ -1,8 +1,5 @@
-"""Rules the operator wrote, and the revisions they went through. Every write here is checked before it
-is written — against this image's catalogue and against the archive's.
-
-Nothing here starts anything: a watch is pinned to the revision it was started with, because a rule
-swapped underfoot produces decisions that look comparable and are not."""
+"""Rules the operator wrote and the revisions they went through, every write checked before it is written. Nothing
+here starts anything: a watch is pinned to its revision, because a rule swapped underfoot produces false comparisons."""
 
 from __future__ import annotations
 

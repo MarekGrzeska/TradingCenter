@@ -82,9 +82,8 @@ def a_history(bars: int = 60) -> ReplayArchive:
 
 class TestLookAhead:
     async def test_incremental_and_batch_agree(self) -> None:
-        """The one test that catches look-ahead, and it works by comparing this module
-        against itself: one driver reads the whole range and slices, the other reads a
-        window per bar. A difference is the future having leaked backwards."""
+        """The one test that catches look-ahead, by comparing this module against itself: one driver reads the whole
+        range and slices, the other a window per bar, and a difference is the future having leaked backwards."""
         archive = a_history()
         window = (archive.times[10], archive.times[-1])
 
@@ -455,9 +454,8 @@ class TestNamingARevisionOnTheCommandLine:
             named("my_rule@latest")
 
     async def test_naming_only_coded_entries_reaches_no_database(self) -> None:
-        """The floor every strategy is measured against has to be recomputable with nothing
-        else standing. The settings below point at a host that does not exist, so a run that
-        reached for a connection would say so."""
+        """The floor every strategy is measured against has to be recomputable with nothing else standing: the
+        settings below point at a host that does not exist, so a run reaching for a connection would say so."""
         settings = Settings(
             database_url="postgresql://nowhere.invalid:5432/strategy?sslmode=require",
             database_user="nobody",

@@ -16,11 +16,8 @@ class Aggregation:
 def aggregate_candles(
     candles: list[dict], target_count: int
 ) -> tuple[list[dict], Aggregation | None]:
-    """Buckets `candles` down to roughly `target_count` entries, OHLC-merged.
-
-    A no-op when the series already fits — aggregating a series that did not need it
-    would answer a request for detail with less than was asked for.
-    """
+    """Buckets `candles` down to roughly `target_count` entries, OHLC-merged, and a no-op when the series already
+    fits: aggregating one that did not need it would answer a request for detail with less than was asked for."""
     n = len(candles)
     if n <= target_count or target_count <= 0:
         return candles, None
@@ -52,10 +49,8 @@ def truncate(items: list, limit: int) -> tuple[list, int]:
 
 
 def thin_series(values: list, target_count: int) -> tuple[list, int | None]:
-    """Every `stride`-th value, keeping the series' shape recognizable instead of its
-    every point — for a full-resolution series, not the OHLC series `aggregate_candles`
-    bucket-merges. `stride` is `None` when the series already fits.
-    """
+    """Every `stride`-th value, keeping the series' shape recognizable instead of its every point — for a
+    full-resolution series, not the OHLC series `aggregate_candles` merges. `None` when it already fits."""
     n = len(values)
     if n <= target_count or target_count <= 0:
         return values, None

@@ -1,9 +1,5 @@
-"""Makes `tool_calls` able to hold a call that was sent and never answered for — two changes seen from
-two sides. `message_id` becomes nullable, because a call that moves the account must leave its row before
-it is sent; a `NULL` afterwards means exactly one thing, that the turn died between sending and answering.
-
-`outcome` gains `unknown`, the fourth answer and the one the model must not retry on. `downgrade` cannot
-restore `NOT NULL` while an unanswered call is in the table, so it deletes those rows — a real loss.
+"""Makes `tool_calls` able to hold a call that was sent and never answered for: `message_id` becomes nullable, and
+`outcome` gains `unknown`, the answer the model must not retry on. `downgrade` deletes those rows, which is a real loss.
 
 Revision ID: 0011
 Revises: 0010

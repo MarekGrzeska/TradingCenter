@@ -42,11 +42,8 @@ async def seeded_prompt_revision_max_id(migrated_url: str) -> int:
 async def db(
     migrated_url: str, seeded_prompt_revision_max_id: int
 ) -> AsyncIterator[asyncpg.Connection]:
-    """A connection to the migrated database, with the tables emptied first. `prompt_revisions` is not in
-    `TABLES`: the migrations themselves insert into it, and truncating would erase the seeds.
-
-    Everything up to `seeded_prompt_revision_max_id` is those seeds, so dropping what follows undoes a
-    previous test's own writes without reconstructing seeded text here."""
+    """A connection to the migrated database with the tables emptied first. `prompt_revisions` is not in `TABLES`,
+    because the migrations insert into it; dropping everything past the seeds undoes a previous test's writes instead."""
     conn = await asyncpg.connect(asyncpg_dsn(migrated_url))
     try:
         await conn.execute(f"TRUNCATE {', '.join(TABLES)} RESTART IDENTITY CASCADE")

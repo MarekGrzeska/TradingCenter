@@ -1,9 +1,5 @@
-"""The two rules that make this a platform rather than one strategy with ambitions: the pure layer imports
-nothing of this module but the contract and reaches for no I/O or clock, and the runtime imports the
-catalogue and never an entry in it.
-
-Read from the AST rather than from the top of the file, so an import inside a function body counts too.
-`importlib` slips past this, and that is accepted: it is not a mistake anybody makes by accident."""
+"""The two rules that make this a platform rather than one strategy with ambitions: the pure layer touches no I/O,
+and the runtime imports the catalogue and never an entry in it. Read from the AST, so an import in a function counts."""
 
 from __future__ import annotations
 
@@ -25,9 +21,8 @@ PURE_MODULES = ("rule.py", "interpreter.py")
 # and each of them is how a strategy would stop being replayable without looking wrong.
 FORBIDDEN_PACKAGES = {"httpx", "asyncpg", "fastapi", "starlette", "mcp", "time", "random"}
 
-# The clock, by the names it actually goes by. A strategy reads `Facts.as_of`, which is the
-# bar's own closing time — a decision that consulted the wall clock would replay to a
-# different answer tomorrow.
+# The clock, by the names it actually goes by. A strategy reads `Facts.as_of`, the bar's own closing time — one that
+# consulted the wall clock would replay to a different answer tomorrow.
 CLOCK_ATTRIBUTES = {"now", "utcnow", "today", "monotonic", "time"}
 
 # Everything that is the runtime. These may import `catalogue`; none of them may import a
@@ -48,11 +43,8 @@ def _sources(package: str) -> list[Path]:
 
 
 def _entries() -> list[Path]:
-    """The entry modules — the catalogue without its registry.
-
-    `catalogue/__init__.py` imports every entry, and that is its whole job: it is the one
-    file a new strategy changes. The rules below are about what an *entry* may know.
-    """
+    """The entry modules — the catalogue without its registry, since `catalogue/__init__.py` importing every entry is
+    its whole job. The rules below are about what an *entry* may know."""
     return [path for path in _sources("catalogue") if path.name != "__init__.py"]
 
 
@@ -73,11 +65,8 @@ def _tree(path: Path) -> ast.AST:
 
 
 def _own_modules_imported(tree: ast.AST) -> set[str]:
-    """Which modules of this package a file imports, however it spells the import.
-
-    `from ..archive import X` and `from strategy.archive import X` are the same reach and
-    are counted the same; a relative import's first component is what this returns.
-    """
+    """Which modules of this package a file imports, however it spells the import: `from ..archive import X` and
+    `from strategy.archive import X` are the same reach and are counted the same."""
     names: set[str] = set()
     for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom):

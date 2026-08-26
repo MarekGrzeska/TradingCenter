@@ -1,7 +1,5 @@
-"""The module's OpenAPI document, printed without starting anything — a twin of market-data's, minus the
-WebSocket hoisting, since this module has no subscription FastAPI cannot describe.
-
-    uv run python -m teams.openapi > schema.json"""
+"""The module's OpenAPI document, printed without starting anything — a twin of market-data's, minus the WebSocket
+hoisting, since this module has no subscription FastAPI cannot describe: `uv run python -m teams.openapi`."""
 
 from __future__ import annotations
 
@@ -24,11 +22,8 @@ def _referenced(node: Any, into: set[str]) -> None:
 
 
 def require_response_fields(schema: dict[str, Any]) -> dict[str, Any]:
-    """Mark every property of a response model as required, in place. Pydantic's reading is right for
-    something a caller sends and untrue for something this module answers with.
-
-    Request bodies keep Pydantic's reading, so the two are told apart by reachability rather than by a
-    hand-kept list, which would rot the first time a model moved sides."""
+    """Mark every property of a response model as required, in place: pydantic's reading is right for what a caller sends
+    and untrue for what this answers with. Request bodies keep it, told apart by reachability rather than a list."""
     components = schema.get("components", {}).get("schemas", {})
     from_requests: set[str] = set()
     for path in schema.get("paths", {}).values():
@@ -58,9 +53,8 @@ _document: dict[str, Any] | None = None
 
 
 def document() -> dict[str, Any]:
-    """The schema this surface publishes, built in-process — a FastAPI of its own, so the generated
-    TypeScript describes *this* surface. The prefixes come from `surface.include`, so there is no second
-    list to keep in step. `/health` is not here: it belongs to the process, not to either surface."""
+    """The schema this surface publishes, built in-process from a FastAPI of its own, so the generated TypeScript
+    describes *this* surface. `/health` is not here: it belongs to the process, not to either surface."""
     global _document
     if _document is None:
         from fastapi import FastAPI

@@ -1,9 +1,5 @@
-"""Adds `stopped` to `messages` — whether this reply ended because the operator said so. `incomplete`
-cannot say *who* cut it, and a model that broke is something to retry where an operator meant it.
-
-A column beside `incomplete` rather than an ending enum replacing both: the enum is tidier on a blank page
-and rewrites the meaning of every row already written. The check constraint is recreated rather than
-added beside, or the one rule would be spelled in two places.
+"""Adds `stopped` to `messages` — whether this reply ended because the operator said so, which `incomplete` cannot say.
+A column beside it rather than an enum replacing both, which would rewrite the meaning of every row already written.
 
 Revision ID: 0014
 Revises: 0013

@@ -1,8 +1,5 @@
-"""`/drawings` — the objects standing on an instrument's chart, and the operator's hand on them. Read,
-correct, remove, and no POST: drawing with the mouse is a different change.
-
-Unlike `/chart`, nothing here has a cursor: a drawing is the instrument's state, read whole and replaced
-whole by whoever draws it."""
+"""`/drawings` — the objects standing on an instrument's chart, and the operator's hand on them: read, correct, remove,
+and no POST, because drawing with the mouse is a different change. Nothing here has a cursor: a drawing is state."""
 
 from __future__ import annotations
 

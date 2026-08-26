@@ -1,6 +1,4 @@
-"""The conversation's routes, and the assembly of what they read. Split out of this package's own `app.py`
-when the two modules became one process: what stays is everything that is about the conversation.
-
+"""The conversation's routes, and the assembly of what they read — split out when the two modules became one process.
 `teams/surface.py` is the twin of this file, and the two never import each other."""
 
 from __future__ import annotations

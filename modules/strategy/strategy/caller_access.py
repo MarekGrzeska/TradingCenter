@@ -1,8 +1,5 @@
-"""Which caller may reach which surface. Easy Auth authorizes an application, not a route, so this record
-is what it cannot express: the workbench reads `pending_setups` at `/mcp`, the operator the REST contract.
-
-A path not in the record is refused, not passed. The identity is the calling application, read from the
-token's claims — never the principal-id header, which for a delegated token names the person."""
+"""Which caller may reach which surface, which Easy Auth cannot express: it authorizes an application, not a route.
+The identity is the calling application read from the token's claims, never the header that names the person."""
 
 from __future__ import annotations
 

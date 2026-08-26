@@ -1,8 +1,5 @@
-"""The clock evaluating triggers, against a real database, a scripted model, and a real MCP stand-in whose
-numeric answer a test can move between calls — not a mock, because the one contract with no committed
-snapshot is this session.
-
-`_check_trigger` is used directly only where a test needs to await the failure-streak bookkeeping."""
+"""The clock evaluating triggers, against a real database, a scripted model and a real MCP stand-in whose numeric
+answer a test can move between calls — not a mock, because the one contract with no committed snapshot is this session."""
 
 from __future__ import annotations
 

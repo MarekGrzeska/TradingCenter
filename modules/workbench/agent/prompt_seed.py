@@ -1,8 +1,5 @@
-"""How a migration seeds the system prompt without overwriting what a person wrote. Here rather than
-inside a migration, because the next seeding migration must not write this `WHERE` again from memory.
-
-The rule is one sentence: a seed lands only when the newest revision is itself a seed. An empty table
-counts as seedable, which is the first seed on a fresh database."""
+"""How a migration seeds the system prompt without overwriting what a person wrote, here rather than inside a migration
+so the next one does not write this `WHERE` from memory: a seed lands only when the newest revision is itself a seed."""
 
 from __future__ import annotations
 

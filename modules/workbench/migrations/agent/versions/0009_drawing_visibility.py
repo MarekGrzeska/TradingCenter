@@ -1,8 +1,5 @@
-"""Adds `hidden` to `chart_drawings` and seeds `"v9"`. Every drawing standing today comes out of this
-migration lit, and a hidden drawing is still the same drawing — same id, moment, prices and colour.
-
-A column on the row rather than a table beside it, and no index: the read is already "every row for this
-symbol". The ceiling keeps counting hidden ones, or it is not a ceiling. `downgrade` brings them back lit.
+"""Adds `hidden` to `chart_drawings` and seeds `"v9"`. A column on the row rather than a table beside it, and no index,
+since the read is already "every row for this symbol". The ceiling keeps counting hidden ones, or it is not a ceiling.
 
 Revision ID: 0009
 Revises: 0008

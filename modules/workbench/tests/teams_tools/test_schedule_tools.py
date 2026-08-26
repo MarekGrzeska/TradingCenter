@@ -1,6 +1,5 @@
-"""The schedule tools: creating, listing, pausing, editing and deleting. `unattended_ack` used to be the
-point of this file; the safeguard is gone, so what is held now is the other half of the same worry — that a
-model reaching for the destructive tool gets a different one from the reversible tool."""
+"""The schedule tools: creating, listing, pausing, editing and deleting. `unattended_ack` used to be the point of this
+file; what is held now is the other half — that a model reaching for the destructive tool gets a different one."""
 
 from __future__ import annotations
 

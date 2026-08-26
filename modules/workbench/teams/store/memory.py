@@ -1,8 +1,5 @@
-"""What a team remembers between runs. Rows are only ever inserted and deleted; nothing here updates one.
-
-The owner is reached by joining `teams` on every statement, including the delete. The one read that does
-not join is `list_for_run`: it is asked mid-run about a run this module started, so there is no caller
-identity to filter by and nothing a stranger could learn."""
+"""What a team remembers between runs; rows are only inserted and deleted. The owner is reached by joining `teams` on
+every statement but `list_for_run`, which is asked mid-run about a run this module started."""
 
 from __future__ import annotations
 
@@ -53,11 +50,8 @@ async def add_memory(
     run_id: int | None,
     content: str,
 ) -> asyncpg.Record | None:
-    """Writes one entry and hands it back, or `None` for a team that does not exist or belongs to somebody
-    else. The owner check rides inside the `INSERT ... SELECT`, because a run holds no lock on its team.
-
-    `archived_at` is deliberately not consulted: a retired team stops being offered for a run, but a run
-    already in flight finishes, and an entry refused here is work the operator paid for and cannot read."""
+    """Writes one entry and hands it back, or `None` for a team that does not exist or belongs to somebody else, with the
+    owner check inside the `INSERT ... SELECT`. `archived_at` is not consulted: a run already in flight finishes."""
     return await conn.fetchrow(
         _INSERT_MEMORY, team_id, author_agent_key, run_id, content, owner_principal
     )

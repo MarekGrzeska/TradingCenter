@@ -1,9 +1,5 @@
-"""One agent's work: the model and its tools, going round until the model stops asking. A plain loop rather
-than a nested graph, because the *team* graph is the LangGraph, and two frameworks' supersteps between a
-question and its answer buy nothing. The round ceiling reads as a `for` bound, which is what it is.
-
-Three failures stay apart, exactly as they do in `agent`: the tool refused, the server could not be reached,
-or the provider broke — and only the last ends the agent's work."""
+"""One agent's work: the model and its tools, going round until the model stops asking. A plain loop, because the *team*
+graph is the LangGraph, and three failures stay apart as they do in `agent`."""
 
 from __future__ import annotations
 
@@ -123,11 +119,8 @@ async def run_agent(
     before_write_call: BeforeWriteCall | None = None,
     moves_the_account: MovesTheAccount | None = None,
 ) -> AgentWork:
-    """Model → tools → model, until the model stops asking or the ceiling is reached. Never raises for a
-    broken provider or a broken tool: the text produced before something broke is part of the trace.
-
-    The hooks are deliberately outside that guarantee: a cost ceiling raises from `before_model_call`, the
-    usage row is written per call rather than per agent, and `before_write_call` is the same seam for orders."""
+    """Model → tools → model, until the model stops asking or the ceiling is reached. Never raises for a broken provider
+    or tool — the text produced before it broke is part of the trace — but the hooks are outside that guarantee."""
     work = AgentWork()
     system_prompt = system_prompt_for(agent, has_tools=bool(tools))
     rounds: list[ToolRound] = []

@@ -1,9 +1,5 @@
-"""Putting a team on a clock or on a market condition — and everything after that: pausing, editing and
-deleting what is already there. The whole set, because the operator who sets a schedule with a sentence
-corrects it with a sentence too.
-
-Pausing and deleting are two tools rather than one with a flag: they differ in what cannot be undone, and a
-model choosing between them should have to name which it means."""
+"""Putting a team on a clock or a market condition, and everything after — the whole set, because the operator who sets
+a schedule with a sentence corrects it with one. Pausing and deleting are two tools: they differ in what cannot be undone."""
 
 from __future__ import annotations
 

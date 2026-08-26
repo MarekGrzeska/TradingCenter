@@ -1,8 +1,5 @@
-"""`GET /usage` — what a run, or a team, cost, broken down so the cost can be attributed. The breakdown by
-agent is the one the spec asks for: a total tells nobody whether the expensive part was the four cheap
-gatherers or the one dear judge.
-
-Nothing here computes a cost: every number is a `SUM` over costs written when their calls happened."""
+"""`GET /usage` — what a run or a team cost, broken down by agent, because a total tells nobody whether the expensive
+part was the four cheap gatherers or the one dear judge. Nothing here computes a cost: every number is a `SUM`."""
 
 from __future__ import annotations
 

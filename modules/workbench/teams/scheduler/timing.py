@@ -1,8 +1,5 @@
-"""What a cron expression means, in time — one place, because three callers need the same answer.
-
-The expression is read as a wall clock in Poland and every moment leaves here in UTC. Read in UTC it meant
-the operator wrote 7:00 to start at nine and rewrote it twice a year; what moves with the clock change is
-the gap to the UTC-midnight cost reset, which nobody reads."""
+"""What a cron expression means, in time — one place, because three callers need the same answer. Read as a wall clock
+in Poland and returned in UTC: read in UTC it meant the operator wrote 7:00 to start at nine and rewrote it twice a year."""
 
 from __future__ import annotations
 

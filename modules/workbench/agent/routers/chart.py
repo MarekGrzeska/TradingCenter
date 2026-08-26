@@ -1,8 +1,5 @@
-"""`GET /chart` — what the agent set the operator's chart to. Global to the module: there is one chart,
-and `current_principal` is asked only to refuse an unauthenticated request.
-
-Nothing here writes: the cursor belongs to the consumer, so two terminals cannot take a command away
-from each other."""
+"""`GET /chart` — what the agent set the operator's chart to, global to the module. Nothing here writes: the cursor
+belongs to the consumer, so two terminals cannot take a command away from each other."""
 
 from __future__ import annotations
 

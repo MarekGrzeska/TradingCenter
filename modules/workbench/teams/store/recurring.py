@@ -1,19 +1,12 @@
-"""The machine a schedule and a trigger both are, and everything that follows from being that machine. The
-owner is copied at creation rather than reached through the team: an access check must not depend on a join.
-
-Every "claim" statement is a conditional UPDATE whose WHERE clause is the whole of the exactly-once
-guarantee: a second caller waits on Postgres's own row lock, re-evaluates, and finds the row no longer due.
-No advisory lock, no leader process, nothing that outlives one statement."""
+"""The machine a schedule and a trigger both are. Every "claim" is a conditional UPDATE whose WHERE clause is the whole
+exactly-once guarantee: no advisory lock, no leader, nothing that outlives one statement."""
 
 from __future__ import annotations
 
 
 class _Recurring:
-    """The statements a schedule and a trigger hold in common, written once per table. The two are the same
-    machine pointed at different questions, and only the table, the column list and the "due" column differ.
-
-    Written as one statement per rule rather than two copies, because the rules are the load-bearing part
-    and a copy only has to drift once. What is deliberately not here is what genuinely differs."""
+    """The statements a schedule and a trigger hold in common, written once per table: the two are the same machine
+    pointed at different questions, and the rules are the load-bearing part — a copy only has to drift once."""
 
     def __init__(self, *, table: str, columns: str, due_column: str, fire_column: str) -> None:
         self.select = f"""

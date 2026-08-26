@@ -32,11 +32,8 @@ DEFAULT_CATALOGUE = {
 
 
 class FakeArchive:
-    """An archive that answers whatever the test put in it, and remembers what it was asked.
-
-    `raises` covers the case the loop cares about most: a read that fails is not an empty
-    read, and the decision recorded has to say so.
-    """
+    """An archive that answers whatever the test put in it and remembers what it was asked. `raises` covers the case
+    the loop cares about most: a read that fails is not an empty read, and the decision has to say so."""
 
     def __init__(
         self,
@@ -53,9 +50,8 @@ class FakeArchive:
         self.last_bar = last_bar
         self.facts = facts
         self.gaps = gaps
-        # `raises` fails everything; `facts_raises` fails only the read of the facts, which
-        # is the more interesting half — the bar can be had, so there is something to
-        # record the refusal against.
+        # `raises` fails everything; `facts_raises` fails only the read of the facts, which is the more interesting
+        # half — the bar can be had, so there is something to record the refusal against.
         self.raises = raises
         self.facts_raises = facts_raises
         self.indicators = indicators

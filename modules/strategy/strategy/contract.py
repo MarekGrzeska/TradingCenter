@@ -1,8 +1,5 @@
-"""The REST contract: what the operator and the terminal read and write. Nothing here reaches a database
-or a strategy — it is the shape of the wire and nothing else.
-
-The rule travels as itself: `RuleDefinition` comes from `rule.py` rather than being restated, so the wire,
-the stored row and the interpreter can never disagree about what a node is."""
+"""The REST contract: the shape of the wire and nothing else. The rule travels as itself — `RuleDefinition` comes
+from `rule.py` — so the wire, the stored row and the interpreter can never disagree about what a node is."""
 
 from __future__ import annotations
 

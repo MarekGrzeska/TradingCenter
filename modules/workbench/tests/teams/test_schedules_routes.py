@@ -1,8 +1,5 @@
-"""Schedules and triggers over HTTP — the wire shapes, the refusals, and who sees what. Through `TestClient`
-and the real lifespan, like the catalogue's own route tests.
-
-Fire history is written directly through `store` here rather than through a route: claiming a due fire is
-the clock's job. What is proven is that the row, once it exists, is exactly what an operator sees."""
+"""Schedules and triggers over HTTP — the wire shapes, the refusals, and who sees what, through `TestClient` and the
+real lifespan. Fire history is written through `store` here, because claiming a due fire is the clock's job."""
 
 from __future__ import annotations
 

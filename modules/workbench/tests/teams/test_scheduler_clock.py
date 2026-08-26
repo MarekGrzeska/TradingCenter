@@ -1,8 +1,5 @@
-"""The clock firing schedules, against a real database and a scripted model, exercising `Clock.tick()` the
-way the module's own background task would.
-
-`_fire_schedule` is used directly in the two tests that need to await its bookkeeping deterministically —
-`tick()` detaches that on purpose, the same as production."""
+"""The clock firing schedules against a real database and a scripted model, exercising `Clock.tick()` as the background
+task would. `_fire_schedule` is used directly only where a test must await bookkeeping `tick()` detaches on purpose."""
 
 from __future__ import annotations
 
@@ -33,12 +30,8 @@ CRON = "*/5 * * * *"
 
 
 def _past(cron: str = CRON) -> datetime:
-    """A moment that is already due and has missed nothing — anchored to the cron grid, not to "a minute
-    ago", which puts a boundary between the due moment and now for 20% of all wall-clock times. It failed
-    in CI at 05:15 for exactly that, having passed every local run not starting on a boundary.
-
-    The second added before asking closes the last hole: `get_prev` is strict, so asked at :05:00 it
-    answers :00:00 and leaves that slot in between."""
+    """A moment already due that has missed nothing, anchored to the cron grid rather than to "a minute ago", which puts
+    a boundary between due and now for a fifth of all wall-clock times — it failed in CI at 05:15 for exactly that."""
     now = datetime.now(UTC)
     return croniter(cron, now + timedelta(seconds=1)).get_prev(datetime)
 

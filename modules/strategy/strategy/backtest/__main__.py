@@ -1,8 +1,5 @@
-"""`uv run python -m strategy.backtest` — one run, or several compared. A command rather than a route,
-and not part of any suite: a backtest over two years is minutes of somebody's afternoon.
-
-`name@version` names a revision, which makes comparing two revisions of one definition a matter of naming
-it twice. The database is reached only when something needs it: coded entries run against the archive alone."""
+"""`uv run python -m strategy.backtest` — one run, or several compared. A command rather than a route and outside
+every suite, because a backtest over two years is minutes of somebody's afternoon. `name@version` names a revision."""
 
 from __future__ import annotations
 

@@ -1,6 +1,5 @@
-"""The two in-process memory tools: what they announce, what they refuse, and what one run leaves for the
-next. The MCP servers are absent throughout on purpose: a team reaching only for memory must run with no
-tool server configured at all."""
+"""The two in-process memory tools: what they announce, what they refuse, and what one run leaves for the next. The MCP
+servers are absent throughout on purpose — a team reaching only for memory must run with no tool server configured."""
 
 from __future__ import annotations
 

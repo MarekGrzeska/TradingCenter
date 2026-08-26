@@ -1,8 +1,5 @@
-"""The published surface: FastAPI over the platform, plus the evaluation loop. The lifespan is
-all-or-nothing on purpose, and a process that answers is itself the proof it migrated.
-
-What it does *not* do is reach the archive: a platform whose start depends on another module's health
-cannot come up while its upstream restarts. The loop finds out per evaluation and records it."""
+"""The published surface: FastAPI over the platform, plus the evaluation loop. The lifespan is all-or-nothing, so a
+process that answers proves it migrated — but it never reaches the archive, or it could not start while one restarts."""
 
 from __future__ import annotations
 

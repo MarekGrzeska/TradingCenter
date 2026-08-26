@@ -1,9 +1,5 @@
-"""The half of "can this definition be run" that Pydantic cannot answer. A definition is refused when it is
-saved, never when it is run, and the checks are split by what each needs to look at: shape lives on
-`TeamDefinition` itself, surroundings live here, because neither the catalogue nor the announcement is in the JSON.
-
-Every refusal names the agent it is about: an operator reading "unknown model" against a team of six roles
-has been told nothing."""
+"""The half of "can this definition be run" that Pydantic cannot answer: shape lives on `TeamDefinition`, surroundings
+live here. Every refusal names its agent — "unknown model" against a team of six roles has told the operator nothing."""
 
 from __future__ import annotations
 
@@ -23,11 +19,8 @@ def check_definition(
     model_ids: Collection[str],
     announced: AnnouncedSnapshot,
 ) -> None:
-    """Raises `DefinitionRefused` naming the agent at fault, or returns. The snapshot is no longer optional:
-    some of what this module announces it serves itself, so "no server has an address" is now inside it.
-
-    Note the asymmetry with a run: a team whose agents carry no tools saves and runs with no server at all —
-    only an agent actually assigned a tool needs the announcement to check it against."""
+    """Raises `DefinitionRefused` naming the agent at fault, or returns. Note the asymmetry with a run: a team whose
+    agents carry no tools saves and runs with no server at all, and only an assigned tool needs an announcement."""
     _every_agent_names_a_known_model(definition, model_ids)
     _every_assigned_tool_is_announced(definition, announced)
 

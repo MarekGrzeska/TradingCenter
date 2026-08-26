@@ -1,6 +1,5 @@
-"""The only door to this module's tables. Three rules the schema states are stated once here too:
-parameter sets are append-only, a decision is keyed by its bar (`ON CONFLICT DO NOTHING`, which is what
-makes the loop idempotent across a restart), and revisions are append-only for the same reason one layer up."""
+"""The only door to this module's tables, stating three rules the schema also states: parameter sets are append-only,
+a decision is keyed by its bar (which is what makes the loop idempotent across a restart), and so are revisions."""
 
 from __future__ import annotations
 
@@ -93,11 +92,8 @@ async def add_definition(
     description: str,
     definition: Mapping[str, Any],
 ) -> tuple[StrategyDefinition, StrategyRevision]:
-    """A new clicked strategy and its first revision, in one transaction.
-
-    One act rather than two, because a definition with no revision is a name with no rule —
-    a state nothing downstream knows how to read and nobody meant to create.
-    """
+    """A new clicked strategy and its first revision, in one transaction: a definition with no revision is a name
+    with no rule, which nothing downstream knows how to read and nobody meant to create."""
     async with conn.transaction():
         row = await conn.fetchrow(
             """
@@ -363,11 +359,8 @@ async def record_decision(
     facts: Mapping[str, Any],
     strategy_revision_id: int | None = None,
 ) -> bool:
-    """Write one decision. `False` when this bar already had one.
-
-    The bar is the key, so this is safe to call again for a bar already decided — which the
-    loop does on every wake, and every restart does for the bar it comes up on.
-    """
+    """Write one decision, answering `False` when this bar already had one. The bar is the key, so this is safe to
+    call again — which the loop does on every wake, and every restart does for the bar it comes up on."""
     written = await conn.fetchval(
         """
         INSERT INTO decisions (

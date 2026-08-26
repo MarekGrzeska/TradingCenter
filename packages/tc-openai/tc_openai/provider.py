@@ -1,6 +1,5 @@
-"""The OpenAI client — one call per round, streamed, tools optional. One copy of what agent's and
-teams' providers each carried, 79.4% identical. The 20% that differed is now a type: agent calls with
-a `Conversation`, teams with a `Briefing`, and there is no history-shaped argument for teams to fill."""
+"""The OpenAI client — one call per round, streamed, tools optional. One copy of what agent's and teams' providers
+each carried, 79.4% identical; the 20% that differed is now a type rather than a history-shaped argument."""
 
 from __future__ import annotations
 

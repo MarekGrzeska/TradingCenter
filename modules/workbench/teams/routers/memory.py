@@ -1,8 +1,5 @@
-"""What a team remembers, for the operator who owns it. Two routes and no third: an entry is written by an
-agent deciding to write it and is never changed, so the operator's part is seeing and removing.
-
-The read is capped at the same ceiling the tool reads under and carries the total: showing the operator
-less than there is without saying so is the same fault as handing a model a truncated memory."""
+"""What a team remembers, for the operator who owns it: two routes and no third, since an entry is written by an agent
+and never changed. The read carries the total, because showing less than there is without saying so is the same fault."""
 
 from __future__ import annotations
 

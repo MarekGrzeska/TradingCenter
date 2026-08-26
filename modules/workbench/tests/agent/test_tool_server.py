@@ -1,9 +1,5 @@
-"""The conversation's MCP client against a real MCP server, not a mock of one. `market-mcp` is not
-importable from here, so the stand-in is a FastMCP server built in this file and served by a real uvicorn.
-
-The catalogues stay local because they are the point: a bare-string return beside a typed list is the
-production bug this file exists for. Slower than the rest of the suite, and worth it — the one contract
-here with no committed snapshot is this session, so a mocked session would be a test of the mock."""
+"""The conversation's MCP client against a real MCP server, since `market-mcp` is not importable from here. Slower than
+the rest of the suite and worth it: the one contract with no committed snapshot is this session, so a mock tests itself."""
 
 from __future__ import annotations
 
@@ -379,11 +375,8 @@ async def test_a_call_survives_the_server_restarting_under_it() -> None:
 
 
 async def test_a_write_refused_as_an_unknown_session_is_retried_rather_than_left_unknown() -> None:
-    """The one this was written for: a redeploy on 17 August 2026 left the first order after it dying
-    against a session that no longer existed, answered as `UNKNOWN` over an account nothing reached.
-
-    The retry is safe for a write for the read's reason: the gate that refused had not yet read which tool
-    was asked for, so its answer proves the call was not handled."""
+    """The one this was written for: a redeploy on 17 August 2026 left the first order after it dying against a session
+    that no longer existed. The retry is safe because the gate that refused had not yet read which tool was asked for."""
     port = _free_port()
     trading_settings = settings_for(None, trading_mcp_url=f"http://127.0.0.1:{port}")
     async with _serving(_trading_stand_in(port).streamable_http_app(), port):

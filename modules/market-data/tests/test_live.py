@@ -1,12 +1,5 @@
-"""The one thing in this module that could not be settled by reasoning: whether the `HOUR_4` boundary
-this module floors to is the one the provider uses. A guess there is wrong in a way nothing catches —
-right length, right shape, offset by hours. Skipped unless `--run-live` and a gateway is listening.
-
-`INDEX_CFD` wants a trading day; `CRYPTO_CFD` does not. Run `-k crypto` at the weekend.
-
-    GATEWAY_API_KEY=k uv run uvicorn capital_gateway.app:app --port 8010  # in modules/capital-gateway
-    MARKET_DATA_GATEWAY_API_KEY=k uv run pytest -m live --run-live       # same k both places
-"""
+"""Whether the `HOUR_4` boundary this module floors to is the one the provider uses — the one thing here reasoning
+could not settle, and wrong in a way nothing catches. Skipped unless `--run-live` with a gateway on 8010."""
 
 from __future__ import annotations
 
@@ -30,9 +23,8 @@ GATEWAY_URL = os.environ.get("MARKET_DATA_GATEWAY_URL", "http://localhost:8010")
 # module docstring for how to run one locally.
 GATEWAY_API_KEY = os.environ.get("MARKET_DATA_GATEWAY_API_KEY", "")
 
-# Two instruments whose sessions are as unlike as capital.com offers: if the four-hour anchor followed
-# a venue's open rather than the clock, two instruments opening at different times would disagree.
-# Measured 2026-08-08, not reasoned about — and a frozen series is an outage, not a calendar.
+# Two instruments whose sessions are as unlike as capital.com offers: an anchor following a venue's open rather
+# than the clock would have them disagree. Measured 2026-08-08, and a frozen series is an outage, not a calendar.
 CRYPTO_CFD = "BTCUSD"
 INDEX_CFD = "US100"
 
@@ -146,9 +138,8 @@ async def test_a_derived_hour_matches_the_provider_s_own(
 async def test_the_minute_series_is_dense_enough_to_derive_from(
     gateway: GatewayHistory, symbol: str
 ) -> None:
-    """Whether `complete` means anything in practice. Measured over three trading days: every interior
-    four-hour period is full except the one starting 20:00 UTC, which is the daily break of a 23/5
-    schedule — so `complete` must never be read as "data is missing". Run this on a trading day."""
+    """Whether `complete` means anything in practice. Measured over three trading days: every interior four-hour
+    period is full except 20:00 UTC, the daily break — so `complete` must never be read as "data is missing"."""
     page = await gateway.history(symbol, Resolution.MINUTE, MINUTES)
     starts = [candle.period_start for candle in page.candles]
     assert len(starts) == len(set(starts))

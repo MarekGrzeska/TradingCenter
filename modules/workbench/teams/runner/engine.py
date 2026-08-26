@@ -1,9 +1,5 @@
-"""Running a team: the trace, the statuses, the ceiling on time, and who is watching. One function does the
-work and one object keeps what a running run needs from outside itself — the task, and the watchers' queues.
-
-Everything here is written as it happens, never assembled at the end: a run that broke in the middle is a
-result too, and more often the interesting one. The registry lives in this process, which is what the
-deployment is — one worker, on purpose."""
+"""Running a team: the trace, the statuses, the ceiling on time, and who is watching. Everything is written as it happens,
+because a run that broke in the middle is a result too — and the registry lives in this one worker, on purpose."""
 
 from __future__ import annotations
 
@@ -251,12 +247,8 @@ class _Run:
 
 
 class _StepRunner:
-    """One agent's step: the row it writes, the guards it asks, and the trade it is holding while it waits
-    for the reply that settles it. `pending_trade` was a `nonlocal` between two closures, readable only by
-    following them in the order they were defined; as a field it is a fact about the step.
-
-    One instance per agent per run, which is what makes a plain field correct: each agent's calls are
-    sequential."""
+    """One agent's step: the row it writes, the guards it asks, and the trade it holds while waiting. `pending_trade` was
+    a `nonlocal` between two closures; one instance per agent per run is what makes a plain field correct."""
 
     def __init__(self, run: _Run, agent: AgentDefinition) -> None:
         self._run = run

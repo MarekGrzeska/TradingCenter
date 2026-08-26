@@ -27,12 +27,8 @@ router = APIRouter()
 
 
 async def _check(request: Request, definition: TeamDefinition) -> None:
-    """The surroundings half of the save-time check. 422 rather than 400, so a refusal over an unknown
-    model reads to the terminal exactly like one over a cycle.
-
-    The tool names are asked of every configured server here rather than read from a list, so a server
-    that reworded a tool is answered correctly without a restart. The models are the other way round: that
-    catalogue is this module's own configuration, checked once at start-up."""
+    """The surroundings half of the save-time check, answering 422 so an unknown model reads exactly like a cycle. Tool
+    names are asked of every configured server rather than read from a list; the models are this module's own configuration."""
     try:
         check_definition(
             definition,

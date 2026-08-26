@@ -1,9 +1,5 @@
-"""One place where a strategy id becomes a `StrategySpec`, whatever it was written in — and the only file
-that knows there are two sources. A branch of the shape "if this one was configured" anywhere else would
-mean the entry contract had not been enough.
-
-One namespace, and the image wins it. A stored rule this image can no longer parse is a refusal rather
-than a crash: a revision written by a later image is an ordinary consequence of a rollback."""
+"""One place where a strategy id becomes a `StrategySpec`, and the only file that knows there are two sources. One
+namespace, and the image wins it: a stored rule this image cannot parse is a refusal, which a rollback makes ordinary."""
 
 from __future__ import annotations
 
@@ -22,11 +18,8 @@ from .store import StrategyDefinition, StrategyRevision
 
 @dataclass(frozen=True)
 class Resolved:
-    """A strategy ready to evaluate, and the revision it came from if it came from one.
-
-    `revision is None` is the whole of "this one is code in the image" — recorded on every
-    decision as a null, which means what it says rather than standing in for missing data.
-    """
+    """A strategy ready to evaluate, and the revision it came from if it came from one. `revision is None` is the
+    whole of "this one is code in the image", recorded on every decision as a null that means what it says."""
 
     spec: StrategySpec
     revision: StrategyRevision | None = None

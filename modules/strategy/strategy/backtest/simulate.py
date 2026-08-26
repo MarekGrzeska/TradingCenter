@@ -1,8 +1,5 @@
-"""What became of a setup: the bars after it, walked until something happened. Three rules, each the
-pessimistic reading on purpose — a backtest that flatters itself is worse than none, because it is believed.
-
-A bar touching both stop and target is a loss; entering and leaving both cost; and a setup that never
-resolves is closed at the last bar it was given and counted."""
+"""What became of a setup: the bars after it, walked under three rules that are each the pessimistic reading. A
+backtest that flatters itself is worse than none, because it is believed."""
 
 from __future__ import annotations
 

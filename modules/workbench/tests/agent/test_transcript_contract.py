@@ -1,8 +1,5 @@
-"""The transcript on the wire, field by field. The terminal holds hand-written DTOs against this contract —
-there is no generator to fail here — so a new field would reach it as an unannounced change.
-
-The previous version asserted that nothing about tools reached the transcript, and said the change showing
-them was the one to edit it. This is that edit."""
+"""The transcript on the wire, field by field. The terminal holds hand-written DTOs against this contract — there is no
+generator to fail here — so a new field would otherwise reach it as an unannounced change."""
 
 from __future__ import annotations
 

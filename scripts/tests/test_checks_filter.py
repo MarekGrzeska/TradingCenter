@@ -1,6 +1,5 @@
-"""The `changes` filter in `checks.yml`, run rather than read: every other job depends on it, so a mistake
-is not one red job but a repository where no pull request runs anything. Only the context and the diff are
-replaced — iteration 1's unassigned variable was found by running the step, not by reading it."""
+"""The `changes` filter in `checks.yml`, run rather than read: every other job depends on it, so a mistake is a
+repository where no pull request runs anything. Iteration 1's unassigned variable was found by running it."""
 
 from __future__ import annotations
 

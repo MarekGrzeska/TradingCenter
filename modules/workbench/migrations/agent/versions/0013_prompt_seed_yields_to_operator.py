@@ -1,9 +1,5 @@
-"""Makes `prompt_revisions` able to say who wrote a row, so a seed can stop overwriting a person. The bug
-was reproduced, not inferred: the version an operator gets by saving once is always the one the next
-seeding migration will use, and `latest_prompt_revision` orders by id, so the seed won.
-
-Three things in an order that is load-bearing: the `source` column, a backfill derived rather than guessed,
-and de-duplication before the unique — a constraint that fails here is a module that will not start.
+"""Makes `prompt_revisions` able to say who wrote a row, so a seed stops overwriting a person — reproduced, not
+inferred. Three steps in a load-bearing order: the column, a derived backfill, de-duplication before the unique.
 
 Revision ID: 0013
 Revises: 0012

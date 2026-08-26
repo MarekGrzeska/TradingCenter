@@ -1,8 +1,5 @@
-"""Reading an instrument's trading terms, and turning a deposit into a size. Measured 17 August 2026:
-an agent read 2% of an account as contract value and tied up a twentieth of what was meant.
-
-`size_for_margin` takes the price as an argument rather than reading one: a price fetched here would
-be a second source inside one run, and the trace would not show which one the size was computed against."""
+"""Reading an instrument's trading terms, and turning a deposit into a size — measured 17 August 2026, when an agent
+read 2% of an account as contract value. `size_for_margin` takes the price, or the trace could not say which one."""
 
 from __future__ import annotations
 

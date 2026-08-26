@@ -1,9 +1,5 @@
-"""The trading ceilings, and the one place a run is stopped for orders rather than for money or for work —
-a deliberate twin of `cost.py`, with the same two moments and the same reasoning.
-
-Where the twin diverges is the point: every limit here is optional and an absent one means no limit at all.
-What is not the operator's to move lives in `trading-mcp`, which refuses anything but the demo account —
-which is the split worth keeping in mind: a number the operator cannot change belongs over there."""
+"""The trading ceilings, and the one place a run is stopped for orders rather than for money. Every limit here is
+optional; what is not the operator's to move lives in `trading-mcp`, which refuses anything but the demo account."""
 
 from __future__ import annotations
 
@@ -51,11 +47,8 @@ class OrderTooLarge(TradeLimitReached):
 
 
 class TradeGuard:
-    """How many orders this run has placed, and whether it may place another. Counted in memory for
-    `CostGuard`'s reason: a guard reading a count mid-write acts on a number already stale.
-
-    An order is counted when it is *sent*, not when it comes back: one whose reply never arrived may well
-    have reached the account, and a ceiling that forgave it is one an outage could walk through."""
+    """How many orders this run has placed, and whether it may place another, counted in memory for `CostGuard`'s reason.
+    An order counts when it is *sent*: one whose reply never arrived may have reached the account."""
 
     def __init__(self, limits: TradingLimits) -> None:
         self._per_run = limits.orders_per_run
@@ -71,9 +64,8 @@ class TradeGuard:
         self._placed += 1
 
     def check(self, arguments: dict[str, Any]) -> None:
-        """Raises before a write call is made, or returns. Two different refusals, and the difference is
-        whether the agent can do anything about it: an exhausted count stops the run, while a size too
-        large comes back as a refused call saying exactly what to correct it to."""
+        """Raises before a write call is made, or returns. Two refusals, differing in whether the agent can do anything:
+        an exhausted count stops the run, a size too large comes back saying exactly what to correct it to."""
         if self._per_run is not None and self._placed >= self._per_run:
             raise RunOrderLimitReached(self._placed, self._per_run)
 

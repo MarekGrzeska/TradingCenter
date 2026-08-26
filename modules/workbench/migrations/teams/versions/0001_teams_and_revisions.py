@@ -1,9 +1,5 @@
-"""The catalogue: named teams, and the append-only revisions of their definitions. A row in
-`team_revisions` is never updated — a fresh save inserts the next version, which is what lets a run point
-at exactly the definition it ran on.
-
-`archived_at` retires a team without deleting it, since runs reference a revision. No validation of
-`definition`'s shape lives here: a CHECK cannot look up the model catalogue or the tool server.
+"""The catalogue: named teams and the append-only revisions of their definitions, so a run can point at exactly the
+definition it ran on. No validation of `definition`'s shape lives here — a CHECK cannot look up the model catalogue.
 
 Revision ID: 0001
 Revises:

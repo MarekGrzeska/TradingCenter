@@ -17,17 +17,12 @@ from strategy.config import Settings
 
 MODULE_ROOT = Path(__file__).resolve().parent.parent
 
-# Testcontainers' reaper is a sidecar that bind-mounts the Docker socket. On Docker Desktop
-# for macOS that socket lives under the user's home directory, which the VM refuses to
-# mount, and every `db` test then fails on a container that will not start. Safe to
-# disable here because the container fixture is a context manager: normal runs, failing
-# runs and Ctrl-C all stop it on the way out.
+# Testcontainers' reaper bind-mounts the Docker socket, which on macOS lives under a home directory the VM refuses
+# to mount. Safe to disable: the container fixture is a context manager, so every exit still stops it.
 os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
-# Emptied between tests so that one test's rows are never another's premise. TRUNCATE
-# rather than dropping and re-migrating: the schema is the same for every test.
-# One statement listing every table, so the foreign keys between them do not decide the
-# order — a TRUNCATE naming all the referencing tables together needs no CASCADE.
+# Emptied between tests so one test's rows are never another's premise; TRUNCATE rather than re-migrating, since the
+# schema is the same for every test. One statement naming every table, so the foreign keys need no CASCADE.
 TABLES = (
     "decisions",
     "watches",

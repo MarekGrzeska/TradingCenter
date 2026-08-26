@@ -274,12 +274,8 @@ async def test_a_missing_candle_outside_coverage_means_nobody_looked(
 
 
 async def test_the_two_absences_are_told_apart(db: asyncpg.Connection) -> None:
-    """4.6, stated in one place.
-
-    In the candle table these two are the same nothing: a Saturday at 3am and an
-    afternoon when ingest was down both read as no row. Only one of them is worth
-    sending anyone back to the provider for, and coverage is what separates them.
-    """
+    """In the candle table these two are the same nothing: a Saturday at 3am and an afternoon when ingest was down
+    both read as no row. Only one is worth sending anyone back to the provider for, and coverage separates them."""
     await record_coverage(db, *PAIR, at(0), at(60))
 
     """4.6, stated in one place. In the candle table a Saturday at 3am and an afternoon when ingest was

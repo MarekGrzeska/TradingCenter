@@ -1,9 +1,5 @@
-"""The rhythm a schedule is described by, and its translation to the cron expression the clock runs. The
-translation lives here exactly once: a caller that repeated it would eventually show something else.
-
-`from_cron` is deliberately narrow — a rhythm only for an expression that is exactly what `to_cron` would
-produce, so an operator who wrote their own gets it back unrounded. Weekdays are ISO here, because that is
-the week an operator reads, and they ride on three rhythms rather than one."""
+"""The rhythm a schedule is described by, and its translation to the cron the clock runs — exactly once, or a repeat
+would eventually show something else. `from_cron` is narrow, so an operator's own expression comes back unrounded."""
 
 from __future__ import annotations
 

@@ -1,13 +1,9 @@
 #!/usr/bin/env python3
-"""How much of the Python here is a hand-maintained copy of other Python here — the number condition 1
-of `docs/architecture.md`'s sharing rule rests on, so somebody who was not there can take it again.
+How much of the Python here is a hand-maintained copy of other Python here — the number condition 1 of
+`docs/architecture.md`'s sharing rule rests on, taken per pair of modules holding a file of the same name by
+`difflib.SequenceMatcher` with `autojunk` off. Comments count: prose kept in step is a copy too.
 
     uv run --no-project python scripts/measure-duplication.py --threshold 40
-
-Per pair of modules holding a file of the same name, the fraction of lines in common by
-`difflib.SequenceMatcher` with `autojunk` off; comments count, because prose kept in step is a copy too.
-Taken 18 August 2026, before `tc-runtime`: 959 lines lived as copies, in seven pairs at or above 70%.
-"""
 
 from __future__ import annotations
 

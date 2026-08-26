@@ -1,8 +1,5 @@
-"""What a rule is checked against before it is ever saved — the half that is only knowable by asking the
-archive. What `rule.py` can decide alone it decides alone, and this file never repeats it.
-
-Refused when it is written rather than at the first candle, and every refusal names the one thing that has
-to change. This does not replace the check at registration, which is the one that guards the loop."""
+"""What a rule is checked against before it is saved — the half only knowable by asking the archive, never repeating
+what `rule.py` decides alone. Refused when written rather than at the first candle, naming the one thing to change."""
 
 from __future__ import annotations
 
@@ -14,11 +11,8 @@ from .rule import FactRead, RuleDefinition, RuleFact, RuleParam
 
 
 def check(rule: RuleDefinition, catalogue: Mapping[str, AnnouncedIndicator]) -> None:
-    """Refuse the rule, or say nothing. The first problem found is the one reported.
-
-    First rather than all: a list of eleven complaints, ten of which are the same missing
-    indicator seen from different angles, is a worse thing to read than one sentence.
-    """
+    """Refuse the rule, or say nothing, reporting the first problem found: a list of eleven complaints, ten of them
+    the same missing indicator seen from different angles, is a worse thing to read than one sentence."""
     by_key = {fact.key: fact for fact in rule.facts}
     declared_params = {param.name: param for param in rule.params}
 

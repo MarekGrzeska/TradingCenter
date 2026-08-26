@@ -20,9 +20,8 @@ class FormingCandleRejected(ValueError):
     turns a caller's bug into a gap discovered weeks later, when the provider no longer has the data."""
 
 
-# ON CONFLICT rather than read-then-write: the same period can arrive from the stream and a backfill
-# at once. The WHERE on the update is the authority rule — a streamed value never displaces a stored
-# history one, since a disconnected stream understates the range it reports.
+# ON CONFLICT rather than read-then-write: the same period can arrive from the stream and a backfill at once. The
+# WHERE is the authority rule — a streamed value never displaces a stored one, since a broken stream understates.
 _UPSERT = """
     INSERT INTO candles (
         symbol, resolution, period_start, price_side,

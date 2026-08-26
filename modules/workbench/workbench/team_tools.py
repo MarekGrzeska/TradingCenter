@@ -1,9 +1,5 @@
-"""The team tools as the conversation's registry sees them — the adapter between them. It lives here because
-it is the one thing that knows both `agent`'s tool-source protocol and `teams_tools`' registry.
-
-A drop-in for a `ToolServer`, so nothing above the registry had to learn that one of its sources is not on
-a network: it is always configured, nothing is retried, no session can be gone, and `moves_the_account` is
-always false. What a tool raises becomes an outcome rather than an exception, exactly as it does over the wire."""
+"""The team tools as the conversation's registry sees them, and the one thing that knows both `agent`'s tool-source
+protocol and `teams_tools`' registry: a drop-in `ToolServer`, always configured, never retried, raising nothing."""
 
 from __future__ import annotations
 
@@ -71,10 +67,8 @@ class LocalTeamsTools:
             with carrying(operator_principal):
                 result = await self._mcp.call_tool(name, arguments)
         except ToolError as err:
-            # Everything a tool raises arrives wrapped in this, including the refusals the
-            # tools write deliberately — so the text a `ToolServer` would have received
-            # from the far side as `isError` is the text of this exception. The tools'
-            # own words travel rather than a summary of them.
+            # Everything a tool raises arrives wrapped in this, including the refusals the tools write deliberately,
+            # so the tools' own words travel where a `ToolServer` would have received `isError` text.
             return ToolOutcome(ToolOutcomeKind.REFUSED, str(err), elapsed())
         except Exception as err:  # noqa: BLE001 - a broken tool is not a broken turn
             log.warning("tool call %s failed: %s", name, err)
@@ -88,9 +82,8 @@ class LocalTeamsTools:
 
 
 def _text_of(result: Any) -> str:
-    """What the model reads. `call_tool` answers a `(content, structured)` pair for a tool with a declared
-    output schema, and the structured half is the one to read: content blocks are one per item, and joining
-    them hands a reader expecting one JSON document several of them back to back."""
+    """What the model reads: `call_tool` answers a `(content, structured)` pair for a tool with an output schema, and the
+    structured half is the one to read — content blocks are one per item, and joining them hands back several documents."""
     if isinstance(result, tuple) and len(result) == 2:
         return json.dumps(result[1])
     if isinstance(result, dict):

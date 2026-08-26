@@ -1,9 +1,5 @@
-"""Evaluating a rule — the `evaluate` of every strategy that was clicked together. This file is a
-catalogue entry's equal, not the runtime's: it reaches nothing outside its arguments and reads no clock.
-
-Three-valued and closed on refusal: a reading the archive did not compute is neither a number nor a zero,
-and a question that came out undetermined refuses — an unsettled average looks exactly like a crossing
-that did not happen. Total, too: a rule that raised would take the loop's whole pass with it."""
+"""Evaluating a rule, which is the `evaluate` of every clicked-together strategy: a catalogue entry's equal, reaching
+nothing outside its arguments. Three-valued, closed on refusal, and total — a rule that raised would take the pass."""
 
 from __future__ import annotations
 

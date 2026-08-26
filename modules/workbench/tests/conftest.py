@@ -1,8 +1,5 @@
-"""What every suite in this module needs, and what pytest will only take from here. Three suites live under
-this directory and two arrived carrying a byte-identical copy of the Docker probe below.
-
-`pytest_addoption` had no choice: pytest reads it from the *initial* conftest only, so `--run-live` declared
-in a suite's own conftest would silently not exist."""
+"""What every suite in this module needs, and what pytest will only take from here: three suites live under this
+directory, and `pytest_addoption` is read from the *initial* conftest only, so `--run-live` would silently not exist."""
 
 from __future__ import annotations
 
@@ -76,13 +73,8 @@ def _docker_is_installed() -> bool:
 
 @pytest.fixture(autouse=True)
 def _no_developer_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Every source of settings a developer's machine has and CI does not, taken away from each test that
-    builds `Settings()` itself. Two sources, and neither covers the other: the module's `.env`, switched off
-    at the class rather than name by name after a stale list cost six tests, and the process environment,
-    which is what keeps `AZURE_CLIENT_ID` away from `DefaultAzureCredential`.
-
-    One class is emptied rather than three: `workbench.config.Settings` is the only one that reads the
-    environment, and the two surfaces' settings are built from its fields by argument."""
+    """Every source of settings a developer's machine has and CI does not: the module's `.env`, switched off at the class
+    after a stale list cost six tests, and the process environment, which keeps `AZURE_CLIENT_ID` out of the credential."""
     monkeypatch.setitem(Settings.model_config, "env_file", None)
     for field in Settings.model_fields:
         monkeypatch.delenv(field.upper(), raising=False)

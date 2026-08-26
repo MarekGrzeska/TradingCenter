@@ -1,8 +1,5 @@
-"""The one tool this module owns rather than borrows, and the whole of the agent's write access. It never
-touches the terminal: it records what the operator's chart should show, and the terminal applies it.
-
-Checking happens here, before the row exists, because a refusal has to reach the model inside the same
-turn. Without the tool server there is nothing to check against, and the tool refuses rather than writing blind."""
+"""The one tool this module owns rather than borrows, and the whole of the agent's write access: it records what the
+chart should show, and the terminal applies it. Checking happens here, because a refusal must reach the model in the turn."""
 
 from __future__ import annotations
 
@@ -38,9 +35,8 @@ CHART_COLORS = (
     "--color-down",
 )
 
-# What the terminal draws an operator's own objects in, sharing no colour with the list above: a level
-# somebody put on the chart and one an indicator computed cannot be told apart in one colour. Four rather
-# than eight, because a drawing's colour can end up beside any other drawing's.
+# What the terminal draws an operator's own objects in, sharing no colour with the list above: a level somebody put on
+# the chart and one an indicator computed must be distinguishable. Four, because a drawing can end up beside any other.
 DRAWING_COLORS = (
     "--color-drawing-1",
     "--color-drawing-2",

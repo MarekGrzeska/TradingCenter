@@ -1,8 +1,5 @@
-"""market-data, as this module consumes it — and the only place that talks to it. The REST contract, not
-the tool surface: `/mcp` is narrowed for a model, which is too tight for a loop reading three hundred bars.
-
-Two things to know before changing anything: a read that fails is never an empty read, and uncovered
-stretches travel with the answer — the gate that reads them is in `gates.py`."""
+"""market-data as this module consumes it, and the only place that talks to it — the REST contract, not `/mcp`, which
+is too tight for a loop reading three hundred bars. A read that fails is never an empty read."""
 
 from __future__ import annotations
 

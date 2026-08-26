@@ -43,11 +43,8 @@ async def a_written_strategy(conn, definition: dict | None = None):
 
 
 async def a_watch_on(conn, revision, *, symbol: str = "US100"):
-    """A watch pinned to one revision, with the parameter set the route would have written.
-
-    Resolved defaults rather than an empty set: `/parameter-sets` resolves before it stores,
-    so a set of raw `{}` is a row nothing in this module produces.
-    """
+    """A watch pinned to one revision, with the parameter set the route would have written: resolved defaults rather
+    than an empty set, since `/parameter-sets` resolves before it stores."""
     found = await resolver.resolve(conn, revision.strategy_id, revision_id=revision.id)
     params = await store.add_parameter_set(
         conn,
@@ -125,9 +122,8 @@ class TestPinning:
     async def test_a_parameter_set_from_another_revision_is_refused_naming_both(
         self, api, app, pool
     ) -> None:
-        """A value inside its range under one revision may be outside it — or have no
-        declaration at all — under the next, so reusing the set silently would run a
-        strategy on numbers nothing vouches for."""
+        """A value inside its range under one revision may be outside it — or undeclared — under the next, so reusing
+        the set silently would run a strategy on numbers nothing vouches for."""
         app.state.archive = FakeArchive()
         async with pool.acquire() as conn:
             _, first = await a_written_strategy(conn)
@@ -210,9 +206,8 @@ class TestWhatOneDecisionRemembers:
     async def test_a_recorded_decision_is_re_decided_from_what_was_written_down(
         self, pool
     ) -> None:
-        """The acceptance test of this whole change. The definition moves on afterwards, and
-        the replay still lands on the decision that was recorded — because it reads the
-        revision the decision names, not the newest one."""
+        """The acceptance test of this whole change: the definition moves on afterwards, and the replay still lands
+        on the decision that was recorded, because it reads the revision the decision names."""
         async with pool.acquire() as conn:
             _, revision = await a_written_strategy(conn)
             watch = await a_watch_on(conn, revision)

@@ -1,8 +1,5 @@
-"""The seam to the teams routes — three outcomes, one retry rule, and one identity. Everything is
-intercepted above the transport, so what is checked is what the client sends and makes of what comes back.
-
-Two tests went with the network: there is no timeout to exceed when the call is a function call on the same
-event loop, and arranging one by hand would be checking that httpx can raise."""
+"""The seam to the teams routes — three outcomes, one retry rule, one identity, all intercepted above the transport.
+Two tests went with the network: there is no timeout to exceed when the call is a function call on the same loop."""
 
 from __future__ import annotations
 

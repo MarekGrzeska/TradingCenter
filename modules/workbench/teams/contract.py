@@ -1,9 +1,5 @@
-"""The shapes this module answers with — snake_case on the wire, the same convention as its neighbours.
-No separate domain-model layer: this module's tables map onto their wire shape almost one to one.
-
-`TeamDefinition` is the exception and the shape that matters most: it is both what is stored and what the
-wire carries. What is validated here is the *pure* shape; whether a model or a tool name exists needs a
-database and a live session, so those two are the store's job at the moment a revision is saved."""
+"""The shapes this module answers with, snake_case and with no separate domain layer, its tables mapping onto the wire
+almost one to one. `TeamDefinition` is the exception: the *pure* shape is checked here, the rest at save time."""
 
 from __future__ import annotations
 
@@ -26,9 +22,8 @@ def _parse_jsonb(value: object) -> Any:
     return json.loads(value) if isinstance(value, str) else value
 
 
-# What a team may remember, in three numbers. Constants rather than settings, and the split is the one
-# `docs/architecture.md` states: a number the operator has a right to set is their budget and lives in the
-# revision. These bound the shape in which this module hands anything to a model, so an env var must not move them.
+# What a team may remember, in three numbers — constants rather than settings, on `docs/architecture.md`'s split: these
+# bound the shape in which this module hands anything to a model, so an env var must not move them.
 MEMORY_ENTRY_MAX_CHARS = 2000
 MEMORY_READ_LIMIT = 20
 MEMORY_WRITES_PER_RUN = 10
@@ -58,11 +53,8 @@ class ModelOut(BaseModel):
 
 
 class ToolOut(BaseModel):
-    """One tool as the tool server announces it right now. Name and description, and deliberately not the
-    input schema: publishing it would put a copy of somebody else's contract on this module's wire.
-
-    `read_only` is the one property that does travel, read straight off the server's own hint, so an
-    operator sees which tools move the account before assigning one. `None` means unknown, not read-only."""
+    """One tool as the server announces it right now — name and description, deliberately not the input schema, which
+    would put a copy of somebody else's contract on this wire. `read_only` travels; `None` means unknown, not read-only."""
 
     name: str
     description: str
@@ -136,12 +128,8 @@ class CostLimits(BaseModel):
 
 
 class TradingLimits(BaseModel):
-    """What a revision allows its agents to do to the account. Every one of the three is optional, and an
-    omitted one means no limit at all — a team the operator deliberately lets trade with everything it has
-    is an experiment they are entitled to run.
-
-    What is not negotiable lives a module away: `trading-mcp` refuses to start against anything but the
-    demo account. That is the split — the irreversible thing is fixed, the operator's budget is theirs."""
+    """What a revision allows its agents to do to the account: all three optional, an omitted one meaning no limit at
+    all. What is not negotiable lives a module away, in a `trading-mcp` that starts only against the demo account."""
 
     max_order_size: str | None = Field(
         default=None, description="largest size one order may carry; null means no limit"
@@ -178,11 +166,8 @@ class TradingLimits(BaseModel):
 
 
 class TeamDefinition(BaseModel):
-    """The whole of what a team revision carries — every agent, every dependency, and the limits a run
-    must respect. One immutable blob per revision.
-
-    `trading` defaults to an empty `TradingLimits`, which is what every revision saved before this field
-    existed reads back as, and it means the same thing there: no limit."""
+    """The whole of what a team revision carries, as one immutable blob. `trading` defaults to an empty `TradingLimits`,
+    which is what every revision saved before that field existed reads back as, and it means the same thing: no limit."""
 
     agents: list[AgentDefinition]
     edges: list[TeamEdge] = Field(default_factory=list)
@@ -487,12 +472,8 @@ class TeamMemoryOut(BaseModel):
 
 
 class TradeOut(BaseModel):
-    """One call a run made that could change the account — the same event a `ToolCallOut` is, read as a
-    *trade*: what, which way, how much, and what came of it, as columns rather than JSON.
-
-    `status` is this module's reading of the outcome and `result_status` the provider's word, kept separate
-    because a row can carry the first without the second arriving. A row still saying `sent` after its run
-    finished is an order whose fate this module does not know, which the trace must be able to say."""
+    """One call a run made that could change the account, read as a *trade*, as columns rather than JSON. A row still
+    saying `sent` after its run finished is an order whose fate this module does not know."""
 
     id: int
     run_id: int
@@ -594,9 +575,8 @@ def _revision_selection_is_coherent(revision_mode: str, pinned_revision_id: int 
 
 
 class ScheduleTiming(BaseModel):
-    """When a schedule fires, said either way: as a rhythm, or as the cron expression the clock runs.
-    Exactly one of the two, and shared by the save and the preview so a draft cannot preview happily and
-    then fail on save."""
+    """When a schedule fires, said either way — as a rhythm, or as the cron expression the clock runs. Exactly one of
+    the two, shared by the save and the preview, so a draft cannot preview happily and then fail on save."""
 
     cron_expression: str | None = None
     recurrence: Recurrence | None = None

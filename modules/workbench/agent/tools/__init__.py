@@ -1,9 +1,5 @@
-"""The conversation's tools: sessions with the servers that have one, and the shapes a turn sees.
-`client.py` is the only place the `mcp` package exists; everything past this package speaks
-`ToolDescriptor` and `ToolOutcome`.
-
-`registry.py` is what the rest of the package holds instead of a single `ToolServer` — several sources,
-each configured and each failing on its own, and one of them is not a server at all."""
+"""The conversation's tools: sessions with the servers that have one, and the shapes a turn sees. `client.py` is the
+only place the `mcp` package exists; `registry.py` holds several sources, one of them not a server at all."""
 
 from __future__ import annotations
 

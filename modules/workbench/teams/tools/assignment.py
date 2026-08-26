@@ -1,10 +1,5 @@
-"""Which tools each agent gets, and the refusals that stop a run — or a save — before it proceeds. The split
-against `client.py`: that file knows how to talk to a server, this one what the definition asked for and how
-several servers reconcile into one answer, asked once before any agent is called.
-
-This module keeps no description or parameter shape of its own. Resolving a name against more than one
-server is the one place the configured announcements ever meet: every configured server is queried, because
-a name found on one says nothing about whether a second also announces it — which is what a collision needs."""
+"""Which tools each agent gets, and the refusals that stop a run — or a save — before it proceeds. Every configured
+server is queried, because a name found on one says nothing about whether a second announces it, which is a collision."""
 
 from __future__ import annotations
 
@@ -64,12 +59,8 @@ class ToolPlan:
     async def call(
         self, name: str, arguments: dict[str, Any], *, agent_key: str
     ) -> ToolOutcome:
-        """Dispatch to the one source that announced `name` — collision-free by construction. The assignment
-        is checked here, not only when the tools were handed out: what the model was offered is protection
-        against a mistake, not against an attempt, and the model writes the name itself.
-
-        Refused as an outcome rather than raised: a model that guessed a name made a mistake worth
-        correcting, not one worth ending the experiment over."""
+        """Dispatch to the one source that announced `name`, with the assignment checked here rather than only when the
+        tools were handed out. Refused as an outcome: a model that guessed a name made a correctable mistake."""
         assigned = {tool.name for tool in self.per_agent.get(agent_key, ())}
         if name not in assigned:
             return ToolOutcome(
@@ -91,12 +82,8 @@ class ToolPlan:
         return await server.call(name, arguments)
 
     def moves_the_account(self, name: str) -> bool:
-        """Whether calling `name` could leave the account changed — the question a trade row and the daily
-        count are both written from. A name the plan does not know answers `False`, because `call` cannot
-        reach any server with it.
-
-        That is the one place this differs from agent's method of the same name, and the difference is real:
-        agent asks a live session whose list is dropped on every break, where a plan is resolved once."""
+        """Whether calling `name` could leave the account changed — what a trade row and the daily count are written
+        from. Unlike agent's method of the same name, this reads a plan resolved once rather than a live session."""
         return self.writes_by_name.get(name, False)
 
 
@@ -157,11 +144,8 @@ async def plan_tools(
     *,
     memory: MemoryScope | None = None,
 ) -> ToolPlan:
-    """Resolve the definition's tool names against every source's announcements, raising one of three
-    `ToolAccessError`s — unavailable, a collision, or a name nobody announces.
-
-    `memory` is the run this plan belongs to. Absent, the in-process memory tools still resolve and count
-    as announced; they simply have no run to act in."""
+    """Resolve the definition's tool names against every source's announcements, raising one of three `ToolAccessError`s.
+    `memory` is the run this plan belongs to; absent, the in-process memory tools resolve but have no run to act in."""
     assigned = {name for agent in definition.agents for name in agent.tools}
     if not assigned:
         # Nothing is contacted at all — a team whose agents carry no tools runs whether or not any server
@@ -221,12 +205,8 @@ async def plan_tools(
 
 
 def _moves_the_account(server: ToolServer, tool: ToolDescriptor) -> bool:
-    """The rule, in one place and written the conservative way. `read_only is not True`, not `read_only is
-    False`: unknown on a server that can send orders has to read as an order, or the first unannotated tool
-    travels with no trade row and no charge against the limits.
-
-    The server gate keeps that conservatism from spreading: an unannotated market-mcp tool reads as what it
-    is, because nothing market-mcp publishes can reach the account."""
+    """The rule, in one place and written the conservative way: unknown on a server that can send orders reads as an
+    order. The server gate keeps that from spreading, since nothing market-mcp publishes can reach the account."""
     return server.can_move_the_account and tool.read_only is not True
 
 
@@ -251,11 +231,8 @@ class AnnouncedSnapshot:
 
 
 async def announced_snapshot(settings: Settings) -> AnnouncedSnapshot:
-    """The save path's view of every source: the servers it can reach, and the tools this process serves
-    itself. It no longer answers `None` — what that said is now `configured_servers` being empty.
-
-    A registry of its own, opened and closed inside this call: the transport holds its halves in anyio task
-    groups, and a session left open when its task returns corrupts the scope stack far from the cause."""
+    """The save path's view of every source: the servers it can reach, and the tools this process serves itself. Its own
+    registry, opened and closed inside this call, because a session left open when its task returns corrupts the scope stack."""
     registry = ToolServerRegistry.from_settings(settings)
     try:
         resolution = await _resolve_all(registry)

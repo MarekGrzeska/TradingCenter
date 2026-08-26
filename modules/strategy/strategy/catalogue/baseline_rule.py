@@ -1,9 +1,5 @@
-"""`baseline_ma_cross`, written a second time — as data, in the node vocabulary. Deliberately absent from
-`CATALOGUE`: this is the measuring stick, kept beside the thing it measures.
-
-Comparing the two decision by decision is the only honest test of whether the vocabulary can carry a real
-strategy and whether the interpreter computes what it appears to. One difference is intended and named in
-the test; the arithmetic is nested exactly as the coded entry nests it, because multiplication does not associate."""
+"""`baseline_ma_cross` written a second time as data, absent from `CATALOGUE` because it is the measuring stick kept
+beside the thing it measures. Its arithmetic nests exactly as the coded entry's does, since multiplication does not."""
 
 from __future__ import annotations
 

@@ -1,8 +1,5 @@
-"""The catalogue: every strategy this image carries. The list below is the only file that changes when a
-strategy is added, and nothing in the runtime may import an entry module directly.
-
-Entries are code rather than rows, and the cost is that a new strategy is a deployment. What it buys is
-that `evaluate` is an ordinary reviewed function, identical in the loop and in the backtest."""
+"""Every strategy this image carries, and the only file that changes when one is added. Entries are code rather than
+rows, so a new strategy is a deployment — what that buys is an `evaluate` identical in the loop and in the backtest."""
 
 from __future__ import annotations
 

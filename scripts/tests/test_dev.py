@@ -1,6 +1,5 @@
-"""Every refusal the dev runner makes, called directly. Each was there because of a real failure — a mismatched
-gateway key taking the stack down with "a service exited", an `.env` still pointing at Azure, a leftover process
-on 8010 — and none had a test, because shell here never did. Porting them on the eye is how the drift happened."""
+"""Every refusal the dev runner makes, called directly. Each was there because of a real failure and none had a
+test, because shell here never did — and porting them on the eye is how the third drift happened."""
 
 from __future__ import annotations
 

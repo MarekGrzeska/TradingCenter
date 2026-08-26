@@ -1,8 +1,5 @@
-"""History, walked bar by bar through the very function the loop calls. One `evaluate`, two drivers, and
-there must never be a second implementation — the look-ahead test compares this module against itself.
-
-Slicing is where look-ahead actually creeps in: a fact read over the whole range carries answers about
-the future, and `slice_at` masks all of it. Getting that wrong is invisible in the equity curve."""
+"""History walked bar by bar through the very function the loop calls — one `evaluate`, two drivers, never a second
+implementation. Slicing is where look-ahead creeps in, and getting it wrong is invisible in the equity curve."""
 
 from __future__ import annotations
 

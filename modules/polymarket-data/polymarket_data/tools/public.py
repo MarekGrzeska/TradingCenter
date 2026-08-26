@@ -1,6 +1,5 @@
-"""Two ways into Polymarket's public database: by phrase, and by category. Two tools because "is there a
-market about X" has a phrase in it and "what is there about tariffs" does not — guessing phrases at a
-subject is how a model misses the market it was asked for. Both answers are aggressively projected."""
+"""Two ways into Polymarket's public database, by phrase and by category: "is there a market about X" has a phrase
+in it and "what is there about tariffs" does not, and guessing phrases is how a model misses what it was asked for."""
 
 from __future__ import annotations
 

@@ -1,8 +1,5 @@
-"""What a run came to, in the numbers that mean something — everything in R, because money is
-instrument-specific and risk is not.
-
-The one metric that is not a number is the attribution: splitting the trades at each feature's median is
-the crudest honest answer to which part of a bundle carries the edge, and crude is right here."""
+"""What a run came to, in R rather than in money, because money is instrument-specific and risk is not. Splitting the
+trades at each feature's median is the crudest honest answer to which part of a bundle carries the edge."""
 
 from __future__ import annotations
 

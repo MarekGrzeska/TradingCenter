@@ -1,9 +1,5 @@
-"""Bringing a module's database to the revision its image was built for, at startup under the advisory
-lock — so no operator step stands between a merge and a working module.
-
-Alembic is driven through its Python API rather than as a subprocess: the image would otherwise ship the
-CLI and resolve `alembic.ini` against a directory App Service picks. Every entry point takes the module's
-own migrations directory, which used to be one expression resolving to a different place in each copy."""
+"""Bringing a module's database to the revision its image was built for, at startup under the advisory lock, so no
+operator step stands between a merge and a working module. Alembic through its Python API, so no image ships the CLI."""
 
 from __future__ import annotations
 

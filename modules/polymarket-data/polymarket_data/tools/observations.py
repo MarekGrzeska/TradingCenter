@@ -1,9 +1,5 @@
-"""The three tools that change something, and the boundary around them. This is the deliberate departure
-from `market-data-tools`: there a write would mutate the candle archive, here it is the list of
-observations — reversible, and exactly what the operator clicks in the terminal.
-
-The boundary is elsewhere and just as hard: no tool deletes collected history, none changes configuration,
-and none touches money. `tests/test_tools_surface.py` holds it."""
+"""The three tools that change something: a write here is the list of observations, reversible and exactly what the
+operator clicks. No tool deletes collected history, changes configuration or touches money."""
 
 from __future__ import annotations
 

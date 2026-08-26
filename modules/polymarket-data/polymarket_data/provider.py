@@ -1,8 +1,5 @@
-"""The only door to Polymarket. Neither surface needs a credential, but the provider's edge selects on
-`User-Agent` and refuses some defaults, so the header is set from a setting rather than left to a library.
-
-Three refusals are told apart on purpose: it has nothing, it declined, or it answered unreadably. None
-of them may reach a consumer as "no data" — over HTTP that looks like an empty answer and means the opposite."""
+"""The only door to Polymarket, which needs no credential but whose edge refuses some library defaults on `User-Agent`.
+Three refusals are told apart — nothing, declined, unreadable — because none may reach a consumer as "no data"."""
 
 from __future__ import annotations
 

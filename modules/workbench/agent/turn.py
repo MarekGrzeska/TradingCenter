@@ -1,8 +1,5 @@
-"""Runs one turn: calls the graph, forwards its deltas to a queue, and writes exactly one agent message
-plus one usage row — always, whether the call finished, failed, or the listener went away first.
-
-The queue is unbounded, so `put_nowait` never blocks and a turn never stalls on a consumer that stopped
-reading. That is the whole mechanism behind a disconnect closing the queue rather than the turn."""
+"""Runs one turn: calls the graph, forwards its deltas to a queue, and writes exactly one agent message and one usage
+row, whatever happened. The queue is unbounded, so a turn never stalls on a consumer that stopped reading."""
 
 from __future__ import annotations
 

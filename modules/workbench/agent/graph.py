@@ -1,9 +1,5 @@
-"""Two nodes and a loop between them: the model call, and the tools it asks for. History is rebuilt from
-the database on every turn, and tool rounds live in the state for one turn only.
-
-Four failures are kept apart, and conflating any two is the mistake this file exists to avoid: the tool
-refused, the server could not be reached, the server could not be reached *and the call could have
-landed* — the one the model must not retry on — and the provider broke mid-answer."""
+"""Two nodes and a loop between them: the model call, and the tools it asks for. Four failures are kept apart, and
+conflating any two is the mistake this file exists to avoid — the third being a call that could have landed."""
 
 from __future__ import annotations
 

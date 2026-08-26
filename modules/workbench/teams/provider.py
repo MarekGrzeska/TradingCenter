@@ -1,8 +1,5 @@
-"""This module's binding of `tc_openai` — the shared OpenAI call. What stays here is the pair the package
-must not hold: this module's own API key, and the `Briefing` shape it calls with, because an agent sees
-its predecessors' conclusions and never the run's history.
-
-agent and teams spend against separate keys on purpose, which is why the package takes a string."""
+"""This module's binding of `tc_openai`. What stays here is the pair the package must not hold: this module's own API
+key, and the `Briefing` shape it calls with, because an agent sees its predecessors' conclusions and not the history."""
 
 from __future__ import annotations
 

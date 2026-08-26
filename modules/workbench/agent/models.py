@@ -74,11 +74,8 @@ class RecordedCall(BaseModel):
 
 
 class ToolCall(BaseModel):
-    """One call the agent made while producing an agent message. Not a `Message`, on purpose: the transcript
-    is the conversation, and this is how the agent got to its half of it.
-
-    `message_id` is `None` for a call that outlived its turn: it was written before being sent, and the
-    reply it would have hung off never came."""
+    """One call the agent made while producing an agent message — not a `Message`, on purpose: the transcript is the
+    conversation. `message_id` is `None` for a call that outlived its turn, written before being sent and never answered."""
 
     id: int
     session_id: int
@@ -143,9 +140,8 @@ class ChartSnapshot(BaseModel):
 
 
 class ChartFocus(BaseModel):
-    """Which fragment of the time axis the chart should show — exactly one of its three shapes filled,
-    checked by the tool that builds this. Absolute time on the wire, so a command sitting in the log for an
-    hour still means what it meant; `last_bars` is the one named exception."""
+    """Which fragment of the time axis the chart should show — exactly one of its three shapes filled. Absolute time on
+    the wire, so a command sitting in the log for an hour still means what it meant; `last_bars` is the one exception."""
 
     # No wire alias here — this shape is only ever read back by this module's own store. The "from" alias
     # a caller sends and sees lives on `ChartFocusOut`, where the wire is what matters.
@@ -157,11 +153,8 @@ class ChartFocus(BaseModel):
 
 
 class ChartCommand(BaseModel):
-    """What the agent set the chart to, once. Declarative: `None` means "leave that as it is", never "clear
-    it", and an empty `indicators` list is the one way to say "draw none".
-
-    `sequence` is the row's own id, rising across the whole module rather than per session, so a consumer
-    holding one number knows what it has already applied."""
+    """What the agent set the chart to, once, declaratively: `None` means "leave that as it is", never "clear it", and an
+    empty `indicators` list is the one way to say "draw none". `sequence` rises across the module, not per session."""
 
     sequence: int
     session_id: int

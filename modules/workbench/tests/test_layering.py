@@ -1,8 +1,5 @@
-"""The rule that replaced "no module imports another module" inside this process: `agent`, `teams` and
-`teams_tools` import none of the others, and `workbench/` is the only place that may import all three.
-
-Read from the AST rather than the top of the file, so an import inside a function body counts too.
-`importlib` slips past this, and that is accepted: it is not a mistake anybody makes by accident."""
+"""The rule that replaced "no module imports another module" inside this process: `agent`, `teams` and `teams_tools`
+import none of the others, and `workbench/` alone may import all three. Read from the AST, so an import in a function counts."""
 
 from __future__ import annotations
 

@@ -1,11 +1,5 @@
-"""The one place this process reads its environment. Twelve settings that existed twice while the surfaces
-were two modules are one name each here.
-
-What stays doubled carries a prefix and stays doubled on purpose: two schemas, two OpenAI keys so the
-experiments bill on their own line, and two model catalogues, only one of which has a default.
-
-This module builds the two surfaces' own `Settings` rather than replacing them, so every validator they
-carry runs unchanged on values handed in as arguments."""
+"""The one place this process reads its environment. What stays doubled carries a prefix and is doubled on purpose:
+two schemas, two OpenAI keys so the experiments bill on their own line, and two catalogues."""
 
 from __future__ import annotations
 
@@ -21,19 +15,16 @@ from teams.config import Settings as TeamsSettings
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # One `DATABASE_USER` for both, and that is a consequence of one App Service rather
-    # than a simplification: the process presents a single managed identity, so the role
-    # it connects as is the same in both databases. That role has to exist in both — the
-    # one operator step this change carries (`design.md`, Migration Plan).
+    # One `DATABASE_USER` for both, a consequence of one App Service rather than a simplification: the process
+    # presents one identity, and that role has to exist in both databases — the one operator step this change carries.
     agent_database_url: str
     teams_database_url: str
     database_user: str | None = None
     azure_client_id: str | None = None
     azure_client_secret: str | None = None
     azure_tenant_id: str | None = None
-    # How long a starting process waits for another to finish migrating before it gives up.
-    # One value for both chains: they are the same size of small, and neither is
-    # market-data's candle table.
+    # How long a starting process waits for another to finish migrating before it gives up. One value for both chains:
+    # they are the same size of small, and neither is market-data's candle table.
     migration_lock_wait_seconds: float = 300.0
 
     agent_openai_api_key: str
@@ -53,16 +44,14 @@ class Settings(BaseSettings):
     trading_mcp_scope: str | None = None
     trading_mcp_request_timeout_seconds: float = 35.0
 
-    # The third pair, read by both surfaces like the two above, and optional on its own:
-    # unset means neither surface can say what a market prices an event at, which is the
-    # state both were in before this module existed.
+    # The third pair, read by both surfaces and optional on its own: unset means neither can say what a market prices
+    # an event at, which is the state both were in before that module existed.
     polymarket_mcp_url: str | None = None
     polymarket_mcp_scope: str | None = None
     polymarket_mcp_request_timeout_seconds: float = 35.0
 
-    # No `TEAMS_MCP_*`. The teams tools are a layer in this process now, so there is no
-    # address to configure, no token to fetch and no timeout to set — a `.env` from before
-    # this change carries three settings that are read by nothing.
+    # No `TEAMS_MCP_*`: the teams tools are a layer in this process now, so a `.env` from before this change carries
+    # three settings that are read by nothing.
 
     run_timeout_seconds: float = 900.0
     scheduler_enabled: bool = True
@@ -79,9 +68,8 @@ class Settings(BaseSettings):
     )
     @classmethod
     def _not_blank(cls, value: str, info: ValidationInfo) -> str:
-        # Named per surface rather than as "DATABASE_URL", because there are two of each
-        # and a message that does not say which is a message that sends the reader to the
-        # wrong line of the same file.
+        # Named per surface rather than as "DATABASE_URL", because there are two of each and a message that does not
+        # say which sends the reader to the wrong line of the same file.
         if not value.strip():
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()
@@ -97,9 +85,8 @@ class Settings(BaseSettings):
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
-        # `MARKET_MCP_URL=` left in a .env is the same intent as the line being absent.
-        # Both surfaces' own settings say this too; it has to happen here as well, because
-        # what reaches them is what this class hands over.
+        # `MARKET_MCP_URL=` left in a .env is the same intent as the line being absent. Both surfaces' own settings say
+        # this too; it has to happen here as well, because what reaches them is what this class hands over.
         if value is None or not value.strip():
             return None
         return value.strip()

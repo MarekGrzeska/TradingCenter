@@ -1,8 +1,5 @@
-"""Helpers every tool submodule needs: the annotations that say which tools change something, and the one
-seam that turns a `TeamsClient` outcome into what a tool answers.
-
-The seam is where the operator's identity is required, so no tool can forget it — except on a machine where
-no layer could have identified one, which is `operator.py`'s decision to make and not this file's."""
+"""Helpers every tool submodule needs: the annotations saying which tools change something, and the seam that turns a
+`TeamsClient` outcome into what a tool answers — which is where the operator's identity is required, so none forgets it."""
 
 from __future__ import annotations
 

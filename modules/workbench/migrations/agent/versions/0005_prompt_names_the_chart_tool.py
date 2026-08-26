@@ -1,8 +1,5 @@
-"""Seeds `"v5"`: the same prompt, with the chart tool named in it — a tool the prompt does not mention
-goes unused. Both variants carry it, since the chart tool does not need market-mcp.
-
-The `v4` text is repeated here rather than read and patched: a migration that rewrites prose it reads at
-runtime lands differently depending on whether an operator had edited the prompt in between.
+"""Seeds `"v5"`: the same prompt with the chart tool named in it, because a tool the prompt does not mention goes
+unused. The `v4` text is repeated rather than read and patched — a migration that rewrites prose it reads drifts.
 
 Revision ID: 0005
 Revises: 0004

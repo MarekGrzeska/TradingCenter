@@ -1,8 +1,5 @@
-"""What each model call inside a run cost — one row per call, priced at write time and never aggregated
-there, which is what lets a read answer "how much did each agent cost" as a `GROUP BY`.
-
-The rates are snapshotted from the catalogue, for agent's reason: a cennik changed after a run must not
-reprice it retroactively.
+"""What each model call inside a run cost — one row per call, priced at write time, which is what lets a read answer
+"how much did each agent cost" as a `GROUP BY`. The rates are snapshotted, so a later price change reprices nothing.
 
 Revision ID: 0003
 Revises: 0002

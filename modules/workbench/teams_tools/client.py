@@ -1,10 +1,5 @@
-"""The seam every call to the teams surface passes through — and no network: the routes are in the same
-process, reached through `httpx.ASGITransport`. HTTP is kept as the shape of the call rather than replaced
-by direct calls into the store, because the owner filter and every check live in the routers.
-
-Every request carries the operator's principal in the header a platform authenticator would have written,
-which is how a team created from the chat belongs to the person who asked. And one rule with teeth: a write
-is never retried — a repeated `create_team` is a second team."""
+"""The seam every call to the teams surface passes through, and no network: the routes are in this process, reached
+through `httpx.ASGITransport`. One rule has teeth — a write is never retried, since a repeated `create_team` is a second team."""
 
 from __future__ import annotations
 

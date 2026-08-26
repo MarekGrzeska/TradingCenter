@@ -1,6 +1,5 @@
-"""Saving a definition that assigns tools, with a tool server actually answering — the other half of
-`test_catalogue_routes.py`, and the check the save-time rule was written for: the names are confirmed
-against what the server announces right now, not against a list this module keeps."""
+"""Saving a definition that assigns tools, with a tool server actually answering: the names are confirmed against what
+the server announces right now, not against a list this module keeps."""
 
 from __future__ import annotations
 

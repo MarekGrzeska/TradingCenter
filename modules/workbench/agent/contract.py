@@ -81,11 +81,8 @@ def _source_of(tool_name: str) -> str:
 
 
 class ToolCallOut(BaseModel):
-    """One tool call, published in exactly one shape whether it is leaving as a stream event mid-turn or
-    hanging off a message in a reloaded transcript. Two shapes would be two chances to disagree.
-
-    No `id` and no `created_at`: the live event has neither, and a field one path cannot fill is a field
-    the reader has to check the origin of before trusting."""
+    """One tool call, published in exactly one shape whether it leaves as a stream event or hangs off a reloaded
+    transcript. No `id` and no `created_at`: the live event has neither, and a field one path cannot fill is unreliable."""
 
     # Which round of the turn, and where within it. These say whether three calls were one round of three
     # or three rounds of one, which is the difference between a model surveying and a model iterating.

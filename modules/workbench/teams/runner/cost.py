@@ -1,7 +1,5 @@
-"""The cost ceilings, and the one place a run is stopped for money rather than for work. The run limit is
-checked before every model call, the daily one before a run starts, because a run refused halfway already spent.
-
-Neither lives in a prompt: a prompt asks a model to restrain itself, and a ceiling has to hold when it does not."""
+"""The cost ceilings, and the one place a run is stopped for money rather than for work: the run limit before every
+model call, the daily one before a run starts. Neither lives in a prompt — a ceiling has to hold when a model does not."""
 
 from __future__ import annotations
 
@@ -34,11 +32,8 @@ class DailyCostLimitReached(CostLimitReached):
 
 
 class CostGuard:
-    """What one run has spent so far, and whether it may spend again. Counted in memory rather than re-read,
-    and not for speed: several agents write at once, and a guard reading mid-write acts on a stale number.
-
-    A row the provider gave no tokens for adds nothing — counting an unknown as zero is the same lie as
-    writing it as zero."""
+    """What one run has spent, and whether it may spend again. Counted in memory rather than re-read, and not for speed:
+    several agents write at once, and a guard reading mid-write acts on a stale number."""
 
     def __init__(self, limit: Decimal | None) -> None:
         self._limit = limit

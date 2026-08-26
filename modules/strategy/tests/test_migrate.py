@@ -35,9 +35,8 @@ async def test_a_trade_without_its_levels_is_refused(db: asyncpg.Connection) -> 
 
 
 async def test_one_decision_per_bar(db: asyncpg.Connection) -> None:
-    """The loop re-reads the last closed bar on every wake and after every restart. Writing
-    a second row for it would turn a restart into a second setup — so the bar is the key,
-    and the loop is idempotent because the table says so."""
+    """The loop re-reads the last closed bar on every wake and after every restart, so writing a second row for it
+    would turn a restart into a second setup. The bar is the key, and the loop is idempotent because the table says so."""
     params_id = await db.fetchval(
         "INSERT INTO parameter_sets (strategy_id, version, params) "
         "VALUES ('baseline', 1, '{}'::jsonb) RETURNING id"

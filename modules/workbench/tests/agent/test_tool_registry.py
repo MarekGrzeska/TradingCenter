@@ -1,8 +1,5 @@
-"""Several sources of tools behind one door. The property under test is independence: one source being
-absent, unreachable or slow costs the model that source's tools and nothing else.
-
-Two of the three are servers on a network; the third runs in this process and is handed in, because
-building one needs the application object. The stand-in below is all three."""
+"""Several sources of tools behind one door, and the property under test is independence: one source being absent,
+unreachable or slow costs the model that source's tools and nothing else. The stand-in below is all three."""
 
 from __future__ import annotations
 

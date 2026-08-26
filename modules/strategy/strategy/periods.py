@@ -1,8 +1,5 @@
-"""How long a bar lasts, and the window that holds a given number of them. The archive's vocabulary,
-copied rather than imported, so a change on that side is a deliberate edit here.
-
-`DAY` and `WEEK` are approximations — their real boundary follows the venue — and both uses here err
-safely when a period is overstated."""
+"""How long a bar lasts, and the window that holds a given number of them. The archive's vocabulary, copied rather
+than imported, so a change there is a deliberate edit here; `DAY` and `WEEK` are approximations that err safely."""
 
 from __future__ import annotations
 

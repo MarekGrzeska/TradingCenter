@@ -1,8 +1,5 @@
-"""The system prompt's trusted storage, replacing the constants `agent/prompt.py` used to hold. Append-only:
-a row is never updated, only added.
-
-Seeds `"v4"` with the exact text held when this was written — as literals, not imported, so it keeps
-seeding the same history whatever `agent/prompt.py` becomes later.
+"""The system prompt's trusted storage, append-only, replacing the constants `agent/prompt.py` held. Seeds `"v4"` as
+literals rather than by import, so it keeps seeding the same history whatever `agent/prompt.py` becomes later.
 
 Revision ID: 0003
 Revises: 0002

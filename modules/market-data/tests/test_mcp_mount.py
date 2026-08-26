@@ -1,6 +1,5 @@
-"""The tool surface as a route of this application: where it is mounted, what it lists, and the import
-order that keeps mounting it from breaking telemetry. One request through the front door caught three
-defects that rode into production on 19 August 2026 inside a change whose tests were green."""
+"""The tool surface as a route of this application: where it is mounted, what it lists, and the import order that
+keeps mounting it from breaking telemetry. One request through the front door caught three defects."""
 
 from __future__ import annotations
 

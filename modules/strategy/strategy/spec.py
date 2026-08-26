@@ -1,6 +1,5 @@
-"""The contract of a catalogue entry: what a strategy declares, and what it returns. Four properties carry
-it, each enforced rather than asked for — a strategy declares its facts and does not fetch them, `evaluate`
-is pure, there is one shape of `Decision`, and parameters belong to the entry with their ranges."""
+"""The contract of a catalogue entry: what a strategy declares and what it returns, in four properties that are
+enforced — declared facts it does not fetch, a pure `evaluate`, one shape of `Decision`, parameters with ranges."""
 
 from __future__ import annotations
 
@@ -32,16 +31,14 @@ class Param:
 
 @dataclass(frozen=True)
 class Fact:
-    """One thing a strategy needs read on its behalf, named the archive's way. A parameter value may be the
-    name of one of the strategy's own, which is what lets a period be tuned without the declaration stopping
-    being one. `bars` belongs to the entry, because only the strategy knows how far back its answer depends."""
+    """One thing a strategy needs read on its behalf, named the archive's way. A parameter value may name one of the
+    strategy's own, which is what lets a period be tuned; `bars` belongs to the entry, which knows how far back it reads."""
 
     indicator: str
     resolution: str
     params: Mapping[str, float | str] = field(default_factory=dict)
-    # What `Facts[...]` reads it back under. Two facts about the same indicator at
-    # different periods are the ordinary case, so the key cannot default to the id alone
-    # for more than one of them.
+    # What `Facts[...]` reads it back under. Two facts about the same indicator at different periods are the ordinary
+    # case, so the key cannot default to the id alone for more than one of them.
     key: str | None = None
     bars: int = 300
 
@@ -108,9 +105,8 @@ class FactValue:
     markers: tuple[Marker, ...] = ()
     zones: tuple[Zone, ...] = ()
     levels: tuple[Level, ...] = ()
-    # Set when the archive could compute nothing for this one fact — a series it does not
-    # hold at that resolution. Never read as "there was nothing": a strategy that cannot
-    # see is not a strategy that saw nothing.
+    # Set when the archive could compute nothing for this one fact — a series it does not hold at that resolution.
+    # Never read as "there was nothing": a strategy that cannot see is not a strategy that saw nothing.
     error: str | None = None
 
     def line(self, name: str) -> tuple[float | None, ...]:
@@ -129,11 +125,8 @@ class FactValue:
 
 @dataclass(frozen=True)
 class Facts:
-    """Everything `evaluate` is allowed to know.
-
-    `as_of` is the closing time of the bar being decided on, never the wall clock: a
-    decision belongs to a bar, and a replay of that bar has to land on the same answer.
-    """
+    """Everything `evaluate` is allowed to know. `as_of` is the closing time of the bar being decided on, never the
+    wall clock: a decision belongs to a bar, and a replay of that bar has to land on the same answer."""
 
     symbol: str
     as_of: datetime
@@ -260,9 +253,8 @@ class StrategySpec:
         for fact in self.facts:
             unknown = sorted(set(fact.parameter_references) - declared)
             if unknown:
-                # Caught at import, where it is one wrong word, rather than at the first
-                # evaluation, where it is a strategy that reads a different indicator than
-                # the one it was written against.
+                # Caught at import, where it is one wrong word, rather than at the first evaluation, where it is a
+                # strategy reading a different indicator than the one it was written against.
                 raise ValueError(
                     f"strategy {self.id!r} points fact {fact.name!r} at parameter(s) "
                     f"{', '.join(unknown)}, which it does not declare"

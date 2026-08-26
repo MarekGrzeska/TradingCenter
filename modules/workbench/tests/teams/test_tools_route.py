@@ -1,6 +1,5 @@
-"""`GET /tools` — the three answers, and why the last two are not the same one. What it has to get right is
-the difference between a module that announces nothing and a module that could not ask: a terminal told
-`[]` for both would show an empty picker while the tools are sitting there."""
+"""`GET /tools` — the three answers, and why the last two are not the same one: a terminal told `[]` for both a module
+that announces nothing and one that could not ask would show an empty picker while the tools are sitting there."""
 
 from __future__ import annotations
 

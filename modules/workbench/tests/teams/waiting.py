@@ -1,8 +1,5 @@
-"""Waiting for a run that is working in the background, from a synchronous test. `TestClient` drives the
-app from a portal thread while the run's task lives on the event loop, so a test has to hand that loop time.
-
-Both helpers were a bare `for _ in range(60)` with no pause — bounded by round trips rather than time, and
-a race the test can lose. `time.sleep` releases the GIL, which is what lets the loop thread move the run."""
+"""Waiting for a run working in the background, from a synchronous test: `TestClient` drives the app from a portal
+thread while the run lives on the event loop. `time.sleep` releases the GIL, which is what lets that loop move the run."""
 
 from __future__ import annotations
 

@@ -91,9 +91,8 @@ def upgrade() -> None:
         """
     )
 
-    # One row per (outcome, moment), whichever way the sample arrived: two rows for one moment would
-    # leave two prices at one instant. Two valuations because on a thin market they differ by a lot.
-    # `quoted_at` is the moment the valuation is *about* — without it a nine-hour-old trade reads as fresh.
+    # One row per (outcome, moment), whichever way the sample arrived; two valuations, because on a thin market they
+    # differ by a lot. `quoted_at` is the moment the valuation is *about* — without it a stale trade reads as fresh.
     op.execute(
         """
         CREATE TABLE price_samples (

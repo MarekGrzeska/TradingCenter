@@ -1,16 +1,5 @@
-"""Whose request this is — the one fact every tool here needs before it does anything. The teams surface
-filters every statement by owner, so a tool acting on the process's own identity would write rows the
-operator cannot see: existing, costing money, impossible to open.
-
-What travels changed with the merge: in one process there is no authenticator in the middle, so what
-travels is the *principal itself*, taken off the incoming chat request, which the authenticator in front of
-this process has already validated. It is carried in a context variable because `FastMCP` builds the
-`Context` a tool receives and has no field for it, and it is never read from a tool argument — an identity
-that can be written is one that can be borrowed.
-
-The refusal is bounded, and the boundary is "could an identity have existed": behind an authenticator a
-missing principal refuses everything, while on a machine where nothing authenticates the call proceeds
-carrying none, and the teams surface attributes it to the principal the local terminal also gets."""
+"""Whose request this is — the fact every tool needs first, because the teams surface filters by owner. What travels is
+the principal itself, in a context variable rather than an argument: an identity that can be written can be borrowed."""
 
 from __future__ import annotations
 
@@ -46,11 +35,8 @@ class carrying:
 
 
 def operator_principal(*, optional: bool = False) -> str | None:
-    """The operator this one call acts for. Refuses for reads exactly as for writes: without an identity
-    there is no catalogue to read, only somebody else's.
-
-    `optional=True` — decided from whether an authenticator stands in front, never by a caller's judgement —
-    answers `None`, which the client turns into a request carrying no principal header at all."""
+    """The operator this one call acts for, refusing for reads exactly as for writes: without an identity there is no
+    catalogue to read, only somebody else's. `optional=True` answers `None`, which becomes a request with no principal."""
     principal = (_operator.get() or "").strip()
     if principal:
         return principal

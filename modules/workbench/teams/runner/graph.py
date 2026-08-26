@@ -1,10 +1,5 @@
-"""The definition compiled to something that can be executed: one node per agent, the edges the operator
-drew, and nothing else. LangGraph carries it because explicit nodes and edges map onto what a revision
-already stores, and two properties come with it — an agent starts when all its predecessors have finished,
-and agents whose dependencies are satisfied run at the same time.
-
-What is written here is the third: each node is handed only its own predecessors' outputs, never the whole
-state. The definition is already known to be acyclic and connected, so nothing here re-checks that."""
+"""The definition compiled to something executable: one node per agent and the edges the operator drew. What is written
+here is the third property LangGraph does not give — each node is handed only its predecessors' outputs."""
 
 from __future__ import annotations
 

@@ -1,8 +1,5 @@
-"""Reading and writing everything this module owns — the only door to its tables. Same shape as
-market-data's store: asyncpg directly, no ORM in the runtime path, one module per table.
-
-The split fixed a real defect rather than only shortening files: `usage` was written in one place and
-aggregated 250 lines further down, with the whole tool-call section between the two halves of one table."""
+"""The only door to this module's tables — asyncpg directly, no ORM, one module per table. The split fixed a real
+defect rather than only shortening files: `usage` was written in one place and aggregated 250 lines further down."""
 
 from __future__ import annotations
 

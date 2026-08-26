@@ -1,9 +1,5 @@
-"""The module's own clock: waking on its own, claiming a due schedule or trigger exactly once, and starting
-the run each fire calls for — the same sequence the route runs, minus the click.
-
-Two concerns share one wake rather than two tasks: what decides "is this due" differs, but both end in a
-call to `start_run_on_revision` and a row in `schedule_fires`, and both share the overlap check, the daily
-refusal and the failure streak. The conditional `UPDATE` that claims a row is the whole exactly-once guarantee."""
+"""The module's own clock: waking, claiming a due schedule or trigger exactly once, and starting the run each fire calls
+for. Two concerns share one wake because both end in `start_run_on_revision` and a row in `schedule_fires`."""
 
 from __future__ import annotations
 
@@ -187,11 +183,8 @@ async def _start_from(
 
 
 class _ScheduleSource:
-    """A claimed row as the shared tail sees it: what to call it, and the four `store` calls that name it.
-    Binding the kind here is what lets one sequence serve both, since the id keywords differ on purpose.
-
-    No shared base, deliberately: it would be five `raise NotImplementedError` bodies standing in for what
-    the union already says, and pyright checks the two agree at every call site."""
+    """A claimed row as the shared tail sees it: what to call it, and the four `store` calls that name it. No shared base,
+    deliberately — it would be five `raise NotImplementedError` bodies standing in for what the union already says."""
 
     kind = "schedule"
 

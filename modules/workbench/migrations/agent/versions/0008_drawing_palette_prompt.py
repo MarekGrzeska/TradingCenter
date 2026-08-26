@@ -1,7 +1,5 @@
-"""Seeds `"v8"`: the drawings paragraph now names the palette a drawing is actually drawn from, since a
-prompt promising the indicator one sends the model to pick a colour it will be refused.
-
-Nothing in `chart_drawings` moves: rows saved with an indicator token keep it and keep drawing in it.
+"""Seeds `"v8"`: the drawings paragraph now names the palette a drawing is actually drawn from, since a prompt
+promising the indicator one sends the model to pick a colour it will be refused. Nothing in `chart_drawings` moves.
 
 Revision ID: 0008
 Revises: 0007

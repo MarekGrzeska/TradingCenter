@@ -1,7 +1,5 @@
-"""One FastMCP instance, and no transport at all. `FastMCP` is kept because a transport was never what it
-was for here: it is the tool registry, the schema generator and the annotation carrier.
-
-What went with the process: the HTTP app, the caller-identity check, `/health`, and the host and port."""
+"""One FastMCP instance and no transport at all: `FastMCP` is kept because it is the tool registry, the schema generator
+and the annotation carrier. What went with the process is the HTTP app, the caller-identity check and `/health`."""
 
 from __future__ import annotations
 
@@ -38,11 +36,8 @@ def build_server(teams: TeamsClient) -> FastMCP:
 
 
 def say_whose_name_the_tools_act_in(operator_identity_optional: bool) -> None:
-    """Which of the two states this process came up in, said once, at startup. The state where tools work
-    without an operator behind them MUST NOT be one an operator infers from an absence of refusals.
-
-    Said in a log line rather than appended to every answer: a sentence in each result is paid for in
-    tokens, and it would make a local answer differ in content from the deployed one."""
+    """Which of the two states this process came up in, said once at startup, because the state where tools work with
+    no operator behind them MUST NOT be inferred from an absence of refusals. In a log line: a sentence per answer costs tokens."""
     if operator_identity_optional:
         log.info(
             "no authenticator stands in front of this process "

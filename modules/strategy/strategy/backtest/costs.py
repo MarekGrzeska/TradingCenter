@@ -1,8 +1,5 @@
-"""What a trade costs, stated rather than assumed. The archive holds the bid side, so the spread is
-invisible in the data, and a report that does not name its cost model is not a result.
-
-Stated as a parameter per instrument rather than measured, for now: swapping a measurement in later
-changes nothing here, because the report names whatever model it was given either way."""
+"""What a trade costs, stated rather than assumed: the archive holds the bid side, so the spread is invisible, and a
+report that does not name its cost model is not a result. Swapping a measurement in later changes nothing here."""
 
 from __future__ import annotations
 

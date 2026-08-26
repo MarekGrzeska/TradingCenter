@@ -1,8 +1,5 @@
-"""Runs: starting one, reading its trace, watching it work, and interrupting it. Every route hands
-`current_principal` to the store, so a stranger's run answers 404, exactly as one that never existed.
-
-A run is started on a *revision*, never on "the team as it is now": an operator saving a new revision
-while a run works changes nothing about the run."""
+"""Runs: starting one, reading its trace, watching it work, and interrupting it, with every route handing
+`current_principal` to the store. A run is started on a *revision*, so a save while it works changes nothing about it."""
 
 from __future__ import annotations
 
@@ -161,9 +158,8 @@ async def run_events(
     to see the agents that already finished, and dropping the connection unsubscribes a queue and nothing else."""
     pool = request.app.state.teams.pool
     registry = request.app.state.teams.runs
-    # Subscribed before the snapshot is *read*, not merely before it is sent: releasing the connection is
-    # a suspension point, so a step finishing right there landed in neither place. The cost is an event
-    # repeated to a watcher that has already seen it — deliberately the direction to fail in.
+    # Subscribed before the snapshot is *read*, not merely before it is sent: releasing the connection is a suspension
+    # point, so a step finishing there landed in neither place. A repeated event is the direction to fail in.
     queue = registry.subscribe(run_id)
     try:
         async with pool.acquire() as conn:

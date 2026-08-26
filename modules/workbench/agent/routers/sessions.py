@@ -136,11 +136,8 @@ async def delete_session(
 
 
 def _operator_principal(request: Request) -> str | None:
-    """Who this turn acts for, as the authenticator in front of this process said it. Not the bearer token,
-    which needs a validator, and there is none between this line and the routes it ends up at.
-
-    `None` where nothing authenticates, which is a developer's machine: the team tools then act carrying
-    no identity at all."""
+    """Who this turn acts for, as the authenticator in front said it — not the bearer token, which needs a validator
+    there is none of here. `None` where nothing authenticates, and the team tools then act carrying no identity."""
     identity = (
         request.headers.get(PRINCIPAL_ID_HEADER) or request.headers.get(PRINCIPAL_NAME_HEADER) or ""
     ).strip()
@@ -198,9 +195,8 @@ async def send_message(
     task.add_done_callback(lambda _: running.pop(session_id, None))
 
     def _close_stream_if_the_turn_died(finished: asyncio.Task) -> None:
-        """A turn that raises before its own guard leaves nothing on the queue, and the stream then waits
-        for an event that never comes — a hang rather than an error. `run_turn` guards the model call;
-        everything before it is outside that guard, and this is what covers it."""
+        """A turn that raises before its own guard leaves nothing on the queue, and the stream then waits for an event
+        that never comes. `run_turn` guards the model call; everything before it is outside that guard, and this covers it."""
         if finished.cancelled() or finished.exception() is None:
             return
         log.exception(

@@ -1,9 +1,5 @@
-"""Adds `chart_drawings` — the levels, zones and trend lines left on an instrument's chart — and seeds
-`"v7"`. A drawing is a state of the instrument, not a log: one symbol, all its rows, always the whole set.
-
-Geometry lives in four shared columns rather than one per shape, with a `CHECK` per `kind` pinning what
-each column means there. `session_id` is nullable with `ON DELETE SET NULL`: a drawing outlives the
-session that made it.
+"""Adds `chart_drawings` — the objects left on an instrument's chart, a state of the instrument rather than a log.
+Geometry lives in four shared columns with a `CHECK` per `kind`, and a drawing outlives the session that made it.
 
 Revision ID: 0007
 Revises: 0006

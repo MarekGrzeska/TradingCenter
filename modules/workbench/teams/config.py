@@ -1,10 +1,5 @@
-"""Settings, and the mode switches this module refuses to leave ambiguous. The database follows the rule
-every module owning one duplicates: identity off-machine, or password on loopback, never neither and never
-both. OpenAI has no such switch, and its key is this module's own — the experiments bill on their own line.
-
-A tool server has the database's shape with one difference: the whole setting is optional, because a team
-whose agents carry no tools never needs one. Unlike agent's catalogue there is no default model: a
-revision either names one for every agent or is refused when it is saved."""
+"""Settings, and the mode switches this module refuses to leave ambiguous: identity off-machine or password on loopback,
+never neither. There is no default model — a revision names one per agent or is refused at save."""
 
 from __future__ import annotations
 
@@ -20,11 +15,8 @@ _TLS_REQUIRING_SSLMODES = {"require", "verify-ca", "verify-full"}
 
 
 class ModelCatalogueEntry(BaseModel):
-    """One model an agent in a team can be assigned. Rates are per 1,000,000 tokens, and `Decimal` rather
-    than `float`, because a run costs a fraction of a cent across several agents.
-
-    Required, not defaulted: a model entry without a rate must fail to parse, which keeps the module from
-    starting rather than pricing a run as free."""
+    """One model an agent can be assigned. Rates are per 1,000,000 tokens and `Decimal` rather than `float`, because a run
+    costs a fraction of a cent across several agents — and required, so a rateless entry stops the module starting."""
 
     id: str
     # What OpenAI is actually asked for, kept separate from `id` because the two need not match: `id` is

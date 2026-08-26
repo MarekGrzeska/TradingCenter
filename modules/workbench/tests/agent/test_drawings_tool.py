@@ -1,8 +1,5 @@
-"""The two drawing tools against a real database: what lands, what comes back, what does not. The
-market-mcp stand-in answers with the same JSON the real server's typed tools serialize.
-
-Argument validation is not here: it refuses before the pool is touched, so the two dozen permutations that
-used to sit in this file are one parameterised test in `test_drawings_refusals.py` now."""
+"""The two drawing tools against a real database: what lands, what comes back, what does not. Argument validation is
+not here — it refuses before the pool is touched, so those permutations are one parameterised test elsewhere."""
 
 from __future__ import annotations
 

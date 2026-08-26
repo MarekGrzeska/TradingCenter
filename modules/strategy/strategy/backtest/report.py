@@ -1,8 +1,5 @@
-"""One run's result, and the rule that keeps two of them comparable. A report names its range, its cost
-model, its parameter version and its revision, because without them it is a number somebody produced.
-
-The revision is the exception `compare` allows: two revisions of one definition is the question this
-command exists to answer, and every report prints its own so a table can say which is which."""
+"""One run's result, and the rule that keeps two comparable: a report names its range, cost model, parameter version
+and revision, or it is a number somebody produced. The revision is `compare`'s one exception, being its question."""
 
 from __future__ import annotations
 

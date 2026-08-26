@@ -1,10 +1,6 @@
-"""Everything the terminal needs, in the order it needs it — on every platform, once.
+"""Everything the terminal needs, in the order it needs it — on every platform, once. This replaces `dev.sh`
+and `dev.ps1`, which were one script written twice and drifted three times, each in one of them only.
 
-This replaces `dev.sh` and `dev.ps1`, which were one script written twice and drifted three
-times, each time in one of them only. The drift lived in the service table, so the table is
-data here and there is one copy of it; both wrappers pass their arguments to this file.
-
-    uv run python scripts/dev.py                 # everything
     uv run python scripts/dev.py --no-terminal   # back end only, e.g. to run the live tests
 """
 
@@ -209,9 +205,8 @@ SERVICES: tuple[Service, ...] = (
     ),
 )
 
-# Every migration chain and which module owns it; `workbench` appears twice because it owns two
-# databases. Redundant with each module's startup migration, and kept because it fails readably
-# here rather than inside a lifespan that is holding a lock.
+# Every migration chain and which module owns it; `workbench` appears twice because it owns two databases.
+# Redundant with each module's startup migration, and kept because it fails readably rather than under a lock.
 MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
     ("market-data", None),
     ("workbench", "alembic-agent.ini"),

@@ -1,8 +1,5 @@
-"""The settings rules both surfaces carry identically, checked once for both. The two classes are separate
-on purpose — the prefixed names are what stays doubled — but two of their validator blocks were byte-identical
-apart from the word "agent" or "teams" inside a URL.
-
-Each surface's own test_config keeps what is genuinely its own: its key, its catalogue, its default model."""
+"""The settings rules both surfaces carry identically, checked once for both: the classes stay separate, since the
+prefixed names are what is doubled, but two validator blocks were byte-identical apart from a word inside a URL."""
 
 from __future__ import annotations
 
@@ -130,11 +127,8 @@ def test_a_missing_database_url_names_itself(surface: str) -> None:
     assert "database_url" in str(err.value)
 
 
-# Parameterised over the servers rather than copied per server: the rule is one
-# `_checked_server` call per configured server, so a copy per name would be the same
-# assertion three times over — and the third server, added on 22 August 2026, would have
-# been that copy. Each surface's own test_config.py keeps only what is not this: how the
-# several servers interact.
+# Parameterised over the servers rather than copied per server, since the rule is one `_checked_server` call each and
+# the third server added later would have been that copy. Each surface's own test_config keeps what is genuinely its own.
 
 
 @pytest.fixture(params=["market_mcp", "trading_mcp", "polymarket_mcp"])

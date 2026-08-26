@@ -1,8 +1,5 @@
-"""Which of a `PromptRevision`'s two texts a turn runs. The prompt itself is no longer a constant here —
-it moved to the `prompt_revisions` table, so an operator can rewrite it without a deploy.
-
-Two texts, one version: which one a turn runs is a fact about the turn — with tools, or without them
-because the tool server is unreachable — not a change to the prompt."""
+"""Which of a `PromptRevision`'s two texts a turn runs — the prompt itself moved to the table, so an operator can
+rewrite it without a deploy. Two texts, one version: which one runs is a fact about the turn, not about the prompt."""
 
 from __future__ import annotations
 

@@ -1,9 +1,5 @@
-"""Every call a run made that could change the account, and what came of it. A table of its own rather than
-a read over `tool_calls`, because the daily limit has to count a team's orders before a run is created, and
-counting inside another module's JSON document breaks silently when it renames a field.
-
-A row exists before the call is sent: `status` starts at `sent`, and a row still reading `sent` after its
-run is over is an order whose fate this module does not know.
+"""Every call a run made that could change the account, in a table of its own rather than a read over `tool_calls`: the
+daily limit counts orders before a run exists, and counting inside another module's JSON breaks when it renames a field.
 
 Revision ID: 0006
 Revises: 0005
@@ -21,9 +17,8 @@ down_revision: str | None = "0005"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-# sent — written and the call went out, nothing known yet; settled — the server answered with a settled
-# result; unsettled — answered, not resolved yet, with a reference; refused — answered no; unknown — the
-# call failed in a way that says nothing about whether it arrived.
+# sent — written and the call went out; settled — the server answered with a settled result; unsettled — answered with
+# a reference; refused — answered no; unknown — the call failed in a way that says nothing about whether it arrived.
 _STATUSES = ("sent", "settled", "unsettled", "refused", "unknown")
 
 

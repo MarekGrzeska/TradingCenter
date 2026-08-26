@@ -1,8 +1,5 @@
-"""Whose request this is, and what happens when nobody can say. Its own file because every other test in
-this suite puts an operator in place, and something has to check the thing being put in place.
-
-What is read changed with the merge: not a bearer token out of a header, but the operator's own principal
-out of a context variable — the identity travels rather than the credential."""
+"""Whose request this is, and what happens when nobody can say — its own file, because every other test here puts an
+operator in place. What is read is the principal out of a context variable: the identity travels, not the credential."""
 
 from __future__ import annotations
 
@@ -60,9 +57,8 @@ def test_a_blank_principal_answers_the_same_as_none_under_the_carve_out() -> Non
 
 
 def test_a_present_operator_is_still_carried_when_an_absent_one_would_be_tolerated() -> None:
-    """The carve-out tolerates an absence; it does not stop reading an identity that is
-    there, which is what would quietly turn a signed-in local operator into an anonymous
-    one."""
+    """The carve-out tolerates an absence; it does not stop reading an identity that is there, which is what would
+    quietly turn a signed-in local operator into an anonymous one."""
     with carrying("some-operator"):
         assert operator_principal(optional=True) == "some-operator"
 

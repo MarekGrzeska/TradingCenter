@@ -1,7 +1,5 @@
-"""The queryable catalogue built from `Settings.models`. A twin of agent's with one thing deliberately
-missing: no default and no `resolve()` — every agent names its own model or the revision is refused.
-
-What this adds over `config.py`'s own checks is a stable order and a lookup that names a refusal."""
+"""The queryable catalogue built from `Settings.models`, a twin of agent's with one thing deliberately missing: no
+default and no `resolve()`, because every agent names its own model or the revision is refused."""
 
 from __future__ import annotations
 

@@ -100,9 +100,8 @@ class TestWhoGetsIn:
         assert response.json() == {"detail": "not authenticated"}
 
     async def test_the_rest_caller_reaches_rest(self, guarded) -> None:
-        # The root rather than `/strategies`, which the refusals below use: what is under
-        # test is the gate, and the gate is the only thing this application has that can
-        # answer without a database behind it.
+        # The root rather than `/strategies`, which the refusals below use: what is under test is the gate, and it is
+        # the only thing this application has that can answer without a database behind it.
         response = await guarded.get("/", headers=principal("terminal-app-id"))
 
         assert response.status_code == 200
@@ -128,9 +127,8 @@ class TestWhoGetsIn:
     async def test_a_principal_header_naming_a_person_is_not_an_application(
         self, guarded
     ) -> None:
-        """Measured on market-data in production on 19 August 2026: for a delegated token
-        the principal-id header carries the signed-in *person's* object id, so a record of
-        application identifiers can never match it."""
+        """Measured on market-data in production on 19 August 2026: for a delegated token the principal-id header
+        carries the signed-in *person's* object id, so a record of application identifiers can never match it."""
         response = await guarded.get(
             "/strategies", headers={"x-ms-client-principal-id": "terminal-app-id"}
         )

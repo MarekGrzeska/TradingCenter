@@ -1,8 +1,5 @@
-"""Seeds `"v11"`: the trading tools paragraph, and one sentence corrected because it had become false.
-
-The paragraph is written for one failure above all — retrying a call whose outcome came back unknown,
-which is a second position rather than a second attempt. And every prompt from `v4` on told the model it
-could not place an order, which a prompt asserting the opposite of the tool list makes worse than silence.
+"""Seeds `"v11"`: the trading tools paragraph, written for one failure above all — retrying a call whose outcome came
+back unknown, which is a second position rather than a second attempt. One sentence is corrected, having become false.
 
 Revision ID: 0012
 Revises: 0011

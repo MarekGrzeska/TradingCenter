@@ -1,8 +1,5 @@
-"""The teams routes, and the assembly of what they read. Split out of this package's own `app.py` when the
-two modules became one process — `agent/surface.py` is its twin, and neither imports the other.
-
-Two paths moved and the rest did not: `GET /models` and `GET /usage` existed on both surfaces with
-different answers, so this one's are published under `/teams/`."""
+"""The teams routes, and the assembly of what they read — split out when the two modules became one process, with
+`agent/surface.py` as its twin. `GET /models` and `GET /usage` existed on both with different answers, so these moved."""
 
 from __future__ import annotations
 

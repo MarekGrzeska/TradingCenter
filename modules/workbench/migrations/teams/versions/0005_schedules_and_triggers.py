@@ -1,11 +1,5 @@
-"""A team's clock: cron schedules, market-condition triggers, and the fire history that survives both —
-including the fires that started nothing. Purely additive, so it commutes with the phase-2 branch being
-written from the same ancestor.
-
-`schedules` and `triggers` share a revision-selection shape but not a table: a trigger has its own cadence
-and its own three-valued state, so one table would need nullable columns for whichever half did not apply.
-`schedule_fires` records the attempts that started nothing, because a schedule quiet for want of work looks
-identical to one hitting its daily ceiling unless the difference is written down.
+"""A team's clock: cron schedules, market-condition triggers, and the fire history that survives both — including the
+fires that started nothing, because quiet for want of work looks identical to quiet against a ceiling.
 
 Revision ID: 0005
 Revises: 0004

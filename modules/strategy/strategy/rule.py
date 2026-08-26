@@ -1,9 +1,5 @@
-"""A rule as data: the closed vocabulary a clicked-together strategy is built from. A tree of typed nodes,
-never a text — nothing writes rules as text, so there is no lexer, no grammar and no syntax errors.
-
-One grammar, two uses: the same expressions answer a question and produce a number, and without the second
-half not even the strategy of reference is expressible. Closed on purpose, which is what makes it safe to
-run a rule nobody reviewed. Every check here is static; what needs the archive lives in `rule_validation.py`."""
+"""A rule as data: the closed vocabulary a clicked-together strategy is built from, a tree of typed nodes and never a
+text, which is what makes it safe to run a rule nobody reviewed. What needs the archive lives in `rule_validation.py`."""
 
 from __future__ import annotations
 
@@ -47,11 +43,8 @@ class ParamRef(_Node):
 
 
 class FactRead(_Node):
-    """One line of one declared fact, at this bar or a few bars back.
-
-    `offset` counts backwards from the bar being decided on, so `0` is the reading the loop
-    would call "now" and `1` is the other half of every crossing test.
-    """
+    """One line of one declared fact, at this bar or a few bars back. `offset` counts backwards from the bar being
+    decided on, so `0` is the reading the loop calls "now" and `1` is the other half of every crossing test."""
 
     node: Literal["fact"] = "fact"
     key: str = Field(min_length=1)
@@ -99,11 +92,8 @@ class Call(_Node):
 
 
 class Previous(_Node):
-    """The same expression, evaluated one bar earlier.
-
-    A frame shift rather than an offset on every leaf inside it: `previous(fast − slow)`
-    says what it means, while shifting each leaf by hand is three places to forget one.
-    """
+    """The same expression, evaluated one bar earlier — a frame shift rather than an offset on every leaf inside it:
+    `previous(fast − slow)` says what it means, while shifting each leaf by hand is three places to forget one."""
 
     node: Literal["previous"] = "previous"
     of: Numeric
@@ -209,11 +199,8 @@ class RuleFact(BaseModel):
 
 
 class Guard(BaseModel):
-    """A reason to refuse, in the order it should be asked.
-
-    Ordered because the cheapest and commonest refusal belongs first: the usual answer of a
-    strategy worth running is "no", and it should also be the shortest path to one.
-    """
+    """A reason to refuse, in the order it should be asked: the cheapest and commonest refusal belongs first, since
+    the usual answer of a strategy worth running is "no"."""
 
     model_config = ConfigDict(extra="forbid")
 

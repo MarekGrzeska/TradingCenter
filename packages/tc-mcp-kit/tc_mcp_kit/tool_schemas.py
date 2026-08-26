@@ -1,6 +1,5 @@
-"""The published tool surface, without the scaffolding pydantic emits around it: a model reads every
-description and both schemas in every turn. Measured 18 August 2026 across three modules: 64 416
-characters before, 50 172 after, with every field, type, `format` and `required` entry surviving."""
+"""The published tool surface without the scaffolding pydantic emits around it, because a model reads every
+description in every turn. Measured across three modules: 64,416 characters before, 50,172 after, nothing lost."""
 
 from __future__ import annotations
 

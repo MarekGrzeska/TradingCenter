@@ -1,7 +1,5 @@
-"""One FastMCP instance, mounted at `/mcp` in this module's own application. The three notes are
-market-data's, kept because they are the three ways this went wrong in production on 19 August 2026:
-the transport's path doubles under the mount, a mounted lifespan never runs, and `/mcp` without the
-trailing slash answers a 307 an MCP client will not follow on a POST."""
+"""One FastMCP instance, mounted at `/mcp` in this module's own application. The three notes are market-data's, kept
+because they are the three ways this went wrong in production — the last being a 307 no MCP client follows on a POST."""
 
 from __future__ import annotations
 
@@ -53,11 +51,8 @@ MOUNT_PATH = "/mcp"
 
 
 def tool_surface_session(app) -> AbstractAsyncContextManager:
-    """The session manager's own lifetime, held open for as long as the app serves.
-
-    `nullcontext` when nothing was mounted: the suites that drive the lifespan build their
-    own applications, and one without a tool surface has nothing to start.
-    """
+    """The session manager's own lifetime, held open for as long as the app serves. `nullcontext` when nothing was
+    mounted: the suites that drive the lifespan build their own applications, with no tool surface to start."""
     mcp = getattr(app.state, "mcp_server", None)
     return nullcontext() if mcp is None else mcp.session_manager.run()
 

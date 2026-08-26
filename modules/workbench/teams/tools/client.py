@@ -1,13 +1,5 @@
-"""The session with `market-mcp`, and the one place the `mcp` package is imported — a deliberate twin of
-agent's, copied rather than shared. Three responsibilities carry over: what tools exist, asked once per
-session; three outcomes rather than two; and a call that never raises into the run.
-
-One divergence, and it is the point of this module's own spec: agent answers `[]` when the server cannot be
-asked, because a turn without tools is still an answer. Here it raises — a team whose agents were assigned
-tools does not degrade into several agents guessing independently, each guess paid for.
-
-One constraint found the hard way: the transport holds its halves in anyio task groups, so a session opened
-inside a task that then returns leaves scopes on that task's stack and raises nowhere near the cause."""
+"""The session with `market-mcp`, and the one place the `mcp` package is imported — a deliberate twin of agent's, with
+one divergence: agent answers `[]` when a server cannot be asked, while this raises rather than let agents guess."""
 
 from __future__ import annotations
 
@@ -100,11 +92,8 @@ class _ManagedIdentityAuth(httpx.Auth):
 
 
 class ToolServer:
-    """One MCP session over one server, named by which triplet of `Settings` fields it reads. The default
-    prefix carries the whole of this module's history, so nothing already calling it had to change.
-
-    `can_move_the_account` marks the one server whose writes land somewhere this module cannot look
-    afterwards — the trade row, and the daily count that stops the next one."""
+    """One MCP session over one server, named by which triplet of `Settings` fields it reads. `can_move_the_account`
+    marks the one server whose writes land somewhere this module cannot look afterwards."""
 
     def __init__(
         self,
@@ -196,11 +185,8 @@ class ToolServer:
         return self._tools
 
     async def call(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
-        """One logical call, and at most two requests. The second happens only when the server rejected the
-        first as belonging to a session it does not know — which it answers before reading the tool name.
-
-        A restart on the other side is the ordinary way this happens, and it did in production on
-        17 August 2026: an order died against a session that no longer existed."""
+        """One logical call, and at most two requests: the second happens only when the server rejected the first as
+        belonging to a session it does not know. A restart on the other side is the ordinary way that happens."""
         started = time.monotonic()
 
         def elapsed() -> int:
@@ -332,10 +318,8 @@ class ToolServer:
 
 @dataclass(frozen=True)
 class ToolServerRegistry:
-    """Every tool server this module knows about, by label — a registry in place of the one `ToolServer`
-    earlier groups built around. The third arrived on 22 August 2026 as one line in `from_settings`.
-
-    A source in this process is not one of them, and is kept in `local` for that reason."""
+    """Every tool server this module knows about, by label — a registry in place of the one `ToolServer` earlier groups
+    built around. A source in this process is not one of them, and is kept in `local` for that reason."""
 
     servers: dict[str, ToolServer]
     # Sources this process serves itself. Not `servers`, because none of what that word implies is true of

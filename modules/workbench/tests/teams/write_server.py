@@ -1,6 +1,5 @@
-"""A tool server announcing one write tool and answering without a session, shared by the two files that
-need a run to place a real order. What matters is the pair the runner reads a call as an order from:
-`read_only=False` on the tool, and `can_move_the_account` on the server it came from."""
+"""A tool server announcing one write tool and answering without a session, shared by the two files that need a run to
+place a real order. What matters is the pair: `read_only=False` on the tool, `can_move_the_account` on the server."""
 
 from __future__ import annotations
 

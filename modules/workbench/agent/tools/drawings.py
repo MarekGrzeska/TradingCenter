@@ -1,9 +1,5 @@
-"""The two tools that put objects on the operator's chart and read them back. Everything `chart.py` says
-about checking before writing and refusing in a sentence holds here unchanged.
-
-What is different is that `draw_on_chart` is *incremental*: a declarative one would let one forgetful call
-wipe supports collected over weeks. Reading is a separate tool from writing, because a read is safe to
-repeat and a write is not."""
+"""The two tools that put objects on the operator's chart and read them back, under everything `chart.py` says about
+checking first. `draw_on_chart` is *incremental*: a declarative one would let a forgetful call wipe weeks of supports."""
 
 from __future__ import annotations
 

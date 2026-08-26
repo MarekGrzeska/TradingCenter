@@ -1,7 +1,5 @@
-"""Two gates stand in front of every request — Easy Auth's `excluded_paths` and a module's own `OPEN_PATHS` —
-and a path is only open if both say so. `strategy` shipped excluded from one and guarded by the other, and the
-deploy of d2e2290 failed against a container that was up and correctly migrated. The other direction is not
-checked: a module may open a path the platform still guards, which is a safe way to be wrong."""
+"""Two gates stand in front of every request — Easy Auth's `excluded_paths` and a module's own `OPEN_PATHS` — and a
+path is open only if both say so, which the deploy of d2e2290 found the hard way. The other direction is safe."""
 
 from __future__ import annotations
 

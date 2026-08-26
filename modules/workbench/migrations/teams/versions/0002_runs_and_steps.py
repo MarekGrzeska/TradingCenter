@@ -1,9 +1,5 @@
-"""A run of a team revision, the per-agent steps it goes through, and the tool calls each step makes. A run
-always names the revision it ran on, which is the whole reason `team_revisions` is append-only.
-
-`run_steps` is one row per agent, not per round of that agent's own loop: what an operator needs is which
-agent is waiting and what each handed on. The cross-field CHECKs exist because a row that could be
-inserted self-contradictory is a row a bug can produce.
+"""A run of a team revision, its per-agent steps and their tool calls. A run always names the revision it ran on, which
+is the whole reason `team_revisions` is append-only; `run_steps` is one row per agent rather than per round.
 
 Revision ID: 0002
 Revises: 0001

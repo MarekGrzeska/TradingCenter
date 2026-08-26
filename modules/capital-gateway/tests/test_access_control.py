@@ -279,10 +279,8 @@ def test_the_key_still_reaches_everything(with_terminal: TestClient) -> None:
 def test_a_refusal_says_which_door_it_was(
     client: TestClient, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """Three different faults produced an identical silent 401 in two days: a caller key
-    that did not match, a platform injecting no principal, and an audience this app did not
-    list. The module wrote nothing for any of them, so the only evidence was the absence of
-    a row in `AppRequests` — a thing you can only notice if you already suspect it."""
+    """Three faults produced an identical silent 401 in two days: a wrong caller key, a platform injecting no
+    principal, and an unlisted audience. The only evidence was a missing row in `AppRequests`."""
     with caplog.at_level("WARNING"), client:
         client.get("/positions", headers={API_KEY_HEADER: "not-the-key"})
 

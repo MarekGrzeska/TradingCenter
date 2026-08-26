@@ -1,10 +1,5 @@
-"""An observation is collected or it is gone — the third state leaves the schema. Nothing wrote
-`tracking_ended_at` any more, and a column nothing writes backing a state the contract announces is a
-promise with no producer.
-
-The two steps are in the only order that works: after the column is dropped there is no way to tell
-which rows were the stopped ones, so they are deleted first, through 0001's own cascades. This deletes
-data the provider will not give back, and that cost was taken deliberately.
+"""An observation is collected or it is gone: a column nothing writes, backing a state the contract announces, is a
+promise with no producer. The rows go before the column, since afterwards there is no telling which they were.
 
 Revision ID: 0003
 Revises: 0002

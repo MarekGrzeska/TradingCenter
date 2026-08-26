@@ -1,8 +1,5 @@
-"""Starting a run on an already-resolved revision — the sequence both the route and the clock need once a
-revision has been picked, factored out so a schedule firing at 3am takes exactly the same checks.
-
-Deliberately not the one to resolve *which* revision runs: mixing that choice in here would make this the
-second place it gets made."""
+"""Starting a run on an already-resolved revision — the sequence both the route and the clock need, factored out so a
+schedule firing at 3am takes exactly the same checks. Deliberately not the place that picks *which* revision runs."""
 
 from __future__ import annotations
 

@@ -1,8 +1,5 @@
-"""Where the operator put each agent on the canvas — beside the revision, deliberately not inside it.
-Coordinates in that immutable blob would mint a revision every time a node was dragged.
-
-One consequence, accepted: a layout belongs to the team, so an agent it does not know gets a place computed
-from the dependencies instead. The layout is a remembered hint, never a claim about where something is.
+"""Where the operator put each agent on the canvas, beside the revision rather than inside it: coordinates in that
+immutable blob would mint a revision every time a node was dragged. A layout is a remembered hint, never a claim.
 
 Revision ID: 0004
 Revises: 0003

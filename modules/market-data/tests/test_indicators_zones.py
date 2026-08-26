@@ -174,9 +174,8 @@ class TestSessionRange:
         return local.astimezone(UTC)
 
     def test_recognises_the_same_local_hours_across_a_dst_change(self):
-        """Task 4.9: the UK springs forward at 01:00 UTC on 2026-03-29, so
-        local 08:00 is 08:00 UTC on the 28th and 07:00 UTC on the 30th. A
-        window keyed on a fixed UTC offset would get one of the two wrong."""
+        """The UK springs forward at 01:00 UTC on 2026-03-29, so local 08:00 is 08:00 UTC on the 28th and 07:00 on
+        the 30th: a window keyed on a fixed UTC offset would get one of the two wrong."""
         times = [
             self._minute(7.5, day=28),  # before the session, pre-DST
             self._minute(8.0, day=28),  # inside, pre-DST (GMT, UTC+0)
@@ -210,9 +209,8 @@ class TestSessionRange:
         assert zone.bottom == pytest.approx(1.0)
 
     def test_two_consecutive_days_never_merge_into_one_zone(self):
-        """A window that closes right at midnight (in-window on the last bar
-        of one day, in-window again on the first bar of the next) must still
-        produce two zones, not one that silently spans the boundary."""
+        """A window closing right at midnight — in-window on the last bar of one day and the first of the next —
+        must still produce two zones, not one that silently spans the boundary."""
         entry = get("session_range_london")
         # 23:00 local both days is inside a 22:00-23:30 window.
         times = [self._minute(23.0, day=28), self._minute(23.0, day=29)]

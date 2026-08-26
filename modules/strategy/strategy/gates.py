@@ -1,8 +1,5 @@
-"""The rules every strategy is subject to, wherever it came from. The split this file holds: a rule that
-binds every strategy belongs here, a rule one strategy might not want belongs in its entry.
-
-Each gate names its own kind, so a refusal can be read for what to do about it — a gap in the data is
-answered by fetching history, a reward too small by reading the strategy."""
+"""The rules every strategy is subject to, wherever it came from — one a strategy might not want belongs in its
+entry. Each gate names its kind, so a refusal says what to do: fetch history, or read the strategy."""
 
 from __future__ import annotations
 

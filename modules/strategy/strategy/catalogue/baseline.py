@@ -1,7 +1,5 @@
-"""The strategy of reference: two moving averages crossing, with a stop sized by range. Deliberately
-ordinary and first on purpose — it tests the contract's honesty, walks the whole pipe, and leaves a number.
-
-"The strategy works" means nothing until it means "it beats this, after costs, on the same data"."""
+"""The strategy of reference: two moving averages crossing, with a stop sized by range. Deliberately ordinary and
+first, because "the strategy works" means nothing until it means "it beats this, after costs, on the same data"."""
 
 from __future__ import annotations
 

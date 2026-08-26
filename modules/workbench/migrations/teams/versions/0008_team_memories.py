@@ -1,11 +1,5 @@
-"""What a team learned, kept where the next run can read it — beside the revision rather than inside it. A
-note in that immutable blob would mint a revision per note, and a team that learns by minting revisions can
-never be run twice on the same one.
-
-Keyed by team, so a memory outlives the run that wrote it. `author_agent_key` and `run_id` are legibility,
-never permission. Rows are never updated: a correction is the next entry, so a trace read a week later
-matches the memory the team actually had. The length ceiling is stated here too, being the only one of the
-three whose breach would land on disk.
+"""What a team learned, kept beside the revision rather than inside it: a note in that immutable blob would mint a
+revision per note. Rows are never updated, so a trace read a week later matches the memory the team actually had.
 
 Revision ID: 0008
 Revises: 0007

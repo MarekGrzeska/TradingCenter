@@ -1,9 +1,5 @@
-"""The two tools a team uses to remember something, served by this process. A source rather than a server:
-no address, no identity, no session to lose.
-
-Announcing does not touch the database — the descriptors are module constants, which is what lets the
-save-time paths publish these names with no connection. Calling does: a call needs the team, the operator
-and the run, so the run binds a scope and an unbound call answers as unavailable rather than raising."""
+"""The two tools a team uses to remember something, served by this process as a source rather than a server: no address,
+no session to lose. Announcing touches no database, so the save-time paths publish these names with no connection."""
 
 from __future__ import annotations
 

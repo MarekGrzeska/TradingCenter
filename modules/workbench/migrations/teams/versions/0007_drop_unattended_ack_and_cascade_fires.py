@@ -1,10 +1,5 @@
-"""Two changes to the schedule tables, arriving together because both are the same decision: a schedule is
-a thing the operator manages, not a thing they consent to once.
-
-`unattended_ack` goes — it was checked when a schedule was saved and never at a fire, so it stopped the
-honest route while leaving the hole. `schedule_fires` gets `ON DELETE CASCADE`, because a schedule can now
-be deleted and the `CHECK` from 0005 leaves no orphan state to move its fires into. Runs are untouched by
-construction: it is `schedule_fires.run_id` that points at a run, never the other way.
+"""Two changes arriving together because both are one decision: a schedule is managed, not consented to once.
+`unattended_ack` was checked at save and never at a fire; the cascade follows a schedule now being deletable.
 
 Revision ID: 0007
 Revises: 0006

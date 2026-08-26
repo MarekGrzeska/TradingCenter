@@ -99,11 +99,8 @@ async def begin_tool_call(
     arguments: dict,
     result_text: str,
 ) -> int:
-    """A row for a call that is about to be sent, returning its id. Only for calls that can change the
-    account: a read that vanished with its turn left nothing to reconcile.
-
-    `position` is the caller's here, unlike in `record_tool_calls`: the row exists before the round is
-    finished, so there is no loop to derive it from."""
+    """A row for a call that is about to be sent, and only for calls that can change the account: a read that vanished
+    with its turn left nothing to reconcile. `position` is the caller's, since the row exists before the round ends."""
     row = await fetch_one(
         conn,
         _BEGIN_TOOL_CALL,

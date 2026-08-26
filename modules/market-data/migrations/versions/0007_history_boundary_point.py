@@ -1,8 +1,5 @@
-"""Where the provider's history actually ends, as its own column. `history_ended` said only *that* a
-boundary exists, and reading it off `range_start` drifted as coverage ranges merged.
-
-Backfilled to `range_start` for rows that already claim a boundary: no better value exists, and a
-deeper request now drops the boundary and re-measures it.
+"""Where the provider's history actually ends, as its own column: `history_ended` said only *that* a boundary exists,
+and reading it off `range_start` drifted as ranges merged. Backfilled there anyway, since a deeper request re-measures.
 
 Revision ID: 0007
 Revises: 0006

@@ -1,8 +1,5 @@
-"""What `draw_on_chart` refuses before it reaches for anything. The whole argument object is parsed first,
-so every refusal below happens with no database and no tool server involved — a permutation that needed a
-PostgreSQL container to prove "21400 is not above 21600" was paying container time for arithmetic.
-
-The behaviour that does reach the database is `test_drawings_tool.py`'s."""
+"""What `draw_on_chart` refuses before it reaches for anything: the argument object is parsed first, so every refusal
+here needs no database — a permutation proving "21400 is not above 21600" was paying container time for arithmetic."""
 
 from __future__ import annotations
 

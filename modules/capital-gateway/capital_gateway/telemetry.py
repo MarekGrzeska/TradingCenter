@@ -7,9 +7,8 @@ import logging
 import os
 import sys
 
-# Libraries whose INFO is traffic rather than information. `httpx` narrates every request
-# this module makes, which at ten a second is the whole log; `websockets` narrates frames.
-# Their warnings still come through, which is the part worth hearing.
+# Libraries whose INFO is traffic rather than information: `httpx` narrates every request, which at ten a second
+# is the whole log, and `websockets` narrates frames. Their warnings still come through.
 NOISY_LOGGERS = ("httpx", "httpcore", "websockets", "azure.core.pipeline.policies.http_logging_policy")
 
 

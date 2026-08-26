@@ -1,9 +1,5 @@
-"""Settings, and the one mode switch this module refuses to leave ambiguous. The database follows
-market-data's rule: identity off-machine, or password on loopback, never neither and never both.
-
-The model provider has no such switch — OpenAI is not in Entra, so the key is the only credential either
-shape can use. A tool server has the database's shape with one difference: the whole setting is optional,
-and an unset URL is a module with no tools rather than a misconfiguration."""
+"""Settings, and the one mode switch this module refuses to leave ambiguous: identity off-machine, or password on
+loopback, never neither. A tool server's whole setting is optional — unset is a module with no tools."""
 
 from __future__ import annotations
 
@@ -19,11 +15,8 @@ _TLS_REQUIRING_SSLMODES = {"require", "verify-ca", "verify-full"}
 
 
 class ModelCatalogueEntry(BaseModel):
-    """One model this module can hand a turn to. Rates are per 1,000,000 tokens, the unit every provider
-    advertises, and `Decimal` rather than `float`, because summing thousands of them loses the pennies.
-
-    Required, not defaulted: a model entry without a rate must fail to parse, which keeps the module from
-    starting rather than starting and pricing a turn as free."""
+    """One model this module can hand a turn to. Rates are per 1,000,000 tokens and `Decimal` rather than `float`, since
+    summing thousands loses the pennies — and required, so a rateless entry stops the module rather than pricing at zero."""
 
     id: str
     # What OpenAI is actually asked for, kept separate from `id` because the two need not match: `id`

@@ -1,6 +1,5 @@
-"""The session with `market-mcp`, and the one place the `mcp` package is imported. Three responsibilities
-that are easy to conflate: what tools exist, asked once per session rather than per turn; three outcomes
-rather than two, because a refusal is something the model can act on; and never raising into the turn."""
+"""The session with `market-mcp`, and the one place the `mcp` package is imported. Three responsibilities easy to
+conflate: what tools exist, asked once per session; three outcomes rather than two; and never raising into the turn."""
 
 from __future__ import annotations
 
@@ -96,11 +95,8 @@ class _ManagedIdentityAuth(httpx.Auth):
 
 
 class ToolServer:
-    """One MCP session over one server, named by which triplet of `Settings` fields it reads. `prefix`
-    selects the field group, and the default is what every call site predating the second server gets.
-
-    `can_move_the_account` marks the one server whose writes land somewhere this module cannot look
-    afterwards. It decides nothing about how a call is made and everything about how one that did not answer is recorded."""
+    """One MCP session over one server, named by which triplet of `Settings` fields it reads. `can_move_the_account`
+    decides nothing about how a call is made and everything about how one that did not answer is recorded."""
 
     def __init__(
         self,
@@ -144,10 +140,8 @@ class ToolServer:
             await self._credential.close()
 
     async def list_tools(self, operator_principal: str | None = None) -> list[ToolDescriptor]:
-        """What the model may call this turn. An empty list is the answer whenever the server is not
-        configured or not reachable — the caller runs the turn without tools rather than failing it.
-
-        `operator_principal` is accepted and ignored, so every tool source in the registry has one signature."""
+        """What the model may call this turn. An empty list is the answer whenever the server is not configured or not
+        reachable, so the caller runs the turn without tools; `operator_principal` is accepted and ignored for one signature."""
         if self._url is None:
             return []
         if self._tools is not None:
@@ -189,11 +183,8 @@ class ToolServer:
     async def call(
         self, name: str, arguments: dict[str, Any], operator_principal: str | None = None
     ) -> ToolOutcome:
-        """One logical call, and at most two requests. The second happens only when the server rejected the
-        first as belonging to a session it does not know — which it answers before reading the tool name.
-
-        A restart on the other side is the ordinary way this happens, and it did in production on
-        17 August 2026: without the retry an order reads as `UNKNOWN` and sends the operator to check nothing."""
+        """One logical call, and at most two requests: the second only when the server rejected the first as belonging
+        to a session it does not know. Without the retry an order reads as `UNKNOWN` and sends the operator to check nothing."""
         started = time.monotonic()
 
         def elapsed() -> int:

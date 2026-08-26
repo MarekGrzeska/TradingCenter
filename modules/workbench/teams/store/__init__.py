@@ -1,10 +1,5 @@
-"""Reading and writing everything `teams` owns — asyncpg directly, no ORM in the runtime path. Unlike its
-neighbours it is a package: as one file it had reached 1 227 lines, and every change pulled all of it in.
-
-One property rides on every statement rather than on the routes that call them, so that no route can forget
-it: the owner filter is part of the statement, and a stranger's row answers identically to one that never
-existed. The two exceptions are named where they stand — the clock reaching across owners, and reads whose
-id a caller already resolved."""
+"""Reading and writing everything `teams` owns, through asyncpg and no ORM, as a package since it reached 1,227 lines.
+The owner filter is part of every statement rather than of the routes, so a stranger's row answers as a missing one."""
 
 from __future__ import annotations
 
