@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-How much of the Python here is a hand-maintained copy of other Python here — the number condition 1 of
+"""How much of the Python here is a hand-maintained copy of other Python here — the number condition 1 of
 `docs/architecture.md`'s sharing rule rests on, taken per pair of modules holding a file of the same name by
 `difflib.SequenceMatcher` with `autojunk` off. Comments count: prose kept in step is a copy too.
 
     uv run --no-project python scripts/measure-duplication.py --threshold 40
-
+"""
 from __future__ import annotations
 
 import argparse
