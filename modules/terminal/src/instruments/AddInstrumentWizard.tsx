@@ -22,25 +22,12 @@ import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import { Button } from "../ui/Button";
 
 /**
- * Adding instruments as a decision made once, not one blind click per pair
- * (proposal.md, "Dodawanie instrumentów przestaje być formularzem"). The wizard only
- * collects what to collect and starts nothing itself: committing opens the acceptance
- * dialog, the only thing that calls `trackPairs`.
- *
- * A date earlier than the provider's history is not validated here — it means
- * "everything available" and is clipped server-side, not a client-side error.
+ * Adding instruments as a decision made once, not one blind click per pair. The wizard starts nothing itself:
+ * committing opens the acceptance dialog, the only thing that calls `trackPairs`.
  */
 
-/** The start of the current year — year to date, as the operator's own Warsaw
- *  calendar sees "current".
- *
- *  Deliberately not "everything available": at `MINUTE` a decade is around a hundred
- *  chunks per pair, so every operator who never touched this field would commit hundreds
- *  of gateway requests without deciding to. Deep history stays one edit away.
- *
- *  A round boundary rather than a rolling window, so the same instrument added twice in
- *  a month asks for the same range both times. It is shallow in January, which is the
- *  safe direction for a default that costs provider requests. */
+/** Year to date on the operator's Warsaw calendar, not "everything available": at `MINUTE` a decade is a hundred
+ *  chunks per pair. A round boundary, so the same instrument added twice in a month asks for the same range. */
 function defaultCollectFromInput(): string {
   return `${todayInWarsaw().slice(0, 4)}-01-01`;
 }
@@ -64,9 +51,8 @@ export function AddInstrumentWizard({
   const [collectFromInput, setCollectFromInput] = useState(defaultCollectFromInput);
   const [pending, setPending] = useState<PairRequest[] | null>(null);
 
-  // Disabled rather than omitted while no class is chosen — the instrument
-  // step only makes sense after the first one, so it stays visible and says
-  // so instead of appearing once a class is picked.
+  // Disabled rather than omitted while no class is chosen — the instrument step only makes sense after the first
+  // one, so it stays visible and says so instead of appearing once a class is picked.
   const instrumentSource = useMemo(
     () => (assetClass ? instrumentInClassSource(instruments, assetClass) : async () => ({ options: [] })),
     [assetClass],
@@ -74,9 +60,8 @@ export function AddInstrumentWizard({
 
   function changeAssetClass(next: AssetClass | null) {
     setAssetClass(next);
-    // Any change to the class — not just clearing it — invalidates whatever
-    // instrument was chosen under the old one (terminal-data-manager spec,
-    // "Zmiana klasy po wybraniu instrumentu").
+    // Any change to the class — not just clearing it — invalidates whatever instrument was chosen under the old
+    // one (terminal-data-manager spec, "Zmiana klasy po wybraniu instrumentu").
     setInstrument(null);
   }
 
@@ -187,10 +172,8 @@ export function AddInstrumentWizard({
       {missing && <p className="mt-2 text-xs text-ink-muted">{missing}</p>}
 
       {pending && (
-        // Keyed on the request, so a different one is structurally a different
-        // dialog: the price is fetched once per mount, and a dialog that
-        // re-rendered with new pairs would otherwise show the old estimate
-        // above a button that accepts the new ones.
+        // Keyed on the request, so a different one is structurally a different dialog: the price is fetched once
+        // per mount, and a re-render with new pairs would show the old estimate above a button accepting the new.
         <AcceptanceDialog
           key={requestKey(pending, collectFromInput)}
           pairs={pending}
@@ -204,11 +187,8 @@ export function AddInstrumentWizard({
   );
 }
 
-/** One suggested instrument, with everything the operator judges it on:
- *  symbol, name, class, whether it can be traded, and the current spread where
- *  the gateway reports one (terminal-instruments spec, "Instrumenty wyszukuje
- *  się po frazie"). Not tradeable is worth saying and is not disqualifying —
- *  the archive collects it and the chart draws it either way. */
+/** One suggested instrument, with everything the operator judges it on. Not tradeable is worth saying and is not
+ *  disqualifying — the archive collects it and the chart draws it either way (terminal-instruments spec). */
 function InstrumentOption({ instrument }: { instrument: Instrument }) {
   return (
     <span className="flex flex-wrap items-center gap-2">
@@ -246,8 +226,6 @@ function Field({
   );
 }
 
-// --- acceptance dialog ---
-
 function isAlreadyCollected(existing: TrackedPair[], symbol: string, resolution: Resolution): boolean {
   return existing.some((pair) => pair.symbol === symbol && pair.resolution === resolution);
 }
@@ -267,10 +245,8 @@ function AcceptanceDialog({
 }) {
   const [result, setResult] = useState<TrackPairsResult | null>(null);
 
-  // One mount per request — the caller keys this component on it — so the request is
-  // fixed for this dialog's whole lifetime, and the price is asked for once. The request
-  // itself is the cache key rather than `pairs`, which is a fresh array every render:
-  // keying on the identity would re-price on every one of them.
+  // One mount per request, so the price is asked for once. The request is the cache key rather than `pairs`, which
+  // is a fresh array every render — keying on its identity would re-price on every one of them.
   const priced = useRead({
     key: ["archive", "estimate", requestKey(pairs, String(collectFrom))],
     read: (signal: AbortSignal) => archive.estimateJob(pairs, collectFrom, signal),
@@ -291,9 +267,8 @@ function AcceptanceDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collectFrom]);
 
-  // Accepting does not close this: what came back is the answer to the question,
-  // and refusals in particular have to be read where the decision was made. So
-  // the same dialog stays, with a result inside it and nothing left to cancel.
+  // Accepting does not close this: what came back is the answer to the question, and refusals in particular have
+  // to be read where the decision was made.
   if (result) {
     const accepted = result.results.filter((r) => r.refused === null);
     return (
@@ -317,9 +292,8 @@ function AcceptanceDialog({
       busyLabel="Starting…"
       confirmDisabled={!estimate || estimateError !== null}
       fallbackError="could not start collecting"
-      // What comes back is not just "it worked": the archive may have refused
-      // some of the pairs, and that has to be read where the decision was made
-      // rather than vanish with the dialog.
+      // What comes back is not just "it worked": the archive may have refused some of the pairs, and that has to
+      // be read where the decision was made rather than vanish with the dialog.
       closeOnSuccess={false}
       onConfirm={accept}
       onClose={onClose}

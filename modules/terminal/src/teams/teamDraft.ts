@@ -6,19 +6,8 @@ import type {
 } from "./teamsApi";
 
 /**
- * Editing a definition, as plain functions over a plain value.
- *
- * The canvas and the panel both change the same thing — one by dragging, the other by
- * typing — so the changes live here rather than in either component, and every one of
- * them is a new definition rather than a mutation: the editor keeps the saved revision
- * beside the draft to know whether anything is unsaved at all.
- *
- * What this file does **not** do is decide whether a definition is valid. Acyclicity,
- * every agent reachable, models and tools that exist — those are the module's answers
- * (specs/teams-catalogue, "Definicja, której nie da się wykonać, jest odrzucana przy
- * zapisie"), and a second opinion here would be a second thing to keep true. The two
- * exceptions below are canvas hygiene, not validation: an edge to itself and the same
- * edge twice are gestures, not intentions, and neither is worth a round trip.
+ * Editing a definition as plain functions over a plain value, each returning a new one so the editor can tell
+ * whether anything is unsaved. Validity is the module's answer; the two exceptions below are canvas hygiene.
  */
 
 export const NEW_AGENT_ROLE = "New role";
@@ -34,19 +23,16 @@ export function nextAgentKey(definition: TeamDefinition): string {
 }
 
 /**
- * A team with one agent on it — what "new team" starts from. `modelId` comes from the
- * module's catalogue (the cheapest entry the picker was given), never from a constant
- * here: the terminal carries no model id of its own (specs/teams-models, "wybierak
- * powstaje bez ani jednego identyfikatora modelu wpisanego w kod terminala").
+ * A team with one agent on it. `modelId` comes from the module's catalogue, never from a constant here: the
+ * terminal carries no model id of its own (specs/teams-models).
  */
 export function emptyDefinition(modelId: string): TeamDefinition {
   return {
     agents: [newAgent("agent-1", modelId)],
     dependencies: [],
     limits: { runLimit: null, dailyLimit: null },
-    // Three empty trading limits, which is a team allowed to trade without one — the
-    // module holds no default and puts no ceiling in for a missing one, so neither does
-    // this (specs/teams-trading, "Każda granica handlowa daje się wyłączyć").
+    // Three empty trading limits, which is a team allowed to trade without one — the module holds no default
+    // and puts no ceiling in for a missing one (specs/teams-trading, "Każda granica…daje się wyłączyć").
     trading: { maxOrderSize: null, ordersPerRun: null, ordersPerDay: null },
   };
 }
@@ -134,22 +120,15 @@ export function hasChanges(draft: TeamDefinition, saved: TeamDefinition): boolea
 }
 
 /**
- * Where each agent sits on the canvas: one column per dependency depth, so the direction
- * of work reads left to right without anyone clicking (`terminal-teams`, "rozmieszczone
- * tak, żeby kierunek pracy dało się odczytać bez klikania").
- *
- * Depth is the longest path into an agent. A cycle — which the module refuses, but which
- * an operator can draw on the way to noticing — would make that infinite, so the walk
- * stops at the first repeat and leaves the rest where they last landed rather than
- * hanging the view.
+ * One column per dependency depth, so the direction of work reads left to right without clicking. A cycle would
+ * make depth infinite, so the walk stops at the first repeat and leaves the rest where they last landed.
  */
 export function layout(definition: TeamDefinition): Map<string, { x: number; y: number }> {
   const depth = new Map<string, number>();
   for (const agent of definition.agents) depth.set(agent.key, 0);
 
-  // One pass per agent is enough for the longest acyclic path; a draft still carrying a
-  // cycle simply stops improving after that, which is the "leaves the rest where they
-  // are" case above.
+  // One pass per agent is enough for the longest acyclic path; a draft still carrying a cycle simply stops
+  // improving after that, which is the "leaves the rest where they are" case above.
   for (let pass = 0; pass < definition.agents.length; pass += 1) {
     let moved = false;
     for (const edge of definition.dependencies) {

@@ -17,22 +17,8 @@ import {
 } from "./vocabulary";
 
 /**
- * One node of a rule, and every node under it.
- *
- * **A tree, edited as a tree.** There is no text to parse and no syntax to get wrong: the
- * kind is a picker, the operands are rows underneath, and what leaves this component is
- * already the shape the module stores. That is the whole reason the vocabulary is data and
- * not a little language (`strategy/rule.py`).
- *
- * **The pickers come from the archive, never from a list in here.** Which indicators exist,
- * which lines each publishes and what range each parameter accepts are the archive's to
- * say, and a copy of them on this screen would drift at the first new indicator
- * (`terminal-strategy-configurator`, "Wybieraki konfiguratora pochodzą z katalogu
- * archiwum").
- *
- * **Nothing here validates.** A value outside a range, a line that does not exist for the
- * chosen indicator: the module refuses those at the moment the rule is saved, naming what
- * it refused, and a second opinion here would be a rule this screen does not own.
+ * A tree edited as a tree — no text to parse, which is why the vocabulary is data and not a little language. The
+ * pickers come from the archive, and nothing here validates: the module refuses at save, naming what it refused.
  */
 
 export interface EditorContext {
@@ -43,9 +29,8 @@ export interface EditorContext {
   indicators: Map<string, IndicatorCatalogueEntry>;
 }
 
-// One height for every control in the tree, and it is load-bearing rather than tidy: a row
-// mixing a 24px select with a 28px input reads as two rows, and a tree is only legible while
-// its rows read as a column.
+// One height for every control in the tree, load-bearing rather than tidy: a row mixing a 24px select with a 28px
+// input reads as two rows, and a tree is only legible while its rows read as a column.
 const CONTROL = "h-7 rounded border border-border bg-sunken px-1 text-ink";
 // The kind picker is the column an operator's eye runs down, so it has one width whatever it
 // currently says. The operator picker beside it has another, narrower one.

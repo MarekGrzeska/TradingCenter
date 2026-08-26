@@ -2,10 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-// These tests are about the shell — routing, the tab registry, the connection
-// indicator. The Graph tab's real grid would mount charts (and with them a
-// canvas jsdom cannot provide) for every assertion about a link. GridView has
-// its own tests.
+// These tests are about the shell — routing, the tab registry, the connection indicator. The Graph tab's
+// real grid would mount charts, and with them a canvas jsdom cannot provide, for every assertion.
 vi.mock("./grid/GridView", () => ({
   GridView: () => <div>grid stub</div>,
 }));
@@ -46,19 +44,13 @@ vi.mock("./data/marketData", () => ({
     history: async () => [],
     subscribe: () => () => {},
   },
-  // The agent panel reads what the agent set the chart to, and checks it against what
-  // the archive collects before applying any of it — stubbed empty here for the same
-  // reason the two back ends are: these tests assert routing.
+  // The agent panel reads what the agent set the chart to and checks it against the archive — stubbed
+  // empty here for the same reason the two back ends are: these tests assert routing.
   archive: {
     listPairs: async () => [],
   },
-  // The unconfigured identity, which is what a local run has: the top bar shows
-  // no sign-in state at all, so these tests keep asserting on routing and the
-  // two back ends without a third indicator appearing beside them.
-  //
-  // One per back end since the audiences were split — the module exports four, and a
-  // mock missing one fails at import rather than at the assertion, which is how this
-  // list stays honest.
+  // The unconfigured identity, which is what a local run has. One entry per back end since the audiences
+  // were split: a mock missing one fails at import rather than at the assertion.
   identity: unconfigured,
   workbenchIdentity: unconfigured,
   gatewayIdentity: unconfigured,
@@ -72,10 +64,8 @@ beforeEach(() => {
   window.history.pushState({}, "", "/");
 });
 
-// The top bar's health check (useSourceHealth) resolves asynchronously right
-// after mount regardless of what a test cares about — waiting for it once
-// keeps that update inside `act()` instead of leaking a warning into
-// whichever test happens to be running when the microtask lands.
+// The top bar's health check resolves asynchronously right after mount, so waiting for it once keeps that
+// update inside `act()` rather than leaking a warning into whichever test happens to be running.
 async function renderApp() {
   const view = render(<App />);
   await screen.findByText(/market-data (checking|connected|unreachable)/i);
@@ -109,9 +99,7 @@ describe("App routing (terminal-shell spec)", () => {
     expect(window.location.pathname).toBe("/instruments");
   });
 
-  // Both tabs this change introduced are addressable, so a reload on either comes back
-  // to it (terminal-data-manager and terminal-collection-history specs, "Odświeżenie
-  // strony").
+  // Both tabs this change introduced are addressable, so a reload on either comes back to it.
   it("comes back to Data History on a reload rather than the default tab", async () => {
     window.history.pushState({}, "", "/data-history");
     await renderApp();
@@ -130,10 +118,8 @@ describe("App routing (terminal-shell spec)", () => {
     expect(screen.queryByRole("link", { name: "Catalogue" })).not.toBeInTheDocument();
   });
 
-  // `Instruments` absorbed the old `Archive` tab rather than being renamed
-  // from it, so a bookmark to the old address must not resolve to anything —
-  // a silent redirect would be a second, hidden way to reach the same tab
-  // (design.md, "Zakładki: `Archive` znika, `Data History` dochodzi").
+  // `Instruments` absorbed the old `Archive` tab rather than being renamed from it, so a bookmark to the
+  // old address must not resolve: a silent redirect would be a second, hidden way to reach the same tab.
   it("sends a stale /archive bookmark to the unknown-tab page, not a tab", async () => {
     window.history.pushState({}, "", "/archive");
     await renderApp();
@@ -141,9 +127,8 @@ describe("App routing (terminal-shell spec)", () => {
     expect(screen.getByText(/no tab lives at this address/i)).toBeInTheDocument();
   });
 
-  // Positions, Orders and Account never shipped a view, so the registry never carried
-  // them past that (`terminal-shell` spec, "Rejestr zakładek jest otwarty") — their
-  // addresses behave like any other unknown one, not like a placeholder tab.
+  // Positions, Orders and Account never shipped a view, so the registry never carried them past that —
+  // their addresses behave like any other unknown one, not like a placeholder tab.
   it("sends the old placeholder addresses to the unknown-tab page, not a tab", async () => {
     window.history.pushState({}, "", "/account");
     await renderApp();
@@ -189,9 +174,8 @@ describe("App agent chat", () => {
 });
 
 describe("App top bar (terminal-shell spec, source status)", () => {
-  // Two back ends, two indicators: the archive keeps the candles and the
-  // gateway keeps the catalogue, and they go down separately. One combined
-  // light would send an operator looking in the wrong place.
+  // Two back ends, two indicators: the archive keeps the candles and the gateway keeps the catalogue, and
+  // they go down separately. One combined light would send an operator looking in the wrong place.
   it("names each back end and reports it reachable once it answers", async () => {
     await renderApp();
     expect(await screen.findByText(/market-data connected/i)).toBeInTheDocument();

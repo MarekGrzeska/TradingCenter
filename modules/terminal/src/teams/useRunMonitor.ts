@@ -9,20 +9,8 @@ import {
 import type { TeamsApi } from "./teamsApi";
 
 /**
- * One run, watched.
- *
- * The stream is the whole source of truth while it lasts, and it opens with a snapshot of
- * where the run is now — so opening this view halfway through, or closing and opening it
- * again, shows the run as it stands rather than as it was (specs/teams-runs, "po ponownym
- * otwarciu widać jego bieżący stan"). Nothing here polls.
- *
- * The one read beside it is the tool calls already recorded before this view arrived. They
- * are not in the snapshot — the module sends the steps, and a call is a row under a step —
- * so they are fetched once, after the snapshot names the steps to attach them to. Calls
- * that happen while watching arrive on the stream and are appended.
- *
- * Closing the view aborts the request and nothing more: the run holds no reference to any
- * of this, which is exactly the property the module was built for.
+ * One run, watched. The stream is the whole source of truth and opens with a snapshot, so nothing polls and
+ * reopening shows the run as it stands. The one read beside it is the calls recorded before the view arrived.
  */
 export interface RunMonitor {
   status: "loading" | "watching" | "error";
@@ -50,13 +38,11 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
   // Read once per connection, and only after the first snapshot: the steps it needs to
   // resolve a call's agent are in that snapshot.
   const recordedRead = useRef(false);
-  // The steps as the last snapshot named them — which is all a recorded call needs to be
-  // given an agent. Kept in a ref rather than read from state: the read at the end of a
-  // run happens inside the stream loop, where `steps` is the value it closed over.
+  // The steps as the last snapshot named them, kept in a ref rather than read from state: the read at the
+  // end of a run happens inside the stream loop, where `steps` is the value it closed over.
   const stepsSeen = useRef<TeamRunStep[]>([]);
-  // One trades read at a time. A round of calls from three agents at once would otherwise
-  // start three reads of the same list, and the last to answer would not be the last to
-  // have been asked.
+  // One trades read at a time: three agents calling at once would start three reads of the same list, and
+  // the last to answer would not be the last to have been asked.
   const tradesInFlight = useRef(false);
 
   useEffect(() => {
@@ -70,10 +56,8 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
 
     async function watch() {
       const events = await api.watchRun(runId, controller.signal);
-      // The module closes the stream itself once the run is over, and only then. A body
-      // that ends while the run is still working is a dropped connection, and it has to be
-      // said: the last snapshot stays on screen either way, so silence here reads exactly
-      // like an agent thinking for a long time.
+      // The module closes the stream itself once the run is over, and only then. A body that ends earlier
+      // is a dropped connection and has to be said — silence here reads like an agent thinking.
       let over = false;
       let working = true;
       for await (const event of events) {
@@ -107,10 +91,8 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
             break;
           case "toolCall":
             setToolCalls((current) => [...current, event.call]);
-            // A trade is written by a call, so a call is the only moment one can appear.
-            // Reading the list rather than deriving a row from the event: the event says
-            // a tool was called, the row says what it did to the account, and the second
-            // is not in the first.
+            // A trade is written by a call, so a call is the only moment one can appear. The event says a
+            // tool was called, the row says what it did to the account, and the second is not in the first.
             void readTrades();
             break;
           case "runFinished":
@@ -119,13 +101,8 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
                 ? current
                 : { ...current, status: event.status, stoppedReason: event.stoppedReason },
             );
-            // The recorded rows again, and this time they are complete: the run will not
-            // write another. Until now a call that arrived on the stream carried no
-            // arguments and no answer — the frame does not send them — so an operator who
-            // watched a run from the start could read less of it than one who opened it
-            // afterwards, and the call they most want to read is the one that just failed
-            // (specs/terminal-teams, "Zakończony przebieg pokazuje treść każdego
-            // wywołania").
+            // The recorded rows again, and complete this time: a call arriving on the stream carries no
+            // arguments and no answer, so watching from the start showed less than opening afterwards.
             void readRecordedCalls(stepsSeen.current, { replacing: true });
             // Once more at the end, because the last order's row is written as the reply
             // lands — which can be after the call event that started it.
@@ -147,14 +124,12 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
         const recorded = await api.runToolCalls(runId, controller.signal);
         if (cancelled) return;
         const attached = attachAgentKeys(recorded, known);
-        // Replacing rather than merging once the run is over: the rows are the whole of
-        // what happened, so the stream's copies of the same calls have nothing left to
-        // add and would only be shown twice.
+        // Replacing rather than merging once the run is over: the rows are the whole of what happened, so
+        // the stream's copies of the same calls would only be shown twice.
         setToolCalls((current) => (replacing ? attached : [...attached, ...current]));
       } catch {
-        // The trace of calls is not what this view is for; the run's own progress is, and
-        // that is already arriving. Failing the whole monitor over the older half of a
-        // side panel would be the worse answer.
+      // The trace of calls is not what this view is for; the run's own progress is, and that is already
+      // arriving. Failing the whole monitor over the older half of a side panel is the worse answer.
       }
     }
 
@@ -165,10 +140,8 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
         const placed = await api.runTrades(runId, controller.signal);
         if (!cancelled) setTrades(placed);
       } catch {
-        // The list the module already answered stays on screen. A module deployed before
-        // this route existed answers 404 here, and a run that placed nothing is the same
-        // empty list either way — neither is worth failing the monitor over, whose job is
-        // the run's own progress.
+      // The list the module already answered stays on screen. A module deployed before this route existed
+      // answers 404, and a run that placed nothing is the same empty list — neither is worth failing over.
       } finally {
         tradesInFlight.current = false;
       }

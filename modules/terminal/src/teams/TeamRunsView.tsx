@@ -11,18 +11,8 @@ import { NO_RUNS, runsKey } from "./runsRead";
 import type { TeamRevision, TeamsApi, TeamsModel } from "./teamsApi";
 
 /**
- * One team's runs: the list, and the run picked out of it drawn underneath.
- *
- * This replaces a drawer that unfolded inside the catalogue row. That shape cost two clicks
- * to reach a run — open the drawer, then `Watch` — and then took the operator somewhere
- * else entirely to look at it, so comparing two runs meant walking back through the
- * catalogue each time. Here the list stays on screen and the picture changes under it.
- *
- * **The canvas gets less room than it does in the editor, deliberately.** Composing a team
- * is a job for the whole screen; reading a run is a job for the statuses on the boxes and
- * what the agents wrote, and the outputs have a window of their own
- * (`RunOutputsDialog`). The list above is worth its share of the height because picking the
- * next run is half of what this view is for.
+ * One team's runs, the picked one drawn underneath — replacing a drawer that cost two clicks and then moved the
+ * operator elsewhere. The canvas gets less room than in the editor: reading a run is not composing one.
  */
 export function TeamRunsView({
   api,
@@ -57,9 +47,8 @@ export function TeamRunsView({
   const runs = runList.status === "loading" ? null : runList.value;
   const error = runList.error;
 
-  // Newest first is the module's order, and the newest run is what somebody arriving here
-  // almost always means. Only when nothing is being watched yet: a reload must not move
-  // the operator off the run they were reading.
+  // Newest first is the module's order, and the newest run is what somebody arriving here almost always
+  // means. Only when nothing is being watched yet: a reload must not move the operator off their run.
   useEffect(() => {
     setWatching((current) => current ?? runList.value[0]?.id ?? null);
   }, [runList.value]);
@@ -163,15 +152,8 @@ export function TeamRunsView({
 }
 
 /**
- * Starting a run from where the runs are read — the operator's most common next move after
- * comparing two of them (specs/terminal-teams, "Przebieg da się uruchomić z widoku
- * przebiegów zespołu").
- *
- * The question names the revision before it is answered, which is the whole reason this is
- * a dialog rather than a button that just fires: a run costs tokens and, for a team with
- * the order tools, places demo orders. Which revision runs is not a choice here — the
- * module runs the latest, the same as the catalogue's own Run button — so it is read and
- * shown rather than picked.
+ * A dialog rather than a button that just fires, because a run costs tokens and, with the order tools, places
+ * demo orders. Which revision runs is not a choice — the module runs the latest, so it is read and shown.
  */
 function StartRunDialog({
   api,

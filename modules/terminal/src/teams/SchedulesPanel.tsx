@@ -37,14 +37,8 @@ const NO_FIRES: ScheduleFire[] = [];
 const INPUT = "rounded border border-border bg-panel px-2 py-1 text-sm text-ink";
 
 /**
- * A team's own clock: the schedules that fire it on time, and the triggers that fire it
- * on a market condition — `terminal-teams-schedules`. Both fire the same shape of thing
- * (a run, or a row explaining why not), so they share this one view and the fire history
- * beneath each (`FireHistoryList.tsx`).
- *
- * Nothing here computes a moment to fire at, or evaluates a condition — every timestamp
- * and every `enabled`/`disabledReason` shown is read straight from the module's own
- * answer (`terminal-teams-schedules`, "Terminal nie liczy czasu wyzwolenia sam").
+ * A team's own clock: schedules that fire it on time, triggers that fire it on a market condition. Nothing here
+ * computes a moment or evaluates a condition (`terminal-teams-schedules`, "Terminal nie liczy czasu…").
  */
 export function SchedulesPanel({
   api,
@@ -61,9 +55,8 @@ export function SchedulesPanel({
   onClose(): void;
   onWatchRun(runId: number): void;
 }) {
-  // One read over all three, because the panel has one loading state and one failure:
-  // a rule list without the revision it may pin to is not half a panel, it is a panel
-  // that cannot say which revision "latest" means.
+  // One read over all three, because the panel has one loading state and one failure: a rule list without the
+  // revision it may pin to is a panel that cannot say which revision "latest" means.
   const rules = useRead({
     key: ["teams", teamId, "rules"],
     read: async (signal) => {
@@ -81,10 +74,8 @@ export function SchedulesPanel({
   const loadError = rules.error;
   const reload = rules.reload;
 
-  // `schedule_team` and `trigger_team` are chat tools too, and nothing about them reaches
-  // this panel — the same staleness the catalogue had (`agentActivity.ts`). Everything on
-  // screen here is a read of the module's own rows, so re-reading costs nothing but the
-  // three requests above; the form being filled in is local state and is left alone.
+  // `schedule_team` and `trigger_team` are chat tools too, and nothing about them reaches this panel — the
+  // same staleness the catalogue had. Re-reading costs three requests; the form being filled in is left alone.
   useAgentTurns(reload);
 
   return (
@@ -126,8 +117,6 @@ function refusalMessage(cause: unknown, fallback: string): string {
   if (cause instanceof MarketDataError && cause.kind === "refused") return cause.message;
   return cause instanceof Error ? cause.message : fallback;
 }
-
-// --- schedules --------------------------------------------------------------------
 
 function ScheduleSection({
   api,
@@ -254,11 +243,8 @@ function ScheduleSection({
 }
 
 /**
- * The one control here that changes something without a form around it — so it carries
- * its own refusal, in the module's words, the same way `ScheduleForm.save` does
- * (`terminal-teams-schedules`, "Odmowa modułu jest pokazana słowami modułu"). Without
- * this the failed call was invisible: the button simply went back to saying what it said
- * before, and the rejection went to the console.
+ * The one control here that changes something without a form around it, so it carries its own refusal in the
+ * module's words: without this the failed call was invisible and the rejection went to the console.
  */
 function EnableToggle({
   enabled,
@@ -282,12 +268,8 @@ function EnableToggle({
 }
 
 /**
- * What a rule has done so far. A schedule's fires and a trigger's are the same rows read
- * through two routes, so they are one component with the read passed in — the shape they
- * always had, minus the second copy of the guard around it.
- *
- * A history that cannot be read renders as an empty one: the rule above it is the point
- * of the row, and its own failure is already reported at the top of the panel.
+ * A schedule's fires and a trigger's are the same rows read through two routes, so they are one component. A
+ * history that cannot be read renders empty: its failure is already reported at the top of the panel.
  */
 function FireHistory({
   ruleKey,
@@ -337,8 +319,6 @@ function RevisionModeFields({
     </label>
   );
 }
-
-// --- triggers -----------------------------------------------------------------------
 
 function TriggerSection({
   api,

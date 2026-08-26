@@ -2,17 +2,8 @@ import type { ReactNode } from "react";
 import { Button } from "./Button";
 
 /**
- * "This is not empty — nobody could be asked", with a way to ask again.
- *
- * Eight views said this in their own words and drew the same button beside it. The words
- * stay theirs — an empty archive, an unknown cost and a run nobody is watching are three
- * different sentences, and the module's own message travels intact inside each — but the
- * shape is one: a critical line, the reason, and the retry.
- *
- * `className` replaces rather than extends the default: the padding a notice needs is
- * whatever the view around it gives it (a table cell, a panel header, a whole tab), and
- * two Tailwind text sizes on one element resolve by stylesheet order rather than by the
- * order they were written in.
+ * "This is not empty — nobody could be asked", with a way to ask again. The words stay each view's; the shape is one.
+ * `className` replaces rather than extends: two Tailwind text sizes on one element resolve by stylesheet order.
  */
 export function UnreachableNotice({
   children,

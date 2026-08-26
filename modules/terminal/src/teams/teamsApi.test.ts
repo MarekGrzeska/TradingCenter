@@ -265,9 +265,8 @@ describe("listTools", () => {
   });
 
   it("keeps an unannotated tool unannotated rather than calling it read-only", async () => {
-    // specs/trading-mcp-tools over this side of the wire: `null` is a third value. A tool
-    // nobody annotated is one nobody said anything about, and promoting it to "reads
-    // only" here would be this terminal holding an opinion about somebody else's tool.
+    // specs/trading-mcp-tools over this side of the wire: `null` is a third value. Promoting an unannotated
+    // tool to "reads only" would be this terminal holding an opinion about somebody else's tool.
     server.use(
       http.get(`${HTTP_BASE}/tools`, () =>
         HttpResponse.json([{ name: "get_candles", description: "candles" }]),

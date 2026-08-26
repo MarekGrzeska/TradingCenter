@@ -1,10 +1,8 @@
 import { todayInWarsaw, warsawMidnightEpochSeconds } from "../../ui/formatTime";
 
 /**
- * The Agent Settings page's cost section's date range, as `<input type="date">` trades in it — a
- * `YYYY-MM-DD` string with no timezone of its own — converted to the epoch-second
- * bounds `GET /usage` actually takes. Kept apart from `useUsage.ts` and the view: the
- * only thing worth a unit test here is the arithmetic, not a render.
+ * The cost section's range as `<input type="date">` trades in it — `YYYY-MM-DD`, no timezone — converted to the
+ * epoch-second bounds the route takes. The arithmetic is the part worth a unit test, not a render.
  */
 
 export interface DateRangeInputs {

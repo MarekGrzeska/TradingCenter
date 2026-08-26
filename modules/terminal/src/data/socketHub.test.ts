@@ -31,20 +31,14 @@ class FakeSocket implements SocketLike {
   }
 }
 
-// The hub knows nothing about any protocol — a frame is whatever `translate`
-// says it is. These tests use the plainest possible one, so what fails here is
-// the ref-counting and the reconnecting rather than someone's wire format.
+// The hub knows nothing about any protocol — a frame is whatever `translate` says it is. These use the
+// plainest possible one, so what fails here is the ref-counting and the reconnecting, not a wire format.
 const translate = (raw: string): StreamEvent[] =>
   raw === "" ? [] : [{ kind: "error", message: raw }];
 
 /**
- * Lets an attempt reach the point of having a socket.
- *
- * The hub asks for an address before it dials — the archive's stream costs a
- * one-time ticket, so the address is a promise now — and a socket therefore
- * exists a microtask after `subscribe`, not on the line after it. Every test
- * that reaches for `sockets[0]` waits here first. Anything that assumes
- * otherwise is asserting on a race.
+ * The hub asks for an address before it dials, so a socket exists a microtask after `subscribe`, not on the
+ * line after it. Every test reaching for `sockets[0]` waits here first; assuming otherwise asserts on a race.
  */
 const settle = () => vi.advanceTimersByTimeAsync(0);
 
@@ -157,11 +151,8 @@ describe("SocketHub", () => {
     expect(sockets).toHaveLength(2);
   });
 
-  // What used to happen here was a backfill: work out how far back the outage
-  // reached and fetch it. The archive's subscription opens with a snapshot, so
-  // reconnecting delivers the missed bars by itself — the hub reopens the
-  // socket and does nothing else (terminal-market-data spec, "Połączenie
-  // wraca": the terminal MUST NOT ask for the gap separately).
+  // This used to be a backfill. The archive's subscription opens with a snapshot, so reconnecting delivers
+  // the missed bars by itself (terminal-market-data spec: the terminal MUST NOT ask for the gap separately).
   it("asks for nothing after a reconnect beyond reopening the socket", async () => {
     const events: StreamEvent[] = [];
     hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
@@ -208,13 +199,8 @@ describe("SocketHub", () => {
 });
 
 /**
- * A close with no code to read.
- *
- * The archive refuses a pair nobody collects before the handshake, and a
- * browser cannot see the status of a handshake that was rejected — so the page
- * gets a connection that failed, indistinguishable from an archive that is
- * down. Caught in a real browser, where three of four grid slots sat on
- * "RECONNECTING" forever instead of saying nobody was collecting those pairs.
+ * A browser cannot see the status of a rejected handshake, so a refused pair is indistinguishable from an
+ * archive that is down. Caught in a real browser: three of four slots sat on "RECONNECTING" forever.
  */
 describe("SocketHub asking why a socket would not open", () => {
   let sockets: FakeSocket[];
@@ -344,15 +330,8 @@ describe("SocketHub asking why a socket would not open", () => {
 });
 
 /**
- * The third way an attempt can fail.
- *
- * Two were already here: the connection dropped (retry) and the pair is not
- * collected (stop, and say so). Getting an address now costs a request, so a
- * signed-out operator is a third — and it is the one the old rules would have
- * got wrong, because "the question failed, so keep retrying" is exactly what an
- * expired session looks like from the outside. It would have retried forever
- * while never saying the one thing that fixes it
- * (terminal-market-data spec, "Zerwane połączenie wraca samo i mówi o sobie").
+ * The third way an attempt can fail: getting an address now costs a request, so a signed-out operator is one.
+ * The old rule — "the question failed, so keep retrying" — is exactly what an expired session would loop on.
  */
 describe("SocketHub when the operator is signed out", () => {
   const signedOut = () => new MarketDataError("unauthenticated", "you are signed out — sign in");
@@ -402,9 +381,8 @@ describe("SocketHub when the operator is signed out", () => {
   });
 
   it("keeps retrying when the address could not be got for any other reason", async () => {
-    // The archive being briefly unreachable is not a signed-out session, and
-    // treating it as one would send the operator through a sign-in that fixes
-    // nothing — and that they may not be able to complete while it is down.
+    // The archive being briefly unreachable is not a signed-out session; treating it as one sends the
+    // operator through a sign-in that fixes nothing and may not be completable while it is down.
     const hub = hubThatCannotAddress(() => new Error("the candle archive is not reachable"));
     const events: StreamEvent[] = [];
 
@@ -416,10 +394,8 @@ describe("SocketHub when the operator is signed out", () => {
   });
 
   it("stops when the diagnosis is itself refused for want of an identity", async () => {
-    // The handshake failed and the second question — "is this pair even
-    // collected?" — is refused too, because the session is gone. Under the old
-    // rule a failed diagnosis meant "keep retrying"; here it means the opposite,
-    // and the difference is the whole point of this case.
+    // The handshake failed and the second question is refused too, because the session is gone. Under the
+    // old rule a failed diagnosis meant "keep retrying"; here it means the opposite.
     const events: StreamEvent[] = [];
     let address = 0;
     const hub = new SocketHub(

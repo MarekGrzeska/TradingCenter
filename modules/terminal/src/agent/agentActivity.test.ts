@@ -2,11 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createAgentActivityStore } from "./agentActivity";
 
 /**
- * The channel that tells a tab a turn ended, so it can re-read state the chat wrote in a
- * module the chat store knows nothing about (`agentActivity.ts`).
- *
- * Small enough that the tests are about the two ways this breaks in a terminal with tabs:
- * a listener that unsubscribes while being notified, and a listener that throws.
+ * The channel that tells a tab a turn ended, so it can re-read state the chat wrote in a module the chat
+ * store knows nothing about. Small enough that the tests are about the two ways this breaks.
  */
 
 describe("the agent activity channel", () => {

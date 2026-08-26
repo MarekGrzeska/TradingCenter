@@ -4,10 +4,8 @@ import { DefinitionsPanel } from "./DefinitionsPanel";
 import type { Definition, Strategy, StrategyApi, Watch } from "./strategyApi";
 
 /**
- * The list of rules, and the one distinction it exists to make: which of them is code.
- *
- * A greyed-out edit button with no explanation reads as a fault. "kod w obrazie" says it is
- * a decision, and says where the rule actually lives.
+ * The list of rules, and the one distinction it exists to make: which of them is code. A greyed-out edit button with
+ * no explanation reads as a fault; "kod w obrazie" says it is a decision, and where the rule lives.
  */
 
 const CODED: Strategy = {

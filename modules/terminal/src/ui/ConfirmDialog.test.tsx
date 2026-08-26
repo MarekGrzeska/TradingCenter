@@ -5,10 +5,8 @@ import { useState } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
 
 /**
- * The behaviours every confirmation in the terminal inherits by being built on
- * this — `terminal-dialogs` spec. They are tested once, here, which is the whole
- * argument for the component existing: three copies of a dialog drift apart one
- * behaviour at a time, and the operator stops knowing what to expect.
+ * The behaviours every confirmation inherits by being built on this, tested once — which is the whole argument for the
+ * component: three copies of a dialog drift apart one behaviour at a time, and the operator stops knowing what to expect.
  */
 
 function Harness({

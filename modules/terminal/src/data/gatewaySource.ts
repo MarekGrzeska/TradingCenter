@@ -4,18 +4,8 @@ import type { AssetClass, Instrument, InstrumentPage } from "./types";
 import type { InstrumentSource } from "./source";
 
 /**
- * The instrument catalogue, which is `capital-gateway`'s and stays there — the archive
- * does not pretend to own what it does not have (design.md, "Archiwum nie udaje
- * właściciela rzeczy, których nie posiada").
- *
- * The wire path changed, the ownership did not: the gateway is not reachable from a
- * browser, so this calls `market-data`, which proxies these three routes unmodified.
- * One consequence is worth knowing — an archive outage now takes the search with it,
- * because both go through the same process. A *gateway* refusal is still told apart
- * from that: `market-data` answers it with a `502` rather than an empty result.
- *
- * The gateway's wire shapes (snake_case, per its OpenAPI schema) stay private to this
- * file.
+ * The catalogue is `capital-gateway`'s and stays there; only the wire path changed, since the gateway is not
+ * reachable from a browser. So an archive outage takes the search with it — a *gateway* refusal answers 502.
  */
 
 interface RawInstrument {
@@ -58,9 +48,8 @@ export function createGatewaySource(
   httpBase: string,
   identity: Identity = noIdentity,
 ): InstrumentSource {
-  // The same identity the archive uses, because this is the same deployment: the
-  // catalogue is the gateway's data, but the address answering for it is
-  // market-data's, behind the same authenticator.
+  // The same identity the archive uses, because this is the same deployment: the catalogue is the gateway's
+  // data, but the address answering for it is market-data's, behind the same authenticator.
   const http = jsonClient("capital-gateway", mapStatus, identity);
 
   return {
@@ -69,9 +58,8 @@ export function createGatewaySource(
     whenUnreachable: "instrument search is unavailable",
 
     async searchInstruments(query, signal, assetClass) {
-      // The gateway's search has no class filter of its own — narrowed here so
-      // the wizard's second autocomplete never offers an instrument outside
-      // the class already chosen in its first step.
+      // The gateway's search has no class filter of its own — narrowed here so the wizard's second
+      // autocomplete never offers an instrument outside the class chosen in its first step.
       const url = `${httpBase}/instruments/search?q=${encodeURIComponent(query)}`;
       const raw = await http.json<RawInstrument[]>(url, { signal });
       const instruments = raw.map(mapInstrument);
@@ -89,11 +77,8 @@ export function createGatewaySource(
     },
 
     async ping(signal) {
-      // Not /capabilities: that route is capital-gateway's own and this source
-      // no longer reaches it directly. /asset-classes is the cheapest route
-      // market-data proxies, and answering it proves the whole path this
-      // source actually depends on — market-data up, reachable, and itself
-      // able to reach the gateway — not just that market-data is up.
+      // Not /capabilities, which is the gateway's own route: /asset-classes is the cheapest one market-data
+      // proxies, and answering it proves the whole path — market-data up *and* able to reach the gateway.
       await http.json(`${httpBase}/asset-classes`, { signal });
     },
   };

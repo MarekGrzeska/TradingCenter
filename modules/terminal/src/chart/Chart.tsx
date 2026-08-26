@@ -52,56 +52,34 @@ export interface ChartProps {
   /** Rendered at the left of the header — the grid puts its symbol picker
    *  here; a standalone chart passes nothing and just shows the symbol. */
   headerLeft?: React.ReactNode;
-  /** Resolutions offered by the selector. Defaults to every one this
-   *  terminal knows — a caller that can say which are actually archived for
-   *  this symbol (the grid slot) narrows it, so the picker never offers a
-   *  resolution that can only end in a refusal (terminal-grid spec, "Slot ma
-   *  własny instrument i własny interwał"). */
+  /** Resolutions offered by the selector. Defaults to every one this terminal knows; a caller that can say
+   *  which are archived for this symbol narrows it, so the picker never offers a certain refusal. */
   resolutions?: readonly Resolution[];
   /** Indicators: the catalogue to build the picker from and the computation
    *  behind it. Omitted, the chart draws candles exactly as before — a caller
    *  with nowhere to compute indicators simply does not offer them. */
   indicatorSource?: IndicatorSource;
-  /** What the operator had selected when this chart last mounted — omitted, it
-   *  starts with none. Read once, not kept in sync afterward: a caller that
-   *  persists selections (the grid slot) restores from here and is notified of
-   *  every change via `onIndicatorSelectionsChange`, the same way it owns
-   *  `resolution` — but as an initial value rather than a controlled one, since
-   *  nothing here needs the reverse (an external reset mid-session). */
+  /** What the operator had selected when this chart last mounted. Read once, not kept in sync: a caller
+   *  that persists selections restores from here and is notified of every change afterwards. */
   initialIndicatorSelections?: IndicatorSelection[];
   onIndicatorSelectionsChange?(selections: IndicatorSelection[]): void;
-  /** A one-off "show this fragment of the axis" — omitted, the chart never jumps on its
-   *  own. A new object (not a mutation of the previous one) is what triggers a pursuit;
-   *  the same reference twice is a no-op, which is what lets the caller pass its own
-   *  stored value on every render without refiring anything (`terminal-chart` spec,
-   *  "Wykres przyjmuje kadr z zewnątrz"). */
+  /** A one-off "show this fragment of the axis". A new object is what triggers a pursuit; the same
+   *  reference twice is a no-op, which lets the caller pass its stored value on every render. */
   focusRequest?: ChartFocusRequest | null;
   /** Called once `focusRequest` has been either applied or given up on — never both, and
    *  never left uncalled for a request the chart accepted. The caller's cue to stop
    *  offering it again (`terminal-chart` spec, "Kadr MUST być żądaniem jednorazowym"). */
   onFocusRequestSettled?(): void;
-  /** Fired whenever the visible span changes — panning, zooming, a resolution change's
-   *  own repositioning, or `focusRequest` landing — and with `null` when there is
-   *  nothing to report (no series drawn yet, or the chart is going away). Never read
-   *  back by this component; it exists for a caller keeping its own record of what the
-   *  operator is looking at (`terminal-agent-chat` spec, "Panel wysyła migawkę tego, co
-   *  rysuje aktywny slot"). Not a controlled value — there is no prop that sets it. */
+  /** Fired whenever the visible span changes, and with `null` when there is nothing to report. Never read
+   *  back here: it exists for a caller keeping its own record of what the operator is looking at. */
   onVisibleRangeChange?(range: VisibleTimeRange | null): void;
-  /** Objects drawn on this instrument — levels, zones and trend lines the agent and the
-   *  operator left on it — together with the operator's own hand on them. Not indicators
-   *  and not on the same lifecycle: they are not computed from candles and they survive a
-   *  resolution change, because they belong to the instrument rather than to the view
-   *  (`terminal-chart` spec, "Wykres rysuje obiekty naniesione na instrument"). Omitted,
-   *  the chart draws none and offers no list — a caller with nowhere to read them from
-   *  simply does not pass any. */
+  /** Objects drawn on this instrument, together with the operator's own hand on them. Not indicators and
+   *  not on the same lifecycle: they survive a resolution change, because they belong to the instrument. */
   drawings?: ChartDrawings;
 }
 
-/** What the chart needs to draw the objects on an instrument and let the operator manage
- *  them: the list, how the last read went, and the two writes. `remove` and `patch`
- *  answer null on success and the sentence to show on failure — the list keeps whatever
- *  it had rather than guessing (`terminal-chart` spec, "Nieudane usunięcie albo nieudana
- *  poprawka"). */
+/** What the chart needs to draw the objects on an instrument and let the operator manage them. `remove`
+ *  and `patch` answer null on success and the sentence to show on failure — the list keeps what it had. */
 export interface ChartDrawings {
   items: readonly AgentChartDrawing[];
   status: DrawingsStatus;
@@ -114,13 +92,8 @@ export interface ChartDrawings {
  *  on every render and never restarts the sync effect that watches it. */
 const EMPTY_DRAWINGS: readonly AgentChartDrawing[] = [];
 /**
- * One candlestick chart, defined entirely by `symbol` + `resolution` — the same
- * component standalone and inside a grid slot (terminal-chart spec, "Wykres
- * jest sterowany symbolem i rozdzielczością").
- *
- * The chart instance is created once and written to imperatively; bars never
- * pass through React state. See design.md, "Wykres pisze do canvasu, nie do
- * stanu Reacta".
+ * One candlestick chart, defined entirely by `symbol` + `resolution`. The instance is created once and
+ * written to imperatively; bars never pass through React state.
  */
 export function Chart({
   source,
@@ -155,44 +128,31 @@ export function Chart({
   // The array alone, not the whole prop: a caller that rebuilds the object every render
   // (the grid slot does) must not make the sync effect below run every render with it.
   const allObjects = drawings?.items ?? EMPTY_DRAWINGS;
-  // What the chart draws, against what the instrument carries — two different questions.
-  // A hidden object is as absent from the canvas as one that was removed: it occludes no
-  // candles, puts nothing on the price axis and cannot be clicked (`terminal-chart` spec,
-  // "Zgaszony obiekt nie jest rysowany"). The list below gets `allObjects`, because it is
-  // the only way back to a hidden one.
+  // What the chart draws, against what the instrument carries — two different questions. A hidden object
+  // is as absent from the canvas as one removed; the list below gets them all, being the only way back.
   const drawnObjects = useMemo(
     () => (allObjects.some((drawing) => drawing.hidden) ? allObjects.filter((d) => !d.hidden) : allObjects),
     [allObjects],
   );
 
-  // --- the object the operator picked out, by its own id.
-  //
-  // State of the *screen*, and of this slot's screen alone — not of the instrument, which
-  // is what `drawingsStore` holds. Two slots showing US100 show the same objects, and the
-  // operator points at one of them in one of the slots (design.md, "Zaznaczenie mieszka
-  // w `Chart`, nie w `drawingsStore`"). The list in the header is rendered from here too,
-  // so one piece of state answers both and no channel between them is needed.
+  // State of the *screen*, and of this slot's screen alone — not of the instrument. Two slots showing
+  // US100 show the same objects, and the operator points at one of them in one of the slots.
   const [selected, setSelected] = useState<{ id: number; at: { x: number; y: number } | null } | null>(
     null,
   );
   const selectedId = selected?.id ?? null;
-  // From the whole list, not from what is drawn: hiding the picked object leaves its card
-  // open with the button flipped to bring it back, because the nearest way to undo has to
-  // be where the action happened (design.md, "Zaznaczenie wskazuje obiekt z zapisu, nie
-  // z płótna").
+  // From the whole list, not from what is drawn: hiding the picked object leaves its card open with the
+  // button flipped, because the nearest way to undo has to be where the action happened.
   const selectedDrawing = allObjects.find((drawing) => drawing.id === selectedId) ?? null;
 
-  // The objects of the previous instrument are not on the chart any more, so nothing of
-  // theirs can be picked out (`terminal-chart-objects` spec, "Zmiana symbolu przy
-  // wskazanym obiekcie").
+  // The objects of the previous instrument are not on the chart any more, so nothing of theirs can be
+  // picked out.
   useEffect(() => {
     setSelected(null);
   }, [symbol]);
 
-  // An object removed while picked — by the card, by the list, or by the agent's own next
-  // turn — takes the selection with it: what is not there cannot be pointed at. Hiding is
-  // deliberately not that: the object is still on the instrument, so it can still be the
-  // one being looked at.
+  // An object removed while picked takes the selection with it: what is not there cannot be pointed at.
+  // Hiding is deliberately not that — the object is still on the instrument.
   useEffect(() => {
     setSelected((current) =>
       current === null || allObjects.some((drawing) => drawing.id === current.id) ? current : null,
@@ -204,27 +164,20 @@ export function Chart({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setSelected(null);
     };
-    // On the document rather than on the chart's own element: `Escape` has to reach the
-    // selection wherever the focus happens to be, which is the reason it exists beside
-    // clicking on empty space (`terminal-chart-objects` spec, "Odznaczenie klawiszem").
+    // On the document rather than on the chart's own element: `Escape` has to reach the selection wherever
+    // the focus happens to be.
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [selectedId]);
 
   const [readout, setReadout] = useState<Readout | null>(null);
-  // The newest bar, mirrored into state on purpose. Reading `barsRef` during
-  // render looks cheaper but silently freezes the header: while a candle is
-  // forming nothing else about this component's state changes, so React has no
-  // reason to re-render and the numbers stop following the market. Coalesced to
-  // one write per frame, the same way the crosshair readout is.
+  // The newest bar, mirrored into state on purpose. Reading the ref during render looks cheaper and
+  // silently freezes the header, because nothing else about this component's state changes.
   const [latestBar, setLatestBar] = useState<Bar | null>(null);
   const latestFrameRef = useRef(0);
 
-  // --- indicators: chosen by the operator, computed over whatever the chart draws ---
-  //
-  // Everything from the picker to the numbers behind a line lives in `useChartIndicators`,
-  // called here rather than lower down because effects run in the order they were declared
-  // and its window sync has to exist before the chart instance is handed a ref to it.
+  // Everything from the picker to the numbers behind a line lives in `useChartIndicators`, called here
+  // because effects run in declaration order and its window sync must exist before the chart instance.
   const indicators = useChartIndicators({
     indicatorSource,
     symbol,
@@ -240,17 +193,13 @@ export function Chart({
   const { indicatorsState, catalogueById, instanceColors, readoutAssignment } = indicators;
   const { syncIndicatorWindowRef, clearIndicatorWindow } = indicators;
 
-  // Declared up here rather than with the rest of the focus refs below, because the
-  // chart-instance call reads it during render and a ref read during render must
-  // already exist. Its assignment stays where every other callback ref's is.
+  // Declared up here rather than with the rest of the focus refs, because the chart-instance call reads
+  // it during render and a ref read during render must already exist.
   const onVisibleRangeChangeRef = useRef(onVisibleRangeChange);
   onVisibleRangeChangeRef.current = onVisibleRangeChange;
 
-  // --- the chart instance itself: created once, never on data change ---
-  //
-  // Declared here, above every hook that draws onto the chart, because effects run in
-  // the order they were declared. `useChartInstance` carries why its one moving part —
-  // what to clear on the way out — arrives as a ref.
+  // Declared here, above every hook that draws onto the chart, because effects run in declaration order.
+  // `useChartInstance` carries why its one moving part arrives as a ref.
   const clearIndicatorLayersRef = useRef<() => void>(() => {});
   useChartInstance({
     containerRef,
@@ -281,13 +230,8 @@ export function Chart({
   );
 
   /**
-   * The right-hand scale says what the market is doing now, not what it was doing at the
-   * left edge of the viewport.
-   *
-   * The library's own last-value label reads the last *visible* bar, so a chart panned
-   * back a week labelled the scale with a week-old price — the one number on screen an
-   * operator is most likely to act on. A price line of our own carries the newest close
-   * instead, and follows it as the candle forms.
+   * The right-hand scale says what the market is doing now. The library's own last-value label reads the
+   * last *visible* bar, so a chart panned back a week labelled the scale with a week-old price.
    */
   useEffect(() => {
     const series = seriesRef.current;
@@ -318,7 +262,6 @@ export function Chart({
     else priceLineRef.current = series.createPriceLine(options);
   }, [latestBar]);
 
-  // --- crosshair readout, coalesced to one state write per frame ---
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
@@ -352,12 +295,8 @@ export function Chart({
     };
   }, []);
 
-  // --- picking an object out of the chart ---
-  //
-  // `hoveredObjectId` is whatever the primitives' own `hitTest` answered on these very
-  // coordinates, so the geometry a click is measured against is the geometry the object
-  // was drawn with — one description of the shape, not a second one kept in step by hand
-  // (design.md, "Trafianie natywnym `hitTest`").
+  // `hoveredObjectId` is whatever the primitives' own `hitTest` answered on these coordinates, so a click
+  // is measured against the geometry the object was drawn with, not a second copy kept in step by hand.
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
@@ -378,8 +317,6 @@ export function Chart({
     return () => chart.unsubscribeClick(onClick);
   }, []);
 
-  // --- focus: a one-off "show this fragment" from outside ---
-  // --- focus: a one-off "show this fragment" from outside ---
   const { pendingFocusRef, pursueFocus, settlePendingFocus, abandonPendingFocus } = useChartFocus({
     symbol,
     resolution,
@@ -391,19 +328,12 @@ export function Chart({
     reachBackRef,
   });
 
-  // --- resolution change: the viewport it leaves behind, for the incoming series' first
-  // draw to stand over instead of `fitContent()`'s whole-series view ---
   const pendingResolutionFrameRef = useRef<PendingResolutionFrame | null>(null);
   const previousParamsRef = useRef({ source, symbol, resolution });
 
   /**
-   * Redraw the whole series, keeping the operator looking at the same candles.
-   *
-   * `setData` keeps the visible *logical* range, and logical indices count from the
-   * start of the data — so every bar merged in at the front slides the frame that many
-   * candles to the right. Shifting the range back by exactly that many puts it back.
-   * `previousFirstTime` undefined means nothing was drawn yet, and that is the one case
-   * where the frame should move: fit the new series.
+   * Redraw the whole series, keeping the operator on the same candles: `setData` keeps the visible *logical*
+   * range, so every bar merged in at the front slides the frame right. Undefined means nothing was drawn yet.
    */
   const redraw = useCallback((merged: Bar[], previousFirstTime: number | undefined) => {
     const timeScale = chartRef.current?.timeScale();
@@ -411,14 +341,12 @@ export function Chart({
 
     seriesRef.current?.setData(merged.map(toCandlestick));
 
-    // Wrapped so the indicator window is pointed at the frame this leaves behind, not the
-    // one it found: every branch below either sets a frame or corrects one, and reading
-    // the viewport before that lands would compute indicators for where the chart was.
+    // Wrapped so the indicator window is pointed at the frame this leaves behind, not the one it found:
+    // reading the viewport before that lands would compute indicators for where the chart was.
     const reframe = () => {
     if (previousFirstTime === undefined) {
-      // A resolution change leaves a viewport behind for exactly this moment — the
-      // series' first draw — to stand over, instead of the whole-series view
-      // `fitContent()` gives a slot that never had anything on screen before.
+      // A resolution change leaves a viewport behind for exactly this moment — the series' first draw —
+      // to stand over, instead of `fitContent()`'s whole-series view.
       const pendingFrame = pendingResolutionFrameRef.current;
       pendingResolutionFrameRef.current = null;
       if (pendingFrame && merged.length > 0) {
@@ -455,28 +383,18 @@ export function Chart({
     syncIndicatorWindowRef.current(true);
   }, [resolution, syncIndicatorWindowRef]);
 
-  // --- the feed writes straight into the series ---
   const applyHistory = useCallback(
     (bars: Bar[]) => {
-      // The subscription opens before the history read finishes, so live bars
-      // routinely land first — the gateway sends a forming candle within a
-      // second, while a deep read takes far longer. Merging (rather than
-      // replacing) keeps those bars instead of blanking them until the next
-      // tick, which at DAY resolution could be hours away.
-      //
-      // A reconnect's snapshot comes through here too, which is why the frame
-      // is only fitted on the first draw: a chart panned back three thousand
-      // candles must not be thrown to the right-hand edge because the socket
-      // blinked.
+      // The subscription opens before the history read finishes, so live bars routinely land first. Merging
+      // keeps them instead of blanking until the next tick, which at DAY could be hours away.
       const previousFirstTime = barsRef.current[0]?.time;
       const merged = mergeSeries(bars, barsRef.current);
       barsRef.current = merged;
       redraw(merged, previousFirstTime);
       setLatestBar(merged.at(-1) ?? null);
       setReadout(null);
-      // The first attempt at a pending focus often finds too short a series to even
-      // start the pager (`useOlderBars`'s own "at least two bars" floor) — retried here
-      // now that the deep read has landed.
+      // The first attempt at a pending focus often finds too short a series to even start the pager —
+      // retried here now that the deep read has landed.
       if (pendingFocusRef.current) pursueFocus(pendingFocusRef.current);
     },
     [redraw, pursueFocus, pendingFocusRef],
@@ -492,17 +410,13 @@ export function Chart({
       barsRef.current = merged;
       redraw(merged, previousFirstTime);
 
-      // Checked here rather than by watching `older.status`: a `"loading"` render is not
-      // guaranteed to ever commit on its own — React is free to batch it away with the
-      // `"idle"` that follows a fast enough answer, which a mocked source in a test
-      // reliably is and a fast real one occasionally is too. A page landing is a plain
-      // function call, not a render, so it cannot be skipped the same way.
+      // Checked here rather than by watching `older.status`: a `"loading"` render is not guaranteed to
+      // commit, since React may batch it away with the `"idle"` that follows a fast answer.
       const pending = pendingFocusRef.current;
       if (pending) {
         const reached = reachesBack(merged, pending);
-        // The exact condition `useOlderBars` itself uses to call the archive out of
-        // history: a page that left the series starting where it started is a page of
-        // candles already drawn, and no later page will do better.
+        // The exact condition `useOlderBars` itself uses to call the archive out of history: a page that
+        // left the series starting where it started is a page of candles already drawn.
         const noProgress = (merged[0]?.time ?? previousFirstTime) >= (previousFirstTime ?? -Infinity);
         if (reached || noProgress) settlePendingFocus(pending);
       }
@@ -519,20 +433,13 @@ export function Chart({
       // The hot path: replace the forming bar, or open a new one.
       seriesRef.current?.update(toCandlestick(bar));
       if (last && bar.time > last.time) {
-        // `bar` opened a new period, which means `last` — the one this
-        // request never saw settled — just closed. Slide `barsRange.to` to
-        // it and let `useIndicators` requery, same request shape, nothing
-        // new (task 6.1). Still not on every tick: `bar.time === last.time`
-        // above (the forming candle itself moving) never reaches here, which
-        // is what keeps task 6.2 true.
+        // `bar` opened a new period, which means `last` just closed. Slide the window to it and let the
+        // indicators requery — never on the forming candle moving, which is caught above.
         syncIndicatorWindowRef.current(true);
       }
     } else {
-      // Older than what is drawn — a reconnect's gap fill. `update()` rejects
-      // going backwards, so the merged series is redrawn wholesale. Rare by
-      // construction: only after a dropped stream. Through `redraw`, because
-      // such a bar can land in front of the series and shift every logical
-      // index by one, which without the correction nudges the frame.
+      // Older than what is drawn — a reconnect's gap fill. `update()` rejects going backwards, so the
+      // merged series is redrawn wholesale, through `redraw`, because such a bar shifts every logical index.
       redraw(barsRef.current, previous[0]?.time);
     }
     publishLatestBar();
@@ -554,11 +461,8 @@ export function Chart({
         const focusNeedsMore = pending !== null && !reachesBack(barsRef.current, pending);
         return viewportNeedsMore || focusNeedsMore;
       },
-      // The pager gave up before the focus was reachable — twenty pages of history that
-      // each made progress and still did not reach far enough. Settled here rather than
-      // left pending: an unsettled request never tells the caller it is done, so the grid
-      // store keeps offering it until the symbol changes, and the operator is never told
-      // why the chart did not move.
+      // The pager gave up before the focus was reachable. Settled here rather than left pending: an
+      // unsettled request never tells the caller it is done, and the operator is never told why.
       stoppedShort: () => {
         const pending = pendingFocusRef.current;
         if (pending) settlePendingFocus(pending);
@@ -567,18 +471,11 @@ export function Chart({
     [applyOlder, settlePendingFocus, pendingFocusRef],
   );
 
-  // Changing symbol, resolution *or source* must not leave the previous
-  // series on screen while the new history loads. Source matters as much as
-  // the other two: switching mock → gateway was observed showing mock prices
-  // under a "gateway" label for the seconds a deep read takes, which is not a
-  // stale chart but a wrong one.
+  // Changing symbol, resolution *or source* must not leave the previous series on screen. Source matters
+  // as much: switching mock → gateway showed mock prices under a "gateway" label for seconds.
   useEffect(() => {
-    // `barsRef` still holds the outgoing series at this point — nothing has cleared it
-    // yet — so a resolution change (and only a resolution change: switching symbol or
-    // source is a different instrument or a different pipe, whose old window means
-    // nothing on the new one) captures its viewport here, before the lines below clear
-    // it. The comparison needs the *previous* render's params, which is exactly what a
-    // ref updated at the top of this same body, every time, keeps holding until now.
+    // `barsRef` still holds the outgoing series here, so a resolution change — and only that — captures
+    // its viewport before the lines below clear it. The comparison needs the previous render's params.
     const previous = previousParamsRef.current;
     previousParamsRef.current = { source, symbol, resolution };
     const onlyResolutionChanged =
@@ -606,20 +503,16 @@ export function Chart({
     seriesRef.current?.setData([]);
     setReadout(null);
     setLatestBar(null);
-    // An indicator computed for the previous series has no business staying on screen
-    // while the new one loads — `barsRange` going null empties `indicatorsState.results`
-    // (`useIndicators`), which the sync effect below reads as "remove every line".
+    // An indicator computed for the previous series has no business staying on screen while the new one
+    // loads — `barsRange` going null empties the results, which the sync effect reads as "remove every line".
     clearIndicatorWindow();
-    // The cleanup, not the body: a cleanup runs only when `source`/`symbol`/`resolution`
-    // are *about to change* — never on the initial mount, which is what a focus supplied
-    // as a starting prop needs, since the "pursue on prop change" effect below runs in
-    // the same commit and must not have what it just set undone by this one.
+    // The cleanup, not the body: a cleanup runs only when the params are about to change, never on the
+    // initial mount — which is what a focus supplied as a starting prop needs.
     return abandonPendingFocus;
   }, [source, symbol, resolution, clearIndicatorWindow, abandonPendingFocus]);
 
-  // Declared here rather than higher up on purpose: effects run in the order they were
-  // declared, and this one has to find a chart that the instance effect above has already
-  // created. Its own maps and its own cleanup live in the hook.
+  // Declared here rather than higher up: effects run in declaration order, and this one has to find a
+  // chart the instance effect above has already created.
   const { clear: clearIndicatorLayers } = useIndicatorLayers({
     chartRef,
     seriesRef,
@@ -641,12 +534,8 @@ export function Chart({
   requestOlderRef.current = older.requestOlder;
   reachBackRef.current = older.reachBack;
 
-  /** The rare case `applyOlder`'s own check cannot see: the pager walked every empty
-   *  window and delivered nothing at all, or failed outright, so no page ever arrived to
-   *  trigger that check. `"exhausted"`/`"error"` are never the initial value — unlike
-   *  `"idle"`, seeing either one is on its own proof that a real attempt just ended, so
-   *  this needs no transition tracking the way a check keyed on `"idle"` would (`"idle"`
-   *  is also what the very first render reads, before anything has run at all). */
+  /** The rare case `applyOlder`'s own check cannot see: the pager walked every empty window and delivered
+   *  nothing, so no page arrived to trigger it. `"exhausted"`/`"error"` are never the initial value. */
   useEffect(() => {
     if (older.status !== "exhausted" && older.status !== "error") return;
     if (pendingFocusRef.current) settlePendingFocus(pendingFocusRef.current);
@@ -677,13 +566,9 @@ export function Chart({
 
       <div className="relative min-h-0 flex-1">
         <div ref={containerRef} className="absolute inset-0" data-testid="chart-canvas" />
-        {/* The legend sits *on* the chart rather than in the header above it, the way
-            every charting platform draws one — and here for a reason beyond convention.
-            In the header its height was part of the layout, so a value changing width
-            mid-pan could re-wrap the row, resize the chart container, and set the
-            `ResizeObserver` above re-laying out the whole chart in the middle of a drag.
-            Absolutely positioned it cannot change what the chart is given.
-            `pointer-events-none` so the candles underneath still take the drag. */}
+          {/* The legend sits *on* the chart rather than in the header, and for a reason beyond convention:
+              in the header a value changing width mid-pan could re-wrap the row and set the ResizeObserver
+              re-laying out the chart in the middle of a drag. */}
         {shown && (
           <div
             data-testid="chart-readout"

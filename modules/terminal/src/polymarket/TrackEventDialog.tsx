@@ -3,16 +3,8 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import type { Group, PolymarketApi } from "./polymarketApi";
 
 /**
- * Bringing an event under observation.
- *
- * **Either spelling names the same observation.** The operator copies an address out of
- * the browser; a model has the slug. The module resolves both, so this dialog asks for one
- * field and does not make anybody work out which kind they are holding.
- *
- * Two answers are not failures and must not look like them. An event already tracked is
- * said plainly — no second observation was created and no history was disturbed — and the
- * ceiling is a refusal with a reason and a next move, not an outage
- * (specs/terminal-polymarket, "Objęcie obserwacją odbywa się z zakładki").
+ * Either spelling names the same observation — an address out of the browser, or a slug — so the module resolves
+ * both and this asks one field. Already tracked and the ceiling are answers, not failures, and read as such.
  */
 export function TrackEventDialog({
   client,

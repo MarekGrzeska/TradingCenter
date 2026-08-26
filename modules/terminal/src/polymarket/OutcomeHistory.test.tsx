@@ -4,11 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { MarketDataError } from "../data/types";
 import { OutcomeHistory } from "./OutcomeHistory";
 
-// The real library draws to a canvas jsdom cannot render — it reaches into a null 2d
-// context inside a `requestAnimationFrame` callback, which surfaces after the test that
-// triggered it has already finished. What this file tests is what the panel *says* and
-// what it asks the module for; the series' own rule (where a line breaks) is a pure
-// function with its own tests in `series.test.ts`.
+// The real library draws to a canvas jsdom cannot render, reaching into a null 2d context inside a
+// `requestAnimationFrame` that surfaces after the test that triggered it has finished.
 vi.mock("./ProbabilityChart", () => ({
   ProbabilityChart: () => null,
 }));
@@ -16,10 +13,8 @@ vi.mock("./ProbabilityChart", () => ({
 import type { History, PolymarketApi, TrackedEvent } from "./polymarketApi";
 
 /**
- * What the panel says, rather than what the canvas draws. The gap rule is a pure function
- * with its own tests (`series.test.ts`); what is left here is the outcome picker, the
- * range, and the sentence that has to appear when the range reaches back past everything
- * that was ever collected.
+ * What the panel says, rather than what the canvas draws: the outcome picker, the range, and the sentence that
+ * has to appear when the range reaches back past everything collected. The gap rule is `series.test.ts`.
  */
 
 const EVENT: TrackedEvent = {

@@ -1,7 +1,6 @@
 /**
- * `useIndicators` answers with one snapshot: the times, the results, and the selections
- * those results were computed for. `Chart.tsx` binds result to instance by position
- * within that snapshot, so the three must never come from different reads.
+ * `useIndicators` answers with one snapshot: the times, the results, and the selections those results were
+ * computed for. Result is bound to instance by position, so the three must never come from different reads.
  */
 
 import { act, renderHook, waitFor } from "@testing-library/react";

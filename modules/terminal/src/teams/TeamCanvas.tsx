@@ -17,19 +17,8 @@ const NODE_TYPES = { agent: AgentNode };
 const EDGE_TYPES = { dependency: DependencyEdge };
 
 /**
- * The team as a picture of its dependencies, which is the point of the tab: a list of
- * roles shows everything except the one thing that makes a team a team (`terminal-teams`,
- * "Zespół jest widoczny jako obraz zależności, nie jako lista ról").
- *
- * Where a node sits comes from two places, in this order: the layout the module remembers
- * for this team, and `layout()` for every agent that layout does not name — one added
- * since the last drag, or one present only in the older revision a run is being watched
- * on. Depth-ordered columns are therefore the starting arrangement rather than the only
- * one, and they still give the property the spec asks for on their own: the direction of
- * work readable without clicking.
- *
- * A layout is not part of the definition and moving a node is not an edit — `onMove` goes
- * to its own route (specs/terminal-teams, "Przesunięcie nie jest zmianą definicji").
+ * The team as a picture of its dependencies (`terminal-teams`). Positions come from the module's remembered
+ * layout, then `layout()` for anything it does not name; moving a node is not an edit and takes its own route.
  */
 export function TeamCanvas({
   definition,

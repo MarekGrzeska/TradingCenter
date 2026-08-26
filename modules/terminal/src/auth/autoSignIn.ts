@@ -1,15 +1,8 @@
 import type { Identity } from "./identity";
 
 /**
- * Sending the operator to sign in without being asked to: a terminal with no identity
- * shows no candle, no instrument and no history (`terminal-identity` spec, "Operator
- * loguje się kontem organizacji").
- *
- * The whole risk is the redirect loop, the one failure an operator cannot break out of.
- * Hence this marker, written *before* the page leaves, so a return that finds it means
- * "already tried once" and the terminal stays put with a button. `sessionStorage`
- * because the redirect is a full page load that module memory does not survive, and it
- * dies with the tab — where MSAL keeps its own session, for the same reason.
+ * Sending the operator to sign in unasked, because a terminal with no identity shows nothing. The whole risk is the
+ * redirect loop, hence this marker — in `sessionStorage`, since the redirect is a full page load and it dies with the tab.
  */
 export const SIGN_IN_ATTEMPTED_KEY = "tc.terminal.sign-in-attempted";
 
@@ -28,10 +21,8 @@ export function startSignInIfNeeded(
     return false;
   }
 
-  // Without storage there is no way to remember an attempt, and without that
-  // there is no way to stop at one. Not signing in at all is the safe answer;
-  // the operator still has the button. (MSAL caches its session in the same
-  // place, so this is a terminal that could not stay signed in anyway.)
+  // Without storage there is no way to remember an attempt, and so no way to stop at one. Not signing in
+  // is the safe answer, and the operator still has the button.
   if (!storage) return false;
 
   if (storage.getItem(SIGN_IN_ATTEMPTED_KEY) !== null) return false;

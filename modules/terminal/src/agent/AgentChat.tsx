@@ -23,35 +23,22 @@ import { ToolCallEntry } from "./ToolCallEntry";
 import { Button } from "../ui/Button";
 
 /**
- * Mounted once in `Shell`, as a sibling of the router outlet rather than inside it: the
- * panel belongs to the terminal, not to a tab, so switching tabs neither hides it nor
- * remounts the conversation (`terminal-agent-chat` spec, "Panel należy do terminala, nie
- * do zakładki").
- *
- * Collapsed it is a rail on the right edge — a place, not a floating button, so the way in
- * is always in the same pixels whatever tab is on screen. Expanded it is a column in the
- * shell's flex row, which is what pushes the tab content aside instead of covering it; the
- * chart's ResizeObserver picks the new width up on its own.
- *
- * Whether the list of conversations or the transcript is on screen is this component's
- * own, unpersisted state — the store only remembers which conversation was open, not
- * which panel the operator was looking at when they last left.
+ * Mounted once in `Shell`, beside the router outlet rather than inside it: the panel belongs to the terminal, not
+ * to a tab. Collapsed it is a rail, expanded a column in the shell's flex row — it pushes, never covers.
  */
 export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore } = {}) {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const [view, setView] = useState<"chat" | "conversations">("chat");
   const turnInFlight = state.turn?.status === "waiting" || state.turn?.status === "streaming";
 
-  // The panel mounts after `main.tsx` has awaited `identity.initialize()`; the store is
-  // constructed during `import`, which is before it. Asking here is what makes the first
-  // request carry a token — see `ensureLoaded`.
+  // The panel mounts after `main.tsx` has awaited `identity.initialize()`; the store is constructed during
+  // `import`, which is before it. Asking here is what makes the first request carry a token.
   useEffect(() => {
     store.ensureLoaded();
   }, [store]);
 
-  // A width chosen on a wide window is not a width on a narrow one. Re-asked rather than
-  // recomputed: `setWidth` clamps against the window it is given and commits only when
-  // the answer actually moved, so a resize that changes nothing costs no render.
+  // A width chosen on a wide window is not a width on a narrow one. Re-asked rather than recomputed:
+  // `setWidth` clamps against the window it is given and commits only when the answer moved.
   useEffect(() => {
     const reclamp = (): void => store.setWidth(store.getSnapshot().width);
     window.addEventListener("resize", reclamp);
@@ -60,10 +47,8 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
 
   if (!state.expanded) {
     return (
-      // The whole rail is the button, not a control sitting on one: a full-height strip is
-      // a target that cannot be missed at any window size, and there is nothing else in the
-      // rail to aim at instead. The handle is centred rather than at the top so it reads as
-      // the edge of a drawer — the shape says "pulls out", which the rotated word did not.
+      // The whole rail is the button, not a control sitting on one: a full-height strip cannot be missed
+      // at any window size. The handle is centred so it reads as the edge of a drawer.
       <button
         type="button"
         onClick={() => store.setExpanded(true)}
@@ -88,9 +73,8 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
     <aside
       id="agent-chat-panel"
       aria-label="Agent chat"
-      // Width from the store rather than a Tailwind class: there is no class for a number
-      // the operator chose, and building class names at runtime is exactly what Tailwind's
-      // scanner cannot see.
+      // Width from the store rather than a Tailwind class: there is no class for a number the operator
+      // chose, and building class names at runtime is what Tailwind's scanner cannot see.
       style={{ width: state.width }}
       className="relative flex shrink-0 flex-col border-l border-primary-line bg-panel"
     >
@@ -149,10 +133,8 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
             unclaimedToolCalls={state.unclaimedToolCalls}
           />
           {state.chartNotice !== null && (
-            // Above the composer rather than inside the transcript: the agent changed the
-            // chart, it did not say something — a bubble here would put words in its
-            // mouth. A chart that moves with no sentence anywhere reads as a fault
-            // (`terminal-agent-chat` spec, "Panel mówi, że wykres zmienił agent").
+            // Above the composer rather than inside the transcript: the agent changed the chart, it did
+            // not say something — and a chart that moves with no sentence anywhere reads as a fault.
             <p
               role="status"
               className="mx-3 mb-2 rounded border border-primary-line bg-primary-soft px-2 py-1 text-[11px] text-ink-secondary"
@@ -160,11 +142,8 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
               {state.chartNotice}
             </p>
           )}
-          {/* The picker sits under the box it applies to, not in the header: which model
-              answers is a decision made while writing the question, so it belongs beside
-              the writing rather than at the far end of the panel. It rides inside the
-              composer for that reason and is out of sight in the conversations view,
-              where there is nothing to send. */}
+          {/* The picker sits under the box it applies to: which model answers is a decision made while
+              writing the question, so it belongs beside the writing rather than at the far end. */}
           <Composer
             onSend={(text) => store.send(text)}
             onStop={() => store.stop()}
@@ -179,16 +158,8 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
 }
 
 /**
- * The panel's own left edge, made draggable.
- *
- * A `separator` rather than a decorated border: it is the one control here that has no
- * label of its own on screen, and an operator who cannot use a mouse still has to be able
- * to give the chart its width back (`terminal-agent-chat` spec, "Chwyt MUST dać się
- * obsłużyć klawiaturą").
- *
- * Absolutely positioned over the border and a few pixels wide, so it takes the drag
- * without taking layout: a handle inside the flow would move the very column it is
- * measuring.
+ * The panel's own left edge, draggable. A `separator` because it is the one control here with no label. Absolutely
+ * positioned over the border, so it takes the drag without taking layout — it would move the column it measures.
  */
 function ResizeHandle({
   width,
@@ -198,9 +169,8 @@ function ResizeHandle({
   onResize: (width: number) => void;
 }) {
   const max = maxPanelWidth(typeof window === "undefined" ? width : window.innerWidth);
-  // Whether a drag is under way. Kept here rather than asked of the element: pointer
-  // capture is what keeps the moves coming, but it is an optimisation of the browser's
-  // and not every environment has it — this is the fact the handler actually needs.
+  // Whether a drag is under way. Kept here rather than asked of the element: pointer capture is an
+  // optimisation of the browser's and not every environment has it.
   const dragging = useRef(false);
 
   function onPointerDown(event: ReactPointerEvent<HTMLDivElement>): void {
@@ -217,9 +187,8 @@ function ResizeHandle({
 
   function onPointerMove(event: ReactPointerEvent<HTMLDivElement>): void {
     if (!dragging.current) return;
-    // From the right edge of the window, not from a delta: the panel is the last column,
-    // so its width *is* the distance from the pointer to that edge, and a delta would
-    // drift by whatever the clamp swallowed on the previous frame.
+    // From the right edge of the window, not from a delta: the panel is the last column, so its width
+    // *is* that distance, and a delta would drift by whatever the clamp swallowed last frame.
     onResize(window.innerWidth - event.clientX);
   }
 
@@ -253,9 +222,8 @@ function ResizeHandle({
 }
 
 /**
- * A speech bubble with a spark in it: what this panel holds is a conversation, and what
- * answers in it is not a person. Drawn rather than set as ✦ — a glyph is whatever the
- * machine's font decides, and lands at a different weight and baseline on each one.
+ * A speech bubble with a spark in it: what this panel holds is a conversation, and what answers in it is
+ * not a person. Drawn rather than set as a glyph, which lands at a different weight on each machine.
  */
 function AgentGlyph({ className }: { className?: string }) {
   return (
@@ -289,10 +257,8 @@ function Chevron({ className, direction }: { className?: string; direction: "lef
 }
 
 /**
- * Built entirely from `state.models` — `terminal-agent-chat` spec, "terminal MUST NOT
- * nieść listy modeli we własnym kodzie". A catalogue that failed to load says so in
- * words rather than falling back to anything baked in here, which is the one way this
- * component could quietly start lying about what a session will actually run on.
+ * Built entirely from `state.models` — the terminal must not carry a list of its own. A catalogue that
+ * failed to load says so in words rather than falling back to anything baked in here.
  */
 function ModelPicker({
   state,
@@ -333,11 +299,8 @@ function ModelPicker({
 }
 
 /**
- * Newest-first, exactly as the module already orders `GET /sessions` — nothing here
- * re-sorts it. A conversation joins this list only once it has a title, which the
- * module only assigns after the first exchange (`terminal-agent-chat` spec, "rozmowa
- * pojawia się na liście dopiero po pierwszej wymianie zdań"): an empty, unsent new
- * conversation is never a row here.
+ * Newest-first, exactly as the module already orders it — nothing here re-sorts. A conversation joins this
+ * list only once it has a title, so an empty, unsent new conversation is never a row.
  */
 function ConversationList({
   state,
@@ -391,9 +354,8 @@ function ConversationRow({
   onRename: (id: number, title: string) => void;
   onDelete: (id: number) => void;
 }) {
-  // Three states, not two: renaming and confirming a delete are both modes this one row
-  // enters, and neither may be reachable from the other — a stray Enter must not both
-  // rename and remove.
+  // Three states, not two: renaming and confirming a delete are both modes this row enters, and neither
+  // may be reachable from the other — a stray Enter must not both rename and remove.
   const [mode, setMode] = useState<"idle" | "renaming" | "confirming">("idle");
   const [draft, setDraft] = useState(session.title ?? "");
 
@@ -447,9 +409,8 @@ function ConversationRow({
   }
 
   return (
-    // `group` rather than always-on controls: a list read far more often than edited
-    // stays a list of names, and the two buttons appear on the row under the pointer.
-    // They are still in the tab order, so a keyboard reaches them without hovering.
+    // `group` rather than always-on controls: a list read far more often than edited stays a list of
+    // names. The two buttons are still in the tab order, so a keyboard reaches them without hovering.
     <li className="group flex items-center">
       <button
         type="button"
@@ -524,14 +485,10 @@ function Transcript({
         </Fragment>
       ))}
       {unclaimedToolCalls.length > 0 && <UnclaimedCalls calls={unclaimedToolCalls} />}
-      {/* Before the first fragment the panel already says something happened — a
-          message that vanished into a silent, unchanged screen is indistinguishable
-          from one that was never sent (`terminal-agent-chat` spec, "Widać, że
-          odpowiedź powstaje"). */}
-      {/* The turn's own calls, shown as they arrive rather than at the end — a round of
-          tools produces no text, and without them the panel says "thinking…" through the
-          part of the turn that is doing the most (`terminal-agent-chat` spec, "Narzędzie
-          w trakcie tury"). */}
+          {/* Before the first fragment the panel already says something happened — a message that
+              vanished into a silent screen is indistinguishable from one never sent. */}
+          {/* The turn's own calls, shown as they arrive rather than at the end: a round of tools produces
+              no text, and without them the panel says "thinking…" through the busiest part of the turn. */}
       {(turn?.status === "waiting" || turn?.status === "streaming") &&
         turn.toolCalls.map((call) => (
           <ToolCallEntry key={`turn-${call.roundIndex}-${call.position}`} call={call} />
@@ -551,9 +508,7 @@ function Transcript({
         />
       )}
       {turn?.status === "unreachable" && (
-        // Not a bubble: no agent reply happened, so nothing here impersonates one
-        // (`terminal-agent-chat` spec, "MUST NOT pokazywać wypowiedzi agenta, która nie
-        // powstała").
+        // Not a bubble: no agent reply happened, so nothing here impersonates one.
         <p className="rounded border border-critical/40 bg-critical/10 px-3 py-2 text-xs text-critical">
           the agent module is not reachable — {turn.message}
         </p>
@@ -563,14 +518,8 @@ function Transcript({
 }
 
 /**
- * Calls the module kept that no reply claimed — a turn that died with something in flight
- * (`agent-trading` spec). At the end of the transcript and under a heading that says what
- * they are, because they belong to no exchange: putting them beside the last reply would
- * say that reply made them.
- *
- * Rare enough that most operators will never see this block, and the rare case is exactly
- * the reason it exists — one of these can be an order sitting on the account that no
- * sentence anywhere mentions.
+ * Calls the module kept that no reply claimed — a turn that died with something in flight, so they belong to no
+ * exchange and sit under a heading at the end. One of these can be an order no sentence anywhere mentions.
  */
 function UnclaimedCalls({ calls }: { calls: readonly AgentToolCall[] }) {
   return (
@@ -615,18 +564,14 @@ function Bubble({ message, streaming = false }: { message: ChatMessage; streamin
               : "rounded-bl-sm border border-border bg-panel-strong text-ink-secondary"
         }`}
       >
-        {/* The operator's own words stay literal — they typed them, so reinterpreting
-            `*` as emphasis would be this panel putting words in their mouth. Only the
-            model's side is Markdown, because only the model writes it. */}
+            {/* The operator's own words stay literal — they typed them, so reinterpreting `*` as emphasis
+                would be this panel putting words in their mouth. */}
         {operator ? message.text : <MessageBody text={message.text} streaming={streaming} />}
-        {/* Never shown as a whole reply — the module's own `incomplete` flag, carried
-            straight through (`terminal-agent-chat` spec, "Odpowiedź niepełna MUST być
-            oznaczona jako niepełna, a nie pokazana jako całość"). */}
+            {/* Never shown as a whole reply — the module's own `incomplete` flag, carried straight through. */}
         {!operator && message.incomplete && (
           message.stopped ? (
-            // Not critical-coloured and not called a break: nothing went wrong here, the
-            // operator ended it (`terminal-agent-chat` spec, "Odpowiedź zatrzymana nie
-            // jest błędem").
+              // Not critical-coloured and not called a break: nothing went wrong here, the operator
+              // ended it.
             <div className="mt-1 text-[10px] font-semibold text-ink-faint">■ stopped by you</div>
           ) : (
             <div className="mt-1 text-[10px] font-semibold text-critical">⚠ incomplete — broke off</div>
@@ -644,10 +589,8 @@ function Composer({
   children,
 }: {
   onSend: (text: string) => void;
-  /** Ends the turn in flight. Takes the place of Send while one is running — the button
-   *  the operator is looking at is the one they can actually use, and there is nothing
-   *  else in this corner to reach for (`terminal-agent-chat` spec, "Operator zatrzymuje
-   *  odpowiedź z panelu"). */
+  /** Ends the turn in flight. Takes the place of Send while one is running — the button the operator is
+   *  looking at is the one they can use, and there is nothing else in this corner to reach for. */
   onStop: () => void;
   disabled: boolean;
   /** Rendered between the box and the send row — the model picker, today. */

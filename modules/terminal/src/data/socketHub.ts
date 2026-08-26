@@ -18,12 +18,8 @@ export interface SocketLike {
 export type SocketFactory = (url: string) => SocketLike;
 
 /**
- * Where one pair's stream lives — asked afresh for every attempt, retries included,
- * because the archive hands out a one-time ticket for the handshake (a browser cannot
- * put a header on one) and a spent ticket is no ticket at all.
- *
- * Rejecting is meaningful: a `MarketDataError` of kind `unauthenticated` stops the
- * retrying, any other rejection resumes it.
+ * Asked afresh for every attempt, retries included: the archive hands out a one-time ticket for the handshake
+ * and a spent one is no ticket. Rejecting with kind `unauthenticated` stops the retrying, anything else resumes it.
  */
 export type UrlFor = (symbol: string, resolution: Resolution) => Promise<string>;
 
@@ -34,13 +30,8 @@ export type UrlFor = (symbol: string, resolution: Resolution) => Promise<string>
 export type Translate = (raw: string) => StreamEvent[];
 
 /**
- * Why a connection that failed will keep failing, or `null` when the failure looks
- * transient.
- *
- * A browser cannot read the status of a rejected WebSocket handshake, so a source
- * refusing with `403` is indistinguishable from one that is down — and "the archive is
- * down" and "nobody chose to collect this pair" ask different things of whoever is
- * looking at the chart. Whoever supplies the socket supplies this second question too.
+ * Why a failed connection will keep failing, or `null` when it looks transient. A browser cannot read a rejected
+ * handshake's status, so a `403` is indistinguishable from a source that is down — hence a second question.
  */
 export type Diagnose = (symbol: string, resolution: Resolution) => Promise<string | null>;
 
@@ -72,17 +63,8 @@ function backoffMs(attempt: number, random: () => number): number {
 const REFUSAL_CLOSE_CODE = 1008; // "refused before accepting" — see the archive's README
 
 /**
- * Ref-counted per (symbol, resolution) WebSocket: the first subscriber opens the
- * connection, later ones share it, the last one closes it (terminal-market-data spec,
- * "Jedno połączenie obsługuje wielu odbiorców tej samej pary"). Reconnects on drop with
- * growing backoff.
- *
- * No gap-filling, deliberately: the archive's subscription opens with a snapshot, so a
- * reconnect delivers the missed bars as a matter of course. The gap closes because the
- * protocol has none, not because the browser went looking for one.
- *
- * The protocol itself is not this class's business — `urlFor` says where a pair lives
- * and `translate` says what a frame means, both supplied by whoever is being read.
+ * Ref-counted per (symbol, resolution) socket, reconnecting with growing backoff (terminal-market-data spec).
+ * No gap-filling: the archive's subscription opens with a snapshot, so the protocol has no gap to fill.
  */
 export class SocketHub {
   private readonly entries = new Map<string, HubEntry>();
@@ -150,14 +132,8 @@ export class SocketHub {
     void this.open(key, entry);
   }
 
-  /** The attempt itself, which now begins with a wait: the address has to be
-   *  asked for before it can be dialled.
-   *
-   *  Three ways it can end before a socket exists. The entry was torn down while
-   *  the address was in flight — drop it, silently, because nobody is listening.
-   *  The operator is signed out — stop, and say so, because no number of
-   *  attempts will produce an address. Anything else — retry, because a source
-   *  that will not answer right now is the case retrying exists for. */
+  /** The attempt begins with a wait: the address has to be asked for before it can be dialled. Torn down while
+   *  it was in flight — drop it; signed out — stop, no attempt will produce an address; anything else — retry. */
   private async open(key: string, entry: HubEntry): Promise<void> {
     let url: string;
     try {
@@ -204,9 +180,8 @@ export class SocketHub {
       entry.state = "reconnecting";
       this.broadcast(entry, { kind: "status", state: "reconnecting" });
 
-      // A close with no code to read may still be a refusal — a handshake the
-      // source rejected outright looks exactly like a source that is down. Ask
-      // before settling into a retry loop that cannot succeed.
+      // A close with no code to read may still be a refusal — a rejected handshake looks exactly like a
+      // source that is down. Ask before settling into a retry loop that cannot succeed.
       if (this.diagnose && !entry.diagnosed) {
         entry.diagnosed = true;
         void this.askWhy(key, entry);
@@ -216,18 +191,8 @@ export class SocketHub {
     };
   }
 
-  /** Runs the second question, then either stops or resumes retrying.
-   *
-   *  A diagnosis that itself fails resolves nothing and must not be treated as
-   *  "no reason found" — the source not answering is the case retrying exists
-   *  for. **With one exception**: a diagnosis refused because the operator is
-   *  signed out has resolved something, and the answer is not "retry". Without
-   *  that exception an expired session looks exactly like an unreachable
-   *  archive, and the terminal would retry it forever while never saying the
-   *  one thing that would fix it.
-   *
-   *  Either way the entry may have been torn down while the answer was in
-   *  flight, so every path checks before touching it. */
+  /** A diagnosis that itself fails resolves nothing and must not read as "no reason found". **One exception**:
+   *  refused because the operator is signed out has resolved it, and without that an expired session retries forever. */
   private async askWhy(key: string, entry: HubEntry): Promise<void> {
     let reason: string | null = null;
     try {

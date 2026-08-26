@@ -64,10 +64,8 @@ export interface FakePane {
    *  after the one it removes, and a cached index would go stale exactly the way
    *  `Chart.tsx` must not let its own `paneIndex()` calls go stale. */
   paneIndex(): number;
-  /** What `chart.addPane()`'s own argument set — mirrors the real
-   *  `IPaneApi.preserveEmptyPane()`. `false` (the real library's own default)
-   *  is what makes `removeSeries` below delete a pane whose last series just
-   *  left, the exact behaviour that raced `Chart.tsx`'s own explicit
+  /** What `chart.addPane()`'s own argument set. `false` — the real library's default — is what makes
+   *  `removeSeries` delete a pane whose last series just left, the behaviour that raced `Chart.tsx`'s own
    *  `removePane` and threw until `addPane(true)` opted out of it. */
   preserveEmptyPane: boolean;
 }
@@ -200,9 +198,8 @@ export function makeFakeChart(): FakeChart {
 export function fakeChartApi(chart: FakeChart) {
   return {
     addSeries: (type: unknown, options: Record<string, unknown> = {}, paneIndex = 0) => {
-      // The mocked module exports `{ type: "Candlestick" }` / `{ type: "Line" }` in
-      // place of the real series-definition objects — the same shape `Chart.tsx`
-      // passes through unmodified, so reading it back here needs no separate map.
+      // The mocked module exports a plain `{ type }` in place of the real series definitions — the same
+      // shape `Chart.tsx` passes through unmodified, so reading it back needs no separate map.
       const kind = (type as { type?: string } | undefined)?.type ?? "unknown";
       const pane = chart.panesList[paneIndex] ?? chart.panesList[0];
       const series = makeFakeSeries(kind, options, pane);
@@ -212,11 +209,8 @@ export function fakeChartApi(chart: FakeChart) {
     removeSeries: (series: FakeSeries) => {
       chart.series = chart.series.filter((existing) => existing !== series);
       chart.removedSeries.push(series);
-      // The real chart's own default: a pane with no series left in it goes
-      // too, unless it was created with `preserveEmptyPane: true`. Pane 0
-      // (the price pane) is exempt in practice — the candlestick series
-      // always occupies it — and exempt here explicitly, so a test can never
-      // end up asserting against a chart with no price pane at all.
+      // The real chart's own default: a pane with no series left goes too, unless it was created to be
+      // preserved. Pane 0 is exempt explicitly, so a test can never assert against a chart with no price pane.
       const vacated = series.pane;
       if (vacated !== chart.panesList[0] && !vacated.preserveEmptyPane) {
         const stillOccupied = chart.series.some((s) => s.pane === vacated);
@@ -244,10 +238,8 @@ export function fakeChartApi(chart: FakeChart) {
       getVisibleLogicalRange: () => chart.visibleRange,
       setVisibleLogicalRange: (range: LogicalRange) => {
         chart.rangesSet.push(range);
-        // The real time scale notifies its subscribers about a range it was
-        // told to take, exactly as it does about one the operator dragged to —
-        // which is what makes a chart correcting its own frame able to trigger
-        // itself. The fake has to do it too, or that loop cannot be tested.
+        // The real time scale notifies its subscribers about a range it was told to take, exactly as
+        // about one the operator dragged to — which is what makes a self-correcting frame able to loop.
         chart.pan(range);
       },
       setVisibleRange: (range: { from: number; to: number }) => {
@@ -350,14 +342,8 @@ export function fakeCreateSeriesMarkers(series: FakeSeries, markers: unknown[] =
 }
 
 /**
- * A source whose subscription the test drives message by message.
- *
- * The live edge arrives through `subscribe` — the opening snapshot included — so nothing
- * a chart draws today comes from a range read. `historyCalls` records the reads anyway,
- * because there is one legitimate reason for them and one illegitimate one: paging back
- * through older candles is fine, re-fetching the live edge is the seam growing back
- * (design.md, "Archiwum jest dla terminala jedynym źródłem świec i strumienia"). Every
- * range read here carries its bounds, so a test can tell the two apart.
+ * A source whose subscription the test drives message by message. `historyCalls` records range reads with
+ * their bounds: paging back is fine, re-fetching the live edge is the seam growing back, and they differ.
  */
 export class ControllableSource implements MarketDataSource {
   readonly parts = [
@@ -510,10 +496,8 @@ export function indicatorAnswer(
 }
 
 /**
- * An indicator source the test drives directly — no HTTP, no fake server. `computeQueue`
- * answers successive `computeIndicators` calls in order; an exhausted queue answers with
- * an empty result, which is how "nothing computed yet" looks without a test having to
- * seed one for every call it does not care about.
+ * An indicator source the test drives directly — no HTTP, no fake server. An exhausted queue answers with
+ * an empty result, which is how "nothing computed yet" looks without seeding one for every call.
  */
 export class FakeIndicatorSource implements IndicatorSource {
   catalogueEntries: IndicatorCatalogueEntry[] = [];

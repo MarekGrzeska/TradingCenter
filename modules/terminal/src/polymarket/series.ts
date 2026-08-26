@@ -2,14 +2,8 @@ import type { UTCTimestamp } from "lightweight-charts";
 import type { PricePoint } from "./polymarketApi";
 
 /**
- * Turning a collected series into what a line chart may draw.
- *
- * The whole content is the gap. A line series joins consecutive points, so two readings
- * either side of a stretch that was never collected come out as a straight run between
- * them — a claim that the probability moved evenly across days nobody measured. The
- * library's own way of refusing to draw that is a **whitespace point**: a time with no
- * value, which breaks the line (specs/terminal-polymarket, "Seria prawdopodobieństwa jest
- * oglądalna wraz z granicą pokrycia").
+ * The whole content is the gap: a line series joins consecutive points, so two readings either side of an
+ * uncollected stretch draw as a straight run. The library's refusal is a **whitespace point**, which breaks it.
  */
 
 export interface LinePoint {
@@ -20,13 +14,8 @@ export interface LinePoint {
   value?: number;
 }
 
-/** How many times the series' own typical spacing counts as a gap.
- *
- *  Relative rather than absolute, and that is the measurement this file rests on: the
- *  module samples live prices once a minute, but backfilled history arrives at whatever
- *  resolution the provider gives for an old range, which is coarser and varies with the
- *  span asked for. A fixed threshold in minutes would call every backfilled series one
- *  long gap, or call nothing a gap at all, depending on the range the operator picked. */
+/** How many times the series' own typical spacing counts as a gap. Relative because backfilled history arrives at
+ *  whatever resolution the provider gives: a fixed threshold in minutes calls every backfill one long gap. */
 const GAP_FACTOR = 3;
 
 /** The middle spacing between consecutive points, or `null` for a series too short to
@@ -44,12 +33,8 @@ export function medianSpacing(points: PricePoint[]): number | null {
 }
 
 /**
- * The series as the chart takes it: seconds since the epoch, and a whitespace point
- * wherever the collected history stops and starts again.
- *
- * A point whose price is `null` is itself a hole — the module recorded the moment and no
- * price for it — so it becomes whitespace rather than being dropped, which would let the
- * line close over it.
+ * The series as the chart takes it, with whitespace wherever the collected history stops and starts again. A point
+ * whose price is `null` is itself a hole, so it becomes whitespace rather than being dropped over.
  */
 export function toLineData(points: PricePoint[]): LinePoint[] {
   const threshold = medianSpacing(points);

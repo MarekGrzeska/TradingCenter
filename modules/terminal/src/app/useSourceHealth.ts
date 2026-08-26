@@ -6,11 +6,8 @@ import { MarketDataError } from "../data/types";
 
 export type SourceHealth = "checking" | "reachable" | "unreachable" | "signed-out";
 
-/** A source that will not answer without a credential is not a source that is
- *  down. `types.ts` keeps `unauthenticated` apart from `unreachable` so that
- *  this indicator can too — and flattening the two here is what sent an
- *  operator through a night of Azure dashboards for an expired session, with
- *  both back ends healthy and answering the whole time. */
+/** A source that will not answer without a credential is not a source that is down. Flattening the two
+ *  here is what sent an operator through a night of Azure dashboards for an expired session. */
 function healthFromFailure(cause: unknown): SourceHealth {
   return cause instanceof MarketDataError && cause.kind === "unauthenticated"
     ? "signed-out"
@@ -19,15 +16,8 @@ function healthFromFailure(cause: unknown): SourceHealth {
 
 const POLL_MS = 15_000;
 
-/** Pings every part of the source on mount and every `POLL_MS` after —
- *  independent of whatever charts are or aren't subscribed, so the indicator in
- *  the top bar reflects the sources themselves, not one chart's luck.
- *  terminal-shell spec, "Stan źródła danych jest widoczny globalnie".
- *
- *  One query per part, because they fail separately and mean different things:
- *  the archive down empties the charts, the gateway down stops the search, and
- *  reporting either as "the source is unreachable" would send an operator
- *  looking in the wrong place (design.md, Risks). */
+/** Pings every part on mount and every `POLL_MS` after, independent of whatever charts are subscribed. One query per
+ *  part, because they fail separately: reporting either as "the source is unreachable" sends an operator the wrong way. */
 export function useSourceHealth(parts: readonly SourcePart[]): Record<string, SourceHealth> {
   const results = useQueries(
     {
@@ -50,9 +40,8 @@ export function useSourceHealth(parts: readonly SourcePart[]): Record<string, So
     return [part.id, "checking"];
   });
 
-  // Keyed on the values, not on the array `useQueries` rebuilds every render: the top
-  // bar re-renders on every parent render either way, but a new record identity would
-  // also restart any effect downstream that watches this.
+  // Keyed on the values, not on the array `useQueries` rebuilds every render: a new record identity would
+  // restart any effect downstream that watches this.
   const signature = health.map(([id, state]) => `${id}:${state}`).join("|");
   return useMemo(() => Object.fromEntries(health), [signature]); // eslint-disable-line react-hooks/exhaustive-deps
 }

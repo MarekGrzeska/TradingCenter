@@ -6,23 +6,14 @@ import type {
 } from "../data/types";
 
 /**
- * Which indicator instances this chart can draw, and in what colours.
- *
- * Pure, and out of `Chart.tsx` for that reason: the crosshair readout needs the same two
- * answers the drawing effect does, and a chart that computed them twice would eventually
- * compute them differently.
+ * Which indicator instances this chart can draw, and in what colours. Pure, and out of `Chart.tsx` for
+ * that reason: a chart that computed these twice would eventually compute them differently.
  */
 
-/** Price-pane overlays, own-pane oscillators, price-pane markers, price-pane
- *  levels and price-pane zones all draw today. Every one of them is
- *  price-pane only because every entry the catalogue offers in those shapes
- *  draws on the candles, not in a pane of its own — `render.style ===
- *  "histogram"` on a `levels` entry (`time_profile`) still routes to
- *  `TimeProfilePrimitive` rather than `RayPrimitive` further down, but it is
- *  a *drawing* choice, not a *drawable* one, so it does not belong here.
- *  Kept as a predicate rather than a filter on the catalogue itself: the
- *  picker still lists every indicator the archive offers, this only decides
- *  which of them the operator may currently pick. */
+/**
+ * A predicate rather than a filter on the catalogue: the picker still lists everything the archive offers,
+ * and this only decides what may currently be picked. Every shape that draws today is price-pane only.
+ */
 export function canDrawIndicator(entry: IndicatorCatalogueEntry): boolean {
   if (entry.output === "lines") {
     return entry.render.pane === "price" || entry.render.pane === "own";
@@ -63,17 +54,8 @@ export function drawnInstances(
 }
 
 /**
- * A colour per line of every drawn instance, in one pass. An instance the operator gave a
- * colour spends it on its first line; its remaining lines (MACD's signal and histogram)
- * keep taking from the cycle, since three same-coloured lines in one pane say less than
- * three different ones.
- *
- * The cycle index is fixed by draw order alone, never by which colours are already claimed
- * by hand — matching `indicatorLines`' own invariant (theme.ts, "indexed by how many
- * indicator lines are already drawn — never by which one a line is"). Choosing a colour for
- * one instance can therefore only repaint that instance's own lines; it may occasionally
- * land on a hue a still-auto line already cycled onto, which a legend disambiguates.
- * Instances beyond the palette's eight repeat it, the way they always did.
+ * A colour per line of every drawn instance, in one pass. The cycle index is fixed by draw order alone, never
+ * by which colours are already claimed by hand, so choosing one repaints that instance's own lines and no more.
  */
 export function assignLineColors(
   drawn: DrawnInstance[],
@@ -82,9 +64,8 @@ export function assignLineColors(
 ): Map<string, string[]> {
   const chosen = new Map<string, string | null>();
   for (const { selection } of drawn) {
-    // `has`, not `??`: null is the operator choosing *no* colour, and falling through to
-    // the snapshot's own on null would make "Auto" a no-op for an instance restored with
-    // a colour — it would keep painting the old one until the next recompute.
+    // `has`, not `??`: null is the operator choosing *no* colour, and falling through on null would make
+    // "Auto" a no-op for an instance restored with a colour.
     const token = chosenByKey.has(selection.key)
       ? (chosenByKey.get(selection.key) ?? null)
       : selection.color;

@@ -48,11 +48,8 @@ const REFUSED_CALL: AgentToolCall = {
   source: "server",
 };
 
-/** A stream that only advances when the test tells it to — the fixed-array fake below
- *  resolves purely through microtasks, which can finish a whole turn before a
- *  timer-based `waitFor` gets to look; this one genuinely suspends between events, so a
- *  test asserting something about the "streaming" window is not racing the code under
- *  test. */
+/** A stream that only advances when the test tells it to — the fixed-array fake resolves purely through
+ *  microtasks and can finish a whole turn before a `waitFor` looks. This one genuinely suspends. */
 function controllableEvents() {
   let notify: (() => void) | null = null;
   const pending: AgentStreamEvent[] = [];
@@ -96,9 +93,8 @@ interface FakeApi extends AgentApi {
   failStopTurn: boolean;
   /** What `sendMessage` hands back, set per test — a plain event list by default. */
   script: AgentStreamEvent[];
-  /** Seeds a titled, already-exchanged conversation, the way one would exist in the
-   *  module before the panel ever opened — through `nextId`, so it can never collide
-   *  with a session `send()` goes on to create in the same test. */
+  /** Seeds a titled, already-exchanged conversation, the way one would exist in the module before the
+   *  panel ever opened — through `nextId`, so it can never collide with one `send()` creates. */
   seed(title: string, modelId: string): AgentSession;
 }
 
@@ -380,9 +376,8 @@ describe("createAgentChatStore", () => {
     await waitFor(() => expect(store.getSnapshot().modelsStatus).toBe("ready"));
 
     store.send("why is BTC flat");
-    // The reload `finishTurn` issues right after the break is what must fail here —
-    // flipped on right after the send so the initial "does the module exist" catalogue
-    // load above is unaffected.
+    // The reload `finishTurn` issues right after the break is what must fail here — flipped on after the
+    // send, so the initial catalogue load above is unaffected.
     api.failGetMessages = true;
     await waitFor(() => expect(store.getSnapshot().turn).toBeNull());
 
@@ -559,10 +554,8 @@ describe("createAgentChatStore", () => {
     first.openSession(older.id);
     await waitFor(() => expect(first.getSnapshot().transcriptStatus).toBe("ready"));
 
-    // A fresh store, as a reload would construct — reads back the same conversation and
-    // loads it without anybody clicking it again. The load is asked for by the panel's
-    // mount, not by construction: construction happens during `import`, before sign-in
-    // has been resolved, and a request made there never carries a token.
+    // A fresh store, as a reload would construct. The load is asked for by the panel's mount, not by
+    // construction: construction happens during `import`, before sign-in has been resolved.
     const second = createAgentChatStore(storage, api);
     expect(second.getSnapshot().activeSessionId).toBe(older.id);
     second.ensureLoaded();
@@ -618,13 +611,8 @@ describe("createAgentChatStore", () => {
 
   it("asks for nothing at construction, and everything once the panel mounts", async () => {
     /**
-     * The production bug of 13 August 2026. The store is a module-level const, so
-     * constructing it ran during `import` — before `main.tsx` had awaited
-     * `identity.initialize()`. Every request it made there asked an MSAL that had not
-     * resolved the session yet, was refused, and never reached the network. The session
-     * list recovered by itself, because `finishTurn` reloads it after every turn; the
-     * model catalogue had no second chance and the picker read "unavailable" for the life
-     * of the page, while the module's own log showed no request for it at all.
+     * The production bug of 13 August 2026: a module-level const constructed during `import`, before
+     * `identity.initialize()`. The session list recovered; the model catalogue read "unavailable" for the page.
      */
     const api = createFakeApi();
     api.seed("older chat", "luna");
@@ -649,9 +637,8 @@ describe("createAgentChatStore", () => {
     store.setExpanded(true);
     await waitFor(() => expect(store.getSnapshot().modelsStatus).toBe("unreachable"));
 
-    // The old gate was "has the panel ever been opened", so this second ask did nothing
-    // and the picker stayed broken until the operator reloaded — which reproduced the
-    // failure rather than clearing it.
+    // The old gate was "has the panel ever been opened", so this second ask did nothing and the picker
+    // stayed broken until the operator reloaded — which reproduced the failure rather than clearing it.
     api.failListModels = false;
     store.ensureLoaded();
 
@@ -867,10 +854,8 @@ describe("createAgentChatStore — the chart the agent can set", () => {
   });
 
   it("says a turn ended, for whatever is showing state this store cannot read", async () => {
-    // Since `teams-mcp` a chat writes into another module — a team created, revised, put
-    // on a schedule — and none of it passes through `agent`. The tab showing it re-reads
-    // on this, which is why the announcement carries no payload and no tool names
-    // (`agentActivity.ts`).
+    // Since the team tools a chat writes into another module, and none of it passes through `agent`. The
+    // tab showing it re-reads on this, which is why the announcement carries no payload.
     const api = createFakeApi();
     const heard: number[] = [];
     const activity = {
@@ -919,10 +904,8 @@ describe("createAgentChatStore — the chart the agent can set", () => {
 });
 
 
-/** A turn that says one fragment and then waits, so a test can act while it is genuinely
- *  in flight. `ending` is what it says once released. The module's own transcript is
- *  recorded through `recordExchange`'s twin on the fake, so the reload afterwards shows
- *  what a real one would. */
+/** A turn that says one fragment and then waits, so a test can act while it is genuinely in flight.
+ *  `ending` is what it says once released. */
 function holdAfterFirstFragment(
   api: FakeApi,
   ending: AgentStreamEvent,
@@ -952,9 +935,7 @@ function holdAfterFirstFragment(
 
 describe("createAgentChatStore — stopping a turn", () => {
   it("asks the module to stop and marks nothing itself", async () => {
-    // `terminal-agent-chat` spec, "Operator zatrzymuje trwającą odpowiedź" — the ending
-    // comes from the module, on the stream and in the transcript. The store's own job is
-    // to ask.
+    // The ending comes from the module, on the stream and in the transcript. The store's own job is to ask.
     const api = createFakeApi();
     const held = holdAfterFirstFragment(api, { kind: "stopped" });
     const store = createAgentChatStore(null, held.api);

@@ -5,16 +5,8 @@ import { showToast } from "../ui/toastStore";
 import type { Group, PolymarketApi } from "./polymarketApi";
 
 /**
- * The operator's own categories, and nothing more than that.
- *
- * A group is a way of narrowing this list — it is not a property of the market and the
- * module does not collect differently because of one. Deleting one therefore ends no
- * observation and removes no sample, which the dialog says out loud for the same reason
- * the stop-tracking dialog does: a delete button standing near data reads as a delete
- * button for that data (specs/terminal-polymarket, "Grupy obserwacji są operatora").
- *
- * Absent entirely when there are no groups. A row of controls for an empty set is a
- * promise of a part of the screen that is not there.
+ * The operator's own categories: a group narrows the list and is not a property of the market, so deleting one
+ * ends no observation — said out loud, because a delete button standing near data reads as one for that data.
  */
 export function GroupBar({
   client,

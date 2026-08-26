@@ -1,17 +1,6 @@
 /**
- * The run half of the teams wire: what a run, a step and a tool call look like on this
- * side, and how the module's progress stream is read.
- *
- * Kept apart from `teamsApi.ts` — which maps the catalogue half — because a run arrives
- * through two doors that carry the same facts: a JSON read (`/runs/{id}`, `/steps`,
- * `/tool-calls`) and an SSE frame on `/runs/{id}/events`. Both land in the mappers below,
- * so the monitor cannot be shown two different versions of one run depending on whether
- * it was watching when the step finished.
- *
- * The reading itself is `data/sseStream.ts`, shared with the agent's turn stream; the
- * vocabulary is not, and deliberately so — four event kinds there, five here, none with
- * the same name. A common *parser* would have to be told which set to expect, which is
- * the whole of what it would be doing; a common *reader* is told nothing.
+ * The run half of the teams wire. Apart from `teamsApi.ts` because a run arrives through two doors carrying the
+ * same facts — a JSON read and an SSE frame — and both land in these mappers, so the monitor sees one version.
  */
 
 import type { components } from "../data/contract.teams.generated";
@@ -60,12 +49,8 @@ export interface TeamRunStep {
   finishedAt: number | null;
 }
 
-/** What a call was given and what it answered — the two halves that explain an output.
- *
- *  Its own type because its *absence* means something: the stream announces a call
- *  without a body, so a call watched live has no detail until the recorded rows are read.
- *  Folded into the call as two optional fields, "no arguments" and "not read yet" would
- *  be the same shape. */
+/** What a call was given and what it answered. Its own type because its *absence* means something: the stream
+ *  announces a call without a body, and as two optional fields "no arguments" and "not read yet" would be one shape. */
 export interface ToolCallDetail {
   arguments: Record<string, unknown>;
   /** The tool's answer, or the reason it refused — the module puts both in one column. */
@@ -192,15 +177,8 @@ export function mapTrade(raw: RawTrade): TeamTrade {
   };
 }
 
-/** What to say about an order, and how loudly. `unknown` is a value the module writes on
- *  purpose — a call whose reply never arrived may well have reached the account — and it
- *  is shown as unknown rather than folded in with a refusal (specs/terminal-teams,
- *  "Zlecenie o skutku nieznanym MUST być pokazane jako nieznane").
- *
- *  `sent` is the one reading that depends on the run: while the run works it is an order
- *  on its way, and once the run is over it is an order this module never learned the fate
- *  of — the module's own `contract.py` says so of the row, and this is that sentence on
- *  screen. */
+/** `unknown` is a value the module writes on purpose — a call whose reply never arrived may well have reached the
+ *  account. `sent` is the one reading that depends on the run: on its way, or never learned the fate of. */
 export function outcomeOf(trade: TeamTrade, runOver: boolean): { text: string; known: boolean } {
   switch (trade.status) {
     case "settled":
@@ -219,18 +197,8 @@ export function outcomeOf(trade: TeamTrade, runOver: boolean): { text: string; k
 }
 
 /**
- * Which ceiling stopped a run, when one did.
- *
- * The module writes the sentence and it travels intact — this only picks the heading
- * above it (specs/terminal-teams, "Terminal MUST pokazywać granicę zleceń jako przyczynę
- * zatrzymania, odróżniając ją od granicy kosztu"). There is nothing else on the wire to
- * read: `stopped_reason` is prose, and both ceilings write their own words for it
- * (`runner/trading.py`, `runner/cost.py`).
- *
- * Reworded upstream, this falls back to `"other"` and the reason is shown with no heading
- * — the sentence still says which limit it was, because it is the module's own. That is
- * the whole of what a miss costs here, and it is why the terminal does not translate the
- * sentence into words of its own.
+ * Which ceiling stopped a run. The module writes the sentence and it travels intact; this only picks the heading,
+ * so a rewording upstream costs a heading and nothing else — which is why the sentence is never translated here.
  */
 export type StopCause = "orders" | "cost" | "other";
 
@@ -242,11 +210,8 @@ export function stopCause(reason: string | null): StopCause | null {
 }
 
 /**
- * Recorded calls, given the agent key their step belongs to.
- *
- * A call whose step is not among the ones handed in is dropped rather than shown under
- * an invented name — it can only mean the two reads crossed a step being created, and
- * the next snapshot carries both.
+ * Recorded calls, given the agent key their step belongs to. A call whose step is not among those handed in is
+ * dropped rather than shown under an invented name: the two reads crossed a step being created.
  */
 export function attachAgentKeys(
   calls: RecordedToolCall[],
@@ -260,9 +225,8 @@ export function attachAgentKeys(
 }
 
 /**
- * One frame to a typed event, or `null` for a keepalive comment (`: ping`, sent every 15s
- * so App Service does not drop a connection an agent's thinking left quiet), a blank
- * frame, or an event name this terminal has no use for.
+ * One frame to a typed event, or `null` for a keepalive comment (sent every 15s so App Service does not drop a
+ * connection an agent's thinking left quiet), a blank frame, or an event name this terminal has no use for.
  */
 export function parseRunFrame(frame: string): RunStreamEvent | null {
   if (frame.trim() === "" || frame.startsWith(":")) return null;
@@ -323,13 +287,8 @@ export function parseRunFrame(frame: string): RunStreamEvent | null {
 }
 
 /**
- * The events a run's stream carries, until the module closes it.
- *
- * It closes it itself once the run is over — and immediately, with nothing but the
- * snapshot, for a run that was already over when the view opened. A body that ends
- * without `run_finished` is a dropped connection; the caller is where that becomes
- * something the operator sees, since only it knows what arrived before the drop. Nothing
- * is terminal here for that reason: the module's own close is the end of the read.
+ * The module closes the stream itself once the run is over, so nothing here is terminal: a body that ends without
+ * `run_finished` is a dropped connection, and only the caller knows what arrived before the drop.
  */
 export function readRunStream(body: ReadableStream<Uint8Array>): AsyncGenerator<RunStreamEvent> {
   return readSseStream(body, parseRunFrame);

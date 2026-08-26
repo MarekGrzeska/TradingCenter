@@ -1,22 +1,14 @@
 /**
- * What separates an object the operator drew from a line the catalogue computed, and the
- * geometry a click into one has to satisfy.
- *
- * It lives here rather than three times over because the three primitives draw three
- * shapes with one vocabulary: weight says who made the mark, the chip carries its caption
- * over the candles, the axis label says where it sits, and the tolerance band says how
- * near a click has to land. Three copies of that would drift, and the drift shows up as
- * "sometimes the level cannot be clicked" (design.md, "Trafianie natywnym `hitTest`").
+ * What separates an object the operator drew from a line the catalogue computed, and the geometry a click has
+ * to satisfy. Here rather than three times over: three copies drift into "sometimes the level cannot be clicked".
  */
 
 import type { ISeriesPrimitiveAxisView } from "lightweight-charts";
 import { readChartColors } from "./theme";
 
 /**
- * Who put the mark on the chart. 2 px solid is an operator's ruling, 1 px dashed a
- * reading taken from the archive — the difference is carried by weight rather than by
- * colour alone, because a chart with eight hues on it gives nobody a way to remember
- * which four belong to which group (design.md, "Rysunek cięższy od wskaźnika").
+ * Who put the mark on the chart. 2 px solid is an operator's ruling, 1 px dashed a reading from the archive —
+ * carried by weight rather than hue, because eight colours give nobody a way to remember which four are which.
  */
 export type MarkWeight = "drawing" | "indicator";
 
@@ -102,9 +94,8 @@ export interface ChipPlacement {
 }
 
 /**
- * The caption on a filled plate rather than as bare text. Text laid straight on the chart
- * disappears into the wicks; the plate is what makes it readable over them
- * (`terminal-chart` spec, "Etykieta MUST być czytelna nad świecami").
+ * The caption on a filled plate rather than as bare text: text laid straight on the chart disappears into
+ * the wicks, and the plate is what makes it readable over them.
  */
 export function drawChip(
   ctx: ChipContext,
@@ -130,13 +121,8 @@ export function drawChip(
 }
 
 /**
- * The colour of the object's label at the price axis — its role, not its own colour.
- *
- * The line already says *which* object this is; the axis label is the one place left to
- * say *what* it is, and that costs nothing since the label is drawn either way
- * (design.md, "Kolor: linia z palety rysunków, etykieta przy osi kolorowana rolą"). The
- * role is recomputed from the newest candle, so a level the price breaks through stops
- * calling itself resistance on its own — which is the point.
+ * The colour of the object's label at the price axis — its role, not its own colour, and recomputed from the
+ * newest candle, so a level the price breaks through stops calling itself resistance on its own.
  */
 export function roleColor(
   price: number,

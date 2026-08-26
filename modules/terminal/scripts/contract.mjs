@@ -1,20 +1,6 @@
 /**
- * The wire types of every module whose contract is generated rather than copied.
- *
- *   node scripts/contract.mjs generate   # rewrite every source's *.generated.ts
- *   node scripts/contract.mjs check      # fail if any of them is stale
- *
- * Why a script and not a one-line pipe: `check` has to produce a message that says what
- * to run, and a pipe that fails prints a diff nobody asked for. It is also the one place
- * that knows each schema comes from that module's own Python, not from a URL —
- * regenerating deliberately needs no running server, because a check that needs one is a
- * check nobody runs, which is how the two copies of market-data's contract drifted apart
- * before this script existed.
- *
- * Generalized from one source to a list of them when `teams` needed the same treatment:
- * agent's own contract stays hand-written (design.md, "Kontrakt terminala pisany ręcznie,
- * bez generatora") precisely because its surface is narrow — the pattern below is for a
- * module whose surface is wide enough that hand-copied types would rot.
+ * `generate` rewrites every source's *.generated.ts, `check` fails when one is stale. Each schema is read
+ * from that module's own Python, because a check that needs a running server is a check nobody runs.
  */
 
 import { execFileSync } from "node:child_process";
@@ -35,11 +21,8 @@ const SOURCES = [
     banner: `/**
  * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
  *
- * The source is market-data's own OpenAPI document, printed straight from its Pydantic
- * models by \`python -m market_data.openapi\`. Everything the terminal reads off that
- * module's wire — including the subscription's Snapshot and CandleChange, which have no
- * HTTP path — is described here, so \`tsc\` is what notices a contract change rather than
- * an operator noticing a blank cell.
+ * Printed from market-data's own Pydantic models by \`python -m market_data.openapi\`, the subscription's
+ * Snapshot and CandleChange included though they have no HTTP path — so \`tsc\` is what notices a change.
  */
 `,
   },
@@ -51,11 +34,8 @@ const SOURCES = [
     banner: `/**
  * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
  *
- * The source is the workbench's teams surface, printed straight from its Pydantic models
- * by \`python -m teams.openapi\`. That surface's own routers and prefixes, not the whole
- * process's: the conversation's contract is hand-written in \`agentApi.ts\` and stays that
- * way. No WebSocket here — unlike market-data's, this schema is exactly what FastAPI
- * already describes on its own.
+ * Printed from the workbench's teams surface by \`python -m teams.openapi\` — that surface's own routers, not
+ * the whole process's: the conversation's contract is hand-written in \`agentApi.ts\` and stays that way.
  */
 `,
   },
@@ -67,17 +47,8 @@ const SOURCES = [
     banner: `/**
  * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
  *
- * The source is polymarket-data's own OpenAPI document, printed straight from its
- * Pydantic models by \`python -m polymarket_data.openapi\`.
- *
- * **Nothing imports this file yet**, and that is on purpose: the subpage that reads this
- * archive is a change of its own. What it buys before that exists is that
- * \`contract:check\` fails the day the contract moves, so the subpage starts against types
- * that are true rather than against a file born stale.
- *
- * Every price here is a probability on 0..1, never a percentage — the descriptions say
- * so because reading 0.62 as 62 is wrong by two orders of magnitude with no error on
- * the way.
+ * Printed from polymarket-data's models by \`python -m polymarket_data.openapi\`. Nothing imports it yet, on
+ * purpose: \`contract:check\` fails the day the contract moves. Every price here is a probability on 0..1.
  */
 `,
   },
@@ -87,45 +58,23 @@ const SOURCES = [
     pythonModule: "strategy.openapi",
     output: join(terminal, "src", "data", "contract.strategy.generated.ts"),
     banner: `/**
- * GENERATED — do not edit. Rewrite it with \\\`pnpm contract:generate\\\`.
+ * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
  *
- * The source is the strategy platform's own OpenAPI document, printed straight from its
- * Pydantic models by \\\`python -m strategy.openapi\\\`.
- *
- * Most of what this contract describes is a **refusal**: a decision carrying a reason and
- * no levels. \\\`reason_kind\\\` says which layer said no — the strategy, a gap in the data,
- * or a platform limit — and the three have different answers, so a consumer that collapses
- * them has thrown away the part worth reading.
- *
- * Every optional field on a response is generated as \\\`T | null\\\` rather than
- * \\\`T | undefined\\\`: this module answers with the whole model, and a stop that is absent
- * is a stop that was never set, not a field that failed to arrive.
- */
+ * Printed from the strategy platform's models by \`python -m strategy.openapi\`. Most of what it describes is
+ * a refusal: \`reason_kind\` names the layer that said no, and an optional field is \`T | null\`, never absent.
 `,
   },
 ];
 
 function schemaJson(source, envDir) {
   try {
-    // `--python 3.12`, the floor of the module's own `requires-python`, because this
-    // document is committed and must come out the same everywhere. Left to itself uv
-    // takes whatever interpreter satisfies that floor — 3.12 on the CI runner, 3.14 on a
-    // developer's machine — and the two disagree: 3.13 renamed HTTP 422's reason phrase
-    // from "Unprocessable Entity" to "Unprocessable Content", which FastAPI reads from
-    // the stdlib and prints into the schema. Regenerating on a newer Python therefore
-    // produced a diff describing no contract change and failed `contract:check` in CI.
-    // uv fetches the interpreter if it is missing; the module's tests still run on
-    // whatever `requires-python` allows.
+    // `--python 3.12`, the floor of `requires-python`, because this document is committed: 3.13 renamed
+    // HTTP 422's reason phrase, so regenerating on a newer Python failed `contract:check` with no change.
     return execFileSync("uv", ["run", "--python", "3.12", "python", "-m", source.pythonModule], {
       cwd: source.moduleDir,
       encoding: "utf8",
-      // Windows pipes Python's stdout through the ANSI codepage unless told otherwise,
-      // which turned every em dash in a docstring into U+FFFD and made the committed
-      // file differ by encoding alone depending on who regenerated it.
-      //
-      // The pinned interpreter gets its own throwaway environment, so generating the
-      // contract does not quietly rebuild the module's own `.venv` on 3.12 underneath
-      // whoever is working there.
+      // Windows pipes Python's stdout through the ANSI codepage unless told otherwise, turning every em
+      // dash into U+FFFD. The throwaway environment keeps 3.12 out of the module's own `.venv`.
       env: {
         ...process.env,
         PYTHONIOENCODING: "utf-8",
@@ -152,10 +101,8 @@ function generate(source) {
     const schema = join(scratch, "openapi.json");
     const emitted = join(scratch, "contract.ts");
     writeFileSync(schema, schemaJson(source, join(scratch, "python-env")));
-    // The generator's own JS, run by this node — not `npx`, and not the `.bin` shim.
-    // Both of those are `.cmd` files on Windows, which node refuses to spawn without a
-    // shell (since the 2024 argument-injection fix), so `pnpm contract:generate` failed
-    // there with `spawnSync npx ENOENT` while working everywhere else.
+    // Run by this node, not `npx` or the `.bin` shim: both are `.cmd` on Windows, which node refuses to
+    // spawn without a shell since the 2024 argument-injection fix — `spawnSync npx ENOENT`.
     const manifest = fileURLToPath(import.meta.resolve("openapi-typescript/package.json"));
     const cli = join(dirname(manifest), JSON.parse(readFileSync(manifest, "utf8")).bin[
       "openapi-typescript"

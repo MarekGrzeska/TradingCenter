@@ -147,11 +147,8 @@ describe("Chart — feed states (terminal-chart spec)", () => {
     expect(source.subscribeCalls).toHaveLength(2);
   });
 
-  // jsdom computes no paint order, so this cannot assert what is on top — it
-  // asserts the one property that decides it. Found in a browser: the chart
-  // library mounts canvases at z-index 1 and 2 inside a container that opens no
-  // stacking context, so at the default level every message below rendered,
-  // passed its test, and was painted over by an empty canvas.
+  // jsdom computes no paint order, so this asserts the one property that decides it. Found in a browser:
+  // the library mounts canvases inside a container that opens no stacking context.
   it("puts what it has to say above the chart library's canvases", async () => {
     const { container } = renderChart(source);
     await act(async () => {
@@ -246,9 +243,8 @@ describe("Chart — live bars", () => {
   it("keeps a bar that arrived before the snapshot did", async () => {
     renderChart(source);
 
-    // Not the normal order — the snapshot is the first message by construction
-    // — but the merge must not depend on that, or a chart would blank itself
-    // the one time the archive reordered anything.
+    // Not the normal order — the snapshot is the first message by construction — but the merge must not
+    // depend on that, or a chart would blank itself the one time the archive reordered anything.
     await act(async () => {
       source.emit({ kind: "bar", bar: bar(300, 3, true) });
     });
@@ -362,9 +358,8 @@ describe("Chart — header readout freshness", () => {
     // `bar(t, c)` puts high at c+1, which is unique in the readout.
     await waitFor(() => expect(screen.getByText("51")).toBeInTheDocument());
 
-    // Same period, price moved. `forming` does not change, so nothing else
-    // about the component's state does either — which is exactly how the
-    // header used to freeze while the canvas kept moving.
+    // Same period, price moved. `forming` does not change, so nothing else about the component's state
+    // does either — which is exactly how the header used to freeze while the canvas kept moving.
     await act(async () => {
       source.emit({ kind: "bar", bar: bar(100, 60, true) });
     });
@@ -398,9 +393,8 @@ describe("Chart — older history (terminal-chart spec)", () => {
     source.historyPages = [olderPage(60)];
     await drawAndPan();
 
-    // The window is the span the drawn candles occupy (220 - 100), taken
-    // backwards from the oldest of them — never forwards, so the live edge the
-    // subscription owns is not asked for a second time.
+    // The window is the span the drawn candles occupy, taken backwards from the oldest of them — never
+    // forwards, so the live edge the subscription owns is not asked for a second time.
     expect(source.historyCalls[0]).toEqual({
       symbol: "US100",
       resolution: "MINUTE_5",
@@ -411,9 +405,8 @@ describe("Chart — older history (terminal-chart spec)", () => {
   });
 
   it("stops once the viewport has candles to its left again", async () => {
-    // One page wide enough to put the margin back is one page: the pager is
-    // asking "does the operator have room to keep dragging", not "is there more
-    // history in the archive".
+    // One page wide enough to put the margin back is one page: the pager asks "does the operator have
+    // room to keep dragging", not "is there more history in the archive".
     source.historyPages = [olderPage(60), olderPage(60)];
     await drawAndPan();
 
@@ -421,9 +414,8 @@ describe("Chart — older history (terminal-chart spec)", () => {
   });
 
   it("keeps paging when a page is too small to fill the margin", async () => {
-    // The bug this replaced: the chart compared logical indices across a series
-    // that had just grown at the front, so after a page or two the comparison
-    // could no longer be satisfied and paging stopped for good.
+    // The bug this replaced: the chart compared logical indices across a series that had just grown at
+    // the front, so after a page or two the comparison could not be satisfied and paging stopped.
     source.historyPages = [olderPage(2), olderPage(60)];
     await drawAndPan();
 
@@ -470,10 +462,8 @@ describe("Chart — older history (terminal-chart spec)", () => {
   });
 
   it("walks past empty windows before calling it the start of history", async () => {
-    // A weekend, a holiday and a pause in collection all look like this: a
-    // range with no candles in it. None of them is the end of the archive, and
-    // four windows — which is what this used to walk — reached back three days,
-    // less than a long Easter weekend.
+    // A weekend, a holiday and a pause in collection all look like this: a range with no candles in it.
+    // Four windows — which is what this used to walk — reached back less than a long Easter weekend.
     source.historyPages = [];
     await drawAndPan();
 
@@ -682,10 +672,8 @@ describe("Chart — agent focus (terminal-chart spec, agent-chart-navigation)", 
   });
 
   it("shows the newest N candles for a last-bars focus, by logical range", async () => {
-    // Sixty candles, not three: a series this short would itself sit inside the pager's
-    // own left-edge margin (`OLDER_MARGIN_BARS`) the moment the logical range narrows to
-    // the newest two, which would fetch more history for a reason that has nothing to do
-    // with this test.
+    // Sixty candles, not three: a series this short would sit inside the pager's own left-edge margin the
+    // moment the range narrows, fetching history for a reason unrelated to this test.
     const long = Array.from({ length: 60 }, (_, i) => bar(1000 + i * 60, i + 1));
     const focus: ChartFocusRequest = { from: null, to: null, around: null, bars: null, lastBars: 2 };
     const { onFocusRequestSettled } = renderChart(source, { focusRequest: focus });
@@ -739,10 +727,8 @@ describe("Chart — agent focus (terminal-chart spec, agent-chart-navigation)", 
   });
 
   it("asks for the whole window to a distant focus in one read, not a page at a time", async () => {
-    // The bug this exists for: the pager walks about a day of calendar per page on
-    // MINUTE_5 and stops after twenty of them, so a focus five months back was never
-    // reached — the chart landed on wherever the walk had got to and looked like it had
-    // moved on purpose. A named moment is asked for once, by name.
+    // The bug this exists for: the pager walks about a day of calendar per page and stops after twenty, so
+    // a focus five months back was never reached. A named moment is asked for once, by name.
     source.historyPages = [olderPage(60)];
     const focus: ChartFocusRequest = {
       from: -1_000_000,
@@ -764,9 +750,8 @@ describe("Chart — agent focus (terminal-chart spec, agent-chart-navigation)", 
   });
 
   it("reads back past an around/bars focus by the half of it that sits before the moment", async () => {
-    // A centred frame needs candles on both sides. Reading only as far back as `around`
-    // puts it on the series' first bar, and the frame the operator asked for comes out
-    // shifted half a screen to the right.
+    // A centred frame needs candles on both sides. Reading only as far back as `around` puts it on the
+    // series' first bar, and the frame comes out shifted half a screen to the right.
     const focus: ChartFocusRequest = {
       from: null,
       to: null,
@@ -786,9 +771,8 @@ describe("Chart — agent focus (terminal-chart spec, agent-chart-navigation)", 
   });
 
   it("applies a focus that arrives in the same breath as a resolution change", async () => {
-    // One `set_chart` carrying both is one commit here: the slot's resolution and its
-    // focus request land together. Reported from a live session — the interval changed
-    // and the chart stayed where it was, and only a second, focus-only request moved it.
+    // One `set_chart` carrying both is one commit here. Reported from a live session — the interval
+    // changed and the chart stayed where it was, and only a second, focus-only request moved it.
     const { rerender, onResolutionChange, onFocusRequestSettled } = renderChart(source, {
       resolution: "MINUTE_5",
     });
@@ -817,9 +801,8 @@ describe("Chart — agent focus (terminal-chart spec, agent-chart-navigation)", 
   });
 
   it("applies a distant focus that arrives with a resolution change, not only the change", async () => {
-    // The shape the live session actually sent: one `set_chart` with a symbol, an
-    // interval, indicators and a focus months back. The interval changed and the chart
-    // did not move; a second, focus-only request moved it.
+    // The shape the live session actually sent: one `set_chart` with a symbol, an interval, indicators
+    // and a focus months back.
     source.historyPages = [olderPage(60), olderPage(60)];
     const { rerender, onResolutionChange, onFocusRequestSettled } = renderChart(source, {
       resolution: "HOUR",
@@ -854,10 +837,8 @@ describe("Chart — agent focus (terminal-chart spec, agent-chart-navigation)", 
   });
 
   it("does not lose a new focus to the abandoning of the one before it", async () => {
-    // The live sequence: a focus was asked for and could not be reached, so it sat
-    // pending; the next command carried a new focus *and* a new interval. The interval
-    // change abandons whatever was pending — and telling the caller so clears the request
-    // the store is holding, which by then is the new one.
+    // The live sequence: a focus that could not be reached sat pending, and the next command carried a
+    // new focus *and* a new interval. The interval change abandons whatever was pending.
     source.historyPages = []; // nothing older, so the first focus stays out of reach
     const first: ChartFocusRequest = {
       from: -9_000_000,
@@ -893,10 +874,8 @@ describe("Chart — agent focus (terminal-chart spec, agent-chart-navigation)", 
   });
 
   it("settles a focus the archive has no candles far enough back for", async () => {
-    // One read is the whole attempt, so the wait ends either way. Before `stoppedShort`
-    // the request sat in `pendingFocusRef` unsettled: the chart never moved,
-    // `onFocusRequestSettled` never fired, and the grid store went on offering the same
-    // request until the symbol changed.
+    // One read is the whole attempt, so the wait ends either way. Before `stoppedShort` the request sat
+    // unsettled: the chart never moved and the store went on offering the same request.
     source.historyPages = [olderPage(60)]; // reaches -3500, nowhere near the target
     const focus: ChartFocusRequest = {
       from: -1_000_000,
@@ -952,11 +931,8 @@ describe("Chart — agent focus (terminal-chart spec, agent-chart-navigation)", 
   });
 
   it("lets the operator pan freely after a focus applies, without snapping back", async () => {
-    // `pan()` is what a drag looks like from the library's side: it moves the range and
-    // notifies subscribers, the same as `setVisibleLogicalRange` — but it is not a call
-    // `Chart.tsx` itself made, so it never lands in `rangesSet`, which only records what
-    // this component wrote. A focus that kept re-asserting itself would show up there as
-    // a second write; one that behaved would not.
+    // `pan()` is what a drag looks like from the library's side, and it is not a call `Chart.tsx` made —
+    // so a focus that kept re-asserting itself would show up in `rangesSet`, and one that behaved would not.
     const focus: ChartFocusRequest = { from: null, to: null, around: null, bars: null, lastBars: 2 };
     renderChart(source, { focusRequest: focus });
     await act(async () => {

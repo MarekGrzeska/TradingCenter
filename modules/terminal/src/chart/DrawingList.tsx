@@ -6,19 +6,8 @@ import { formatInstant } from "../ui/formatTime";
 import { Button } from "../ui/Button";
 
 /**
- * The objects standing on this instrument, and one of the two ways the operator takes one
- * off — the other being the card beside the object itself.
- *
- * That is what it is for: whatever the agent draws must be undoable by hand, without a
- * conversation and without the model (`agent-tools` spec, "Zapis MUST być odwracalny ręką
- * operatora"). So this sits in the chart's own header beside the indicator picker, not
- * inside the agent panel — a list reachable only through the thing it exists to undo
- * would not be reachable at all.
- *
- * Nothing here holds its own copy of the list. Every write goes to the module and the
- * store re-reads: an object removed from the screen but not from the record comes back
- * on the next read, and that reads as a fault (`terminal-chart` spec, "Nieudane usunięcie
- * albo nieudana poprawka").
+ * Whatever the agent draws must be undoable by hand, without a conversation and without the model — so this
+ * sits in the chart's own header. Nothing here holds a copy: every write goes to the module, the store re-reads.
  */
 export interface DrawingListProps {
   drawings: ChartDrawings;
@@ -66,9 +55,8 @@ export function DrawingList({ drawings, selectedId, onSelect }: DrawingListProps
       {open && (
         <div className="absolute top-7 left-0 z-20 max-h-96 w-80 overflow-y-auto rounded border border-border bg-panel p-2 shadow-lg">
           {drawings.status === "error" ? (
-            // Said as its own line above whatever is still on screen: the chart keeps
-            // drawing what it last read, and this says the list may be out of date rather
-            // than pretending the instrument has nothing on it.
+            // Said as its own line above whatever is still on screen: the chart keeps drawing what it
+            // last read, and this says the list may be out of date rather than that the instrument is empty.
             <p className="mb-2 rounded border border-critical/40 px-2 py-1 text-xs text-critical">
               The drawn objects could not be read. {drawings.error}
             </p>
@@ -84,11 +72,8 @@ export function DrawingList({ drawings, selectedId, onSelect }: DrawingListProps
             drawings.status === "loading" ? (
               <p className="px-1 py-2 text-xs text-ink-muted">Reading…</p>
             ) : drawings.status === "error" ? null : (
-              // Only when the read actually succeeded. "Nothing is drawn here" said after
-              // a failed read is a claim about the instrument nobody has grounds for —
-              // and it is precisely the sentence that must not be mistakable for one
-              // (`terminal-chart` spec, "Instrument bez obiektów"); the failure above
-              // stands on its own instead.
+              // Only when the read actually succeeded. "Nothing is drawn here" said after a failed read
+              // is a claim about the instrument nobody has grounds for.
               <p className="px-1 py-2 text-xs text-ink-muted">
                 Nothing is drawn on this instrument.
               </p>
@@ -105,10 +90,8 @@ export function DrawingList({ drawings, selectedId, onSelect }: DrawingListProps
                     (selectedId === drawing.id
                       ? "rounded border border-primary bg-panel-strong px-2 py-1"
                       : "rounded border border-border px-2 py-1") +
-                    // Faded, but never dropped: this list is the only way back to a
-                    // hidden object, so one that left it would be hidden for good
-                    // (`terminal-chart` spec, "Operator zarządza naniesionymi obiektami
-                    // z listy").
+                    // Faded, but never dropped: this list is the only way back to a hidden object, so
+                    // one that left it would be hidden for good.
                     (drawing.hidden ? " opacity-60" : "")
                   }
                 >
@@ -130,9 +113,8 @@ export function DrawingList({ drawings, selectedId, onSelect }: DrawingListProps
                     <span className="ml-auto flex gap-1">
                       <Button
                         size="2xs"
-                        // Picking a row out is the same act as clicking the object on the
-                        // chart, and opens the same editor — the row is where the editor
-                        // appears, the chart is where the card does.
+                        // Picking a row out is the same act as clicking the object on the chart, and
+                        // opens the same editor — the row is where the editor appears.
                         onClick={() => {
                           onSelect(selectedId === drawing.id ? null : drawing.id);
                           setFailure(null);

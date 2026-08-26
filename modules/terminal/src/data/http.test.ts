@@ -5,13 +5,8 @@ import { jsonClient } from "./http";
 import { MarketDataError } from "./types";
 
 /**
- * What the shared client does with the operator's credential.
- *
- * These are `terminal-identity` spec tests, and they live here rather than
- * beside an adapter on purpose: the whole point of attaching the token in one
- * place is that no adapter has to be trusted to do it. A test per adapter would
- * be testing the same line several times over and would still miss the adapter
- * written next year.
+ * `terminal-identity` spec tests, here rather than beside an adapter on purpose: the point of attaching the
+ * token in one place is that no adapter has to be trusted to do it, including the one written next year.
  */
 
 const BASE = "http://archive.test";
@@ -63,9 +58,8 @@ describe("jsonClient and the operator's credential", () => {
         seen.push(request.headers.get("Authorization"));
         return HttpResponse.json({ ok: true });
       }),
-      // The route nobody has written yet, standing in for every route added
-      // later — it carries the token because the client does, not because
-      // whoever writes it remembers to.
+      // The route nobody has written yet, standing in for every route added later — it carries the token
+      // because the client does, not because whoever writes it remembers to.
       http.get(`${BASE}/something-new`, ({ request }) => {
         seen.push(request.headers.get("Authorization"));
         return HttpResponse.json({ ok: true });
@@ -159,9 +153,8 @@ describe("jsonClient and the operator's credential", () => {
   });
 
   it("leaves a token endpoint that is merely down as something to retry", async () => {
-    // Not a `SignedOut`: the session may be perfectly good and the network
-    // briefly not. Reporting it as signed out would send the operator through a
-    // sign-in they did not need — and one they might not be able to complete.
+    // Not a `SignedOut`: the session may be good and the network briefly not. Reporting it as signed out
+    // sends the operator through a sign-in they did not need and may not be able to complete.
     const flaky: Identity = {
       ...noIdentity,
       token: async () => {

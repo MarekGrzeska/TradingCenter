@@ -1,13 +1,6 @@
 /**
- * The agent's turn, read as it arrives — `fetch` + `ReadableStream`, not `EventSource`:
- * the route is a `POST` and carries an `Authorization` header, neither of which
- * `EventSource` can do (design.md, "Odpowiedź strumieniem: fetch + ReadableStream, nie
- * EventSource"). Nothing here is agent-specific vocabulary beyond the four event kinds
- * the module actually sends — `_sse` in `agent/routers/sessions.py`.
- *
- * `parseSseFrame` is a pure string function and is the whole of what is agent-specific
- * here — the reading itself lives in `data/sseStream.ts`, shared with the run stream on
- * the teams side, which knows a different five event names and none of these.
+ * The agent's turn read as it arrives — `fetch` + `ReadableStream`, not `EventSource`: the route is a `POST` and
+ * carries an `Authorization` header. `parseSseFrame` is the whole of what is agent-specific; the reader is shared.
  */
 
 import { readSseStream } from "../data/sseStream";
@@ -23,9 +16,8 @@ export type AgentStreamEvent =
   | { kind: "stopped" };
 
 /**
- * One frame to a typed event, or `null` for a keepalive comment (`: ping`, sent every
- * `_KEEPALIVE_SECONDS` so App Service does not drop an idle connection — design.md), a
- * blank frame, or an event name this terminal has no use for.
+ * One frame to a typed event, or `null` for a keepalive comment, a blank frame, or an event name this
+ * terminal has no use for.
  */
 export function parseSseFrame(frame: string): AgentStreamEvent | null {
   if (frame.trim() === "" || frame.startsWith(":")) return null;
@@ -43,9 +35,8 @@ export function parseSseFrame(frame: string): AgentStreamEvent | null {
     case "fragment":
       return { kind: "fragment", text: String(payload.text ?? "") };
     case "tool_call":
-      // The module publishes one shape for a call whether it arrives here or on a
-      // reloaded transcript (`agent/contract.py`, `ToolCallOut`), so both paths land in
-      // the same mapper and the panel cannot be shown two different versions of one call.
+      // The module publishes one shape for a call whether it arrives here or on a reloaded transcript, so
+      // both paths land in the same mapper and the panel cannot be shown two versions of one call.
       return { kind: "toolCall", call: mapToolCall(payload as unknown as RawToolCall) };
     case "complete":
       return { kind: "complete", incomplete: Boolean(payload.incomplete) };
@@ -59,12 +50,8 @@ export function parseSseFrame(frame: string): AgentStreamEvent | null {
 }
 
 /**
- * Reads a turn's body as the sequence of events it carries, stopping at whichever
- * terminal event arrives first — `complete`, `error`, or `stopped`, the three endings a
- * turn has (`agent-chat` spec). A body that ends with none of them — the connection
- * dropped — simply ends the generator without one; the caller (`agentChatStore`) is
- * where that silence becomes a visible error, since only it knows what, if anything,
- * arrived before the drop.
+ * A turn's body as the events it carries, stopping at the first terminal one. A body ending with none of them just
+ * ends the generator: the caller is where that silence becomes an error, since only it knows what arrived.
  */
 export function readAgentStream(body: ReadableStream<Uint8Array>): AsyncGenerator<AgentStreamEvent> {
   return readSseStream(

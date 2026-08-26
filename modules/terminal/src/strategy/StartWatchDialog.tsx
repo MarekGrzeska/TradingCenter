@@ -7,24 +7,8 @@ import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import type { Strategy, StrategyApi } from "./strategyApi";
 
 /**
- * Starting to watch a pair with a strategy.
- *
- * **The ranges come from the module, not from here.** Every parameter carries its own
- * bounds in the catalogue, and the module refuses a value outside them at the moment the
- * set is written — before any bar is evaluated. This dialog shows those bounds and lets
- * the refusal happen rather than second-guessing it: a copy of the rule here would be a
- * second opinion about numbers this screen does not own, and the two would drift.
- *
- * Left untouched, the parameters are not sent at all. The module then writes a set from
- * the strategy's own defaults, resolved — which is what would be stored either way, and is
- * one fewer place holding an opinion about values it did not declare.
- *
- * **The instrument is chosen from the archive, not typed.** A strategy decides on the
- * archive's candles and on nothing else, so a symbol it does not collect is a watch that
- * can only ever record refusals — and typed by hand, the way it is spelled is a guess the
- * operator has no way to check from here. The list is read when this dialog opens rather
- * than with the screen: it is one request, and it is only ever wanted by somebody about to
- * start something.
+ * **The ranges come from the module**, and untouched parameters are not sent at all, so the module writes its own
+ * defaults. **The instrument is chosen from the archive**: a pair it does not collect can only record refusals.
  */
 
 const NO_PAIRS: TrackedPair[] = [];
@@ -50,12 +34,8 @@ export function StartWatchDialog({
   onClose(): void;
   onStarted(): void;
 }) {
-  // **Which strategy is chosen is derived, not stored until it is chosen.** The catalogue
-  // can arrive after this dialog does — against a cold module in Azure that read takes
-  // seconds — and an initial state captured in that window stayed empty for good: the
-  // select filled itself, nothing in it was selected, and "Zacznij" was disabled with
-  // nothing on screen saying why. `null` here means "not chosen yet", which resolves to
-  // the first entry of whatever the catalogue turned out to hold.
+  // Derived, not stored until chosen: against a cold module the catalogue read takes seconds, and an initial state
+  // captured in that window stayed empty for good — a filled select with nothing selected and "Zacznij" disabled.
   const [chosen, setChosen] = useState<string | null>(null);
   const [chosenSymbol, setChosenSymbol] = useState<string | null>(null);
   const [overrides, setOverrides] = useState<Record<string, string>>({});
@@ -82,11 +62,8 @@ export function StartWatchDialog({
     [strategies, strategyId],
   );
 
-  // What the archive actually holds for the chosen instrument, in the terminal's own
-  // interval order. Shown rather than checked against the strategy's own interval: which
-  // intervals can be served from which — a rollup is built off the minute series — is the
-  // archive's rule, and a copy of it here would be a second opinion that drifts. The
-  // platform records a coverage refusal, with its reason, if the bars are not there.
+  // Shown rather than checked against the strategy's interval: which intervals can be served from which is the
+  // archive's rule, and a copy here would drift. The platform records a coverage refusal if the bars are not there.
   const held = useMemo(
     () =>
       RESOLUTIONS.filter((resolution) =>
@@ -103,9 +80,8 @@ export function StartWatchDialog({
       confirmDisabled={strategyId === "" || symbol === ""}
       fallbackError="nie udało się założyć obserwacji"
       onConfirm={async () => {
-        // Only what the operator actually typed. An untouched field means "the default",
-        // and sending the default back would make this screen the author of a value it
-        // merely displayed.
+        // Only what the operator actually typed. An untouched field means "the default", and sending it back would
+        // make this screen the author of a value it merely displayed.
         const params: Record<string, number> = {};
         for (const [name, raw] of Object.entries(overrides)) {
           if (raw.trim() === "") continue;

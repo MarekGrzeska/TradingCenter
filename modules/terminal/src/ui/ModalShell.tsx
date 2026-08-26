@@ -3,20 +3,8 @@ import type { KeyboardEvent, ReactNode } from "react";
 import { Button } from "./Button";
 
 /**
- * Everything a modal owes the operator, in one place: the ground it dims, the focus it
- * takes and gives back, the keyboard it keeps inside itself, and `Escape`.
- *
- * `ConfirmDialog` was that place while every modal here was a question. It is not one any
- * more — an agent's settings are edited in a modal too, and a form is not a question with
- * a longer body: it has no consent to gather, no work to hold in flight and no failure to
- * keep beside a decision. Rather than bend the question into a form, the behaviours the
- * `terminal-dialogs` spec asks for ("Wszystkie dialogi wychodzą z jednego miejsca") moved
- * down here, and `ConfirmDialog` is now the question built on them.
- *
- * Focus and `Escape` are hand-rolled because no version of jsdom implements
- * `<dialog>.showModal()` (checked 25, 26 and 30), so the native route would put every one
- * of these behaviours behind a polyfill written for the tests rather than the thing that
- * ships.
+ * Everything a modal owes the operator: the dimmed ground, the focus it takes and gives back, and `Escape`. Hand-rolled
+ * because no jsdom implements `<dialog>.showModal()`, so the native route is a polyfill written for the tests.
  */
 
 /** Everything inside the panel a Tab can land on. Queried per keystroke rather
@@ -26,11 +14,8 @@ import { Button } from "./Button";
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-/** `question` is the width a sentence and two buttons want. `wide` is for a modal that
- *  exists *because* the panel it replaced was too narrow — it also takes a fixed height,
- *  so the columns inside it have something to scroll against. `reading` is for the one job
- *  that is neither: several pages of a model's prose, where the limit on how much fits is
- *  the screen and nothing else. */
+/** `question` is the width a sentence and two buttons want. `wide` is for a modal that exists *because* its panel was
+ *  too narrow, and takes a fixed height to scroll against. `reading` is several pages of prose, limited by the screen. */
 const SIZES = {
   question: "max-h-[85vh] w-full max-w-2xl",
   wide: "h-[85vh] w-full max-w-6xl",
@@ -61,9 +46,8 @@ export function ModalShell({
   const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    // Where focus was before this opened, so it can be given back — otherwise
-    // closing drops the operator at the top of the document and a keyboard walk
-    // through the table starts over.
+    // Where focus was before this opened, so it can be given back — otherwise closing drops the operator at the top
+    // of the document and a keyboard walk through the table starts over.
     const opener = document.activeElement;
     panelRef.current?.focus();
     return () => {
@@ -74,9 +58,8 @@ export function ModalShell({
   const onKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       if (event.key === "Escape") {
-        // Not while the work is in flight: it carries on whether or not the
-        // operator is watching, and a dialog that leaves takes the outcome with
-        // it (`terminal-dialogs` spec, "Escape w trakcie pracy").
+        // Not while the work is in flight: it carries on whether or not the operator is watching, and a dialog that
+        // leaves takes the outcome with it (`terminal-dialogs` spec, "Escape w trakcie pracy").
         if (closeDisabled) return;
         event.stopPropagation();
         onClose();

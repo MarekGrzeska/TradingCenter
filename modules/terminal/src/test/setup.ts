@@ -3,12 +3,8 @@ import { afterEach } from "vitest";
 import { notifyManager } from "@tanstack/react-query";
 import { queryClient } from "../data/query";
 
-// Node takes Intl's default locale from the operating system and, on Windows, from
-// nothing else — LANG and LC_ALL are both ignored there. So `12431.toLocaleString()`
-// is "12,431" on CI's C locale and "12 431" (a non-breaking space) on a Polish
-// machine, and every assertion counting candles or megabytes fails locally while
-// passing in CI. The views follow the operator's locale on purpose, so the default is
-// pinned here rather than in the components.
+// Node takes Intl's default locale from the OS and, on Windows, from nothing else — LANG and LC_ALL are ignored — so
+// `12431.toLocaleString()` differs between CI and a Polish machine. The views follow the operator's locale on purpose.
 const formatNumber = Number.prototype.toLocaleString;
 Number.prototype.toLocaleString = function (
   locales?: string | string[],
@@ -27,15 +23,8 @@ if (!("ResizeObserver" in globalThis)) {
   };
 }
 
-// Node 20 had no `localStorage`; Node 22 and later ship one as a global, and it
-// arrives in the jsdom environment as a bare object with none of Storage's
-// methods on it — `window.localStorage === globalThis.localStorage`, and
-// `.clear` is undefined. Anything reading a stored grid layout then fails with
-// "localStorage.clear is not a function", which reads like a bug in the code
-// under test rather than a collision between two runtimes' globals.
-//
-// Replaced rather than patched: a half-working Storage is worse than an
-// obviously fake one, and the tests want a clean slate per file anyway.
+// Node 22 and later ship a `localStorage` global that arrives in jsdom as a bare object with none of Storage's methods,
+// so `.clear is not a function` reads like a bug in the code under test. Replaced rather than patched.
 if (typeof globalThis.localStorage?.clear !== "function") {
   class MemoryStorage implements Storage {
     private entries = new Map<string, string>();
@@ -75,17 +64,12 @@ if (typeof globalThis.localStorage?.clear !== "function") {
   }
 }
 
-// Every read in the terminal goes through one cache (`data/query.ts`), so a test
-// starting with what the previous one left there would be answering from a fake
-// archive that has since been thrown away. Cleared per test, and retries turned off:
-// a test asserting "unreachable" would otherwise wait out a real backoff.
+// Every read goes through one cache (`data/query.ts`), so a test would answer from a fake archive since thrown away.
+// Retries off too: a test asserting "unreachable" would otherwise wait out a real backoff.
 queryClient.setDefaultOptions({ queries: { retry: false } });
 
-// TanStack batches its notifications behind a scheduler of its own, so a re-read that
-// has already resolved lands one macrotask after the timer that asked for it. A test
-// advancing fake timers by exactly the poll interval then asserts against the previous
-// answer. Flushed on the spot here: the batching is a rendering optimisation, and every
-// assertion in this suite is already inside `act`.
+// TanStack batches notifications behind its own scheduler, so a resolved re-read lands one macrotask after the timer
+// that asked for it. Flushed here: the batching is a rendering optimisation, and every assertion is already in `act`.
 notifyManager.setScheduler((flush) => flush());
 afterEach(() => {
   queryClient.clear();

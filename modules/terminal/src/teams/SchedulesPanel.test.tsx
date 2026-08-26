@@ -258,10 +258,8 @@ describe("creating and editing a schedule", () => {
   });
 
   it("shows the module's own words when enabling is refused", async () => {
-    // Without this the rejected call was invisible: the button went back to saying
-    // "Enable" and the operator was left with a schedule that had not changed and no
-    // reason why (`terminal-teams-schedules`, "Odmowa modułu jest pokazana słowami
-    // modułu").
+    // Without this the rejected call was invisible: the button went back to saying "Enable" and the operator
+    // was left with an unchanged schedule and no reason why (`terminal-teams-schedules`).
     const api = fakeApi({
       listSchedules: vi.fn(async () => [{ ...SCHEDULE, enabled: false, disabledReason: null }]),
       enableSchedule: vi.fn(async () => {

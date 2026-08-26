@@ -3,12 +3,8 @@ import type { Bar, ChartFocusRequest, Resolution } from "../data/types";
 import type { BarsRange } from "./indicators/useIndicators";
 
 /**
- * How much of the axis a chart asks for, and where on it a given moment sits.
- *
- * Arithmetic over bars and ranges, with no chart object in sight — which is why it is
- * here and not in `Chart.tsx`: every one of these answers a question the effects there
- * ask ("does the series still cover this?", "how far back does this focus reach?"), and
- * each is worth reading on its own rather than in the middle of an effect.
+ * How much of the axis a chart asks for, and where on it a moment sits — arithmetic over bars and ranges,
+ * with no chart object in sight, each answer worth reading on its own rather than inside an effect.
  */
 
 export function toCandlestick(bar: Bar): CandlestickData<Time> {
@@ -48,17 +44,10 @@ export function reachesBack(series: readonly Bar[], focus: ChartFocusRequest): b
   return target !== null && series[0].time <= target;
 }
 
-/** The window indicators are computed over: what is on screen, widened by a margin, and
- *  never wider than `MAX_INDICATOR_SPAN_BARS` of the resolution's own candles.
- *
- *  Follows the viewport rather than the drawn series, and that is the whole point. The
- *  series after a focus jump runs from March to the live edge with a five-month hole in
- *  the middle; asking for indicators over *that* prices a request nobody wants and gets a
- *  refusal for it. What the operator is looking at is a screenful either way.
- *
- *  `visible` is null before the chart has a frame — the first draw, and every draw where
- *  the library has not answered yet. The newest candles are the honest guess there: it is
- *  where an unfocused chart opens. */
+/**
+ * The window indicators are computed over: the viewport widened by a margin, capped. The viewport rather than
+ * the drawn series, which after a focus jump runs from March to the live edge with a five-month hole.
+ */
 export function indicatorWindow(
   series: readonly Bar[],
   visible: LogicalRange | null,
@@ -71,16 +60,13 @@ export function indicatorWindow(
 
   const fromIndex = Math.max(0, Math.min(lastIndex, rawFrom - INDICATOR_MARGIN_BARS));
   let toIndex = Math.max(fromIndex, Math.min(lastIndex, rawTo + INDICATOR_MARGIN_BARS));
-  // Never the forming candle. A window ending on it would move with every tick, and
-  // moving the window is what asks the archive for a new answer — the one thing this
-  // must not do while a candle is still being built ("na żywo" is a later stage; see
-  // `useIndicators`). Ending on the bar that last settled is what `applyBar` always did.
+  // Never the forming candle. A window ending on it would move with every tick, and moving the window is
+  // what asks the archive for a new answer.
   if (series[toIndex].forming && toIndex > fromIndex) toIndex -= 1;
 
   const to = series[toIndex].time;
-  // Clamped in time, not in candle count: the count is what the module prices, and it
-  // prices it as periods between two moments — so a window straddling the hole a jump
-  // leaves in the series is enormous however few candles are actually in it.
+  // Clamped in time, not in candle count: the module prices a request as periods between two moments, so
+  // a window straddling the hole a jump leaves is enormous however few candles are in it.
   const floor = to - MAX_INDICATOR_SPAN_BARS * RESOLUTION_SECONDS[resolution];
   return { from: Math.max(series[fromIndex].time, floor), to };
 }
@@ -100,17 +86,9 @@ export function windowStillCovers(
   return from >= window.from && to <= window.to;
 }
 
-/** The earliest moment a focus needs drawn before it can be shown in full, or null for
- *  one that names no moment at all (`lastBars`, which is always at the newest end and can
- *  only ever want *more* of what is already there).
- *
- *  Not simply `focus.from ?? focus.around`, which is what `reachesBack` asks: an
- *  `around`+`bars` focus is centred, so half its candles sit *before* the moment it names.
- *  Reading only as far back as `around` puts the target on the series' first bar, and a
- *  frame centred there is the one the operator asked for shifted half a screen right.
- *  Sized with `RESOLUTION_SECONDS`, which is an approximation — a generous one here, since
- *  reading a little too far back costs candles nobody looks at and reading too little
- *  costs the frame. */
+/** The earliest moment a focus needs drawn before it can be shown in full, or null for one that names no
+ *  moment at all. Not simply `focus.from ?? focus.around`: an `around`+`bars` focus is centred, so half
+ *  its candles sit before the moment it names, and reading only that far back shifts the frame. */
 export function focusNeedsBackTo(focus: ChartFocusRequest, resolution: Resolution): number | null {
   if (focus.from !== null) return focus.from;
   if (focus.around !== null && focus.bars !== null) {
@@ -119,11 +97,8 @@ export function focusNeedsBackTo(focus: ChartFocusRequest, resolution: Resolutio
   return null;
 }
 
-/** Whether the drawn series has *any* candle the requested fragment could show — the
- *  weaker condition checked once the pager has given up, since a fragment only partly
- *  reached is still a fragment worth showing (`terminal-chart` spec, "Kadr na fragment
- *  już narysowany" is the applied case; "Kadr na okres, którego archiwum nie ma" is the
- *  one this returns `false` for). */
+/** Whether the drawn series has *any* candle the requested fragment could show — the weaker condition
+ *  checked once the pager has given up, since a fragment only partly reached is still worth showing. */
 export function overlapsSeries(series: readonly Bar[], focus: ChartFocusRequest): boolean {
   if (series.length === 0) return false;
   if (focus.lastBars !== null) return true;
@@ -158,19 +133,10 @@ export const OLDER_MARGIN_BARS = 50;
  *  archive for a new one on every drag. */
 export const INDICATOR_MARGIN_BARS = 300;
 
-/** The widest span, in candles, one indicator request may cover.
- *
- *  Indicators used to be computed over the whole drawn series, which was fine while the
- *  series was whatever the operator had panned through. It stopped being fine when a
- *  focus could jump five months back: market-data prices a request as
- *  candles×indicators against a ceiling of 200,000, and six months of MINUTE_5 with four
- *  averages on it asks for 211,000 — a 422, and a chart that draws candles with no
- *  indicators on them at all.
- *
- *  Chosen against that ceiling with room for the instances an operator actually stacks:
- *  five thousand candles carries forty of them and still fits. It is not a copy of the
- *  module's number — the module refuses for its own reasons and this is the terminal not
- *  asking absurd questions in the first place. */
+/**
+ * The widest span one indicator request may cover: six months of MINUTE_5 with four averages asks for 211,000
+ * against the module's ceiling of 200,000. Not a copy of that number — this is not asking absurd questions.
+ */
 export const MAX_INDICATOR_SPAN_BARS = 5_000;
 
 /** How near the newest drawn bar counts as "standing at the live edge" — a resolution
@@ -179,19 +145,13 @@ export const MAX_INDICATOR_SPAN_BARS = 5_000;
  *  last index. */
 export const RIGHT_EDGE_SLACK_BARS = 3;
 
-/** How many candles a resolution change shows, floor and ceiling — the same reasoning
- *  `agent-chart-navigation`'s `MIN_FOCUS_BARS`/`MAX_FOCUS_BARS` used for a chart focus:
- *  below the floor there is nothing readable, above the ceiling a mismatch between the
- *  old and the new interval (WEEK's month of candles read as MINUTE_5) would ask for a
- *  screen no operator can use anyway. */
+/** How many candles a resolution change shows, floor and ceiling: below the floor there is nothing
+ *  readable, above it a mismatch between the old and new interval asks for a screen nobody can use. */
 export const MIN_VISIBLE_BARS = 10;
 export const MAX_VISIBLE_BARS = 500;
 
-/** A candle's nominal length, seconds — an approximation good enough to size a viewport
- *  around, never a claim about when a real session opens (`useOlderBars.ts` refuses to
- *  keep a table like this for that reason, and does not need to: it measures the window
- *  it asks for from the drawn series' own timestamps instead). This one only decides how
- *  many candles roughly fill the span the operator was looking at. */
+/** A candle's nominal length, seconds — an approximation good enough to size a viewport around, never a
+ *  claim about when a real session opens. It only decides how many candles roughly fill a span. */
 export const RESOLUTION_SECONDS: Record<Resolution, number> = {
   MINUTE: 60,
   MINUTE_5: 300,

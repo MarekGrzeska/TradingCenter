@@ -1,11 +1,6 @@
 /**
- * A stand-in for the slice of `msw` this suite used, backed by swapping
- * `globalThis.fetch`. `msw` stopped intercepting on Node 25 — a matching request hangs
- * rather than answering, which reads exactly like the code under test being broken — and
- * answering a `fetch` needs no service worker.
- *
- * The shape is deliberately msw's, so the tests written against it still say the same
- * things.
+ * A stand-in for the slice of `msw` this suite used, backed by swapping `globalThis.fetch`: `msw` stopped intercepting
+ * on Node 25, hanging rather than answering. The shape is deliberately msw's, so the tests still say the same things.
  */
 
 type Resolver = (context: { request: Request }) => Response | Promise<Response>;
@@ -60,21 +55,14 @@ export function setupServer(...initial: Handler[]): MockServer {
   let original: typeof fetch | undefined;
 
   const swapped: typeof fetch = async (input, init) => {
-    // Deliberately not `new Request(input, init)`. jsdom's `Request` refuses an
-    // `AbortSignal` built by the test's own realm, and the resulting throw
-    // reaches the adapter as a transport failure — reported as "the back end is
-    // not reachable", which is precisely the misleading state this file exists
-    // to remove. The two fields a resolver actually reads are built by hand.
-    // Resolved against the page, because the app's default addresses are
-    // relative (`/api`, `/archive-api`) — what the dev proxy expects — and a
-    // handler is written with the origin spelled out.
+    // Deliberately not `new Request(input, init)`: jsdom's refuses an `AbortSignal` from the test's own realm, and the
+    // throw reaches the adapter as "the back end is not reachable" — the misleading state this file exists to remove.
     const raw = typeof input === "string" ? input : (input as { url: string }).url;
     const url = new URL(raw, globalThis.location?.href ?? "http://localhost").href;
     const method = (init?.method ?? "GET").toUpperCase();
     const body = init?.body;
-    // Carried through because a resolver now has a reason to read them: the
-    // shared client attaches the operator's token itself, and the only way to
-    // assert that it did is to look at what arrived.
+    // Carried through because a resolver now has a reason to read them: the shared client attaches the operator's
+    // token itself, and the only way to assert that it did is to look at what arrived.
     const headers = new Headers(init?.headers as HeadersInit | undefined);
     const request = {
       url,
@@ -95,9 +83,8 @@ export function setupServer(...initial: Handler[]): MockServer {
       if (onUnhandled === "bypass" && original) {
         return original(input as RequestInfo, init);
       }
-      // Thrown rather than answered with a status: a request nobody planned for
-      // is a test that has drifted from the code, and a 404 would be quietly
-      // absorbed by an adapter that has a meaning for one.
+      // Thrown rather than answered with a status: a request nobody planned for is a test that has drifted, and a
+      // 404 would be quietly absorbed by an adapter that has a meaning for one.
       throw new Error(`unhandled request: ${method} ${url}`);
     }
 

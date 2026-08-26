@@ -11,16 +11,8 @@ export interface UsageState {
 }
 
 /**
- * Reads `GET /usage` for one range, refetching whenever the range changes — the range
- * is part of the cache key, so switching back to a range already read renders it while
- * the fresh answer is on its way.
- *
- * Deliberately unlike `useJobHistory`: there, a failed poll keeps the last good rows
- * on screen with a warning, because a job's history was already known and a page
- * still describes it. Here a failure clears `summary` instead — `terminal-agent-cost`
- * spec, "MUST NOT pokazywać liczb sprzed awarii jako bieżących". A stale cost read as
- * current is exactly the failure this tab exists to keep from happening; the other
- * tab's gentler pattern would reproduce it. That is what `onFailure: "forget"` says.
+ * The range is part of the cache key, so switching back renders what is known while the fresh answer arrives. Unlike
+ * `useJobHistory`, a failure clears `summary`: a stale cost read as current is what this tab exists to prevent.
  */
 export function useUsage(api: AgentApi, range: UsageRange): UsageState {
   const read = useRead<AgentUsageSummary | null>({

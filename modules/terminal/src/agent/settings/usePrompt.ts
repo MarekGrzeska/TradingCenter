@@ -11,11 +11,8 @@ export interface PromptState {
 }
 
 /**
- * Reads `GET /prompt` once per mount — `CollapsibleSection` unmounts its body on
- * collapse, so re-expanding is what re-reads, the same "ask the module, not memory"
- * shape `useUsage` uses for cost. `onFailure: "forget"` for the same reason it has one:
- * the prompt on screen is what the operator is about to edit, and one from before an
- * outage is not it.
+ * Reads `GET /prompt` once per mount — the section unmounts its body on collapse, so re-expanding is what
+ * re-reads. `onFailure: "forget"`, because the prompt on screen is what the operator is about to edit.
  */
 export function usePrompt(api: AgentApi): PromptState {
   const read = useRead<AgentPrompt | null>({

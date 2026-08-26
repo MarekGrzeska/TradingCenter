@@ -1,27 +1,6 @@
 /**
- * The strategy platform, read straight from `strategy`.
- *
- * Its own client rather than a route under the archive's: a different App Service behind a
- * different gate, so it carries a token minted for **its** audience and nobody else's
- * (specs/terminal-identity). The wire types come from `contract.strategy.generated.ts`,
- * generated from that module's own Pydantic models — this file maps them to what the views
- * want and is the only place the two shapes meet.
- *
- * **Most of what this reads is a refusal.** A strategy worth running says no to the large
- * majority of the bars it sees, so `listDecisions` is not a feed of opportunities; it is
- * the record that answers "why has nothing happened". `reasonKind` travels with every
- * refusal because the three kinds have three different answers — fetch history, read the
- * strategy, or raise a limit — and a view that flattened them into "no signal" would send
- * somebody the wrong way.
- *
- * **Nothing here can move an account.** The module has no route that does, by design, so
- * there is no call to write and none to guard against.
- *
- * **The rule is the one thing not mapped.** Every other shape here is translated from the
- * wire into what the views want; `Rule` and its node types are re-exported from the
- * generated contract unchanged, because a second shape for the vocabulary is exactly what
- * the module avoided by defining it once (`strategy/rule.py`). A mapper here would be the
- * place the editor and the interpreter drift apart.
+ * Its own client rather than a route under the archive's, carrying a token for **its** audience. Most of what it reads is
+ * a refusal, so `reasonKind` travels with each. `Rule` is re-exported unmapped: a second shape is where the two drift.
  */
 
 import { noIdentity, type Identity } from "../auth/identity";
@@ -29,8 +8,6 @@ import type { components } from "../data/contract.strategy.generated";
 import { jsonClient, statusMapper } from "../data/http";
 
 type Schemas = components["schemas"];
-
-// --- what the views work in -----------------------------------------------------------
 
 /** Which layer said no. `null` on a decision that is not a refusal. */
 export type ReasonKind = "strategy" | "coverage" | "limit";
@@ -68,8 +45,6 @@ export interface Strategy {
   /** Which revision this was built from; `null` for a coded entry. */
   revision: number | null;
 }
-
-// --- the rule, as the module defines it ------------------------------------------------
 
 /** One written rule, exactly as the module spells it. Not translated — see the note at the
  *  top of this file. The `-Output` variant differs from `-Input` only in which defaults are
@@ -165,8 +140,6 @@ export interface BacktestRun {
   report: Record<string, unknown>;
   ranAt: Date;
 }
-
-// --- wire to view ---------------------------------------------------------------------
 
 function mapStrategy(raw: Schemas["StrategyOut"]): Strategy {
   return {
@@ -275,21 +248,9 @@ function mapBacktestRun(raw: Schemas["BacktestRunOut"]): BacktestRun {
   };
 }
 
-// --- the client -----------------------------------------------------------------------
-
 /**
- * What each refusal means here.
- *
- * 403 is `refused` rather than a sign-in problem, and that is the distinction this module
- * makes and the platform cannot: a caller Easy Auth admitted may still have no business on
- * the REST contract, because the gate authorizes an application and not a route
- * (`strategy/caller_access.py`). 401 is not in this table and cannot be — `jsonClient`
- * turns it into a lost session before a mapper is reached.
- *
- * 422 covers both a parameter outside its declared range and a strategy this image does not
- * carry: understood, declined, and unchanged on a retry. 504 is the archive being
- * unreachable *from the module* — the module says so rather than pretending it saw nothing,
- * and it is the one status here worth trying again.
+ * 403 is `refused`, not a sign-in problem: the gate authorizes an application, not a route. 422 is a value out of range or
+ * a strategy this image lacks; 504 is the archive unreachable *from the module* — the one status worth trying again.
  */
 const mapStatus = statusMapper({
   403: "refused",
@@ -429,9 +390,8 @@ export function createStrategyApi(
     },
 
     async startWatch(strategyId, symbol, signal, params, revision) {
-      // Two requests when parameters were given, one when they were not — and the module
-      // is what resolves them either way. Sending a set of its own defaults from here
-      // would be this file holding an opinion about values it does not own.
+      // Two requests when parameters were given, one when they were not — the module resolves them either way.
+      // Sending a set of its own defaults from here would be this file holding an opinion about values it does not own.
       let parameterSetId: number | undefined;
       if (params !== undefined) {
         const written = await http.json<Schemas["ParameterSetOut"]>(

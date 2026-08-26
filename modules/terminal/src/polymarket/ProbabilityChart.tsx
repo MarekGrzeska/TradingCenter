@@ -13,26 +13,8 @@ import type { History } from "./polymarketApi";
 import { toLineData } from "./series";
 
 /**
- * One outcome's probability over time.
- *
- * **Its own chart, not the candle chart with a different series.** They share an axis of
- * time and nothing else: that one carries four prices and a volume per bar, drawings the
- * operator places, primitives, a time profile and a control surface for the agent. This
- * one carries a single value on a fixed 0..1 scale and has to be honest about holes.
- * Reusing it would drag all of that into a tab with no use for any of it, and tie two
- * things that change for entirely different reasons.
- *
- * Two things here are the requirement rather than decoration:
- *
- * **The scale is pinned to 0..1.** Autoscaling a probability makes a market that moved
- * from 0,61 to 0,63 look like one that swung across the whole chart, which is the same
- * two-orders-of-magnitude misreading the percent formatting guards against, drawn instead
- * of written.
- *
- * **The coverage boundary is drawn.** A series that stops because nothing older was ever
- * collected looks exactly like a series that stops because the market was young — so the
- * moment the archive actually reaches back to gets a marked line on the plot, positioned
- * from the time scale itself and moved whenever the operator pans.
+ * One outcome over time, in its own chart: the candle chart carries four prices, drawings and an agent surface,
+ * this one a single value. The scale is pinned to 0..1 and the coverage boundary is drawn — both requirements.
  */
 export function ProbabilityChart({
   history,
@@ -63,9 +45,8 @@ export function ProbabilityChart({
       rightPriceScale: { borderColor: colors.axis },
       localization: {
         timeFormatter: (time: Time) => formatCrosshairTime(time as number),
-        // The axis speaks in percent because that is what the rest of the tab shows, off
-        // the same 0..1 value — the multiplication happens in one place per surface and
-        // this is the chart's.
+        // The axis speaks in percent because that is what the rest of the tab shows, off the same 0..1
+        // value — the multiplication happens once per surface, and this is the chart's.
         priceFormatter: (price: number) => `${(price * 100).toFixed(1)}%`,
       },
       timeScale: { borderColor: colors.axis, timeVisible: true, secondsVisible: false },
@@ -116,9 +97,8 @@ export function ProbabilityChart({
       return;
     }
 
-    // Positioned from the time scale rather than from the data, so it lands correctly even
-    // when the boundary falls outside the drawn points — which is exactly the case it
-    // exists for.
+    // Positioned from the time scale rather than from the data, so it lands correctly even when the
+    // boundary falls outside the drawn points — which is exactly the case it exists for.
     const place = () => {
       const x = chart
         .timeScale()

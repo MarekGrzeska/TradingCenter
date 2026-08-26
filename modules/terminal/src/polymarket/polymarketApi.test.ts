@@ -4,9 +4,8 @@ import { http, HttpResponse, setupServer } from "../test/httpDouble";
 import { createPolymarketApi } from "./polymarketApi";
 
 /**
- * The wire↔domain seam, which is the whole reason this file exists — everything past it
- * works in `Date`s, camelCase and probabilities on 0..1, and nothing past it knows what
- * the module's JSON looks like.
+ * The wire↔domain seam, the whole reason that file exists: everything past it works in `Date`s, camelCase and
+ * probabilities on 0..1, and nothing past it knows what the module's JSON looks like.
  */
 
 const HTTP_BASE = "http://polymarket.test";
@@ -375,9 +374,8 @@ describe("groups", () => {
 
 describe("refusals", () => {
   it("tells a caller with no business here apart from a module that did not answer", async () => {
-    // The distinction the platform cannot make: Easy Auth admits an application, and this
-    // module then decides which surface it may reach. One is a permission the operator has
-    // to be granted; the other is an outage.
+    // The distinction the platform cannot make: Easy Auth admits an application, and this module then decides
+    // which surface it may reach. One is a permission to be granted; the other is an outage.
     server.use(
       http.get(`${HTTP_BASE}/events`, () =>
         HttpResponse.json({ detail: "caller may not reach the REST contract" }, { status: 403 }),

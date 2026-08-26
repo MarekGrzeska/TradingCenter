@@ -6,9 +6,8 @@ import { PolymarketView } from "./PolymarketView";
 import type { EventChanges, Group, PolymarketApi, TrackedEvent } from "./polymarketApi";
 
 /**
- * What the operator can change from this tab: the watch list and the groups. Three tests
- * per route — the happy path, an error, and a refusal — because those are the three things
- * a screen has to get right about a write it did not perform itself.
+ * What the operator can change from this tab: the watch list and the groups. Three tests per route — happy path,
+ * error, refusal — because those are the three things a screen has to get right about a write it did not perform.
  */
 
 function event(overrides: Partial<TrackedEvent> = {}): TrackedEvent {

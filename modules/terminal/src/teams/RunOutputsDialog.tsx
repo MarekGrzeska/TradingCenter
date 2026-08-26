@@ -6,23 +6,8 @@ import { outcomeOf, type TeamRunStep, type TeamRunToolCall, type TeamTrade } fro
 import { Button } from "../ui/Button";
 
 /**
- * What the agents wrote, in a window wide enough to read it in.
- *
- * The monitor's right-hand column is 20rem and shows one agent at a time, which is the
- * right shape for the question a run in flight asks — who is working, is anything stuck.
- * It is the wrong shape for the question a *finished* run asks, which is "what did they
- * say", and the answer is prose: several paragraphs per agent, written by a model that had
- * no idea it was going into a column that narrow. The canvas stays where it is; this is a
- * second door to the same rows.
- *
- * `All agents` is the default and it exists because reading a finished run is reading it in
- * order — one agent handed to the next, and the seams between them are half of what there
- * is to learn. Picking one agent narrows to it, with what it called and what it placed
- * underneath, because those explain an output that otherwise looks like an assertion.
- *
- * Nothing here refetches: it renders what `useRunMonitor` already holds, so opening this
- * while a run is still working shows exactly as much as the stream has delivered, and it
- * keeps arriving with the dialog open.
+ * What the agents wrote, in a window wide enough to read prose in — the monitor's 20rem column answers "who is
+ * working", not "what did they say". Refetches nothing: it renders what `useRunMonitor` already holds.
  */
 export function RunOutputsDialog({
   runId,
@@ -143,16 +128,8 @@ function PickerButton({
   );
 }
 
-/** One agent's output, as the Markdown the model actually wrote.
- *
- *  Through `MessageBody`, the same renderer the chat uses, rather than a second one: an
- *  agent's output is model prose in both places, full of `**` and `-` lists that read as
- *  punctuation noise until something interprets them. Reusing it also inherits the reason
- *  it is safe — no `rehype-raw`, so raw HTML in an output is never rendered at all.
- *
- *  Capped at `max-w-4xl` rather than filling the window: a line of text 90rem wide is as
- *  hard to read as one 20rem wide, for the opposite reason. Wider than `max-w-prose`
- *  because the window is now the screen and the extra width is there to be used. */
+/** One agent's output through `MessageBody`, the renderer the chat uses, which inherits the reason it is safe:
+ *  no `rehype-raw`, so raw HTML is never rendered. Capped at `max-w-4xl` — 90rem of line is as unreadable as 20. */
 function OneOutput({ step, role }: { step: TeamRunStep; role: string }) {
   return (
     <section className="flex flex-col gap-1">
@@ -191,15 +168,8 @@ function Called({ calls }: { calls: TeamRunToolCall[] }) {
   );
 }
 
-/** One call, collapsed until asked — the same bargain the chat transcript strikes.
- *
- *  A tool's answer is what the agent's output was built from, and a row saying only `ok`
- *  asks the reader to take that output on trust. It is worth more here than in the chat:
- *  a team is several agents deep, and one agent's tool result is often the whole of what
- *  the next one had to work with.
- *
- *  Collapsed by default, and each one independently: a run of six agents can hold dozens
- *  of calls, and opening them all would bury the outputs this window exists for. */
+/** One call, collapsed until asked, and each independently: a run of six agents holds dozens, and opening them
+ *  all would bury the outputs this window exists for. A tool's answer is what the next agent worked from. */
 function OneCall({ call }: { call: TeamRunToolCall }) {
   const [expanded, setExpanded] = useState(false);
   const summary = `${call.toolName} — ${call.outcome}`;
@@ -226,10 +196,8 @@ function OneCall({ call }: { call: TeamRunToolCall }) {
       {expanded && (
         <div className="border-t border-border px-2 py-1.5">
           {call.detail === undefined ? (
-            // Said outright rather than drawn as an empty box: this call arrived on the
-            // stream, which carries no body, and the recorded rows were read before it
-            // happened. An empty `arguments` and an empty result would read as a tool
-            // that was given nothing and answered nothing.
+            // Said outright rather than drawn as an empty box: this call arrived on the stream, which
+            // carries no body, and an empty `arguments` would read as a tool given nothing.
             <p className="text-ink-muted">
               This call arrived while the run was being watched — its arguments and answer
               have not been read yet. Reopen the run to read them.

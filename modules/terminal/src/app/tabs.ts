@@ -9,15 +9,8 @@ import { StrategyView } from "../strategy/StrategyView";
 import { TeamsView } from "../teams/TeamsView";
 
 /**
- * The one place tabs are declared — routing and the nav bar are both derived
- * from this list, so adding a tab is an entry here, not a change to either.
- * terminal-shell spec, "Rejestr zakładek jest otwarty".
- *
- * `Archive` is gone rather than renamed: `Instruments` absorbed it, so a
- * stale `/archive` bookmark falls through to the unknown-tab page rather than
- * a silent redirect (design.md, "Zakładki: `Archive` znika, `Data History`
- * dochodzi"). Every entry here has a view — a tab with none does not belong
- * in the registry (terminal-shell spec, "Rejestr zakładek jest otwarty").
+ * The one place tabs are declared — routing and the nav bar are both derived from it. `Archive` is gone rather than
+ * renamed, so a stale bookmark falls through to the unknown-tab page instead of a silent redirect.
  */
 export interface TabDefinition {
   id: string;

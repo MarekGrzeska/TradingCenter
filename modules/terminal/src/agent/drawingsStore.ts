@@ -6,18 +6,8 @@ import {
 } from "./agentApi";
 
 /**
- * What is drawn on each instrument the terminal is looking at, and the operator's hand
- * on it.
- *
- * One entry per symbol rather than one per slot: a drawing belongs to the instrument, so
- * two slots showing US100 read the same entry and show the same objects
- * (`agent-chart-drawings` spec, "Ten sam poziom w dwóch slotach"). Nothing is persisted
- * — the module is the record, and a copy in `localStorage` would be a second one to keep
- * in step.
- *
- * State, not a log: a read replaces a symbol's whole list. There is no cursor here for
- * the same reason there is none on the wire (design.md, "Rysunek jest stanem, nie
- * logiem").
+ * One entry per symbol rather than per slot: a drawing belongs to the instrument, so two slots on US100 read the
+ * same entry. Nothing is persisted, and a read replaces a symbol's whole list — the module is the record.
  */
 
 export type DrawingsStatus = "loading" | "ready" | "error";

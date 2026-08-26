@@ -6,9 +6,8 @@ import { RemoveEventDialog } from "./RemoveEventDialog";
 import type { PolymarketApi, TrackedEvent } from "./polymarketApi";
 
 /**
- * The one irreversible act the terminal offers, and the only door to it anywhere: no tool
- * the model holds removes an observation. The first test is about wording, because wording
- * is what the requirement is made of.
+ * The one irreversible act the terminal offers, and the only door to it anywhere: no tool the model holds removes
+ * an observation. The first test is about wording, because wording is what the requirement is made of.
  */
 
 const EVENT: TrackedEvent = {
