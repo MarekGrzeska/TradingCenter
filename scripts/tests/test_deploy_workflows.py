@@ -1,16 +1,7 @@
-"""The deploy workflows read as data, so their agreement with the shared one is testable.
-
-Nothing checked that seven hand-copied workflows agreed, which is how the 16 August lesson
-reached two of them and not the other five. One shared workflow removes most of that, and
-what is left — a caller naming an input that does not exist, a path filter that never fires,
-a value interpolated in a way that changes it — is what these tests hold.
-
-One of them is written from a bug found while writing this change rather than from a
-theory: `body_contains` is `"status"`, quotes included, and interpolated straight into a
-quoted shell argument it collapses to `status`, which also matches a platform sign-in page.
-The check would still have passed CI, still have gone green, and quietly stopped asserting
-what it was added to assert.
-"""
+"""The deploy workflows read as data, so their agreement with the shared one is testable — seven hand-copied
+ones is how the 16 August lesson reached two and not the other five. One of these is written from a bug found
+while writing it: `body_contains` interpolated into a quoted shell argument lost its quotes and matched a
+sign-in page, which would have gone green while asserting nothing."""
 
 from __future__ import annotations
 
@@ -61,17 +52,8 @@ def test_there_is_at_least_one_caller() -> None:
 
 
 def test_every_caller_declares_the_permissions_itself() -> None:
-    """On the caller, and nowhere else will do.
-
-    A reusable workflow can only *narrow* the caller's GITHUB_TOKEN, never widen it. This
-    repository's default workflow permission is `read`, and `id-token` is never granted by
-    default at all — so a caller without this block hands the shared workflow a token that
-    cannot push to GHCR and cannot exchange an OIDC assertion, and every deploy dies at
-    `azure/login` with `Unable to get ACTIONS_ID_TOKEN_REQUEST_URL`.
-
-    Asserting it on `_deploy-app-service.yml` alone is what missed this: there the block is
-    real and has no effect.
-    """
+    """On the caller, and nowhere else will do: a reusable workflow can only *narrow* the caller's token, and
+    `id-token` is never granted by default. Asserting it on `_deploy-app-service.yml` is what missed this."""
     for path in callers():
         permissions = load(path).get("permissions") or {}
         assert permissions.get("id-token") == "write", path.name  # azure/login's OIDC
@@ -116,18 +98,8 @@ class TestSharedWorkflow:
 
 
 def test_every_app_service_module_deploys_through_the_shared_workflow() -> None:
-    """Read off `modules/`, not from a list here — a typed list is what goes stale.
-
-    The same shape as the `packages` matrix in `checks.yml`: a hand-written list beside a
-    directory is a check that reports green having tested something else. `terminal` is the
-    one module excluded, and it is excluded because it is a Static Web App with no image.
-
-    A module is a directory with a `Dockerfile`, not merely a directory. An archived module
-    leaves its name on disk long after git stops tracking it — `.venv/` and `.pytest_cache/`
-    are ignored, so they keep the husk alive — and reading the bare directory listing made
-    this test fail over `agent/`, `teams/`, `teams-mcp/` and `market-mcp/` months after they
-    stopped existing. What deploys an image is what has one to build.
-    """
+    """Read off `modules/`, because a typed list beside a directory reports green having tested something else.
+    A module is a directory with a `Dockerfile`: an archived one leaves its name on disk long after git stops."""
     repo = Path(__file__).resolve().parents[2]
     app_service_modules = {
         path.name
@@ -145,16 +117,9 @@ def test_every_app_service_module_deploys_through_the_shared_workflow() -> None:
     assert deploying == app_service_modules
 
 
-# --- the packages an image bakes in, held against the three places that name them -------
-#
-# Written from a failure on 19 August 2026. `market-data` took `tc-mcp-kit` when the tool
-# surface moved into it — pyproject.toml said so, uv.lock said so, and its Dockerfile still
-# copied only `tc-runtime`. Nothing caught it: no module job builds an image, so the first
-# thing to notice was `deploy-market-data` on `main`, failing at `uv sync --frozen` with
-# `Distribution not found at: file:///app/packages/tc-mcp-kit`.
-#
-# The build failing loudly was the design and it worked. What was missing is a check that
-# runs before `main`, which is what these two are.
+# Written from a failure on 19 August 2026: `market-data` took `tc-mcp-kit` and its Dockerfile still copied
+# only `tc-runtime`. No module job builds an image, so the first thing to notice was `deploy-market-data`
+# failing on `main` at `uv sync --frozen`. These two are the check that runs before that.
 
 MODULES = Path(__file__).resolve().parents[2] / "modules"
 
@@ -172,10 +137,8 @@ def modules_with_a_dockerfile() -> list[Path]:
     "module", modules_with_a_dockerfile(), ids=lambda p: p.name
 )
 def test_the_image_copies_exactly_the_packages_the_module_takes(module: Path) -> None:
-    """A package in `pyproject.toml` and not in the Dockerfile is a build that fails on
-    `main`; one in the Dockerfile and not in `pyproject.toml` is a layer invalidated by
-    edits to source this image never installs, which is why the comment in every Dockerfile
-    says "only the ones this module's pyproject.toml names"."""
+    """A package in `pyproject.toml` and not in the Dockerfile is a build that fails on `main`; one the other
+    way round is a layer invalidated by source this image never installs."""
     pyproject = (module / "pyproject.toml").read_text(encoding="utf-8")
     dockerfile = (module / "Dockerfile").read_text(encoding="utf-8")
 
@@ -192,9 +155,8 @@ def test_the_image_copies_exactly_the_packages_the_module_takes(module: Path) ->
     "module", modules_with_a_dockerfile(), ids=lambda p: p.name
 )
 def test_the_deploy_filter_watches_every_package_the_image_bakes_in(module: Path) -> None:
-    """Baked in at build time means a merged package fix reaches production only if this
-    module redeploys. A filter missing a package is a fix that is merged, green, and not
-    running."""
+    """Baked in at build time means a merged package fix reaches production only if this module redeploys, so
+    a filter missing a package is a fix that is merged, green, and not running."""
     # One workflow is not named after its module: the gateway's.
     workflow = WORKFLOWS / WORKFLOW_NAMES.get(module.name, f"deploy-{module.name}.yml")
     assert workflow.is_file(), f"{module.name} has a Dockerfile and no deploy workflow"

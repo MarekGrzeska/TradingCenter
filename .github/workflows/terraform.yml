@@ -1,27 +1,8 @@
 name: terraform
 
-# A diff before it is applied — plan on every PR that touches infra/, so the change is
-# reviewable next to the code that causes it.
-#
-# There is deliberately no `apply` job. This root manages Entra applications and two
-# operator-scoped grants, and letting CI apply it would mean handing the CI principal
-# directory write access — a bigger privilege than anything else in this project holds,
-# for a platform one person operates. The concrete failure that made the choice rather
-# than an abstract worry: before key-vault.tf and github-oidc.tf were fixed to read
-# `var.operator_object_id`, a plan from CI proposed destroying the operator's own Key
-# Vault access policy and recreating it pointing at CI.
-#
-# This comment used to claim a second reason — that `plan` in CI 403s on every
-# `azuread_application` for want of Graph access. It does not, and has not since that
-# same fix: the plan on the pull request that added the terminal's registration came back
-# clean and matched the operator's local plan resource for resource. Corrected rather than
-# deleted, because "CI cannot even read the directory" is the sort of belief that quietly
-# rules out ideas it should not. The reason above stands on its own.
-#
-# So `terraform apply` stays with the operator, run locally against the same state. This
-# is a narrowing of design.md's "Wdrożenia przez OIDC", not an abandonment of it: the
-# three application deploy workflows still authenticate through OIDC with no stored
-# secret, which is what that decision was about. Infrastructure is the exception.
+# A diff before it is applied: plan on every PR that touches infra/. There is deliberately no `apply` job — this
+# root manages Entra applications, and letting CI apply it would hand the CI principal directory write. The
+# concrete failure: a plan from CI once proposed destroying the operator's own Key Vault access policy.
 on:
   pull_request:
     branches: [main]
@@ -45,11 +26,8 @@ env:
   ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
   ARM_USE_OIDC: true
-  # `infra/terraform.tfvars` is gitignored on purpose (variables.tf: per-operator, not
-  # per-project — the next person running this root has their own IP and identity). CI
-  # is not a person; it needs the same five values the operator's own tfvars carries, so
-  # they are mirrored here as repository vars. None of the five is a secret — an IP
-  # address, three Entra object ids/UPNs and a notification address are not credentials.
+  # `infra/terraform.tfvars` is gitignored on purpose — per-operator, not per-project. CI is not a person and needs
+  # the same five values; none is a secret, being an IP, three Entra ids and a notification address.
   TF_VAR_developer_ip_address: ${{ vars.TF_VAR_DEVELOPER_IP_ADDRESS }}
   TF_VAR_operator_email: ${{ vars.TF_VAR_OPERATOR_EMAIL }}
   TF_VAR_operator_object_id: ${{ vars.TF_VAR_OPERATOR_OBJECT_ID }}
@@ -69,27 +47,9 @@ jobs:
           terraform_version: "1.5.7"
       - run: terraform fmt -check
       - run: terraform init
-      # Written to a file rather than captured as a step output, and that is not a style
-      # choice: a step output travels to the next step through its *environment*, and a
-      # large enough plan makes the whole environment block exceed the kernel's limit —
-      # the runner then fails to start node at all, with `Argument list too long` and not
-      # one word about Terraform. Measured on 19 August 2026 by a plan with 45 destroys in
-      # it (`agent-and-teams-one-workbench`), where the plan itself was correct and the
-      # job went red anyway. A file has no such ceiling.
-      #
-      # `set -o pipefail` and `2>&1` are both load-bearing, and both were missing until
-      # 22 August 2026, when a plan that exited 1 was reported by this job as a pass.
-      #
-      # A pipeline's exit code is its *last* command's, so `terraform plan | tee` always
-      # exited 0 — which made `steps.plan.outcome` "success" and left the `exit 1` guard at
-      # the bottom of this job unreachable. The guard was written on purpose and had never
-      # once fired. The pipe arrived with the file, for the environment-size reason above,
-      # and quietly took the exit code with it.
-      #
-      # `2>&1` because Terraform writes its refusals to stderr, which the pipe never
-      # carried: the comment showed `Plan: 6 to add, 2 to change, 0 to destroy` — a real
-      # line, printed before the failure — and no error at all. A reader of the pull
-      # request saw a clean plan over one that had failed.
+      # Written to a file rather than a step output: outputs travel through the environment, and a 45-destroy plan
+      # made the runner fail with `Argument list too long` and no word about Terraform. `set -o pipefail` and `2>&1`
+      # are both load-bearing — without them a plan that exited 1 was reported as a pass, with its stderr dropped.
       - run: |
           set -o pipefail
           terraform plan -no-color -input=false 2>&1 | tee "$RUNNER_TEMP/plan.txt"

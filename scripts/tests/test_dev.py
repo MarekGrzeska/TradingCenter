@@ -1,14 +1,6 @@
-"""Every refusal the dev runner makes, called directly.
-
-`dev.sh` and `dev.ps1` refused five things before they started anything, and each refusal
-was there because of a real failure — a mismatched gateway key taking the whole stack down
-with "a service exited", an `.env` still pointing at the Azure server, a leftover process on
-8010 that made the wait watch somebody else's service. None of them had a test, because
-shell here never did.
-
-Porting them on the eye is how the third drift happened. These are the tests, one per
-refusal, each producing exactly the scenario the refusal exists for.
-"""
+"""Every refusal the dev runner makes, called directly. Each was there because of a real failure — a mismatched
+gateway key taking the stack down with "a service exited", an `.env` still pointing at Azure, a leftover process
+on 8010 — and none had a test, because shell here never did. Porting them on the eye is how the drift happened."""
 
 from __future__ import annotations
 
@@ -105,12 +97,8 @@ class TestRefusals:
         ],
     )
     def test_a_remote_database_url_is_refused(self, module: str, key: str) -> None:
-        """The quiet disaster: an `.env` still pointing at the Azure server.
-
-        Two keys for the workbench, checked separately: it owns two databases, and one of
-        them pointing at Azure while the other is local is exactly the half-configured
-        state a single check would wave through.
-        """
+        """The quiet disaster: an `.env` still pointing at the Azure server. Two keys for the workbench, checked
+        separately: one database pointing at Azure while the other is local is what a single check waves through."""
         remote = "psql-tradingcenter.postgres.database.azure.com"
         files = dict(GOOD_ENV)
         files[module] = files[module].replace(
@@ -157,14 +145,8 @@ class TestRefusals:
         assert any(f"modules/{module}/.env is missing" in p for p in problems)
 
     def test_the_modules_needing_an_env_are_the_ones_holding_a_credential(self) -> None:
-        """What is listed here is what has no default to fall back on.
-
-        For four of the five that is a secret nobody may write into a repository. For
-        `polymarket-data` it is one setting and no secret at all — its upstream is public
-        — but `DATABASE_URL` is deliberately undefaulted in every module that owns a
-        database, because a default connection string is how a process writes to a
-        database nobody meant it to.
-        """
+        """What is listed here is what has no default to fall back on: a secret for four of the five, and for
+        `polymarket-data` one public setting — `DATABASE_URL` is undefaulted wherever a module owns a database."""
         assert {module for module, _ in REQUIRED_ENV} == {
             "capital-gateway",
             "market-data",
@@ -228,18 +210,14 @@ class TestAdvisoriesAreNotRefusals:
         lines = advisories(environment(files=files))
 
         assert any("workbench/.env has no TRADING_MCP_URL" in line for line in lines)
-        # `has no ` in front of the name, because `POLYMARKET_MCP_URL` *contains*
-        # `MARKET_MCP_URL`: a bare substring test passed for the wrong reason the moment
-        # the third server existed, and would have gone on passing had the archive's own
-        # advisory fired.
+        # `has no ` in front of the name, because `POLYMARKET_MCP_URL` *contains* `MARKET_MCP_URL`: a bare
+        # substring test passed for the wrong reason the moment the third server existed.
         assert not any("has no MARKET_MCP_URL" in line for line in lines)
         assert not any("has no POLYMARKET_MCP_URL" in line for line in lines)
 
     def test_a_setting_that_stopped_existing_is_said_out_loud(self) -> None:
-        """A line read by nothing looks exactly like a line that is working — which is the
-        whole reason the advisories exist. An `.env` from before the merge carries four
-        shapes of it, and `TEAMS_MCP_URL` is the one that reads most like a working
-        setting."""
+        """A line read by nothing looks exactly like a line that is working. An `.env` from before the merge
+        carries four shapes of it, and `TEAMS_MCP_URL` is the one that reads most like a working setting."""
         files = dict(GOOD_ENV)
         files["workbench"] += "TEAMS_MCP_URL=http://127.0.0.1:8070\nOPENAI_API_KEY=sk-old\n"
 
@@ -277,14 +255,8 @@ class TestStartOrder:
         }
 
     def test_the_ports_that_stopped_being_anybodys_are_not_listened_on(self) -> None:
-        """8040 went with market-mcp and 8050 with teams-mcp; a `.env` still naming either
-        is a tool server that reads as down.
-
-        8070 was on this list until `polymarket-data-joins-the-stack` claimed it, and it
-        left deliberately rather than by accident — a port coming back into use is exactly
-        the edit CLAUDE.md's port line has to make at the same time, and this assertion is
-        what makes forgetting one of the two fail here.
-        """
+        """8040 went with market-mcp and 8050 with teams-mcp; a `.env` still naming either is a tool server that
+        reads as down. 8070 left this list deliberately, which is the edit CLAUDE.md's port line makes with it."""
         assert {8040, 8050}.isdisjoint({service.port for service in SERVICES})
         assert 8070 in {service.port for service in SERVICES}
 
@@ -317,11 +289,8 @@ class TestStartOrder:
 
 class TestArgumentParsing:
     def test_both_spellings_of_the_one_flag_agree(self) -> None:
-        """`dev.ps1` documents -NoTerminal, `dev.sh` documents --no-terminal.
-
-        The wrappers pass their arguments through, so this is the last place a difference
-        between the two platforms could appear.
-        """
+        """`dev.ps1` documents -NoTerminal and `dev.sh` --no-terminal. The wrappers pass their arguments through,
+        so this is the last place a difference between the two platforms could appear."""
         assert parse_args(["--no-terminal"]).start_terminal is False
         assert parse_args(["-NoTerminal"]).start_terminal is False
 
@@ -383,13 +352,8 @@ class TestEnvReading:
 
 
 class TestCommandResolution:
-    """`pnpm` and `npx` are `.CMD` shims on Windows, and CreateProcess only appends `.exe`.
-
-    The failure is nasty because `preflight` uses `shutil.which`, which *does* find the
-    `.CMD` — so the run passes every check, brings all seven back ends up, and then dies on
-    the terminal with `FileNotFoundError [WinError 2]`, taking them down with it. Neither
-    shell script could meet this: PATH resolution was the shell's job there.
-    """
+    """`pnpm` and `npx` are `.CMD` shims on Windows and CreateProcess only appends `.exe`, while `preflight`'s
+    `shutil.which` finds them — so the run passes every check, brings seven back ends up, then dies on the last."""
 
     def test_the_executable_is_resolved_on_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
         import dev
@@ -429,11 +393,8 @@ class TestCommandResolution:
         assert dev.resolve_command(()) == []
 
     def test_every_service_command_resolves_on_this_machine(self) -> None:
-        """The real check: the first word of each row is something this machine can launch.
-
-        `uv` covers seven of the eight; the terminal's is `pnpm` or `npx`, and which one is
-        available is exactly what `terminal_command` decides.
-        """
+        """The real check: the first word of each row is something this machine can launch. `uv` covers seven of
+        the eight, and which of `pnpm`/`npx` is available is what `terminal_command` decides."""
         import shutil
 
         import dev
@@ -444,11 +405,8 @@ class TestCommandResolution:
             assert shutil.which(service.command[0]), f"{service.name}: {service.command[0]}"
 
     def test_start_actually_uses_the_resolution(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Testing `resolve_command` alone would pass with `Stack.start` ignoring it.
-
-        That is the same shape as asserting a permissions block on the file where it has no
-        effect — the unit is right and the wiring is what breaks.
-        """
+        """Testing `resolve_command` alone would pass with `Stack.start` ignoring it — the same shape as asserting
+        a permissions block on the file where it has no effect."""
         import io
 
         import dev

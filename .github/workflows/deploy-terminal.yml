@@ -16,27 +16,18 @@ on:
       - ".github/workflows/deploy-terminal.yml"
   workflow_dispatch: {}
 
-# Static Web Apps' GitHub deployment path has no OIDC/federated-credential option as of
-# this writing — unlike the two App Service apps (deploy-gateway.yml, deploy-market-data.yml),
-# `Azure/static-web-apps-deploy` only takes a deployment token. That token
-# (AZURE_STATIC_WEB_APPS_API_TOKEN, from `terraform output terminal_api_key`) is a real,
-# narrow exception to design.md's "no stored Azure secret" goal — forced by what Azure's
-# own tooling supports today, not a choice made here. Flagged, not hidden.
+# Static Web Apps' GitHub deployment path has no OIDC option as of this writing — the action takes a deployment
+# token only. That token is a real, narrow exception to design.md's "no stored Azure secret". Flagged, not hidden.
 permissions:
   contents: read
   pull-requests: write # Azure/static-web-apps-deploy comments preview URLs on PRs
 
 concurrency:
-  # Keyed by event, not by `github.ref` alone. Merging a PR fires two runs of this
-  # workflow in the same second — the push to `main` and the pull_request `closed` that
-  # tears the preview down — and under a ref-only key they landed in one group, where
-  # `cancel-in-progress` killed one of them. That is how 8f0786a reached `main` with its
-  # production deploy cancelled one second in, zero steps run, and the real site left
-  # serving the previous build while every check on the PR was green.
+  # Keyed by event, not by `github.ref` alone: merging a PR fires two runs in the same second, and under a
+  # ref-only key `cancel-in-progress` killed the production deploy of 8f0786a one second in.
   group: deploy-terminal-${{ github.event_name }}-${{ github.event.number || github.ref }}
-  # A superseded PR build is worth cancelling; a deploy to the real site is not. The
-  # same rule deploy-gateway.yml and deploy-market-data.yml already state as "never
-  # cancel a deploy mid-flight" — this workflow just has two kinds of run to tell apart.
+  # A superseded PR build is worth cancelling; a deploy to the real site is not. Same rule as the App Service
+  # workflows state as "never cancel a deploy mid-flight" — this one has two kinds of run to tell apart.
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -45,9 +36,8 @@ jobs:
     defaults:
       run:
         working-directory: modules/terminal
-    # PRs get a preview environment; only `main` is the real site. Skipped entirely for
-    # PRs from forks, which never have access to the deployment token secret — and for a
-    # PR being closed, which is `close_preview`'s job below.
+    # PRs get a preview environment; only `main` is the real site. Skipped for PRs from forks, which never have
+    # the deployment token, and for a PR being closed, which is `close_preview`'s job.
     if: >-
       github.event.action != 'closed' &&
       (github.event_name != 'pull_request' ||
@@ -65,52 +55,19 @@ jobs:
           cache-dependency-path: modules/terminal/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
 
-      # Cross-origin, full-URL mode (src/data/config.ts) — market-data's real hostname,
-      # not a relative prefix. Static Web Apps cannot proxy the candle WebSocket at all,
-      # so a reverse proxy in front of market-data was never going to cover the whole
-      # picture; this is the mode the client code already supports for exactly that
-      # reason. What makes cross-origin actually work now lives on both sides: CORS on
-      # App Service and the Entra token below.
-      #
-      # The three VITE_ENTRA_* values are **public** — a client id, a tenant id and a
-      # scope name travel in every authorization request the browser makes and are
-      # visible to anyone with the developer tools open. They go through `vars`, never
-      # `secrets`; this workflow still stores exactly one secret, and it is the Static
-      # Web Apps deployment token flagged above.
-      #
-      # Left unset, the build produces a terminal that attaches no credential — which is
-      # the local mode and would fail against the deployed archive. `terraform output
-      # terminal_entra_client_id` / `_tenant_id` / `_scope` produce the three values.
+      # Cross-origin, full-URL mode: Static Web Apps cannot proxy the candle WebSocket at all. The three
+      # VITE_ENTRA_* values are **public** and go through `vars`, never `secrets` — a client id, a tenant id and a
+      # scope name travel in every authorization request the browser makes.
       - run: pnpm build
         env:
           VITE_ARCHIVE_HTTP: https://app-tradingcenter-market-data.azurewebsites.net
           VITE_ARCHIVE_WS: wss://app-tradingcenter-market-data.azurewebsites.net/ws
-          # Left unset the panel does not fall back to "no agent" — it falls back to
-          # `/agent-api`, the dev proxy path, which in Static Web Apps is a 404 and reads
-          # as "the catalogue could not be read". No request ever left the browser, so
-          # the agent's own log stays empty and looks healthy while the panel says it is
-          # not. Deployed 13 August 2026 without it, and that is exactly what happened.
-          #
-          # No token setting beside it: the terminal asks for one scope, market-data's,
-          # and the agent's Easy Auth accepts that audience on purpose
-          # (infra/app-service.tf, "Both audiences, deliberately").
-          #
-          # One setting where there were two. `VITE_TEAMS_HTTP` went with the merge, and
-          # the trap it guarded is the same one: unset, the Teams tab would fall back to a
-          # relative prefix the Static Web App answers with its own 404 page — nothing
-          # reaches the module, so its log stays quiet and healthy while the tab says the
-          # catalogue cannot be read.
-          #
-          # The host keeps the `-agent` spelling because the App Service does
-          # (infra/app-service.tf, `local.workbench_app_name`).
+          # Left unset the panel falls back to `/agent-api`, which Static Web Apps answers with a 404, so nothing
+          # leaves the browser and the module's log stays healthy while the tab says it cannot read the catalogue.
+          # The host keeps the `-agent` spelling because the App Service does (`local.workbench_app_name`).
           VITE_WORKBENCH_HTTP: https://app-tradingcenter-agent.azurewebsites.net
-          # The third time this trap has been walked into, and the second time it is
-          # written down here. The Accounts tab shipped on 20 August without this line,
-          # so the browser asked the Static Web App for `/gateway-api/accounts`, got the
-          # single-page app back, and the screen said `Unexpected token '<'` — the JSON
-          # parser meeting `<!doctype html>`. Nothing reached capital-gateway, whose log
-          # stayed quiet and healthy throughout.
-          #
+          # The third time this trap has been walked into: the Accounts tab shipped without this line, the browser
+          # got the single-page app back, and the screen said `Unexpected token '<'` while the gateway stayed quiet.
           VITE_GATEWAY_HTTP: https://app-tradingcenter-gateway.azurewebsites.net
           # The prediction-market archive. Its own host and its own scope, like every
           # other back end here.
@@ -118,23 +75,9 @@ jobs:
           VITE_STRATEGY_HTTP: https://app-tradingcenter-strategy.azurewebsites.net
           VITE_ENTRA_CLIENT_ID: ${{ vars.TERMINAL_ENTRA_CLIENT_ID }}
           VITE_ENTRA_TENANT_ID: ${{ vars.TERMINAL_ENTRA_TENANT_ID }}
-          # **One scope per back end since `polymarket-screen-opens-the-archive`.** The
-          # terminal used to ask for one, market-data's, and present it to all three —
-          # the gateway had been configured to accept that audience for exactly that
-          # reason. A token minted for one module is not sent to another any more
-          # (specs/terminal-identity), and the pre-authorizations that make asking by
-          # name possible without a second consent screen have been standing in
-          # `infra/entra.tf` since August.
-          #
-          # Literals rather than four `vars`, unlike the client and tenant ids above.
-          # These are the same kind of fact as the four hostnames they sit beside:
-          # deterministic, public — every authorization request the browser makes carries
-          # one — and four repository variables would be four chances to leave one unset,
-          # which surfaces at sign-in as a message about an unknown resource.
-          #
-          # A scope left out is NOT a fallback to another module's: that back end is then
-          # called with no credential and refuses, which the tab can name. Setting all
-          # four to market-data's scope is the deliberate rollback, not the default.
+          # **One scope per back end**: a token minted for one module is not sent to another (specs/terminal-identity).
+          # Literals rather than four `vars`, being the same kind of public fact as the hostnames beside them — and a
+          # scope left out is no credential rather than another module's, which the tab can name.
           VITE_ENTRA_SCOPE: ${{ vars.TERMINAL_ENTRA_SCOPE }}
           VITE_ENTRA_SCOPE_WORKBENCH: api://tradingcenter-agent/access_as_user
           VITE_ENTRA_SCOPE_GATEWAY: api://tradingcenter-capital-gateway/access_as_user
@@ -150,14 +93,8 @@ jobs:
           output_location: ""
           skip_app_build: true
 
-      # Only for the real site — a preview build lives on a generated hostname this does
-      # not know, and the action comments that URL on the PR anyway.
-      #
-      # Two assertions, because one of them has already been wrong here: the site answers,
-      # and a *tab address* answers rather than the 404 page. Deep links broke once before
-      # (13:13 on 9 August, "serve tab addresses, not Static Web Apps' 404 page") — a
-      # single-page app whose host does not rewrite unknown paths to index.html serves the
-      # root perfectly while every bookmark 404s.
+      # Only for the real site, since a preview lives on a hostname this does not know. Two assertions, because one
+      # has already been wrong: a single-page app whose host does not rewrite unknown paths serves `/` and 404s bookmarks.
       - name: Smoke-check the deployed terminal
         if: github.event_name != 'pull_request'
         run: |
@@ -176,17 +113,8 @@ jobs:
           echo "::error::terminal did not serve both / ($root) and /instruments ($deep)"
           exit 1
 
-  # Take the preview environment down with the PR that created it.
-  #
-  # Without this, every merged PR that touched the terminal leaves its environment
-  # behind for good. The Free SKU allows three, so the fourth PR does not get a
-  # slower deploy — it gets a hard `BadRequest: This Static Web App already has the
-  # maximum number of staging environments`, on a branch whose own build is fine.
-  # Seen exactly that way on #28, with three environments held by PRs merged hours
-  # earlier.
-  #
-  # No checkout and no build: the action only needs to be told which PR closed, and
-  # Static Web Apps works out the environment from that.
+    # Take the preview environment down with the PR that created it: the Free SKU allows three, so the fourth PR gets
+    # a hard `BadRequest` on a branch whose own build is fine — seen on #28. No checkout and no build.
   close_preview:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' && github.event.action == 'closed'

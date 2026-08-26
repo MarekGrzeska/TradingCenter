@@ -1,29 +1,18 @@
-# `terminal` — Free tier (design.md, cost: one operator, no need for the paid tier's
-# extra environments or bandwidth) with Static Web Apps' own built-in Entra ID login,
-# not a custom app registration like market-data's Easy Auth (5.4). "Built-in" is the
-# platform's own multi-tenant app — the operator hits `/.auth/login/aad` and there is
-# nothing here to register or rotate.
+# `terminal` — Free tier, with Static Web Apps' own built-in Entra ID login rather than a custom registration like
+# market-data's: "built-in" is the platform's own multi-tenant app, so there is nothing here to register or rotate.
 resource "azurerm_static_web_app" "terminal" {
   name                = "swa-tradingcenter-terminal"
   resource_group_name = azurerm_resource_group.main.name
-  # Static Web Apps only ships in five regions, Poland Central isn't one, and this
-  # subscription's West Europe is closed to new customers (Azure error
-  # RequestDisallowedByAzure at apply time — https://aka.ms/locationineligible). East US
-  # 2 is the next closest of the remaining four (Central US, East US 2, West US 2, East
-  # Asia). Static content and Easy Auth's login redirect are the only things served from
-  # here — nothing latency-sensitive, unlike the database and the two App Service apps,
-  # which do stay in Poland Central.
+  # Static Web Apps ships in five regions, Poland Central is not one, and this subscription's West Europe is closed to
+  # new customers. Only static content and a login redirect are served here — nothing latency-sensitive.
   location = "eastus2"
 
   sku_tier = "Free"
   sku_size = "Free"
 
   lifecycle {
-    # `Azure/static-web-apps-deploy` records which repository and branch it deployed
-    # from, so these appear on the resource after the first deploy even though nothing
-    # here sets them. Left to fight it out, Terraform would null them on every apply and
-    # the next deploy would write them straight back — perpetual drift over a value the
-    # deploy owns. Same reasoning as the App Service apps' docker_image_name.
+    # The deploy action records which repository and branch it deployed from, so these appear after the first deploy
+    # although nothing here sets them. Left to fight it out, Terraform and the deploy would trade them every apply.
     ignore_changes = [repository_url, repository_branch]
   }
 }

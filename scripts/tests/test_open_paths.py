@@ -1,18 +1,7 @@
-"""Two gates stand in front of every request, and a path is only open if both say so.
-
-Easy Auth's `excluded_paths` (infra/app-service.tf) lets a request reach the container
-without an identity. A module's own `OPEN_PATHS` (its `caller_access.py`) is what lets that
-request reach a route. Exempting a path from one of them is not exempting it: it reads as
-open in Terraform and answers 401 from the module, and nothing in either file says so.
-
-That is not hypothetical. `strategy` shipped with `/health` excluded from Easy Auth and
-guarded by its own record; the deploy of d2e2290 failed on the probe, against a container
-that was up, serving and correctly migrated. The two files were each right on their own.
-
-So: every path a web app excludes MUST be one its module opens. The other direction is
-deliberately not checked — a module may open a path the platform still guards, which is
-simply a path nobody can reach without a token, and that is a safe way to be wrong.
-"""
+"""Two gates stand in front of every request — Easy Auth's `excluded_paths` and a module's own `OPEN_PATHS` —
+and a path is only open if both say so. `strategy` shipped excluded from one and guarded by the other, and the
+deploy of d2e2290 failed against a container that was up and correctly migrated. The other direction is not
+checked: a module may open a path the platform still guards, which is a safe way to be wrong."""
 
 from __future__ import annotations
 
@@ -47,13 +36,8 @@ def _web_apps() -> list[tuple[str, set[str]]]:
 
 
 def _open_paths(resource_name: str) -> set[str] | None:
-    """What the module opens, or `None` if it does not keep a record of this shape.
-
-    `capital-gateway` has a `caller_access.py` and no `OPEN_PATHS` in it: its door is the
-    shared key checked inside the module, not a per-path record, so there is no second
-    list here for the first one to disagree with. Out of scope rather than exempt — and
-    the test below keeps this from becoming a way for the whole check to evaporate.
-    """
+    """What the module opens, or `None` if it keeps no record of this shape. `capital-gateway`'s door is the
+    shared key checked inside the module, so it is out of scope rather than exempt — and the test below says so."""
     path = (
         REPO_ROOT
         / "modules"
@@ -75,11 +59,8 @@ def test_the_apps_are_found_at_all() -> None:
 
 
 def test_the_modules_that_keep_this_record_still_keep_it() -> None:
-    """Stated positively, so the check cannot be satisfied by the record disappearing.
-
-    Every module here serving two surfaces behind one Easy Auth door keeps an `OPEN_PATHS`;
-    if one stopped, the parametrised test below would skip it in silence.
-    """
+    """Stated positively, so the check cannot be satisfied by the record disappearing: if a module stopped
+    keeping an `OPEN_PATHS`, the parametrised test below would skip it in silence."""
     keeping = {name for name, _ in _web_apps() if _open_paths(name) is not None}
     assert {"market_data", "polymarket_data", "strategy"} <= keeping
 

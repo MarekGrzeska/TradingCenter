@@ -8,12 +8,8 @@ terraform {
     }
   }
 
-  # Local state on purpose — this is the chicken-and-egg exception. It creates the
-  # storage account that every other Terraform root's state lives in, so it cannot
-  # itself depend on that storage account being there yet.
-  #
-  # openspec/changes/provision-azure-platform, design.md, "Bootstrap osobnym
-  # katalogiem ze stanem lokalnym".
+  # Local state on purpose — this is the chicken-and-egg exception: it creates the storage account every other root's
+  # state lives in, so it cannot itself depend on that account being there (provision-azure-platform, design.md).
 }
 
 provider "azurerm" {
@@ -43,11 +39,8 @@ resource "azurerm_storage_account" "tfstate" {
   account_replication_type = "LRS"
   min_tls_version          = "TLS1_2"
 
-  # Off, on purpose: azurerm_storage_account always pulls the account's primary/secondary
-  # keys into Terraform state, and this root's state is committed (see .gitignore). Every
-  # caller already authenticates with Entra (`use_azuread_auth = true`, infra/main.tf), so
-  # the keys have no legitimate use — disabling shared key auth makes them permanently
-  # inert instead of live secrets sitting in a checked-in file.
+  # Off, on purpose: `azurerm_storage_account` always pulls the account's keys into state, and this root's state is
+  # committed. Every caller authenticates with Entra, so disabling shared key auth makes those keys permanently inert.
   shared_access_key_enabled = false
 
   blob_properties {

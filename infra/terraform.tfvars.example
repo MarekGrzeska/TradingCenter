@@ -1,6 +1,5 @@
-# Copy to terraform.tfvars (gitignored) and fill in. Nothing here is a secret — it is
-# left out of version control because it is per-operator, not per-project: the next
-# person running this root has their own IP and their own Entra identity.
+# Copy to terraform.tfvars (gitignored) and fill in. Nothing here is a secret — it is left out of version control
+# because it is per-operator, not per-project: the next person has their own IP and their own Entra identity.
 
 # curl ifconfig.me — refresh this when your ISP reassigns you an address; see
 # docs/dbeaver-azure-connection.html, "Zanim zadzwonisz, że nie działa".
@@ -10,17 +9,12 @@ developer_ip_address = "203.0.113.10"
 postgres_admin_object_id = "00000000-0000-0000-0000-000000000000"
 postgres_admin_upn       = "you@example.com"
 
-# The same `id` as above today — the operator and the database administrator are one
-# person here. Named separately because they are different jobs, and because this one
-# must never be inferred from whoever happens to be running Terraform (variables.tf).
+# The same `id` as above today — the operator and the database administrator are one person here. Named separately
+# because they are different jobs, and because this one must never be inferred from whoever ran Terraform.
 operator_object_id = "00000000-0000-0000-0000-000000000000"
 
 # Where the alerts in infra/monitoring.tf go.
 operator_email = "you@example.com"
 
-# The agent's model catalogue has a working default in variables.tf and is left out
-# here on purpose. Override it only to change which models the agent offers — and then
-# confirm each `model` against OpenAI's own list first, because nothing in this root
-# checks it. The OpenAI key itself is not a Terraform variable at all: it goes into Key
-# Vault by hand (`az keyvault secret set ... --name openai-api-key`), so it never
-# reaches state.
+# The agent's model catalogue has a working default in variables.tf. Override it only to change which models the agent
+# offers, confirming each against OpenAI's own list, since nothing here checks it. The key is not a variable at all.
