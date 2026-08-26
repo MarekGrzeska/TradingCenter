@@ -1,9 +1,5 @@
-"""Every field this module reads off capital-gateway's wire, checked against the
-committed snapshot rather than assumed — same reasoning as market-mcp's own
-`test_contract.py`. No running gateway needed: the snapshot is a file, and
-`scripts/contract.py check` (a separate CI step, not this test) is what keeps it
-honest against a live sibling checkout.
-"""
+"""Every field this module reads off capital-gateway's wire, checked against the committed snapshot
+rather than assumed. No running gateway needed: the snapshot is a file."""
 
 from __future__ import annotations
 
@@ -38,9 +34,8 @@ def test_capabilities_carries_environment(schema: dict) -> None:
 
 
 def test_trading_routes_are_still_published(schema: dict) -> None:
-    """The routes group 3's tools call. Not their shapes yet — those DTOs land with
-    the tools that read them — just that the routes this module is built around have
-    not moved."""
+    """The routes group 3's tools call. Not their shapes yet — just that the routes this module is
+    built around have not moved."""
     paths = schema["paths"]
     assert "/positions" in paths
     assert "/orders" in paths

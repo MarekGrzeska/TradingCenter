@@ -1,15 +1,5 @@
-"""Changing the account: place, close, amend, cancel.
-
-Every tool here re-checks the demo environment before the gateway is touched — inside
-`_write`, which is also where its failures get the same wording as every other failure
-in this module (`_shared.py`'s own docstring says why that moved). What is left in this
-file is what each tool alone can decide: the arguments that cannot mean anything
-together, refused before a request is built rather than after the account has an
-opinion about them.
-
-No tool here is retried by this module on its own failure (specs/trading-mcp-execution,
-"Moduł nie ponawia zlecenia po własnej awarii").
-"""
+"""Changing the account: place, close, amend, cancel. What is left in this file is what each tool alone
+can decide — arguments that cannot mean anything together, refused before a request is built."""
 
 from __future__ import annotations
 
@@ -50,13 +40,8 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
             raise ToolRefusal(
                 f"refused: {order_type} orders need a target level — provide `level`."
             )
-        # The mirror of the line above, and it is the one that costs money if it is
-        # missing: `capital-gateway` builds a MARKET order from symbol, direction, size
-        # and the two stops, and **silently drops `level` and `good_till`**
-        # (`capital_gateway/adapter.py`). An agent that meant "buy, but not above this
-        # price" would be filled at whatever the market is, and the `level` it reads back
-        # is the fill price — so nothing in the answer reveals its cap was ignored.
-        # Refused by name instead, with both ways out of it.
+        # The one that costs money if it is missing: `capital-gateway` silently drops `level` and
+        # `good_till` from a MARKET order, and the `level` read back is the fill price.
         if order_type == "MARKET":
             ignored = [name for name, value in (("level", level), ("good_till", good_till)) if value is not None]
             if ignored:

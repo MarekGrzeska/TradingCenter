@@ -31,10 +31,8 @@ def test_the_entrypoint_never_runs_the_stdio_transport() -> None:
 async def test_the_process_does_not_listen_when_the_account_is_not_demo(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The whole guard, now that the re-check in front of every write is gone: a process
-    that never opens a port cannot be reached by anything
-    (specs/trading-mcp-upstream-access, "Moduł pracuje wyłącznie na rachunku
-    demonstracyjnym")."""
+    """The whole guard, now that the re-check in front of every write is gone: a process that never
+    opens a port cannot be reached by anything."""
     monkeypatch.setenv("CAPITAL_GATEWAY_URL", BASE)
     monkeypatch.setenv("CAPITAL_GATEWAY_API_KEY", "k")
     respx.get(f"{BASE}/capabilities").mock(

@@ -12,9 +12,8 @@ KEY = "test-gateway-key"
 
 @pytest.fixture(autouse=True)
 def _no_ambient_settings(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep a developer's real .env out of the tests — `Settings` reads the environment
-    and the .env file, so without this a machine holding one runs different tests than
-    a machine without it."""
+    """Keep a developer's real .env out of the tests — `Settings` reads the environment and the .env
+    file, so without this a machine holding one runs different tests."""
     for name in (
         "CAPITAL_GATEWAY_URL",
         "CAPITAL_GATEWAY_API_KEY",
