@@ -1,9 +1,5 @@
-"""CapitalAdapter — raw capital.com payloads in, neutral DTOs out.
-
-Owns a ``CapitalClient`` and hides every provider quirk: the session, the market
-navigation tree, and the asynchronous ``dealReference -> confirms`` settlement. Nothing
-above this layer knows what an epic is.
-"""
+"""CapitalAdapter — raw capital.com payloads in, neutral DTOs out. Hides every provider
+quirk: the session, the navigation tree, the async ``dealReference -> confirms`` settlement."""
 
 from __future__ import annotations
 
@@ -40,15 +36,8 @@ _TREE_CONCURRENCY = 5  # parallel marketnavigation requests, under the rate gate
 _CONFIRM_ATTEMPTS = 5
 _CONFIRM_DELAY = 0.4  # seconds between confirm polls; after the attempts run out -> PENDING
 
-# How long an answer about whether a venue is trading stays good enough to reuse. One read
-# of DAY or WEEK candles asks `GET /markets/{epic}` through `mark_forming`, and a caller
-# reading a period boundary asks for the same instrument again a moment later — against a
-# 10 requests/second budget capital.com counts per *account*, not per process.
-#
-# Bounded by the mistake it can make: a market that shuts inside the window has its newest
-# candle marked as still forming for up to this long. A forming candle is not stored as a
-# settled one, so that error is undone by the next read; the opposite error, a settled
-# candle called forming, is not one this memo can produce.
+# Reused so a caller reading a period boundary does not ask `GET /markets/{epic}` twice against
+# a 10 req/s budget counted per account. Bounded by its error: a stale `forming` undoes itself.
 _MARKET_STATUS_MEMO_SECONDS = 5.0
 
 
@@ -70,14 +59,8 @@ class CapitalAdapter:
 
     @staticmethod
     def _write_json(resp: httpx.Response) -> dict:
-        """Parse what came back from a write.
-
-        Deliberately not `_json_ok`: the provider's own JSON refusal of an order is an
-        answer about the order, and it travels on to `_settle` to become a REJECTED
-        `Order` the caller can read. What does not travel on is a body that is not JSON
-        at all — App Service's HTML 502, an empty 504 — which used to leave here as a
-        `JSONDecodeError` and reach the caller as an unhandled 500 with a stack trace.
-        """
+        """Deliberately not `_json_ok`: the provider's JSON refusal of an order is an answer
+        about the order, while a body that is not JSON at all used to surface as a 500."""
         try:
             return resp.json()
         except ValueError as err:
@@ -85,8 +68,6 @@ class CapitalAdapter:
                 f"capital.com answered {resp.status_code} with a body that is not JSON: "
                 f"{resp.text[:200]!r}"
             ) from err
-
-    # --- accounts ---
 
     async def list_accounts(self) -> list[Account]:
         active = await self._active_account_id()
@@ -113,14 +94,8 @@ class CapitalAdapter:
         raise GatewayError(f"account {account_id} not found after switch", status_code=404)
 
     async def top_up(self, amount: float) -> Account:
-        """Moves the demo balance and answers with the account as it stands afterwards.
-
-        The provider's own limits — the balance ceiling, the range one adjustment may
-        carry, the daily count — are not repeated here. They are checked where they are
-        set, and a copy of them in this module would be true only until the first quiet
-        change on the other side (design.md, D3). What this does is turn a refusal into a
-        refusal *with the provider's reason*, rather than into a failure to reach it.
-        """
+        """Moves the demo balance and answers with the account as it stands afterwards. The
+        provider's own limits are not copied here; a refusal carries its reason (design.md, D3)."""
         r = await self._c.top_up(amount)
         if not r.is_success:
             raise GatewayError(
@@ -134,8 +109,6 @@ class CapitalAdapter:
                 return mapping.account_from_raw(acc, active=True)
         raise GatewayError("capital.com did not name an active account after the top-up")
 
-    # --- market data ---
-
     async def search_instruments(self, query: str) -> list[Instrument]:
         data = self._json_ok(await self._c.search_markets(query))
         return [mapping.instrument_from_market(m) for m in data.get("markets", [])]
@@ -143,20 +116,8 @@ class CapitalAdapter:
     async def list_instruments(
         self, max_nodes: int = 300, asset_class: AssetClass | None = None
     ) -> InstrumentPage:
-        """Walk the marketnavigation tree, flatten every market, dedupe by symbol.
-
-        ``max_nodes`` is a bound on how much of the tree is visited. asyncio is
-        cooperative, so the check and the increment below both run before any await —
-        the counter cannot overshoot. The returned ``truncated`` flag is what stops a
-        partial catalogue from reading as a complete one.
-
-        ``asset_class`` narrows the result to one class. The sieve is on the markets
-        rather than on the branches: a node's name suggests its class but does not
-        promise it, and a branch skipped on a guess would drop instruments the caller
-        asked for. The walk therefore costs the same either way, which is why the route
-        gives a filtered request a larger node budget — one class is a fraction of the
-        catalogue, so the same budget reaches much further inside it.
-        """
+        """``max_nodes`` bounds the walk and ``truncated`` stops a partial catalogue reading as
+        complete. ``asset_class`` sieves markets, not branches: a node's name promises no class."""
         sem = asyncio.Semaphore(_TREE_CONCURRENCY)
         markets: list[dict] = []
         visited = 0
@@ -183,10 +144,8 @@ class CapitalAdapter:
         seen: set[str] = set()
         out: list[Instrument] = []
         for m in markets:
-            # Subscripted, not `.get`: the epic is the instrument's identity and
-            # `instrument_from_market` requires it two lines down, so a market without one
-            # is a provider payload nobody can read — better said here than deduplicated
-            # under a `None` key first.
+            # Subscripted, not `.get`: the epic is the instrument's identity, so a market
+            # without one is a payload nobody can read, not a key to dedupe under.
             epic = m["epic"]
             # The same instrument hangs under several branches, so without this the
             # catalogue reports duplicates as separate instruments.
@@ -202,28 +161,16 @@ class CapitalAdapter:
         )
 
     async def get_instrument_terms(self, symbol: str) -> InstrumentTerms:
-        """The deposit and size rules the provider applies to one instrument.
-
-        The same `GET /markets/{epic}` `_market_open` already calls — this reads the rest
-        of that answer, which until now was discarded.
-        """
+        """The deposit and size rules the provider applies to one instrument — the rest of the
+        `GET /markets/{epic}` answer `_market_open` already asks for, and used to discard."""
         resp = await self._c.market(symbol)
         if resp.status_code == 404:
             raise GatewayError(f"unknown instrument {symbol!r}", status_code=404)
         return mapping.instrument_terms_from_details(symbol, self._json_ok(resp))
 
     async def _market_open(self, symbol: str) -> bool:
-        """Whether the venue is trading this instrument right now.
-
-        The only thing that knows where a daily period ends is the provider, so this is
-        what stands in for a boundary this module refuses to compute. Called lazily —
-        `history.mark_forming` awaits it only when nothing cheaper can decide — and
-        remembered for `_MARKET_STATUS_MEMO_SECONDS`, which is what stops one operator
-        question about DAY candles from spending two of the account's requests.
-
-        A 404 is not remembered: an unknown instrument is a refusal the caller has to
-        see, and it costs nothing to raise it from the answer rather than from a memo.
-        """
+        """Only the provider knows where a daily period ends, so this stands in for a boundary
+        this module refuses to compute. Memoised; a 404 is not, being a refusal the caller needs."""
         now = asyncio.get_running_loop().time()
         remembered = self._market_open_memo.get(symbol)
         if remembered is not None and now - remembered[0] < _MARKET_STATUS_MEMO_SECONDS:
@@ -256,15 +203,8 @@ class CapitalAdapter:
         anchor: datetime | None = None,
         floor: datetime | None = None,
     ) -> CandleHistory:
-        """Candles further back than one request reaches.
-
-        The paging rules live in ``history``; this supplies the one page fetch and the
-        judgement of what the provider's refusals mean. ``anchor`` shapes only the first
-        page — see ``history.collect`` — so a caller can reach for a window that ended
-        months ago instead of always reaching back from now. ``floor`` bounds the other
-        end: nothing older than it is fetched or returned, which ``bars`` alone cannot
-        express for an instrument that is not open around the clock.
-        """
+        """The paging rules live in ``history``; this supplies one page fetch and reads what the
+        provider's refusals mean. ``anchor`` shapes the first page, ``floor`` bounds the far end."""
 
         async def fetch_page(
             date_from: str | None, date_to: str | None, limit: int
@@ -277,9 +217,8 @@ class CapitalAdapter:
                     payload = resp.json()
                 except ValueError:
                     payload = {}
-                # Checked before the status, because the bottom of history arrives as a
-                # 404 too. Reading it as an unknown symbol would raise on the last page
-                # of a deep read and throw away every page before it.
+                # Checked before the status: the bottom of history arrives as a 404 too, and
+                # reading it as an unknown symbol would discard every page of a deep read.
                 if payload.get("errorCode") == history.HISTORY_EXHAUSTED:
                     return None
                 if resp.status_code == 404:
@@ -295,18 +234,13 @@ class CapitalAdapter:
         )
         return page.model_copy(update={"candles": marked})
 
-    # --- trading ---
-
     async def list_positions(self) -> list[Position]:
         data = self._json_ok(await self._c.positions())
         return [mapping.position_from_raw(row) for row in data.get("positions", [])]
 
     async def place_order(self, req: PlaceOrderRequest) -> Order:
-        """MARKET opens a position now; LIMIT and STOP rest as working orders.
-
-        Two different provider endpoints, one request shape for the caller — which is
-        the whole reason this module has an order type rather than two routes.
-        """
+        """MARKET opens a position now; LIMIT and STOP rest as working orders. Two provider
+        endpoints behind one request shape — the reason this module has an order type."""
         body: dict = {"epic": req.symbol, "direction": req.direction.value, "size": req.size}
         if req.stop_loss is not None:
             body["stopLevel"] = req.stop_loss
@@ -331,9 +265,8 @@ class CapitalAdapter:
         return await self._settle(closed, accepted=OrderStatus.CLOSED)
 
     async def update_position(self, position_id: str, req: UpdatePositionRequest) -> Order:
-        """Set or remove stops. Only the fields the caller named are sent: a value sets,
-        None removes, an omitted field is left alone. Sending the whole model would
-        clear a live stop the caller never mentioned."""
+        """Set or remove stops. Only the fields the caller named are sent: sending the whole
+        model would clear a live stop the caller never mentioned."""
         body: dict = {}
         if "stop_loss" in req.model_fields_set:
             body["stopLevel"] = req.stop_loss
@@ -351,20 +284,8 @@ class CapitalAdapter:
         return await self._settle(cancelled, accepted=OrderStatus.CANCELLED)
 
     async def _settle(self, created: dict, accepted: OrderStatus = OrderStatus.FILLED) -> Order:
-        """Turn the provider's acknowledgement into an outcome.
-
-        capital.com answers a create, close, amend or cancel with a ``dealReference``
-        and settles it separately — the acknowledgement says the request was received,
-        not that anything happened. So the reference is polled until the deal reports a
-        status.
-
-        ``accepted`` is what an ACCEPTED deal means for the action that produced it.
-
-        When the attempts run out the result is PENDING, carrying the reference. That is
-        the important case: reporting an unresolved reference as FILLED would tell a
-        caller it holds a position that may not exist, and the reference is what lets it
-        find out later.
-        """
+        """capital.com acknowledges a write with a ``dealReference`` and settles it separately,
+        so it is polled. Running out gives PENDING: FILLED would claim a position that may not exist."""
         ref = created.get("dealReference")
         if not ref:
             # No reference at all means the provider refused before the deal existed —
@@ -378,18 +299,9 @@ class CapitalAdapter:
             await asyncio.sleep(_CONFIRM_DELAY)
         return Order(status=OrderStatus.PENDING, reference=ref)
 
-    # --- meta ---
-
     def capabilities(self) -> Capabilities:
-        """What this module serves, and which host it is bound to.
-
-        `environment` is derived rather than declared, and that is the whole point of the
-        field: `trading-mcp` refuses to open a port until it has read it, and a constant
-        that cannot come out any other way answers "yes" to a question it never asked
-        (specs/capital-session, "Wyłącznie środowisko demo"). `Settings` still refuses
-        any host but the demo one at startup, so today this can only say `demo` — the
-        difference is that it says it because of where the module is pointed.
-        """
+        """`environment` is derived rather than declared: `trading-mcp` refuses to open a port
+        until it has read it, and a constant would answer a question it never asked."""
         return Capabilities(
             provider="capital.com",
             environment=environment_of(self._c.base_url),

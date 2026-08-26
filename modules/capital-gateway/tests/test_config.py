@@ -75,8 +75,6 @@ def test_a_blank_credential_names_itself(field: str) -> None:
     assert field.upper() in str(err.value)
 
 
-# --- the environment a consumer reads is the host this module is bound to ------------
-
 
 def test_the_demo_host_is_the_demo_environment() -> None:
     assert environment_of(DEMO_BASE_URL) == "demo"
@@ -84,7 +82,6 @@ def test_the_demo_host_is_the_demo_environment() -> None:
 
 
 def test_any_other_host_is_not() -> None:
-    """`Settings` refuses to start on one, so this cannot happen in a running process —
-    which is exactly why the value has to be derived rather than declared: the field
-    `trading-mcp` reads before it opens a port has to be able to come out differently."""
+    """`Settings` refuses to start on one, which is why the value is derived rather than declared:
+    the field `trading-mcp` reads before it opens a port has to be able to come out differently."""
     assert environment_of("https://api-capital.backend-capital.com") == "live"

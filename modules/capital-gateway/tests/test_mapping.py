@@ -67,9 +67,8 @@ def test_candles_take_the_bid_side() -> None:
 
 
 def test_history_and_the_stream_read_the_same_price_side() -> None:
-    """The seam. Both halves are mapped from one provider payload and must land on the
-    same number — a midpoint on either side puts a half-spread step where a consumer
-    joins stored history to live candles, and nothing in either half alone shows it."""
+    """The seam. Both halves are mapped from one payload and must land on the same number: a
+    midpoint on either side puts a half-spread step where history joins live candles."""
     raw = load_fixture("prices_gold.json")["prices"][0]
 
     from_history = mapping.candle_from_price(raw, Resolution.MINUTE)
@@ -148,9 +147,8 @@ def test_a_non_accepted_confirm_is_rejected_and_says_why() -> None:
     o = mapping.order_from_confirm(load_fixture("confirm_rejected.json"))
 
     assert o.status is OrderStatus.REJECTED
-    # `rejectReason`, which is what the provider actually sends. This assertion was
-    # written against an invented `reason` field and passed for it, so every real
-    # rejection reached the caller with a null cause.
+    # `rejectReason`, which is what the provider actually sends. Written against an invented
+    # `reason` field, this passed while every real rejection reached the caller with a null cause.
     assert o.reason == "RC_NOT_ENOUGH_MARGIN"
 
 

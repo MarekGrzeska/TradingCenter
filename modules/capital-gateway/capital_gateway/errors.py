@@ -1,9 +1,5 @@
-"""The one error type this module raises, carrying the status it becomes over HTTP.
-
-Every provider failure is converted here rather than propagating an httpx error: a
-caller of this module deals in its contract, and an upstream exception leaking through
-would publish capital.com's shape at exactly the moment things go wrong.
-"""
+"""The one error type this module raises, carrying the status it becomes over HTTP. Converting here
+stops an upstream exception from publishing capital.com's shape when things go wrong."""
 
 from __future__ import annotations
 

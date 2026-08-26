@@ -1,12 +1,5 @@
-"""Settings, and the guards that keep this module off a live account and off the
-open internet.
-
-The guards run here rather than on the trading routes on purpose: a runtime check
-would still leave an authenticated live session sitting in the process, readable by
-every other route. Refusing to build the settings leaves nothing running to misuse.
-The same reasoning covers the caller credential — a module that starts without one
-is an open trading endpoint, and nothing about it looks wrong until it is used.
-"""
+"""Settings, and the guards that keep this module off a live account and off the open internet.
+Refusing to build the settings leaves nothing running to misuse, which a route check would not."""
 
 from __future__ import annotations
 
@@ -30,25 +23,14 @@ LIVE_ENVIRONMENT = "live"
 
 
 def environment_of(base_url: str) -> str:
-    """Which capital.com environment a base URL belongs to.
-
-    `Settings` refuses anything but `DEMO_BASE_URL` at startup, so in a running process
-    this only ever answers `demo`. It exists so that the answer is *read* rather than
-    asserted: `/capabilities` is what `trading-mcp` asks before it opens a port, and a
-    field that cannot come out any other way is a question answered by its own asking.
-    """
+    """Which capital.com environment a base URL belongs to. It exists so the answer is *read*
+    rather than asserted: `trading-mcp` asks `/capabilities` before it opens a port."""
     return DEMO_ENVIRONMENT if base_url.rstrip("/") == DEMO_BASE_URL else LIVE_ENVIRONMENT
 
 
 def is_production() -> bool:
-    """Whether this process is the deployed one.
-
-    Read from the environment directly rather than from `Settings`, because the
-    answer is needed when the FastAPI application object is constructed at import
-    time — before a `.env` has been loaded and before credentials are required.
-    Anything other than the exact word is development: a typo must not silently
-    publish the schema of a trading API.
-    """
+    """Whether this process is the deployed one. Read from the environment rather than `Settings`,
+    which is not built yet at import time; anything but the exact word is development."""
     return os.getenv(ENV_VAR, "").strip().lower() == PRODUCTION
 
 
@@ -61,15 +43,8 @@ class Settings(BaseSettings):
     capital_base_url: str = DEMO_BASE_URL
     capital_stream_url: str = DEMO_STREAM_URL
     gateway_api_key: str
-    # Applications allowed to reach this module without the shared key, on the strength of
-    # a token the platform in front of it has already validated — the terminal's Accounts
-    # screen, today. Empty everywhere but production, and empty means *nobody* comes that
-    # way rather than everybody: a caller with no key and no recognised application is the
-    # same 401 it has always been.
-    #
-    # Set from `infra/app-service.tf` alongside the platform's own allow-list, and neither
-    # substitutes for the other: that list is the door, this one is what happens past it
-    # (`caller_access.py`).
+    # Applications allowed in without the shared key, on a token the platform already validated.
+    # Empty everywhere but production, and empty means nobody. The door itself is app-service.tf.
     browser_caller_application_ids: list[str] = []
 
     @field_validator("capital_api_key", "capital_identifier", "capital_password", "gateway_api_key")
@@ -84,9 +59,8 @@ class Settings(BaseSettings):
     @field_validator("capital_base_url", "capital_stream_url")
     @classmethod
     def _demo_only(cls, value: str, info: ValidationInfo) -> str:
-        # An exact match, not a "looks like demo" test. The live REST host is the demo
-        # one minus a prefix, so any rule loose enough to allow a variant is loose
-        # enough to allow the live account.
+        # An exact match, not a "looks like demo" test: the live host is the demo one minus a
+        # prefix, so any rule loose enough to allow a variant allows the live account.
         expected = DEMO_BASE_URL if info.field_name == "capital_base_url" else DEMO_STREAM_URL
         url = value.rstrip("/")
         if url != expected:

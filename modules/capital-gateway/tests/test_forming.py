@@ -111,13 +111,8 @@ def test_a_seeded_period_takes_quotes_without_any_arithmetic(resolution: Resolut
 def test_a_sealed_candle_is_never_stretched_into_the_next_period(
     resolution: Resolution,
 ) -> None:
-    """The defect this replaced.
-
-    A sealed daily candle used to absorb every quote that followed it, because the only
-    boundary the module had was that candle's own start. What reached a chart was
-    yesterday's candle carrying today's high — marked forming, and wrong in a way nothing
-    downstream could detect.
-    """
+    """The defect this replaced: a sealed daily candle absorbed every quote that followed, so a
+    chart got yesterday's candle carrying today's high — marked forming, and undetectably wrong."""
     f = FormingCandle(resolution)
     f.seed(Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0))
     sealed = f.on_sealed(Bar(time=BASE_S, open=100.0, high=105.0, low=99.0, close=104.0))
@@ -166,13 +161,8 @@ def test_an_out_of_order_quote_does_not_rewind_the_candle() -> None:
 
 @pytest.mark.parametrize("resolution", [Resolution.DAY, Resolution.WEEK])
 def test_a_break_and_a_seal_are_told_apart(resolution: Resolution) -> None:
-    """Both leave the module needing a boundary, and they need different answers to the
-    same question — whether the provider handing back the *same* period is any use.
-
-    After a seal it is not: that period is finished. After a break it is exactly the
-    confirmation being asked for, and reading it as no progress silenced the room until
-    the next period.
-    """
+    """Both leave the module needing a boundary and need different answers to the same question.
+    After a seal the same period is no use; after a break it is the confirmation being asked for."""
     f = FormingCandle(resolution)
     f.seed(Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0))
 
@@ -185,11 +175,8 @@ def test_a_break_and_a_seal_are_told_apart(resolution: Resolution) -> None:
     assert f.period_is_over is True
 
 
-# --- a period that ended without the provider saying so ---------------------------------
-#
-# Measured 24 August 2026: every weekly room was holding a bar opened on the 17th and
-# folding the 24th's quotes into it. The week had rolled at midnight, the provider's seal
-# for it never arrived, and a seal was the only thing that could move the boundary.
+# Measured 24 August 2026: every weekly room held a bar opened on the 17th and folded the 24th's
+# quotes into it, because the provider's seal never arrived and only a seal moved the boundary.
 
 
 @pytest.mark.parametrize(
@@ -215,11 +202,8 @@ def test_a_quote_a_whole_period_later_does_not_stretch_the_bar(
 def test_a_quote_inside_the_nominal_period_still_stretches_the_bar(
     resolution: Resolution, period: int
 ) -> None:
-    """The bound overstates elapsed time on purpose, so everything under it is left alone.
-
-    A venue's day is shorter than 24 hours; reading this as a boundary rather than as a
-    ceiling would cut the candle at the wrong moment — which is the mistake the whole
-    module is built to avoid."""
+    """The bound overstates elapsed time on purpose, so everything under it is left alone. Read as
+    a boundary rather than a ceiling it would cut the candle at the wrong moment."""
     f = FormingCandle(resolution)
     f.seed(Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0))
 
@@ -231,11 +215,8 @@ def test_a_quote_inside_the_nominal_period_still_stretches_the_bar(
 
 
 def test_the_nominal_length_is_never_a_boundary_to_floor_by() -> None:
-    """The one way this change could undo the decision it is built on.
-
-    `NOMINAL_SECONDS` answers "has this period certainly ended". `BUCKET_SECONDS` answers
-    "where does the period start", and a daily boundary computed from UTC midnight looks
-    right and is wrong — so these two must not converge."""
+    """`NOMINAL_SECONDS` answers "has this period certainly ended", `BUCKET_SECONDS` "where does it
+    start" — and a daily boundary computed from UTC midnight looks right and is wrong."""
     assert Resolution.DAY not in BUCKET_SECONDS
     assert Resolution.WEEK not in BUCKET_SECONDS
     assert set(NOMINAL_SECONDS) == set(BUCKET_SECONDS) | {Resolution.DAY, Resolution.WEEK}
@@ -247,10 +228,8 @@ def test_the_nominal_length_is_never_a_boundary_to_floor_by() -> None:
 def test_a_bar_this_module_assembled_is_never_the_providers_sealed_one(
     resolution: Resolution,
 ) -> None:
-    """What a joiner is handed hangs on this, and a consumer stores what is marked
-    settled. A period can now end without a seal, so "over" and "sealed" have to be
-    separable — otherwise the room's own assembly of an unfinished period goes out as a
-    settled candle and lands in an archive."""
+    """A period can now end without a seal, so "over" and "sealed" have to stay separable —
+    otherwise the room's own assembly of an unfinished period lands in an archive as settled."""
     f = FormingCandle(resolution)
     f.seed(Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0))
     assert f.held_is_sealed is False

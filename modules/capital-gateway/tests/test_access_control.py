@@ -1,9 +1,5 @@
-"""specs/capital-access-control — who may call this module, and what it never shows.
-
-`docs_url` / `openapi_url` are baked into the FastAPI app object at import time (they
-are constructor arguments, not per-request state), so the production variant needs a
-fresh import with `GATEWAY_ENV` already set — see `_imported_with`.
-"""
+"""specs/capital-access-control — who may call this module, and what it never shows. `docs_url` is
+baked into the app object at import time, so the production variant needs a fresh import."""
 
 from __future__ import annotations
 
@@ -68,8 +64,6 @@ def production_client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     next(gen, None)
 
 
-# --- every call carries a credential ---
-
 
 def test_a_request_without_the_header_is_refused(client: TestClient) -> None:
     with client:
@@ -127,8 +121,6 @@ def test_a_websocket_with_the_wrong_key_is_closed(client: TestClient) -> None:
         pass
 
 
-# --- the health probe is the one exception ---
-
 
 def test_the_health_probe_needs_no_key(client: TestClient) -> None:
     with client:
@@ -146,22 +138,16 @@ def test_the_health_probe_names_nothing_sensitive(client: TestClient) -> None:
     assert set(body) == {"service", "status"}
 
 
-# --- without a configured key, the module refuses to start ---
-
 
 def test_start_without_a_gateway_key_is_refused(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("GATEWAY_API_KEY", raising=False)
     from capital_gateway.config import Settings
 
-    # `_env_file=None`: Settings reads env_file=".env" by default, so a developer's own
-    # .env would still satisfy the required field and this test would pass only where the
-    # misconfiguration it checks for cannot happen. Disabling the file here isolates the
-    # check to the environment actually being deleted from, above.
+    # `_env_file=None`: Settings reads ".env" by default, so a developer's own file would satisfy
+    # the required field and pass this test only where the misconfiguration cannot happen.
     with pytest.raises(ValueError):
         Settings(_env_file=None)  # type: ignore[call-arg]
 
-
-# --- the schema is off in production ---
 
 
 def test_docs_are_published_off_production(client: TestClient) -> None:
@@ -183,8 +169,6 @@ def test_docs_are_absent_in_production(production_client: TestClient) -> None:
     assert docs_response.status_code == 404
 
 
-# --- the key itself never leaks ---
-
 
 def test_a_refusal_does_not_echo_the_key_back(client: TestClient) -> None:
     with client:
@@ -193,8 +177,6 @@ def test_a_refusal_does_not_echo_the_key_back(client: TestClient) -> None:
     assert "guess-1" not in response.text
     assert GATEWAY_KEY not in response.text
 
-
-# --- the second credential: a browser the platform authenticated ---
 
 
 @pytest.fixture
@@ -292,8 +274,6 @@ def test_the_key_still_reaches_everything(with_terminal: TestClient) -> None:
 
     assert response.status_code == 200
 
-
-# --- a refusal leaves a trace, so the next one is one query rather than a bisection ---
 
 
 def test_a_refusal_says_which_door_it_was(

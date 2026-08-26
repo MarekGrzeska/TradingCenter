@@ -91,18 +91,16 @@ async def test_concurrent_callers_trigger_exactly_one_login(client: CapitalClien
 
     await asyncio.gather(*(client.accounts() for _ in range(8)))
 
-    # Eight logins would be seven wasted requests against the account's shared 10/second
-    # budget, and eight sessions expiring on eight schedules. (Not seven dead sessions:
-    # measurement on 10 August 2026 found that capital.com sessions coexist.)
+    # Eight logins would be seven wasted requests against the account's shared 10/second budget,
+    # and eight sessions expiring on eight schedules. Not seven dead ones: they coexist.
     assert session.call_count == 1
     await client.aclose()
 
 
 @respx.mock
 async def test_a_login_is_shared_not_serialised(client: CapitalClient) -> None:
-    # A lock would also produce one login here if the second caller re-checked the
-    # session; it would not if it simply logged in again in turn. Proving the waiters
-    # got the *same* result is what separates sharing from serialising.
+    # A lock would also produce one login here if the second caller re-checked. Proving the
+    # waiters got the *same* result is what separates sharing from serialising.
     respx.post(SESSION).mock(return_value=login_response())
     respx.get(ACCOUNTS).mock(return_value=httpx.Response(200, json={"accounts": []}))
 
@@ -143,14 +141,11 @@ def test_stream_tokens_refuse_to_answer_before_a_session(client: CapitalClient) 
         client.stream_tokens()
 
 
-# --- the session the stream borrows ---
-
 
 @respx.mock
 async def test_stream_tokens_prove_the_session_still_answers(client: CapitalClient) -> None:
-    """A websocket never receives a 401, so the stream cannot notice its session died.
-    Checking costs one request per connection and is what stops a reconnect loop that
-    would otherwise retry with dead tokens forever."""
+    """A websocket never receives a 401, so the stream cannot notice its session died. Checking
+    costs one request per connection and stops a reconnect loop retrying with dead tokens."""
     respx.post(SESSION).mock(return_value=login_response())
     check = respx.get(SESSION).mock(return_value=httpx.Response(200, json={}))
 
@@ -165,14 +160,8 @@ async def test_stream_tokens_prove_the_session_still_answers(client: CapitalClie
 async def test_a_session_invalidated_elsewhere_is_replaced_before_the_stream_uses_it(
     client: CapitalClient,
 ) -> None:
-    """A session can stop being honoured while the tokens are still sitting there — a
-    stream makes no REST calls, so its borrowed session expires from disuse. The tokens
-    are then still present and still wrong, which is the state that left a production
-    stream reconnecting into nothing until some REST call happened by.
-
-    The name says "invalidated elsewhere" for the shape, not for a particular cause: what
-    this covers is a 401 arriving from a session the client believed in, whatever ended it.
-    """
+    """A session can stop being honoured while the tokens sit there — a stream makes no REST calls,
+    so its borrowed session expires from disuse, and the pair is then present and wrong."""
     login = respx.post(SESSION)
     login.side_effect = [login_response(), login_response("cst-2", "tok-2")]
     check = respx.get(SESSION)
@@ -193,15 +182,8 @@ async def test_a_session_invalidated_elsewhere_is_replaced_before_the_stream_use
 async def test_a_session_the_provider_will_not_confirm_stops_the_subscription(
     client: CapitalClient,
 ) -> None:
-    """The failure mode this defence exists for, and the one it did not cover until
-    18 August 2026: the check was made and its answer dropped on the floor.
-
-    A login that fails for good — a rotated key, a locked account, a provider outage —
-    leaves `request()` out of retries and the old tokens still sitting in the client.
-    Answering with them let `Upstream` subscribe with a dead pair and reconnect into
-    nothing every three seconds, which is exactly the loop this function was written to
-    break, one level down. Raising is what makes the caller back off.
-    """
+    """The failure this defence did not cover until 18 August 2026: the check was made and its
+    answer dropped, so a login that fails for good let `Upstream` subscribe with a dead pair."""
     respx.post(SESSION).mock(return_value=login_response())
     check = respx.get(SESSION).mock(return_value=httpx.Response(403, json={}))
 
