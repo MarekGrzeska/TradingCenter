@@ -1,14 +1,5 @@
-"""What this module answers with. These models are the published shape.
-
-Separate from the internal ones on purpose, and here that separation is load-bearing twice
-over. It keeps the provider's shapes out of the terminal — Polymarket sends three fields as
-JSON inside a string, and a field it renames must be a change in this module and nowhere else.
-And it keeps `Decimal` off the wire, where JSON has no such thing.
-
-Prices are **probabilities on 0..1**, never percentages, and every field that carries one says
-so in its description. A consumer that reads 0,62 as 62 is wrong by two orders of magnitude
-without a single error on the way.
-"""
+"""What this module answers with — the published shape, which keeps the provider's JSON-in-a-string
+fields and `Decimal` off the wire. Prices are probabilities on 0..1, never percentages."""
 
 from __future__ import annotations
 
@@ -28,12 +19,8 @@ def _f(value: Decimal | None) -> float | None:
 
 
 class Problem(BaseModel):
-    """One refusal shape for every route, so a consumer handles one thing.
-
-    `retryable` is the field that matters: a consumer has to be able to tell "ask again" from
-    "fix the request" from "tell the operator", and over HTTP a refusal and an empty answer
-    look alike.
-    """
+    """One refusal shape for every route, so a consumer handles one thing. `retryable` is the field that
+    matters: over HTTP a refusal and an empty answer look alike."""
 
     detail: str
     cause: Literal["module", "provider", "request"] = "module"
@@ -105,9 +92,8 @@ class MarketOut(BaseModel):
 class CollectionOut(BaseModel):
     """Whether prices are actually arriving. Being on the list does not prove they are."""
 
-    # Three, and there is no fourth to add back: an observation is collected or it is gone,
-    # so a state meaning "on the list and not collecting" has no producer any more
-    # (`openspec/specs/polymarket-data-tracking`).
+    # Three, and there is no fourth to add back: an observation is collected or it is gone, so a
+    # state meaning "on the list and not collecting" has no producer any more.
     state: Literal["collecting", "stalled", "resolved"]
     last_sample_at: datetime | None = None
     reason: str | None = Field(
@@ -228,10 +214,8 @@ class SnapshotEntry(BaseModel):
 
 
 class SnapshotOut(BaseModel):
-    """The whole screen in one read.
-
-    A request per event would be a request per row, and one measured event holds 128 markets.
-    """
+    """The whole screen in one read. A request per event would be a request per row, and one measured
+    event holds 128 markets."""
 
     entries: list[SnapshotEntry]
 

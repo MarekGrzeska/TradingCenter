@@ -1,15 +1,5 @@
-"""Change over a window, computed when somebody asks.
-
-The application this module replaces kept a second worker, a table of upserts, per-window
-matching margins and a notification-deduplication table — all so a Telegram bot would not
-repeat itself. Without the bot none of it has an audience, and what is left is one query per
-window over history this module already holds.
-
-What does carry over is the tolerance, and it carries over because it was measured rather
-than guessed: the provider's own spacing wobbles between 57 and 63 seconds inside one series
-and widens on its own for older ranges. A base point demanded at an exact instant would
-report "no data" on a series that plainly has some.
-"""
+"""Change over a window, computed when somebody asks — one query per window over history this module
+already holds. The tolerance carries over because it was measured: the provider's spacing wobbles."""
 
 from __future__ import annotations
 
@@ -21,13 +11,8 @@ from tc_runtime.db import Conn
 from . import store
 from .contract import OutcomeChanges, WindowChange
 
-# Dense near now, sparse further out, and asymmetric on purpose. Seven were chosen before
-# anybody had seen them on a screen; after a day of the terminal's tab the operator named the
-# five they actually read (`five-windows-are-enough`). The two that went — 15m and 12h — were
-# not wrong, they were unread, and each one is a separate base-point query **per outcome** on
-# every read: a two-outcome event asked fourteen where ten will do, and a 128-market event
-# asked hundreds. A prediction market moves slowly enough that a second quarter-hour window
-# says what the first one said.
+# Dense near now, sparse further out, and asymmetric on purpose. Seven were chosen before anybody saw
+# them; the two that went were unread, and each is a base-point query *per outcome* on every read.
 WINDOWS: tuple[tuple[str, timedelta], ...] = (
     ("5m", timedelta(minutes=5)),
     ("1h", timedelta(hours=1)),
@@ -36,10 +21,8 @@ WINDOWS: tuple[tuple[str, timedelta], ...] = (
     ("7d", timedelta(days=7)),
 )
 
-# The shortest window is five minutes and the sampler ticks each minute, so a base point may
-# legitimately sit a couple of ticks off the mark. Beyond a tenth of the window it is not the
-# spacing wobbling any more — it is a hole, and a change measured across it is a change over
-# a longer window than the one it is labelled with.
+# The shortest window is five minutes and the sampler ticks each minute, so a base point may sit a
+# couple of ticks off. Beyond a tenth of the window it is a hole, and the change spans more than its label.
 MIN_TOLERANCE = timedelta(minutes=3)
 TOLERANCE_FRACTION = 0.1
 
@@ -87,9 +70,8 @@ async def _one_window(
 
     baseline = await store.sample_at_or_before(conn, outcome_id, target)
     if baseline is None or baseline.midpoint is None:
-        # Not zero, and deliberately not a change measured from the oldest point that does
-        # exist. The first would be a claim about the market; the second would be a change
-        # over a longer window than the label says.
+        # Not zero, and deliberately not a change measured from the oldest point that does exist.
+        # The first would be a claim about the market; the second a change over a longer window.
         return WindowChange(
             window=label,  # type: ignore[arg-type]
             unavailable="the collected history does not reach back this far",

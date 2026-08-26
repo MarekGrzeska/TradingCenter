@@ -1,9 +1,5 @@
-"""What collection is currently doing, per tracked event.
-
-A failure that lives only in a log is a failure nobody reads. The list of observations has to
-be able to say "this one is not being collected, and here is why" — otherwise silence in the
-data reads exactly like silence in the market, which is the one distinction this archive
-exists to keep.
+"""What collection is currently doing, per tracked event. A failure that lives only in a log is a
+failure nobody reads: silence in the data would otherwise read exactly like silence in the market.
 
 Revision ID: 0002
 Revises: 0001

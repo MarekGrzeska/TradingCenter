@@ -1,27 +1,6 @@
-"""Which caller may reach which surface of this application.
-
-The platform's own gate answers a narrower question than it looks like it does: Easy Auth
-authorizes an **application**, and once a caller is through that door every path in this
-process is behind it. This module serves two surfaces, so the record below is what Easy Auth
-cannot express — route by route, which identity has business there.
-
-**The boundary is not the same as `market-data`'s, and the difference is the whole point.**
-There, the tool surface only reads, so the record keeps the tool callers away from every
-route that writes. Here three tools write by design — they change the list of observations —
-so what the record protects is different and smaller and harder: the tool caller must not
-reach **deleting collected history**, which is the one act in this module nobody can undo,
-and must not reach the rest of the REST contract either.
-
-**The identity is the calling application, read from the token's own claims.** Not the
-principal-id header, which for a delegated token names the person at the keyboard.
-
-**A path not in the record is refused, not passed.** A REST route added next month would
-otherwise be reachable by the workbench on the day it is written, and nothing would say so.
-
-Raw ASGI, not `BaseHTTPMiddleware`, and that is load-bearing rather than stylistic:
-`BaseHTTPMiddleware` buffers a response body in some Starlette versions, which would break
-the streamable-http transport `/mcp` is served over.
-"""
+"""Which caller may reach which surface. The boundary is not `market-data`'s and the difference is the
+point: three tools here write by design, so what the record protects is that the tool caller must not
+reach deleting collected history — the one act in this module nobody can undo."""
 
 from __future__ import annotations
 
@@ -41,13 +20,8 @@ PRINCIPAL_ID_HEADER = b"x-ms-client-principal-id"
 PRINCIPAL_NAME_HEADER = b"x-ms-client-principal-name"
 PRINCIPAL_HEADER = b"x-ms-client-principal"
 
-# The token claim naming the application the token was issued to. `azp` in a v2 token,
-# `appid` in a v1 one, and Easy Auth passes some claim types through as the long URI form.
-# All three are the same fact: who is calling.
-#
-# Deliberately not `oid` or `sub`: those name the person, and this module admits programs.
-# Measured elsewhere in this repository on 19 August 2026, by deploying the opposite
-# assumption and refusing every request the terminal made.
+# The token claim naming the application the token was issued to: `azp` in v2, `appid` in v1, and Easy
+# Auth's long URI form. Deliberately not `oid` or `sub`: those name the person, and this admits programs.
 APPLICATION_CLAIMS = (
     "azp",
     "appid",
@@ -58,11 +32,8 @@ UNAUTHENTICATED = "anonymous"
 
 
 def calling_application(headers: dict[bytes, bytes]) -> str | None:
-    """The application identifier this request was issued to, or `None`.
-
-    `None` is a refusal, never a pass: a request whose calling application cannot be read is
-    exactly the request this record has nothing to say about.
-    """
+    """The application identifier this request was issued to, or `None`. `None` is a refusal, never a
+    pass: it is exactly the request this record has nothing to say about."""
     raw = headers.get(PRINCIPAL_HEADER)
     if not raw:
         return None
@@ -88,23 +59,14 @@ class Surface(str, Enum):
     OPEN = "open"
 
 
-# Reachable with no identity even where the requirement is on. Both are excluded from Easy
-# Auth in production, which is exactly why they are named here rather than left to a prefix
-# rule — and why the test on this set asserts equality, so any addition fails CI.
-#
-#   /       answers a constant naming this module, which is what the deploy probe reads to
-#           tell this application from another one on the same plan.
-#   /ping   answers a constant. It reads nothing, so its answer cannot vary with anything
-#           the archive holds — that is what makes it exemptible at all.
+# Reachable with no identity even where the requirement is on, and both excluded from Easy Auth in
+# production. `/` names this module for the deploy probe; `/ping` reads nothing. Asserted by equality.
 OPEN_PATHS = frozenset({"/", "/ping"})
 
 TOOLS_PREFIX = "/mcp"
 
-# Every REST path this module publishes, as its route template. Written out rather than read
-# off `app.routes`: a record derived from the application can never disagree with it, and
-# disagreeing is the whole job — `test_caller_access.py` holds this list against the
-# published document, so a new route fails a test until somebody decides which surface it
-# belongs to.
+# Every REST path this module publishes, written out rather than read off `app.routes`: a record
+# derived from the application can never disagree with it, and disagreeing is the whole job.
 REST_PATHS: tuple[str, ...] = (
     "/health",
     "/events",
@@ -174,9 +136,8 @@ class CallerAccess:
 
         settings = getattr(self._state, "settings", None)
         if settings is None:
-            # The lifespan puts them there before anything serves, so a running process does
-            # not reach this. Refused rather than passed anyway: "the settings were missing"
-            # must never be the reading under which everything is allowed.
+            # The lifespan puts them there before anything serves, so a running process does not
+            # reach this. "The settings were missing" must never be the reading that allows all.
             log.error("request refused: settings are not on the application state yet")
             await self._refuse(scope, receive, send, 503, "the archive is still starting")
             return
@@ -190,9 +151,8 @@ class CallerAccess:
         )
 
         if not settings.require_authenticated_principal:
-            # Local work: nothing stands in front, so there is no identity to have and no
-            # list to be on. Logged rather than passed silently — a deployed instance
-            # printing this line is a misconfiguration somebody needs to see.
+            # Local work: nothing stands in front, so there is no identity to have. Logged rather
+            # than silent — a deployed instance printing this is a misconfiguration to see.
             log.info("request on %s from %s", path, application or principal or UNAUTHENTICATED)
             await self._app(scope, receive, send)
             return

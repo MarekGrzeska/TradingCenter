@@ -1,11 +1,5 @@
-"""The rules about what may be tracked, in the one place both surfaces go through.
-
-The REST contract and the tool surface are two doors to the same decision, and the ceiling
-has to hold at both. Written here rather than in each router because a limit enforced in one
-of two places is a limit the other one does not have — and the door without it is the tool
-surface, where a model asked to "add whatever looks interesting" is the case the ceiling
-exists for.
-"""
+"""The rules about what may be tracked, in the one place both surfaces go through. A limit enforced in
+one of two doors is a limit the other does not have — and the other is the tool surface."""
 
 from __future__ import annotations
 
@@ -36,16 +30,8 @@ async def track(
     max_tracked_events: int,
     group_id: int | None = None,
 ) -> tuple[int, bool]:
-    """Brings an event under observation. Returns `(event_id, was_already_tracked)`.
-
-    Already tracked is not an error and does not make a second observation: a repeat may
-    move the event to a different group and says so, which is what lets a model call this
-    without first having to remember whether it called it before.
-
-    The ceiling is checked only for an event that is not already tracked. A refresh of
-    something already being watched adds no traffic, so refusing it at the limit would make
-    a full archive unable to notice a market being added to an event it already holds.
-    """
+    """Brings an event under observation. Already tracked is not an error and makes no second observation.
+    The ceiling is checked only for a new event: a refresh adds no traffic, and refusing it would freeze a full archive."""
     existing = await store.load_events(conn, provider_event_id=event.provider_event_id)
     already_tracking = bool(existing)
 

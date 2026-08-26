@@ -1,9 +1,5 @@
-"""The REST contract: the happy path, one error and one refusal per route.
-
-The domain rules are tested once at the lowest layer that holds them — the ceiling and the
-atomicity of deletion are in `test_store.py`. What is here is that the decision reaches the
-wire, and the refusals a consumer has to be able to tell apart.
-"""
+"""The REST contract: the happy path, one error and one refusal per route. The domain rules are tested
+once at the lowest layer that holds them; what is here is that the decision reaches the wire."""
 
 from __future__ import annotations
 
@@ -120,9 +116,8 @@ class TestTracking:
 
         assert response.status_code == 204
         assert (await api.get("/events")).json() == []
-        # The outcome itself went with the event, so its history is not empty — it is not
-        # there. That is the difference between removing an observation and deleting its
-        # data, and it is the whole reason both acts exist.
+        # The outcome itself went with the event, so its history is not empty — it is not there.
+        # That is the difference between removing an observation and deleting its data.
         history = await api.get(f"/outcomes/{outcome_id}/history")
         assert history.status_code == 404
 
@@ -130,9 +125,8 @@ class TestTracking:
         assert (await api.delete("/events/never-seen")).status_code == 404
 
     async def test_there_is_no_way_to_stop_collecting_without_removing(self, app) -> None:
-        """Asserted against the published document rather than against one request: a route
-        that no longer answers but is still described is still a route somebody writes a
-        client for."""
+        """Asserted against the published document rather than against one request: a route that no
+        longer answers but is still described is still a route somebody writes a client for."""
         paths = app.openapi()["paths"]
 
         assert "/events/{provider_event_id}/tracking" not in paths
@@ -211,9 +205,8 @@ class TestReads:
 
 class TestBackfillStartsOnTracking:
     async def test_tracking_an_event_starts_filling_its_past(self, api, app) -> None:
-        """The route answers that the recent past is being filled in, and until this was
-        wired nothing kept that promise: `backfill_event` had no caller outside its tests,
-        so ninety days arrived only when the process next restarted."""
+        """The route answers that the recent past is being filled in, and until this was wired nothing
+        kept that promise: `backfill_event` had no caller outside its tests."""
         app.state.provider = fakes.FakeProvider(by_slug={"an-event": fakes.event_payload()})
 
         answer = await api.post(
@@ -241,14 +234,8 @@ class TestWindows:
     async def test_the_answer_carries_exactly_the_windows_the_module_computes(
         self, api, pool
     ) -> None:
-        """Read off `changes.WINDOWS` rather than retyped here.
-
-        A list written out in the test is a second place the set lives, and the two drift:
-        this assertion would have gone on passing with the two unread windows still being
-        queried on every read, which is what `five-windows-are-enough` removed. What it
-        pins is the shape — one entry per window, in the module's own order — not which
-        windows somebody felt like naming twice.
-        """
+        """Read off `changes.WINDOWS` rather than retyped here: a list written out in the test is a second
+        place the set lives. What it pins is the shape, not which windows somebody named twice."""
         await observe(pool, fakes.event_payload())
 
         body = (await api.get("/events/e-1/changes")).json()

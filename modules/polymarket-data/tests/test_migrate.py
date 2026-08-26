@@ -19,12 +19,8 @@ from polymarket_data.runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
 @pytest.fixture
 async def empty_database_url(postgres_url: str) -> AsyncIterator[str]:
-    """A database in the session's container that no migration has touched.
-
-    `migrated_url` is session scoped and runs the migrations once for everything that asks
-    for it, so a test needing an *unmigrated* database cannot share it — and cannot rely on
-    running before it either.
-    """
+    """A database in the session's container that no migration has touched. `migrated_url` is session
+    scoped, so a test needing an unmigrated one cannot share it or rely on running first."""
     name = f"empty_{uuid.uuid4().hex[:12]}"
     admin = await asyncpg.connect(asyncpg_dsn(postgres_url))
     try:
@@ -71,11 +67,8 @@ async def test_a_database_at_no_revision_is_refused_before_it_serves(
 
 @pytest.mark.db
 async def test_only_one_of_two_processes_migrates(empty_database_url: str) -> None:
-    """Two starts against one empty database, racing the way two App Service instances do.
-
-    Each takes its own connection, as two processes would; the lock lives in the database,
-    which is the whole reason it works across them.
-    """
+    """Two starts against one empty database, racing the way two App Service instances do. Each takes its
+    own connection; the lock lives in the database, which is why it works across them."""
     migrated: list[str] = []
 
     async def start(name: str) -> None:
@@ -135,13 +128,8 @@ async def test_the_chain_comes_back_down_and_up_again(empty_database_url: str) -
 async def test_0003_takes_the_stopped_observations_and_leaves_the_rest(
     empty_database_url: str,
 ) -> None:
-    """The one migration in this module that deletes collected history.
-
-    It runs once, against whatever a production database happens to hold, and there is no
-    second chance to get it right — so it is walked here rather than reasoned about: a
-    stopped observation goes with everything under it, a live one is untouched, and the
-    column that told them apart is gone afterwards.
-    """
+    """The one migration in this module that deletes collected history. It runs once against whatever a
+    production database holds, with no second chance, so it is walked here rather than reasoned about."""
     from alembic import command
     from tc_runtime.migrate import alembic_config
 

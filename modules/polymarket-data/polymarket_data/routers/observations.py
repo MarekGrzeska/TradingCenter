@@ -1,9 +1,5 @@
-"""What is under observation, and the two acts that change it.
-
-Three acts, in fact, and the third is the one worth naming: **deleting collected history
-lives here and only here**. Ending an observation stops the sampling and keeps every sample;
-deleting is separate, irreversible, and out of reach of every tool.
-"""
+"""What is under observation, and the two acts that change it. Three, in fact, and the third is worth
+naming: deleting collected history lives here and only here, out of reach of every tool."""
 
 from __future__ import annotations
 
@@ -110,9 +106,8 @@ async def track_event(request: Request, body: TrackRequest) -> TrackResult:
             provider_event_id=event.provider_event_id,
         )
 
-    # Outside the connection and after the row exists: the past is filled by its own task, so
-    # this request does not wait on six provider calls per outcome. Only for a new
-    # observation — re-tracking something already observed has nothing to reach back for.
+    # Outside the connection and after the row exists: the past is filled by its own task, so this
+    # request does not wait on six provider calls per outcome. Only for a new observation.
     if not already:
         request.app.state.ingest.event_tracked(event_id)
     return TrackResult(event=out, already_tracked=already)

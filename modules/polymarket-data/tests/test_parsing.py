@@ -1,9 +1,5 @@
-"""The provider's payloads, read without touching the network.
-
-Every awkward thing about Polymarket's shapes is in here rather than in the client, which is
-why these are unit tests: `outcomes`, `outcomePrices` and `clobTokenIds` arrive as JSON
-inside a string, aligned by position, and nothing in the payload says so.
-"""
+"""The provider's payloads, read without touching the network. Every awkward thing about Polymarket's
+shapes is here rather than in the client, which is why these are unit tests."""
 
 from __future__ import annotations
 

@@ -1,10 +1,5 @@
-"""The published surface: FastAPI over the prediction-market archive.
-
-Only assembly lives here — the lifespan and the routers. The one thing worth reading twice
-is the order inside the lifespan: the database is brought to this image's revision before
-anything is built on top of it, before a request is served and before a single price
-sample is written. Sampling starts at the bottom of this file for exactly that reason.
-"""
+"""The published surface: FastAPI over the prediction-market archive. Only assembly lives here, and the
+order inside the lifespan is what to read twice: the database is migrated before anything is written."""
 
 from __future__ import annotations
 
@@ -29,17 +24,8 @@ log = logging.getLogger(__name__)
 
 
 def configure_logging() -> None:
-    """Give the root logger a level and somewhere to write, because nothing else does.
-
-    Uvicorn configures its own three loggers and leaves the root alone, so without this a
-    deployed container prints the access log and not one line this module wrote — the
-    root logger's default level is WARNING and it has no handler regardless. `market-data`
-    learned this the expensive way: a collection job that never started looked exactly
-    like one running quietly.
-
-    `basicConfig` is a no-op if the root logger already has a handler, which is the right
-    behaviour — a caller who configured logging themselves keeps their configuration.
-    """
+    """Give the root logger a level and somewhere to write, because nothing else does. Uvicorn configures
+    only its own, so without this a deployed container prints the access log and nothing this module wrote."""
     logging.basicConfig(
         level=os.environ.get("LOG_LEVEL", "INFO").upper(),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -68,17 +54,15 @@ async def lifespan(app: FastAPI):
             concurrency=settings.provider_concurrency,
         ) as polymarket,
     ):
-        # One connection held for the whole of it: the advisory lock is session scoped, so
-        # it has to be released on the connection that took it, and handing that connection
-        # back to the pool in between would release it early.
+        # One connection held for the whole of it: the advisory lock is session scoped, so handing
+        # the connection back to the pool in between would release it early.
         async with pool.acquire() as conn:
             async with advisory_lock(
                 conn, MIGRATION_LOCK_KEY, wait=settings.migration_lock_wait_seconds
             ):
                 await migrate.run(MIGRATIONS)
-            # Still checked after migrating, for the pair a migration cannot fix: an
-            # upgrade that reported success without arriving, and an image older than the
-            # schema it found.
+            # Still checked after migrating, for the pair a migration cannot fix: an upgrade that
+            # reported success without arriving, and an image older than the schema it found.
             await schema_version.verify(conn, MIGRATIONS)
 
         app.state.pool = pool
@@ -96,10 +80,8 @@ async def lifespan(app: FastAPI):
         app.state.ingest = ingest
         await ingest.start()
 
-        # The tool surface's session manager. A mounted application's lifespan is never run
-        # — only the outermost one is — so the task group the streamable-http transport
-        # dispatches into has to be started here, or every tool call answers `RuntimeError:
-        # Task group is not initialized`.
+        # The tool surface's session manager: a mounted application's lifespan is never run, so the
+        # task group has to be started here or every tool call fails.
         async with mcp_app.tool_surface_session(app):
             log.info("polymarket-data is serving")
             try:
@@ -124,9 +106,8 @@ def create_app() -> FastAPI:
     app.state.mcp_server = server
     app.mount(mcp_app.MOUNT_PATH, tool_app)
 
-    # In front of the whole application, and in this order: the address fix runs before
-    # routing so `/mcp` and `/mcp/` are one address, and the caller record runs before that
-    # so nothing decides who may call after the routing has already begun.
+    # In front of the whole application, and in this order: the address fix runs before routing, and
+    # the caller record before that, so nothing decides who may call after routing has begun.
     app.add_middleware(mcp_app.ToolSurfaceAddress)
     app.add_middleware(CallerAccess, state=app.state)
     return app

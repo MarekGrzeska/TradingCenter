@@ -1,21 +1,9 @@
-"""The three tools that change something, and the boundary around them.
+"""The three tools that change something, and the boundary around them. This is the deliberate departure
+from `market-data-tools`: there a write would mutate the candle archive, here it is the list of
+observations — reversible, and exactly what the operator clicks in the terminal.
 
-This is the deliberate departure from `market-data-tools`, which holds outright that its set
-only reads and that no setting may add a writing tool to it. That rule is right there and
-wrong here, and the difference is what "writing" means in each module. There, a write would
-mutate the candle archive: data nobody can reconstruct, in a module where a quiet change is
-corruption. Here, a write is the **list of observations** — exactly what the operator clicks
-in the terminal, entirely reversible, with no effect beyond this module starting or stopping
-asking the provider about an event.
-
-The boundary is somewhere else and is just as hard: **no tool deletes collected history**,
-none changes the module's configuration, and none touches anything to do with money — this
-system trades nothing on Polymarket. Deleting is a route on the REST contract, because it is
-the one act here that cannot be undone.
-
-`tests/test_tools_surface.py` holds this: a tool reaching past the observation list fails
-before it is deployed, rather than being noticed at review.
-"""
+The boundary is elsewhere and just as hard: no tool deletes collected history, none changes configuration,
+and none touches money. `tests/test_tools_surface.py` holds it."""
 
 from __future__ import annotations
 
@@ -79,9 +67,8 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
                     group_id=group_id,
                 )
             except tracking.LimitReached as err:
-                # The refusal a model has to be able to act on. It says what to do first,
-                # because "add whatever looks interesting" is exactly the request that
-                # reaches this ceiling.
+                # The refusal a model has to be able to act on. It says what to do first, because
+                # "add whatever looks interesting" is exactly the request that reaches this ceiling.
                 return {
                     "refused": str(err),
                     "do_first": (

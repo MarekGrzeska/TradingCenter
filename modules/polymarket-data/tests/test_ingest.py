@@ -33,9 +33,8 @@ async def track(pool, payload: dict) -> int:
 
 class TestTheTick:
     async def test_one_request_prices_every_outcome_of_every_market(self, pool) -> None:
-        """The whole difference from the application this module replaces: the metadata
-        surface carries the midpoint of every outcome at once, so a 128-market event costs
-        one request rather than 256."""
+        """The whole difference from the application this module replaces: the metadata surface carries
+        the midpoint of every outcome at once, so a 128-market event costs one request rather than 256."""
         payload = fakes.event_payload(
             markets=(
                 fakes.market_payload("m-1", prices=("0.6", "0.4")),
@@ -146,11 +145,8 @@ class TestTheTick:
 
 class TestATickIsAWindowNotAnInstant:
     async def test_consecutive_ticks_merge_into_one_collected_range(self, pool) -> None:
-        """Recorded as an instant, two ticks a minute apart never touched, so nothing ever
-        merged: `collected_ranges` grew a row per outcome per minute — some 368k a day for
-        one 256-outcome event — and `is_collected` answered false for the 59 seconds between
-        them. A tick stands for the interval it samples, which is what makes it adjacent to
-        the last."""
+        """Recorded as an instant, two ticks a minute apart never touched, so `collected_ranges` grew a
+        row per outcome per minute — some 368k a day for one 256-outcome event."""
         payload = fakes.event_payload(markets=(fakes.market_payload("m-1", prices=("0.6", "0.4")),))
         event_id = await track(pool, payload)
         fake = fakes.FakeProvider({"e-1": payload})
@@ -184,9 +180,8 @@ class TestBackfill:
         assert len(windows) == 6
 
     async def test_points_outside_the_window_are_not_written(self, pool) -> None:
-        """`endTs` is not honoured by the provider — measured — so a response routinely runs
-        to the present moment whatever was asked for. A point written outside the window
-        makes "collected" a wider claim than what was verified."""
+        """`endTs` is not honoured by the provider, so a response routinely runs to the present. A point
+        written outside the window makes "collected" a wider claim than what was verified."""
         event_id = await track(pool, fakes.event_payload())
         start = _now() - timedelta(days=2)
         end = start + timedelta(days=1)
@@ -261,9 +256,8 @@ class TestTheProvidersOwnBoundary:
     async def test_a_backfill_does_not_reach_before_what_the_provider_admits_to(
         self, pool
     ) -> None:
-        """The clamp was inverted — `since >= oldest` then `max(since, oldest)` is `since`,
-        a guaranteed no-op — so the boundary the provider taught us limited nothing and every
-        restart re-requested the same known-empty windows."""
+        """The clamp was inverted — a guaranteed no-op — so the boundary the provider taught us limited
+        nothing and every restart re-requested the same known-empty windows."""
         payload = fakes.event_payload(markets=(fakes.market_payload("m-1", prices=("0.6", "0.4")),))
         event_id = await track(pool, payload)
         oldest = _now() - timedelta(days=3)

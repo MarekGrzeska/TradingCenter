@@ -1,23 +1,8 @@
-"""The module's OpenAPI document, printed without starting anything.
+"""The module's OpenAPI document, printed without starting anything, so regenerating needs no database
+and no network — which is exactly how two copies of a contract stay together.
 
-The terminal generates its view of this contract from here rather than copying it by hand,
-the way it already does for `market-data` and the workbench's teams surface. What makes
-that possible is that FastAPI builds the document from the Pydantic models in
-`contract.py` — a property of the code, not of a running process — so nothing here opens a
-connection pool, reaches for Polymarket or reads a setting. `Settings()` is constructed
-inside `lifespan`, which this never enters.
-
-    uv run python -m polymarket_data.openapi > schema.json
-
-That matters more than it looks: regenerating against a *running* server would mean
-regenerating needs a database and a network, which means it would not be run — which is
-exactly how two copies of a contract drift apart.
-
-**There is no consumer of these types yet**, and that is deliberate rather than an
-oversight. The terminal's subpage is a separate change; what this buys before it exists is
-that `contract:check` fails the day this contract moves, so the subpage starts against
-types that are true rather than against a file born stale.
-"""
+There is no consumer of these types yet, deliberately: what it buys before one exists is that
+`contract:check` fails the day this contract moves."""
 
 from __future__ import annotations
 
@@ -40,25 +25,9 @@ def _referenced(node: Any, into: set[str]) -> None:
 
 
 def require_response_fields(schema: dict[str, Any]) -> dict[str, Any]:
-    """Mark every property of a response model as required, in place.
-
-    The twin of `market_data/openapi.py`'s function of the same name, copied rather than
-    shared because no module imports another — and the reason it exists is identical, which
-    is why it is worth stating again rather than pointing at. Pydantic leaves a field with a
-    default out of `required`, which is right for something a caller *sends*: omitting it
-    means "use the default". For something this module *answers with* it is simply untrue.
-    FastAPI serialises a response model whole — an `OutcomeOut` always carries `price`, as
-    `null` when nothing has been collected — so a schema calling it optional describes a
-    response this module never sends.
-
-    This contract is mostly such fields: a price, the moment it was taken, the baseline a
-    change was measured from, all `X | None`. Generated as `T | undefined` they would make a
-    consumer either write handling for a case that cannot happen or assert it away and lose
-    the checking it generated types to get.
-
-    Request bodies keep Pydantic's reading, so the two are told apart by reachability rather
-    than by a hand-kept list — a list would rot the first time a model moved sides.
-    """
+    """Mark every property of a response model as required, in place. Pydantic's reading is right for
+    something a caller sends and untrue for something this module answers with, which is serialised
+    whole — and this contract is mostly `X | None` fields that would generate as `T | undefined`."""
     components = schema.get("components", {}).get("schemas", {})
     from_requests: set[str] = set()
     for path in schema.get("paths", {}).values():
@@ -90,9 +59,8 @@ def document() -> dict[str, Any]:
 
 
 def main() -> None:
-    # Sorted keys so the same code always prints the same bytes: the generated TypeScript is
-    # committed and compared, and a diff caused by dictionary ordering would be noise nobody
-    # can act on.
+    # Sorted keys so the same code always prints the same bytes: the generated TypeScript is committed
+    # and compared, and a diff caused by dictionary ordering is noise nobody can act on.
     json.dump(document(), sys.stdout, indent=2, sort_keys=True, ensure_ascii=False)
     sys.stdout.write("\n")
 

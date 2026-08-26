@@ -1,6 +1,5 @@
-"""What the tool surface announces, what it costs to announce it, and the boundary that
-makes three writing tools acceptable in a module whose neighbour publishes none.
-"""
+"""What the tool surface announces, what it costs to announce it, and the boundary that makes three
+writing tools acceptable in a module whose neighbour publishes none."""
 
 from __future__ import annotations
 
@@ -25,28 +24,14 @@ READ_TOOLS = {
     "get_price_changes",
 }
 
-# The two that change the list of observations — and the whole list of what this surface may
-# change. A third appearing here without a decision is what the equality below catches.
-#
-# `untrack_event` was here until an observation became "collected or gone": the only way off
-# the list now takes the collected history with it, so a tool for it would be a tool that
-# deletes history — which the requirement above this one forbids outright.
+# The two that change the list of observations — and the whole list of what this surface may change.
+# `untrack_event` went when the only way off the list started taking the collected history with it.
 OBSERVATION_TOOLS = {"track_event", "create_group"}
 
 EXPECTED_TOOLS = READ_TOOLS | OBSERVATION_TOOLS
 
-# Characters of the serialized `list_tools()`, which is what an MCP client reads before every
-# turn of a conversation — and this is the third such surface in the system, so its size adds
-# to two others. In characters rather than tokens so the test needs no tokenizer; the ratio
-# measured on this material elsewhere in this repository is a steady 4,2.
-#
-# Raising it is a deliberate edit of this line, never a side effect of adding a tool.
-#
-# Measured 13 811 characters on 22 August 2026 for nine tools — about 3 300 tokens, against
-# market-data's 19 700 for eleven. The headroom below is 12%: enough for a description to
-# grow a sentence that earns it, not enough for the essays to arrive. Eight tools since
-# `untrack_event` went; the ceiling is left where it was, because it is a budget for the
-# surface and not a record of its current size.
+# Characters of the serialized `list_tools()`, read by a client before every turn — and this is the third
+# such surface in the system. Measured 13 811 on 22 August 2026 for nine tools; the headroom is 12%.
 SURFACE_CEILING_CHARS = 15_500
 
 
@@ -58,13 +43,8 @@ async def test_the_expected_tools_and_no_others(tool_server) -> None:
 async def test_only_the_two_observation_tools_are_declared_as_changing_anything(
     tool_server,
 ) -> None:
-    """The annotation is a structural claim an MCP client can act on, so it has to be exact.
-
-    `market-data` publishes no writing tool at all and says in its spec that no setting may
-    add one. This module departs from that on purpose and in one direction only: the list of
-    observations, which is what the operator clicks in the terminal anyway — and in one
-    direction only within that: both writing tools *add*, neither takes anything away.
-    """
+    """The annotation is a structural claim an MCP client can act on, so it has to be exact. This module
+    departs from `market-data` in one direction only: the observation list, and both tools *add*."""
     tools = await tool_server.list_tools()
     writing = {
         tool.name
@@ -75,20 +55,15 @@ async def test_only_the_two_observation_tools_are_declared_as_changing_anything(
 
 
 async def test_nothing_on_this_surface_is_declared_destructive(tool_server) -> None:
-    """Exact rather than optimistic: starting an observation adds, ending one stops sampling
-    and keeps every sample, and creating a group is idempotent. The one operation here that
-    loses data is not on this surface at all."""
+    """Exact rather than optimistic: starting an observation adds, ending one keeps every sample, and
+    creating a group is idempotent. The one operation that loses data is not on this surface."""
     for tool in await tool_server.list_tools():
         assert tool.annotations is None or tool.annotations.destructiveHint is False
 
 
 async def test_no_tool_can_remove_a_single_collected_price(tool_server, pool) -> None:
-    """The boundary, tested by running the whole surface rather than by reading its source.
-
-    Every tool is called with arguments that would plausibly reach data, including the three
-    that write, and the archive is counted before and after. Deleting collected history is a
-    route on the REST contract precisely because it is the one act nobody can undo.
-    """
+    """The boundary, tested by running the whole surface rather than by reading its source: every tool is
+    called with arguments that would plausibly reach data, and the archive is counted before and after."""
     payload = fakes.event_payload()
     async with pool.acquire() as conn:
         event_id = await store.upsert_event(conn, parsing.event_from(payload))
