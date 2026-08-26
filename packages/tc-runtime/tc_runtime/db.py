@@ -1,15 +1,5 @@
-"""The connection string, the pool and the migration lock — in the shapes every module
-with a database needs them.
-
-One copy, taken from `agent/db.py` on 18 August 2026, where it was 97.1% identical to
-`teams/db.py`. What did *not* come here is `market_data/db.py`: measured at 56.2% against
-this one, with its own thirty-minute migration window for the largest table in the
-repository. That is a different file, not a copy that drifted, and it stays where it is
-(`packages-replace-the-hand-copies/design.md`, D4).
-
-What this package cannot know stays with the caller: which advisory-lock key a module's
-migrations take, and where its migrations live. Both arrive as arguments.
-"""
+"""The connection string, the pool and the migration lock. `market_data/db.py` did not come here: at
+56.2% it is a different file, not a copy that drifted. The lock key and migrations directory are the caller's."""
 
 from __future__ import annotations
 
@@ -26,10 +16,8 @@ from azure.identity.aio import ClientSecretCredential, DefaultAzureCredential
 
 log = logging.getLogger(__name__)
 
-# What a `store.py` function actually receives: `pool.acquire()` yields a
-# `PoolConnectionProxy`, not a `Connection` — it forwards every method at runtime
-# (`__getattr__`) but does not subclass `Connection`, so a bare `asyncpg.Connection`
-# annotation on a store function rejects the one thing every route actually passes it.
+# What a `store.py` function actually receives: `pool.acquire()` yields a `PoolConnectionProxy`, which
+# forwards every method but does not subclass `Connection`.
 Conn = asyncpg.Connection | asyncpg.pool.PoolConnectionProxy
 
 _SCHEME_SEPARATOR = "://"
@@ -49,22 +37,8 @@ class LockNotAcquired(RuntimeError):
 async def advisory_lock(
     conn: Conn, key: int, *, wait: float, poll: float = 1.0
 ) -> AsyncIterator[None]:
-    """Holds a session-level advisory lock on `conn`, or refuses.
-
-    `pg_try_advisory_lock` in a loop rather than the blocking `pg_advisory_lock`, because
-    the blocking form has nowhere to put a deadline: it returns when it returns. A wait
-    with no end is how a module that will never start looks exactly like one that is
-    starting slowly.
-
-    A lock left behind by a process that died needs no timeout to clear — it is session
-    scoped, so Postgres drops it with the connection. `wait` is therefore sized for the
-    slow case (a long migration ahead of us in the queue), not the dead one.
-
-    `key` is the caller's, and it matters that it stays the caller's: advisory locks are
-    scoped to a database, so two modules sharing a value would each be waiting on a lock
-    the other holds in a database it cannot see. Every module asserts its own value in
-    its own test suite.
-    """
+    """Holds a session-level advisory lock on `conn`, or refuses. `pg_try_advisory_lock` in a loop because
+    the blocking form has nowhere to put a deadline, and `key` stays the caller's: locks are per database."""
     deadline = time.monotonic() + wait
     while not await conn.fetchval("SELECT pg_try_advisory_lock($1)", key):
         if time.monotonic() >= deadline:
@@ -91,9 +65,8 @@ def asyncpg_dsn(database_url: str) -> str:
 
 
 def sqlalchemy_url(database_url: str) -> str:
-    """The URL as SQLAlchemy takes it — asyncpg named, because it is the only driver
-    here. Alembic runs through SQLAlchemy; without the suffix it defaults to psycopg2,
-    which no module here installs."""
+    """The URL as SQLAlchemy takes it — asyncpg named, because it is the only driver here. Without the
+    suffix alembic defaults to psycopg2, which no module installs."""
     scheme, separator, rest = database_url.partition(_SCHEME_SEPARATOR)
     if not separator:
         raise ValueError(f"DATABASE_URL is not a usable connection string: {database_url!r}")
@@ -109,10 +82,8 @@ def _connection_target(database_url: str) -> str:
 def _credential(
     client_id: str | None, client_secret: str | None, tenant_id: str | None
 ) -> Credential:
-    """All three present selects a service principal — local development's own
-    identity. None of them present falls through to `DefaultAzureCredential`, which in
-    Azure finds the App Service's system-assigned managed identity with no
-    configuration at all. A partial set authenticates as nothing and is rejected."""
+    """All three present selects a service principal; none present falls through to the managed identity.
+    A partial set authenticates as nothing and is rejected."""
     values = (("client_id", client_id), ("client_secret", client_secret), ("tenant_id", tenant_id))
     given = [name for name, value in values if value]
     if given and len(given) < 3:
@@ -126,9 +97,8 @@ def _credential(
 
 
 class _TokenProvider:
-    """Fetches an Entra token on every call — once per physical connection asyncpg
-    opens, which is what makes a connection opened after the previous token expired
-    just work, with no separate refresh loop to get wrong."""
+    """Fetches an Entra token on every call — once per physical connection asyncpg opens, which is what
+    renews an expired credential with no separate refresh loop."""
 
     def __init__(self, credential: Credential) -> None:
         self._credential = credential
@@ -164,9 +134,8 @@ async def pool(
     min_size: int = 1,
     max_size: int = 10,
 ) -> AsyncIterator:
-    """A pool. `user` selects identity-based auth: an Entra token is fetched fresh at
-    the moment each connection is opened. Omitted — as a test suite's throwaway
-    PostgreSQL needs — `database_url` is used exactly as given."""
+    """A pool. `user` selects identity-based auth, with a token fetched fresh per connection; omitted,
+    `database_url` is used exactly as given."""
     if user is None:
         try:
             created = await asyncpg.create_pool(
@@ -200,12 +169,8 @@ async def pool(
 
 
 async def fetch_one(conn: Conn, query: str, *args: object) -> asyncpg.Record:
-    """`fetchrow` for a statement that cannot answer with nothing.
-
-    An `INSERT ... RETURNING` that comes back empty is not "no rows" — it is a statement
-    that did not do what it said. Turning that into `None` hands the caller an optional
-    it will dereference two lines later, a long way from the cause.
-    """
+    """`fetchrow` for a statement that cannot answer with nothing. An `INSERT ... RETURNING` that comes
+    back empty did not do what it said, and `None` hands the caller an optional far from the cause."""
     row = await conn.fetchrow(query, *args)
     if row is None:
         raise RuntimeError(f"no row from a statement that always returns one: {query.strip()}")

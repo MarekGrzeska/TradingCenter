@@ -1,9 +1,5 @@
-"""The lock that keeps two processes from migrating one database at once.
-
-Moved here from `modules/agent/tests/test_migrate.py` with the code it tests. What stayed
-in the modules is everything that needs *their* migrations: this file drives the lock
-against a fake connection, so it asserts the contract and nothing about any one schema.
-"""
+"""The lock that keeps two processes from migrating one database at once, driven against a fake
+connection — so it asserts the contract and nothing about any one schema."""
 
 from __future__ import annotations
 
@@ -17,11 +13,8 @@ SOME_KEY = 4242
 
 
 class FakeConnection:
-    """Enough of a connection for the two statements `advisory_lock` runs.
-
-    `taken` says the lock is held by somebody else — every `pg_try_advisory_lock` answers
-    false, which is the case the wait exists for.
-    """
+    """Enough of a connection for the two statements `advisory_lock` runs. `taken` says the lock is held
+    by somebody else, which is the case the wait exists for."""
 
     def __init__(self, *, taken: bool = False) -> None:
         self._taken = taken
@@ -60,9 +53,8 @@ async def test_a_lock_that_never_frees_up_refuses_rather_than_waits_forever() ->
 
 
 async def test_the_key_reaches_postgres_unchanged() -> None:
-    """The argument that replaced a per-module constant. A package that quietly used one
-    key for every caller would put two modules' migrations behind one lock, in databases
-    neither can see — a deadlock with no query to find it by."""
+    """The argument that replaced a per-module constant. A package quietly using one key for every caller
+    would put two modules' migrations behind one lock, in databases neither can see."""
     seen: list[int] = []
 
     class Recording(FakeConnection):

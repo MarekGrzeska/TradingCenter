@@ -1,32 +1,6 @@
-"""Whether the database a process reached is at the revision its code was built for.
-
-One copy of what `agent`, `teams` and `market_data` each carried. A comparison, never a
-migration: the heads alembic ships in the image against the version the database says it
-is at.
-
-`migrate.run()` runs immediately before this, so the common case is that the check passes
-over a database it just watched being migrated. What it still catches is the pair the
-migration cannot fix:
-
-- **database behind the image after migrating** — the upgrade reported success and did
-  not arrive where it said it would;
-- **database ahead of the image** — an older image was deployed onto a newer schema.
-  This one gets *more* likely once deployments migrate on their own, not less, because
-  the schema now moves forward at every deploy and a rollback moves only the code back.
-
-Both leave a module running code against a schema it was never tested on, so both end the
-same way: the process refuses to start and says which two revisions disagree.
-
-Written after 15 August 2026, when the image carrying `0003_prompt_revisions` served
-against a database still at `0002` and only `GET /prompt` failed — a half-broken
-deployment with no symptom until an operator opened the one panel that read the new table.
-
-This is teams' version of the file, and the difference from agent's is the reason. Both
-name the case where the *database* is at no revision; only teams names it where the
-*image* ships none. Agent's message then read "expects the database at , and it is at …"
-— a sentence with a hole in it, produced exactly when a module has migrations pending
-creation. Merged here with agent's own paragraph above, which teams had dropped.
-"""
+"""Whether the database a process reached is at the revision its code was built for — a comparison, never
+a migration. It catches the pair a migration cannot fix: a database behind the image after migrating, and
+one ahead of it after a rollback. Written after 15 August 2026, when only `GET /prompt` failed."""
 
 from __future__ import annotations
 
@@ -60,12 +34,8 @@ async def applied_heads(conn: asyncpg.Connection) -> set[str]:
 
 
 async def verify(conn: asyncpg.Connection, migrations: Path) -> None:
-    """Raise unless the database is at the revision this code was built for.
-
-    Deliberately not "at least" — a database ahead of the image is the same accident seen
-    from the other side (a rollback that left the schema where it was), and the code
-    running against it is as untested as the case above.
-    """
+    """Raise unless the database is at the revision this code was built for. Deliberately not "at least":
+    a database ahead of the image is the same accident from the other side."""
     expected = expected_heads(migrations)
     applied = await applied_heads(conn)
     if applied == expected:

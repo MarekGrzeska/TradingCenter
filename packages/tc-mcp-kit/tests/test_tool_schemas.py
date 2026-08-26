@@ -1,9 +1,5 @@
-"""What the slimmer must not lose, alongside what it takes.
-
-Every test here is one half of the same claim: the published schema costs less and allows
-exactly what it allowed before. `jsonschema` is what says the second half — a document
-validated against the schema before the change validates against it after.
-"""
+"""What the slimmer must not lose, alongside what it takes. `jsonschema` says the second half: a
+document valid against the schema before the change is valid against it after."""
 
 from __future__ import annotations
 
@@ -157,10 +153,8 @@ async def test_a_reply_invalid_before_is_still_invalid(server: FastMCP) -> None:
 
 
 class _Parameter(BaseModel):
-    """A model whose own field names collide with the keywords being stripped. Not
-    hypothetical: `market-data`'s indicator catalogue publishes exactly this shape, and
-    the first version of the slimmer deleted the `default` a model needs in order to
-    build a request at all."""
+    """A model whose own field names collide with the keywords being stripped. Not hypothetical:
+    the first version of the slimmer deleted the `default` a model needs to build a request at all."""
 
     name: str
     default: float
