@@ -1,14 +1,5 @@
-"""The seam between the two roads a candle travels (3.4).
-
-`capital-gateway` spells a period start twice over — an ISO string over REST, epoch
-seconds over the WebSocket — and calls the split deliberate. For a chart it costs
-nothing. For an archive keyed on `(symbol, resolution, period_start)` a one-second or
-one-timezone disagreement is not a rounding difference: it is a second row where there
-should have been an overwrite, and a duplicate candle in every series read afterwards.
-
-So the claim is checked where it matters, through both clients rather than through the
-parser they share.
-"""
+"""The seam between the two roads a candle travels. The gateway spells a period start twice over, and
+for an archive keyed on it a one-second disagreement is a second row where an overwrite belonged."""
 
 from __future__ import annotations
 
@@ -24,9 +15,8 @@ from market_data.models import CandleSource, Resolution
 
 BASE_URL = "http://gateway.test:8010"
 
-# 2026-08-07 12:00:00 UTC, written twice. The constant is spelled out rather than
-# computed from the datetime beside it, so a bug in the conversion cannot agree with
-# itself and pass.
+# 2026-08-07 12:00:00 UTC, written twice. Spelled out rather than computed from the datetime beside
+# it, so a bug in the conversion cannot agree with itself and pass.
 PERIOD_START = datetime(2026, 8, 7, 12, 0, tzinfo=UTC)
 PERIOD_START_ISO = "2026-08-07T12:00:00Z"
 PERIOD_START_EPOCH = 1_786_104_000

@@ -1,21 +1,6 @@
-"""The tool surface as a route of this application: where it is mounted, what it lists,
-and the import order that keeps mounting it from breaking telemetry.
-
-The handshake test at the bottom is the one that matters most, and it is here because it
-was missing. Everything else in this file — and every tool test in the suite — reaches the
-tools through objects: `FastMCP.call_tool`, or an in-memory session against the lowlevel
-server. Not one of them crossed the mount, so three separate defects rode into production
-on 19 August 2026 inside a change whose tests were green:
-
-* the transport served itself at `/mcp` *inside* an app mounted at `/mcp`, so the address
-  every caller was configured with was really `/mcp/mcp`;
-* the mounted app's lifespan never ran, so the session manager's task group was never
-  started and every request died on `RuntimeError: Task group is not initialized`;
-* FastMCP turns DNS-rebinding protection on for a loopback `host`, which is its default,
-  so every request carrying a real `Host` header was answered `421`.
-
-One request through the front door would have caught all three.
-"""
+"""The tool surface as a route of this application: where it is mounted, what it lists, and the import
+order that keeps mounting it from breaking telemetry. One request through the front door caught three
+defects that rode into production on 19 August 2026 inside a change whose tests were green."""
 
 from __future__ import annotations
 
@@ -34,9 +19,8 @@ from test_tools_surface import EXPECTED_TOOL_NAMES
 from market_data import app as app_module
 from market_data.mcp_app import tool_surface_session
 
-# Anything that pulls in FastAPI, Starlette or the MCP library. `telemetry.configure()`
-# instruments libraries by patching them, so a module imported above that call is
-# instrumented too late — silently, with the only symptom a span that never appears.
+# Anything that pulls in FastAPI, Starlette or the MCP library. `telemetry.configure()` instruments
+# libraries by patching them, so a module imported above that call is instrumented too late.
 INSTRUMENTED = ("fastapi", "starlette", "mcp", "market_data.mcp_app")
 
 
@@ -56,9 +40,7 @@ def test_the_mount_does_not_shadow_a_rest_route() -> None:
 
 async def test_a_session_lists_exactly_the_expected_tools() -> None:
     """The list a client actually receives, through a real MCP session rather than through
-    `FastMCP.list_tools()` — the same eleven names the separate process published, which
-    is the whole promise of this move to its two callers.
-    """
+    `FastMCP.list_tools()` — the same eleven names the separate process published."""
     from mcp.shared.memory import create_connected_server_and_client_session
 
     from market_data.mcp_app import build_server
@@ -77,10 +59,8 @@ async def test_a_session_lists_exactly_the_expected_tools() -> None:
 
 
 def test_nothing_instrumented_is_imported_above_telemetry_configure() -> None:
-    """`telemetry.configure()` has to run before FastAPI, Starlette or the MCP library are
-    imported, which is why `app.py`'s import block is split around it and why `mcp_app` is
-    imported inside `create_app()`. Both are invisible conventions a tidying import sort
-    would undo, so the order is asserted rather than commented."""
+    """`telemetry.configure()` has to run before FastAPI, Starlette or the MCP library are imported.
+    Both places that arrange it are invisible conventions a tidying import sort would undo."""
     source = Path(inspect.getfile(app_module)).read_text(encoding="utf-8")
     tree = ast.parse(source)
 
@@ -112,8 +92,6 @@ def test_nothing_instrumented_is_imported_above_telemetry_configure() -> None:
                 )
 
 
-# --- the front door, end to end --------------------------------------------------------
-
 INITIALIZE = {
     "jsonrpc": "2.0",
     "id": 1,
@@ -125,9 +103,8 @@ INITIALIZE = {
     },
 }
 
-# A real deployed host, not `testserver`: the DNS-rebinding check FastMCP enables by
-# default rejects exactly this kind of Host header, and a test addressing localhost would
-# not have noticed.
+# A real deployed host, not `testserver`: the DNS-rebinding check FastMCP enables by default rejects
+# exactly this kind of Host header, and a test addressing localhost would not have noticed.
 BASE = "https://app-tradingcenter-market-data.azurewebsites.net"
 
 MCP_HEADERS = {
@@ -146,9 +123,8 @@ def _result(body: str) -> dict:
 
 @pytest.mark.parametrize("path", ["/mcp", "/mcp/"])
 async def test_a_session_initializes_through_the_mounted_path(app, settings, path: str) -> None:
-    """Both spellings of the address, because a mount answers the one with the trailing
-    slash and a client posts the one without — and a POST does not follow the 307 between
-    them (`mcp_app.ToolSurfaceAddress`)."""
+    """Both spellings of the address, because a mount answers the one with the trailing slash and a
+    client posts the one without — and a POST does not follow the 307 between them."""
     app.state.settings = settings
 
     async with tool_surface_session(app):

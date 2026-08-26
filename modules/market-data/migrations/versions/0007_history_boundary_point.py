@@ -1,16 +1,8 @@
-"""Where the provider's history actually ends, as its own column.
+"""Where the provider's history actually ends, as its own column. `history_ended` said only *that* a
+boundary exists, and reading it off `range_start` drifted as coverage ranges merged.
 
-`history_ended` said only *that* a boundary exists; where it lay was read off
-`range_start`. Those are the same point only for a range nothing ever merged with, and
-coverage ranges merge by design — a fill meeting an older one end to end becomes a single
-row whose start is the older edge. So the boundary drifted to the earliest moment the
-pair had ever verified, which is not where the provider ran out and is usually a long way
-below it.
-
-Backfilled to `range_start` for the rows that already claim a boundary, because that is
-what those rows meant when they were written. It is the wrong point for any of them that
-merged since — the reason for this column — and no better value exists in the data. A
-deeper request now drops the boundary and re-measures it, which is the recovery path.
+Backfilled to `range_start` for rows that already claim a boundary: no better value exists, and a
+deeper request now drops the boundary and re-measures it.
 
 Revision ID: 0007
 Revises: 0006

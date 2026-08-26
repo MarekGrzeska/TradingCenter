@@ -1,9 +1,5 @@
-"""Collection jobs over the contract — `market-data-jobs`, section 9.
-
-The runner's own behaviour is `test_jobs_runner.py` and the store's is
-`test_jobs_store.py`; what this holds is the shape a consumer sees: estimating, starting,
-reading progress and retrying.
-"""
+"""Collection jobs over the contract — `market-data-jobs`, section 9. The runner's own behaviour and
+the store's live next door; what this holds is the shape a consumer sees."""
 
 from __future__ import annotations
 
@@ -21,8 +17,6 @@ from market_data.store import write_candles
 
 pytestmark = pytest.mark.db
 
-
-# --- 9: collection jobs, over the contract ----------------------------------------------
 
 
 async def test_adding_several_pairs_is_one_decision_with_one_job(app, api) -> None:
@@ -112,9 +106,8 @@ async def test_estimating_names_a_symbol_the_gateway_does_not_know(app, api) -> 
     assert pair["estimated_candles"] == 0
 
 
-# A start date after now is the one date the module refuses outright, and the refusal has
-# to name itself — a 500 would say "the archive broke" about a request that was simply
-# wrong (`market-data-jobs` spec, "Data w przyszłości").
+# A start date after now is the one date the module refuses outright, and the refusal has to name
+# itself — a 500 would say "the archive broke" about a request that was simply wrong.
 async def test_estimating_from_a_future_date_is_refused_with_the_reason(api, pool) -> None:
     # Ahead of the real clock, not of this module's frozen `NOW`: these endpoints compare
     # against `datetime.now(UTC)`, so a date only after `NOW` is simply the recent past.
@@ -234,12 +227,8 @@ async def test_retrying_an_unknown_job_is_404(api) -> None:
 
 
 async def _deep_job(api) -> int:
-    """One pair, reaching back far enough to plan several chunks.
-
-    Depth is the point: a `MINUTE` window holds `MAX_BARS_PER_FILL` candles — about five
-    weeks — so a request for the last couple of days is a single chunk, and a job of one
-    chunk cannot be partly anything.
-    """
+    """One pair, reaching back far enough to plan several chunks. Depth is the point: a `MINUTE` window
+    holds about five weeks, so a couple of days is a single chunk, and one chunk cannot be partly anything."""
     created = await api.post(
         "/pairs",
         json={
@@ -252,12 +241,8 @@ async def _deep_job(api) -> int:
 
 
 async def _set_chunk_states(pool, job_id: int, *states: str) -> None:
-    """Put a job's chunks into given states, oldest chunk first.
-
-    A contract test about how a running or half-failed job *reads* needs one to exist,
-    and driving the runner to produce one would be testing the runner instead. States
-    shorter than the chunk list leave the rest as they were.
-    """
+    """Put a job's chunks into given states, oldest first. A contract test about how a half-failed job
+    reads needs one to exist, and driving the runner to produce one would test the runner instead."""
     async with pool.acquire() as conn:
         ids = [
             row["id"]

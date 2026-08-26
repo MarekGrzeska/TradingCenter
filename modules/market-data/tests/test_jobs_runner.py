@@ -1,8 +1,4 @@
-"""jobs/runner.py: turning a claimed chunk into a settled outcome, and the loop that
-keeps doing that.
-
-Group 4 of rework-instrument-collection.
-"""
+"""jobs/runner.py: turning a claimed chunk into a settled outcome, and the loop that keeps doing that."""
 
 from __future__ import annotations
 
@@ -113,29 +109,14 @@ async def _tracked(pool, symbol: str = "US100", resolution: Resolution = Resolut
         await track(conn, symbol, resolution, LIMIT, collect_from=NOW - timedelta(days=3650))
 
 
-# How long a test waits for a running worker to finish with a job. Generous because it is
-# not a budget being asserted: `_settled` returns the moment the job settles, so a healthy
-# run never spends more than the work actually takes. It only has to outlast the slowest
-# machine the suite runs on, and that machine is not this one.
+# How long a test waits for a worker to finish. Generous because it is not a budget being asserted:
+# `_settled` returns the moment the job settles, so it only has to outlast the slowest machine.
 SETTLE_TIMEOUT = 5.0
 
 
 async def _settled(pool, job_id: int, timeout: float = SETTLE_TIMEOUT):
-    """Read a job back until no chunk of it is open any more, and return it.
-
-    What these tests want to wait for is "the worker has finished with this job", and the
-    job says so itself: `status` is derived from its chunks and leaves `running` exactly
-    when the last one settles. Polling for that beats sleeping a fixed stretch in both
-    directions — a fast machine stops waiting as soon as the work is done, and a slow one
-    is not called a failure for being slow. A tenth of a second was enough here and not
-    in CI, where these round trips go to a container sharing a runner with everything
-    else in the job: two of the tests below failed there on a branch whose whole diff was
-    a pinned ruff version.
-
-    A timeout returns the job as it was last read rather than raising, so the caller's own
-    assertion is what reports the state — `running` where `done` was expected says more
-    than any message this helper could invent.
-    """
+    """Read a job back until no chunk of it is open, and return it. Polling beats a fixed sleep both
+    ways; a timeout returns the job as last read, so the caller's own assertion reports the state."""
     loop = asyncio.get_running_loop()
     deadline = loop.time() + timeout
     while True:
@@ -145,8 +126,6 @@ async def _settled(pool, job_id: int, timeout: float = SETTLE_TIMEOUT):
             return job
         await asyncio.sleep(0.01)
 
-
-# --- execute_chunk: the happy path ----------------------------------------------------
 
 
 async def test_a_successful_chunk_writes_candles_and_settles_done(pool) -> None:
@@ -213,14 +192,8 @@ async def test_a_chunk_names_its_own_window_as_the_floor(pool) -> None:
 
 
 async def test_a_chunk_stores_nothing_older_than_its_own_window(pool) -> None:
-    """The bug this exists for, in the shape that let it through.
-
-    `bars` counts candles and `periods_between` counts calendar periods, so for an
-    instrument shut part of the week the gateway hands back candles reaching well past
-    the window that was asked for. Every test here used to assert what was *requested*;
-    none asserted what landed in the archive, which is the only place the overshoot was
-    ever visible.
-    """
+    """The bug this exists for, in the shape that let it through: every test asserted what was
+    *requested*, and none what landed in the archive — the only place the overshoot was visible."""
     await _tracked(pool)
     chunk_start = NOW - timedelta(hours=1)
     async with pool.acquire() as conn:
@@ -241,9 +214,8 @@ async def test_a_chunk_stores_nothing_older_than_its_own_window(pool) -> None:
 
 
 async def test_a_chunk_for_a_pair_deleted_mid_flight_writes_nothing(pool) -> None:
-    """The gateway answer for a chunk claimed before deletion still arrives after it —
-    `delete-archived-pair-data` design.md, "Kawałek nigdy nie zapisuje dla pary, której
-    nikt nie zbiera"."""
+    """The gateway answer for a chunk claimed before deletion still arrives after it — "Kawałek nigdy
+    nie zapisuje dla pary, której nikt nie zbiera"."""
     from market_data.deletion import close_for_deletion, delete_pair_data
 
     await _tracked(pool)
@@ -302,8 +274,6 @@ async def test_the_full_window_is_recorded_as_covered_not_only_where_candles_lan
     assert coverage.range_end == chunk_end
 
 
-# --- execute_chunk: failure --------------------------------------------------------------
-
 
 async def test_a_refusal_settles_the_chunk_as_failed_with_the_reason(pool) -> None:
     await _tracked(pool)
@@ -348,8 +318,6 @@ async def test_a_failed_chunk_does_not_raise_out_of_execute_chunk(pool) -> None:
     )  # must not raise
 
 
-# --- execute_chunk: discovering the provider's boundary ---------------------------------
-
 
 async def test_history_ended_bulk_skips_older_pending_chunks_of_the_same_pair(pool) -> None:
     await _tracked(pool)
@@ -366,9 +334,8 @@ async def test_history_ended_bulk_skips_older_pending_chunks_of_the_same_pair(po
     async with pool.acquire() as conn:
         second_claimed = await claim_pending_chunk(conn)  # boundary_chunk
 
-    # This one discovers the end of history — and brings back the candle that places it.
-    # A read that returned nothing could not say where the boundary lies, and does not get
-    # to skip anything on the strength of it.
+    # This one discovers the end of history, and brings back the candle that places it. A read that
+    # returned nothing could not say where the boundary lies.
     oldest = minute_candle(int(timedelta(days=2).total_seconds() // 60) - 1)
     await execute_chunk(
         pool, FakeHistory([oldest], history_ended=True), second_claimed, asyncio.Semaphore(1)
@@ -383,9 +350,8 @@ async def test_history_ended_bulk_skips_older_pending_chunks_of_the_same_pair(po
 
 
 async def test_a_chunk_does_not_store_the_period_still_running(pool) -> None:
-    """The newest chunk of a job ends at the present, so its read brings back the period
-    in progress. Its values are not the period's result yet, and the archive keeps
-    results."""
+    """The newest chunk of a job ends at the present, so its read brings back the period in progress.
+    Its values are not the period's result yet, and the archive keeps results."""
     await _tracked(pool)
     only = plan(chunk_start=NOW - timedelta(hours=1), chunk_end=NOW)
     async with pool.acquire() as conn:
@@ -408,9 +374,8 @@ async def test_a_chunk_does_not_store_the_period_still_running(pool) -> None:
 
 
 async def test_a_chunk_that_brought_back_nothing_records_no_boundary(pool) -> None:
-    """`history_ended` with an empty page says the read ran out, not where. Recorded
-    against the window's own edge it announced as measured a stretch nobody looked at —
-    and then kept it, which is how US100 lost every request to reach below 2026."""
+    """`history_ended` with an empty page says the read ran out, not where. Recorded against the
+    window's own edge it announced as measured a stretch nobody looked at — and then kept it."""
     await _tracked(pool)
     newest = plan(chunk_start=NOW - timedelta(days=1), chunk_end=NOW)
     older = plan(chunk_start=NOW - timedelta(days=2), chunk_end=NOW - timedelta(days=1))
@@ -448,8 +413,6 @@ async def test_a_pair_untouched_by_the_boundary_is_not_skipped(pool) -> None:
     assert remaining["state"] == "pending"
 
 
-# --- the worker loop ------------------------------------------------------------------
-
 
 async def test_the_runner_claims_and_settles_a_pending_chunk(pool) -> None:
     await _tracked(pool)
@@ -479,9 +442,8 @@ async def test_notify_wakes_an_idle_worker_without_waiting_for_the_poll(pool) ->
             )
         runner.notify()
 
-        # Well inside the runner's own idle poll, which is what this test is asserting
-        # against: waiting past `IDLE_POLL_SECONDS` would let the fallback poll find the
-        # job by itself and pass this test with `notify()` doing nothing at all.
+        # Well inside the runner's own idle poll: waiting past `IDLE_POLL_SECONDS` would let the
+        # fallback poll find the job by itself and pass this test with `notify()` doing nothing.
         reread = await _settled(pool, job.id, timeout=IDLE_POLL_SECONDS / 2)
     finally:
         await runner.stop()
@@ -499,9 +461,8 @@ async def test_stopping_the_runner_ends_its_workers(pool) -> None:
 async def test_a_chunk_whose_execution_raises_settles_failed_rather_than_stuck_running(
     pool,
 ) -> None:
-    """A chunk left `running` is worse than a chunk marked `failed`: no worker re-claims
-    one, `retry_job` refuses to touch one, and the job reads as forever in progress. So
-    anything raising past `execute_chunk`'s own gateway handling still has to settle."""
+    """A chunk left `running` is worse than one marked `failed`: no worker re-claims it, `retry_job`
+    refuses it, and the job reads as forever in progress."""
     await _tracked(pool)
     async with pool.acquire() as conn:
         job = await create_job(
@@ -568,16 +529,10 @@ async def test_a_worker_keeps_going_after_one_chunk_raises(pool) -> None:
     assert states == {ChunkState.FAILED, ChunkState.DONE}
 
 
-# --- taking work is where the loop used to die ----------------------------------------
-
 
 class _FlakyPool:
-    """A pool that refuses to hand out a connection until it is told to stop.
-
-    Stands in for the failure the loop was blind to: not the gateway, not the chunk, but
-    the database underneath `claim_pending_chunk`. Before, one of these ended the worker
-    for the life of the process.
-    """
+    """A pool that refuses to hand out a connection until told to stop — the failure the loop was blind
+    to: not the gateway, not the chunk, but the database underneath `claim_pending_chunk`."""
 
     def __init__(self, real, failures: int) -> None:
         self._real = real
@@ -660,19 +615,10 @@ async def test_a_worker_stopped_while_waiting_out_a_failure_ends_quietly(pool, c
     assert all(worker.done() for worker in runner._workers) or runner._workers == []
 
 
-# --- a worker that dies must say so ---------------------------------------------------
-
 
 async def test_a_worker_that_dies_says_so(caplog) -> None:
-    """The loop now catches everything it can reach, so this should never fire — which
-    is exactly why it stays.
-
-    A task that raises while still referenced never reports the exception — Python logs
-    it on garbage collection, and `JobRunner._workers` is the reference that prevents
-    that. Found the hard way: eight chunks pending in production across a restart and a
-    retry, with no log line and no exception anywhere to read. An end nobody planned for
-    is the end of every job this module would run, and it must not be silent.
-    """
+    """The loop now catches everything it can reach, so this should never fire — which is why it stays.
+    Found the hard way: eight chunks pending in production, with no log line anywhere to read."""
 
     async def dies() -> None:
         raise RuntimeError("something outside the loop's reach")

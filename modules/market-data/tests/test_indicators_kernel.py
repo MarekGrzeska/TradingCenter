@@ -17,9 +17,8 @@ def _load_golden() -> dict:
 
 
 def _assert_matches(actual: np.ndarray, expected: list[float | None]) -> None:
-    # The golden file stores values rounded to 8 decimal places, so the tolerance here is
-    # about that rounding, not about the determinism this file is testing — determinism
-    # is `TestDeterminism` and `TestStartIndependence` below, both exact.
+    # The golden file stores values rounded to 8 decimal places, so this tolerance is about that
+    # rounding, not about the determinism this file tests — that is exact, below.
     assert len(actual) == len(expected)
     for value, want in zip(actual, expected, strict=True):
         if want is None:
@@ -29,9 +28,8 @@ def _assert_matches(actual: np.ndarray, expected: list[float | None]) -> None:
 
 
 class TestGoldenFile:
-    """A committed snapshot of `kernel`'s output on a fixed series. A future change to
-    any of these formulas shows up here as a diff, not as a silently different chart —
-    design.md, "Zmiana wzoru bez podniesienia wersji"."""
+    """A committed snapshot of `kernel`'s output on a fixed series. A future change to any of these
+    formulas shows up here as a diff, not as a silently different chart."""
 
     def test_sma(self):
         golden = _load_golden()
@@ -163,9 +161,8 @@ class TestAlma:
         assert not math.isnan(result[3])
 
     def test_weights_sum_to_one_on_a_ramp(self):
-        # A perfectly linear ramp: any weighted average of it lands back on the
-        # ramp's own value at the window's centre of mass, regardless of the
-        # weight shape, as long as the weights sum to one.
+        # A perfectly linear ramp: any weighted average of it lands back on the ramp's own value at
+        # the window's centre of mass, whatever the weight shape, as long as the weights sum to one.
         values = [1.0, 2.0, 3.0, 4.0, 5.0]
         result = kernel.alma(values, 5, offset=0.5, sigma=6.0)
         assert result[-1] == pytest.approx(3.0)
@@ -184,10 +181,8 @@ class TestKama:
         assert not any(math.isnan(v) for v in result[2:])
 
     def test_a_straight_trend_settles_at_the_steady_state_lag(self):
-        # Perfect efficiency (no chop) drives the smoothing constant to a fixed
-        # `fast_sc ** 2` every bar, so this is an ordinary fixed-alpha recursive
-        # filter fed a straight ramp — its steady-state lag behind the ramp has a
-        # closed form: `(1 - alpha) / alpha` per unit of slope.
+        # Perfect efficiency drives the smoothing constant to a fixed `fast_sc ** 2` every bar, so
+        # this is a fixed-alpha filter fed a ramp — its steady-state lag is `(1 - alpha) / alpha`.
         values = [float(100 + i) for i in range(30)]
         result = kernel.kama(values, 5, fast=2, slow=30)
         fast_sc = 2.0 / 3.0

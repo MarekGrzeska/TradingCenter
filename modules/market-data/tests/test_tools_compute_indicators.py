@@ -1,11 +1,5 @@
-"""What a computed indicator looks like once it has been reduced for a model.
-
-The catalogue is no longer mocked. It used to be fetched over HTTP and every test built a
-fake entry to answer that fetch; the tools read the module's own catalogue now, so these
-run against the real entries — `ema` really is `lines`, `swing_points` really is `markers`,
-and an alias hint really is one of the names the catalogue publishes. What stays doubled is
-the computation itself, which needs a database.
-"""
+"""What a computed indicator looks like once it has been reduced for a model. The catalogue is no longer
+mocked: the tools read the module's own, so these run against the real entries."""
 
 from __future__ import annotations
 
@@ -177,9 +171,8 @@ async def test_error_result_carries_the_archives_own_reason(tool_server, archive
 
 
 async def test_unknown_indicator_is_refused_with_a_hint(tool_server) -> None:
-    """"FVG" is a name the catalogue publishes — as an alias of `range_gap`, not as an
-    id. Named rather than substituted: a model asking for one indicator and silently
-    getting another is worse than being told."""
+    """"FVG" is a name the catalogue publishes — as an alias of `range_gap`, not as an id. Named rather
+    than substituted: a model asking for one indicator and silently getting another is worse."""
     with pytest.raises(ToolError, match="range_gap"):
         await tool_server.call_tool(
             "compute_indicators", {"symbol": "US100", "specs": [{"id": "FVG"}]}
@@ -208,10 +201,8 @@ async def test_invalid_mode_is_refused(tool_server) -> None:
 
 
 async def test_an_unknown_resolution_is_refused_here_not_swallowed(tool_server, archive) -> None:
-    """The archive's 422 used to refuse this before the request reached a handler. In one
-    process there is no request: `Resolution("SECOND")` would raise a ValueError out of the
-    read, and the tool would answer with an exception rather than a sentence.
-    """
+    """The archive's 422 used to refuse this before the request reached a handler. In one process there
+    is no request, and the tool would answer with an exception rather than a sentence."""
     archive.computed = _computed(0, [])
 
     with pytest.raises(ToolError, match="unknown resolution 'SECOND'"):

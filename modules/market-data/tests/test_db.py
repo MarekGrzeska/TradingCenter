@@ -47,16 +47,11 @@ def test_a_connection_string_without_a_scheme_names_itself(url: str) -> None:
 
 @pytest.mark.db
 async def test_the_test_database_is_reachable(postgres_url: str) -> None:
-    """The harness itself, proven once: a container comes up and answers a query.
-
-    Everything under the `db` marker builds on this, so its failure should point here
-    rather than at whichever schema test happened to run first.
-    """
+    """The harness itself, proven once: a container comes up and answers a query. Everything under the
+    `db` marker builds on this, so its failure should point here."""
     async with connect(postgres_url) as conn:
         assert await conn.fetchval("SELECT 1") == 1
 
-
-# --- identity: specs/market-data-database-connection/spec.md ---
 
 
 class _FakeToken:
@@ -76,9 +71,8 @@ class _FakeCredential:
         self.calls += 1
         if self._error is not None:
             raise self._error
-        # Repeats the last one once the scripted list is exhausted, rather than
-        # raising IndexError — a test that only checks the first two calls should not
-        # have to know how many the code under test happens to make.
+        # Repeats the last one once the scripted list is exhausted rather than raising IndexError: a
+        # test checking the first two calls should not have to know how many the code makes.
         index = min(self.calls, len(self._tokens)) - 1
         return _FakeToken(self._tokens[index])
 
@@ -123,9 +117,8 @@ async def test_token_provider_returns_the_credentials_token() -> None:
 
 
 async def test_token_provider_wraps_a_credential_failure() -> None:
-    # specs/market-data-database-connection/spec.md, "Poświadczenia nie da się uzyskać":
-    # no retry loop, no fallback password — the failure surfaces with the credential
-    # named as the cause.
+    # specs/market-data-database-connection, "Poświadczenia nie da się uzyskać": no retry loop, no
+    # fallback password — the failure surfaces with the credential named as the cause.
     fake = _FakeCredential(error=RuntimeError("no route to the identity endpoint"))
     provider = _TokenProvider(fake)
     with pytest.raises(RuntimeError, match="credential"):
@@ -182,11 +175,8 @@ async def test_a_connection_failure_is_logged_without_the_credential(monkeypatch
     monkeypatch.setattr(db.asyncpg, "connect", fake_connect)
     monkeypatch.setattr(db, "_credential", lambda *a: _FakeCredential(["super-secret-token"]))
 
-    # A `db`-marked test earlier in the same session runs Alembic (`migrated_url`
-    # fixture), and Alembic's own `logging.config.fileConfig(alembic.ini)` disables
-    # every logger that already existed at that point — this one included, since the
-    # module is imported at collection time. Not this test's fixture to own; undone
-    # locally instead of chasing it into `migrations/env.py`.
+    # A `db`-marked test earlier in the session runs Alembic, whose `fileConfig` disables every logger
+    # that already existed. Not this test's fixture to own; undone locally instead.
     monkeypatch.setattr(logging.getLogger("market_data.db"), "disabled", False)
 
     with caplog.at_level(logging.ERROR, logger="market_data.db"), pytest.raises(ConnectionError):

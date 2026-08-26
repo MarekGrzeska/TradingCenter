@@ -39,8 +39,7 @@ def upgrade() -> None:
         sa.Column("resolution", sa.Text(), nullable=False),
         sa.Column("range_start", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("range_end", sa.TIMESTAMP(timezone=True), nullable=False),
-        # Set when the provider answered that it has nothing older than `range_start`.
-        # The gateway already publishes this as `history_ended` on a deep read; dropping it
+        # Set when the provider answered that it has nothing older than `range_start`. Dropping it
         # would mean asking forever for data that does not exist.
         sa.Column("history_ended", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column(
@@ -61,9 +60,8 @@ def upgrade() -> None:
         # inverted one is a bug that would silently cover nothing.
         sa.CheckConstraint("range_end >= range_start", name="coverage_ranges_not_inverted"),
     )
-    # A pair has at most one oldest-possible boundary. Two of them would mean two different
-    # answers to "how far back is there anything to fetch", and backfill would believe
-    # whichever it read first.
+    # A pair has at most one oldest-possible boundary: two would be two answers to "how far back is
+    # there anything to fetch", and backfill would believe whichever it read first.
     op.create_index(
         "coverage_ranges_one_history_end_per_pair",
         "coverage_ranges",

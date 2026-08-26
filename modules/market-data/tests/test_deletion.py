@@ -1,11 +1,5 @@
-"""deletion.py — kasowanie a pair's data, and the trace it leaves behind.
-
-`delete-archived-pair-data`, groups 1 and 2: the tables `close_for_deletion` and
-`delete_pair_data` write to are `tracked_pairs`, `collection_job_chunks`, `candles`,
-`coverage_ranges`, `derived_candles` and `pair_deletions` — everything the pair touched
-except the live ingest task itself, which `app.py`'s endpoint stops between the two
-calls.
-"""
+"""deletion.py — kasowanie a pair's data, and the trace it leaves behind. Everything the pair touched
+except the live ingest task, which the endpoint stops between the two calls."""
 
 from __future__ import annotations
 
@@ -58,8 +52,6 @@ def plan(
     }
     return ChunkPlan(**values)
 
-
-# --- 1.2/1.3: the trace a deletion leaves -----------------------------------------------
 
 
 async def test_deleting_a_pair_with_candles_records_the_count_and_range(
@@ -126,8 +118,6 @@ async def test_a_deletion_survives_a_fresh_connection(migrated_url: str) -> None
     assert [d.symbol for d in deletions] == ["US100"]
 
 
-# --- 2.5: what deleting a pair's data actually removes -----------------------------------
-
 
 async def test_deleting_removes_candles_and_coverage(db: asyncpg.Connection) -> None:
     await track(db, "US100", Resolution.MINUTE, LIMIT)
@@ -188,8 +178,6 @@ async def test_a_period_that_was_covered_before_deletion_reads_as_not_collected(
     )
 
 
-# --- 2.1/2.2: closing the decision before anything is removed ----------------------------
-
 
 async def test_closing_for_deletion_untracks_the_pair(db: asyncpg.Connection) -> None:
     await track(db, "US100", Resolution.MINUTE, LIMIT)
@@ -231,8 +219,6 @@ async def test_closing_for_deletion_does_not_touch_a_chunk_already_running(
     reread = await read_job(db, job.id)
     assert [c.state for c in reread.chunks] == [ChunkState.RUNNING]
 
-
-# --- 2.6: a pair re-added after deletion starts from nothing ------------------------------
 
 
 async def test_a_pair_re_added_after_deletion_has_no_leftover_coverage(

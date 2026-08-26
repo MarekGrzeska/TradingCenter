@@ -1,10 +1,5 @@
-"""Reaching one kind of computer off a catalogue entry, in a test.
-
-`IndicatorSpec.computer` is a tagged union, so a test that means to exercise one kind
-says which and fails with the entry's name if the catalogue changed shape underneath it —
-rather than with an attribute error three lines later, or with the silent pass a
-`compute` that answered `{}` for every non-lines entry used to give.
-"""
+"""Reaching one kind of computer off a catalogue entry, in a test. `IndicatorSpec.computer` is a
+tagged union, so a test says which kind it means and fails with the entry's name if the shape changed."""
 
 from __future__ import annotations
 
@@ -12,9 +7,8 @@ from typing import Any
 
 from market_data.indicators.catalogue import CATALOGUE, IndicatorSpec, Lines
 
-# Every entry that answers with lines — the only ones a `compute(series, params)` test
-# has anything to say about. The rest answer with markers, zones or levels and are each
-# exercised by the file named after their group.
+# Every entry that answers with lines — the only ones a `compute(series, params)` test has anything
+# to say about. The rest are exercised by the file named after their group.
 LINE_ENTRIES: list[IndicatorSpec] = [e for e in CATALOGUE if isinstance(e.computer, Lines)]
 
 

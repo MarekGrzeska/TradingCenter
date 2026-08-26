@@ -1,10 +1,5 @@
-"""The market-status cache and the decision it feeds, tested without an HTTP client.
-
-Both used to live inside `app.py` — one as a module-level dict, the other as a private
-helper — so the only way to reach either was through `TestClient` and, in the cache's
-case, by importing a private name to clear it between cases. The rules they encode are
-about traffic and staleness, not about HTTP, and these tests say so directly.
-"""
+"""The market-status cache and the decision it feeds, tested without an HTTP client. Both used to live
+inside `app.py`; the rules they encode are about traffic and staleness, not about HTTP."""
 
 from __future__ import annotations
 
@@ -50,8 +45,6 @@ def status(
     )
 
 
-# --- the cache ---
-
 
 async def test_a_first_reading_asks_the_gateway() -> None:
     gateway = FakeInstruments(market_open=True)
@@ -61,9 +54,8 @@ async def test_a_first_reading_asks_the_gateway() -> None:
 
 
 async def test_a_second_reading_inside_the_window_asks_nothing() -> None:
-    # The whole reason this exists: without it a shut market is permanently "late", so
-    # every read of the pair list spends a request per closed pair, forever. Measured over
-    # a quarter of an hour of a weekend: 74 requests about one instrument shut since Friday.
+    # The whole reason this exists: without it a shut market is permanently late, so every read of
+    # the pair list spends a request per closed pair. Measured over a weekend quarter-hour: 74.
     gateway = FakeInstruments(market_open=False)
     cache = MarketStatus()
 
@@ -115,8 +107,6 @@ async def test_two_caches_do_not_share_what_they_remember() -> None:
 
     assert gateway.asked == ["US100", "US100"]
 
-
-# --- the decision it feeds ---
 
 
 async def test_a_fresh_pair_costs_the_gateway_nothing() -> None:

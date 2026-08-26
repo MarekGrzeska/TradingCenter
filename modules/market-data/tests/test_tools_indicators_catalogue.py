@@ -1,10 +1,5 @@
-"""The two catalogue tools, against the catalogue this module publishes itself.
-
-`tests/test_indicators_catalogue.py` is the module's own test of what the catalogue
-contains; this one is about what the tools do with it — the group filter, the full entry,
-and the two refusals. The fabricated two-entry catalogue those tests used to answer a
-mocked `GET /indicators` with is gone: there is no fetch to answer.
-"""
+"""The two catalogue tools, against the catalogue this module publishes itself. What the module's
+catalogue *contains* is tested next door; this is about what the tools do with it."""
 
 from __future__ import annotations
 
@@ -33,9 +28,8 @@ async def test_list_indicators_filters_by_group(tool_server) -> None:
 
 
 async def test_the_catalogue_is_read_once_across_calls(tool_server, monkeypatch) -> None:
-    """It was cached because a fetch cost a request. There is no request now, and the
-    cache is down to the two lookups `_Catalogue` builds — still worth building once,
-    which is what this holds in place."""
+    """It was cached because a fetch cost a request. There is no request now, and the cache is down to
+    the two lookups `_Catalogue` builds — still worth building once."""
     reads = {"n": 0}
     original = service.catalogue
 

@@ -1,8 +1,5 @@
-"""`market-data-indicators` spec, "Strefy mają granice, kierunek i moment domknięcia" —
-the W2 layer (`docs/wskazniki-plan-wdrozenia.html`), tested the way `test_indicators_
-structure.py` tests W1: small, hand-computed series, not the synthetic one
-`test_indicators_catalogue.py` uses for golden snapshots.
-"""
+"""`market-data-indicators`, "Strefy mają granice, kierunek i moment domknięcia" — small, hand-computed
+series, tested the way `test_indicators_structure.py` tests W1."""
 
 from __future__ import annotations
 
@@ -107,9 +104,8 @@ class TestRangeGap:
         assert zone.end_bar is None
 
     def test_a_gap_never_touches_itself_at_formation(self):
-        """The bar that forms the gap's own far edge must not count as the bar
-        that later touches it — regression for the off-by-one where the
-        touch/fill scan started at the gap's own third bar instead of after it."""
+        """The bar that forms the gap's own far edge must not count as the bar that later touches it —
+        regression for the off-by-one where the scan started at the gap's own third bar."""
         entry = get("range_gap")
         zones = _own_series_zones(
             entry,
@@ -198,9 +194,8 @@ class TestSessionRange:
         assert zones[0].top == pytest.approx(2.0)
         assert zones[1].start_bar == 3
         assert zones[1].top == pytest.approx(4.0)
-        # Two calendar days apart is 48 hours; these are 47 — the same local
-        # clock time landed an hour earlier in UTC because the offset itself
-        # moved under it (GMT, UTC+0, to BST, UTC+1).
+        # Two calendar days apart is 48 hours; these are 47, because the same local clock time landed
+        # an hour earlier in UTC when the offset moved under it (GMT to BST).
         assert times[3] - times[1] == timedelta(hours=47)
 
     def test_window_still_forming_stays_open(self):

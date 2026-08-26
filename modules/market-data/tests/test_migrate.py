@@ -24,11 +24,8 @@ from market_data.runtime import MIGRATIONS
 
 
 class FakeConnection:
-    """Enough of a connection for the two statements `advisory_lock` runs.
-
-    `taken` says the lock is held by somebody else — every `pg_try_advisory_lock` answers
-    false, which is the case the wait exists for.
-    """
+    """Enough of a connection for the two statements `advisory_lock` runs. `taken` says the lock is
+    held by somebody else, which is the case the wait exists for."""
 
     def __init__(self, *, taken: bool = False) -> None:
         self._taken = taken
@@ -67,12 +64,8 @@ async def test_a_lock_that_never_frees_up_refuses_rather_than_waits_forever() ->
 
 
 def test_the_wait_outlasts_a_long_migration() -> None:
-    """`market-data-database-connection`, "Kres MUST być dłuższy niż najdłuższa migracja".
-
-    Not a number this module can measure, so what is asserted is the ordering that the
-    requirement is really about: this module's wait is the generous one, and the agent's
-    five minutes would be the wrong default here.
-    """
+    """"Kres MUST być dłuższy niż najdłuższa migracja". Not a number this module can measure, so what
+    is asserted is the ordering: this module's wait is the generous one."""
     from market_data.config import Settings
 
     assert Settings.model_fields["migration_lock_wait_seconds"].default >= 900
@@ -80,12 +73,8 @@ def test_the_wait_outlasts_a_long_migration() -> None:
 
 @pytest.fixture
 async def empty_database_url(postgres_url: str) -> AsyncIterator[str]:
-    """A database in the session's container that no migration has touched.
-
-    `migrated_url` is session scoped and runs the migrations once for everything that
-    asks for it, so a test needing an *unmigrated* database cannot share it — and cannot
-    rely on running before it either. A fresh logical database costs one statement.
-    """
+    """A database in the session's container that no migration has touched. `migrated_url` is session
+    scoped, so a test needing an unmigrated one cannot share it — a fresh one costs a statement."""
     name = f"empty_{uuid.uuid4().hex[:12]}"
     admin = await asyncpg.connect(asyncpg_dsn(postgres_url))
     try:
@@ -132,11 +121,8 @@ async def test_a_database_already_at_head_is_left_alone(migrated_url: str) -> No
 
 @pytest.mark.db
 async def test_only_one_of_two_processes_migrates(empty_database_url: str) -> None:
-    """Two starts against one empty database, racing the way two App Service instances do.
-
-    Each takes its own connection, as two processes would; the lock lives in the database,
-    which is the whole reason it works across them.
-    """
+    """Two starts against one empty database, racing the way two App Service instances do. Each takes
+    its own connection; the lock lives in the database, which is why it works across them."""
     migrated: list[str] = []
 
     async def start(name: str) -> None:
@@ -165,12 +151,8 @@ async def test_only_one_of_two_processes_migrates(empty_database_url: str) -> No
 async def test_nothing_is_collected_before_the_migration_finishes(
     migrated_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The ordering inside the lifespan, which is the whole of this module's half of
-    "Zbieranie nie rusza przed migracją".
-
-    Recorded rather than asserted on the clock: what matters is that `ingest.start()`
-    cannot be reached before `migrate.run()` returned, not how long either took.
-    """
+    """The ordering inside the lifespan. Recorded rather than asserted on the clock: what matters is
+    that `ingest.start()` cannot be reached before `migrate.run()` returned."""
     from market_data import app as app_module
     from market_data.ingest import Ingest
     from market_data.jobs.runner import JobRunner
