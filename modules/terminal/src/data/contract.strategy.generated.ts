@@ -824,10 +824,8 @@ export interface components {
         };
         /**
          * FactRead
-         * @description One line of one declared fact, at this bar or a few bars back.
-         *
-         *     `offset` counts backwards from the bar being decided on, so `0` is the reading the loop
-         *     would call "now" and `1` is the other half of every crossing test.
+         * @description One line of one declared fact, at this bar or a few bars back. `offset` counts backwards from the bar being
+         *     decided on, so `0` is the reading the loop calls "now" and `1` is the other half of every crossing test.
          */
         FactRead: {
             /** Key */
@@ -847,10 +845,8 @@ export interface components {
         };
         /**
          * Guard
-         * @description A reason to refuse, in the order it should be asked.
-         *
-         *     Ordered because the cheapest and commonest refusal belongs first: the usual answer of a
-         *     strategy worth running is "no", and it should also be the shortest path to one.
+         * @description A reason to refuse, in the order it should be asked: the cheapest and commonest refusal belongs first, since
+         *     the usual answer of a strategy worth running is "no".
          */
         "Guard-Input": {
             /** Reason */
@@ -860,10 +856,8 @@ export interface components {
         };
         /**
          * Guard
-         * @description A reason to refuse, in the order it should be asked.
-         *
-         *     Ordered because the cheapest and commonest refusal belongs first: the usual answer of a
-         *     strategy worth running is "no", and it should also be the shortest path to one.
+         * @description A reason to refuse, in the order it should be asked: the cheapest and commonest refusal belongs first, since
+         *     the usual answer of a strategy worth running is "no".
          */
         "Guard-Output": {
             /** Reason */
@@ -975,10 +969,8 @@ export interface components {
         };
         /**
          * Previous
-         * @description The same expression, evaluated one bar earlier.
-         *
-         *     A frame shift rather than an offset on every leaf inside it: `previous(fast − slow)`
-         *     says what it means, while shifting each leaf by hand is three places to forget one.
+         * @description The same expression, evaluated one bar earlier — a frame shift rather than an offset on every leaf inside it:
+         *     `previous(fast − slow)` says what it means, while shifting each leaf by hand is three places to forget one.
          */
         "Previous-Input": {
             /**
@@ -991,10 +983,8 @@ export interface components {
         };
         /**
          * Previous
-         * @description The same expression, evaluated one bar earlier.
-         *
-         *     A frame shift rather than an offset on every leaf inside it: `previous(fast − slow)`
-         *     says what it means, while shifting each leaf by hand is three places to forget one.
+         * @description The same expression, evaluated one bar earlier — a frame shift rather than an offset on every leaf inside it:
+         *     `previous(fast − slow)` says what it means, while shifting each leaf by hand is three places to forget one.
          */
         "Previous-Output": {
             /**

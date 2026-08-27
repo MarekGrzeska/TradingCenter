@@ -918,11 +918,8 @@ export interface components {
         };
         /**
          * TeamDefinition
-         * @description The whole of what a team revision carries — every agent, every dependency, and the limits a run
-         *     must respect. One immutable blob per revision.
-         *
-         *     `trading` defaults to an empty `TradingLimits`, which is what every revision saved before this field
-         *     existed reads back as, and it means the same thing there: no limit.
+         * @description The whole of what a team revision carries, as one immutable blob. `trading` defaults to an empty `TradingLimits`,
+         *     which is what every revision saved before that field existed reads back as, and it means the same thing: no limit.
          */
         TeamDefinition: {
             /** Agents */
@@ -1033,11 +1030,8 @@ export interface components {
         };
         /**
          * ToolOut
-         * @description One tool as the tool server announces it right now. Name and description, and deliberately not the
-         *     input schema: publishing it would put a copy of somebody else's contract on this module's wire.
-         *
-         *     `read_only` is the one property that does travel, read straight off the server's own hint, so an
-         *     operator sees which tools move the account before assigning one. `None` means unknown, not read-only.
+         * @description One tool as the server announces it right now — name and description, deliberately not the input schema, which
+         *     would put a copy of somebody else's contract on this wire. `read_only` travels; `None` means unknown, not read-only.
          */
         ToolOut: {
             /** Description */
@@ -1049,12 +1043,8 @@ export interface components {
         };
         /**
          * TradeOut
-         * @description One call a run made that could change the account — the same event a `ToolCallOut` is, read as a
-         *     *trade*: what, which way, how much, and what came of it, as columns rather than JSON.
-         *
-         *     `status` is this module's reading of the outcome and `result_status` the provider's word, kept separate
-         *     because a row can carry the first without the second arriving. A row still saying `sent` after its run
-         *     finished is an order whose fate this module does not know, which the trace must be able to say.
+         * @description One call a run made that could change the account, read as a *trade*, as columns rather than JSON. A row still
+         *     saying `sent` after its run finished is an order whose fate this module does not know.
          */
         TradeOut: {
             /** Agent Key */
@@ -1093,12 +1083,8 @@ export interface components {
         };
         /**
          * TradingLimits
-         * @description What a revision allows its agents to do to the account. Every one of the three is optional, and an
-         *     omitted one means no limit at all — a team the operator deliberately lets trade with everything it has
-         *     is an experiment they are entitled to run.
-         *
-         *     What is not negotiable lives a module away: `trading-mcp` refuses to start against anything but the
-         *     demo account. That is the split — the irreversible thing is fixed, the operator's budget is theirs.
+         * @description What a revision allows its agents to do to the account: all three optional, an omitted one meaning no limit at
+         *     all. What is not negotiable lives a module away, in a `trading-mcp` that starts only against the demo account.
          */
         TradingLimits: {
             /**
