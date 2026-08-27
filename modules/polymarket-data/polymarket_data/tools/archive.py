@@ -1,9 +1,5 @@
-"""Reading what this module has collected.
-
-Four tools, reduced for a model rather than for a chart. A chart wants every point; a model
-wants the current state and the shape of the move, and asking it to read three thousand
-points to find out that a probability rose four points is a bill for nothing.
-"""
+"""Reading what this module has collected — four tools, reduced for a model rather than for a chart. A
+model wants the current state and the shape of the move, not three thousand points."""
 
 from __future__ import annotations
 

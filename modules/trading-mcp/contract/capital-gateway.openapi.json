@@ -135,7 +135,7 @@
         "type": "object"
       },
       "CandleHistory": {
-        "description": "A deep read, with what it cost.\n\nThe provider serves at most 1000 candles per request, so a deep read is many\nrequests and can take tens of seconds. ``requests`` makes that visible instead of\nleaving a caller to guess why a read was slow, and ``history_ended`` distinguishes\n\"the instrument has no more data\" from \"we stopped early\" — both of which otherwise\nlook identical: a series shorter than the one asked for.",
+        "description": "A deep read, with what it cost. ``requests`` makes a slow read visible, and ``history_ended``\ntells \"the instrument has no more data\" from \"we stopped early\" — otherwise identical.",
         "properties": {
           "candles": {
             "items": {
@@ -357,7 +357,7 @@
         "type": "object"
       },
       "InstrumentTerms": {
-        "description": "What the provider will let a caller do with one instrument, and at what deposit.\n\nDeliberately not fields on `Instrument`: the provider carries none of this in the flat\nmarket dict that search and marketnavigation return, only in the detail of a single\ninstrument. Hanging them off the catalogue would mean one request per row.\n\nNo price here. It is already in `Instrument` and in `Candle`, and a third place for it\nis a third answer that can be from a different moment.\n\nEvery field but `symbol` may be absent: the provider omits some of them for some\ninstruments, and a missing rule is not a rule of zero.",
+        "description": "What the provider will let a caller do with one instrument, and at what deposit. Not fields\non `Instrument`: the provider carries these only in a single instrument's detail, one request each.",
         "properties": {
           "currency": {
             "anyOf": [
@@ -713,7 +713,7 @@
         "type": "object"
       },
       "Resolution": {
-        "description": "Candle time frame. One vocabulary serves REST and streaming alike —\n``GET /prices/{epic}?resolution=`` and ``OHLCMarketData.subscribe`` take the\nsame spellings.",
+        "description": "Candle time frame. One vocabulary serves REST and streaming alike — the two take the\nsame spellings.",
         "enum": [
           "MINUTE",
           "MINUTE_5",

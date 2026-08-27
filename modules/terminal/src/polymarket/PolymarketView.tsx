@@ -16,21 +16,8 @@ import {
 } from "./polymarketApi";
 
 /**
- * The prediction markets the operator is watching.
- *
- * Until this tab existed the only way to see any of it was to ask the model, which
- * inverts how the rest of this terminal works: the operator looks, and the model is a
- * second pair of eyes rather than the only one. A probability moves slowly and means
- * something only in a window, and a number in a sentence shows no movement at all.
- *
- * **Two reads, not one per row.** The structure — events, their markets and outcomes —
- * comes from `/events`; every current price comes from `/snapshot` in a single request.
- * That is a correctness rule and not a saving: prices fetched per outcome come from
- * different moments, and a market whose outcomes were priced at different instants shows
- * a total that never existed (specs/terminal-polymarket, "Ceny całej listy biorą się
- * z jednego żądania"). The windows are per event and arrive only for an event the
- * operator opens — seven windows for fifty events would be fifty requests nobody asked
- * for.
+ * The prediction markets the operator is watching. **Two reads, not one per row**: prices fetched per outcome come
+ * from different moments, and a market priced at several instants shows a total that never existed.
  */
 
 /** How often the prices are re-asked. The module samples every 60s, so anything faster
@@ -145,11 +132,8 @@ export function PolymarketView({ api }: { api?: PolymarketApi } = {}) {
         </p>
       )}
 
-      {/* `flex-1` is what makes this the scrolling region rather than a block that stops at
-          its content: without it the list never grows, so the tab ended in dead space below
-          the last event and the last row was clipped instead of scrolled to. The pair
-          `min-h-0 flex-1 overflow-auto` is what `InstrumentsView` and `CollectionHistoryView`
-          already use for the same job. */}
+      {/* `flex-1` is what makes this the scrolling region rather than a block that stops at its content: the
+          tab ended in dead space and clipped its last row. `min-h-0 flex-1 overflow-auto`, as elsewhere. */}
       <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
         {events.value.map((event) => (
           <EventCard

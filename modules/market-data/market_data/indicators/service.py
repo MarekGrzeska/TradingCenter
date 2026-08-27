@@ -1,15 +1,5 @@
-"""Indicators: a catalogue anyone can build a picker from, and a computation over the
-series this module already owns.
-
-The one rule every line here answers to: an indicator measures, it never decides
-(`market-data-indicators` spec, "Katalog mierzy, a nie orzeka"). Nothing here returns a
-boolean, and every threshold a formula needs is a parameter the caller sent back to it in
-the response — never a constant this file decided on its own.
-
-This was `routers/indicators.py` until the tool surface arrived. It has two callers now —
-the REST route and the `/mcp` tools — so its refusals are raised as `IndicatorRequestRejected`
-and each transport spells that in its own words: a 422 there, a tool refusal here.
-"""
+"""Indicators: a catalogue anyone can build a picker from, and a computation over the series this
+module owns. An indicator measures, it never decides. Two callers now, so refusals are raised."""
 
 from __future__ import annotations
 
@@ -56,31 +46,17 @@ from .catalogue import (
 )
 from .catalogue import get as get_indicator
 
-# candles × requested indicators, above which the module refuses rather than compute.
-# Set in the first stage at 5000 candles × 10 indicators, ~16.5ms p95 on a 3-entry catalogue.
-# Re-measured in 2.17 against the full 44-entry catalogue E1 grew it to: every entry at
-# once, at however many candles this ceiling allows that many entries (~4500), costs
-# ~63ms p95 — measured by hand, not guarded by a test: a threshold at 10x the p95 caught
-# nothing vectorised numpy can do by accident and went red on a slow runner instead.
-# Cells scale roughly linearly with either factor, so the number held rather than moving
-# (design.md, "Obliczenia dzielą pętlę zdarzeń ze strumieniem świec").
+# candles × requested indicators, above which the module refuses rather than compute. Re-measured
+# in 2.17 against the full 44-entry catalogue: ~63ms p95 at ~4500 candles, so the number held.
 REQUEST_CEILING = 200_000
 
-# The resolution `time_profile`/`session_range_*`/`opening_range` read regardless of what
-# was requested (`IndicatorSpec.needs_minute_series`). Raw MINUTE is the finer choice on
-# paper, but nothing in this deployment actually tracks it — pairs are collected starting
-# at MINUTE_5, with MINUTE itself existing only as the source `rollups.py` derives it from
-# when asked for directly. Targeting MINUTE_5 here, with the same DERIVABLE fallback the
-# primary series read already gets, is what makes these entries usable against real
-# tracked pairs instead of refusing on every request for want of a series nobody collects.
+# The resolution a few entries read regardless of what was requested. Raw MINUTE is finer on paper,
+# but nothing here tracks it — pairs are collected starting at MINUTE_5.
 FINE_RESOLUTION = Resolution.MINUTE_5
 
 class IndicatorRequestRejected(ValueError):
-    """The request is the thing that is wrong, not the archive.
-
-    Raised rather than returned so neither caller can forget it: the REST route turns it
-    into a 422, the tool surface into a refusal naming what to change.
-    """
+    """The request is the thing that is wrong, not the archive. Raised rather than returned so neither
+    caller can forget it: a 422 there, a tool refusal here."""
 
 
 def _ensure_utc(value: datetime) -> datetime:
@@ -121,11 +97,8 @@ def _entry_out(entry: IndicatorSpec) -> IndicatorCatalogueEntryOut:
 
 
 def catalogue() -> IndicatorsCatalogueOut:
-    """Every indicator this module can compute, and how to draw it.
-
-    A consumer builds its whole picker from this — parameters, defaults, output shape,
-    render hint — and never needs to know an indicator by name beforehand.
-    """
+    """Every indicator this module can compute, and how to draw it. A consumer builds its whole picker
+    from this and never needs to know an indicator by name beforehand."""
     return IndicatorsCatalogueOut(
         algorithm_version=ALGORITHM_VERSION,
         indicators=[_entry_out(entry) for entry in CATALOGUE],
@@ -133,12 +106,8 @@ def catalogue() -> IndicatorsCatalogueOut:
 
 
 async def compute(symbol: str, body: IndicatorsRequest, db, limiter) -> IndicatorsOut:
-    """Compute one or more indicators over a range, on one shared time axis.
-
-    Reads further back than `from` on its own, by however much each requested indicator's
-    warmup needs, and says in `warmup_from`/`settled` whether the archive actually held
-    enough history for the answer to be trusted.
-    """
+    """Compute one or more indicators over a range, on one shared time axis. Reads further back than
+    `from` by each indicator's warmup, and says whether the archive held enough for that."""
     start = _ensure_utc(body.from_)
     end = _ensure_utc(body.to)
     if end < start:
@@ -175,13 +144,8 @@ async def compute(symbol: str, body: IndicatorsRequest, db, limiter) -> Indicato
         if entry.higher_resolution is not None
     }
     needs_minute_series = any(entry.needs_minute_series for entry, _params in resolved)
-    # A DAY-resolution chart asking for `time_profile` can otherwise hide a
-    # fine-resolution read many orders of magnitude bigger than what
-    # `requested_candles` above ever saw — the module's one performance
-    # promise (design.md, "Obliczenia dzielą pętlę zdarzeń ze strumieniem
-    # świec") would not survive that read silently bypassing the ceiling.
-    # Already covered when the chart itself reads at `FINE_RESOLUTION` or
-    # finer (raw MINUTE): the top-level `cells` check above priced that read.
+    # A DAY-resolution chart asking for `time_profile` would otherwise hide a fine-resolution read
+    # orders of magnitude bigger than the one the ceiling above priced.
     if needs_minute_series and body.resolution not in (Resolution.MINUTE, FINE_RESOLUTION):
         fine_candles = periods_between(FINE_RESOLUTION, start, end)
         if fine_candles > REQUEST_CEILING:
@@ -209,12 +173,8 @@ async def compute(symbol: str, body: IndicatorsRequest, db, limiter) -> Indicato
         while first_requested < len(rows) and rows[first_requested].period_start < start:
             first_requested += 1
 
-        # A series the archive does not hold is not the caller's mistake — it is a
-        # property of what someone chose to collect, and it differs entry by entry. The
-        # read still happens once per resolution rather than once per entry; what
-        # changes is that a miss is written down here and handed to whichever entries
-        # asked for that series, instead of taking the whole request down with it
-        # (design.md, "Granica biegnie po tym, czyj to jest problem").
+    # A series the archive does not hold is not the caller's mistake. The miss is written down here
+    # and handed to whichever entries asked for that series, rather than taking the request down.
         htf_periods: dict[Resolution, list[tuple[datetime, Candle]]] = {}
         for htf_resolution in needed_htf_resolutions:
             htf_window_start = start - period_length(htf_resolution)
@@ -229,13 +189,8 @@ async def compute(symbol: str, body: IndicatorsRequest, db, limiter) -> Indicato
 
         minute_rows: Sequence[Candle | DerivedCandle] = []
         if needs_minute_series:
-            # Trimmed to exactly `[start, end)` even when the requested
-            # resolution already *is* `FINE_RESOLUTION` (or finer, raw MINUTE)
-            # and `rows` is sitting right there — `rows` may reach back past
-            # `start` for a different entry's warmup in the same request,
-            # which `time_profile`/`session_range`/`opening_range` must not
-            # see: none of them warm up, each reads exactly the window the
-            # operator asked for.
+            # Trimmed to exactly `[start, end)` even when `rows` is sitting right there: `rows` may
+            # reach back for another entry's warmup, and none of these entries warms up.
             if body.resolution in (Resolution.MINUTE, FINE_RESOLUTION):
                 minute_rows = rows[first_requested:]
             else:
@@ -303,15 +258,8 @@ def _session_close_before(
     resolution: Resolution,
     gaps: Sequence[tuple[datetime, datetime]],
 ) -> np.ndarray:
-    """`out[i]` is true when the stretch between bar `i - 1` and bar `i` is
-    wider than one nominal period *and* the archive has verified it, meaning
-    the candle that would have filled it never existed because the market was
-    shut (`coverage.Absence.MARKET_CLOSED`) — as opposed to a stretch nobody
-    has verified yet, `uncovered_within`'s `gaps`, which might just as well be
-    a hole ingest left behind. Only the first is a session boundary; task 4.3
-    is the difference, and it is the reason this reads `gaps` rather than the
-    elapsed time alone.
-    """
+    """`out[i]` is true when the stretch before bar `i` is wider than a period *and* the archive has
+    verified it — a shut market, as opposed to a hole nobody has looked at yet."""
     n = len(times)
     out = np.zeros(n, dtype=bool)
     if n < 2:
@@ -342,18 +290,8 @@ def _zone_out(zone: Zone, times: Sequence[datetime]) -> IndicatorZoneOut:
 def _htf_effective_periods(
     htf_candles: Sequence[Candle], start: datetime, end: datetime
 ) -> list[tuple[datetime, Candle]]:
-    """Which of a higher-resolution read's closed candles are in effect somewhere in
-    `[start, end)` — a candle's own close moment is the *next* candle's `period_start`,
-    read from the data rather than assumed (`DAY`/`WEEK` follow the venue's session,
-    not a fixed number of seconds — `rollups.py`'s reason for never flooring either).
-    The newest read candle has no next one to read that from, so its close is estimated
-    as one period-length later, the same safe-overstatement `periods.py` already uses
-    for sizing.
-
-    Kept to one candle per boundary crossed, plus the single one already in effect at
-    `start` — enough to draw an unbroken ray across the whole requested window without
-    the list growing with everything the archive has ever collected.
-    """
+    """Which of a higher-resolution read's closed candles are in effect in `[start, end)`. A candle's
+    close is the next candle's `period_start`, read rather than assumed; the newest is estimated."""
     if not htf_candles:
         return []
     step = period_length(htf_candles[0].resolution)
@@ -390,15 +328,8 @@ def _result_out(
     needed = entry.warmup_bars(params)
     settled = available_warmup_bars >= needed
 
-    # Asked for before anything is computed: an entry whose series is not there has no
-    # answer to give, and the reason belongs where its answer would have been.
-    # `warmup_bars` stays null — nothing was read to warm anything up.
-    #
-    # Both series are checked, not whichever one the entry mostly uses. No entry wants
-    # both today, and an `if/else` here would read as if that were guaranteed — the
-    # first one that does would have its missing coarse series ignored, compute against
-    # an empty `htf_periods` and answer with an empty `levels`: "computed, found none",
-    # which is the exact claim this whole change exists to stop being made.
+    # Asked for before anything is computed: an entry whose series is missing has no answer, and the
+    # reason belongs where its answer would have been. Both series are checked, not the likelier one.
     wanted = (
         FINE_RESOLUTION if entry.needs_minute_series else None,
         entry.higher_resolution,
@@ -409,17 +340,8 @@ def _result_out(
                 id=entry.id, params=params, settled=False, error=missing_series[resolution]
             )
 
-    # One case per computer, and the computer is what says which. This used to be a
-    # chain of `if entry.compute_x is not None`, where the *order* of the branches was
-    # the tie-break for an entry that had set two of them — a state nothing refused and
-    # nobody meant. A `match` on the tagged union has no order to get wrong, and pyright
-    # tells us when a case is missing rather than the entry silently falling through to
-    # `lines` and answering with an empty dict.
-    #
-    # The two `warmup_bars` values are the real difference between these cases and not
-    # an inconsistency: an entry reading its own series has a warmup measured in bars of
-    # that series, and one reading a different series (a closed DAY candle, the fine
-    # minute series) has none to measure — it is settled the moment its source is there.
+    # One case per computer, and the computer says which. A chain of `if ... is not None` made branch
+    # order the tie-break for an entry that set two; a `match` has no order to get wrong.
     match entry.computer:
         case Zones(fn=compute):
             zones = [

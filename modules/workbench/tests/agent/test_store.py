@@ -114,8 +114,7 @@ async def test_an_incomplete_reply_is_marked(db) -> None:
 
 
 async def test_a_stopped_reply_is_marked_apart_from_a_broken_one(db) -> None:
-    """specs/agent-chat, "Zatrzymana odróżnia się od urwanej błędem" — read back from the
-    transcript, not only from the return value, because that is where a later reader
+    """Read back from the transcript, not only from the return value, because that is where a later reader
     looks."""
     session = await store.create_session(db, owner_principal="op-1", model_id="gpt-5.6-luna")
     await store.append_operator_message(db, session_id=session.id, content="hello")

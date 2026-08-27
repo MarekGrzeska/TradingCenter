@@ -1,17 +1,5 @@
-"""The module's OpenAPI document, printed without starting anything.
-
-A twin of `market_data/openapi.py`, minus the WebSocket message hoisting that file also
-does: this module has no subscription with messages FastAPI cannot describe on its own.
-If one arrives later, it is the same pattern — hang the models into `components.schemas`
-by hand, the way `market_data.hub`'s `Snapshot`/`CandleChange` are.
-
-FastAPI builds the document from the Pydantic models in `contract.py` — it is a property
-of the code, not of a running process — so nothing here opens a connection pool, reaches
-for market-mcp, or reads a setting. `Settings()` is constructed inside `lifespan`, which
-this never enters.
-
-    uv run python -m teams.openapi > schema.json
-"""
+"""The module's OpenAPI document, printed without starting anything — a twin of market-data's, minus the WebSocket
+hoisting, since this module has no subscription FastAPI cannot describe: `uv run python -m teams.openapi`."""
 
 from __future__ import annotations
 
@@ -34,19 +22,8 @@ def _referenced(node: Any, into: set[str]) -> None:
 
 
 def require_response_fields(schema: dict[str, Any]) -> dict[str, Any]:
-    """Mark every property of a response model as required, in place.
-
-    Pydantic leaves a field with a default out of `required`, which is right for
-    something a caller *sends*: omitting it means "use the default". For something this
-    module *answers with* it is simply untrue — a `TeamOut` always carries
-    `latest_revision`, never omits it. Left alone as an internal wart it would cost
-    nothing; it stops being internal the moment a consumer generates types from it, where
-    every optional field arrives as `T | undefined` for a case that cannot happen.
-
-    Request bodies keep Pydantic's reading, so the two are told apart by reachability
-    rather than by a hand-kept list — a list would rot the first time a model moved
-    sides.
-    """
+    """Mark every property of a response model as required, in place: pydantic's reading is right for what a caller sends
+    and untrue for what this answers with. Request bodies keep it, told apart by reachability rather than a list."""
     components = schema.get("components", {}).get("schemas", {})
     from_requests: set[str] = set()
     for path in schema.get("paths", {}).values():
@@ -70,23 +47,14 @@ def require_response_fields(schema: dict[str, Any]) -> dict[str, Any]:
     return schema
 
 
-# Built once per process. `require_response_fields` mutates in place and every caller is
-# free to read the result, so handing out two objects that only look alike is a way for one
-# caller's edit to be invisible to the next — which is what FastAPI's own `openapi_schema`
-# cache used to prevent while this read a running application's document.
+# Built once per process. `require_response_fields` mutates in place and every caller reads the result, so
+# handing out two objects that only look alike is a way for one caller's edit to be invisible to the next.
 _document: dict[str, Any] | None = None
 
 
 def document() -> dict[str, Any]:
-    """The schema this surface publishes, built in-process.
-
-    A FastAPI of its own rather than the process's, and the difference is the point: the
-    generated TypeScript describes *this* surface, not the conversation's beside it. The
-    routers and their prefixes come from `surface.include`, the same function
-    `workbench/app.py` calls, so a path published here is a path served there — there is no
-    second list of prefixes to keep in step. What is *not* here is `/health`: that belongs
-    to the process, not to either surface.
-    """
+    """The schema this surface publishes, built in-process from a FastAPI of its own, so the generated TypeScript
+    describes *this* surface. `/health` is not here: it belongs to the process, not to either surface."""
     global _document
     if _document is None:
         from fastapi import FastAPI
@@ -100,9 +68,8 @@ def document() -> dict[str, Any]:
 
 
 def main() -> None:
-    # Sorted keys so the same code always prints the same bytes: the generated
-    # TypeScript is committed and compared, and a diff caused by dictionary ordering
-    # would be noise nobody can act on.
+    # Sorted keys so the same code always prints the same bytes: the generated TypeScript is committed and
+    # compared, and a diff caused by dictionary ordering is noise nobody can act on.
     json.dump(document(), sys.stdout, indent=2, sort_keys=True, ensure_ascii=False)
     sys.stdout.write("\n")
 

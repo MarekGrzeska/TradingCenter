@@ -19,12 +19,8 @@ from agent.runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
 @pytest.fixture
 async def empty_database_url(postgres_url: str) -> AsyncIterator[str]:
-    """A database in the session's container that no migration has touched.
-
-    `migrated_url` is session scoped and runs the migrations once for everything that
-    asks for it, so a test needing an *unmigrated* database cannot share it — and cannot
-    rely on running before it either. A fresh logical database costs one statement.
-    """
+    """A database in the session's container that no migration has touched. `migrated_url` is session
+    scoped, so a test needing an unmigrated one cannot share it or rely on running first."""
     name = f"empty_{uuid.uuid4().hex[:12]}"
     admin = await asyncpg.connect(asyncpg_dsn(postgres_url))
     try:
@@ -74,16 +70,13 @@ async def test_a_database_already_at_head_is_left_alone(migrated_url: str) -> No
 async def test_the_account_trace_migration_comes_back_down_over_a_row_it_forbids(
     empty_database_url: str,
 ) -> None:
-    """`0011`'s downgrade is the one that cannot simply undo itself: it puts `NOT NULL` back
-    on a column it allowed nulls into, and `unknown` out of a `CHECK` a row may be sitting
-    on. Both are impossible while such a row exists, so the downgrade deletes them first —
-    a real loss, named in the migration, and untested until here."""
+    """`0011`'s downgrade is the one that cannot simply undo itself: it puts `NOT NULL` back on a column it
+    allowed nulls into. Both are impossible while such a row exists, so the downgrade deletes them first."""
     from alembic import command
     from tc_runtime.migrate import alembic_config
 
-    # The same Config the module's own startup upgrade builds, so this walks the real
-    # chain. In a thread because alembic's env.py drives its async engine with
-    # `asyncio.run`, which refuses to nest inside this test's own loop.
+    # The same Config the module's own startup upgrade builds, so this walks the real chain. In a thread
+    # because alembic's env.py drives its async engine with `asyncio.run`, which refuses to nest.
     config = alembic_config(MIGRATIONS, sqlalchemy_url(empty_database_url))
     await asyncio.to_thread(command.upgrade, config, "head")
 
@@ -117,11 +110,8 @@ async def test_the_account_trace_migration_comes_back_down_over_a_row_it_forbids
 
 @pytest.mark.db
 async def test_only_one_of_two_processes_migrates(empty_database_url: str) -> None:
-    """Two starts against one empty database, racing the way two App Service instances do.
-
-    Each takes its own connection, as two processes would; the lock lives in the database,
-    which is the whole reason it works across them.
-    """
+    """Two starts against one empty database, racing the way two App Service instances do. Each takes its
+    own connection; the lock lives in the database, which is why it works across them."""
     migrated: list[str] = []
 
     async def start(name: str) -> None:
@@ -149,12 +139,8 @@ async def test_only_one_of_two_processes_migrates(empty_database_url: str) -> No
 
 
 def test_this_modules_lock_key_is_still_its_own() -> None:
-    """The key stopped being a constant in the file that takes the lock and became an
-    argument this module supplies (`agent/runtime.py`). That is the whole risk of sharing
-    `db.py`: a key silently changed — or silently shared with teams — would put two
-    modules' migrations behind one lock, in databases neither can see, and the symptom
-    would be a start-up that hangs with no failing query to find it by.
-    """
+    """The key stopped being a constant in the file that takes the lock and became an argument this module
+    supplies. A key silently shared would put two chains behind one lock, in databases neither can see."""
     assert MIGRATION_LOCK_KEY == 8030
 
 
@@ -162,14 +148,8 @@ def test_this_modules_lock_key_is_still_its_own() -> None:
 async def test_the_prompt_source_migration_backfills_a_collision_the_way_it_claims(
     empty_database_url: str,
 ) -> None:
-    """`0013`'s backfill is a rule about rows it did not write, so it is worth walking.
-
-    The state it is written for is the one the bug produced: an operator's save and a
-    seeding migration under one version, the seed later. The rule says the newer row of
-    such a pair is the migration's — which is the only way the pair arises — and the
-    older is the person's, who keeps the text and gives up only the number, because the
-    number is what a seeding `downgrade()` aims at.
-    """
+    """`0013`'s backfill is a rule about rows it did not write, so it is worth walking. The rule says the
+    newer row of such a pair is the migration's, and the older is the person's, who keeps the text."""
     from alembic import command
     from tc_runtime.migrate import alembic_config
 
@@ -178,9 +158,8 @@ async def test_the_prompt_source_migration_backfills_a_collision_the_way_it_clai
 
     conn = await asyncpg.connect(asyncpg_dsn(empty_database_url))
     try:
-        # An operator's save that landed on the version `0012` was about to seed. At
-        # `0012` there is no `source` column yet — which is the whole reason the backfill
-        # has to infer this.
+        # An operator's save that landed on the version `0012` was about to seed. At `0012` there is no
+        # `source` column yet, which is the whole reason the backfill has to infer this.
         await conn.execute(
             "DELETE FROM prompt_revisions WHERE version = 'v11'",
         )

@@ -1,12 +1,5 @@
-"""Two things about the OpenAI client that are invisible until a live call.
-
-Moved here from `modules/agent/tests/` with the code they test — they assert the shared
-client's shape, which is now one shape rather than agent's.
-
-Both were found by one: a real turn with tools answered `400`, and the panel showed
-"incomplete — broke off" with no reason recorded anywhere. These are unit assertions on
-the shape, standing in for a call this suite will never make.
-"""
+"""Two things about the OpenAI client that are invisible until a live call. Both were found by one:
+a real turn with tools answered 400, and the panel showed "incomplete" with no reason recorded."""
 
 from __future__ import annotations
 
@@ -40,10 +33,8 @@ def _provider() -> OpenAIProvider:
 
 
 def test_the_client_talks_to_the_responses_api() -> None:
-    """A reasoning model asked for function tools on /v1/chat/completions answers 400:
-    "Function tools with reasoning_effort are not supported ... use /v1/responses or set
-    reasoning_effort to 'none'." The second way out buys tools by throwing away the
-    reasoning the model was chosen for, so this is the first."""
+    """A reasoning model asked for function tools on /v1/chat/completions answers 400. The other way
+    out buys tools by throwing away the reasoning the model was chosen for."""
     client = _provider()._client(MODEL, [])
 
     assert client.use_responses_api is True  # pyright: ignore[reportAttributeAccessIssue]
@@ -59,9 +50,8 @@ def test_the_responses_api_shape_stays_bound_when_tools_are_added() -> None:
 
 
 def test_text_is_taken_from_blocks_not_from_stringified_content() -> None:
-    """On the responses API `content` is a list of blocks and a tool call is one of
-    them. `str(content)` would stream `[{'type': 'function_call', ...}]` into the
-    operator's panel as prose; `.text` takes the text blocks and nothing else."""
+    """On the responses API `content` is a list of blocks and a tool call is one of them. `str(content)`
+    would stream `[{'type': 'function_call', ...}]` into the operator's panel as prose."""
     tool_call_chunk = AIMessageChunk(
         content=[{"type": "function_call", "name": "get_last_price", "arguments": "", "index": 0}]
     )

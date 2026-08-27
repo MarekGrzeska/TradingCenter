@@ -20,17 +20,8 @@ import { MarkPrimitive } from "./MarkPrimitive";
 import { timeToX } from "./timeCoordinates";
 
 /**
- * A line between two time–price points — the one shape neither `RayPrimitive` nor
- * `ZonePrimitive` already draws, and the reason this file exists
- * (`terminal-chart` spec, "Linia trendu MUST być odcinkiem między swoimi punktami").
- *
- * Built on `RayPrimitive`'s frame — same class shape, same `timeToX` — with one
- * difference that is the whole point: a ray runs to the right edge and this stops where
- * it was told to. It is **not** extended past its points and **not** clipped to the
- * visible range: a segment drawn only as far as the screen reaches would change slope
- * with the pan, and an extended one would claim a level the operator never drew. The
- * canvas clips what falls outside the pane on its own, which is the correct clipping and
- * costs nothing here.
+ * A line between two time–price points, on `RayPrimitive`'s frame with the one difference that is the point: it
+ * stops where it was told. Not clipped to the visible range either — that would change its slope with the pan.
  */
 export interface DrawnTrendline {
   from: Time;
@@ -70,10 +61,8 @@ class TrendlinePaneRenderer implements IPrimitivePaneRenderer {
       const ctx = scope.context;
       const stroke = strokeSpec(this.weight, this.emphasis);
       for (const item of this.items) {
-        // Either endpoint unplaceable means there is no segment to draw — unlike a ray,
-        // whose far end is the pane's edge and always exists. Both coordinates are kept
-        // whatever they are, negative ones included: clamping the left end to 0 the way
-        // `RayPrimitive` does would tilt a line whose start is off-screen.
+        // Either endpoint unplaceable means there is no segment to draw. Both coordinates are kept
+        // whatever they are: clamping the left end to 0 would tilt a line whose start is off-screen.
         if (item.x1 === null || item.y1 === null || item.x2 === null || item.y2 === null) continue;
         const x1 = item.x1 * scope.horizontalPixelRatio;
         const x2 = item.x2 * scope.horizontalPixelRatio;
@@ -100,10 +89,8 @@ class TrendlinePaneRenderer implements IPrimitivePaneRenderer {
         ctx.stroke();
 
         if (item.label) {
-          // At the later end, where a trend line is read from: the newest point is the
-          // one the operator is looking at when the chart sits at the live edge. The chip
-          // keeps itself inside the pane from there, so a line running in from off-screen
-          // is still named.
+          // At the later end, where a trend line is read from: the newest point is the one the operator
+          // is looking at at the live edge. The chip keeps itself inside the pane from there.
           drawChip(ctx, item.label, item.color, this.palette, {
             x: x2,
             y: y2,
@@ -166,9 +153,8 @@ export class TrendlinePrimitive extends MarkPrimitive<TrendlineRenderItem> {
     const series = this.series;
     if (!chart || !series) return [];
     const timeScale = chart.timeScale();
-    // No visible-range filter, unlike `ZonePrimitive`: a trend line crossing the screen
-    // with both of its ends outside it is exactly the case that must still draw, and the
-    // handful of drawings an instrument carries never makes the filter worth its risk.
+    // No visible-range filter, unlike `ZonePrimitive`: a trend line crossing the screen with both ends
+    // outside it is exactly the case that must still draw.
     return this.lines.map((line) => ({
       x1: timeToX(timeScale, line.from),
       y1: series.priceToCoordinate(line.fromPrice),

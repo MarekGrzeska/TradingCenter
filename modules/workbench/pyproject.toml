@@ -10,41 +10,33 @@ dependencies = [
     "pydantic-settings>=2.2",
     "asyncpg>=0.30",
     "alembic>=1.14",
-    # Alembic drives migrations through SQLAlchemy Core; both surfaces' own queries go
-    # straight through asyncpg, so no ORM is pulled into the runtime path — same split
-    # as market-data.
+    # Alembic drives migrations through SQLAlchemy Core; both surfaces' own queries go straight through asyncpg, so
+    # no ORM is pulled into the runtime path — the same split market-data makes.
     "sqlalchemy[asyncio]>=2.0",
-    # The database credential, and only that: a managed identity in Azure, a service
-    # principal (client secret) locally — never a stored password. The model provider
-    # does not use it, because OpenAI is not in Entra.
+    # The database credential, and only that: a managed identity in Azure, a service principal locally, never a
+    # stored password. The model provider does not use it, because OpenAI is not in Entra.
     "azure-identity>=1.19",
-    # azure-identity's `aio` credentials build an async HTTP pipeline that imports this
-    # at construction time — `DefaultAzureCredential()` fails without it, not just the
-    # tool-server session that uses it directly.
+    # azure-identity's `aio` credentials build an async pipeline that imports this at construction time, so
+    # `DefaultAzureCredential()` fails without it — not just the tool session that uses it directly.
     "aiohttp>=3.10",
     # Both surfaces' graphs: the conversation's model-and-tool loop, and a team's one
     # node per agent with the operator's edges between them.
     "langgraph>=0.2",
     "langchain-openai>=0.2",
-    # The MCP client half of the SDK market-data and trading-mcp serve with, pinned
-    # exactly for the reason all of them pin it: `mcp` shipped a 2.0.0 that moved public
-    # names during a minor series.
+    # The MCP client half of the SDK market-data and trading-mcp serve with, pinned exactly for the reason all of
+    # them pin it: `mcp` shipped a 2.0.0 that moved public names during a minor series.
     "mcp==1.27.0",
-    # `tools/client.py` on both surfaces builds its session's HTTP client and per-request
-    # auth flow against httpx directly, and `teams_tools/client.py` speaks to the teams
-    # routers through `httpx.ASGITransport` — no network, same process (design.md, D3).
+    # `tools/client.py` builds its session's HTTP client and per-request auth flow against httpx directly, and
+    # `teams_tools/client.py` speaks to the teams routers through `httpx.ASGITransport` — no network, same process.
     "httpx>=0.27",
     # Rolls a five-field cron expression forward from a point in time — the one place the
     # teams surface resolves "when does this schedule fire next".
     "croniter>=3.0",
-    # The IANA database `ZoneInfo("Europe/Warsaw")` reads. Named explicitly because the
-    # platform is not a reliable source of it: Windows ships none at all, and a slim
-    # container image usually ships none either.
+    # The IANA database `ZoneInfo("Europe/Warsaw")` reads, named explicitly because the platform is not a reliable
+    # source of it: Windows ships none, and a slim container image usually ships none either.
     "tzdata>=2024.1",
-    # Runtime plumbing shared with the other module that owns a database. A path
-    # dependency, not a workspace member and not a published artifact: the package is
-    # resolved into *this* module's own lock and baked into its image at build time
-    # (packages-replace-the-hand-copies/design.md, D3).
+    # A path dependency, not a workspace member and not a published artifact: the package is resolved into *this*
+    # module's own lock and baked into its image at build time (packages-replace-the-hand-copies/design.md, D3).
     "tc-runtime",
     # The streamed OpenAI call. Both surfaces make one, with separate keys that never
     # travel through the package.
@@ -88,9 +80,8 @@ dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "ruff==0.16.2",
-    # Brings up a throwaway PostgreSQL per test session, same reason as market-data: the
-    # schema is the thing under test, and a leftover table from a previous run is
-    # indistinguishable from a migration that works.
+    # A throwaway PostgreSQL per test session, same reason as market-data: the schema is the thing under test, and a
+    # leftover table is indistinguishable from a migration that works.
     "testcontainers[postgres]>=4.8",
     "respx>=0.21",
 ]

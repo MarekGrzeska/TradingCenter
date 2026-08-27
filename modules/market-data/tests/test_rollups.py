@@ -38,8 +38,6 @@ def minute(offset: int, **overrides) -> Candle:
     )
 
 
-# --- the boundary, in Python (the SQL is checked against it below) ------------------
-
 
 @pytest.mark.parametrize(
     ("resolution", "minutes"),
@@ -74,9 +72,8 @@ def test_flooring_a_resolution_with_no_clock_boundary_is_refused(
 
 
 def test_day_and_week_are_not_derivable() -> None:
-    # Their boundary follows the venue's session, not the clock. A daily candle guessed
-    # from UTC midnight looks right and is wrong — the gateway's forming candle skips
-    # them for the same reason.
+    # Their boundary follows the venue's session, not the clock. A daily candle guessed from UTC
+    # midnight looks right and is wrong — the gateway's forming candle skips them for the same reason.
     assert Resolution.DAY not in DERIVABLE
     assert Resolution.WEEK not in DERIVABLE
     assert Resolution.MINUTE not in DERIVABLE  # the source, not a result
@@ -108,16 +105,13 @@ def test_the_four_hour_boundary_is_utc_midnight() -> None:
         assert bucket_start(start + timedelta(minutes=239), Resolution.HOUR_4) == start
 
 
-# --- 5.5: what a derived candle is made of ------------------------------------------
-
 
 @pytest.mark.db
 async def test_a_derived_candle_opens_first_closes_last_and_spans_all(
     db: asyncpg.Connection,
 ) -> None:
-    """The rule, stated once: open of the first, high and low of every one, close of the
-    last. The extremes are put in the middle of the period on purpose, so a candle that
-    merely copied the first and last minute would fail."""
+    """The rule, stated once: open of the first, high and low of every one, close of the last. The
+    extremes sit in the middle of the period, so a candle copying the first and last minute fails."""
     await write_candles(
         db,
         [
@@ -195,8 +189,6 @@ async def test_a_derived_candle_keeps_the_price_side(db: asyncpg.Connection) -> 
     assert (await read_derived(db, "US100", Resolution.MINUTE_5))[0].price_side is PriceSide.BID
 
 
-# --- 5.4: the period that is not all there ------------------------------------------
-
 
 @pytest.mark.db
 async def test_a_full_period_says_it_is_complete(db: asyncpg.Connection) -> None:
@@ -236,8 +228,6 @@ async def test_a_period_completes_when_its_remaining_minutes_arrive(
     assert derived.complete is True
     assert derived.close == minute(4).close
 
-
-# --- 5.3: refreshing only what changed ----------------------------------------------
 
 
 @pytest.mark.db
@@ -323,8 +313,6 @@ async def test_a_window_that_ends_before_it_starts_is_refused(db: asyncpg.Connec
     with pytest.raises(ValueError, match="cannot end before"):
         await refresh(db, "US100", Resolution.MINUTE_5, MIDNIGHT + timedelta(minutes=5), MIDNIGHT)
 
-
-# --- 5.2: every derivable resolution --------------------------------------------------
 
 
 @pytest.mark.db

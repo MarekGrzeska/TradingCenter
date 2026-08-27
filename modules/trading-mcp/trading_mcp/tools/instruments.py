@@ -1,18 +1,5 @@
-"""Reading an instrument's trading terms, and turning a deposit into a size.
-
-The gap this closes was measured, not imagined: on 17 August 2026 an agent asked to put
-2% of a 95 306,83 USD account into US100 sent `size=0.0631704` — 2% read as the *contract
-value*. At a 5% deposit requirement that tied up about 95 USD, one twentieth of what was
-meant, and nothing in the answer said so. The provider then rounded the size to `0.063`,
-which nothing said either.
-
-No price tool lives here, and `size_for_margin` takes the price as an argument rather than
-reading one. Both follow the same rule as the rest of this module: the market is the
-archive's to answer (specs/trading-mcp-tools, "Zestaw obejmuje rachunek i wykonanie, a nie
-rynek"). A price fetched here would be a second source inside one run, and the trace would
-no longer show which price the size was computed against — it now sits in the call's own
-arguments.
-"""
+"""Reading an instrument's trading terms, and turning a deposit into a size — measured 17 August 2026, when an agent
+read 2% of an account as contract value. `size_for_margin` takes the price, or the trace could not say which one."""
 
 from __future__ import annotations
 
@@ -25,9 +12,8 @@ from ..client import GatewayClient
 from ..errors import ToolRefusal
 from ._shared import READ_ONLY, _read
 
-# The one unit this module knows how to compute with. capital.com has only ever been
-# observed sending this one; anything else is refused by name rather than assumed, because
-# a multiplier read as a percentage is wrong by a factor of the leverage itself.
+# The one unit this module knows how to compute with, and the only one capital.com has been observed
+# sending. Anything else is refused by name: a multiplier read as a percentage is wrong by the leverage.
 PERCENTAGE = "PERCENTAGE"
 
 
@@ -46,12 +32,8 @@ class InstrumentTermsOut(BaseModel):
 
 
 class SizeForMarginOut(BaseModel):
-    """A size that fits both the deposit asked for and the provider's own rules.
-
-    `margin_used` is computed from the published `margin_factor`, not read off the
-    account: a provider applying a tiered requirement can charge more than this. What the
-    account really committed is `get_balance`, after the order.
-    """
+    """A size that fits both the deposit asked for and the provider's own rules. `margin_used` is computed
+    from the published factor, not read off the account, which a tiered requirement can exceed."""
 
     symbol: str
     size: float
@@ -101,10 +83,8 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
         notional = _decimal(margin) / (factor / Decimal(100))
         size = _round_down(notional / _decimal(price), terms.get("size_increment"))
 
-        # Before the provider's own floor, because an instrument it publishes no
-        # `min_deal_size` for still cannot be traded in nothing: a deposit under one step
-        # rounds down to zero, and zero is a size the gateway would carry all the way to
-        # an order.
+        # Before the provider's own floor, because an instrument it publishes no `min_deal_size` for
+        # still cannot be traded in nothing: a deposit under one step rounds down to zero.
         if size <= 0:
             raise ToolRefusal(
                 f"refused: {margin} of margin buys less than one step of {symbol} at "
@@ -176,9 +156,8 @@ def _round_down(size: Decimal, increment: float | None) -> Decimal:
 
 
 def _decimal(value: float | str) -> Decimal:
-    """Through `str`, because `Decimal(0.001)` is not 0.001 — and the whole point of
-    working in `Decimal` here is that a step of 0.001 divides an obvious number into an
-    obvious one."""
+    """Through `str`, because `Decimal(0.001)` is not 0.001 — and the point of working in `Decimal`
+    here is that a step of 0.001 divides an obvious number into an obvious one."""
     try:
         return Decimal(str(value))
     except InvalidOperation as err:  # pragma: no cover - the gateway sends numbers

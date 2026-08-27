@@ -1,23 +1,8 @@
 import type { Decision, ReasonKind } from "./strategyApi";
 
 /**
- * One decision, and mostly one refusal.
- *
- * The kind of refusal is a badge rather than a line of detail, because the three kinds
- * have three different answers: a gap in coverage is fixed by fetching history, the
- * strategy's own no by reading the strategy, and a platform limit by changing the limit.
- * A screen that showed all three as "no signal" would send somebody the wrong way, which
- * is the whole reason this column exists (specs/terminal-strategy).
- *
- * A refusal is not an error and must not read as one. `coverage` is the only kind that
- * means something is missing; `strategy` is the platform working exactly as intended and
- * is styled as the ordinary state it is.
- *
- * **The revision travels with the row**, and it is the revision this decision was computed
- * under rather than the newest one. A screen showing today's rule beside a decision made by
- * last week's answers "why did this enter" convincingly and wrongly, which is worse than
- * not answering (`terminal-strategy-configurator`, "Ekran pokazuje rewizję jako pochodzenie").
- * Nothing is shown for a coded entry: its rule is in the repository under that id.
+ * The kind of refusal is a badge because the three have three answers: fetch history, read the strategy, change the
+ * limit. **The revision travels with the row** — today's rule beside last week's decision answers convincingly and wrongly.
  */
 
 const KIND_LABEL: Record<ReasonKind, string> = {

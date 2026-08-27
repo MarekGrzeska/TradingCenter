@@ -1,11 +1,5 @@
-"""The published surface: FastAPI over the adapter, plus the streaming WebSocket.
-
-Every route below is a trading endpoint or reads toward one, with one exception: `/`,
-which the hosting platform polls with no credential to decide whether to restart the
-process. That single exception is why the credential check is middleware rather than a
-route dependency — a dependency would have to be added to every route by hand, and the
-one route someone forgets is the one that ships open.
-"""
+"""The published surface: FastAPI over the adapter, plus the streaming WebSocket. The credential
+check is middleware, not a dependency: the one route someone forgets is the one that ships open."""
 
 from __future__ import annotations
 
@@ -16,15 +10,8 @@ from datetime import datetime
 
 from . import telemetry
 
-# Must run before `from fastapi import FastAPI` below, not merely before `FastAPI(...)` is
-# called — and before anything else that might have something to say, since a failure in
-# `Settings()` (read inside `lifespan`) has to be readable, and it is unreadable if logging
-# is configured after it. `configure_azure_monitor()`'s FastAPI auto-instrumentation patches
-# the `fastapi.FastAPI` *class attribute*, but `from fastapi import FastAPI` binds this
-# module's own `FastAPI` name to whatever the attribute holds at the moment that statement
-# runs — called from `lifespan`, long after every import here has resolved, the patch lands
-# on an attribute this module never looks at again, and `AppRequests` never receives a point
-# regardless of where `FastAPI(...)` itself is called.
+# Must run before `from fastapi import FastAPI` below, not merely before `FastAPI(...)` is called:
+# the auto-instrumentation patches the class attribute, and the import binds this module's name.
 telemetry.configure()
 
 log = logging.getLogger(__name__)
@@ -66,37 +53,8 @@ from .stream.upstream import Upstream
 
 
 async def stream_tokens_for(client: CapitalClient) -> tuple[str, str]:
-    """The pair the streaming protocol needs, from a session known to still answer.
-
-    The stream borrows the REST session and has no way of noticing that it stopped
-    working: a websocket never receives a 401. `client.authenticated` says the tokens
-    exist, not that the provider still honours them.
-
-    This used to name a second gateway process as what kills them, which measurement on
-    10 August 2026 ruled out — sessions coexist, and two streams on one account both keep
-    receiving. What is left is enough on its own: a session is good for about ten idle
-    minutes, and a stream makes no REST calls at all. A gateway whose only traffic is the
-    subscription therefore holds tokens that expire from disuse, on a schedule nobody
-    watches.
-
-    Trusting them is a reconnect loop that never recovers. Every attempt subscribes with
-    the same dead tokens, the provider refuses, the socket drops, and three seconds later
-    it happens again — for as long as nothing else makes a REST call. Measured as a real
-    hazard before running the live suite against the account production uses.
-
-    So the session is *checked* here rather than assumed, through the one path that
-    already heals itself: `request()` answers a 401 by logging in again and retrying, so
-    by the time this returns the tokens are ones the provider has just accepted. One
-    extra request per connection, and a connection is rare — the loop that would need
-    this often is exactly the loop it exists to break.
-
-    And the answer is *read*, which it was not until 18 August 2026. The call was made and
-    the response dropped on the floor, so a login that fails for good — a rotated key, a
-    provider outage, an account locked — left the old tokens in place and let the caller
-    subscribe with them. That is the same endless reconnect loop this function exists to
-    prevent, moved one level down: `request()` retries the 401 once, gives up, and the
-    stream took the corpse anyway. Raising is what makes `Upstream` back off instead.
-    """
+    """The pair the streaming protocol needs, from a session known to still answer. A stream makes
+    no REST calls, so its tokens expire unwatched; checked here, and raised on, or it reconnects forever."""
     resp = await client.session_details()
     if not resp.is_success:
         raise GatewayError(
@@ -121,13 +79,8 @@ async def lifespan(app: FastAPI):
     adapter = CapitalAdapter(client)
 
     async def current_period(epic: str, resolution: Resolution) -> Bar | None:
-        """Where the period a room is currently building starts.
-
-        Only asked for DAY and WEEK, whose boundary follows the venue's session rather
-        than the clock, and only when nothing cheaper can answer. One candle: the
-        provider's newest is the period it is in, and its stamp is the boundary this
-        module is not allowed to compute.
-        """
+        """Where the period a room is currently building starts. Only DAY and WEEK, whose boundary
+        follows the venue rather than the clock — the provider's newest candle is that boundary."""
         candles = await adapter.get_candles(epic, resolution, 1)
         if not candles:
             return None
@@ -162,31 +115,14 @@ async def lifespan(app: FastAPI):
         await client.aclose()
 
 
-# The one route the hosting platform must reach with no credential, to decide whether
-# to restart the process, plus the schema routes — a browser fetching /docs or
-# /openapi.json carries no X-Gateway-Key, so without this exemption they 401 instead of
-# serving the page they are meant to. Harmless in production: docs_url/openapi_url are
-# None there, so FastAPI has no route registered at either path regardless of what this
-# set exempts, and the request still ends in 404. Exact matches, not prefixes — a prefix
-# match would be one typo away from exempting a real route.
+# The routes reachable with no credential: the platform's restart probe, and the schema pages a
+# browser fetches without the key. Exact matches, not prefixes — a prefix is a typo from a real route.
 _UNAUTHENTICATED_PATHS = frozenset({"/", "/docs", "/openapi.json"})
 
 
 class RequireGatewayKey(BaseHTTPMiddleware):
-    """Rejects every request but the health probe unless it carries a credential this
-    module recognises — and there are two, because its two kinds of caller cannot present
-    the same one.
-
-    A module presents the shared key and reaches everything. A browser presents a token,
-    validated by the platform in front of this app, and reaches the account and nothing
-    else (`caller_access.py` holds which paths and why). A request carrying neither is the
-    401 it has always been.
-
-    `hmac.compare_digest` rather than `==`: a plain comparison returns as soon as the
-    first byte differs, and the time that takes leaks how many leading bytes a guess got
-    right. That timing channel is exactly the kind of thing not worth having on a
-    trading endpoint's front door.
-    """
+    """Rejects every request but the health probe unless it carries a credential this module
+    recognises: a module's shared key, or a browser's platform-validated token (`caller_access.py`)."""
 
     async def dispatch(self, request: Request, call_next):
         if request.url.path in _UNAUTHENTICATED_PATHS:
@@ -195,33 +131,24 @@ class RequireGatewayKey(BaseHTTPMiddleware):
         settings = request.app.state.settings
         expected: str = settings.gateway_api_key
         provided = request.headers.get(API_KEY_HEADER, "")
-        # Compared as bytes: hmac.compare_digest raises TypeError on a `str` containing a
-        # non-ASCII character, and a header can carry one — encoding first turns a caller
-        # sending garbage into the intended 401 instead of an unhandled 500.
+        # Compared as bytes: hmac.compare_digest raises TypeError on a `str` holding a non-ASCII
+        # character, so encoding first turns a garbage header into the intended 401, not a 500.
         if provided and hmac.compare_digest(provided.encode(), expected.encode()):
             return await call_next(request)
 
         application = calling_application(request.headers.get(PRINCIPAL_HEADER))
         if application and application in settings.browser_caller_application_ids:
             if not browser_caller_may_reach(request.url.path):
-                # A refusal about permission, not about the provider: this request never
-                # left the module, and saying "capital.com" here would send the reader
-                # looking in the wrong place.
+                # A refusal about permission, not about the provider: this request never left
+                # the module, and naming capital.com would send the reader to the wrong place.
                 return JSONResponse(
                     status_code=403,
                     content={"detail": "this caller may reach the account, not this path"},
                 )
             return await call_next(request)
 
-        # **The refusal says which door it was.** Until 21 August 2026 this branch answered
-        # 401 and wrote nothing anywhere, so a browser that could not get in left no trace
-        # at all: the module's traces were empty, and the only evidence was the *absence*
-        # of a row in `AppRequests`. Three different faults produced that same silence in
-        # two days — a caller key that did not match, a platform that injected no principal,
-        # and an audience this app did not list.
-        #
-        # Nothing secret goes in the line. An application id is a public identifier; the key
-        # and the token are never read into it.
+        # The refusal says which door it was: until 21 August 2026 it answered 401 silently, and
+        # three different faults produced that same silence. An application id is public; the key is not.
         log.warning(
             "refused %s: caller key %s, principal header %s, application %s",
             request.url.path,
@@ -245,9 +172,8 @@ app = FastAPI(
     ),
     version="0.1.0",
     lifespan=lifespan,
-    # A published schema hands anyone the exact shape of /orders and /positions/{id}.
-    # Fine off production, where the caller is a developer who already has the source;
-    # not fine on the endpoint actually reachable from the internet.
+    # A published schema hands anyone the exact shape of /orders and /positions/{id} — fine for a
+    # developer who already has the source, not on the endpoint reachable from the internet.
     docs_url="/docs" if not is_production() else None,
     openapi_url="/openapi.json" if not is_production() else None,
 )
@@ -280,8 +206,6 @@ async def capabilities(a: CapitalAdapter = Depends(adapter)):
     """What this module serves, and which environment it is bound to."""
     return a.capabilities()
 
-
-# --- accounts ---
 
 
 @app.get("/accounts", tags=["accounts"], response_model=list[Account])
@@ -330,8 +254,6 @@ async def top_up(body: TopUp, a: CapitalAdapter = Depends(adapter)):
     return await a.top_up(body.amount)
 
 
-# --- market data ---
-
 
 @app.get("/asset-classes", tags=["market-data"], response_model=list[AssetClass])
 async def asset_classes() -> list[AssetClass]:
@@ -343,10 +265,8 @@ async def asset_classes() -> list[AssetClass]:
     return list(AssetClass)
 
 
-# How much of the tree an unfiltered walk visits, and how much a filtered one may. One
-# class is a fraction of the catalogue, so the same budget spent looking for it reaches
-# correspondingly further in — and a consumer picking an instrument to archive decides
-# on what it can see, which makes a list cut short worse for it than for a browser.
+# How much of the tree an unfiltered walk visits, and how much a filtered one may: one class is a
+# fraction of the catalogue, and a consumer picking what to archive decides on what it can see.
 _CATALOGUE_NODES = 300
 _CLASS_NODES = 1500
 
@@ -371,13 +291,8 @@ async def instruments(
 
 
 def _asset_class_or_refuse(value: str | None) -> AssetClass | None:
-    """Read the query parameter, or refuse in a sentence naming the alternatives.
-
-    Typed as `str` on the route rather than as the enum so this refusal is ours: the
-    framework's own would be a validation envelope about an unexpected literal, and the
-    caller's next move is to pick a different class, which is exactly what the list
-    below gives them.
-    """
+    """Read the query parameter, or refuse in a sentence naming the alternatives. Typed as `str`
+    rather than the enum so the refusal is ours: the framework's would be a validation envelope."""
     if value is None:
         return None
     try:
@@ -455,8 +370,6 @@ async def history(
     return await a.get_history(symbol, resolution, bars, still_wanted, anchor=before, floor=after)
 
 
-# --- trading ---
-
 
 @app.get("/positions", tags=["trading"], response_model=list[Position])
 async def positions(a: CapitalAdapter = Depends(adapter)):
@@ -498,23 +411,16 @@ async def cancel_working_order(order_id: str, a: CapitalAdapter = Depends(adapte
     return await a.cancel_working_order(order_id)
 
 
-# --- streaming ---
-#
-# Not described by the OpenAPI schema — OpenAPI has no vocabulary for WebSocket
-# payloads. The message shapes are pydantic models in stream/messages.py and are
-# documented in the module README.
+# The stream is not described by the OpenAPI schema — OpenAPI has no vocabulary for WebSocket
+# payloads. The message shapes are pydantic models in stream/messages.py.
 
 
 @app.websocket("/ws/stream")
 async def stream(websocket: WebSocket, the_hub: Hub = Depends(hub)) -> None:
-    """Live candles and quotes for one symbol at one resolution.
-
-    Sends `candle` (forming and settled), `quote`, `status` and `error`. Reads nothing:
-    the subscription is the query string, so there is no client protocol to get wrong.
-    """
-    # HTTP middleware never sees a WebSocket handshake, so the caller key is checked
-    # here, before accept() — accepting first and closing after would register the
-    # caller with the hub for the instant between the two.
+    """Live candles and quotes for one symbol at one resolution. Reads nothing: the subscription
+    is the query string, so there is no client protocol to get wrong."""
+    # HTTP middleware never sees a WebSocket handshake, so the key is checked here, before
+    # accept() — accepting and closing after would register the caller with the hub in between.
     expected: str = websocket.app.state.settings.gateway_api_key
     provided = websocket.headers.get(API_KEY_HEADER, "")
     # See RequireGatewayKey.dispatch above: compared as bytes so a non-ASCII header

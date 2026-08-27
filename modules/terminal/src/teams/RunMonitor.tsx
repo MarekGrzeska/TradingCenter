@@ -16,17 +16,8 @@ const NO_GRAPH: { definition: TeamDefinition | null; version: number | null; pla
   { definition: null, version: null, places: new Map() };
 
 /**
- * A run, watched on the picture of the team it is running.
- *
- * The same canvas the operator composed the team on, with each agent carrying the state
- * of its step — waiting, working, done, failed. That is the requirement and it is not a
- * presentational preference: a run takes minutes, and a picture where nothing moves does
- * not distinguish work from a hang, which is the first thing the operator wants to know
- * (`terminal-teams`, "Przebieg widać na obrazie zespołu w trakcie, nie po fakcie").
- *
- * The graph drawn is the run's **revision**, fetched by the id the run names — never the
- * team's latest. An operator who saved a new revision while this run works would
- * otherwise watch it against a team it is not running (specs/teams-runs).
+ * A run watched on the picture of the team, because a run takes minutes and a still picture does not separate
+ * work from a hang. The graph is the run's **revision**, never the team's latest (specs/teams-runs).
  */
 export function RunMonitor({
   api,
@@ -44,23 +35,15 @@ export function RunMonitor({
   const monitor = useRunMonitor(api, runId);
   const { run, steps, toolCalls, trades } = monitor;
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  // Reading what the agents wrote is a different job from watching whether they are
-  // working, and the 20rem column beside the canvas is shaped for the second one
-  // (`RunOutputsDialog`).
+  // Reading what the agents wrote is a different job from watching whether they are working, and the 20rem
+  // column beside the canvas is shaped for the second one (`RunOutputsDialog`).
   const [readingOutputs, setReadingOutputs] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
 
   const revisionId = run?.teamRevisionId ?? null;
-  // The revision and the team's arrangement, so a run is watched on the picture the
-  // operator built rather than on a second one laid out from scratch. The layout belongs
-  // to the team and this revision may be older than it — an agent it does not name falls
-  // back to `layout()` inside the canvas, which is the case the spec names, and a layout
-  // that cannot be read is not worth failing the graph over.
-  //
-  // `onFailure: "forget"`: a revision that cannot be read leaves no graph to draw the run
-  // on, and the body below says that outright. The stream is still the run's own state
-  // and keeps arriving either way.
+  // The revision and the team's arrangement, so a run is watched on the picture the operator built. A layout
+  // that cannot be read is not worth failing over; `onFailure: "forget"` because a stale graph is not this run.
   const graph = useRead({
     key: ["teams", "revision", revisionId],
     read: async (signal) => {
@@ -148,13 +131,8 @@ export function RunMonitor({
         )}
       </header>
 
-      {/* The module's own sentence, whatever stopped it — a cost ceiling names the cost
-          (specs/teams-usage), a timeout names the limit, the operator's own interruption
-          says so. Kept above the canvas because it explains everything below it, and
-          headed by which ceiling it was: an operator reading "cost" buys more budget, one
-          reading "orders" learns their team wanted to trade more than they allowed, and
-          those are two different mornings (specs/terminal-teams, "Zatrzymanie z powodu
-          granicy zleceń jest pokazane jako takie"). */}
+      {/* The module's own sentence, whatever stopped it, headed by which ceiling it was: one operator buys
+          more budget, another learns their team wanted to trade more than they allowed (specs/terminal-teams). */}
       {run?.stoppedReason && (
         <p className="border-b border-border px-2 py-1 text-xs text-warning">
           <StopHeading cause={stopCause(run.stoppedReason)} />
@@ -264,10 +242,8 @@ function AgentWork({
       <section className="flex flex-col gap-1">
         <h4 className="text-xs uppercase tracking-wide text-ink-faint">Output</h4>
         {step.output ? (
-          // The same renderer the chat uses, for the same reason: this is model prose, and
-          // as raw text it reads as `**` and `-` rather than as emphasis and a list. The
-          // full-width version of this is `RunOutputsDialog`, which is where an output
-          // longer than a paragraph belongs.
+          // The same renderer the chat uses, for the same reason: this is model prose, and as raw text it
+          // reads as `**` and `-`. The full-width version is `RunOutputsDialog`.
           <div className="text-xs text-ink">
             <MessageBody text={step.output} />
           </div>
@@ -278,11 +254,8 @@ function AgentWork({
         )}
       </section>
 
-      {/* Above the tool calls, and not folded into them: a call is what the agent asked
-          for, an order is what happened to the account, and the operator watching a team
-          trade is asking the second (specs/terminal-teams, "Złożone zlecenia widać przy
-          agencie, który je złożył"). An agent that placed nothing has no section here —
-          most of them never will. */}
+      {/* Above the tool calls, not folded into them: a call is what the agent asked for, an order is what
+          happened to the account, and the operator watching a team trade is asking the second. */}
       {trades.length > 0 && (
         <section className="flex flex-col gap-1">
           <h4 className="text-xs uppercase tracking-wide text-ink-faint">Orders</h4>

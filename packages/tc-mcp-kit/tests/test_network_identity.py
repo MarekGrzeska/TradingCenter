@@ -1,7 +1,5 @@
-"""One copy of what `market-mcp`, `teams-mcp` and `trading-mcp` each carried before
-18 August 2026. Was tested only indirectly, through each module's own HTTP app — this is
-the first place the middleware itself is tested, independent of any of the three servers.
-"""
+"""One copy of what the three MCP modules each carried, tested here as itself — independent of any of
+the three servers it used to be reached through."""
 
 from __future__ import annotations
 
@@ -21,9 +19,8 @@ async def _reached(scope: Scope, receive: Receive, send: Send) -> None:
 
 
 def _client(require: bool) -> TestClient:
-    # No `with`: `_reached` answers HTTP only and does not speak the lifespan
-    # protocol TestClient's context manager waits on — every module's real app does,
-    # through FastAPI, but that is not what this test is exercising.
+    # No `with`: `_reached` answers HTTP only and does not speak the lifespan protocol TestClient's
+    # context manager waits on.
     return TestClient(RequireCallerIdentity(_reached, require_authenticated_principal=require))
 
 

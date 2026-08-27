@@ -1,8 +1,5 @@
-"""What the teams surface's settings hold that the conversation's do not.
-
-The database-mode rules and the market-mcp mode switch are the same validators on both
-surfaces and are checked once for both, in `tests/test_config_common.py`.
-"""
+"""What the teams surface's settings hold that the conversation's do not. The database-mode rules and the
+tool-server mode switch are the same validators on both and are checked once for both."""
 
 from __future__ import annotations
 
@@ -35,8 +32,6 @@ def settings(**overrides) -> Settings:
     return Settings(**{**REQUIRED, **overrides}, _env_file=None)
 
 
-# --- provider credential: the key, and nothing to fall back to ---
-
 
 def test_a_missing_api_key_refuses_to_start() -> None:
     """Not optional, unlike the database's: OpenAI is not in Entra, so there is no
@@ -56,8 +51,6 @@ def test_a_blank_api_key_is_a_missing_one_not_a_key_named_blank() -> None:
 def test_the_api_key_is_stripped() -> None:
     assert settings(openai_api_key="  sk-abc  ").openai_api_key == "sk-abc"
 
-
-# --- model catalogue: no default_model_id here, unlike agent's ---
 
 
 def test_an_empty_catalogue_refuses_to_start() -> None:
@@ -88,19 +81,13 @@ def test_a_non_positive_rate_refuses_to_start(field: str) -> None:
     assert field in str(err.value)
 
 
-# --- the several tool servers, checked independently (specs/teams-tool-access,
-# "Moduł MAY być skonfigurowany z więcej niż jednym serwerem narzędzi") ---
-#
-# Each server's own mode switch is one rule tested once, over every server, in
-# `tests/test_config_common.py`. What is left here is the part that only exists because
-# there is more than one of them: that a refusal names the one at fault, and that all of
-# them can be configured differently at the same time.
+# Each server's own mode switch is one rule tested once over every server. What is left here is the part
+# that only exists because there is more than one: that a refusal names the one at fault.
 
 
 def test_one_valid_server_and_one_broken_server_is_refused_naming_the_broken_one() -> None:
-    """specs/teams-tool-access, "Niespójność dotyczy drugiego serwera": market-mcp is
-    fine here, and the refusal has to say it is trading-mcp's configuration that is
-    not — an operator fixing the wrong one would still be stuck."""
+    """market-mcp is fine here, and the refusal has to say it is trading-mcp's configuration that is not —
+    an operator fixing the wrong one would still be stuck."""
     with pytest.raises(ValidationError) as err:
         settings(
             market_mcp_url="http://127.0.0.1:8020",
@@ -124,9 +111,8 @@ def test_every_server_configured_independently_is_accepted() -> None:
 
 
 def test_two_servers_configured_and_the_third_unset_is_accepted() -> None:
-    """The state a deployment is in between the module going live and the operator's
-    apply: the third address is simply not there yet, and that is a configuration, not a
-    half-finished one (specs/teams-tool-access)."""
+    """The state a deployment is in between the module going live and the operator's apply: the third
+    address is simply not there yet, and that is a configuration, not a half-finished one."""
     resolved = settings(
         market_mcp_url="http://127.0.0.1:8020",
         trading_mcp_url="http://127.0.0.1:8060",

@@ -1,17 +1,8 @@
 name: deploy-app-service
 
-# The one deployment path for all seven App Service modules. Before this, seven copies of
-# it differed by the same handful of substitutions, and nothing checked that they agreed:
-# the lesson of 16 August 2026 — the control plane reports `Running` over a container that
-# exits on every restart — reached two of the seven, and the other five got it by hand in a
-# later pass. A change to the OIDC block or the buildx version was seven edits.
-#
-# What stays with the callers is what actually differs: the trigger, the path filter, the
-# probe's four parameters, and the incident comments. Those comments are the most valuable
-# content in a deploy workflow and there is nowhere in a shared file to put them.
-#
-# `deploy-terminal.yml` is not a caller — a Static Web App is deployed by a different
-# action with no image and no container to probe.
+# The one deployment path for all seven App Service modules: seven copies differed by a handful of
+# substitutions, and the 16 August lesson reached two of them. What stays with the callers is what differs —
+# the trigger, the path filter, the probe's four parameters, and the incident comments, which have no home here.
 on:
   workflow_call:
     inputs:
@@ -69,9 +60,8 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    # Not only an approval gate: the federated credential in `github-oidc.tf` has
-    # `:environment:production` in its subject, so a job without this cannot authenticate to
-    # Azure at all. The AZURE_* values themselves are repository variables.
+    # Not only an approval gate: the federated credential in `github-oidc.tf` has `:environment:production`
+    # in its subject, so a job without this cannot authenticate to Azure at all.
     environment: production
     # One deploy of a given module at a time, and never cancelled mid-flight — a cancelled
     # `webapps-deploy` leaves the site pointing at an image whose push may not have finished.
@@ -124,14 +114,8 @@ jobs:
         with:
           enable-cache: true
 
-      # Two questions, and the second used to go unasked. `scripts/deploy_probe.py` carries
-      # the reasoning and — unlike the loop that lived here — a test of the failure mode it
-      # exists for.
-      # Every input arrives through `env`, not through `${{ }}` inside the shell line, and
-      # that is load-bearing rather than stylistic: `body_contains` is `"status"` — quotes
-      # included, because a bare `status` also matches a platform sign-in page. Interpolated
-      # into a quoted argument it would collapse to `status` and silently weaken the check
-      # the step exists for.
+      # Every input arrives through `env`, not through `${{ }}` inside the shell line, and that is
+      # load-bearing: `body_contains` is `"status"` with quotes, which interpolation would collapse.
       - name: Confirm this commit's image is the one serving
         working-directory: scripts
         env:

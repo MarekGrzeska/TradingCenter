@@ -1,12 +1,5 @@
-"""Technical indicators, computed on the series this module already owns.
-
-`kernel.py` is the math and nothing else — no FastAPI, no asyncpg, no pydantic, so that
-moving it to a process of its own one day is moving a file, not rewriting one. `warmup.py`
-turns a filter's decay into how many bars of history to read before trusting its answer.
-`catalogue/` is the published list, one module per group: what an indicator is called, what
-it takes, what shape it answers in, how to draw it — and the one thing none of the three ever produce is a
-verdict. See `market-data-indicators` spec, "Katalog mierzy, a nie orzeka".
-"""
+"""Technical indicators, computed on the series this module already owns. `kernel.py` is the maths
+and nothing else; `catalogue/` is the published list — and none of it ever produces a verdict."""
 
 from __future__ import annotations
 

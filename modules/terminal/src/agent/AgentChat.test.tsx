@@ -13,11 +13,8 @@ import type { AgentApi, AgentMessage, AgentModel, AgentSession, AgentToolCall } 
 import type { AgentStreamEvent } from "./stream";
 
 /**
- * What only a rendered panel can hold: the rail, the catalogue on screen, a turn typed
- * into the box, and the styles that tell one tool outcome from another. Everything about
- * *what the store does* — streaming, a mid-stream break, an unreachable module, a blank
- * send, the conversation remembered across a reload — is asserted once, in
- * `agentChatStore.test.ts`, against the store itself.
+ * What only a rendered panel can hold: the rail, the catalogue on screen, a turn typed into the box, and
+ * the styles that tell one tool outcome from another. What the store does is asserted against the store.
  */
 
 function toolCall(overrides: Partial<AgentToolCall> = {}): AgentToolCall {
@@ -72,9 +69,8 @@ interface FakeApi extends AgentApi {
   transcripts: Map<number, AgentMessage[]>;
   nextId: number;
   seed(title: string, modelId: string, messages?: AgentMessage[]): AgentSession;
-  /** What the module itself would have persisted for a turn, exposed so a test that
-   *  overrides `sendMessage` for control over event *timing* does not also have to
-   *  reinvent what a reload afterwards shows. */
+  /** What the module itself would have persisted for a turn, exposed so a test that overrides
+   *  `sendMessage` for control over event timing does not also have to reinvent what a reload shows. */
   recordExchange(id: number, content: string, replyText: string, toolCalls?: AgentToolCall[]): void;
   /** Sessions the panel asked to stop, in order. */
   stopped: number[];
@@ -211,12 +207,8 @@ function createFakeApi(): FakeApi {
   return api;
 }
 
-/** One drag of the handle to a screen position.
- *
- *  Dispatched as `MouseEvent`s named for the pointer events, rather than through
- *  `fireEvent.pointerMove`: jsdom's own `PointerEvent` drops `clientX`, so the handler
- *  under test would read `undefined` and the gesture would prove nothing. React reads the
- *  coordinate off the native event, which a `MouseEvent` carries. */
+/** One drag of the handle to a screen position. Dispatched as `MouseEvent`s named for the pointer events:
+ *  jsdom's own `PointerEvent` drops `clientX`, so the handler would read `undefined`. */
 function drag(handle: HTMLElement, clientX: number): void {
   fireEvent(handle, new MouseEvent("pointerdown", { bubbles: true, clientX: 0 }));
   fireEvent(handle, new MouseEvent("pointermove", { bubbles: true, clientX }));
@@ -401,9 +393,8 @@ describe("AgentChat", () => {
 
     await screen.findByText("get_candles");
     expect(screen.getByText("ok")).toHaveClass("text-ink-muted");
-    // A refusal is the archive answering "not like that"; an unreachable server means
-    // nothing was asked and nothing is known. Reading the second as the first is how
-    // "the archive has no data" gets said about data the archive has.
+    // A refusal is the archive answering "not like that"; an unreachable server means nothing was asked.
+    // Reading the second as the first is how "the archive has no data" gets said about data it has.
     expect(screen.getByText("refused")).toHaveClass("text-warning");
     expect(screen.getByText("no answer")).toHaveClass("text-critical");
     expect(screen.queryByText(/incomplete/i)).not.toBeInTheDocument();

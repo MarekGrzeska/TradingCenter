@@ -1,8 +1,5 @@
-"""Every statement this module runs against its own database.
-
-Plain asyncpg, no ORM: the tables are handwritten SQL in the migrations and the queries are
-handwritten here, so a read is the statement it will actually run.
-"""
+"""Every statement this module runs against its own database. Plain asyncpg, no ORM: the tables are
+handwritten SQL and so are the queries, so a read is the statement it will actually run."""
 
 from __future__ import annotations
 
@@ -11,8 +8,6 @@ from datetime import datetime
 from tc_runtime.db import Conn, fetch_one
 
 from .models import CollectedRange, Event, Group, Market, Outcome, Sample, Surface
-
-# --- groups ---------------------------------------------------------------------------
 
 
 async def create_group(conn: Conn, name: str) -> Group:
@@ -60,22 +55,12 @@ async def assign_group(conn: Conn, event_id: int, group_id: int | None) -> bool:
     return result.endswith(" 1")
 
 
-# --- events, markets, outcomes ----------------------------------------------------------
-
 
 async def upsert_event(
     conn: Conn, event: Event, *, group_id: int | None = None
 ) -> int:
-    """The event with its whole structure, in one transaction.
-
-    All of it or none of it: an event row without its markets is an observation the sampler
-    would run against nothing, and a market without its outcomes has no token to ask about.
-
-    Markets and outcomes are upserted rather than replaced. Replacing them would take every
-    outcome's id with it and `price_samples` cascades from those ids — a refresh would then
-    delete the history it was refreshing. The provider adding a market to a running event is
-    a measured case, so this path is walked often, not only at first track.
-    """
+    """The event with its whole structure, in one transaction — all of it or none. Markets and outcomes
+    are upserted rather than replaced: replacing them would cascade away the history being refreshed."""
     async with conn.transaction():
         row = await fetch_one(
             conn,
@@ -240,18 +225,8 @@ async def count_tracked(conn: Conn) -> int:
 
 
 async def remove_event(conn: Conn, provider_event_id: str) -> bool:
-    """The observation and everything collected for it. `False` when there was no such one.
-
-    **One statement, and the atomicity is the schema's.** `markets`, `outcomes`,
-    `price_samples`, `collected_ranges` and `sampling_state` all cascade from this row, so
-    there is no order to get wrong and no half-done state to leave behind. Doing it as a
-    sequence of deletes in Python would be the same act made of four, and the one that can
-    fail between two of them — leaving history without its observation, or the reverse
-    (`openspec/specs/polymarket-data-tracking`, "Usunięcie obserwacji zabiera wszystko").
-
-    The one act in this module that cannot be undone, and the only way an event leaves the
-    list. No tool reaches it.
-    """
+    """The observation and everything collected for it. One statement, and the atomicity is the schema's:
+    five tables cascade from this row, so there is no order to get wrong and no half-done state."""
     result = await conn.execute(
         "DELETE FROM tracked_events WHERE provider_event_id = $1", provider_event_id
     )
@@ -288,17 +263,10 @@ async def sampleable_outcomes(conn: Conn) -> list[tuple[int, str, int]]:
     return [(row["id"], row["token_id"], row["event_id"]) for row in rows]
 
 
-# --- samples ---------------------------------------------------------------------------
-
 
 async def record_samples(conn: Conn, samples: list[Sample]) -> int:
-    """Upsert on `(outcome_id, observed_at)`.
-
-    The sampler and a backfill meet in the same minute regularly, and two rows for one
-    moment would leave a series with two prices at one instant. The later write wins on the
-    columns it carries and leaves the others alone, so a backfill carrying only a midpoint
-    does not erase a last trade the sampler wrote for the same moment.
-    """
+    """Upsert on `(outcome_id, observed_at)`: the sampler and a backfill meet in the same minute
+    regularly. The later write wins only on the columns it carries, so a backfill erases no last trade."""
     if not samples:
         return 0
     await conn.executemany(
@@ -358,11 +326,8 @@ async def history(
 
 
 async def latest_samples(conn: Conn) -> dict[int, Sample]:
-    """The newest sample of every tracked outcome, in one query.
-
-    The snapshot the terminal opens on. A request per event would be a request per row of
-    the screen, and one measured event holds 128 markets.
-    """
+    """The newest sample of every tracked outcome, in one query — the snapshot the terminal opens on.
+    A request per event would be a request per row of the screen."""
     rows = await conn.fetch(
         """
         SELECT DISTINCT ON (s.outcome_id)
@@ -387,13 +352,8 @@ async def latest_samples(conn: Conn) -> dict[int, Sample]:
 
 
 async def sample_at_or_before(conn: Conn, outcome_id: int, moment: datetime) -> Sample | None:
-    """The base point a change window is measured from.
-
-    At or *before*, and the caller decides whether what comes back is close enough — the
-    provider's own spacing wobbles between 57 and 63 seconds and widens on its own for older
-    ranges, so a window that demanded an exact instant would answer "no data" on a series
-    that plainly has some.
-    """
+    """The base point a change window is measured from. At or *before*, and the caller decides whether
+    it is close enough: the provider's spacing wobbles, so an exact instant would answer "no data"."""
     row = await conn.fetchrow(
         """
         SELECT outcome_id, observed_at, midpoint, last_trade, quoted_at, source
@@ -417,18 +377,12 @@ async def sample_at_or_before(conn: Conn, outcome_id: int, moment: datetime) -> 
     )
 
 
-# --- what has actually been collected ----------------------------------------------------
-
 
 async def record_collected(
     conn: Conn, outcome_id: int, starts_at: datetime, ends_at: datetime
 ) -> None:
-    """Adds a window and merges it with everything it touches, in one statement.
-
-    Merging matters more than tidiness: two adjacent ranges left separate answer "not
-    collected" for the instant between them, which is a gap this module would then keep
-    trying to fill for ever.
-    """
+    """Adds a window and merges it with everything it touches, in one statement. Two adjacent ranges left
+    separate answer "not collected" for the instant between them, which is a gap nothing ever fills."""
     await conn.execute(
         """
         WITH touching AS (
@@ -475,14 +429,8 @@ async def is_collected(conn: Conn, outcome_id: int, moment: datetime) -> bool:
 
 
 async def note_oldest_available(conn: Conn, outcome_id: int, moment: datetime) -> None:
-    """The "the provider has nothing older" boundary, written at the oldest point a read
-    actually returned.
-
-    Never at the edge of the window asked for: those two are separated by everything the
-    provider did not have, and writing the second announces as checked something nobody
-    checked. Only moved *earlier* — a later read finding less is the provider being
-    unhelpful, not history shrinking.
-    """
+    """The "provider has nothing older" boundary, written at the oldest point a read actually returned —
+    never the edge asked for. Only moved earlier: a later read finding less is the provider being unhelpful."""
     await conn.execute(
         """
         UPDATE outcomes
@@ -495,26 +443,17 @@ async def note_oldest_available(conn: Conn, outcome_id: int, moment: datetime) -
 
 
 async def clear_oldest_available(conn: Conn, outcome_id: int) -> None:
-    """Lifts the boundary, for the one act that means "check that again": somebody asking
-    for data older than it. The provider's history deepens over time and the record may have
-    come from an answer that did not mean what was read into it."""
+    """Lifts the boundary, for the one act that means "check that again": somebody asking for data older
+    than it. The provider's history deepens over time."""
     await conn.execute(
         "UPDATE outcomes SET oldest_available_at = NULL WHERE id = $1", outcome_id
     )
 
 
-# --- deletion, the one act nobody can undo ------------------------------------------------
-
 
 async def delete_history(conn: Conn, event_id: int) -> tuple[int, int]:
-    """Samples and collected ranges together, or neither. Returns `(samples, ranges)`.
-
-    A range surviving its samples is worse than either alone: it is binding on planning, so
-    the window would read as already collected and backfill would never return to it.
-
-    The event, its markets and its outcomes stay. What is deleted is the collected data, not
-    the observation — ending an observation is a different act again.
-    """
+    """Samples and collected ranges together, or neither. A range surviving its samples is binding on
+    planning, so the window would read as collected and backfill would never return to it."""
     async with conn.transaction():
         samples = await conn.fetchval(
             """
@@ -556,16 +495,10 @@ async def delete_history(conn: Conn, event_id: int) -> tuple[int, int]:
     return int(samples or 0), int(ranges or 0)
 
 
-# --- what collection is currently doing ---------------------------------------------------
-
 
 async def sampleable_events(conn: Conn) -> list[tuple[int, str]]:
-    """`(event_id, provider_event_id)` for every event still worth a request: tracked, and
-    holding at least one market the provider has not answered.
-
-    The unit is the event because the request is: one read of the metadata surface prices
-    every outcome of every market it holds.
-    """
+    """`(event_id, provider_event_id)` for every event still worth a request. The unit is the event
+    because the request is: one read prices every outcome of every market it holds."""
     rows = await conn.fetch(
         """
         SELECT DISTINCT e.id, e.provider_event_id
@@ -607,9 +540,8 @@ async def note_sampled(conn: Conn, event_id: int) -> None:
 
 
 async def note_sampling_failed(conn: Conn, event_id: int, reason: str) -> None:
-    """Counted rather than merely logged. Repeated failure is what the list of observations
-    has to be able to say out loud — silence in the data must not read as silence in the
-    market."""
+    """Counted rather than merely logged. Repeated failure is what the list of observations has to be
+    able to say out loud — silence in the data must not read as silence in the market."""
     await conn.execute(
         """
         INSERT INTO sampling_state (

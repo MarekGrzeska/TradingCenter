@@ -1,12 +1,5 @@
-"""Working a job's chunks, under the same fill budget as everything else this module
-fetches with.
-
-Nothing here decides what a chunk covers — that is `plan.py`. This turns one claimed
-chunk into a gateway request and a settled outcome, and loops doing that for as long as
-there is work and the process is alive. No runner survives past that: a chunk still
-`pending` or `running` when the process stops is picked up by
-`store.interrupt_orphaned_chunks` at the next start, not resumed here.
-"""
+"""Working a job's chunks, under the same fill budget as everything else. No runner survives the
+process: a chunk still open when it stops is picked up by `store.interrupt_orphaned_chunks`."""
 
 from __future__ import annotations
 
@@ -29,17 +22,12 @@ from .store import (
 
 log = logging.getLogger(__name__)
 
-# How long an idle worker waits before checking again. `JobRunner.notify()` wakes it
-# immediately after a job is created; this is only the fallback for a missed wake-up,
-# so it can afford to be unhurried.
+# How long an idle worker waits before checking again. `notify()` wakes it immediately after a job
+# is created, so this is only the fallback for a missed wake-up.
 IDLE_POLL_SECONDS = 5.0
 
-# How long a worker waits after failing to take work, and how far that wait grows while
-# it keeps failing. The cause is almost always the database, which comes back in minutes
-# rather than milliseconds: retrying every five seconds for an hour buys nothing but 720
-# identical log lines and 720 connection attempts. The ceiling keeps the return to work
-# inside a minute of the cause clearing, which is nothing against a job measured in tens
-# of minutes.
+# How long a worker waits after failing to take work, and how far that grows. The cause is almost
+# always the database, which comes back in minutes: retrying every five seconds buys 720 log lines.
 FAILURE_BACKOFF_SECONDS = 5.0
 MAX_FAILURE_BACKOFF_SECONDS = 60.0
 
@@ -47,25 +35,8 @@ MAX_FAILURE_BACKOFF_SECONDS = 60.0
 async def execute_chunk(
     pool, history: GatewayHistory, chunk: Chunk, limiter: asyncio.Semaphore
 ) -> None:
-    """Run one claimed chunk to a settled state.
-
-    One gateway request, however deep the window: `before=chunk.chunk_end` anchors it,
-    and `bars` is sized to the window exactly, so the gateway's own internal paging is
-    what reaches back through it — this module does not page a second time
-    (`capital-market-data` spec, "Historia jest stronicowana poza limit providera").
-
-    Both edges are named, and the older one is the load-bearing half. `bars` counts
-    *candles*, while `periods_between` counts *calendar periods* — for an instrument
-    shut part of the week the two differ by half again, and a chunk asking for a
-    January-to-August window's worth of bars was quietly handed candles reaching back to
-    the previous autumn. `after=chunk.chunk_start` says the bound in time, which a count
-    cannot; the filter below is the same promise kept locally, so this module never
-    depends on the gateway having honoured it.
-
-    A refusal or an unreachable gateway settles the chunk as `failed`, named, and stops
-    there — it does not raise, because one chunk's failure must not take a worker down
-    with it (`market-data-jobs` spec, "Nieudany kawałek nie przerywa zlecenia").
-    """
+    """Run one claimed chunk to a settled state — one gateway request, however deep. Both edges are
+    named: `bars` counts candles and cannot bound a read in time, which `after` does."""
     bars = periods_between(chunk.resolution, chunk.chunk_start, chunk.chunk_end)
     try:
         async with limiter:
@@ -85,11 +56,8 @@ async def execute_chunk(
         return
 
     async with pool.acquire() as conn:
-        # The pair may have been deleted while this chunk's request was in flight — the
-        # gateway does not know that, so its answer still arrives, and writing it would
-        # resurrect data an operator just removed (`market-data-tracking` spec, "Kawałek
-        # nigdy nie zapisuje dla pary, której nikt nie zbiera"). Not narrower than
-        # "tracked": an untracked-but-not-deleted pair must not gain new candles either.
+        # The pair may have been deleted while this chunk's request was in flight, and writing the
+        # answer would resurrect data an operator just removed. Not narrower than "tracked".
         if not await is_tracked(conn, chunk.symbol, chunk.resolution):
             await finish_chunk_skipped(conn, chunk.id, requests=page.requests)
             log.info(
@@ -100,31 +68,23 @@ async def execute_chunk(
             )
             return
 
-        # Nothing older than this chunk's own window, whatever came back. The gateway
-        # is asked to bound the read and does, but a promise about what the archive
-        # stores is not one to delegate. And nothing still forming: the newest chunk of a
-        # job ends at the present, so its read brings back the period in progress, whose
-        # values are not the period's result yet.
+        # Nothing older than this chunk's own window, whatever came back: a promise about what the
+        # archive stores is not one to delegate. And nothing still forming.
         within = [
             c
             for c in page.candles
             if c.period_start >= chunk.chunk_start and not c.forming
         ]
-        # The boundary is where the data actually ran out rather than where this chunk
-        # asked. Those two are a whole window apart, and the wrong one announces as
-        # checked a stretch nobody looked at — which is then kept forever. A chunk that
-        # came back with nothing cannot place a boundary at all, so it records none:
-        # what it has is an absence, not an edge.
+        # The boundary is where the data ran out rather than where this chunk asked — a whole window
+        # apart. A chunk that came back with nothing has an absence, not an edge.
         boundary = page.history_ended and bool(within)
         committed = await commit_candles(
             conn,
             within,
             symbol=chunk.symbol,
             resolution=chunk.resolution,
-            # The requested window is what was verified, not only the span the candles
-            # happen to occupy — an exhaustive read of an empty stretch is still a
-            # stretch looked at, and using the requested edges keeps neighbouring
-            # chunks' coverage touching with no seam between them.
+            # The requested window is what was verified, not only the span the candles occupy: an
+            # exhaustive read of an empty stretch is still a stretch looked at, and edges must touch.
             covered_from=chunk.chunk_start,
             covered_to=chunk.chunk_end,
             history_ended=boundary,
@@ -137,14 +97,8 @@ async def execute_chunk(
 
         skipped = 0
         if covered.history_ends_at is not None:
-            # Every chunk still queued behind this one — by construction older, by
-            # construction past this boundary, since chunks run newest-first
-            # (`plan.py`) — is settled here in bulk rather than each spending its own
-            # request to rediscover the same edge.
-            #
-            # Against the boundary itself, not the merged range's start: the merged start
-            # is wherever this pair's oldest coverage begins, which is below the boundary
-            # and would leave the chunks in between to rediscover it one request each.
+            # Every chunk still queued behind this one is older by construction and past this
+            # boundary, so it is settled in bulk. Against the boundary, not the merged range's start.
             skipped = await skip_chunks_beyond_history(
                 conn, chunk.job_id, chunk.symbol, chunk.resolution, covered.history_ends_at
             )
@@ -162,19 +116,8 @@ async def execute_chunk(
 
 
 def _report_worker_death(worker: asyncio.Task) -> None:
-    """Say so when a worker stops, because otherwise nothing does.
-
-    A task that raises and is still referenced never reports it: Python logs
-    "Task exception was never retrieved" when the task is *garbage collected*, and
-    `JobRunner._workers` is exactly the reference that stops that from happening. The
-    loop below now catches everything it can reach, so a worker ending on its own should
-    not happen at all — which is precisely why this stays. An end nobody planned for is
-    the end of every job this module would ever run, and it must not be the quietest
-    thing that ever happened here.
-
-    Seen in production: eight chunks pending across a restart and a retry, no log line,
-    no exception, no way in from outside.
-    """
+    """Say so when a worker stops, because otherwise nothing does: a task that raises and is still
+    referenced never reports it. Seen in production — eight chunks pending, no log line at all."""
     if worker.cancelled():
         return  # `stop()` — the normal way this ends.
     error = worker.exception()
@@ -185,13 +128,8 @@ def _report_worker_death(worker: asyncio.Task) -> None:
 
 
 class JobRunner:
-    """Works every job's pending chunks, worker count bounded by `concurrency`, all of
-    them drawing from one shared fill budget with the rest of this module.
-
-    A worker that finds nothing pending waits — `notify()` (called right after a job is
-    created) wakes every idle worker immediately, and a short poll is only the fallback
-    for a wake missed between a worker checking and going to sleep.
-    """
+    """Works every job's pending chunks, worker count bounded by `concurrency`, all drawing from one
+    shared fill budget. A worker that finds nothing waits until `notify()` or a short poll."""
 
     def __init__(
         self,
@@ -230,16 +168,8 @@ class JobRunner:
         self._workers = []
 
     async def _worker_loop(self, name: str) -> None:
-        """Take work, do it, repeat — for as long as the process lives.
-
-        Two failures are possible here and they are not the same failure. A chunk that
-        blows up is one entry in a job's history and one thing to retry; taking work is
-        what every future chunk depends on, so a failure *there* ends collection for the
-        whole module with nothing written anywhere, because there is no chunk in hand to
-        write it against. Both are handled, separately, and neither ends this loop —
-        only `stop()` does (`market-data-jobs` spec, "Mechanizm wykonujący kawałki
-        przeżywa własną awarię").
-        """
+        """Take work, do it, repeat. Two different failures: a chunk that blows up is one thing to
+        retry, while a failure taking work ends collection with nothing written anywhere."""
         backoff = FAILURE_BACKOFF_SECONDS
         while True:
             try:
@@ -257,10 +187,8 @@ class JobRunner:
             except asyncio.CancelledError:
                 raise
             except Exception:
-                # Nothing was claimed, so there is nothing to settle as failed — the
-                # only thing to do is say what happened and come back for it. Waiting
-                # longer each time keeps an outage that lasts an hour from filling the
-                # log with the same line 720 times.
+                # Nothing was claimed, so there is nothing to settle as failed. Waiting longer each
+                # time keeps an hour-long outage from filling the log with one line 720 times.
                 log.exception(
                     "job runner worker %s could not take work; trying again in %ss", name, backoff
                 )
@@ -281,23 +209,13 @@ class JobRunner:
                     chunk.symbol,
                     chunk.resolution.value,
                 )
-                # And it must cost the chunk *visibly*. `execute_chunk` names its own
-                # gateway failures, but anything past that — a write that hit the
-                # database wrong, a bug in this module — would otherwise leave the chunk
-                # `running` with nobody running it: no worker re-claims a running chunk,
-                # `retry_job` will not touch one, and the job reads as forever in
-                # progress until the next restart sweeps it. Settling it as `failed`
-                # here is what makes it retryable instead.
+                # And it must cost the chunk visibly: anything past `execute_chunk`'s own handling
+                # would leave it `running` with nobody running it, and no worker re-claims one.
                 await self._fail_orphan(chunk, err)
 
     async def _fail_orphan(self, chunk: Chunk, err: Exception) -> None:
-        """Settle a chunk whose execution raised past `execute_chunk`'s own handling.
-
-        Best effort by nature: the likeliest cause is the database itself, and this
-        needs the database to record anything. A failure here leaves the chunk for
-        `interrupt_orphaned_chunks` at the next start, which is where it would have been
-        anyway — never a reason to take the worker down with it.
-        """
+        """Settle a chunk whose execution raised past `execute_chunk`. Best effort by nature: the
+        likeliest cause is the database, and this needs the database — a failure leaves it for startup."""
         try:
             async with self._pool.acquire() as conn:
                 await finish_chunk_failed(

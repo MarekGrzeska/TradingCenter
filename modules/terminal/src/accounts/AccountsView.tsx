@@ -8,24 +8,12 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 
 /**
- * The demo accounts, and the money on them.
- *
- * What the operator had before this tab was a sentence from the agent, on request. What is
- * here is the standing background of trading: which accounts exist, what is on them, what
- * is open on the one being traded, and a way to add or take demo money without leaving the
- * terminal (`terminal-accounts` spec).
- *
- * **Positions belong to the active account only**, and that is the provider's shape rather
- * than a shortcut: capital.com ties open positions to the session, and a session has one
- * account. Reading another account's positions would mean switching to it — which ends the
- * quote stream the archive collects candles through, and changes where the next order
- * goes. The screen says so before it does it, and never does it to satisfy a read.
+ * The demo accounts and the money on them. Positions belong to the active account only — reading another's would mean
+ * switching to it, which ends the quote stream and moves where the next order goes; never done to satisfy a read.
  */
 
-/** How often the screen re-asks. The provider counts ten requests a second **per account**
- *  against everything this system does — the archive filling candles, the agent's tools,
- *  this screen — so a tab refreshing twice a second would be taking that budget from the
- *  work. Five seconds is faster than an operator can act on and cheap enough to ignore. */
+/** How often the screen re-asks. The provider counts ten requests a second per account against everything
+ *  this system does, and five seconds is faster than an operator can act on. */
 const POLL_MS = 5000;
 
 export function AccountsView({ api }: { api?: AccountsApi } = {}) {
@@ -76,9 +64,8 @@ export function AccountsView({ api }: { api?: AccountsApi } = {}) {
         </div>
       </header>
 
-      {/* Said once, above both tables: a failed read leaves the rows it already had on
-          screen (`useRead`'s own "keep"), and without this line those rows would read as
-          current (`terminal-accounts` spec, "Odczyt zawiódł"). */}
+      {/* Said once, above both tables: a failed read leaves the rows it already had on screen, and
+          without this line those rows would read as current. */}
       {accounts.error !== null && (
         <UnreachableNotice onRetry={accounts.reload}>
           The accounts could not be read — {accounts.error}. What is shown is the last
@@ -222,9 +209,8 @@ export function AccountsView({ api }: { api?: AccountsApi } = {}) {
           }}
           onClose={() => setPendingSwitch(null)}
         >
-          {/* Said before, not after: the cost of this lands in a part of the system this
-              screen does not show (`terminal-accounts` spec, "Przełączenie konta mówi, co
-              zrywa"). */}
+          {/* Said before, not after: the cost of this lands in a part of the system this screen does
+              not show. */}
           <p className="text-sm text-ink-secondary">
             Every order placed after this acts on <strong>{pendingSwitch.name}</strong>.
           </p>

@@ -6,17 +6,8 @@ import { formatInstant } from "../ui/formatTime";
 import type { TeamsApi, TeamSummary } from "./teamsApi";
 
 /**
- * The list an operator picks a team from — name, description and when it last changed,
- * which is exactly what the module's catalogue publishes and all of what this needs
- * (`terminal-teams`, "Katalog pokazuje, co jest do uruchomienia"; specs/teams-catalogue,
- * "lista powstaje bez pobierania definicji"). No definition is read here, so a catalogue
- * of twenty teams is one request.
- *
- * A run starts from here and a team is opened from here (`terminal-teams`, "z każdej
- * pozycji może otworzyć zespół albo uruchomić przebieg") — opening by clicking the row,
- * since that is the thing done to a row most often and it used to be a button among five. The
- * runs themselves are read in `TeamRunsView`, never here: a catalogue that listed every
- * team's runs would be one request per row.
+ * Name, description and when it last changed — what the module's catalogue publishes, so twenty teams are one
+ * request and no definition is read. The runs are read in `TeamRunsView`: listing them here is a request a row.
  */
 export function TeamCatalogue({
   teams,
@@ -100,16 +91,12 @@ export function TeamCatalogue({
         {teams.map((team) => (
           <li
             key={team.id}
-            // The way in, replacing the `Open` button that used to sit among four others —
-            // opening a team is the one thing done to a row far more often than everything
-            // else on it, and it had the same weight as `Retire`. `Enter` does the same for
-            // a keyboard, which no pointer gesture is reachable from.
+            // The way in, replacing the `Open` button that had the same weight as `Retire` — opening a team
+            // is done far more often than anything else on the row. `Enter` does the same for a keyboard.
             tabIndex={0}
             title="Click to open"
-            // A single click, and the guard is what makes that safe: the row still carries
-            // four buttons, and a click that started on one of them is that button's, not
-            // the row's. `closest` rather than a direct target check because a button's own
-            // text node is what the click actually lands on.
+            // A single click, and the guard makes that safe: the row carries four buttons, and a click that
+            // started on one is that button's. `closest` because a button's own text node is what is hit.
             onClick={(event) => {
               if (event.target instanceof Element && event.target.closest("button")) return;
               onOpen(team.id);
@@ -119,10 +106,8 @@ export function TeamCatalogue({
               if (event.target !== event.currentTarget) return;
               onOpen(team.id);
             }}
-            // `group` so the row's own hover can light up the hint beside the name. The
-            // border and the ground both move, because a cursor alone is a poor signal on a
-            // row that also carries four buttons — the whole row has to read as the target,
-            // not just the pointer over it.
+            // `group` so the row's hover lights the hint beside the name. Border and ground both move: on a
+            // row that also carries four buttons, the whole row has to read as the target.
             className="group cursor-pointer rounded border border-border bg-panel px-3 py-2 transition-colors hover:border-primary-line hover:bg-panel-strong focus-visible:border-primary-line focus-visible:outline-none"
           >
             <div className="flex items-center justify-between gap-3">

@@ -1,16 +1,6 @@
 /**
- * The agent chat's own state, in a store rather than a context for the same reason
- * `gridStore` is one: the panel is mounted once in `Shell`, beside the router outlet and
- * not inside it, so nothing in a tab has to provide anything for it to open — and it must
- * survive a tab switch untouched (`terminal-agent-chat` spec, "Panel należy do terminala,
- * nie do zakładki").
- *
- * The transcript and the session list are the module's, not this store's — every read
- * that matters (opening a conversation, finishing a turn) reloads from `agentApi` rather
- * than trusting what accumulated locally, so the browser is never the only place a
- * message lives (`terminal-agent-chat` spec, "przeglądarka MUST NOT być jego jedynym
- * źródłem"). Only the panel's own furniture — whether it is expanded, and which
- * conversation was open — is this store's to keep.
+ * A store rather than a context, for the reason `gridStore` is one: the panel is mounted once in `Shell` and must
+ * survive a tab switch. The transcript and the session list are the module's — only the furniture is kept here.
  */
 
 import { safeLocalStorage } from "../data/storage";
@@ -210,9 +200,8 @@ function loadWidth(storage: Storage | null, windowWidth: number): number {
   if (!storage) return DEFAULT_PANEL_WIDTH;
   try {
     const raw = Number(storage.getItem(WIDTH_KEY));
-    // A key that was never written, or was written by hand into something that is not a
-    // number, is the same case as no storage at all — the default, not a panel one pixel
-    // wide (`loadActiveSessionId` treats a spoiled id the same way).
+    // A key that was never written, or written by hand into something that is not a number, is the same
+    // case as no storage at all — the default, not a panel one pixel wide.
     if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_PANEL_WIDTH;
     return clampPanelWidth(raw, windowWidth);
   } catch {
@@ -256,14 +245,11 @@ export function createAgentChatStore(
   // What the terminal is drawing as the question is asked. Read at send time, not at
   // construction: the operator may have changed slots since the panel opened.
   chartSnapshot: () => AgentChartSnapshot | null = activeChartSnapshot,
-  // The objects the agent leaves on an instrument. Read the same way and at the same
-  // moments as its chart commands, and said in the same sentence — one channel, not two
-  // (`terminal-agent-chat` spec, "tą samą drogą i w tej samej chwili").
+  // The objects the agent leaves on an instrument. Read the same way and at the same moments as its chart
+  // commands, and said in the same sentence — one channel, not two.
   drawings: DrawingsStore = drawingsStore,
-  // Everything else a turn may have changed, in a module this store knows nothing about.
-  // Since `teams-mcp` a chat can create a team, revise it and run it, and none of that
-  // passes through `agent` — so the tab showing it is told a turn ended and re-reads what
-  // it owns (`agentActivity.ts`).
+  // Everything else a turn may have changed, in a module this store knows nothing about: a chat can create
+  // and run a team without any of it passing through `agent`.
   activity: AgentActivityStore = agentActivity,
 ): AgentChatStore {
   let state: AgentChatState = {
@@ -283,15 +269,13 @@ export function createAgentChatStore(
   };
   let nextLocalId = 1;
   let transcriptSeq = 0;
-  // Not "has the panel been opened before" — that was the old gate, and a load which
-  // failed under it never got a second chance. These say only "a request is already out",
-  // so `ensureLoaded` can be called as often as anything likes without doubling it.
+  // Not "has the panel been opened before" — that was the old gate, and a load which failed under it never
+  // got a second chance. These say only "a request is already out".
   let modelsInFlight = false;
   let sessionsInFlight = false;
   let chartSyncInFlight = false;
-  // Which conversation's transcript is actually on screen. `transcriptStatus` cannot say:
-  // it starts "ready", because an empty panel is not a panel that is loading, so it reads
-  // the same before the first read as after a successful one.
+  // Which conversation's transcript is actually on screen. `transcriptStatus` cannot say: it starts
+  // "ready", because an empty panel is not one that is loading.
   let transcriptFor: number | null = null;
   const listeners = new Set<() => void>();
 
@@ -335,9 +319,8 @@ export function createAgentChatStore(
         ...state,
         models,
         modelsStatus: "ready",
-        // The cheapest catalogue entry is the module's own default too — see
-        // `.env.example`'s `DEFAULT_MODEL_ID`. Only filled in when nothing is picked
-        // yet: opening an existing session sets this from that session's own model.
+        // The cheapest catalogue entry is the module's own default too. Only filled in when nothing is
+        // picked yet: opening an existing session sets this from that session's own model.
         selectedModelId: state.selectedModelId ?? models[0]?.id ?? null,
       });
     } catch {
@@ -360,11 +343,8 @@ export function createAgentChatStore(
     }
   }
 
-  /** Read alongside the transcript, and never allowed to fail it: a conversation whose
-   *  unclaimed calls could not be read is still a conversation worth showing. An empty
-   *  list is both "there are none" and "we could not tell", which is acceptable only
-   *  because the ordinary answer is empty — the row itself lives in the module either
-   *  way, and the next reload asks again. */
+  /** Read alongside the transcript, and never allowed to fail it. An empty list is both "there are none"
+   *  and "we could not tell", which is acceptable only because the ordinary answer is empty. */
   async function readUnclaimed(id: number): Promise<AgentToolCall[]> {
     try {
       return await api.getUnclaimedToolCalls(id, new AbortController().signal);
@@ -396,26 +376,19 @@ export function createAgentChatStore(
     }
   }
 
-  /** Called once a turn has ended, one way or another, to bring the transcript back to
-   *  what the module actually holds. `errorMessage` set means the stream broke or the
-   *  connection dropped mid-turn; the reload still happens first; only when the reload
-   *  itself fails does the accumulated text get shown as a local, unconfirmed bubble
-   *  (`terminal-agent-chat` spec, "to, co dotarło, zostaje na ekranie"). */
+  /** Called once a turn has ended, to bring the transcript back to what the module holds. Only when the
+   *  reload itself fails does the accumulated text show as a local, unconfirmed bubble. */
   async function finishTurn(
     sessionId: number,
     accumulated: string,
     calls: AgentToolCall[],
     errorMessage: string | null,
   ): Promise<void> {
-    // A turn is the one moment the chart is most likely to have been set, so the read
-    // happens here rather than on a timer. Not awaited by the transcript reload below:
-    // the two are independent, and neither should hold the other up.
+    // A turn is the one moment the chart is most likely to have been set, so the read happens here rather
+    // than on a timer. Not awaited: the two are independent.
     void syncChartCommands();
-    // And the same moment for everything the agent may have written *outside* this
-    // module, which this store cannot read and must not try to: it says a turn ended and
-    // whoever is showing such state re-reads it (`agentActivity.ts`). Announced before
-    // the transcript reload below and not awaited, for the same reason — a tab refreshing
-    // itself is nobody's turn to wait for.
+    // And the same moment for everything the agent may have written *outside* this module, which this
+    // store cannot read and must not try to. Not awaited: a tab refreshing itself is nobody's turn to wait for.
     activity.turnFinished();
 
     const seq = ++transcriptSeq;
@@ -441,9 +414,8 @@ export function createAgentChatStore(
           text: accumulated,
           incomplete: true,
           stopped: false,
-          // The module could not be asked what it holds, so the calls that arrived on the
-          // stream are the only record of them there is on screen — dropping them here
-          // would take away the one thing that explains a reply that broke off.
+          // The module could not be asked what it holds, so the calls that arrived on the stream are the
+          // only record on screen — dropping them would take away what explains a reply that broke off.
           toolCalls: calls,
         },
       ];
@@ -457,9 +429,8 @@ export function createAgentChatStore(
     });
     void loadSessions();
     if (errorMessage) {
-      // Said once, at the moment of the break — the bubble's own `incomplete` flag is
-      // what stays on screen after this (`terminal-agent-chat` spec, "MUST być
-      // oznaczona jako niepełna"), so nothing here needs to persist in state.
+      // Said once, at the moment of the break — the bubble's own `incomplete` flag is what stays on screen
+      // after this, so nothing here needs to persist in state.
       console.warn(`[agent] turn ended early: ${errorMessage}`);
     }
   }
@@ -476,22 +447,15 @@ export function createAgentChatStore(
     if (expanded) ensureLoaded();
   }
 
-  /** Whatever the agent set while nobody was reading — on the way in, and after every
-   *  turn. Never awaited by anything the operator is waiting for: a chart that could not
-   *  be synced is not a reason to hold up a reply (`terminal-agent-chat` spec, "Nieudany
-   *  odczyt poleceń"). Guarded against overlap the same way `loadModels`/`loadSessions`
-   *  are — `ensureLoaded` can run from the panel's mount and from `setExpanded` in the
-   *  same tick, and applying one standing command twice would rebuild every indicator
-   *  series on the chart twice for nothing. */
+  /** Whatever the agent set while nobody was reading — on the way in, and after every turn. Never awaited
+   *  by anything the operator waits for, and guarded against overlap: applying one command twice would
+   *  rebuild every indicator series for nothing. */
   async function syncChartCommands(): Promise<void> {
     if (chartSyncInFlight) return;
     chartSyncInFlight = true;
     try {
-      // Both reads, then one sentence. The drawing read is not conditional on the
-      // command read having found anything: the agent may have drawn without setting the
-      // chart at all, and a failed read of either answers "nothing" rather than throwing
-      // (`terminal-agent-chat` spec, "Nieudany odczyt poleceń MUST NOT przerywać
-      // rozmowy"; the same applies to objects).
+      // Both reads, then one sentence. The drawing read is not conditional on the command read having
+      // found anything: the agent may have drawn without setting the chart at all.
       let change: DrawingsChange = { added: 0, removed: 0 };
       const [command] = await Promise.all([
         syncChart(),
@@ -510,28 +474,12 @@ export function createAgentChatStore(
   }
 
   /**
-   * Loads whatever an open panel needs and has not got, and is safe to call repeatedly.
-   *
-   * Called from the panel's own mount rather than from this module's construction, and
-   * that difference is the whole point. The store is a module-level const, so
-   * constructing it ran during `import` — before `main.tsx` had awaited
-   * `identity.initialize()`. Every request made there asked for a token from an MSAL that
-   * had not resolved the session yet, got `SignedOut`, and never reached the network:
-   * `jsonClient` awaits the token *before* it calls `fetch`, so nothing was even sent.
-   *
-   * The session list recovered on its own — `finishTurn` reloads it after every turn — so
-   * the symptom was one panel that worked with a permanently empty model picker saying
-   * the catalogue could not be read, while the module's log showed no request for it at
-   * all. Observed in production on 13 August 2026; a reload reproduced it exactly,
-   * because the race is deterministic rather than a race at all.
+   * Safe to call repeatedly, and called from the panel's mount rather than this module's construction: that ran
+   * during `import`, before sign-in resolved, and the model picker read "unavailable" for the life of the page.
    */
   function ensureLoaded(): void {
-    // Read whether or not the panel is open — `terminal-agent-chat` spec, "MUST czytać
-    // nowe polecenia agenta po zakończonej turze oraz po wejściu na stronę", so a
-    // command issued before the tab closed is not left waiting on the operator opening
-    // the panel first. The notice this leaves in `state.chartNotice` renders the moment
-    // they do (`chartNotice` is cleared only by the next turn or a session switch, not
-    // by time), so nothing here is said and then lost.
+    // Read whether or not the panel is open, so a command issued before the tab closed is not left waiting
+    // on the operator opening it. The notice this leaves renders the moment they do.
     void syncChartCommands();
     if (!state.expanded) return;
     if (state.modelsStatus !== "ready") void loadModels();
@@ -575,9 +523,8 @@ export function createAgentChatStore(
   }
 
   /**
-   * Optimistic on neither count: the row changes only once the module has agreed. A list
-   * that renames itself and then silently reverts on a failed request is worse than one
-   * that pauses — the operator would go on believing the name they can see.
+   * Optimistic on neither count: the row changes only once the module has agreed. A list that renames
+   * itself and then silently reverts is worse than one that pauses.
    */
   function renameSession(id: number, title: string): void {
     const trimmed = title.trim();
@@ -601,9 +548,8 @@ export function createAgentChatStore(
   }
 
   /**
-   * Removing the conversation currently on screen leaves the panel on a new, empty one —
-   * the transcript it was showing is gone, and keeping it visible would be showing a
-   * rozmowa the module now answers 404 for.
+   * Removing the conversation currently on screen leaves the panel on a new, empty one — keeping the
+   * transcript visible would be showing a rozmowa the module now answers 404 for.
    */
   function deleteSession(id: number): void {
     if (turnInFlight()) return;
@@ -714,9 +660,8 @@ export function createAgentChatStore(
             commit({ ...state, turn: { status: "streaming", text: accumulated, toolCalls: calls } });
           } else if (event.kind === "toolCall") {
             calls = [...calls, event.call];
-            // Still `waiting` until the first fragment: a round of tools can resolve
-            // before the model has written a word, and claiming `streaming` with no text
-            // would swap the panel's "thinking…" for an empty bubble.
+            // Still `waiting` until the first fragment: a round of tools can resolve before the model has
+            // written a word, and claiming `streaming` with no text would show an empty bubble.
             commit({
               ...state,
               turn:
@@ -731,17 +676,14 @@ export function createAgentChatStore(
             await finishTurn(sessionId, accumulated, calls, event.message);
             return;
           } else if (event.kind === "stopped") {
-            // Nothing said in the console and nothing kept in state: this ending is not a
-            // fault, and the reply reloaded below carries its own mark
-            // (`terminal-agent-chat` spec, "Odpowiedź zatrzymana nie jest błędem").
+            // Nothing said in the console and nothing kept in state: this ending is not a fault, and the
+            // reply reloaded below carries its own mark.
             await finishTurn(sessionId, accumulated, calls, null);
             return;
           }
         }
-        // The body ended with neither `complete` nor `error` — a dropped connection.
-        // The turn was accepted (we have a session and got at least the response
-        // headers), so this is the same recovery as a mid-stream error, not a "nothing
-        // happened" refusal.
+        // The body ended with neither `complete` nor `error` — a dropped connection. The turn was accepted,
+        // so this is the same recovery as a mid-stream error, not a "nothing happened" refusal.
         await finishTurn(sessionId, accumulated, calls, "the connection ended before the reply finished");
       } catch (cause) {
         await finishTurn(sessionId, accumulated, calls, describeError(cause));
@@ -760,10 +702,8 @@ export function createAgentChatStore(
       try {
         await api.stopTurn(sessionId, new AbortController().signal);
       } catch (cause) {
-        // The turn is still running and will still answer. Saying so is the whole of what
-        // this branch does: marking the reply stopped here would put a word on screen
-        // that the module never agreed to (`terminal-agent-chat` spec, "Moduł nie przyjął
-        // zatrzymania").
+        // The turn is still running and will still answer. Marking the reply stopped here would put a word on
+        // screen the module never agreed to (`terminal-agent-chat` spec, "Moduł nie przyjął zatrzymania").
         showToast({
           key: "agent:stop",
           severity: "error",
@@ -774,11 +714,8 @@ export function createAgentChatStore(
     })();
   }
 
-  // A checkout that reloads with the panel already expanded (`STORAGE_KEY` read as
-  // "expanded" above) gets no click on the rail button to trigger the load that click
-  // would otherwise cause. That trigger used to run here, at construction — which is
-  // during `import`, before the sign-in state exists. `AgentChat` calls `ensureLoaded`
-  // on mount instead, which is after it.
+  // A checkout that reloads with the panel already expanded gets no click on the rail button, and the load that
+  // click would cause used to run at construction — during `import`. `AgentChat` calls `ensureLoaded` on mount.
 
   return {
     subscribe(listener) {

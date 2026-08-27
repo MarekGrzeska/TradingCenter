@@ -1,18 +1,5 @@
-"""`CLAUDE.md` is a running cost, so it has a ceiling — and a floor.
-
-The repository already gives the MCP tool surface a written character ceiling with a test,
-because a tool schema is paid for in every turn of a conversation
-(`market-data/tests/test_tools_surface.py`, specs/market-data-tools, "Powierzchnia narzędzi ma
-zapisany sufit"). The guide is the same kind of cost, paid in every agent session, and it had
-no ceiling at all: it reached 531 lines and 37 470 characters, roughly 8 900 tokens spent
-before a single question was asked.
-
-Two things keep this from being the character budget rule 8 of "How much test is enough"
-forbids. It is on an **aggregate with headroom**, never on one sentence — a per-paragraph
-budget is what turns every edit red. And it is paired with tests that read the *source of
-truth* rather than the prose, so shrinking the file by deleting facts fails as loudly as
-growing it: a guide kept under its ceiling by saying nothing would be cheap and useless.
-"""
+"""The guide is paid for in every session, so it has a ceiling — and tests that read the
+source of truth, so shrinking it by deleting facts fails as loudly as growing it."""
 
 from __future__ import annotations
 
@@ -24,17 +11,12 @@ import dev
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GUIDE = REPO_ROOT / "CLAUDE.md"
 
-# Characters of the whole file, which is what an agent reads before its first tool call. In
-# characters rather than tokens so the test needs no tokenizer: the ratio measured on this
-# material with `cl100k_base` is a steady 4,2, so the ceiling below is ~5 000 tokens.
-# Raising it is a deliberate edit of this line, never a side effect of adding a paragraph —
-# that is the whole point of writing it down.
-GUIDE_CEILING_CHARS = 21_000
+# Characters rather than tokens so the test needs no tokenizer: the measured ratio here is 4,2,
+# so this is ~5 200 tokens. Raised from 21 000 on 26 August 2026 to fit the comment rule.
+GUIDE_CEILING_CHARS = 22_000
 
-# Measured 17 831 characters on 20 August 2026, immediately after the prose diet: 37 470
-# before it, so 52% went. The headroom is deliberate and is 15% — enough that a genuinely new
-# trap can be written down without touching this file, not enough for the essays to come
-# back. Written down so the next reader can tell headroom from a ceiling raised to fit.
+# 21 361 characters on 26 August 2026; the headroom is deliberate, and is enough for a new trap
+# but not for the essays to come back.
 
 
 def guide() -> str:
@@ -51,20 +33,8 @@ def test_the_guide_stays_under_its_ceiling() -> None:
 
 
 def tracked_directories() -> list[str]:
-    """What the repository actually holds, as `modules/x` and `packages/y`.
-
-    **Git, not the filesystem, and that distinction is the whole point of this helper.**
-    The first version of this guard walked `iterdir()`, which meant it read a working copy
-    rather than a repository — and a working copy keeps what `git rm` cannot touch. Four
-    directories deleted in the August merges still stood on disk on 20 August 2026 holding
-    609 MB of `.venv` and `__pycache__`: `modules/agent`, `modules/teams`,
-    `modules/market-mcp`, `modules/teams-mcp`. The guard saw all four and passed on all
-    four, because `agent`, `teams`, `market-mcp` and `teams-mcp` each appear in CLAUDE.md
-    for unrelated reasons — `AGENT_DATABASE_URL`, the resource still named
-    `app-tradingcenter-agent`, the `.env` trap named after `market-mcp-into-market-data`.
-    A guard that reads what a deleted module left behind is checking the wrong thing, and
-    a substring match let it agree with itself.
-    """
+    """Git, not the filesystem: a working copy keeps directories `git rm` already removed, and
+    four deleted modules passed this guard on their leftover names."""
     out = subprocess.run(
         ["git", "ls-files", "-z", "modules", "packages"],
         cwd=REPO_ROOT,
@@ -76,17 +46,8 @@ def tracked_directories() -> list[str]:
 
 
 def test_every_module_and_package_is_on_the_map() -> None:
-    """The drift this file is really written against.
-
-    The guide's whole job is to be the map, and the way a map goes wrong is not that a
-    sentence ages — it is that something is built and never added. Read off the repository
-    rather than a list kept here, because a hand-maintained list of what to check is the
-    thing that goes stale (the same reasoning `scripts/pyproject.toml` gives pyright).
-
-    Matched as the full `modules/<name>` path rather than the bare name, so a module can
-    only satisfy this by being named where the map names things — never by its name
-    happening to occur in a settings example or an Azure resource id.
-    """
+    """Read off the repository, because a hand-kept list is what goes stale. Matched as the full
+    `modules/<name>` path, so a name occurring in a settings example cannot satisfy it."""
     text = guide()
     directories = tracked_directories()
     assert directories, "found no modules or packages to check the map against"
@@ -99,13 +60,8 @@ def test_every_module_and_package_is_on_the_map() -> None:
 
 
 def test_every_port_the_dev_runner_starts_is_named() -> None:
-    """The ports are the one fact here whose absence costs an hour rather than a minute.
-
-    A `.env` pointing at a port nobody serves reads as a tool server being down, and the
-    guide names the three retired ones for exactly that reason. Checked against `dev.py`'s
-    own service table — the source of truth both dev scripts already read — so a service
-    that moves port cannot leave the guide behind.
-    """
+    """Checked against `dev.py`'s service table, the source of truth both dev scripts read, so a
+    service that moves port cannot leave the guide behind."""
     text = guide()
     missing = [
         f"{service.name} ({service.port})"
@@ -119,10 +75,8 @@ def test_every_port_the_dev_runner_starts_is_named() -> None:
 
 
 def test_the_retired_ports_stay_written_down() -> None:
-    """8040, 8050 and 8070 belonged to modules that no longer exist, and an `.env` copied
-    before they went still points at them. The symptom is a tool server that reads as down,
-    which is why the guide says whose they were rather than dropping them once the module
-    was deleted."""
+    """An `.env` copied before a module went still points at its port, and the symptom is a tool
+    server that reads as down."""
     text = guide()
     live = {str(service.port) for service in dev.SERVICES}
     retired = [port for port in ("8040", "8050", "8070") if port not in live]

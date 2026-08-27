@@ -1,8 +1,5 @@
-"""Triggers — a team started by a condition being met.
-
-The half a schedule has no version of: this table's own INSERT and UPDATE, and
-`record_trigger_check`, the one statement neither shares. The rest is `TRIGGERS`.
-"""
+"""Triggers — a team started by a condition being met. The half a schedule has no version of, including
+`record_trigger_check`, the one statement neither shares."""
 
 from __future__ import annotations
 
@@ -35,12 +32,8 @@ _UPDATE_TRIGGER = f"""
     RETURNING {TRIGGER_COLUMNS}
 """
 
-# The edge-detection state itself: what the condition answered, and when it last fired.
-# `result` is `NULL` when the tool server could not be asked at all — a third value, not
-# a `false` (specs/teams-triggers, "Niedostępność serwera narzędzi to nie jest niespełniony
-# warunek") — so this statement, not the caller's Python, is what a reader trusts for
-# "was this ever actually evaluated". The one statement in this half with no counterpart
-# on the other: a schedule has nothing to evaluate.
+# The edge-detection state itself. `result` is `NULL` when the tool server could not be asked at all — a
+# third value, not a `false` — so this statement is what a reader trusts for "was this ever evaluated".
 _RECORD_TRIGGER_CHECK = f"""
     UPDATE triggers
        SET last_result = $2,

@@ -5,27 +5,8 @@ import type { TeamAgent, TeamDefinition, TeamDependency, TeamsModel, TeamsTool }
 import { Button } from "../ui/Button";
 
 /**
- * One agent's settings, opened from the gear on its own box on the canvas.
- *
- * This was a 20rem column beside the canvas, and the prompt is what paid for it: the field
- * an operator writes the most in had five rows and no width, while the tool list underneath
- * it scrolled the whole panel away. A modal is not a second view — the graph stays behind
- * it, so the requirement this has to keep holding still holds (`terminal-teams`, "Operator
- * składa zespół w tym samym widoku, w którym go ogląda").
- *
- * Two columns, and the split is by how much room each thing needs rather than by kind:
- * everything that is a choice (role, model, tools, dependencies) reads down the left,
- * while the prompt takes the whole right side and grows with the dialog.
- *
- * Both pickers are built from what the module publishes — `models` from its catalogue,
- * `tools` from what its tool server announces — and this file names no model and no tool
- * of its own. That is the requirement, not an implementation detail: adding a model is a
- * line in the module's configuration, and a terminal carrying its own list would make it
- * a release here too.
- *
- * Nothing here is saved by closing it. Every keystroke edits the draft the canvas and the
- * Save button already share, so `Done` means "I am finished looking at this agent" and the
- * revision is still saved from the editor's own header.
+ * One agent's settings, in a modal rather than the 20rem column that made the prompt five rows wide. Both
+ * pickers are built from what the module publishes, so adding a model is not a release here (`terminal-teams`).
  */
 export function AgentSettingsDialog({
   agent,
@@ -57,9 +38,8 @@ export function AgentSettingsDialog({
   const [waitFor, setWaitFor] = useState("");
   const incoming = definition.dependencies.filter((edge) => edge.to === agent.key);
   const outgoing = definition.dependencies.filter((edge) => edge.from === agent.key);
-  // Itself excluded, and so is anything it already waits for. An agent it hands to is left
-  // in: the module refuses a cycle by name, and hiding the option would replace a refusal
-  // that says which agents are on the cycle with a list that quietly lacks one.
+  // Itself excluded, and so is anything it already waits for. An agent it hands to is left in: the module
+  // refuses a cycle by name, and hiding the option would replace that refusal with a list quietly lacking one.
   const available = definition.agents.filter(
     (candidate) =>
       candidate.key !== agent.key && !incoming.some((edge) => edge.from === candidate.key),
@@ -67,9 +47,8 @@ export function AgentSettingsDialog({
   const roleOf = (key: string) =>
     definition.agents.find((candidate) => candidate.key === key)?.role ?? key;
   const refusedHere = refusal?.agents.includes(agent.key) ?? false;
-  // A model that was in the catalogue when the revision was saved and is not now still
-  // has to appear in the picker — otherwise selecting nothing silently rewrites the
-  // agent onto whatever sits first in the list.
+  // A model that was in the catalogue when the revision was saved and is not now still has to appear —
+  // otherwise selecting nothing silently rewrites the agent onto whatever sits first in the list.
   const modelMissing = !models.some((model) => model.id === agent.modelId);
 
   return (
@@ -267,18 +246,8 @@ export function AgentSettingsDialog({
 }
 
 /**
- * What ticking this tool lets the agent do to the account.
- *
- * Marked, rather than sorted into two lists: an operator picking tools reads them by what
- * they do, and splitting the picker would put the one tool that matters at the bottom of
- * a scroll (`terminal-teams`, "narzędzia zmieniające stan rachunku są odróżnione od
- * czytających").
- *
- * Three states, not two. A tool the server annotates as read-only gets no mark at all —
- * reading is what a tool does unless somebody says otherwise — while one carrying no
- * annotation is shown as exactly that. Both of this module's tool servers annotate
- * everything they publish, so an unmarked-and-unannotated tool means a third server
- * nobody here has an opinion about (specs/teams-tool-access).
+ * Marked rather than sorted into two lists: splitting the picker would put the one tool that matters at the
+ * bottom of a scroll. Three states — unannotated means a third tool server nobody here has an opinion about.
  */
 function ToolMark({ readOnly }: { readOnly: boolean | null }) {
   if (readOnly === true) return null;

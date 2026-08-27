@@ -1,11 +1,5 @@
-"""Saving a definition that assigns tools, with a tool server actually answering.
-
-`test_catalogue_routes.py` covers the same routes with no server configured, which is the
-refusal `validation.py` writes for a missing session. This file is the other half — the
-one that needs a session to exist — and it is the check the save-time rule was written
-for: the names in a definition are confirmed against what the server announces right now,
-not against a list this module keeps (specs/teams-tool-access).
-"""
+"""Saving a definition that assigns tools, with a tool server actually answering: the names are confirmed against what
+the server announces right now, not against a list this module keeps."""
 
 from __future__ import annotations
 
@@ -96,9 +90,8 @@ def test_a_definition_naming_a_tool_the_server_does_not_announce_is_refused(
 
 
 def test_the_names_come_from_the_server_not_from_this_module(client: TestClient) -> None:
-    """The assertion that fails the day someone writes a local list of tool names: the
-    stand-in publishes exactly three, and a fourth that market-mcp really has in
-    production is refused here because *this* server does not announce it."""
+    """The assertion that fails the day someone writes a local list of tool names: the stand-in publishes
+    exactly three, and a fourth market-mcp really has is refused because *this* server does not announce it."""
     response = client.post("/teams", json=_body(["get_candles"]), headers=OWNER)
 
     assert response.status_code == 422

@@ -1,8 +1,5 @@
-"""The OpenAI call, shared by the two modules that make one.
-
-Everything worth importing is in `provider`; this re-exports it so a consumer writes
-`from tc_openai import Briefing` rather than naming the submodule.
-"""
+"""The OpenAI call, shared by the two modules that make one. Everything worth importing is in
+`provider`; this re-exports it so a consumer need not name the submodule."""
 
 from .provider import (
     Briefing,

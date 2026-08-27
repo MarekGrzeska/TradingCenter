@@ -1,12 +1,6 @@
 /**
- * Where the archive lives — the one back end the terminal holds an address for —
- * accepting a relative path or a full URL.
- *
- * HTTP and WebSocket are configured separately because Static Web Apps cannot proxy the
- * socket (design.md, "Azure Static Web Apps poda statyki, ale nie przeprowadzi
- * strumienia"), so the two may need different hosts. `capital-gateway` has no address
- * here at all: it is not reachable from a browser, and its catalogue arrives proxied
- * through the archive.
+ * Where the archive lives, as a relative path or a full URL. HTTP and WebSocket are configured separately
+ * because Static Web Apps cannot proxy the socket (design.md), so the two may need different hosts.
  */
 
 const ABSOLUTE_URL = /^https?:\/\//i;
@@ -19,13 +13,8 @@ export function resolveHttpBase(raw: string): string {
   return raw.replace(/\/+$/, "");
 }
 
-/** A relative WS path has no such native resolution — `new WebSocket("/ws")`
- *  throws, because a WebSocket URL must be absolute. This expands it against
- *  the page's own origin, upgrading the scheme (`http`→`ws`, `https`→`wss`) so a
- *  page served over TLS never opens a plaintext socket. An absolute `ws(s)://`
- *  base passes through unchanged; an absolute `http(s)://` base — a plausible
- *  mistake given the sibling variable — has its scheme corrected rather than
- *  left to fail opaquely inside the WebSocket constructor. */
+/** `new WebSocket("/ws")` throws — a WebSocket URL must be absolute — so a relative base is expanded against
+ *  the page's origin, upgrading the scheme so a page served over TLS never opens a plaintext socket. */
 export function resolveWsBase(
   raw: string,
   loc: Pick<Location, "protocol" | "host"> = window.location,
@@ -49,43 +38,24 @@ export interface Endpoints {
    *  own any more. */
   archiveHttp: string;
   archiveWs: string;
-  /** The workbench: the conversation and its cost, and the team catalogue, the model
-   *  catalogue and a run's progress. **One address for both**, because they are one
-   *  process — two were two modules on two hosts, and there is one host now.
-   *
-   *  Its own address rather than a path under the archive's: Static Web Apps cannot proxy
-   *  a stream any more than it can a WebSocket, so it gets the same split treatment as the
-   *  archive. No WS counterpart: both a turn and a run's progress ride plain HTTP
-   *  (`fetch` + `ReadableStream`), not a socket. */
+  /** The workbench: the conversation, its cost, the catalogues and a run's progress. **One address**, because
+   *  they are one process. Its own rather than a path under the archive's, since SWA cannot proxy a stream. */
   workbenchHttp: string;
-  /** `polymarket-data`, for the prediction-market archive: what is tracked, the last
-   *  probability of every tracked outcome in one request, an outcome's series and its
-   *  changes over a window. Its own address for the same reason the workbench has one —
-   *  it is a different App Service behind a different gate — and its own scope, because
-   *  it accepts only its own audience. */
+  /** `polymarket-data`, for the prediction-market archive. Its own address for the reason the workbench has
+   *  one — a different App Service behind a different gate — and its own scope: it accepts only its audience. */
   polymarketHttp: string;
   /** `strategy`, for the strategy platform: the catalogue of entries, which pairs are
    *  watched, every decision with the reason it carries, and the backtest reports that
    *  were kept. Its own address and its own scope for the same reason as the two above —
    *  a different App Service behind a different gate. */
   strategyHttp: string;
-  /** `capital-gateway`, for the account: which demo accounts exist, what is open on the
-   *  active one, and the demo money on it.
-   *
-   *  It used to have no address here at all — the gateway was reachable only from two
-   *  service addresses, and the instrument catalogue came through market-data for exactly
-   *  that reason. It still does; what changed is that the gateway now also recognises an
-   *  authenticated browser and lets it reach the account and nothing else
-   *  (`capital_gateway/caller_access.py`). In dev this is a prefix the dev server proxies,
-   *  because the shared key must not travel to a browser. */
+  /** `capital-gateway`, for the account. It used to have no address here at all; what changed is that the
+   *  gateway recognises an authenticated browser. In dev this is a prefix the dev server proxies. */
   gatewayHttp: string;
 }
 
-// Same defaults as .env.example: a checkout without one falls back to the dev proxy
-// rather than crashing the moment a source is built. The `-api` suffix keeps the prefix
-// clear of the tab routes — a back end answering a prefix a tab also claims shadows that
-// tab — and a test compares it against the route list so a future prefix cannot repeat
-// the mistake. See the note in vite.config.ts.
+// Same defaults as .env.example, so a checkout without one falls back to the dev proxy. The `-api` suffix
+// keeps the prefix clear of the tab routes — a back end answering a tab's prefix shadows that tab.
 const DEFAULT_ARCHIVE_HTTP = "/archive-api";
 const DEFAULT_ARCHIVE_WS = "/archive-api/ws";
 const DEFAULT_WORKBENCH_HTTP = "/workbench-api";
@@ -109,16 +79,8 @@ export interface EnvVars {
   VITE_ENTRA_SCOPE_STRATEGY?: string;
 }
 
-/** One scope per module the terminal calls, because each stands behind its own gate and
- *  accepts a token minted for its **own** audience. Entra will only mint one for a
- *  resource asked for by name, so this is what the terminal has to know per back end.
- *
- *  `archive` keeps `VITE_ENTRA_SCOPE`'s plain name — it was the only one when there was
- *  only one — and is the one required scope: it is also what the sign-in redirect asks
- *  for. The other four are optional, and their absence means that module is called with
- *  no credential rather than with the archive's (terminal-identity, "Dwa moduły o różnych
- *  publicznościach"). Sending one module's token to another is what this type exists to
- *  stop; a silent fallback would put it straight back. */
+/** One scope per module, because each accepts a token minted for its **own** audience. `archive` keeps
+ *  `VITE_ENTRA_SCOPE`'s plain name and is the required one; the rest absent means no credential, not this one. */
 export interface ModuleScopes {
   archive: string;
   workbench: string | null;
@@ -136,13 +98,8 @@ export interface EntraConfig {
 }
 
 /**
- * The identity configuration, or `null` when there is none.
- *
- * `null` is a working mode, not a misconfiguration. Locally the archive runs on
- * the same machine with nothing in front of it, and a terminal that demanded a
- * sign-in before it would start would make `pnpm dev` depend on a tenant. All
- * three values or none: two out of three is a typo, and starting anyway would
- * turn it into a sign-in that fails much later with a message about audiences.
+ * `null` is a working mode: locally the archive has nothing in front of it, and demanding a sign-in would make
+ * `pnpm dev` depend on a tenant. All three values or none — two is a typo that fails much later.
  */
 export function resolveEntra(env: EnvVars = import.meta.env): EntraConfig | null {
   const clientId = env.VITE_ENTRA_CLIENT_ID?.trim();
@@ -156,14 +113,8 @@ export function resolveEntra(env: EnvVars = import.meta.env): EntraConfig | null
         "or left out together — a partial set cannot sign anyone in.",
     );
   }
-  // The four per-module scopes are each optional on their own, unlike the triple above:
-  // a module with no scope is called with no credential, which its own gate then refuses
-  // in a way the tab can name. That is deliberately not the same as reaching for the
-  // archive's token, which would be the terminal telling five gates the same thing.
-  //
-  // A module whose Entra registration announces no delegated scope has nothing to put
-  // here even when the terminal is on its caller list: the list says who may enter, the
-  // scope is what lets a browser ask for the key (terminal-identity).
+  // Each per-module scope is optional on its own: a module with no scope is called with no credential, which
+  // its gate refuses in a way the tab can name. Reaching for the archive's token would tell five gates one thing.
   return {
     clientId,
     tenantId,

@@ -1,27 +1,5 @@
-"""Settings, and the one mode switch this module refuses to leave ambiguous.
-
-The database follows the rule market-data's `config.py` set for its own: `database_user`
-set → identity, off-machine; unset → password, loopback only. A configuration naming
-neither or both is rejected at startup rather than guessed at (design.md, "Moduł nie
-dzieli bazy z innym modułem" — the two modules duplicate this check rather than share
-it).
-
-The model provider has no such switch, because there is nothing to switch between:
-OpenAI is not in Entra, so a managed identity has nobody to present a token to and
-`openai_api_key` is the only credential either shape can use (design.md, "Wobec OpenAI:
-klucz, i tylko klucz"). Local and production differ only in where the value comes from —
-`.env` there, a Key Vault reference here (infra/key-vault.tf).
-
-The tool server has the database's shape rather than the provider's: `market_mcp_scope`
-set → the server is off this machine and a token for that scope is what proves this
-module to it; unset → `market_mcp_url` MUST point at loopback. It differs from the
-database in one way that matters — the whole setting is optional. An unset
-`market_mcp_url` is not a misconfiguration but a module with no tools, which is what
-this module was until this change and what it falls back to when the server is down
-(specs/agent-tool-access, "Brak serwera narzędzi nie odbiera agentowi mowy").
-
-Refusing to build the settings leaves nothing running to misuse.
-"""
+"""Settings, and the one mode switch this module refuses to leave ambiguous: identity off-machine, or password on
+loopback, never neither. A tool server's whole setting is optional — unset is a module with no tools."""
 
 from __future__ import annotations
 
@@ -31,35 +9,22 @@ from urllib.parse import parse_qs, urlparse
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Same set market-data's config.py checks against — "Połączenie z bazą jest szyfrowane"
-# is duplicated here as a requirement (specs/agent-database-connection), not imported,
+# Same set market-data's config.py checks against — duplicated here as a requirement, not imported,
 # because there is no shared library between modules.
 _TLS_REQUIRING_SSLMODES = {"require", "verify-ca", "verify-full"}
 
 
 class ModelCatalogueEntry(BaseModel):
-    """One model this module can hand a turn to.
-
-    Rates are per 1,000,000 tokens — the unit every provider advertises, so a rate copied
-    from a pricing page needs no arithmetic on the way in and none on the way out to the
-    operator. `Decimal` rather than `float`: a turn costs a fraction of a cent, and
-    summing thousands of `float`s loses the pennies the usage ledger exists to get right
-    (design.md, "Cennik jest konfiguracją, stawka jest przepisywana na wiersz").
-
-    Required, not defaulted — a model entry without a rate must fail to *parse*, which
-    is what keeps the module from starting rather than starting and pricing a turn as
-    free (specs/agent-models, "Model spoza katalogu jest odmową, nie podmianą").
-    """
+    """One model this module can hand a turn to. Rates are per 1,000,000 tokens and `Decimal` rather than `float`, since
+    summing thousands loses the pennies — and required, so a rateless entry stops the module rather than pricing at zero."""
 
     id: str
-    # What OpenAI is actually asked for. Kept separate from `id` because the two need
-    # not match: `id` is this module's own stable identifier, carried in every session
-    # and usage row, and outliving a model renamed or retired upstream.
+    # What OpenAI is actually asked for, kept separate from `id` because the two need not match: `id`
+    # is this module's own stable identifier, outliving a model renamed or retired upstream.
     model: str
     display_name: str
-    # Lower is cheaper. An explicit field rather than list order, because list order in
-    # an env-supplied JSON string is easy to get wrong silently; a wybierak sorts by
-    # this and a config typo in the order shows up as a wrong number, not a swapped row.
+    # Lower is cheaper. An explicit field rather than list order, because order in an env-supplied JSON
+    # string is easy to get wrong silently.
     cost_rank: int
     input_rate_per_1m: Decimal
     output_rate_per_1m: Decimal
@@ -84,87 +49,53 @@ class ModelCatalogueEntry(BaseModel):
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # --- this module's own storage — same switch as market-data/config.py ---
     database_url: str
     database_user: str | None = None
     azure_client_id: str | None = None
     azure_client_secret: str | None = None
     azure_tenant_id: str | None = None
-    # How long this module waits for another process to finish migrating before it gives
-    # up and refuses to start. Sized for the slow case — a migration running ahead of us —
-    # not for a dead one, which releases its lock with its connection. This module's
-    # migrations touch small tables; market-data's twin allows far longer, because its
-    # tables are not small.
+    # How long this module waits for another process to finish migrating. Sized for the slow case, not
+    # a dead one, which releases its lock with its connection. These tables are small; market-data's are not.
     migration_lock_wait_seconds: float = 300.0
 
-    # --- OpenAI, this module's only model provider ---
-    #
-    # Required, with no fallback to an ambient credential: unlike the database, OpenAI
-    # has no Entra identity to fall back *to*. A module that started without this would
-    # accept a turn and fail on the call, after the operator's message was already
-    # stored.
+    # Required, with no fallback to an ambient credential: OpenAI has no Entra identity to fall back to.
+    # A module that started without this would accept a turn and fail after storing the operator's message.
     openai_api_key: str
 
-    # --- the models this module offers, and which one a session gets by default ---
     models: list[ModelCatalogueEntry] = Field(default_factory=list)
     default_model_id: str
 
-    # --- market-mcp, the tool server that reads the archive ---
-    #
-    # Unset means no tools, deliberately: the module answers from the model alone, the
-    # way it did before this setting existed. That is also the state a failed connection
-    # degrades to, so it is a path the tests exercise rather than a corner nobody has
-    # been down.
+    # Unset means no tools, deliberately: the module answers from the model alone. That is also the state
+    # a failed connection degrades to, so the tests walk it.
     market_mcp_url: str | None = None
     # api://<market-mcp-app-id>/.default — the scope this module's managed identity
     # requests a token for. Set only when `market_mcp_url` is not loopback.
     market_mcp_scope: str | None = None
-    # Per tool call. The operator is watching a panel while this runs, and market-mcp's
-    # own ceiling on reaching the archive is 10s — a little more than that here leaves
-    # room for its own work without turning one slow call into a turn that never ends.
+    # Per tool call. The operator is watching a panel, and market-mcp's own ceiling is 10s — a little
+    # more here leaves room for its work without turning one slow call into a turn that never ends.
     market_mcp_request_timeout_seconds: float = 15.0
 
-    # No settings for the teams tools, and their absence is the point: that surface is a
-    # layer in this process, so there is no address to name, no token to fetch and no
-    # timeout to choose. It is also the one tool source that cannot be unconfigured — see
-    # `tools/registry.py`.
+    # No settings for the teams tools, and their absence is the point: that surface is a layer in this
+    # process, so there is no address, no token and no timeout. It is also the one that cannot be unconfigured.
 
-    # --- trading-mcp, the tool server that moves the demo account ---
-    #
-    # Unset means the same as the two above, with the sharpest consequence of the three:
-    # the module runs, reads the archive, builds teams, and cannot see a position or send
-    # an order. That is a supported state and the one this module was in until this
-    # change (specs/agent-tools, "Agent zapisuje w widoku terminala i na rachunku
-    # demonstracyjnym").
+    # Unset means what it means for the two above, with the sharpest consequence: the module runs, reads
+    # the archive, builds teams, and cannot see a position or send an order.
     trading_mcp_url: str | None = None
     trading_mcp_scope: str | None = None
-    # trading-mcp waits on the gateway for up to 30s (`trading_mcp/config.py`), and a
-    # ceiling below that would time out this side of an order that had already been sent
-    # — the one failure shape the module must never produce silently. teams uses the same
-    # number against the same server for the same reason.
+    # trading-mcp waits on the gateway for up to 30s, and a ceiling below that would time out this side
+    # of an order that had already been sent — the one failure shape this must never produce silently.
     trading_mcp_request_timeout_seconds: float = 35.0
 
-    # --- polymarket-data, the tool server that reads the prediction-market archive ---
-    #
-    # The third of the three, and unset means what it means for the other two: the module
-    # runs and cannot answer what a market prices an event at. Two of its nine tools reach
-    # the provider live rather than the archive, which is why the ceiling below is not
-    # market-mcp's.
+    # The third of the three: unset, the module runs and cannot answer what a market prices an event at.
+    # Two of its nine tools reach the provider live, which is why the ceiling below is not market-mcp's.
     polymarket_mcp_url: str | None = None
     polymarket_mcp_scope: str | None = None
-    # A little past polymarket-data's own ceiling on the provider (30s per request,
-    # `polymarket_data/provider.py`), for trading-mcp's reason rather than market-mcp's:
-    # `search_events` and `browse_events` ask Polymarket while the operator waits, so a
-    # ceiling below that would fire here on a call that was still being answered.
+    # A little past polymarket-data's own ceiling on the provider, for trading-mcp's reason rather than
+    # market-mcp's: two of its tools ask Polymarket while the operator waits.
     polymarket_mcp_request_timeout_seconds: float = 35.0
 
-    # --- who may call this module from a browser ---
-    #
-    # Mirrors market-data's own field and its own reasoning: a request without an
-    # identity, accepted because this was left off, opens every session in the database
-    # to whoever finds the address — and every call to a model that costs real money
-    # with it. Off locally, where nothing stands in front and there is no identity to
-    # have.
+    # Mirrors market-data's own field and reasoning: a request without an identity, accepted because this
+    # was left off, opens every session in the database — and every call that costs real money.
     require_authenticated_principal: bool = False
 
     @field_validator("database_url", "openai_api_key")
@@ -185,18 +116,16 @@ class Settings(BaseSettings):
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
-        # `MARKET_MCP_URL=` left in a .env is the same intent as the line being absent,
-        # and the same reading the database's own user field has had since it was
-        # written: an empty string is not a value, it is a line someone stopped filling.
+        # `MARKET_MCP_URL=` left in a .env is the same intent as the line being absent: an empty string
+        # is not a value, it is a line someone stopped filling.
         if value is None or not value.strip():
             return None
         return value.strip()
 
     @model_validator(mode="after")
     def _database_mode_is_coherent(self) -> Settings:
-        """Same two failures market-data's config.py refuses, duplicated rather than
-        shared — this module owns its own database and its own guard on it
-        (specs/agent-database-connection, "Moduł nie dzieli bazy z innym modułem")."""
+        """Same two failures market-data's config.py refuses, duplicated rather than shared — this module
+        owns its own database and its own guard on it."""
         parsed = urlparse(self.database_url)
         if self.database_user is not None:
             sslmode = parse_qs(parsed.query).get("sslmode", [None])[0]
@@ -227,16 +156,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _tool_server_modes_are_coherent(self) -> Settings:
-        """The third copy of the rule market-data set for its database and market-mcp
-        set for its archive: name one mode, or none, never both
-        (specs/agent-tool-access, "Tryb połączenia z serwerem narzędzi jest wybrany
-        jednoznacznie").
-
-        Run once per server rather than once, because there are several of them and they
-        are configured independently — and every message names the one it is about, since "the
-        tool server" stopped being unambiguous. The teams tools are not among them: a
-        source standing in this process has no mode to choose.
-        """
+        """The third copy of the rule market-data set for its database: name one mode, or none, never
+        both. Run once per server, and every message names the one it is about."""
         self.market_mcp_url = _checked_server(
             "MARKET_MCP", self.market_mcp_url, self.market_mcp_scope
         )
@@ -268,9 +189,8 @@ class Settings(BaseSettings):
 
 
 def _checked_server(prefix: str, url: str | None, scope: str | None) -> str | None:
-    """One tool server's mode, refused rather than guessed — see `Settings.
-    _tool_server_modes_are_coherent`. Returns the URL with any trailing slash removed,
-    or `None` for a server this module simply does not have."""
+    """One tool server's mode, refused rather than guessed. Returns the URL with any trailing slash
+    removed, or `None` for a server this module simply does not have."""
     if url is None:
         if scope is not None:
             raise ValueError(

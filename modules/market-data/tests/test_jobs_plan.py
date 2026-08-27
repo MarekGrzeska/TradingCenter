@@ -1,7 +1,4 @@
-"""jobs/plan.py: turning a request into chunks, and pricing it without running it.
-
-Group 3 of rework-instrument-collection.
-"""
+"""jobs/plan.py: turning a request into chunks, and pricing it without running it."""
 
 from __future__ import annotations
 
@@ -29,8 +26,6 @@ LIMIT = 20
 async def _tracked(db: asyncpg.Connection, symbol: str = "US100", resolution: Resolution = Resolution.MINUTE):
     await track(db, symbol, resolution, LIMIT, collect_from=MOMENT - timedelta(days=3650))
 
-
-# --- pure arithmetic -------------------------------------------------------------------
 
 
 def test_a_window_narrower_than_the_ceiling_is_one_chunk() -> None:
@@ -69,8 +64,6 @@ def test_windows_run_newest_to_oldest() -> None:
     ends = [window_end for _, window_end in windows]
     assert ends == sorted(ends, reverse=True)
 
-
-# --- planning against the archive -------------------------------------------------------
 
 
 @pytest.mark.db
@@ -122,16 +115,8 @@ async def test_a_partly_covered_pair_plans_only_the_gap(db: asyncpg.Connection) 
 async def test_a_recorded_boundary_does_not_clip_a_deeper_request(
     db: asyncpg.Connection,
 ) -> None:
-    """The defect, in the place it was silent.
-
-    A boundary recorded once raised every later request up to it, so a pair whose boundary
-    was wrong — or merely stale, since the provider deepens its own history — could not be
-    deepened by any request at all. US100 asked for 2024 against a boundary at 2026 planned
-    no chunks and reported itself done with zero candles.
-
-    Planning no longer reads the boundary. Dropping it is the job-creating path's business
-    (`routers/pairs.py`), which is what keeps pricing free of writes.
-    """
+    """The defect, in the place it was silent: a boundary recorded once raised every later request up to
+    it, so US100 asked for 2024 against a boundary at 2026 planned nothing and reported itself done."""
     await _tracked(db)
     boundary = MOMENT - timedelta(days=30)
     await record_coverage(
@@ -151,8 +136,6 @@ async def test_a_recorded_boundary_does_not_clip_a_deeper_request(
     assert chunks, "a deeper request must plan the work that measures the boundary again"
     assert min(chunk.chunk_start for chunk in chunks) == requested_from
 
-
-# --- estimating --------------------------------------------------------------------------
 
 
 @pytest.mark.db
@@ -188,9 +171,8 @@ async def test_estimating_has_no_side_effects(db: asyncpg.Connection) -> None:
 async def test_an_estimate_prices_what_the_job_will_do_and_writes_nothing(
     db: asyncpg.Connection,
 ) -> None:
-    """The equality that makes a dialog worth showing: pricing and running compute the
-    same range. Pricing gets there by not reading the boundary rather than by dropping it,
-    which is what keeps it free of writes."""
+    """The equality that makes a dialog worth showing: pricing and running compute the same range.
+    Pricing gets there by not reading the boundary rather than by dropping it."""
     await _tracked(db)
     boundary = MOMENT - timedelta(days=10)
     await record_coverage(

@@ -1,8 +1,5 @@
-"""The strategy of reference, on readings put there by hand.
-
-Every test here is "given these three readings, what did it decide". The readings are built
-in `builders.py` so that what a test changes is the one number it is about.
-"""
+"""The strategy of reference, on readings put there by hand: every test is "given these three readings, what did it
+decide". The readings are built in `builders.py`, so what a test changes is the one number it is about."""
 
 from __future__ import annotations
 

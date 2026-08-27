@@ -21,10 +21,8 @@ def test_blank_gateway_key_is_refused() -> None:
 
 
 def test_gateway_key_required_even_at_loopback() -> None:
-    """Unlike market-mcp's upstream mode, there is no loopback exemption here —
-    capital-gateway checks the same header from every caller (specs/
-    trading-mcp-upstream-access, "Poświadczenie do gatewaya jest wymagane
-    niezależnie od adresu")."""
+    """Unlike market-mcp's upstream mode there is no loopback exemption here — capital-gateway checks
+    the same header from every caller."""
     with pytest.raises(ValidationError):
         Settings(capital_gateway_url="http://127.0.0.1:8010", _env_file=None)  # type: ignore[call-arg]
 

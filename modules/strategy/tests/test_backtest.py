@@ -1,10 +1,5 @@
-"""The backtest, and the two tests that are the whole reason it can be believed.
-
-`test_incremental_and_batch_agree` and `test_a_longer_range_does_not_change_the_common_part`
-are not two tests of the same thing. The first catches a slice that carried the future
-backwards; the second catches a read whose *answers* change when more history is added.
-Either one alone passes over the defect the other exists for.
-"""
+"""The backtest, and the two tests that are the whole reason it can be believed: one catches a slice that
+carried the future backwards, the other a read whose answers change when more history is added."""
 
 from __future__ import annotations
 
@@ -34,13 +29,8 @@ def stamps(count: int) -> list[datetime]:
 
 
 class ReplayArchive:
-    """An archive holding one generated history, answering any window out of it.
-
-    The point of generating rather than fixing the data: `read_facts` must answer a window
-    ending at bar *i* with exactly what the full read says at bar *i*, which is the archive's
-    own no-repaint guarantee. Modelling that here is what makes the incremental-versus-batch
-    comparison a test of this module rather than of the double.
-    """
+    """An archive holding one generated history, answering any window out of it. Generated rather than
+    fixed, so the double models the archive's own no-repaint guarantee rather than being tested for it."""
 
     def __init__(self, closes: list[float], fast: list[float], slow: list[float], atr: list[float]):
         self.times = stamps(len(closes))
@@ -92,9 +82,8 @@ def a_history(bars: int = 60) -> ReplayArchive:
 
 class TestLookAhead:
     async def test_incremental_and_batch_agree(self) -> None:
-        """The one test that catches look-ahead, and it works by comparing this module
-        against itself: one driver reads the whole range and slices, the other reads a
-        window per bar. A difference is the future having leaked backwards."""
+        """The one test that catches look-ahead, by comparing this module against itself: one driver reads the whole
+        range and slices, the other a window per bar, and a difference is the future having leaked backwards."""
         archive = a_history()
         window = (archive.times[10], archive.times[-1])
 
@@ -465,9 +454,8 @@ class TestNamingARevisionOnTheCommandLine:
             named("my_rule@latest")
 
     async def test_naming_only_coded_entries_reaches_no_database(self) -> None:
-        """The floor every strategy is measured against has to be recomputable with nothing
-        else standing. The settings below point at a host that does not exist, so a run that
-        reached for a connection would say so."""
+        """The floor every strategy is measured against has to be recomputable with nothing else standing: the
+        settings below point at a host that does not exist, so a run reaching for a connection would say so."""
         settings = Settings(
             database_url="postgresql://nowhere.invalid:5432/strategy?sslmode=require",
             database_user="nobody",

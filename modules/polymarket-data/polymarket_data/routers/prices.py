@@ -11,9 +11,8 @@ from ..contract import ChangesOut, HistoryOut, PricePoint, Problem, SnapshotOut
 
 router = APIRouter(tags=["prices"])
 
-# What a history read covers when the caller names no range. A week, because that is the
-# longest change window this module publishes, so the default answer is enough to draw
-# everything the windows describe.
+# What a history read covers when the caller names no range. A week, because that is the longest change
+# window this module publishes, so the default answer draws everything the windows describe.
 DEFAULT_HISTORY_SPAN = timedelta(days=7)
 
 

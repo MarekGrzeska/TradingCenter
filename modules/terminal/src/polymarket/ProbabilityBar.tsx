@@ -1,25 +1,8 @@
 import { bandFor, formatProbability } from "./probability";
 
 /**
- * A probability, drawn as well as written.
- *
- * The job of this number is **magnitude against a known maximum** — a probability lives on
- * 0..1 and nothing else — so the mark is a bar anchored at zero on a track the width of the
- * whole scale. That is what makes two outcomes comparable at a glance without reading two
- * numbers, which is the thing a column of percentages does not give.
- *
- * **The hue follows the value, not the outcome.** It is the same variable the length
- * encodes, said twice on purpose: a column of bars is scanned rather than read, and a colour
- * says which end of the scale a row sits at before anything has been measured. What it must
- * never be is a colour per outcome — that would be a rainbow nobody can rank, with hue doing
- * a job the label beside it already does.
- *
- * The five bands were stepped by the dataviz skill's validator rather than by eye; the
- * reasoning and the numbers are on `BANDS` in `probability.ts`, next to the values.
- *
- * **No price draws no bar.** A zero-length fill is a bar that says "zero", and zero is a
- * claim about the market where the truth is that nothing has been collected — the same
- * distinction the windows make, one layer down.
+ * Magnitude against a known maximum, so the mark is a bar on a track the width of the whole 0..1 scale. The hue
+ * follows the value, never the outcome — a colour per outcome is a rainbow nobody can rank. No price, no bar.
  */
 export function ProbabilityBar({
   price,

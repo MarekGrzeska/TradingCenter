@@ -21,9 +21,8 @@ describe("MessageBody", () => {
   });
 
   it("does not render raw HTML from a model, at all", () => {
-    // The whole XSS argument for this component: `rehype-raw` is absent, so HTML is not
-    // sanitised — it is never built into elements in the first place. If this ever fails,
-    // someone added `rehype-raw` and the component is no longer safe by construction.
+    // The whole XSS argument for this component: `rehype-raw` is absent, so HTML is never built into
+    // elements in the first place. If this fails, someone added it and the component is no longer safe.
     const { container } = render(
       <MessageBody text={'<img src=x onerror="alert(1)"> and <b>bold</b>'} />,
     );

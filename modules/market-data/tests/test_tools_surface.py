@@ -1,12 +1,5 @@
-"""The opinion every tool's description has to hold up, since it is the only thing a
-model knows about a tool before calling it (specs/market-data-tools, "Opis narzędzia jest
-częścią kontraktu"), and the ceiling on what that surface costs to publish.
-
-The ceiling is the reason this file did not change value in the move: the same eleven
-tools, the same descriptions, the same slimmed schemas, so the same characters. A number
-that moved because the tools changed process would say the measurement was about the
-process rather than about the surface.
-"""
+"""The opinion every tool's description has to hold up, since it is the only thing a model knows before
+calling it, and the ceiling on what that surface costs to publish."""
 
 from __future__ import annotations
 
@@ -50,19 +43,12 @@ async def test_time_tools_name_the_timezone(tool_server) -> None:
         assert "UTC" in description, f"{name} does not name the timezone"
 
 
-# --- the surface as a running cost (specs/market-data-tools, "Powierzchnia narzędzi ma zapisany sufit") ---
-
-# Characters of the serialized `list_tools()`, which is what an MCP client reads before
-# every turn. In characters rather than tokens so the test needs no tokenizer: the ratio
-# measured on this material with `cl100k_base` is a steady 4,2, so the ceiling below is
-# ~4 700 tokens. Raising it is a deliberate edit of this line, never a side effect of
-# adding a tool — that is the whole point of writing it down.
+# Characters of the serialized `list_tools()`, which an MCP client reads before every turn. In characters
+# rather than tokens so the test needs no tokenizer; the measured ratio here is 4,2, so this is ~4 700.
 SURFACE_CEILING_CHARS = 19700
 
-# Measured 18 844 characters here on 19 August 2026, immediately after the tools moved
-# into this module — the same surface the separate process published, since neither a
-# name, a description nor a schema changed in the move. Written down so the next reader
-# can tell headroom from a ceiling that was raised to fit.
+# Measured 18 844 characters on 19 August 2026, immediately after the tools moved into this module —
+# the same surface the separate process published. Written down so headroom reads as headroom.
 
 
 def _surface(tools) -> str:
@@ -90,10 +76,8 @@ async def test_the_schema_still_says_what_a_reply_holds(tool_server) -> None:
 
 
 async def test_the_catalogue_still_publishes_a_parameter_default(tool_server) -> None:
-    """The catalogue is only "enough to build a request" if the defaults are in it
-    (specs/market-data-tools, "Katalog wystarcza do zbudowania żądania"). `default` is a
-    field name here and a JSON Schema keyword everywhere else, and the first version of
-    the schema slimmer could not tell the two apart — it took this one out."""
+    """The catalogue is only "enough to build a request" if the defaults are in it. `default` is a field
+    name here and a JSON Schema keyword everywhere else, and the first slimmer took this one out."""
     by_name = {t.name: t for t in await tool_server.list_tools()}
     for tool in ("list_indicators", "describe_indicator"):
         schema = by_name[tool].outputSchema

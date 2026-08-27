@@ -1,15 +1,5 @@
-"""The reads that have two consumers: the REST routers and the tool surface at `/mcp`.
-
-Everything here used to live in a router body, which was fine while a router was the only
-way in. It stopped being fine when the tools moved into this process: a tool re-deriving
-"collected beats computed" or the three states of a forming candle would be a second copy
-of a decision that has been wrong twice already, and it would drift the way
-`agent`/`teams`'s `tools/client.py` pair drifts — the disease this change exists to stop
-rather than relocate.
-
-Nothing here builds a wire model. Routers turn these into `contract.py` shapes and tools
-turn them into their own; both read the same answer.
-"""
+"""The reads with two consumers: the REST routers and the tool surface at `/mcp`. A tool re-deriving
+"collected beats computed" would be a second copy of a decision that has been wrong twice already."""
 
 from __future__ import annotations
 
@@ -43,12 +33,8 @@ class WindowRejected(ValueError):
 
 
 class FormingState(str, Enum):
-    """Why an answer about the period being built carries no candle — or that it does.
-
-    Mirrors `contract.FormingState`; kept apart because that one is the wire and this one
-    is the decision. The three no-candle cases lead an operator to three different places,
-    which is why this is not a nullable candle.
-    """
+    """Why an answer about the period being built carries no candle — or that it does. Mirrors
+    `contract.FormingState`: that one is the wire, this one the decision, and three cases are not a null."""
 
     FORMING = "forming"
     NOT_TRACKED = "not_tracked"
@@ -80,12 +66,8 @@ class Coverage:
 def window(
     from_: datetime | None, to: datetime | None, default: timedelta = DEFAULT_WINDOW
 ) -> tuple[datetime, datetime]:
-    """The requested range, with defaults and both ends carrying a zone.
-
-    A naive bound is read as UTC rather than refused: it is the commonest way to write one
-    by hand, and the archive stores instants, so the alternative is a refusal for something
-    that has exactly one sensible reading.
-    """
+    """The requested range, with defaults and both ends carrying a zone. A naive bound is read as UTC
+    rather than refused: it is the commonest way to write one, and it has exactly one sensible reading."""
     end = to or datetime.now(UTC)
     start = from_ or end - default
     if start.tzinfo is None:
@@ -104,16 +86,8 @@ async def read_series(
     start: datetime,
     end: datetime,
 ) -> Series:
-    """Collected beats computed, and the order matters more than it looks.
-
-    A resolution being *derivable* does not mean this pair was derived: an operator may
-    track a pair at HOUR, in which case ingest fetches and stores the provider's own hourly
-    candles and nothing ever builds a rollup for it, because rollups are refreshed off the
-    minute series that pair does not have. Reading the rollup table unconditionally answered
-    such a pair with an empty series while coverage said the range was verified — which
-    reads as "the market was shut all day", the one confident wrong answer this module
-    exists to prevent.
-    """
+    """Collected beats computed, and the order matters: a pair tracked at HOUR stores the provider's own
+    candles and never builds a rollup, so reading the rollup table answered it with an empty series."""
     series: Sequence[Candle | DerivedCandle] = await read_candles(
         conn, symbol, resolution, start, end
     )
@@ -133,12 +107,8 @@ async def read_forming(
     symbol: str,
     resolution: Resolution | None,
 ) -> Forming:
-    """The period being built right now, and — when there is none — which of three reasons.
-
-    The market is asked about even when a candle is found: a price with no session behind
-    it cannot be told from a price that stopped moving an hour ago, and that answer is
-    cached per symbol either way.
-    """
+    """The period being built right now, and — when there is none — which of three reasons. The market
+    is asked about even when a candle is found: a price with no session behind it looks like a stopped one."""
     tracked = [pair for pair in await read_tracked(conn) if pair.symbol == symbol]
     if not tracked:
         return Forming(
@@ -159,9 +129,8 @@ async def read_forming(
 
     if candle is None:
         return Forming(
-            # `market_open is None` — the gateway would not say — falls to `no_quotes`
-            # rather than to `market_closed`: claiming a closed market on the strength of
-            # an unanswered question is the one wrong answer here that reads as certain.
+            # `market_open is None` — the gateway would not say — falls to `no_quotes` rather than
+            # `market_closed`: claiming a closed market on an unanswered question reads as certain.
             state=(FormingState.MARKET_CLOSED if market_open is False else FormingState.NO_QUOTES),
             resolution=resolution,
             candle=None,

@@ -13,13 +13,8 @@ export interface OlderBarsReader {
    *  keeps fetching until this goes false, so one drag to the edge is answered
    *  with as much history as the screen needs — not with one page per drag. */
   needsMore(): boolean;
-  /** One request ended with `needsMore()` still true: `MAX_PAGES` ran out before the
-   *  caller's appetite did.
-   *
-   *  Distinct from `"exhausted"`, and the distinction is the point: there *is* more
-   *  history, this request simply stopped asking for it. Whoever was waiting on that
-   *  history — an agent's focus reaching further back than twenty pages of it — otherwise
-   *  waits forever, because the run that gave up ends in `"idle"` like any other. */
+  /** `MAX_PAGES` ran out before the caller's appetite did. Distinct from `"exhausted"` on purpose:
+   *  a run that gave up ends in `"idle"` like any other, leaving whoever waited on that history waiting. */
   stoppedShort?(): void;
 }
 
@@ -30,38 +25,19 @@ export interface OlderBars {
    *  flight, after the archive ran out, and after a failure — a failure waits
    *  for `retry`, so a pan against a dead archive is not a request loop. */
   requestOlder(): void;
-  /** Everything between `target` and the oldest drawn bar, in **one** read.
-   *
-   *  `requestOlder` walks: a page is the span the oldest 300 drawn bars occupy, which on
-   *  MINUTE_5 is about a day of calendar, and `MAX_PAGES` caps one run at twenty of them.
-   *  That is the right shape for a drag to the left edge and the wrong shape entirely for
-   *  "show me the middle of March": reaching five months back would take some 145 pages,
-   *  so the run gave up three weeks in, twenty sequential requests later, and the chart
-   *  landed on wherever it had stopped rather than on what was asked for.
-   *
-   *  A named moment is not a walk — the window is known before the first request, so it
-   *  is asked for once. Ignored when the series already reaches back that far. */
+  /** Everything between `target` and the oldest drawn bar, in **one** read. A named moment is not a walk:
+   *  reaching five months back through `requestOlder`'s ~day-per-page took 145 pages and gave up three weeks in. */
   reachBack(target: number): void;
   retry(): void;
 }
 
-/** How many of the oldest drawn bars define the span asked for. The window is
- *  measured in time the drawn candles actually occupy rather than a period
- *  length per resolution: `types.ts` refuses to keep such a table (a daily
- *  candle starts at the venue's session, not at UTC midnight), and a table
- *  would be blind to weekends besides — 500 minute candles are eight hours of
- *  candles but far more than eight hours of clock. */
+/** How many of the oldest drawn bars define the span asked for — time the candles actually occupy, since a
+ *  period-per-resolution table cannot hold a daily candle's session start and is blind to weekends besides. */
 const PAGE_BARS = 300;
 
 /**
- * Empty windows walked through before this pair counts as having no more history.
- *
- * One empty window means nothing: a weekend, a holiday and a pause in collection all look
- * exactly like a range with no candles in it. Each window doubles, so eight of them reach
- * back 255 times the first — at a five-hour base window that is nearly two months, which
- * no market closure comes near. Four of them (which is what this was) reached back three
- * days, and a long Easter weekend was enough to have a chart announce the start of history
- * in the middle of the archive.
+ * Empty windows walked through before this pair counts as having no more history. One means nothing — a
+ * weekend, a holiday and a pause in collection all look alike. Each doubles; four reached back only three days.
  */
 const EMPTY_WINDOWS = 8;
 
@@ -82,14 +58,8 @@ function pageSpan(series: readonly Bar[]): number {
 }
 
 /**
- * Older candles for one (symbol, resolution), fetched until the viewport has enough of
- * them to its left.
- *
- * This is a range read, which is the thing the hub took away from charts — and it stays
- * taken away for the live edge. Every read here ends at the oldest *drawn* bar, so it can
- * only ever touch periods already settled: the right-hand edge, the forming candle and
- * everything a reconnect fills still come from the subscription's snapshot alone
- * (design.md of `chart-loads-older-candles`, "Odczyt zakresu wraca do wykresu").
+ * Older candles for one (symbol, resolution). Every read ends at the oldest *drawn* bar, so it touches only
+ * settled periods: the live edge still comes from the subscription's snapshot alone (design.md of that change).
  */
 export function useOlderBars(
   source: MarketDataSource,
@@ -111,9 +81,8 @@ export function useOlderBars(
   const blockedRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
 
-  // Each (source, symbol, resolution) gets its own run. The generation makes a
-  // late answer from the previous one dead on arrival, the way the feed's
-  // `cancelled` flag does.
+  // Each (source, symbol, resolution) gets its own run; the generation makes a late answer from the
+  // previous one dead on arrival, the way the feed's `cancelled` flag does.
   const generationRef = useRef(0);
 
   useEffect(() => {
@@ -170,9 +139,8 @@ export function useOlderBars(
 
         readerRef.current.deliver(bars);
 
-        // A page that leaves the series starting where it started is a page of
-        // candles already drawn. Asking again would ask the same question, so
-        // the archive counts as having nothing older.
+        // A page that leaves the series starting where it started is a page of candles already drawn:
+        // asking again asks the same question, so the archive counts as having nothing older.
         if (readerRef.current.readSeries()[0]?.time >= series[0].time) {
           blockedRef.current = true;
           setStatus("exhausted");
@@ -227,10 +195,8 @@ export function useOlderBars(
         }
 
         readerRef.current.deliver(bars);
-        // One read is the whole attempt, so the wait is over either way — reached, or
-        // reached as far as the archive goes. Without this a target the archive starts
-        // after (March asked of a February-onwards archive) would leave whoever was
-        // waiting waiting, since a page that made *some* progress settles nothing.
+        // One read is the whole attempt, so the wait is over either way. Without this, a target the archive
+        // starts after would leave the waiter waiting, since a page that made *some* progress settles nothing.
         if (readerRef.current.needsMore()) readerRef.current.stoppedShort?.();
         setStatus("idle");
       } catch (cause: unknown) {
@@ -259,9 +225,8 @@ export function useOlderBars(
   }, []);
 
   const retry = useCallback(() => {
-    // Only a failure is retried. "Exhausted" is an answer, not an outage: the
-    // archive said there is nothing older, and asking again would ask the same
-    // question of the same data.
+    // Only a failure is retried. "Exhausted" is an answer, not an outage — the archive said there is
+    // nothing older, and asking again asks the same question of the same data.
     if (status !== "error") return;
     blockedRef.current = false;
     setError(null);

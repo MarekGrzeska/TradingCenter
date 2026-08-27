@@ -18,28 +18,8 @@ import type {
 import { formatAge, formatProbability, isStale } from "./probability";
 
 /**
- * One tracked event: its markets, their outcomes, and — once opened — how each has moved.
- *
- * **The event is the unit, and a market is not a coin.** A market with two outcomes is
- * the special case of one with several, not the shape the rest are trimmed to, so every
- * outcome gets its own row and none is dropped for not being "Yes". Where a market is
- * `negRisk` its Yes prices belong to a mutually-exclusive set and need not sum to 1 —
- * saying so is cheaper than an operator working out why they do not.
- *
- * The seven windows are fetched when the card is opened, not with the list: they are one
- * request per event, and fifty events' worth of them is fifty requests for numbers nobody
- * has looked at yet.
- *
- * **Folded, the card carries no price at all** — the title, the group, whether prices are
- * arriving and the way out. The summary that used to sit here quoted one outcome per market,
- * which is a market reduced to a single "for" price: exactly what the unfolded view is
- * forbidden to do. Folding is not an exception to that rule, only the easiest place to slip
- * past it (specs/terminal-polymarket, "Zwinięty wiersz identyfikuje obserwację i nie udaje
- * odczytu").
- *
- * **One way out, and it takes everything.** There is no stopping without removing: that
- * produced an observation which neither collected nor left the list, and the module no
- * longer offers it.
+ * One tracked event. **The event is the unit and a market is not a coin**: every outcome gets a row, and a
+ * folded card carries no price at all, because a summary quoting one outcome is the reduction this forbids.
  */
 
 const NO_CHANGES: EventChanges = { eventId: 0, outcomes: [] };
@@ -57,14 +37,11 @@ export function EventCard({
   groups: Group[];
   onChanged(): void;
 }) {
-  // Two states. It had three for a day: the middle one — outcomes without their windows —
-  // turned out to be a click nobody wanted, since an operator who unfolds an event is
-  // unfolding it to see how it moved. Folded is the state that earns its keep.
+  // Two states. It had three for a day: outcomes without their windows turned out to be a click nobody
+  // wanted, since an operator who unfolds an event is unfolding it to see how it moved.
   const [open, setOpen] = useState(false);
-  // Resolved markets are folded, never dropped. A dated event resolves its markets one by
-  // one and each stays for good: ten of them under one event is a hundred rows saying
-  // nothing about now. The history behind them is the opposite of worthless — it is the
-  // part the provider will not give back.
+  // Resolved markets are folded, never dropped: ten under one event is a hundred rows saying nothing about
+  // now, while the history behind them is the part the provider will not give back.
   const [showResolved, setShowResolved] = useState(false);
   const [removing, setRemoving] = useState(false);
 
@@ -108,9 +85,8 @@ export function EventCard({
             value={groups.find((entry) => entry.name === event.group)?.id ?? ""}
             onChange={(e) => {
               const raw = e.target.value;
-              // Handled rather than awaited into nothing: a rejected assignment used to be
-              // an unhandled rejection, and the control went on showing a group the module
-              // had refused to record.
+              // Handled rather than awaited into nothing: a rejected assignment used to be an unhandled
+              // rejection, and the control went on showing a group the module had refused to record.
               void client
                 .assignGroup(event.id, raw === "" ? null : Number(raw), new AbortController().signal)
                 .then(onChanged)
@@ -215,16 +191,8 @@ export function EventCard({
 }
 
 /**
- * A market that is over.
- *
- * One line: what it settled on. **No windows**, and that is the requirement rather than a
- * saving — after resolution the price stands, so every window comes out `0.0 pp` or "no
- * coverage". The first reads as "the market did not move" and the second as "the archive has
- * a hole"; the truth is a third thing, that there is nothing left to measure
- * (specs/terminal-polymarket, "Rozstrzygnięty rynek pokazany świadomie").
- *
- * The prices are still shown, because they are the answer: 100% against the outcome that
- * won is what resolution looks like.
+ * A market that is over: one line, and **no windows**. After resolution every window reads `0.0 pp` or "no
+ * coverage" — "did not move" and "the archive has a hole" — where the truth is that there is nothing to measure.
  */
 function ResolvedMarket({ market }: { market: Market }) {
   return (
@@ -292,9 +260,8 @@ function MarketRows({
       <ul className="mt-1 flex flex-col gap-1">
         {market.outcomes.map((outcome) => {
           const live = prices.get(outcome.id);
-          // The snapshot is the current answer; the structure read carries whatever was
-          // true when the list was fetched. Preferring the snapshot is what keeps a price
-          // and its moment from coming out of two different reads.
+          // The snapshot is the current answer; the structure read carries whatever was true when the list
+          // was fetched. Preferring the snapshot keeps a price and its moment from two different reads.
           const price = live?.price ?? outcome.price;
           const priceAt = live?.priceAt ?? outcome.priceAt;
           const stale = isStale(priceAt);

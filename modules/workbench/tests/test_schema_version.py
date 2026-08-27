@@ -1,14 +1,5 @@
-"""The one thing about `schema_version` that is this module's rather than the library's.
-
-Both surfaces used to carry a near-identical copy of `tc_runtime.schema_version`'s own unit
-tests — a `FakeConnection` yielding a revision list, and five assertions about `verify`
-against it. Those live with the code they test, in `packages/tc-runtime/tests/`, and the
-copies here proved nothing about this module that the library's own suite did not.
-
-What is left is the pairing no library can check for us: this image's `migrations/` against
-a database they were actually run on, once per schema this process owns — and that the two
-schemas take different advisory locks.
-"""
+"""The one thing about `schema_version` that is this module's rather than the library's: this image's migrations
+against a database they were run on, once per schema, and that the two schemas take different advisory locks."""
 
 from __future__ import annotations
 
@@ -29,9 +20,8 @@ from teams.runtime import MIGRATIONS as TEAMS_MIGRATIONS
 def migrated_schema(
     request: pytest.FixtureRequest, agent_migrated_url: str, teams_migrated_url: str
 ) -> tuple[str, Path]:
-    """Both URLs are requested as arguments rather than pulled with `getfixturevalue`:
-    the migration runs through `asyncio.run`, which refuses to start inside the loop an
-    async test body is already on."""
+    """Both URLs are requested as arguments rather than pulled with `getfixturevalue`: the migration runs through
+    `asyncio.run`, which refuses to start inside the loop an async test body is already on."""
     if request.param == "agent":
         return agent_migrated_url, AGENT_MIGRATIONS
     return teams_migrated_url, TEAMS_MIGRATIONS
@@ -52,14 +42,7 @@ async def test_the_migrated_database_the_tests_run_against_passes(
 
 
 def test_the_two_schemas_do_not_share_an_advisory_lock() -> None:
-    """The key stopped being a constant in the file that takes the lock and became an
-    argument each surface supplies (`agent/runtime.py`, `teams/runtime.py`). That is the
-    whole risk of sharing `db.py`: one key silently equal to the other would put two
-    chains' migrations behind one lock, in databases neither can see, and the symptom would
-    be a start-up that hangs with no failing query to find it by.
-
-    `tests/agent/test_migrate.py` pins the conversation's own number; what is here is the
-    pair, which is what nothing else can see.
-    """
+    """The key stopped being a constant in the file that takes the lock and became an argument each surface supplies:
+    one silently equal to the other would put two chains behind one lock, in databases neither can see."""
     assert TEAMS_LOCK_KEY == 8050
     assert AGENT_LOCK_KEY != TEAMS_LOCK_KEY

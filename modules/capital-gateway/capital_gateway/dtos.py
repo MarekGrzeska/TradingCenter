@@ -1,10 +1,5 @@
-"""Neutral, provider-agnostic DTOs — the module's real contract.
-
-capital.com is mapped into these; callers never see a raw provider payload. There is
-deliberately no ``BrokerPort`` beside them: a Protocol is structural, so it constrains
-nothing unless something is annotated with it, and these models are what the HTTP
-contract is actually made of.
-"""
+"""Neutral, provider-agnostic DTOs — the module's real contract. No ``BrokerPort`` beside them:
+a Protocol constrains nothing unannotated, and these models are what the HTTP contract is made of."""
 
 from __future__ import annotations
 
@@ -28,8 +23,7 @@ class Direction(str, Enum):
 
 
 class Resolution(str, Enum):
-    """Candle time frame. One vocabulary serves REST and streaming alike —
-    ``GET /prices/{epic}?resolution=`` and ``OHLCMarketData.subscribe`` take the
+    """Candle time frame. One vocabulary serves REST and streaming alike — the two take the
     same spellings."""
 
     MINUTE = "MINUTE"
@@ -43,11 +37,11 @@ class Resolution(str, Enum):
 
 
 class OrderStatus(str, Enum):
-    FILLED = "FILLED"  # market order executed
+    FILLED = "FILLED"
     WORKING = "WORKING"  # accepted but resting (pending limit/stop)
-    CLOSED = "CLOSED"  # a position close settled
-    CANCELLED = "CANCELLED"  # a working order cancellation settled
-    UPDATED = "UPDATED"  # a position amendment (SL/TP) settled
+    CLOSED = "CLOSED"
+    CANCELLED = "CANCELLED"
+    UPDATED = "UPDATED"
     REJECTED = "REJECTED"
     PENDING = "PENDING"  # not yet settled — the confirmation is still in flight
 
@@ -70,25 +64,14 @@ class Instrument(BaseModel):
 
 
 class InstrumentTerms(BaseModel):
-    """What the provider will let a caller do with one instrument, and at what deposit.
-
-    Deliberately not fields on `Instrument`: the provider carries none of this in the flat
-    market dict that search and marketnavigation return, only in the detail of a single
-    instrument. Hanging them off the catalogue would mean one request per row.
-
-    No price here. It is already in `Instrument` and in `Candle`, and a third place for it
-    is a third answer that can be from a different moment.
-
-    Every field but `symbol` may be absent: the provider omits some of them for some
-    instruments, and a missing rule is not a rule of zero.
-    """
+    """What the provider will let a caller do with one instrument, and at what deposit. Not fields
+    on `Instrument`: the provider carries these only in a single instrument's detail, one request each."""
 
     symbol: str
     currency: str | None = None
     lot_size: float | None = None
-    # The unit travels with the number and is never folded into it — a bare 5 could be a
-    # 5% deposit or a 20x multiplier, and this module has no way to tell which the
-    # provider meant. `PERCENTAGE` is what capital.com has been observed to send.
+    # The unit travels with the number and is never folded into it — a bare 5 could be a 5%
+    # deposit or a 20x multiplier, and this module cannot tell which the provider meant.
     margin_factor: float | None = None
     margin_factor_unit: str | None = None
     min_deal_size: float | None = None
@@ -118,23 +101,14 @@ class Candle(BaseModel):
     close: float | None = None
     volume: float | None = None
     resolution: Resolution
-    # True while the period this candle covers has not finished. The provider serves
-    # candles up to the present, so a read reaching now hands back the period it is in —
-    # complete in every field and still going to change. A consumer that cannot tell will
-    # store a price from halfway through a period as the period's result, and nothing
-    # downstream ever looks wrong enough to catch it.
+    # True while the period this candle covers has not finished. A consumer that cannot tell
+    # stores a price from halfway through a period as its result, and nothing downstream looks wrong.
     forming: bool = False
 
 
 class CandleHistory(BaseModel):
-    """A deep read, with what it cost.
-
-    The provider serves at most 1000 candles per request, so a deep read is many
-    requests and can take tens of seconds. ``requests`` makes that visible instead of
-    leaving a caller to guess why a read was slow, and ``history_ended`` distinguishes
-    "the instrument has no more data" from "we stopped early" — both of which otherwise
-    look identical: a series shorter than the one asked for.
-    """
+    """A deep read, with what it cost. ``requests`` makes a slow read visible, and ``history_ended``
+    tells "the instrument has no more data" from "we stopped early" — otherwise identical."""
 
     candles: list[Candle]
     count: int

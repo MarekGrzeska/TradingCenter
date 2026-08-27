@@ -4,13 +4,8 @@ import { http, HttpResponse, setupServer } from "../test/httpDouble";
 import { createStrategyApi } from "./strategyApi";
 
 /**
- * The wire↔domain seam. Past it everything is `Date`s and camelCase; nothing past it knows
- * what this module's JSON looks like.
- *
- * The tests that matter most here are about **refusals**, because refusals are what this
- * module mostly answers with — and because two of them mean different things: a 422 is the
- * module declining a request it understood, while a 504 is the module saying it could not
- * see the archive, which is not the same as seeing nothing.
+ * The wire↔domain seam. The tests that matter most are about **refusals**: a 422 is the module declining a request it
+ * understood, a 504 the module saying it could not see the archive — which is not the same as seeing nothing.
  */
 
 const HTTP_BASE = "http://strategy.test";

@@ -42,9 +42,8 @@ def test_an_amendment_naming_neither_stop_is_refused() -> None:
 
 def test_setting_one_stop_leaves_the_other_unset() -> None:
     req = UpdatePositionRequest(stop_loss=1800.0)
-    # The tri-state lives in model_fields_set, not in the value: take_profit is None
-    # here because it was omitted, and None also means "remove it". Only the set of
-    # provided fields tells the two apart.
+    # The tri-state lives in model_fields_set, not in the value: None here means omitted, and
+    # None also means "remove it". Only the set of provided fields tells them apart.
     assert req.model_fields_set == {"stop_loss"}
     assert req.take_profit is None
 

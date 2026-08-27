@@ -1,8 +1,5 @@
-"""Sessions — the rozmowa itself, and the title derived from its first question.
-
-`deleted_at IS NULL` rides on every read here, which is what makes a removed session
-answer like a missing one through every route at once.
-"""
+"""Sessions — the rozmowa itself, and the title derived from its first question. `deleted_at IS NULL` rides
+on every read here, which makes a removed session answer like a missing one through every route."""
 
 from __future__ import annotations
 
@@ -13,9 +10,8 @@ from ..models import (
     Session,
 )
 
-# How much of the first message becomes the session's title (specs/agent-chat, "Tytuł
-# powstaje z pierwszego pytania"). Long enough to be recognisable in a narrow list,
-# short enough that one does not crowd out its neighbours.
+# How much of the first message becomes the session's title: long enough to be recognisable in a narrow
+# list, short enough that one does not crowd out its neighbours.
 _TITLE_MAX_CHARS = 60
 
 
@@ -32,10 +28,8 @@ _INSERT_SESSION = """
     RETURNING id, owner_principal, title, current_model_id, created_at, last_active_at
 """
 
-# `deleted_at IS NULL` rides on every read of a session, here and below. One condition in
-# one place is what makes a removed rozmowa answer like a missing one everywhere at once
-# — GET, PATCH, the transcript and a new turn all reach the session through this — rather
-# than each route remembering to check.
+# `deleted_at IS NULL` rides on every read of a session. One condition in one place is what makes a removed
+# rozmowa answer like a missing one everywhere at once, rather than each route remembering to check.
 _SELECT_SESSION = """
     SELECT id, owner_principal, title, current_model_id, created_at, last_active_at
       FROM sessions
@@ -57,9 +51,8 @@ _UPDATE_SESSION_MODEL = """
     RETURNING id, owner_principal, title, current_model_id, created_at, last_active_at
 """
 
-# The operator's own name for a rozmowa. It overwrites whatever `derive_title` put there
-# and is never overwritten back: `_TOUCH_SESSION` below only fills a title that is still
-# NULL, so a renamed session keeps its name for every turn after.
+# The operator's own name for a rozmowa. It overwrites whatever `derive_title` put there and is never
+# overwritten back: `_TOUCH_SESSION` only fills a title that is still NULL.
 _UPDATE_SESSION_TITLE = """
     UPDATE sessions SET title = $2
      WHERE id = $1 AND owner_principal = $3 AND deleted_at IS NULL
@@ -88,10 +81,8 @@ async def create_session(
 async def get_session(
     conn: Conn, *, session_id: int, owner_principal: str
 ) -> Session | None:
-    """`None` for a session that does not exist, for one owned by someone else, and for
-    one the operator removed — all three are indistinguishable to a caller on purpose
-    (specs/agent-browser-access, "Odmowa dostępu do cudzej sesji MUST być nieodróżnialna
-    od odpowiedzi o sesji nieistniejącej")."""
+    """`None` for a session that does not exist, one owned by someone else, and one the operator removed —
+    all three indistinguishable to a caller on purpose."""
     row = await conn.fetchrow(_SELECT_SESSION, session_id, owner_principal)
     return _session_from_row(row) if row else None
 
@@ -116,13 +107,7 @@ async def set_session_title(
 
 
 async def delete_session(conn: Conn, *, session_id: int, owner_principal: str) -> bool:
-    """False for a session that does not exist, belongs to someone else, or was already
-    removed — the caller cannot tell which, same as `get_session`.
-
-    The row is stamped, not deleted: `usage` references it, and a rozmowa removed from the
-    list must not remove what it cost from the ledger (specs/agent-usage, "Skasowanie
-    rozmowy nie zmniejsza rachunku"). The transcript stays in `messages` too, unreachable
-    through this module's API — actually erasing text is a different operation from
-    tidying a list, and nothing here claims to do it."""
+    """False for a session that does not exist, belongs to someone else, or was already removed. The row is
+    stamped, not deleted: `usage` references it, and removing a rozmowa must not remove what it cost."""
     row = await conn.fetchrow(_SOFT_DELETE_SESSION, session_id, owner_principal)
     return row is not None

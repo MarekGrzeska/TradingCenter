@@ -1,27 +1,5 @@
-"""The definition compiled to something that can be executed: one node per agent, the
-edges the operator drew, and nothing else.
-
-LangGraph carries this because its model — explicit nodes and explicit edges — maps one to
-one onto what a revision already stores (design.md, "LangGraph, nie OpenAI Agents SDK").
-Two properties come with it rather than being written here:
-
-- **an agent starts when its predecessors have finished** — *all* of them, which is what
-  declaring its incoming edges as one joint edge means (`compile_team`; a single edge
-  alone is only a trigger);
-- **agents whose dependencies are already satisfied run at the same time**, because
-  LangGraph runs one superstep's nodes concurrently (specs/teams-runs, "Agenci, których
-  zależności są już spełnione, MAY pracować równocześnie").
-
-What is written here is the third: each node is handed *only* its own predecessors'
-outputs, never the whole state. The state holds every agent's work — a shared dict is how
-LangGraph passes anything at all — so this file is where the narrowing has to happen, and
-`_predecessors_of` is the whole of it (specs/teams-runs, "Agent widzi wypowiedzi
-poprzedników, a nie całą historię przebiegu").
-
-The definition is already known to be acyclic and connected: `TeamDefinition` refuses a
-cycle, a self-edge and an isolated agent at the moment it is saved, so nothing here
-re-checks any of that.
-"""
+"""The definition compiled to something executable: one node per agent and the edges the operator drew. What is written
+here is the third property LangGraph does not give — each node is handed only its predecessors' outputs."""
 
 from __future__ import annotations
 
@@ -34,9 +12,8 @@ from ..contract import AgentDefinition, TeamDefinition
 
 
 class AgentFailed(RuntimeError):
-    """One agent could not finish. Raised out of its node, which stops the run — the work
-    of everyone who finished before it stays written (specs/teams-runs, "Ślad przebiegu
-    zostaje niezależnie od tego, jak przebieg się skończył")."""
+    """One agent could not finish. Raised out of its node, which stops the run — the work of everyone who
+    finished before it stays written."""
 
     def __init__(self, agent_key: str, reason: str) -> None:
         super().__init__(f"agent {agent_key!r} failed: {reason}")
@@ -45,9 +22,8 @@ class AgentFailed(RuntimeError):
 
 
 def _merge_outputs(left: dict[str, str], right: dict[str, str]) -> dict[str, str]:
-    """Two agents finishing in the same superstep each return their own key. Without a
-    reducer LangGraph refuses concurrent writes to one channel — this is the whole reason
-    the state is a dict of outputs rather than a list."""
+    """Two agents finishing in the same superstep each return their own key. Without a reducer LangGraph
+    refuses concurrent writes to one channel, which is why the state is a dict of outputs."""
     return {**left, **right}
 
 
@@ -55,9 +31,8 @@ class RunState(TypedDict):
     outputs: Annotated[dict[str, str], _merge_outputs]
 
 
-# What a node does with one agent: given the agent and its predecessors' work, produce
-# that agent's own output. Supplied by the engine, which is where the model, the tools and
-# the trace live — this module knows only the shape of the work, not how it is done.
+# What a node does with one agent: given the agent and its predecessors' work, produce that agent's own
+# output. Supplied by the engine — this module knows the shape of the work, not how it is done.
 AgentRunner = Callable[[AgentDefinition, Sequence[tuple[str, str]]], Awaitable[str]]
 
 
@@ -84,12 +59,8 @@ def compile_team(definition: TeamDefinition, run_agent: AgentRunner):
     for agent in definition.agents:
         sources = predecessors[agent.key]
         if sources:
-            # The list form is load-bearing. Separate add_edge(a, c) / add_edge(b, c)
-            # calls are independent triggers, so predecessors finishing in different
-            # supersteps ran the node once per wave — run 22's `kronikarz` step was
-            # started a second time after it had finished, on 21 August 2026, and
-            # `run_steps_status_fields_match` is what caught it. Only
-            # add_edge([...], c) makes the node wait for all of them.
+            # The list form is load-bearing: separate `add_edge` calls are independent triggers, so
+            # predecessors finishing in different supersteps ran the node once per wave. Measured 21 Aug 2026.
             graph.add_edge(list(sources), agent.key)
         else:
             graph.add_edge(START, agent.key)
@@ -102,9 +73,8 @@ def compile_team(definition: TeamDefinition, run_agent: AgentRunner):
 def _make_node(agent: AgentDefinition, sources: tuple[str, ...], run_agent: AgentRunner):
     async def node(state: RunState) -> dict:
         outputs = state["outputs"]
-        # `.get` rather than `[]`, and the missing case is deliberate rather than
-        # defensive: a predecessor that produced nothing readable is still a predecessor,
-        # and its successor should be told that instead of dying on a KeyError.
+        # `.get` rather than `[]`, and the missing case is deliberate rather than defensive: a predecessor
+        # that produced nothing readable is still a predecessor, and its successor should be told so.
         given = [(key, outputs.get(key, "")) for key in sources]
         return {"outputs": {agent.key: await run_agent(agent, given)}}
 

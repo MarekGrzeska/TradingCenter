@@ -1,9 +1,5 @@
-"""The configurator's surface: a happy path, an error and a refusal per view.
-
-What this file is really about is the second half of every write — the refusal. A rule that
-cannot run is something the operator can still see on the screen they wrote it on, and an
-hour later it is a strategy that silently records nothing.
-"""
+"""The configurator's surface: a happy path, an error and a refusal per view. What this file is really
+about is the refusal — an hour later a rule that cannot run is a strategy that silently records nothing."""
 
 from __future__ import annotations
 

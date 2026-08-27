@@ -1,10 +1,5 @@
-"""What a rule is refused for before anybody asks the archive anything.
-
-Every refusal here is decidable from the definition alone — a name used and not declared, an
-arity that cannot mean anything, a tree past its ceiling. What needs the archive's catalogue
-lives in `test_rule_validation.py`, and the split is the same one the two files are written
-either side of.
-"""
+"""What a rule is refused for before anybody asks the archive anything — every refusal here is decidable
+from the definition alone. What needs the catalogue lives in `test_rule_validation.py`."""
 
 from __future__ import annotations
 

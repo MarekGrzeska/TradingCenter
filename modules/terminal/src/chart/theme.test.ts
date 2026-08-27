@@ -42,9 +42,8 @@ describe("indicator colour tokens", () => {
 
 describe("drawing colour tokens", () => {
   it("shares no colour with the indicator palette", () => {
-    // The whole reason this palette exists: a drawn resistance in exactly EMA 200's
-    // colour is an object that cannot be told from something else entirely
-    // (`agent-chart-drawings` spec, "Paleta rysunków MUST być odrębna").
+    // The whole reason this palette exists: a drawn resistance in exactly EMA 200's colour is an object
+    // that cannot be told from something else entirely.
     const colors = readChartColors();
     const indicators = new Set(colors.indicatorLines);
     for (const drawn of colors.drawingLines) expect(indicators.has(drawn)).toBe(false);
@@ -62,9 +61,8 @@ describe("drawing colour tokens", () => {
   });
 
   it("still resolves an indicator token, for the objects drawn before this palette", () => {
-    // The tool stopped offering these, but the rows saved with one are still on
-    // instruments; forgetting them here would blank objects nobody removed (design.md,
-    // "Paleta rysunków dokłada tokeny, nie odbiera starych").
+    // The tool stopped offering these, but the rows saved with one are still on instruments; forgetting
+    // them here would blank objects nobody removed.
     const colors = readChartColors();
     expect(drawingColorFromToken(colors, "--color-accent")).toBe(colors.indicatorLines[0]);
     expect(drawingColorFromToken(colors, "--color-down")).toBe(colors.indicatorLines[7]);
@@ -79,9 +77,8 @@ describe("drawing colour tokens", () => {
   it("gives one id one colour, whatever else is on the chart", () => {
     const colors = readChartColors();
     expect(drawingColorFor(7, colors)).toBe(drawingColorFor(7, colors));
-    // The property the old position-in-the-list cycle did not have: an id's colour is a
-    // function of the id alone, so removing a neighbour repaints nothing
-    // (`terminal-chart` spec, "Kolor obiektu po usunięciu innego").
+    // The property the old position-in-the-list cycle did not have: an id's colour is a function of the
+    // id alone, so removing a neighbour repaints nothing.
     const before = [4, 7, 11].map((id) => drawingColorFor(id, colors));
     const after = [7, 11].map((id) => drawingColorFor(id, colors));
     expect(after).toEqual(before.slice(1));

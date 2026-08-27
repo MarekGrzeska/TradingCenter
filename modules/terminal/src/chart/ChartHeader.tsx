@@ -29,14 +29,8 @@ export interface ChartHeaderProps {
 }
 
 /**
- * The row above the canvas: what the chart is showing, the controls that change it, and
- * the badges for everything that is not currently working.
- *
- * A component rather than a fragment of `Chart.tsx` because none of it touches the chart
- * instance — it renders state and calls back. The one prop it takes whole is
- * `useChartIndicators`' own return: the picker, the two warning badges and the retry
- * button are the visible half of exactly that hook, and threading its nine fields through
- * as nine props would only hide where they come from.
+ * The row above the canvas. A component rather than a fragment of `Chart.tsx` because none of it touches the
+ * chart instance; it takes `useChartIndicators`' return whole, since nine props would hide where they come from.
  */
 export function ChartHeader({
   symbol,
@@ -74,10 +68,8 @@ export function ChartHeader({
         aria-label="Resolution"
         value={resolution}
         onChange={(e) => onResolutionChange(e.target.value as Resolution)}
-        // `h-6` rather than the vertical padding alone: a native `<select>` carries its
-        // own intrinsic sizing on top of padding, which made it taller than a `<button>`
-        // given the identical classes — pinning the height is what actually matches
-        // them, not the padding.
+        // `h-6` rather than the vertical padding alone: a native `<select>` carries its own intrinsic
+        // sizing on top of padding, which made it taller than a `<button>` given identical classes.
         className="h-6 rounded border border-border bg-sunken px-1.5 text-xs text-ink"
       >
         {resolutions.map((r) => (
@@ -87,20 +79,16 @@ export function ChartHeader({
         ))}
       </select>
 
-      {/* Grouped with the instrument and interval, not pushed to the far right with
-          the status badges below: this is a control the operator reaches for, the
-          same as the two selectors beside it — and the right side of the header sits
-          directly above the right edge of the price pane, where the current price and
-          its axis label live. Nothing that competes for attention belongs there. */}
+      {/* Grouped with the instrument and interval rather than pushed right with the status badges: this
+          is a control the operator reaches for, and the right side of the header sits above the price
+          pane, where the current price and its axis label live. */}
       {hasIndicatorSource && (
         <IndicatorPicker
           entries={catalogue.entries}
           selections={knownIndicatorSelections}
           onChange={(next) => {
-            // An unknown selection is never touched by an edit to a known
-            // one — only a change that names it (impossible: it has no
-            // checkbox) or a later catalogue read that recognizes it again
-            // moves it out of this list.
+            // An unknown selection is never touched by an edit to a known one — only a later catalogue
+            // read that recognizes it again moves it out of this list.
             const stillUnknown = indicatorSelections.filter((s) => !catalogueById.has(s.id));
             setIndicatorSelections([...stillUnknown, ...next]);
           }}
@@ -141,9 +129,8 @@ export function ChartHeader({
           </span>
         )}
         {failedIndicators.length > 0 && (
-          // Named by id rather than counted: with several chosen, "one is unavailable"
-          // sends the operator looking for which. The reason is in the toast; the id
-          // is what makes the toast findable.
+          // Named by id rather than counted: with several chosen, "one is unavailable" sends the operator
+          // looking for which.
           <span
             title={failureDigest}
             className="rounded border border-critical/40 px-1.5 py-0.5 text-[10px] tracking-wide text-critical uppercase"

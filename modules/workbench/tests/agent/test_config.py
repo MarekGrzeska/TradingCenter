@@ -1,8 +1,5 @@
-"""What the conversation's settings hold that the teams surface's do not.
-
-The database-mode rules and the market-mcp mode switch are the same validators on both
-surfaces and are checked once for both, in `tests/test_config_common.py`.
-"""
+"""What the conversation's settings hold that the teams surface's do not. The database-mode rules and the
+tool-server mode switch are the same validators on both and are checked once for both."""
 
 from __future__ import annotations
 
@@ -40,8 +37,6 @@ def test_a_complete_configuration_names_its_default_model() -> None:
     assert settings().default_model_id == "gpt-5.6-luna"
 
 
-# --- provider credential: the key, and nothing to fall back to ---
-
 
 def test_a_missing_api_key_refuses_to_start() -> None:
     """Not optional, unlike the database's: OpenAI is not in Entra, so there is no
@@ -61,8 +56,6 @@ def test_a_blank_api_key_is_a_missing_one_not_a_key_named_blank() -> None:
 def test_the_api_key_is_stripped() -> None:
     assert settings(openai_api_key="  sk-abc  ").openai_api_key == "sk-abc"
 
-
-# --- model catalogue, and the default this surface alone has ---
 
 
 def test_an_empty_catalogue_refuses_to_start() -> None:

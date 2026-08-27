@@ -1,11 +1,5 @@
-"""The comparison every module makes before it serves anything.
-
-The interesting case here is the one that decided *which* of the two copies became the
-package: a module whose image ships no revision at all. Agent's version formatted the
-expected set unguarded and produced "expects the database at , and it is at …" — a
-sentence with a hole where the answer should be. Teams' version named the case. Neither
-module had a test for it, which is how the fix sat in one copy for a week.
-"""
+"""The comparison every module makes before it serves anything. The interesting case is the one that
+decided which copy became the package: a module whose image ships no revision at all."""
 
 from __future__ import annotations
 

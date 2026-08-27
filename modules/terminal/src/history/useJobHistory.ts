@@ -2,14 +2,8 @@ import { useRead } from "../data/query";
 import type { ArchiveAdmin } from "../data/source";
 import type { JobPairView, PairDeletion } from "../data/types";
 
-/** How often the tab re-asks, while it is open (`terminal-collection-history`
- *  spec, "Zakładka odświeża się sama").
- *
- *  Ten seconds, not the thirty this started at. The read costs one query to the
- *  archive's own database — never the gateway, so it cannot eat into the
- *  provider budget the chunks themselves are queued behind — and a `MINUTE`
- *  chunk settles every few tens of seconds, so thirty was slow enough to make a
- *  working job look stalled. */
+/** How often the tab re-asks while open. Ten seconds, not the thirty this started at: the read costs one query to the
+ *  archive's own database, and a `MINUTE` chunk settles fast enough that thirty made a working job look stalled. */
 const POLL_MS = 10_000;
 
 interface Both {
@@ -38,14 +32,8 @@ export interface JobHistoryState {
 }
 
 /**
- * What has been pulled and what has been deleted, kept current — the same shape of state
- * as `useTrackedPairs` and for the same reason (terminal-collection-history spec,
- * "Zakładka odróżnia brak historii od braku odpowiedzi").
- *
- * The two reads land together or not at all: a deletion cutting a pair's history short
- * is what this tab exists to show, so "jobs refreshed, deletions did not" is not a state
- * worth telling apart from a failed poll. That is why this is one query over both and
- * not two — one cache entry, one status, one failure.
+ * What has been pulled and what has been deleted, kept current. One query over both rather than two: "jobs refreshed,
+ * deletions did not" is not a state worth telling apart from a failed poll — one cache entry, one status.
  */
 export function useJobHistory(admin: ArchiveAdmin): JobHistoryState {
   const read = useRead<Both>({

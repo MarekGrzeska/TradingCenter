@@ -122,9 +122,7 @@ async def test_aggregation_is_scoped_to_the_callers_own_sessions(db) -> None:
 
 
 async def test_a_later_rate_does_not_change_an_earlier_rows_cost(db) -> None:
-    # specs/agent-usage, "Koszt jest przypisany do wiersza w chwili zapisu" — the
-    # mechanism itself: recording a second row on a different rate must not touch the
-    # first.
+    # The mechanism itself: recording a second row on a different rate must not touch the first.
     _, first = await _reply_with_usage(
         db, input_tokens=1000, output_tokens=0, input_rate=Decimal(1), output_rate=Decimal(6)
     )

@@ -1,16 +1,5 @@
-"""capital-gateway's wire, snapshotted rather than assumed.
-
-    uv run python scripts/contract.py generate   # rewrite contract/capital-gateway.openapi.json
-    uv run python scripts/contract.py check      # fail if that file is stale
-
-Same mechanism market-mcp uses for market-data's schema (`market-mcp/scripts/
-contract.py`), ported here rather than shared — no library between modules. Unlike
-market-data, capital-gateway has no dedicated `python -m ....openapi` module, so the
-schema is read straight off `FastAPI.openapi()` — constructing `capital_gateway.app`
-needs no database, no live provider session and no CAPITAL_* credentials: `Settings()`
-is built inside `lifespan`, not at import time, so the schema is a property of the
-route and DTO definitions alone.
-"""
+"""capital-gateway's wire, snapshotted rather than assumed — `generate` rewrites the file, `check`
+fails if it is stale. Constructing the app needs no database and no credentials."""
 
 from __future__ import annotations
 
@@ -26,20 +15,16 @@ MODULE_ROOT = HERE.parent
 CAPITAL_GATEWAY = MODULE_ROOT.parent / "capital-gateway"
 OUTPUT = MODULE_ROOT / "contract" / "capital-gateway.openapi.json"
 
-# The floor of capital-gateway's own `requires-python`, pinned for the same reason
-# market-mcp pins market-data's: a newer interpreter can change a stdlib-sourced
-# string FastAPI writes into the schema (Python 3.13 renamed HTTP 422's reason
-# phrase), which would describe a contract change that never happened.
+# The floor of capital-gateway's own `requires-python`: a newer interpreter can change a stdlib-sourced
+# string FastAPI writes into the schema, which would describe a contract change that never happened.
 PYTHON_VERSION = "3.12"
 
 _PRINT_SCHEMA = "import json; from capital_gateway.app import app; print(json.dumps(app.openapi()))"
 
 
 def schema_text() -> str:
-    # Windows pipes Python's stdout through the ANSI codepage unless told otherwise,
-    # which turns every em dash in a docstring — and FastAPI puts docstrings into the
-    # schema as `description` fields — into a byte `json.loads` cannot decode as
-    # UTF-8. Same fix market-mcp's contract.py needed for the same reason.
+# Windows pipes stdout through the ANSI codepage unless told otherwise, which turns every em dash in a
+# docstring — and FastAPI puts docstrings into the schema — into a byte `json.loads` cannot decode.
     env = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
     with tempfile.TemporaryDirectory(prefix="trading-mcp-contract-") as scratch:
         env["UV_PROJECT_ENVIRONMENT"] = str(Path(scratch) / "python-env")
@@ -62,14 +47,8 @@ def schema_text() -> str:
                 file=sys.stderr,
             )
             raise SystemExit(1) from err
-    # Reformatted rather than the raw stdout: two `uv run` invocations resolving the same
-    # lockfile can still print in a different key order between runs, which would make
-    # `check` flap on nothing. `sort_keys` makes the snapshot a function of the schema
-    # alone.
-    #
-    # `ensure_ascii=False` because the whole worth of a committed snapshot is a readable
-    # diff, and this document is mostly Polish prose: escaped, one reworded sentence
-    # arrives as a wall of `\uXXXX` nobody reads. The file is written as UTF-8 either way.
+    # Reformatted rather than raw stdout: two `uv run` invocations can print a different key order,
+    # which would make `check` flap. `ensure_ascii=False` because a readable diff is the whole worth.
     return json.dumps(json.loads(result.stdout), indent=2, sort_keys=True, ensure_ascii=False) + "\n"
 
 

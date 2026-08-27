@@ -1,18 +1,5 @@
-"""The single gate every provider request passes through.
-
-capital.com allows 10 requests per second. Exceeding it answers with a rate-limit
-error, which reaches a caller looking exactly like a data problem — an empty candle
-series, a missing account — rather than like the traffic problem it is. Two concurrent
-deep reads are enough to do it: a deep read is dozens of requests back to back.
-
-A sliding window rather than a semaphore, because the limit is a *rate*: ten requests
-that each take a second are fine, ten that take a millisecond are not, and a semaphore
-cannot tell those apart.
-
-One gate per ``CapitalClient``, and the provider counts per account — so a second client
-in the same process is a second gate and twice the rate. The app owns exactly one, which
-is what makes this a process-wide budget rather than a per-caller one.
-"""
+"""The single gate every provider request passes through. capital.com allows 10 requests per second,
+and a sliding window rather than a semaphore because the limit is a *rate*, not a concurrency."""
 
 from __future__ import annotations
 

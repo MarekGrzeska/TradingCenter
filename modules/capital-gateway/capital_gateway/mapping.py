@@ -1,8 +1,5 @@
-"""Pure functions: a raw capital.com dict in, a neutral DTO out. No I/O.
-
-Kept free of side effects so the place where the provider's semantics are easiest to
-misread can be tested against recorded payloads alone, with no socket and no mock.
-"""
+"""Pure functions: a raw capital.com dict in, a neutral DTO out. No I/O, so the place where the
+provider's semantics are easiest to misread is testable against recorded payloads alone."""
 
 from __future__ import annotations
 
@@ -48,17 +45,8 @@ def instrument_from_market(m: dict) -> Instrument:
 
 
 def instrument_terms_from_details(symbol: str, m: dict) -> InstrumentTerms:
-    """From the detail of one market — `GET /markets/{epic}`, not the flat dict above.
-
-    `dealingRules` states every rule as `{unit, value}`. Only the value is carried: the
-    unit on a size rule is the provider's own word for "instrument units" (it sends
-    `POINTS` for a size, which it is not), and passing that along would invite a caller to
-    read it as something to convert by. The one unit that does mean something is the
-    margin factor's, which travels beside it untouched.
-
-    A missing field stays missing. `dealingRules` absent entirely is the same answer as
-    every rule inside it absent, so no branch distinguishes them.
-    """
+    """From the detail of one market — `GET /markets/{epic}`, not the flat dict above. Only the
+    value of each `dealingRule` is carried: its unit is the provider's own word and invites conversion."""
     instrument = m.get("instrument") or {}
     rules = m.get("dealingRules") or {}
     return InstrumentTerms(
@@ -79,14 +67,8 @@ def _rule_value(rules: dict, name: str) -> float | None:
 
 
 def _bid(price: dict | None) -> float | None:
-    """The bid side of one candle edge.
-
-    Not the midpoint. REST gives both sides per edge, the stream's `classic` OHLC gives
-    one, and that one is the bid — so a midpoint here would put a half-spread step at
-    every seam between stored history and live candles. On US100 that spread is about
-    1.8 points, which is visible on a chart and invisible in a test that only checks
-    one source at a time.
-    """
+    """The bid side of one candle edge, not the midpoint: the stream's `classic` OHLC gives bid
+    only, so a midpoint would put a half-spread step at every seam with stored history."""
     if not price:
         return None
     bid = price.get("bid")
@@ -96,9 +78,8 @@ def _bid(price: dict | None) -> float | None:
 
 
 def _candle_ts(p: dict) -> str:
-    """capital.com sends `snapshotTimeUTC` without a zone marker, so a consumer parsing
-    it gets local time on most platforms. The `Z` is added here rather than left for
-    every caller to remember."""
+    """capital.com sends `snapshotTimeUTC` without a zone marker, so a consumer parsing it gets local time on
+    most platforms. The `Z` is added here rather than left for every caller to remember."""
     utc = p.get("snapshotTimeUTC")
     if utc:
         return utc if utc.endswith("Z") else f"{utc}Z"
@@ -148,19 +129,8 @@ def position_from_raw(row: dict) -> Position:
 
 
 def order_from_confirm(c: dict, accepted_status: OrderStatus = OrderStatus.FILLED) -> Order:
-    """From a ``GET /confirms/{ref}`` payload.
-
-    ``accepted_status`` is what an ACCEPTED deal means for the action that produced it:
-    FILLED for a market order, WORKING for a resting one, CLOSED for a position close,
-    CANCELLED for a working-order cancel, UPDATED for an amendment. Anything other than
-    ACCEPTED is REJECTED — the provider states one status and the caller needs to know
-    which of those five it settled into.
-
-    The cause of a refusal is ``rejectReason`` (``RC_NOT_ENOUGH_MARGIN`` and friends).
-    ``reason`` is read as a fallback only; no recorded payload carries it. Reading that
-    one alone gave every real rejection a null cause — the caller learned that the deal
-    was refused and never why.
-    """
+    """From a ``GET /confirms/{ref}`` payload. ``accepted_status`` is what ACCEPTED means for the action; the
+    cause of a refusal is ``rejectReason``, and reading ``reason`` alone gave every real rejection a null cause."""
     status = accepted_status if c.get("dealStatus") == "ACCEPTED" else OrderStatus.REJECTED
     deal_id = c.get("dealId")
     affected = c.get("affectedDeals") or []

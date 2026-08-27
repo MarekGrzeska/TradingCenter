@@ -1,25 +1,5 @@
-"""Every source of tools this surface knows about, behind one door.
-
-It is a drop-in for a single `ToolServer`: same `configured`, same `list_tools`, same
-`call`, same `aclose` — so nothing above this package had to learn that there is more than
-one source now.
-
-**Most of them are servers on a network and one is not.** The candle archive's tools, the
-account's and the prediction-market archive's are reached over MCP; the team tools are a
-layer in this same process, handed in as `local_sources` because building one needs the
-application object this registry has no business knowing about (`workbench/team_tools.py`).
-Everything below treats them alike, which is the point of the seam.
-
-**Independence is the property worth stating**, because it is what `specs/agent-tool-access`
-asks for and what a union would quietly lose: one server being unconfigured, unreachable
-or slow costs the model that server's tools and nothing else. A turn keeps whatever
-answered — and a local source answers whatever the network is doing.
-
-A name announced by more than one source is refused rather than resolved by picking one.
-It has not happened with the four that exist — one reads candles, one builds teams, one
-moves the account, one reads prediction markets — and if it ever does, guessing would send
-an operator's "run it" to whichever source happened to be first in a dictionary.
-"""
+"""Every source of tools this surface knows about, behind one door — a drop-in for a single `ToolServer`. Independence
+is the property worth stating: one unreachable source costs the model its tools and nothing else."""
 
 from __future__ import annotations
 
@@ -46,22 +26,16 @@ class ToolServerRegistry:
     def from_settings(
         cls, settings: Settings, local_sources: list[ToolSource] | None = None
     ) -> ToolServerRegistry:
-        """The network servers, plus whatever the assembly hands in.
-
-        `local_sources` defaults to none so a test wanting the network half alone builds
-        it in one line — and so this class stays buildable from settings, which is all it
-        can know by itself.
-        """
+        """The network servers, plus whatever the assembly hands in. `local_sources` defaults to none, so
+        this class stays buildable from settings, which is all it can know by itself."""
         return cls(
             [
                 ToolServer(settings, prefix="market_mcp"),
-                # The one whose writes land on the account. No operator identity: the
-                # account is one and shared, there is nobody in whose name it could be
-                # moved differently, and trading-mcp reads no such header.
+                # The one whose writes land on the account. No operator identity: the account is one and
+                # shared, and trading-mcp reads no such header.
                 ToolServer(settings, prefix="trading_mcp", can_move_the_account=True),
-                # The prediction-market archive. Reads only: nothing this system does on
-                # Polymarket touches money, and the three tools of its nine that write
-                # write a watch list, not an account.
+                # The prediction-market archive. Reads only: the three tools of its nine that write write
+                # a watch list, not an account.
                 ToolServer(settings, prefix="polymarket_mcp"),
                 *(local_sources or []),
             ]
@@ -76,12 +50,8 @@ class ToolServerRegistry:
             await server.aclose()
 
     async def list_tools(self, operator_principal: str | None = None) -> list[ToolDescriptor]:
-        """Every tool every configured source publishes right now.
-
-        Asked of all of them at once — one slow server would otherwise make the model
-        wait for it before the turn could start, and the whole point of asking before the
-        first model call is that the set is fixed for the turn.
-        """
+        """Every tool every configured source publishes right now, asked of all of them at once — one slow
+        server would otherwise make the model wait before the turn could start."""
         configured = [server for server in self._servers if server.configured]
         if not configured:
             return []
@@ -108,25 +78,16 @@ class ToolServerRegistry:
         return tools
 
     def moves_the_account(self, name: str) -> bool:
-        """Whether this name belongs to a tool that could change the account. Answered
-        from the descriptors `list_tools` already read, so the caller can write the trace
-        before dispatching (specs/agent-trading).
-
-        A name nobody announced is not account-moving: `call` will refuse it without
-        sending anything, so there is nothing to leave a trace of.
-        """
+        """Whether this name belongs to a tool that could change the account, answered from the descriptors
+        `list_tools` already read. A name nobody announced is not account-moving."""
         server = self._owner.get(name)
         return server is not None and server.moves_the_account(name)
 
     async def call(
         self, name: str, arguments: dict, operator_principal: str | None = None
     ) -> ToolOutcome:
-        """Dispatch to the source that announced this name.
-
-        A name nobody announced is an outcome rather than an exception, like every other
-        failure on this seam: the model asked for something that is not there, and the
-        turn continues with that as its answer.
-        """
+        """Dispatch to the source that announced this name. A name nobody announced is an outcome rather
+        than an exception, like every other failure on this seam."""
         server = self._owner.get(name)
         if server is None:
             return ToolOutcome(

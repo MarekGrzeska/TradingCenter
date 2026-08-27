@@ -1,11 +1,5 @@
-"""The one difference between the two callers, now that it is a type.
-
-`Conversation` and `Briefing` are not two spellings of the same thing. A team has no
-transcript to replay and teams' own copy of this provider deliberately had no `history`
-parameter for one to grow in; collapsing both into a single argument would have undone
-that quietly. These tests are what stops the union from being flattened back later by
-somebody who reads it as redundant.
-"""
+"""The one difference between the two callers, now that it is a type. Collapsing `Conversation` and
+`Briefing` into one argument would quietly undo the guard that a team has no transcript to replay."""
 
 from __future__ import annotations
 

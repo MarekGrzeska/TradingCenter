@@ -1,48 +1,5 @@
-"""Cross-checked against TA-Lib — task 2.11, design.md's "Własne jądro na `numpy`,
-TA-Lib wyłącznie jako wyrocznia testowa": TA-Lib is a dev-only dependency, nothing
-in `market_data.indicators` imports it, and its only job is to answer the
-question "does an independent implementation agree with this formula".
-
-**What is not compared here, and why — the "spisana lista znanych różnic":**
-
-- No TA-Lib equivalent at all: `atr_pct`, `bar_range_atr`, `body_ratio`,
-  `wick_up_ratio`, `wick_down_ratio`, `close_position`, `gap_prev_close_atr`,
-  `range_position`, `zscore`, `stdev` (as its own entry), `parkinson`,
-  `garman_klass`, `rogers_satchell`, `yang_zhang`, `ulcer`, `choppiness`,
-  `vortex`, `r_squared`, `rma` (as its own entry — TA-Lib never exposes Wilder's
-  smoothing standalone, only baked into `ATR`/`RSI`/`ADX`), `hma`, `alma`,
-  `bbands_percent_b`, `bbands_bandwidth`, `keltner`, `donchian`, `envelope`.
-  None of this is a gap in either implementation — it is exactly the curated
-  set proposal.md describes that a narrower, older library never had reason to
-  carry.
-- `stoch_rsi`: TA-Lib's `STOCHRSI` returns the *raw* stochastic of RSI —
-  `fastk`/`fastd` — with no `slowk`-style smoothing stage before the `%D`
-  average. This catalogue's `stoch_rsi` smooths `%K` first (`k_smooth`), the
-  same shape `stoch` itself uses. The two are answering differently-defined
-  questions, not disagreeing about the same one.
-- `cmo`: Chande's original 1994 definition sums gains and losses over a plain
-  trailing window (what this catalogue computes). TA-Lib's `CMO` instead reuses
-  Wilder's recursive smoothing from `RSI` — verified numerically here to equal
-  `2 * RSI - 100` bit for bit, which is not an independent formula at all, only
-  a rescaling of `RSI`. Kept as the textbook definition rather than matched to
-  TA-Lib's redundant-with-RSI one.
-
-**Seed differences, not bugs on either side** (the reason for comparing only a
-long series' tail rather than a fresh one bar by bar): TA-Lib seeds `EMA`
-family recursive filters with a plain average of the first `period` bars; this
-module seeds with the first bar itself and instead guarantees via
-`warmup.py` that the seed's influence has decayed below `1e-9` by the time
-`warmup_bars` bars have passed. Comparing only the last `TAIL` bars of a
-`N`-bar series, well past every entry's own warmup, is what makes the
-comparison test the *formula* instead of re-measuring the seed.
-
-**One real bug this file found**: `aroon` originally read a `period`-bar
-window, which can never report "the extreme is today" (`bars_since == 0` is
-unreachable). TA-Lib — and Chande's original definition — read `period + 1`
-bars, counting today as day zero. Fixed in `catalogue/regime.py`; the two now agree
-to float precision. Left in this file's history as the reason task 2.11 is
-worth doing even when most of it is "no equivalent exists".
-"""
+"""Cross-checked against TA-Lib, a dev-only dependency whose only job is to say whether an independent
+implementation agrees. The written list of known differences is `docs/talib-known-differences.md`."""
 
 from __future__ import annotations
 
@@ -98,9 +55,8 @@ class TestAgainstTalib:
         _assert_tail_matches(r["wma"], talib.WMA(CLOSE, 20), "wma")
 
     def test_kama(self):
-        # TA-Lib's KAMA hardcodes fast=2/slow=30 internally — matched here rather
-        # than left at this catalogue's own defaults (fast=2, slow=30, period=10),
-        # which happen to already agree.
+        # TA-Lib's KAMA hardcodes fast=2/slow=30 internally — matched here rather than left at this
+        # catalogue's own defaults, which happen to already agree.
         r = fn_of(get("kama"), Lines)(SERIES, {"period": 10, "fast": 2, "slow": 30})
         _assert_tail_matches(r["kama"], talib.KAMA(CLOSE, 10), "kama")
 
@@ -177,9 +133,8 @@ class TestAgainstTalib:
 
 
 class TestKnownDifferenceIsDocumentedNotGuessed:
-    """Pins the one claim the module docstring makes about `cmo`, so a future
-    TA-Lib upgrade that changes its behaviour is caught here rather than only
-    in a comment nobody re-reads."""
+    """Pins the one claim made about `cmo`, so a future TA-Lib upgrade that changes its behaviour is
+    caught here rather than only in a document nobody re-reads."""
 
     def test_talib_cmo_is_exactly_rescaled_rsi(self):
         period = 14

@@ -1,10 +1,5 @@
-"""Where the operator put each agent.
-
-Mutable, beside the revisions rather than inside them: dragging a node MUST NOT mint a
-revision (specs/terminal-teams, "Przesunięcie nie jest zmianą definicji"). The owner is
-reached through the team, which is also what makes a stranger's write a no-op rather than
-a refusal in a second place.
-"""
+"""Where the operator put each agent. Mutable, beside the revisions rather than inside them: dragging a node
+MUST NOT mint a revision. The owner is reached through the team, which makes a stranger's write a no-op."""
 
 from __future__ import annotations
 
@@ -23,9 +18,8 @@ _SELECT_LAYOUT = """
      ORDER BY l.agent_key
 """
 
-# The whole layout arrives at once and replaces what was there: the canvas knows where
-# every node it drew stands, and an agent deleted from the definition has to lose its row
-# rather than sit in the way of a key reused later.
+# The whole layout arrives at once and replaces what was there: an agent deleted from the definition has to
+# lose its row rather than sit in the way of a key reused later.
 _DELETE_LAYOUT = "DELETE FROM team_layouts WHERE team_id = $1"
 
 _UPSERT_PLACE = """
@@ -43,17 +37,11 @@ async def get_layout(
 async def save_layout(
     conn: Conn, *, team_id: int, owner_principal: str, places: Sequence[tuple[str, float, float]]
 ) -> bool:
-    """Replaces this team's layout. `False` for a team that does not exist or belongs to
-    somebody else — the route answers that the same way it answers a missing team.
-
-    `updated_at` on the team is deliberately not touched: the catalogue's "moment ostatniej
-    zmiany" is about the definition, and a column that moved because a node was nudged
-    would make the list reorder itself for nothing.
-    """
+    """Replaces this team's layout. `False` for a team that does not exist or belongs to somebody else.
+    `updated_at` is deliberately not touched: the catalogue's "last changed" is about the definition."""
     async with conn.transaction():
-        # Through the catalogue's own read rather than a second copy of its statement:
-        # `archived_at IS NULL` rides on that one, so a retired team stops accepting
-        # layout writes for the same reason it stops answering reads.
+        # Through the catalogue's own read rather than a second copy of its statement: `archived_at IS NULL`
+        # rides on that one, so a retired team stops accepting layout writes for the same reason.
         team = await catalogue.get_team(conn, team_id=team_id, owner_principal=owner_principal)
         if team is None:
             return False

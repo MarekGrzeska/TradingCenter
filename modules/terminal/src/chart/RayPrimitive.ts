@@ -19,10 +19,8 @@ import { MarkPrimitive } from "./MarkPrimitive";
 import { timeToX } from "./timeCoordinates";
 
 /**
- * One `levels`-shaped price ray: a segment from the moment it took effect to the
- * right edge — never the whole width, unlike `createPriceLine` (`terminal-chart`
- * spec, "Strefy i poziomy rysują się jako obszary, nie jako linie serii"; plan
- * doc, "PDH ma się zaczynać w konkretnym momencie").
+ * One `levels`-shaped price ray: a segment from the moment it took effect to the right edge — never the
+ * whole width, unlike `createPriceLine`.
  */
 export interface RayLevel {
   time: Time;
@@ -109,16 +107,8 @@ class RayPaneView implements IPrimitivePaneView {
 }
 
 /**
- * A series primitive drawing every `IndicatorLevel` a `levels`-output indicator
- * answered with — one instance per (id, params) result, its `levels` replaced
- * wholesale on every recompute rather than diffed, the same way a Line series'
- * `setData` replaces its points (task 3.9). The same class also draws an operator's
- * own level, told apart by the `drawing` weight it is built with.
- *
- * Coordinates are read fresh on every `renderer()` call rather than cached: the
- * library asks for one on every repaint, panning and zooming included, and the
- * levels list this holds is short enough (a handful of pivots or PDH/PDL rays)
- * that recomputing costs nothing worth caching against.
+ * Every `IndicatorLevel` a `levels` entry answered with, replaced wholesale on every recompute; the same class
+ * draws an operator's own level at the `drawing` weight. Coordinates are read fresh — the list is short.
  */
 export class RayPrimitive extends MarkPrimitive<RayRenderItem> {
   private levels: readonly RayLevel[] = [];
@@ -160,10 +150,8 @@ export class RayPrimitive extends MarkPrimitive<RayRenderItem> {
     if (!chart || !series) return [];
     const timeScale = chart.timeScale();
     return this.levels.map((level) => ({
-      // `null` only when the chart holds no bars at all. A moment inside the
-      // loaded range that is not itself a bar — a previous-day close at a
-      // midnight the venue was shut through — snaps to the nearest one rather
-      // than dropping the ray (`timeCoordinates.ts`).
+      // `null` only when the chart holds no bars at all. A moment inside the loaded range that is not
+      // itself a bar snaps to the nearest one rather than dropping the ray.
       x: timeToX(timeScale, level.time),
       y: series.priceToCoordinate(level.price),
       color: this.color,

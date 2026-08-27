@@ -1,20 +1,7 @@
-"""Everything the terminal needs, in the order it needs it — on every platform, once.
+"""Everything the terminal needs, in the order it needs it — on every platform, once. This replaces `dev.sh`
+and `dev.ps1`, which were one script written twice and drifted three times, each in one of them only.
 
-This replaces `dev.sh` and `dev.ps1`, which were the same script written twice and drifted
-three times before 18 August 2026 — each time in one of them and not the other, each time
-found by a symptom rather than by a check. The last of the three left `dev.ps1` starting
-`teams-mcp` and immediately forgetting it: no log, no supervision, and a process surviving
-only because the port sweep at the end happened to leave it alone.
-
-All of that drift lived in the service table, not in the process plumbing, so the table is
-data here and there is one copy of it. `dev.sh` and `dev.ps1` still work; they pass their
-arguments to this file.
-
-    uv run python scripts/dev.py                 # everything
     uv run python scripts/dev.py --no-terminal   # back end only, e.g. to run the live tests
-
-Nothing depends on this script: every module still starts on its own with the command in
-its README.
 """
 
 from __future__ import annotations
@@ -48,8 +35,7 @@ WAIT_SECONDS = 120
 WINDOWS = os.name == "nt"
 
 # Windows consoles default to the ANSI codepage, which turns every em dash in the reasons
-# below into a replacement character. Reconfiguring here rather than asking whoever runs
-# this to set PYTHONUTF8.
+# below into a replacement character. Reconfigured here rather than by asking for PYTHONUTF8.
 for _stream in (sys.stdout, sys.stderr):
     if isinstance(_stream, io.TextIOWrapper):
         _stream.reconfigure(encoding="utf-8", errors="replace")
@@ -58,11 +44,8 @@ for _stream in (sys.stdout, sys.stderr):
 CREATE_NEW_PROCESS_GROUP = getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
 
 
-# --- the service table ---------------------------------------------------------------
-#
-# One row per service, in start order. `why` is the part that used to live as a comment
-# beside a hand-written start block in two files — the reason this row is where it is. It
-# stays with the row so moving the row moves the reason, and `--explain` prints it.
+# One row per service, in start order. `why` used to be a comment beside a hand-written start
+# block in two files; it stays with the row so moving the row moves the reason.
 
 
 @dataclass(frozen=True)
@@ -101,14 +84,10 @@ BLUE, MAGENTA, CYAN, YELLOW, GREEN, RED, DIM, RESET = (
     "\033[2m",
     "\033[0m",
 )
-# Bright green went to trading-mcp, the one remaining tool server that is a process. Two
-# more colours freed up as the tool servers stopped being processes: market-mcp became a
-# route in market-data, and teams-mcp a layer in the workbench — and one of the two went
-# to polymarket-data, which is the second module serving tools from its own process.
+# Bright green went to trading-mcp, the one tool server that is still a process of its own.
 BRIGHT_GREEN = "\033[92m"
-# And bright blue to the strategy platform, which arrived while polymarket-data was
-# taking GREEN. Two services sharing a colour is the one thing this field exists to
-# prevent — the logs interleave, and the colour is how a reader tells them apart.
+# And bright blue to the strategy platform. Two services sharing a colour is the one thing
+# this field exists to prevent — the logs interleave, and colour is how a reader tells them apart.
 BRIGHT_BLUE = "\033[94m"
 
 SERVICES: tuple[Service, ...] = (
@@ -226,13 +205,8 @@ SERVICES: tuple[Service, ...] = (
     ),
 )
 
-# Modules whose migrations are applied before anything starts. Redundant with the startup
-# migration each of them now runs under an advisory lock, and kept because it fails here
-# with a readable error instead of inside a lifespan that is holding a lock.
-# Every migration chain, and which module owns it. `workbench` appears twice because it
-# owns two databases; its two alembic configurations sit beside each other because one
-# `alembic.ini` cannot name two `script_location`s. A module with one chain names no
-# configuration and alembic finds its own.
+# Every migration chain and which module owns it; `workbench` appears twice because it owns two databases.
+# Redundant with each module's startup migration, and kept because it fails readably rather than under a lock.
 MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
     ("market-data", None),
     ("workbench", "alembic-agent.ini"),
@@ -241,13 +215,10 @@ MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
     ("strategy", None),
 )
 
-# The further logical databases in the same container, created here if missing rather than
-# through docker-entrypoint-initdb.d — that only runs against an empty volume, so it would
-# never fire for anyone holding a tradingcenter-db-data from before these modules existed.
+# Created here if missing rather than through docker-entrypoint-initdb.d, which only runs against
+# an empty volume and would never fire for a container from before these modules existed.
 LOGICAL_DATABASES = ("agent", "teams", "polymarket", "strategy")
 
-
-# --- reading .env files --------------------------------------------------------------
 
 
 def env_value(text: str, key: str) -> str | None:
@@ -260,11 +231,8 @@ def env_value(text: str, key: str) -> str | None:
 
 
 def database_host(text: str, *, key: str = "DATABASE_URL") -> str | None:
-    """The host out of a database URL, between the optional `user:pass@` and the port.
-
-    The key is an argument because the workbench owns two databases and names them
-    separately; every other module has one and takes the default.
-    """
+    """The host out of a database URL, between the optional `user:pass@` and the port. The key is an
+    argument because the workbench owns two databases and names them separately."""
     url = env_value(text, key)
     if not url:
         return None
@@ -276,8 +244,6 @@ def is_loopback(host: str | None) -> bool:
     return not host or host == "localhost" or host.startswith("127.") or host == "::1"
 
 
-# --- the checks that run before anything starts --------------------------------------
-#
 # Collected and reported together. Finding out about a missing `.env` after two services
 # are running means killing them to fix one line.
 
@@ -285,9 +251,8 @@ def is_loopback(host: str | None) -> bool:
 REQUIRED_ENV: tuple[tuple[str, str], ...] = (
     ("capital-gateway", "copy .env.example and fill in demo credentials"),
     ("market-data", "copy .env.example; the defaults match compose.yaml"),
-    # Two OpenAI keys, deliberately — the conversation's and the teams experiments', so the
-    # bill splits. `workbench/config.py` refuses to build Settings without either, so the
-    # process exits at start rather than running and misbehaving.
+# Two OpenAI keys, deliberately — the conversation's and the teams experiments', so the bill
+# splits. `workbench/config.py` refuses to build Settings without either.
     (
         "workbench",
         "copy .env.example and fill in AGENT_OPENAI_API_KEY and TEAMS_OPENAI_API_KEY",
@@ -362,12 +327,8 @@ def preflight(env: Environment, *, start_terminal: bool) -> list[str]:
 
 
 def _port_problems(env: Environment, *, start_terminal: bool) -> list[str]:
-    """A taken port is the commonest reason a run appears to hang.
-
-    The new process cannot bind, and the wait then watches somebody else's service. Tested
-    by connecting rather than by asking who owns it: a service left over from a previous run
-    does not always show up under the current user.
-    """
+    """A taken port is the commonest reason a run appears to hang: the new process cannot bind and the
+    wait watches somebody else's service. Tested by connecting — a leftover may run as another user."""
     problems: list[str] = []
     for service in services_to_start(start_terminal=start_terminal):
         if env.port_in_use(service.port):
@@ -380,12 +341,8 @@ def _port_problems(env: Environment, *, start_terminal: bool) -> list[str]:
 
 
 def _database_host_problems(env: Environment) -> list[str]:
-    """The quiet disaster: an `.env` still pointing at the Azure server.
-
-    `config.py` refuses the same thing at startup — no DATABASE_USER means loopback only —
-    and repeating it here refuses earlier, before anything has been launched, naming the
-    file to fix.
-    """
+    """The quiet disaster: an `.env` still pointing at the Azure server. `config.py` refuses the same at
+    startup; refusing here is earlier, before anything has been launched, and names the file to fix."""
     problems: list[str] = []
     for module, key in (
         ("market-data", "DATABASE_URL"),
@@ -405,13 +362,8 @@ def _database_host_problems(env: Environment) -> list[str]:
 
 
 def _gateway_key_problems(env: Environment) -> list[str]:
-    """The two halves of one credential, in two files.
-
-    The gateway checks `X-Gateway-Key` on every caller including loopback, and trading-mcp
-    asks it about the account *before* it opens a port — so a mismatch here is not a failed
-    tool call later, it is a module that exits during start-up and takes the whole run down
-    with it. Cheap to compare, and the message is the fix.
-    """
+    """The two halves of one credential, in two files. trading-mcp asks the gateway about the account
+    before it opens a port, so a mismatch is not a failed tool call later but a run that dies at start."""
     gateway_env = env.read_env("capital-gateway")
     trading_env = env.read_env("trading-mcp")
     if gateway_env is None or trading_env is None:
@@ -438,15 +390,12 @@ def _gateway_key_problems(env: Environment) -> list[str]:
     return []
 
 
-# --- the advisories, which are not refusals ------------------------------------------
-#
 # Each of these is a supported state, and each looks from the operator's seat like a broken
 # module rather than a missing line. That is the whole reason they are said out loud.
 
 ADVISORIES: tuple[tuple[str, str, str, str], ...] = (
-    # 8020, not 8040: the archive serves its own tools at /mcp since
-    # `market-mcp-into-market-data`, and a .env copied before that change points at a port
-    # nothing listens on — which reads as a tool server that is down.
+# 8020, not 8040: the archive serves its own tools at /mcp since `market-mcp-into-market-data`,
+# and a .env copied before that change points at a port nothing listens on.
     (
         "workbench",
         "MARKET_MCP_URL",
@@ -476,9 +425,8 @@ ADVISORIES: tuple[tuple[str, str, str, str], ...] = (
     ),
 )
 
-# Settings that stopped existing, and what a `.env` still carrying them is a sign of. Said
-# rather than ignored for the reason the advisories above exist: a line that is read by
-# nothing looks exactly like a line that is working.
+# Settings that stopped existing, and what a `.env` still carrying them is a sign of. Said rather
+# than ignored, for the reason the advisories above exist: a line read by nothing looks like one that works.
 RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
     (
         "TEAMS_MCP_URL",
@@ -520,16 +468,12 @@ def advisories(env: Environment) -> list[str]:
     return lines
 
 
-# --- what to start, and in what order ------------------------------------------------
-
 
 def services_to_start(*, start_terminal: bool) -> tuple[Service, ...]:
     if start_terminal:
         return SERVICES
     return tuple(service for service in SERVICES if service.name != "terminal")
 
-
-# --- the console ---------------------------------------------------------------------
 
 
 def _enable_ansi() -> bool:
@@ -576,8 +520,6 @@ def fail(message: str) -> None:
     print(paint(message, RED), file=sys.stderr, flush=True)
 
 
-# --- running the processes -----------------------------------------------------------
-
 
 @dataclass
 class Running:
@@ -587,13 +529,8 @@ class Running:
 
 
 class Stack:
-    """The processes this run started, and nothing else.
-
-    Every one of them is killed on the way out, including its children: `uv run` spawns
-    uvicorn and pnpm spawns vite, and it is the children that hold the ports. Killing the
-    parent alone is what leaves something squatting on 8010 until the next reboot — the
-    reason `dev.ps1` needed a port sweep at the end.
-    """
+    """The processes this run started, and nothing else — each killed with its children, since `uv run`
+    spawns uvicorn and pnpm spawns vite, and it is the children that hold the ports."""
 
     def __init__(self) -> None:
         self.running: list[Running] = []
@@ -639,17 +576,8 @@ class Stack:
 
 
 def resolve_command(command: Sequence[str]) -> list[str]:
-    """Resolve the executable on PATH before handing it to `Popen`.
-
-    On Windows `pnpm` and `npx` are `.CMD` shims, and CreateProcess only ever appends
-    `.exe` — so `Popen(["pnpm", ...])` raises `FileNotFoundError [WinError 2]` while
-    `shutil.which("pnpm")` happily finds `pnpm.CMD`. That split is what makes the failure
-    nasty: `preflight` uses `which`, passes, and the run dies on the *last* service after
-    all seven back ends are up, taking them down with it.
-
-    `dev.sh` never met this (PATH lookup is the shell's) and `dev.ps1` never met it either
-    (PowerShell resolves `.CMD`), so it is new with the port, not carried over.
-    """
+    """On Windows `pnpm` is a `.CMD` shim and CreateProcess only appends `.exe`, so `Popen` raises
+    WinError 2 where `shutil.which` succeeds — which is why preflight passes and the last service dies."""
     if not command:
         return []
     resolved = shutil.which(command[0])
@@ -692,8 +620,6 @@ def wait_for_http(url: str, label: str, *, timeout: float = WAIT_SECONDS) -> boo
     return False
 
 
-# --- the database and the migrations -------------------------------------------------
-
 
 def _compose(*args: str) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
@@ -706,9 +632,8 @@ def _compose(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 def start_database() -> bool:
-    """`--wait` blocks on compose.yaml's healthcheck, which names the user and the database
-    on purpose: a bare `pg_isready` answers before first-boot initialisation finishes, and
-    the migrations below would then race it."""
+    """`--wait` blocks on compose.yaml's healthcheck, which names the user and the database on purpose:
+    a bare `pg_isready` answers before first-boot initialisation finishes, and the migrations race it."""
     say("Starting the database container...")
     if _compose("up", "-d", "--wait", "db").returncode != 0:
         fail(
@@ -737,10 +662,8 @@ def _psql(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 def ensure_databases(names: Iterable[str] = LOGICAL_DATABASES) -> bool:
-    # Named rather than counted, and materialised first: the list grows with every module
-    # that owns a database, and a message naming two while creating three is how the third
-    # goes unnoticed. `tuple()` because a generator argument would be spent by the join
-    # below and leave the loop with nothing to create.
+    # Named rather than counted, and materialised first: a message naming two while creating three is
+    # how the third goes unnoticed, and a generator would be spent by the join below.
     names = tuple(names)
     listed = ", ".join(names)
     say(f"Ensuring the {listed} databases exist...")
@@ -767,9 +690,8 @@ def ensure_databases(names: Iterable[str] = LOGICAL_DATABASES) -> bool:
 
 
 def apply_migrations(chains: Iterable[tuple[str, str | None]] = MIGRATION_CHAINS) -> bool:
-    """Applied every run, not only on a fresh one: a checkout that has just pulled a new
-    migration is exactly the case where forgetting this produces an error reading like a bug
-    in the module."""
+    """Applied every run, not only on a fresh one: a checkout that has just pulled a migration is exactly
+    where forgetting this produces an error reading like a bug in the module."""
     say("Applying migrations...")
     for module, config in chains:
         command = ["uv", "run", "alembic"]
@@ -785,16 +707,10 @@ def apply_migrations(chains: Iterable[tuple[str, str | None]] = MIGRATION_CHAINS
     return True
 
 
-# --- the command line ---------------------------------------------------------------
-
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    """Both spellings of the one flag.
-
-    `-NoTerminal` is what `dev.ps1` documents and what the operator's fingers know, and
-    `--no-terminal` is what `dev.sh` documents. Accepting both is what keeps the two
-    wrappers from being the place a difference can appear again.
-    """
+    """Both spellings of the one flag — `-NoTerminal` is what `dev.ps1` documents and `--no-terminal` what
+    `dev.sh` does. Accepting both keeps the two wrappers from differing again."""
     parser = argparse.ArgumentParser(
         prog="dev.py",
         description="Start the whole stack locally, in dependency order.",
@@ -821,8 +737,6 @@ def explain() -> None:
         print(f"   {service.why}\n")
 
 
-# --- the run ------------------------------------------------------------------------
-
 
 def real_environment() -> Environment:
     def read_env(module: str) -> str | None:
@@ -838,12 +752,8 @@ def real_environment() -> Environment:
             return probe.connect_ex((LOOPBACK, port)) == 0
 
     def port_owner(port: int) -> str:
-        """Best-effort, for the message only. Often empty, and that is fine.
-
-        Worth having anyway: "port 8010 is already in use by uvicorn (pid 4312)" names the
-        leftover run, and "already in use" alone sends the reader looking for a second
-        stack that is not there.
-        """
+        """Best-effort, for the message only, and often empty. "port 8010 is already in use by uvicorn
+        (pid 4312)" names the leftover run; "already in use" sends the reader looking for a second stack."""
         pid = _listening_pid(port)
         if pid is None:
             return ""

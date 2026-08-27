@@ -1,7 +1,5 @@
-# Application Insights, workspace-based (the classic, non-workspace mode is deprecated
-# for new resources). market-data emits `market_data.candle_age_seconds` onto it
-# (market_data/telemetry.py) — the metric every alert below that mentions staleness
-# depends on existing before it can be alerted on.
+# Application Insights, workspace-based, since the classic mode is deprecated for new resources. market-data emits
+# `market_data.candle_age_seconds` onto it, which every staleness alert below depends on existing.
 resource "azurerm_log_analytics_workspace" "main" {
   name                = "log-tradingcenter"
   resource_group_name = azurerm_resource_group.main.name
@@ -38,20 +36,8 @@ resource "azurerm_monitor_action_group" "operator" {
   }
 }
 
-# The candle-age metric (market_data/telemetry.py) already excludes any pair whose
-# market the gateway says is closed — so "w godzinach handlu" (design.md, group 10) is
-# encoded in what the metric reports, not in when this alert is allowed to fire.
-#
-# Stands on `market_data.candle_age_periods`, not `..._seconds`: a healthy `DAY` pair
-# sits near 86,400 raw seconds old and a healthy `WEEK` pair near 604,800 — one second
-# threshold could not be both blind to slow resolutions and quiet on fast ones, and
-# `..._seconds` spent nine hours firing continuously as a result (openspec/changes/
-# candle-age-alert-in-periods). The periods metric is `(age − DELIVERY_GRACE) / period`
-# per pair, so one threshold means the same thing at every resolution. Three periods:
-# one more than the module's own STALLED threshold (`STALE_AFTER_PERIODS` in
-# tracking.py), so the production safety net is deliberately blunter than the per-pair
-# indicator, not a second copy of it. `..._seconds` stays published for the portal —
-# periods are what to alert on, seconds are what a human reads once alerted.
+# Stands on `market_data.candle_age_periods`, not `..._seconds`: a healthy `DAY` pair is 86,400 raw seconds old, so one
+# threshold could not be blind to slow resolutions and quiet on fast ones — three periods, blunter than the indicator.
 resource "azurerm_monitor_metric_alert" "candle_age" {
   name                = "alert-candle-age-stale"
   resource_group_name = azurerm_resource_group.main.name
@@ -74,9 +60,8 @@ resource "azurerm_monitor_metric_alert" "candle_age" {
   }
 }
 
-# `connections_failed` is Postgres Flexible Server's own platform metric — any failed
-# connection attempt in the window is worth knowing about on a single-operator database
-# with a handful of expected connections, not just a spike.
+# `connections_failed` is the server's own platform metric — any failed attempt in the window is worth knowing about on
+# a single-operator database with a handful of expected connections, not just a spike.
 resource "azurerm_monitor_metric_alert" "database_unreachable" {
   name                = "alert-database-connections-failed"
   resource_group_name = azurerm_resource_group.main.name
@@ -99,15 +84,8 @@ resource "azurerm_monitor_metric_alert" "database_unreachable" {
   }
 }
 
-# The one question the platform's own metrics cannot answer: whether the container is
-# alive. Request counts cannot — an idle healthy process and a dead one both report zero,
-# which is why the request-count alert that stood here was removed rather than kept as a
-# second opinion (alerts-that-still-have-a-reason). This probe reaches the container from
-# outside, on a path Easy Auth cannot gate (app-service.tf, `excluded_paths`), since a dead
-# container and a live one both answer Easy Auth's own 401 identically.
-#
-# market-data served zero 2xx for nine hours on 10-11 August 2026 with five alerts standing
-# and not one of them able to tell dead from quiet. This is the one that can.
+# The one question the platform's metrics cannot answer: whether the container is alive. An idle healthy process and a
+# dead one both report zero requests, which is how market-data served no 2xx for nine hours with five alerts standing.
 resource "azurerm_application_insights_standard_web_test" "market_data_ping" {
   name                    = "webtest-market-data-ping"
   resource_group_name     = azurerm_resource_group.main.name
@@ -133,9 +111,8 @@ resource "azurerm_application_insights_standard_web_test" "market_data_ping" {
 resource "azurerm_monitor_metric_alert" "market_data_availability" {
   name                = "alert-market-data-availability"
   resource_group_name = azurerm_resource_group.main.name
-  # Both ids, not just the component's — this alert type refuses with a bare "Alert
-  # scope is invalid" 400 unless the web test itself is also in scopes, alongside the
-  # Application Insights resource the criteria block below also names as component_id.
+  # Both ids, not just the component's — this alert type refuses with a bare "Alert scope is invalid" 400 unless the
+  # web test itself is in scopes alongside the Application Insights resource.
   scopes = [
     azurerm_application_insights_standard_web_test.market_data_ping.id,
     azurerm_application_insights.main.id,

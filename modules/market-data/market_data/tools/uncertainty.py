@@ -1,7 +1,5 @@
-"""Sentences for what the numbers alone don't say — built once here so every tool
-touching candles or coverage says the same thing the same way
-(specs/market-data-answers).
-"""
+"""Sentences for what the numbers alone don't say — built once here so every tool touching candles or
+coverage says the same thing the same way."""
 
 from __future__ import annotations
 
@@ -29,12 +27,8 @@ def derived_sentence(derived: bool, resolution: str) -> str | None:
 
 
 def unsettled_sentence(warmup_bars: int | None) -> str:
-    """An indicator result whose `settled` is false is still a value — market-data
-    computed it from a series shorter than the formula wanted. `warmup_bars` is what
-    the formula *needs*, not what was missing: the archive does not publish how many
-    bars fell short, only how many the formula asked for
-    (specs/market-data-answers, "Wskaźnik bez pełnej rozgrzewki").
-    """
+    """An indicator result whose `settled` is false is still a value, computed from a series shorter than
+    the formula wanted. `warmup_bars` is what the formula needs, not what was missing."""
     if warmup_bars is None:
         return (
             "This value has not fully settled — the archive did not hold enough "
@@ -48,10 +42,8 @@ def unsettled_sentence(warmup_bars: int | None) -> str:
 
 
 def forming_sentence(resolution: str) -> str:
-    """Said whenever a price comes from a period that has not closed. Without it a model
-    reports the period's high and low as its range, and both will still move
-    (specs/market-data-tools, "Zakres okresu w toku MUST NOT być podany jako zakres
-    zamknięty")."""
+    """Said whenever a price comes from a period that has not closed. Without it a model reports the
+    period's high and low as its range, and both will still move."""
     return (
         f"This is the {resolution} period still being built — the price is current, but "
         "its high, low and volume will still move before the period closes. Do not quote "
@@ -60,17 +52,8 @@ def forming_sentence(resolution: str) -> str:
 
 
 def no_live_price_sentence(symbol: str, state: str, market_open: bool | None = None) -> str:
-    """Why there is no current price, in the words the state means.
-
-    `market_closed` and `no_quotes` are the pair worth keeping apart: the first is the
-    venue being shut, which is nobody's problem, and the second is the archive not
-    receiving anything while it is open, which is somebody's problem right now
-    (specs/market-data-tools, "Rynek otwarty, a ceny bieżącej nie ma").
-
-    `no_quotes` covers one more case than its name suggests — the archive could not find
-    out whether the market is open at all — and saying "the market is open" there would
-    state as fact the one thing nobody established.
-    """
+    """Why there is no current price, in the words the state means. `market_closed` is nobody's problem
+    and `no_quotes` is somebody's right now — and it also covers "could not find out"."""
     if state == "market_closed":
         return (
             f"{symbol}'s market is closed, so there is no price forming. The figure below "
@@ -96,10 +79,8 @@ def no_live_price_sentence(symbol: str, state: str, market_open: bool | None = N
 
 
 def empty_series_sentence(symbol: str, tracked: bool) -> str:
-    """Distinguishes "nobody is collecting this pair" from "it is tracked, but this
-    window has no candle" — the same empty list means two different things
-    (specs/market-data-answers, "Trzy rodzaje 'nie wiem' są rozróżnione").
-    """
+    """Distinguishes "nobody is collecting this pair" from "it is tracked, but this window has no
+    candle" — the same empty list means two different things."""
     if tracked:
         return (
             f"{symbol} is tracked, but this window has no candle. Check "

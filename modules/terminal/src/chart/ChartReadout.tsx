@@ -8,20 +8,13 @@ import type { useOlderBars } from "./useOlderBars";
 import { Button } from "../ui/Button";
 
 /**
- * Everything the chart says in words rather than in candles: the OHLC line under the
- * crosshair with the indicator values beside it, what paging back through the archive is
- * doing, and the veil over a chart that cannot draw at all.
- *
- * Split out of `Chart.tsx` because none of it touches `lightweight-charts`: these are
- * plain components over a bar and a list of numbers, and they were the part of that file
- * a reader had to scroll past to reach the part that is hard.
+ * Everything the chart says in words rather than in candles. Split out of `Chart.tsx` because none of it
+ * touches the charting library — plain components over a bar and a list of numbers.
  */
 
 /**
- * What paging back through the archive is doing, said in the header rather than over the
- * candles: a chart that is dragging in older history is still a chart worth reading, and
- * a failed page must not hide the series that did arrive (terminal-chart spec, "Wykres
- * mówi, co się dzieje ze starszą historią").
+ * What paging back through the archive is doing, said in the header rather than over the candles: a chart
+ * dragging in older history is still worth reading, and a failed page must not hide the series that arrived.
  */
 export function OlderHistoryState({ older }: { older: ReturnType<typeof useOlderBars> }) {
   if (older.status === "loading") {
@@ -67,11 +60,8 @@ export function OlderHistoryState({ older }: { older: ReturnType<typeof useOlder
 
 export function OhlcReadout({ bar, indicators }: { bar: Bar; indicators: IndicatorReadoutEntry[] }) {
   return (
-    // `tabular-nums` throughout: proportional digits make every value its own width, so
-    // a price ticking 9.50 -> 21000.00 slid the swatch and the label after it sideways on
-    // each frame of a pan. Fixed-width figures hold the whole row still.
-    // `w-fit` so the panel-tinted background hugs the text rather than running the width
-    // of the chart, and the candles stay readable a centimetre to the right of it.
+    // `tabular-nums` throughout: proportional digits made a price ticking 9.50 → 21000.00 slide the swatch
+    // sideways on every frame of a pan. `w-fit` so the tinted background hugs the text.
     <span className="flex w-fit flex-col gap-0.5 rounded bg-panel/75 px-1.5 py-1 text-xs text-ink-secondary tabular-nums">
       <span className="flex flex-wrap items-center gap-2">
         <Field label="O" value={bar.open} />
@@ -162,12 +152,8 @@ export function FeedOverlay({
 }
 
 /**
- * Everything the chart has to say when it cannot draw: loading, empty, refused.
- *
- * `z-10` is load-bearing. Lightweight-charts mounts its canvases at `z-index` 1 and 2 in
- * a container that opens no stacking context, so they compete with this overlay
- * directly. At the default level the veil loses, and every message renders into the DOM,
- * passes its test, and is painted over by an empty canvas.
+ * Everything the chart has to say when it cannot draw. `z-10` is load-bearing: the library's canvas container
+ * opens no stacking context, so at the default level an empty canvas paints over every message.
  */
 function Veil({ children }: { children: ReactNode }) {
   return (

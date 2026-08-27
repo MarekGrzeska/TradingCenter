@@ -1,18 +1,5 @@
-"""Reading and writing everything this module owns — the only door to its tables.
-
-Same shape as `market_data/store.py`: asyncpg directly, no ORM in the runtime path. One
-module per table, because that is the only seam that held when the single 911-line file
-was read for one: each table's SQL, its row mapper and its functions belong together and
-to nothing else.
-
-The names below are the whole public surface and every caller reaches them the same way
-it always did — `from .. import store`, then `store.create_session(...)`. Nothing outside
-this package imports a submodule directly, and nothing needs to.
-
-The split fixed one real defect rather than only shortening files: `usage` was written in
-one place and aggregated 250 lines further down, with the whole tool-call section between
-the two halves of one table.
-"""
+"""The only door to this module's tables — asyncpg directly, no ORM, one module per table. The split fixed a real
+defect rather than only shortening files: `usage` was written in one place and aggregated 250 lines further down."""
 
 from __future__ import annotations
 

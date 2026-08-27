@@ -1,8 +1,5 @@
-"""The refusals that keep a misconfigured process from starting.
-
-Unit tests, not `db` ones: none of this reaches a database — the whole point is that the
-process never gets that far.
-"""
+"""The refusals that keep a misconfigured process from starting. Unit tests, not `db` ones: the whole
+point is that the process never gets that far."""
 
 from __future__ import annotations
 
@@ -73,8 +70,7 @@ class TestProvider:
         )
 
     def test_refuses_an_empty_user_agent(self):
-        # The provider's edge selects on this header — measured 22 August 2026, where
-        # `Python-urllib` draws a 403 and an absent header does not. An empty setting would
+        # The provider's edge selects on this header — measured 22 August 2026. An empty setting would
         # send the header empty and leave the module unnamed to a provider that reads it.
         with pytest.raises(ValidationError, match="PROVIDER_USER_AGENT is set but empty"):
             build(provider_user_agent="  ")

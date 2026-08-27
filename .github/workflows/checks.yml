@@ -1,8 +1,7 @@
 name: checks
 
-# Pull requests are the point. Pushes to `main` are the honest complement: `main` can be
-# written to directly — the OpenSpec archive commits were exactly that — and a rule
-# watching only one door watches none.
+# Pull requests are the point. Pushes to `main` are the honest complement: `main` can be written to directly —
+# the OpenSpec archive commits were exactly that — and a rule watching only one door watches none.
 on:
   pull_request:
     branches: [main]
@@ -19,20 +18,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Which modules this change can possibly have broken.
-  #
-  # Every pull request used to run all three suites, PostgreSQL container included, even
-  # when it touched one markdown file — PR #27 changed a single one and paid two minutes
-  # for it, and three of the four pull requests around it touched no module at all.
-  #
-  # Computed here with git rather than with a paths-filter action: the rule is four lines
-  # of shell, and it stays legible next to the reasons below instead of inside a
-  # third-party action's inputs.
-  #
-  # There is no branch protection on this repository (a private repository on the free
-  # plan cannot have any), so a skipped job blocks nothing and needs no green stand-in.
-  # If protection is ever bought, revisit this: a *required* check that never runs leaves
-  # a pull request permanently pending, and the fix is a stand-in job, not deleting this.
+  # Which modules this change can possibly have broken — every pull request used to run all three suites for a
+  # markdown file. There is no branch protection here, so a skipped job blocks nothing and needs no stand-in.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -47,14 +34,8 @@ jobs:
       packages: ${{ steps.filter.outputs.packages }}
       scripts: ${{ steps.filter.outputs.scripts }}
       infra: ${{ steps.filter.outputs.infra }}
-      # The matrix the `packages` job runs: the diff's package names intersected with
-      # the directory. The diff alone would list a package this PR deletes (whose
-      # working-directory no longer exists); the directory alone runs all three on a
-      # one-package edit, which is what this used to do. A package added by the PR is
-      # in the diff by definition, so the original hazard — a job going green having
-      # tested somebody else's package — stays closed. Empty means the `packages`
-      # output fired on this file itself; then every package runs, because a change
-      # to how the checks run has to be exercised by running them.
+      # The diff's package names intersected with the directory: the diff alone lists a package this PR deletes,
+      # the directory alone runs all three on a one-package edit. Empty means this file itself changed.
       package-list: ${{ steps.filter.outputs.package-list }}
     steps:
       - uses: actions/checkout@v4
@@ -67,10 +48,8 @@ jobs:
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             base="${{ github.event.pull_request.base.sha }}"
           else
-            # A push's `before` is all-zeroes for the first push to a branch, and points
-            # at a commit that no longer exists after a force-push. Either way, falling
-            # back to the parent of HEAD keeps the diff honest rather than empty — and an
-            # empty diff here would skip every job, which is the one wrong answer.
+            # A push's `before` is all-zeroes for a branch's first push and stale after a force-push. Falling back
+            # to the parent of HEAD keeps the diff honest — an empty diff here would skip every job.
             base="${{ github.event.before }}"
             if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
                || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
@@ -87,20 +66,14 @@ jobs:
           # be exercised by running them.
           self='^\.github/workflows/checks\.yml$'
 
-          # Packages first, because module patterns below refer to them. A module's own
-          # directory plus every package it takes as a path dependency: the package is
-          # compiled into that module's image, so a change there can break it exactly the
-          # way a change in its own tree can. This is the whole price of sharing source,
-          # and it is paid in CI rather than in production
-          # (packages-replace-the-hand-copies/design.md, D5).
+          # Packages first, because the module patterns below refer to them. A package is compiled into the image,
+          # so a change there breaks a module exactly the way its own tree does — the price of sharing source.
           tc_runtime='^packages/tc-runtime/'
           tc_openai='^packages/tc-openai/'
           tc_mcp_kit='^packages/tc-mcp-kit/'
 
-          # Keyed by the job name each pattern decides, so there is one list of names
-          # rather than two. The `case` block this replaces existed for one reason — a bash
-          # variable name cannot hold a hyphen — and it meant every new job was two edits in
-          # two places, which is how a name gets added to one list and not the other.
+          # Keyed by the job name each pattern decides, so there is one list of names rather than two. The `case`
+          # block this replaces existed because a bash variable cannot hold a hyphen, and cost two edits per job.
           declare -A PATTERNS=()
 
           PATTERNS[capital-gateway]='^modules/capital-gateway/'
@@ -108,77 +81,27 @@ jobs:
           # One module where there were three. It takes `tc-mcp-kit` as well as the
           # other two, because the team tools moved into it with their schema slimmer.
           PATTERNS[workbench]="^modules/workbench/|$tc_runtime|$tc_openai|$tc_mcp_kit"
-          # The terminal's `contract:check` compares its generated types against the
-          # schema market-data builds from `contract.py`. Filtering the terminal on its
-          # own directory alone would let a contract change land with the check that
-          # exists to catch it never running — the exact failure the check was added for.
-          #
-          # The workbench is the second source and the whole of it, not one file. Its
-          # teams surface is the generated kind — `contract:generate` reads two schema
-          # sources and writes a file per source — and the conversation's `contract.py` is
-          # the hand-written kind, checked by the terminal's own DTOs in `agentApi.ts`,
-          # which only run if this job does. The whole module rather than either
-          # `contract.py`, for the reason `weekdays-on-the-shorter-rhythms` measured: the
-          # document is built from routes and from models those files import rather than
-          # define, and `recurrence.py`'s docstring is a description in the schema.
-          #
-          # polymarket-data is the third source, and its `contract.py` alone rather than the
-          # whole module: unlike the gateway's snapshot below, this document is built from
-          # models in that one file plus the routes that return them, and those routes are
-          # in `routers/`, which no filter here can usefully name without naming the module.
-          # `openapi.py` is in the pattern too — it *shapes* the document (every response
-          # field marked required), so a change there moves the generated types with no edit
-          # to `contract.py` at all.
-          #
-          # Nothing in the terminal imports the generated polymarket types yet; the subpage
-          # is a change of its own. `contract:check` is still the check that matters — it is
-          # what keeps that file from being born stale.
-          #
-          # strategy is the fourth source, and `rule.py` is in its pattern beside `contract.py`
-          # for a reason particular to it: the rule vocabulary is defined once, in `rule.py`,
-          # and `contract.py` publishes those very models rather than restating them. A node
-          # added there moves the generated types with no edit to either other file — and the
-          # configurator is written against those types, so the check that would catch it has
-          # to be the one that runs.
+          # The terminal is filtered on four other modules because its `contract:check` is the check for those seams.
+          # The workbench whole, since its schema is built from routes and from models those files import.
           PATTERNS[terminal]='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/workbench/|^modules/polymarket-data/polymarket_data/(contract|openapi)\.py$|^modules/strategy/strategy/(contract|openapi|rule)\.py$'
-          # market-data takes `tc-mcp-kit` too since the tool surface moved into it: the
-          # package's schema slimmer is what keeps eleven tools under their published
-          # ceiling, and a change there is a change to what the archive announces.
-          # The same rule again, one module along: trading-mcp keeps a committed snapshot
-          # of capital-gateway's whole OpenAPI document (`contract/capital-gateway.
-          # openapi.json`), and `scripts/contract.py check` is what catches it going
-          # stale. The gateway's *whole* directory, not one file: that document is built
-          # from its routes as well as its DTOs, so there is no narrower honest filter.
+          # market-data takes `tc-mcp-kit` since the tool surface moved in — the slimmer keeps eleven tools under their
+          # ceiling. trading-mcp watches the gateway's *whole* directory: its snapshot is built from routes and DTOs both.
           PATTERNS[trading-mcp]="^modules/trading-mcp/|^modules/capital-gateway/|$tc_mcp_kit"
-          # The same two packages as market-data, and for the same two reasons: this module
-          # migrates its own database through `tc-runtime` and slims its tool schemas with
-          # `tc-mcp-kit`. It has no upstream in this repository — Polymarket is outside it —
-          # so unlike trading-mcp there is no second module in this pattern.
+          # The same two packages as market-data, for the same two reasons. It has no upstream in this repository, so
+          # unlike trading-mcp there is no second module in this pattern.
           PATTERNS[polymarket-data]="^modules/polymarket-data/|$tc_runtime|$tc_mcp_kit"
-          # No third pairing here, deliberately: this module reads market-data over its
-          # published REST contract at runtime and keeps no snapshot of it, so there is
-          # nothing to go stale and nothing for a change there to break at build time.
+          # No third pairing here, deliberately: this module reads market-data over its published REST contract at
+          # runtime and keeps no snapshot of it, so there is nothing to go stale.
           PATTERNS[strategy]="^modules/strategy/|$tc_runtime|$tc_mcp_kit"
-          # There used to be a third of this shape — teams-mcp, watching the whole of
-          # `teams` because it kept a snapshot of that module's OpenAPI document. It is
-          # gone with the module: the team tools read those routes in the same process,
-          # so there is no copy left to go stale and nothing to watch.
-          # The archive-shape check, plus the script that is the shape.
+          # The archive-shape check, plus the script that is the shape. There used to be a third pairing above —
+          # teams-mcp's snapshot of the teams document — gone with the module that kept it.
           PATTERNS[openspec]='^openspec/|^scripts/trim-openspec-archive\.sh$'
           PATTERNS[packages]='^packages/'
-          # Repository tooling with tests of its own since one-deploy-path-one-dev-runner:
-          # the dev-stack runner and the probe every deploy workflow ends in.
-          # `CLAUDE.md` is in this list because `scripts/tests/test_guide_ceiling.py` reads
-          # it: the guide has a size ceiling and must name every module and package the
-          # repository holds. Filtered on `^scripts/` alone, an edit to the guide itself —
-          # the one thing that guard is written against — ran none of it, and a guide over
-          # its ceiling or missing a module would have gone green. Found on 20 August 2026,
-          # in the pull request that fixed the same guard for reading a working copy.
+          # Repository tooling with tests of its own. `CLAUDE.md` is here because `test_guide_ceiling.py` reads it:
+          # filtered on `^scripts/` alone, an edit to the guide ran none of the guard written against it.
           PATTERNS[scripts]='^scripts/|^CLAUDE\.md$'
-          # Terraform reached `main` unvalidated until 18 August 2026: `terraform.yml` runs
-          # on pull_request only, so a push straight to `main` passed through nothing at
-          # all. `fmt` and `validate` need no credentials and no state, so they belong here
-          # rather than there. Both roots — `infra/bootstrap/` keeps its own state.
+          # Terraform reached `main` unvalidated until 18 August 2026, since `terraform.yml` runs on pull_request only.
+          # `fmt` and `validate` need no credentials, so they belong here. Both roots — bootstrap keeps its own state.
           PATTERNS[infra]='^infra/'
 
           for name in "${!PATTERNS[@]}"; do
@@ -188,17 +111,12 @@ jobs:
               echo "$name=false" >> "$GITHUB_OUTPUT"
             fi
           done
-          # See the `package-list` output above for why this is diff ∩ directory.
-          #
-          # Assembled without jq, which this step used to reach for. `jq` is on the CI
-          # runner and is not in the `/usr/bin:/bin` this step's own test pins, so a jq
-          # here is a step that runs green in CI and cannot execute where the test runs —
-          # the shape of defence this repository stopped accepting when the audit landed.
+          # See the `package-list` output above for why this is diff ∩ directory. Assembled without jq, which is on the
+          # runner but not in the `/usr/bin:/bin` this step's own test pins — green in CI, unrunnable where it is tested.
           all_pkgs="$(ls -1 packages)"
           touched="$(printf '%s\n' "$changed" | sed -n 's|^packages/\([^/]*\)/.*|\1|p' | sort -u)"
-          # Read line by line rather than `for p in $list`: word splitting would cut a
-          # directory name containing a space into two names that both look fine, and the
-          # guard below would then wave through a matrix entry nothing can run in.
+          # Read line by line rather than `for p in $list`: word splitting would cut a directory name containing a
+          # space into two names that both look fine, and the guard below would wave the matrix entry through.
           list=""
           while IFS= read -r p; do
             [ -n "$p" ] || continue
@@ -212,9 +130,8 @@ jobs:
           json=""
           while IFS= read -r p; do
             [ -n "$p" ] || continue
-            # A name needing JSON escaping is also a broken matrix entry and a
-            # working-directory no job can enter. Refuse it here, where it names itself,
-            # rather than three jobs later as a quoting error in someone else's YAML.
+            # A name needing JSON escaping is also a broken matrix entry and a working-directory no job can enter.
+            # Refused here, where it names itself, rather than three jobs later as a quoting error.
             case "$p" in
               *[!A-Za-z0-9._-]*)
                 echo "package directory is not matrix-safe: $p" >&2
@@ -265,10 +182,8 @@ jobs:
       # Types, which ruff does not check. Scope and mode are in `[tool.pyright]`; the
       # version is pinned in the same file, so this step answers the same way twice.
       - run: uv run pyright
-      # The 273 `db` tests are gated on Docker rather than on a flag, and this runner has
-      # it, so testcontainers starts a real PostgreSQL and they run. That is the intent:
-      # they cover the coverage and rollup logic, which has been wrong twice. The 7 that
-      # skip are the `live` ones, which need a Capital session and stay behind --run-live.
+      # The `db` tests are gated on Docker rather than on a flag and this runner has it, so a real PostgreSQL
+      # starts and they run — they cover the coverage and rollup logic, which has been wrong twice.
       - run: uv run pytest -q
 
   trading-mcp:
@@ -284,16 +199,13 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      # Before the tests rather than after: `scripts/contract.py` reaches into
-      # `../capital-gateway` in this same checkout and reads its OpenAPI document off the
-      # app object — no database, no provider session and no CAPITAL_* credentials, since
-      # that module builds its Settings inside `lifespan` rather than at import.
+      # Before the tests rather than after: `scripts/contract.py` reads the gateway's OpenAPI off the app object
+      # in this same checkout — no database and no credentials, since that module builds Settings in `lifespan`.
       - run: uv run python scripts/contract.py check
       - run: uv run ruff check .
       - run: uv run pyright
-      # Nothing here reaches capital.com or a running gateway: every test doubles the
-      # upstream. The demo-only guard is exercised against that double, which is the only
-      # place it can be exercised without an account to refuse.
+      # Nothing here reaches capital.com or a running gateway: every test doubles the upstream, which is the only
+      # place the demo-only guard can be exercised without an account to refuse.
       - run: uv run pytest -q
 
   polymarket-data:
@@ -311,10 +223,8 @@ jobs:
           enable-cache: true
       - run: uv run ruff check .
       - run: uv run pyright
-      # The `db` tests are gated on Docker rather than on a flag, and this runner has it,
-      # so testcontainers starts a real PostgreSQL and they run. The `live` ones stay
-      # behind --run-live: they read the real Polymarket API, which is a third party's
-      # availability rather than this repository's correctness.
+      # The `db` tests are gated on Docker and this runner has it, so they run. The `live` ones stay behind
+      # --run-live: they read the real Polymarket API, which is a third party's availability, not correctness here.
       - run: uv run pytest -q
 
   strategy:
@@ -332,10 +242,8 @@ jobs:
           enable-cache: true
       - run: uv run ruff check .
       - run: uv run pyright
-      # The `db` tests are gated on Docker rather than on a flag, and this runner has it,
-      # so testcontainers starts a real PostgreSQL and they run. Nothing here reaches
-      # market-data: the archive is an HTTP contract and every test doubles it at the
-      # transport, which is also the only place the "cannot see" refusals can be produced.
+      # The `db` tests are gated on Docker and this runner has it, so they run. Nothing reaches market-data: the
+      # archive is an HTTP contract doubled at the transport, which is where the "cannot see" refusals come from.
       - run: uv run pytest -q
 
   packages:
@@ -344,10 +252,8 @@ jobs:
     if: needs.changes.outputs.packages == 'true'
     runs-on: ubuntu-latest
     strategy:
-      # One job per package rather than a loop, so a failure names which one — and the
-      # list comes from `changes`, which intersects the diff with the directory, so a
-      # one-package edit runs one package and adding a package cannot leave it
-      # untested while the job reports green.
+      # One job per package rather than a loop, so a failure names which one, and the list comes from `changes`:
+      # a one-package edit runs one package, and adding a package cannot leave it untested while the job is green.
       fail-fast: false
       matrix:
         package: ${{ fromJSON(needs.changes.outputs.package-list) }}
@@ -361,9 +267,8 @@ jobs:
           enable-cache: true
       - run: uv run ruff check .
       - run: uv run pyright
-      # The package's own tests only. What proves a package change is safe for its
-      # consumers is that *their* jobs run too — the filter above adds every module that
-      # takes the package as a path dependency, so this job never stands alone.
+      # The package's own tests only. What proves a package change safe for its consumers is that *their* jobs run
+      # too — the filter adds every module taking it as a path dependency, so this job never stands alone.
       - run: uv run pytest -q
 
   workbench:
@@ -383,10 +288,8 @@ jobs:
       # Types, which ruff does not check. Scope and mode are in `[tool.pyright]`; the
       # version is pinned in the same file, so this step answers the same way twice.
       - run: uv run pyright
-      # Same as market-data's own step: the `db` tests are gated on Docker inside
-      # conftest.py, not on a flag, and this runner has it — so one `pytest -q` also runs
-      # them, against two real PostgreSQL containers, one per schema. `live` tests need a
-      # real OpenAI key and stay behind --run-live, never here.
+      # The `db` tests are gated on Docker, so one `pytest -q` runs them against two real PostgreSQL containers,
+      # one per schema. `live` tests need a real OpenAI key and stay behind --run-live.
       - run: uv run pytest -q
 
   terminal:
@@ -399,11 +302,8 @@ jobs:
         working-directory: modules/terminal
     steps:
       - uses: actions/checkout@v4
-      # Version comes from `packageManager` in package.json — one place both CI and a
-      # developer read, instead of knowledge living in a review document. The path is
-      # spelled out because `defaults.run.working-directory` applies to `run` steps and
-      # not to actions: without it this looks for a package.json in the repository root,
-      # where there is none, and fails before anything is installed.
+      # Version comes from `packageManager` in package.json, one place both CI and a developer read. The path is
+      # spelled out because `defaults.run.working-directory` applies to `run` steps and not to actions.
       - uses: pnpm/action-setup@v4
         with:
           package_json_file: modules/terminal/package.json
@@ -412,9 +312,8 @@ jobs:
           node-version: 22
           cache: pnpm
           cache-dependency-path: modules/terminal/pnpm-lock.yaml
-      # `contract:check` regenerates the wire types from market-data's Python, so this job
-      # needs both toolchains. Giving it uv is one step; giving a separate job Node and an
-      # install would duplicate the expensive half.
+      # `contract:check` regenerates the wire types from Python, so this job needs both toolchains. Giving a
+      # separate job Node and an install would duplicate the expensive half.
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
@@ -426,11 +325,8 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm test
 
-  # The dev-stack runner and the deploy probe. Both were shell with no tests until
-  # one-deploy-path-one-dev-runner, and both are defences: the runner refuses a mismatched
-  # gateway key and a non-loopback database before it starts anything, and the probe is what
-  # stood over a crash-looping container on 16 August 2026 reporting green. The same three
-  # commands every module runs, so a rule that passes in a module passes here.
+  # The dev-stack runner and the deploy probe: both were shell with no tests, and both are defences — the runner
+  # refuses a mismatched gateway key before starting anything, the probe is what reported green over a crash loop.
   scripts:
     name: scripts
     needs: changes
@@ -448,15 +344,8 @@ jobs:
       - run: uv run pyright
       - run: uv run pytest -q
 
-  # Terraform reached `main` unvalidated: `terraform.yml` runs a full plan, but only on
-  # pull_request, so a push straight to `main` with infrastructure in it passed through
-  # nothing at all. `apply` stays with the operator and CI stays unable to do it — none of
-  # that changes here. What changes is that `fmt` and `validate` now run on both doors, and
-  # they can, because neither needs a credential or the state:
-  # `init -backend=false` downloads the providers and stops.
-  #
-  # Both roots. `infra/bootstrap/` is a separate root with its own committed local state,
-  # and it was outside every check until now.
+  # Terraform reached `main` unvalidated, since `terraform.yml` runs on pull_request only. `apply` stays with the
+  # operator; what changes is that `fmt` and `validate` run on both doors, needing neither credential nor state.
   infra:
     name: infra
     needs: changes
@@ -480,16 +369,9 @@ jobs:
           terraform init -backend=false -input=false
           terraform validate
 
-  # An archived change keeps proposal, design and review. Its delta specs were merged into
-  # `openspec/specs/` by the archive itself and its ticked `tasks.md` is a worse account of
-  # the work than the commits are, so both are removed on the way in — and a copy that
-  # lives twice is a copy that drifts.
-  #
-  # `/opsx:archive` is told to run the script (`openspec/config.yaml`, `operations.archive`,
-  # verified to reach the workflow through `openspec instructions archive --json`). That
-  # channel is advisory by its own contract, which makes it the right place for the rule
-  # and the wrong place to leave it alone: this step is what notices the archive where it
-  # was not followed. One checkout and one script — there is nothing to install.
+  # An archived change keeps proposal, design and review: its delta specs were merged into `openspec/specs/` and a
+  # copy that lives twice drifts. `/opsx:archive` is told to run the script, and that channel is advisory — this
+  # step is what notices the archive where it was not followed.
   openspec:
     name: openspec
     needs: changes

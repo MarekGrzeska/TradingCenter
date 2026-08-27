@@ -102,16 +102,8 @@ describe("resolveEndpoints", () => {
     });
   });
 
-  // Caught in a browser, not here: the archive answered on `/archive`, which is
-  // also the Archive tab's route, so reloading the tab returned the service's
-  // JSON instead of the app. Clicking through worked — the router never asks a
-  // server — which is why nothing in this suite noticed.
-  //
-  // The relative prefix is only safe if no tab claims it, so it is compared
-  // against the route list rather than eyeballed. Covers the workbench's and the
-  // gateway's prefixes too, since both are relative defaults of the same shape — and the
-  // gateway's is the one that would have collided: there is an `accounts` tab now, and
-  // `/accounts` would have shadowed it exactly the way `/archive` once did.
+  // The archive answered on `/archive`, which is also the Archive tab's route, so reloading returned JSON
+  // instead of the app — clicking through worked, which is why nothing here noticed. Compared, not eyeballed.
   it("gives no back end a relative prefix that a tab route already claims", () => {
     const { archiveHttp, archiveWs, workbenchHttp, gatewayHttp, polymarketHttp } =
       resolveEndpoints({}, devLoc);
@@ -173,10 +165,8 @@ describe("resolveEntra", () => {
     });
   });
 
-  // The rule the split exists for: a module with no scope of its own is called with no
-  // credential, not with the archive's. Falling back would be the terminal telling five
-  // gates the same thing, which is what this change stopped
-  // (specs/terminal-identity, "Dwa moduły o różnych publicznościach").
+  // A module with no scope of its own is called with no credential, not with the archive's: falling back
+  // would be the terminal telling five gates the same thing (specs/terminal-identity).
   it("does not fall back to the archive's scope for a back end with none", () => {
     const scopes = resolveEntra({ ...complete, VITE_ENTRA_SCOPE_GATEWAY: "api://gw/access" })
       ?.scopes;
@@ -191,17 +181,15 @@ describe("resolveEntra", () => {
       .toBeNull();
   });
 
-  // Not a misconfiguration: locally the archive has nothing in front of it, and
-  // a terminal that demanded a tenant before it would start would make `pnpm
-  // dev` depend on Azure.
+  // Not a misconfiguration: locally the archive has nothing in front of it, and demanding a tenant before
+  // start would make `pnpm dev` depend on Azure.
   it("answers with no identity when none is configured", () => {
     expect(resolveEntra({})).toBeNull();
   });
 
   it("refuses a partial set rather than half-signing anybody in", () => {
-    // Two out of three is a typo. Starting anyway turns it into a sign-in that
-    // fails much later with a message about audiences, a long way from the line
-    // that caused it.
+    // Two out of three is a typo. Starting anyway turns it into a sign-in that fails much later with a
+    // message about audiences, a long way from the line that caused it.
     expect(() => resolveEntra({ VITE_ENTRA_CLIENT_ID: "a-client-id" })).toThrow(/together/);
     expect(() =>
       resolveEntra({ ...complete, VITE_ENTRA_SCOPE: "   " }),

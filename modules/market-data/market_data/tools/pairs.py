@@ -1,11 +1,5 @@
-"""What the archive is collecting — asked at two resolutions, because the two questions
-have very different prices.
-
-`list_tracked_symbols` answers "what do we follow at all", one row per symbol.
-`list_tracked_pairs` answers "what exactly is being collected and how healthy is it",
-one row per symbol *and* resolution — which for five symbols is thirty rows, most of
-them the same answer repeated seven times.
-"""
+"""What the archive is collecting, asked at two resolutions because the two questions have very
+different prices: one row per symbol, or one row per symbol *and* resolution."""
 
 from __future__ import annotations
 
@@ -18,11 +12,8 @@ from pydantic import BaseModel, Field
 from ..tracking import TrackedPairStatus
 from ._shared import READ_ONLY, ToolContext, tracked_pairs
 
-# Least healthy first. A symbol whose five-minute candles have stalled is a symbol to
-# warn about even when its weekly ones are fine, so the summary takes the worst state
-# rather than the commonest: over-warning is undone by one call to `list_tracked_pairs`,
-# while a symbol reported as collecting when half of it is not is an answer nobody
-# checks twice.
+# Least healthy first: a symbol whose five-minute candles have stalled is worth warning about even
+# when its weekly ones are fine. Over-warning is undone by one call; the opposite is not checked twice.
 _COLLECTION_SEVERITY = ("stalled", "unknown", "never_collected", "market_closed", "collecting")
 
 
@@ -30,10 +21,8 @@ def _severity(state: str) -> int:
     try:
         return _COLLECTION_SEVERITY.index(state)
     except ValueError:
-        # A state this list has never heard of ranks worst, not best. A new one being
-        # added to `CollectionState` is not a reason to call the symbol healthy on its
-        # behalf — and the two now live in one module, so this is the case where they
-        # were changed together and this list was not.
+        # A state this list has never heard of ranks worst, not best: a new `CollectionState` is not
+        # a reason to call the symbol healthy on its behalf.
         return -1
 
 

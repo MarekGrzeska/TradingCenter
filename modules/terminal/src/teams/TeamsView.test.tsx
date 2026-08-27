@@ -180,13 +180,8 @@ async function openTheTeam(api: TeamsApi) {
   return screen.findByTestId("agent-node-Scout");
 }
 
-/** An agent's fields live in a dialog now, opened by the gear on its own box.
- *
- *  `fireEvent` for the same reason the node clicks below use it: a pointer press on the
- *  canvas wakes d3-zoom, which reaches for a `document` jsdom has already torn down. And
- *  by label rather than by role, because React Flow keeps a node `visibility: hidden`
- *  until it has measured it — which never happens in jsdom, so nothing on this canvas is
- *  in the accessibility tree a `ByRole` query walks. */
+  /** `fireEvent` because a pointer press wakes d3-zoom, which reaches for a `document` jsdom has torn down; by
+   *  label because React Flow keeps a node hidden until measured, which never happens here. */
 async function openAgentSettings(role: string) {
   fireEvent.click(
     within(screen.getByTestId(`agent-node-${role}`)).getByLabelText(`Settings for ${role}`),
@@ -224,9 +219,8 @@ describe("the catalogue", () => {
   });
 
   it("shows a team the model created, without the operator reloading the page", async () => {
-    // Reported from a running stack on 17 August 2026: `create_team` from the chat
-    // succeeded, the team was in the module, and the tab kept showing the list it read on
-    // mount. Those writes never pass through this tab, so nothing invalidated it.
+    // Reported from a running stack on 17 August 2026: `create_team` from the chat succeeded and the tab kept
+    // showing the list it read on mount. Those writes never pass through this tab, so nothing invalidated it.
     const listTeams = vi
       .fn()
       .mockResolvedValueOnce([TEAM])
@@ -243,9 +237,8 @@ describe("the catalogue", () => {
 
 describe("the team on the canvas", () => {
   it("shows every agent with its role and the model it works on", async () => {
-    // `terminal-teams`, "Przy każdym agencie MUST być widoczna jego rola i model" — the
-    // model by the catalogue's display name, which is the only name the operator picked
-    // it by.
+    // `terminal-teams`, "Przy każdym agencie MUST być widoczna jego rola i model" — by the catalogue's display
+    // name, which is the only name the operator picked it by.
     await openTheTeam(fakeApi());
 
     expect(within(screen.getByTestId("agent-node-Scout")).getByText("Mini")).toBeInTheDocument();
@@ -311,9 +304,8 @@ describe("the agent settings dialog", () => {
   });
 
   it("shows a refused save's reason and opens the agent it names", async () => {
-    // `terminal-teams`, "Zapis odrzucony przez moduł jest pokazany przy miejscu, którego
-    // dotyczy" — the message names agent-2, so its settings are what opens and its node is
-    // marked, rather than a general "invalid" somewhere on the page.
+    // `terminal-teams`, "Zapis odrzucony przez moduł jest pokazany przy miejscu, którego dotyczy": the message
+    // names agent-2, so its settings open and its node is marked, not a general "invalid" on the page.
     const refusal = new MarketDataError(
       "refused",
       "agent 'agent-2' names model 'gone', which is not in this module's model catalogue",
@@ -355,9 +347,8 @@ describe("the trading limits", () => {
   });
 
   it("marks the tools that move the account, and says when nobody annotated one", async () => {
-    // specs/terminal-teams, "narzędzia zmieniające stan rachunku są odróżnione od
-    // czytających" — read off the server's own annotation, with `null` kept as a third
-    // value rather than promoted to "reads only".
+    // specs/terminal-teams, "narzędzia zmieniające stan rachunku są odróżnione od czytających" — read off the
+    // server's own annotation, with `null` kept as a third value rather than promoted to "reads only".
     const api = fakeApi({
       listTools: vi.fn(async () => [
         { name: "get_candles", description: "candles", readOnly: true },

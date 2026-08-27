@@ -28,17 +28,8 @@ export interface AxisEntry {
 }
 
 /**
- * What every mark on this chart — a ray, a zone, a trend line — is made of.
- *
- * The three primitives were written one after another and ended up with the same fifty
- * lines each: the chart and series handles, the `requestUpdate` callback, the axis views
- * rebuilt only when the set of prices changes, `attached`/`detached`/`paneViews`, and an
- * `emphasis` that repaints when it actually changed. Only three things ever differed —
- * what the shape draws, where a click lands on it, and which prices it announces — and
- * those are what a subclass writes.
- *
- * Kept apart from the drawing *styles* in `drawingStyle.ts`: that module is about how a
- * mark looks, this one about how a mark lives on a chart.
+ * What every mark — a ray, a zone, a trend line — is made of. The three primitives held the same fifty lines
+ * each, and only three things differed: what the shape draws, where a click lands, which prices it announces.
  */
 export abstract class MarkPrimitive<Item> implements ISeriesPrimitive<Time> {
   protected chart: IChartApi | null = null;

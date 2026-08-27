@@ -1,9 +1,5 @@
-"""`chart_drawings`: the four-column geometry, one `CHECK` per shape, and the round trip
-through `store.py`'s three domain classes.
-
-specs/agent-chart-drawings, "Rysunek należy do instrumentu, nie do widoku" and "Rysunki są
-trwałe i mają własną tożsamość".
-"""
+"""`chart_drawings`: the four-column geometry, one `CHECK` per shape, and the round trip through the
+store's three domain classes."""
 
 from __future__ import annotations
 
@@ -202,9 +198,8 @@ async def test_a_drawing_outlives_the_session_that_made_it(db) -> None:
     )
 
     await store.delete_session(db, session_id=session_id, owner_principal="op-1")
-    # `delete_session` is a soft delete and would not exercise `ON DELETE SET NULL` on its
-    # own, so the row is deleted for real here, the way an operator's account removal one
-    # day might.
+    # `delete_session` is a soft delete and would not exercise `ON DELETE SET NULL` on its own, so the row
+    # is deleted for real here, the way an operator's account removal one day might.
     await db.execute("DELETE FROM sessions WHERE id = $1", session_id)
 
     [read] = await store.list_drawings(db, symbol="US100")

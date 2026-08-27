@@ -125,11 +125,8 @@ class DescribeCoverageOut(BaseModel):
 
 
 def _rows(candles: Sequence[Candle | DerivedCandle]) -> list[dict]:
-    """The four edges and the instant, as the reduction expects them.
-
-    `time` rather than `period_start`: the reduction and every model here speak the wire's
-    word for it, and a candle carries a dozen fields a model has no use for.
-    """
+    """The four edges and the instant, as the reduction expects them. `time` rather than `period_start`:
+    every model here speaks the wire's word, and a candle carries a dozen fields a model cannot use."""
     return [
         {
             "time": candle.period_start,
@@ -152,10 +149,8 @@ async def _read_window(
 async def _newest_candle(
     ctx: ToolContext, symbol: str, resolution: str, notes: list[str]
 ) -> Series:
-    """The archive's newest candle for a pair, read at the instant the pair's own row
-    reports for it rather than found by widening a window. Appends the sentence that says
-    which kind of empty this is when there is nothing to read.
-    """
+    """The archive's newest candle for a pair, read at the instant the pair's own row reports rather
+    than found by widening a window. Appends the sentence saying which kind of empty this is."""
     row = await tracked_pair(ctx, symbol, resolution)
     newest = row.latest_candle if row else None
     empty = Series(candles=[], derived=False, uncovered=[])
@@ -268,9 +263,8 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
 
         notes.append(uncertainty.no_live_price_sentence(symbol, live.state.value, live.market_open))
         if live.state is FormingState.NOT_TRACKED:
-            # Nothing is collected for this symbol at any resolution, so there is no
-            # settled candle to fall back to either — and the sentence above already says
-            # what to do about it.
+            # Nothing is collected for this symbol at any resolution, so there is no settled candle
+            # to fall back to either — and the sentence above already says what to do about it.
             return LastPriceOut(symbol=symbol, resolution=resolution, notes=notes)
 
         settled_resolution = resolution or next(iter(await tracked_resolutions(ctx, symbol)), None)

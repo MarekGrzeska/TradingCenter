@@ -1,7 +1,5 @@
-"""`summarize_range`, `describe_coverage` and `search_instruments` — the tools whose own
-file held three or four cases each. One file, because nothing separated them but a
-filename: every case goes through `tool_server` and reads a structured reply.
-"""
+"""`summarize_range`, `describe_coverage` and `search_instruments` — one file, because nothing separated
+them but a filename: every case goes through `tool_server` and reads a structured reply."""
 
 from __future__ import annotations
 
@@ -13,8 +11,6 @@ from tools_double import candle, coverage_range, tracked
 
 from market_data.errors import GatewayError
 from market_data.reads import Series
-
-# --- summarize_range ------------------------------------------------------------------
 
 
 def _at(minute: int, open_: float, high: float, low: float, close: float):
@@ -68,8 +64,6 @@ async def test_summary_of_empty_series_names_why(tool_server, archive) -> None:
     assert any("nobody is collecting it" in note for note in structured["notes"])
 
 
-# --- describe_coverage ----------------------------------------------------------------
-
 
 def _range(day: int, history_ended: bool = False):
     return coverage_range(
@@ -120,8 +114,6 @@ async def test_no_coverage_for_a_tracked_pair_points_elsewhere(tool_server, arch
     assert not any("nobody is collecting it" in note for note in structured["notes"])
 
 
-# --- search_instruments ---------------------------------------------------------------
-
 
 def _instrument(symbol: str) -> dict:
     return {
@@ -166,10 +158,8 @@ async def test_search_with_no_matches(tool_server) -> None:
 
 
 async def test_an_unreachable_catalogue_is_a_refusal_naming_it(tool_server) -> None:
-    """The one tool whose answer still crosses a network — the instrument catalogue is
-    capital-gateway's, and this archive holds the only key to it. A failure there must
-    reach the model as a refusal naming the gateway, never as an empty result set, which
-    reads as "no such instrument" (specs/market-data-answers, "Trzy rodzaje «nie wiem»")."""
+    """The one tool whose answer still crosses a network. A failure there must reach the model as a
+    refusal naming the gateway, never as an empty result set, which reads as "no such instrument"."""
     tool_server._fake_app.state.instruments.error = GatewayError("the gateway did not answer")
 
     with pytest.raises(ToolError) as err:

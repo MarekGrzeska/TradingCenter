@@ -10,17 +10,8 @@ import { mapToolCall, type AgentToolCall, type RawToolCall } from "./toolCall";
 export type { AgentToolCall, ToolOutcome } from "./toolCall";
 
 /**
- * The agent module's own DTOs, written by hand against its OpenAPI rather than
- * generated: `pnpm contract:generate` is wired to `market-data`'s one contract alone,
- * and giving the agent a second generator is a change of its own weight
- * (design.md, "Kontrakt terminala pisany ręcznie, bez generatora"; `modules/workbench/
- * README.md`, "Contract"). The module's wire shapes (snake_case, per `agent/
- * contract.py`) stay private to this file — every other file speaks the camelCase
- * ones below.
- *
- * Money and rates travel as strings on the wire (`agent/contract.py`: "nothing here
- * ever sums these on the wire") and stay strings here too — this file renders them,
- * it does not add them (`terminal-agent-cost` spec, "Terminal MUST NOT liczyć kosztu").
+ * Hand-written against the module's OpenAPI rather than generated: the generator is wired to market-data's contract
+ * alone. Money and rates travel as strings and stay strings — this file renders them, it does not add them.
  */
 
 export interface AgentModel {
@@ -48,15 +39,12 @@ export interface AgentMessage {
   modelId: string | null;
   promptVersion: string | null;
   incomplete: boolean;
-  /** Why it is incomplete, when the module knows: the operator stopped it. False against
-   *  a module from before stopping existed, which reads as "it broke", the only thing that
-   *  could happen then. */
+  /** Why it is incomplete, when the module knows: the operator stopped it. False against a module from
+   *  before stopping existed, which reads as "it broke" — the only thing that could happen then. */
   stopped: boolean;
   createdAt: number;
-  /** How the agent got to this reply. Empty on an operator's message and on a reply that
-   *  asked nothing — and empty, too, against a module from before `tool_calls` existed on
-   *  the wire, which is the one case worth naming: the mapper defaults rather than reads
-   *  `undefined.map`. */
+  /** How the agent got to this reply. Empty on an operator's message, on a reply that asked nothing, and
+   *  against a module from before this was on the wire — the mapper defaults rather than reads `undefined`. */
   toolCalls: AgentToolCall[];
 }
 
@@ -97,10 +85,8 @@ export interface AgentChartIndicator {
   color: string | null;
 }
 
-/** Which fragment of the time axis the chart should show — epoch seconds here, ISO 8601
- *  UTC on the wire (`parseIsoToEpochSeconds`, the same conversion every other timestamp
- *  from this module goes through). Exactly one of the three shapes is filled: a
- *  `from`/`to` range, an `around`/`bars` point, or `lastBars` alone. */
+/** Which fragment of the time axis the chart should show — epoch seconds here, ISO 8601 UTC on the wire.
+ *  Exactly one of the three shapes is filled: a range, a point with a span, or `lastBars` alone. */
 export interface AgentChartFocus {
   from: number | null;
   to: number | null;
@@ -109,9 +95,8 @@ export interface AgentChartFocus {
   lastBars: number | null;
 }
 
-/** What the agent set the chart to, as of `sequence`. A null field means "leave it as it
- *  is": several commands arrive folded into one, and a field none of them touched is
- *  still untouched here. */
+/** What the agent set the chart to, as of `sequence`. A null field means "leave it as it is": several
+ *  commands arrive folded into one, and a field none of them touched is still untouched here. */
 export interface AgentChartCommand {
   sequence: number;
   symbol: string | null;
@@ -120,14 +105,8 @@ export interface AgentChartCommand {
   focus: AgentChartFocus | null;
 }
 
-/** One object standing on an instrument's chart, in the terminal's own shapes: epoch
- *  seconds for every moment, and the geometry a union discriminated by `kind` exactly as
- *  the module publishes it (`agent-chart-drawings` spec, "Rysunek należy do instrumentu,
- *  nie do widoku").
- *
- *  Unlike an indicator result, this is not computed from candles and does not belong to
- *  the interval it was made on — it belongs to the instrument, and the chart keeps it
- *  across a resolution change. */
+/** One object standing on an instrument's chart, in the terminal's own shapes. Unlike an indicator result it is not
+ *  computed from candles: it belongs to the instrument, and the chart keeps it across a resolution change. */
 export type AgentDrawingGeometry =
   | { kind: "level"; price: number; at: number | null }
   | { kind: "zone"; top: number; bottom: number; from: number | null; to: number | null }
@@ -143,18 +122,15 @@ export interface AgentChartDrawing {
   geometry: AgentDrawingGeometry;
   label: string | null;
   color: string | null;
-  /** Whether the chart draws it. Hidden is not removed: the object keeps everything else
-   *  it has and comes back exactly as it was (`agent-chart-drawings` spec, "Zapalony
-   *  rysunek jest tym samym rysunkiem"). */
+  /** Whether the chart draws it. Hidden is not removed: the object keeps everything else it has and comes
+   *  back exactly as it was. */
   hidden: boolean;
   createdAt: number;
   updatedAt: number;
 }
 
-/** What the operator may correct by hand. Every field optional and at least one required
- *  — the module's own 422 says so, this side does not check first. The price fields are
- *  named by the role they play in a shape, and only the ones that shape has are accepted
- *  (`agent/contract.py`, `PatchDrawingIn`). */
+/** What the operator may correct by hand. Every field optional and at least one required — the module's
+ *  own 422 says so, this side does not check first. Only the price roles that shape has are accepted. */
 export interface AgentDrawingPatch {
   price?: number;
   top?: number;
@@ -167,10 +143,8 @@ export interface AgentDrawingPatch {
   hidden?: boolean;
 }
 
-/** What the terminal is drawing as it asks — context for one turn, never a message.
- *  `visibleFrom`/`visibleTo` (epoch seconds) are the visible span, both present or both
- *  absent: half a span is not a span, and the module reads exactly that distinction to
- *  decide whether to say anything about it at all. */
+/** What the terminal is drawing as it asks — context for one turn, never a message. The visible span is
+ *  both present or both absent: half a span is not a span, and the module reads that distinction. */
 export interface AgentChartSnapshot {
   symbol: string | null;
   resolution: string;
@@ -190,41 +164,25 @@ export interface AgentApi {
    *  already gone answers 404, indistinguishable from one that never existed. */
   deleteSession(id: number, signal: AbortSignal): Promise<void>;
   getMessages(id: number, signal: AbortSignal): Promise<AgentMessage[]>;
-  /** The calls this conversation made that no reply ever claimed — a turn that died with
-   *  something in flight (`agent-trading` spec). Empty for almost every conversation, and
-   *  a row here is the record of an order whose fate nobody knows, so it is read and shown
-   *  rather than left in the database.
-   *
-   *  Its own route rather than a field on the transcript: that one publishes a list, and a
-   *  field would have meant an object, which a terminal deployed before the module would
-   *  have called `map` on. */
+  /** The calls no reply ever claimed — a row here records an order whose fate nobody knows. Its own route rather
+   *  than a field: a field means an object, which a terminal deployed before the module would have called `map` on. */
   getUnclaimedToolCalls(id: number, signal: AbortSignal): Promise<AgentToolCall[]>;
-  /** Posts the operator's turn and hands back its reply as typed events — the raw
-   *  `fetch`/`ReadableStream` plumbing lives entirely in `stream.ts` and in the one
-   *  await below. Rejecting here (before any event is produced) means nothing was
-   *  accepted by the module; a rejection while iterating the result means the turn was
-   *  accepted and broke partway through — `agentChatStore` tells the two apart, because
-   *  only it knows what, if anything, is worth keeping on screen for each. */
+  /** Posts the operator's turn and hands back its reply as typed events. Rejecting here means nothing was
+   *  accepted; a rejection while iterating means the turn was accepted and broke partway through. */
   sendMessage(
     id: number,
     content: string,
     signal: AbortSignal,
     chart?: AgentChartSnapshot | null,
   ): Promise<AsyncGenerator<AgentStreamEvent>>;
-  /** Ends the turn running in this conversation. Resolves on 204 — which is also the
-   *  answer when nothing was running, because a stop landing just after the turn finished
-   *  is a race and not something an operator can act on. A conversation that is not
-   *  theirs answers 404, the same as one that never existed. */
+  /** Ends the turn running in this conversation. Resolves on 204 — which is also the answer when nothing
+   *  was running, because a stop landing just after the turn finished is a race. */
   stopTurn(id: number, signal: AbortSignal): Promise<void>;
-  /** What the agent set the chart to since `after`, or null when it set nothing. Safe to
-   *  repeat: the module keeps no cursor of its own, so asking twice answers twice the
-   *  same (specs/agent-chart-control, "Konsument czyta tylko to, czego jeszcze nie
-   *  zastosował"). */
+  /** What the agent set the chart to since `after`, or null when it set nothing. Safe to repeat: the
+   *  module keeps no cursor of its own, so asking twice answers twice the same. */
   chartCommand(after: number, signal: AbortSignal): Promise<AgentChartCommand | null>;
-  /** Everything drawn on this instrument, read whole. No cursor and nothing folded: a
-   *  drawing is the instrument's state, not a log to catch up with, so the answer
-   *  replaces what the chart shows rather than adding to it (design.md of
-   *  `agent-chart-drawings`, "Rysunek jest stanem, nie logiem"). */
+  /** Everything drawn on this instrument, read whole. No cursor and nothing folded: a drawing is the
+   *  instrument's state, not a log to catch up with. */
   listDrawings(symbol: string, signal: AbortSignal): Promise<AgentChartDrawing[]>;
   /** Rejects with a `"refused"` `MarketDataError` on a price role this shape does not
    *  have, or a zone whose band would end up inverted — the module's own 422. */
@@ -233,9 +191,8 @@ export interface AgentApi {
     patch: AgentDrawingPatch,
     signal: AbortSignal,
   ): Promise<AgentChartDrawing>;
-  /** Resolves on 204. A drawing already gone answers 404 — a `"not-found"` error rather
-   *  than a quiet success, which is what lets the list say the removal did not happen
-   *  (`terminal-chart` spec, "Usunięcie się nie powiodło"). */
+  /** Resolves on 204. A drawing already gone answers 404 — an error rather than a quiet success, which is
+   *  what lets the list say the removal did not happen. */
   deleteDrawing(id: number, signal: AbortSignal): Promise<void>;
   usage(range: UsageRange, signal: AbortSignal): Promise<AgentUsageSummary>;
   getPrompt(signal: AbortSignal): Promise<AgentPrompt>;
@@ -271,9 +228,8 @@ interface RawMessage {
    *  module reads a transcript without it. */
   stopped?: boolean;
   created_at: string;
-  /** Optional here and required on the module's own contract: a terminal deployed ahead
-   *  of the agent reads a transcript without it, and the panel must open rather than
-   *  throw (design.md, "Agent sprzed zmiany wobec terminala po zmianie"). */
+  /** Optional here and required on the module's own contract: a terminal deployed ahead of the agent reads
+   *  a transcript without it, and the panel must open rather than throw. */
   tool_calls?: RawToolCall[];
 }
 
@@ -311,12 +267,9 @@ interface WireChartSnapshot {
   visible_to?: string;
 }
 
-/** The one place `AgentChartSnapshot` meets the wire — `sendMessage`'s `chart` field is
- *  otherwise passed through untouched, which only ever worked because `symbol`,
- *  `resolution` and `indicators` happen to spell the same both ways. The visible span
- *  does not: epoch seconds here, an ISO instant there, and included only when both
- *  halves are known — an ISO instant invented for the half that is not would be a kadr
- *  the module was never actually shown. */
+/** The one place `AgentChartSnapshot` meets the wire. The visible span is the field that does not spell the
+ *  same both ways, and it travels only when both halves are known — an invented instant would be a kadr
+ *  the module was never shown. */
 function chartSnapshotToWire(snapshot: AgentChartSnapshot): WireChartSnapshot {
   const wire: WireChartSnapshot = {
     symbol: snapshot.symbol,
@@ -359,11 +312,8 @@ interface RawDrawing {
 }
 
 function mapDrawingGeometry(raw: RawDrawing["geometry"]): AgentDrawingGeometry | null {
-  // A `kind` this terminal has no shape for is skipped, not thrown on: a module deployed
-  // ahead of the terminal may publish a fourth shape, and one unknown object must not
-  // take the whole read — and with it every drawing the chart *can* draw — down with it
-  // (design.md, "Agent sprzed zmiany wobec terminala po zmianie", read the other way
-  // round).
+  // A `kind` this terminal has no shape for is skipped, not thrown on: a module deployed ahead of the
+  // terminal may publish a fourth shape, and one unknown object must not take the whole read down.
   if (raw.kind === "level") {
     return {
       kind: "level",
@@ -401,9 +351,8 @@ function mapDrawing(raw: RawDrawing): AgentChartDrawing | null {
     geometry,
     label: raw.label,
     color: raw.color,
-    // An absent field reads as lit, never as an object to leave off the chart: a terminal
-    // deployed ahead of the module would otherwise draw an empty instrument for the
-    // length of one deploy (design.md, "Terminal wdrożony przed agentem").
+    // An absent field reads as lit, never as an object to leave off the chart: a terminal deployed ahead
+    // of the module would otherwise draw an empty instrument for the length of one deploy.
     hidden: raw.hidden ?? false,
     createdAt: parseIsoToEpochSeconds(raw.created_at),
     updatedAt: parseIsoToEpochSeconds(raw.updated_at),
@@ -508,9 +457,8 @@ function mapPrompt(raw: RawPrompt): AgentPrompt {
   };
 }
 
-// 422: a model id the catalogue does not know, or a patch with none at all — the module
-// understood the request and declined it, same as a resolution the archive will not take
-// on.
+// 422: a model id the catalogue does not know, or a patch with none at all — the module understood the
+// request and declined it, the same as a resolution the archive will not take.
 const mapStatus = statusMapper({ 404: "not-found", 422: "refused" });
 
 export function createAgentApi(httpBase: string, identity: Identity = noIdentity): AgentApi {
@@ -616,9 +564,8 @@ export function createAgentApi(httpBase: string, identity: Identity = noIdentity
       });
       const mapped = mapDrawing(raw);
       if (mapped === null) {
-        // The corrected drawing came back in a shape this terminal cannot draw. Skipping
-        // it the way a list read does would leave the caller with nothing to show and no
-        // reason why.
+        // The corrected drawing came back in a shape this terminal cannot draw. Skipping it the way a list
+        // read does would leave the caller with nothing to show and no reason why.
         throw new MarketDataError("unknown", `drawing ${id} came back in an unknown shape`);
       }
       return mapped;
@@ -657,9 +604,7 @@ export function createAgentApi(httpBase: string, identity: Identity = noIdentity
 }
 
 /**
- * The one agent client the panel and the cost tab both use. Shares `identity` with
- * `marketData.ts` rather than minting a second one — same operator, same Entra
- * registration's worth of session state, and a second `MSAL` instance would just be two
- * copies of the same sign-in.
+ * The one agent client the panel and the cost tab both use. Shares `identity` with `marketData.ts` rather
+ * than minting a second one: same operator, and a second MSAL instance would be two copies of one sign-in.
  */
 export const agentApi: AgentApi = createAgentApi(resolveEndpoints().workbenchHttp, workbenchIdentity);

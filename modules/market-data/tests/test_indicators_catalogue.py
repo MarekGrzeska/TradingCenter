@@ -1,14 +1,5 @@
-"""What the catalogue promises, checked against what it actually computes.
-
-Two failure modes this file exists for, both named in `CLAUDE.md`'s "A new field on
-market-data's wire" and `design.md`'s risk list:
-
-- An entry declares a line its `compute` never produces (or produces one it never
-  declared) — nothing about Python or FastAPI catches that on its own.
-- An entry crosses into deciding: a boolean output, a volume input, a second
-  instrument. `market-data-indicators` spec, "Katalog mierzy, a nie orzeka" and "Wskaźnik
-  liczy się z jednej serii świec".
-"""
+"""What the catalogue promises, checked against what it actually computes. Two failure modes: an entry
+declaring a line its `compute` never produces, and an entry crossing into deciding."""
 
 from __future__ import annotations
 
@@ -64,18 +55,8 @@ class TestCatalogueMatchesKernel:
 
 
 class TestOnlyLinesEntriesDeclareLines:
-    """The other half of "an entry declares a line its compute never produces".
-
-    Only a `Lines` computer produces the arrays a `LineSpec` names; every other kind
-    answers with markers, zones or levels. An entry that declared both would publish a
-    line the terminal draws an empty series for — and the checks above cannot see it,
-    because they only ever run over the entries that do compute lines.
-
-    This is what replaced running those checks over the whole catalogue. Against a
-    markers or zones entry they asserted `set() == set()` — the old `compute` default
-    answered `{}` for every one of them, so eighty assertions passed by having nothing
-    to compare.
-    """
+    """The other half of "an entry declares a line its compute never produces": only a `Lines` computer
+    produces the arrays a `LineSpec` names, and the checks above only run over entries that do."""
 
     def test_no_other_kind_of_entry_declares_a_line(self) -> None:
         offenders = [
@@ -97,9 +78,8 @@ class TestOnlyLinesEntriesDeclareLines:
 
 
 class TestCatalogueBoundary:
-    """`market-data-indicators` spec, "Wskaźnik liczy się z jednej serii świec" and
-    "Katalog mierzy, a nie orzeka" — checked once, across the whole catalogue, so a
-    future entry cannot cross either line without this failing."""
+    """"Wskaźnik liczy się z jednej serii świec" and "Katalog mierzy, a nie orzeka" — checked once,
+    across the whole catalogue, so a future entry cannot cross either line without this failing."""
 
     def test_no_entry_reads_volume(self):
         for entry in CATALOGUE:
@@ -113,10 +93,8 @@ class TestCatalogueBoundary:
 
 
 class TestStartIndependence:
-    """`market-data-indicators` spec, "Rozgrzewka jest wyliczona, jawna i niezależna od
-    punktu startu" — the value for a given bar must not depend on how much history
-    preceded the point a caller happened to start reading from.
-    """
+    """"Rozgrzewka jest wyliczona, jawna i niezależna od punktu startu" — the value for a given bar must
+    not depend on how much history preceded the point a caller started reading from."""
 
     TAIL = 500
 
@@ -161,12 +139,8 @@ def _golden_series(golden: dict) -> Series:
 
 
 class TestCatalogueGoldenFile:
-    """Task 2.10's "pliki wzorcowe dla całego zestawu" — every entry, at its
-    default parameters, on the same committed series `test_indicators_kernel.py`
-    already golden-tests `sma`/`ema`/`atr` against (with an added `open` column,
-    absent from that file until now because nothing in the first stage read it). A
-    formula change shows up here as a diff, not as a chart that quietly draws
-    something else (design.md, "Zmiana wzoru bez podniesienia wersji")."""
+    """Every entry, at its default parameters, on the same committed series. A formula change shows up
+    here as a diff, not as a chart that quietly draws something else."""
 
     @pytest.mark.parametrize("entry", LINE_ENTRIES, ids=lambda e: e.id)
     def test_default_params_match_the_committed_snapshot(self, entry: IndicatorSpec):
@@ -189,19 +163,8 @@ class TestCatalogueGoldenFile:
 
 
 class TestWarmupKindsAgree:
-    """The wire declares exactly the warmup kinds the catalogue can produce.
-
-    Written from a real divergence rather than from symmetry: `warmup_kind` carried a
-    third variant, `"anchored"`, that no entry produced and nothing set — the wire, the
-    generated types and the terminal all handled a state no producer could reach.
-    Nothing failed, because a `Literal` wider than reality refuses nothing.
-
-    Both directions matter, and they fail differently. A variant on the wire that the
-    catalogue cannot produce is dead weight every consumer must still branch on. A kind
-    the catalogue produces that the wire does not declare is worse: that one is a
-    response the module cannot validate, which is the failure `outputSchema` caught for
-    real in the MCP modules.
-    """
+    """The wire declares exactly the warmup kinds the catalogue can produce. Written from a real
+    divergence: `"anchored"` was declared, produced by nothing, and a `Literal` wider than reality refuses nothing."""
 
     @staticmethod
     def declared() -> set[str]:

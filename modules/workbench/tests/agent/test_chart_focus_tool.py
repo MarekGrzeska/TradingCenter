@@ -1,9 +1,4 @@
-"""The `focus` field of `set_chart`: the three shapes it takes, what it refuses, and what
-it writes.
-
-specs/agent-chart-control (delta, `agent-chart-navigation`), "Narzędzie ustawia zawartość
-aktywnego slotu" and "Odmowa narzędzia nazywa, co poprawić".
-"""
+"""The `focus` field of `set_chart`: the three shapes it takes, what it refuses, and what it writes."""
 
 from __future__ import annotations
 
@@ -82,9 +77,8 @@ async def test_a_focus_only_call_is_something_to_set(db, pool) -> None:
 
 
 async def test_a_focus_only_call_needs_no_archive(db, pool) -> None:
-    # design.md, "Sprawdzenie kadru nie wymaga dodatkowego odczytu z archiwum" — a focus
-    # is checked entirely without a read, so a call naming only a focus must succeed even
-    # when there is no tool server to check a symbol or an indicator against.
+    # A focus is checked entirely without a read, so a call naming only a focus must succeed even when
+    # there is no tool server to check a symbol or an indicator against.
     session = await _session(db)
 
     outcome = await ChartTool(pool, None).call(

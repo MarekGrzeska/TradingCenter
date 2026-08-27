@@ -1,18 +1,5 @@
-"""Seeds `"v5"`: the same prompt, with the chart tool named in it.
-
-A tool the prompt does not mention exists and goes unused — the model reaches for what it
-has been told it is for. This is that sentence, and it is a migration rather than a code
-change for the same reason `0003` was one: the prompt lives in `prompt_revisions` and the
-operator edits it from the terminal (specs/agent-prompt-management).
-
-Both variants carry it. The chart tool is this module's own and does not need market-mcp,
-so a turn running the "no archive" variant can still set the chart — and the variant that
-says "you have no tools" would otherwise be a lie the moment it ran.
-
-The `v4` text is repeated here rather than read and patched: a migration that rewrites
-prose it reads at runtime would produce a different result depending on whether an
-operator had edited the prompt in between, and the point of a seeded revision is that
-everybody who runs it lands on the same text.
+"""Seeds `"v5"`: the same prompt with the chart tool named in it, because a tool the prompt does not mention goes
+unused. The `v4` text is repeated rather than read and patched — a migration that rewrites prose it reads drifts.
 
 Revision ID: 0005
 Revises: 0004
@@ -138,9 +125,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Only this row: an operator's own revisions after it are theirs, and the current
-    # prompt is whichever has the highest id — dropping more would silently reinstate a
-    # text nobody chose.
+    # Only this row: an operator's own revisions after it are theirs, and the current prompt is whichever
+    # has the highest id — dropping more would silently reinstate a text nobody chose.
     op.execute(
         sa.delete(_prompt_revisions).where(_prompt_revisions.c.version == _SEED_VERSION)
     )

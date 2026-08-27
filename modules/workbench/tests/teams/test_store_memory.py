@@ -1,10 +1,5 @@
-"""What a team remembers, against a real PostgreSQL — `store/memory.py`.
-
-Against the container rather than a fake, for the same reason the catalogue's tests are:
-what is under test is the owner filter riding inside every statement, the order the read
-comes back in, and what survives retiring a team. All three are properties of the
-statements themselves.
-"""
+"""What a team remembers, against a real PostgreSQL. What is under test is the owner filter riding inside
+every statement, the order the read comes back in, and what survives retiring a team."""
 
 from __future__ import annotations
 

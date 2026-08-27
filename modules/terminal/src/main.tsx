@@ -11,11 +11,8 @@ if (!container) {
 }
 
 /**
- * Sign-in is resolved before the app mounts, never alongside it. The operator returns
- * from Entra with the answer in the URL and only MSAL can read it, while the first
- * render is already asking for a token — one asked for mid-redirect belongs to nobody,
- * so the subscription is refused and the chart reports a signed-out operator who is in
- * the middle of signing in. In local mode there is no session to resolve.
+ * Sign-in is resolved before the app mounts: the answer comes back in the URL and only MSAL can read it, while a token
+ * asked for mid-redirect belongs to nobody and is refused. In local mode there is no session to resolve.
  */
 async function start(): Promise<void> {
   // A failure here renders signed-out rather than nothing: that is a state the terminal

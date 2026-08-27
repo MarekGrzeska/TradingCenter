@@ -37,10 +37,8 @@ async def test_a_database_one_migration_behind_refuses_to_start() -> None:
     with pytest.raises(SchemaMismatch) as err:
         await verify(FakeConnection(["0006_pair_deletions"]), MIGRATIONS)  # type: ignore[arg-type]
 
-    # The operator reads this in a container log with no other context, so it has to name
-    # both revisions. It no longer names a command to run: the module migrates itself
-    # before reaching here (`migrate.py`), so reaching here at all means the upgrade did
-    # not arrive where it reported — running it again by hand is not the answer.
+    # The operator reads this in a container log with no other context, so it names both revisions.
+    # It no longer names a command: the module migrates itself, so running it by hand is not the answer.
     assert "0006_pair_deletions" in str(err.value)
     assert next(iter(expected_heads(MIGRATIONS))) in str(err.value)
 

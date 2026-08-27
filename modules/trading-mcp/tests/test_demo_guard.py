@@ -1,14 +1,5 @@
-"""`ensure_demo_environment()`: refuse anything but the demo account, before the port
-opens (specs/trading-mcp-upstream-access, "Moduł pracuje wyłącznie na rachunku
-demonstracyjnym").
-
-The three-state cache this file used to test is gone, and so is the re-check in front of
-every write. What it was defending against — a gateway that changed environment under a
-running process — it could not actually detect: the field it compared was a literal in
-the gateway's own source, so the check only ever proved the gateway was answering. The
-gateway derives that field now, and this module still refuses to listen until it has read
-it (`openspec/changes/hot-paths-stop-paying-twice/design.md`, D4).
-"""
+"""`ensure_demo_environment()`: refuse anything but the demo account, before the port opens. The
+three-state cache this used to test could not detect what it defended against, and is gone."""
 
 from __future__ import annotations
 
@@ -98,9 +89,8 @@ async def test_nothing_is_remembered_between_asks(client: GatewayClient) -> None
 
 @respx.mock
 async def test_an_error_on_another_call_costs_nothing_later(client: GatewayClient) -> None:
-    """The measured cost of the old arrangement: a gateway restarted behind App Service
-    answers 503, which set the cache to unverified, and every write for the rest of the
-    process's life then paid for a second round trip."""
+    """The measured cost of the old arrangement: a gateway restarted behind App Service answers 503,
+    which set the cache to unverified, and every later write paid for a second round trip."""
     respx.get(f"{BASE}/capabilities").mock(
         return_value=httpx.Response(200, json={"environment": "demo"})
     )

@@ -1,12 +1,5 @@
-"""What a turn leaves behind besides its reply: one row per tool call, and one usage
-row per model call.
-
-Both hang off the same agent message, and neither is a message. That is the whole point
-of the split: the transcript stays the conversation, and this is how the agent got to its
-half of it (specs/agent-tools, "Wywołanie narzędzia zostawia ślad"). The calls do reach
-the wire — `MessageOut.tool_calls`, since `show-tool-calls-in-chat` — but they reach it
-beside a message rather than as one.
-"""
+"""What a turn leaves behind besides its reply: one row per tool call, and one usage row per model call.
+Both hang off the same agent message, and neither is a message — the transcript stays the conversation."""
 
 from __future__ import annotations
 
@@ -78,13 +71,8 @@ class TradingServer(ServerWithTools):
 
 
 class TradingServerThatDiesMidOrder(TradingServer):
-    """Stands in for the process going away with an order in flight.
-
-    A real `ToolServer.call` never raises — every failure comes back as a `ToolOutcome` —
-    so an exception here is not a server failure being modelled. It is the one thing this
-    module cannot catch: the call went out and nothing on this side lived to write down
-    what came back.
-    """
+    """Stands in for the process going away with an order in flight. A real `ToolServer.call` never raises,
+    so this is not a server failure being modelled: the call went out and nothing lived to write it down."""
 
     async def call(self, name: str, arguments: dict, operator_principal: str | None = None):
         if name == "place_order":
@@ -191,9 +179,8 @@ async def test_a_whole_session_reads_in_one_query_grouped_by_message(pool, db) -
 
 
 async def test_the_announced_position_is_the_one_that_was_stored(pool, db) -> None:
-    """The graph announces a position mid-turn and the store writes one afterwards. Two
-    numbers derived in two places, and a panel would order a round by the first while a
-    reload orders it by the second."""
+    """The graph announces a position mid-turn and the store writes one afterwards. Two numbers derived in
+    two places, and a panel would order a round by the first while a reload orders it by the second."""
     session_id = await _new_session(db)
     provider = FakeProvider(
         [
@@ -326,9 +313,8 @@ async def test_two_model_calls_leave_two_usage_rows_under_one_reply(pool, db) ->
 
     assert len(rows) == 2
     assert [row["input_tokens"] for row in rows] == [1_000_000, 0]
-    # Read through the aggregate the cost tab actually uses, not a fresh query: a turn
-    # that billed twice must show as one sum there (specs/agent-usage, "Tura z
-    # wywołaniem narzędzia").
+    # Read through the aggregate the cost tab actually uses, not a fresh query: a turn that billed twice
+    # must show as one sum there.
     by_session = await store.usage_by_session(db, owner_principal="op-1", since=None, until=None)
     total = sum(aggregate.cost for aggregate in by_session)
     assert total == Decimal(1) + Decimal(6)
@@ -377,19 +363,16 @@ async def test_record_tool_calls_numbers_positions_within_each_round(pool, db) -
 
 
 class ServerWithNoTools(FakeToolServer):
-    """market-mcp unconfigured or unreachable — `list_tools` answers with nothing rather
-    than raising, which is the whole of `agent-tool-access`'s "Brak serwera narzędzi nie
-    odbiera agentowi mowy"."""
+    """market-mcp unconfigured or unreachable — `list_tools` answers with nothing rather than raising,
+    which is the whole of "no tool server does not take the agent's speech away"."""
 
     async def list_tools(self, operator_principal: str | None = None):
         return []
 
 
 async def test_a_turn_without_tools_runs_the_prompt_that_says_so(pool, db) -> None:
-    # The prompt is picked from what the turn actually has, not from configuration: a
-    # market-mcp that was configured and then went down must not leave the model being
-    # told it has tools it cannot call (specs/agent-chat, "Agent bez narzędzi mówi, że
-    # ich nie ma").
+    # The prompt is picked from what the turn actually has, not from configuration: a market-mcp that was
+    # configured and then went down must not leave the model told it has tools it cannot call.
     session_id = await _new_session(db)
     provider = FakeProvider([[TextDelta("no archive today"), UsageReport(1, 1, None, None)]])
 
@@ -403,9 +386,8 @@ async def test_a_turn_without_tools_runs_the_prompt_that_says_so(pool, db) -> No
     )
 
     revision = await store.latest_prompt_revision(db)
-    # This module's own three tools do not need market-mcp to exist, so they are still
-    # offered; the prompt is still the one that says the archive is unreachable
-    # (specs/agent-tools, "Brak serwera narzędzi").
+    # This module's own three tools do not need market-mcp to exist, so they are still offered; the prompt
+    # is still the one that says the archive is unreachable.
     assert [tool.name for tool in provider.calls[0]["tools"]] == [
         CHART_TOOL_NAME,
         DRAW_TOOL_NAME,
@@ -437,8 +419,6 @@ async def test_a_turn_with_tools_runs_the_prompt_that_says_that(pool, db) -> Non
     ]
     assert provider.calls[0]["system_prompt"] == revision.with_tools_body
 
-
-# --- wywołania ruszające rachunek (specs/agent-trading) ---
 
 
 async def _order_turn(pool, session_id, *, server, queue=None):

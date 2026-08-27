@@ -1,24 +1,5 @@
-"""The rhythm a schedule is described by, and its translation to the cron expression the
-clock actually runs (specs/teams-schedules, "Harmonogram da się opisać rytmem, a moduł zna
-oba zapisy").
-
-The translation lives here, in the module, and exactly once: a caller that had to repeat
-it to show an operator their own schedule would eventually show something other than what
-the clock does (specs/terminal-teams-schedules, "Terminal nie liczy czasu wyzwolenia sam").
-
-`from_cron` is deliberately narrow — it answers with a rhythm only for an expression that
-is *exactly* what `to_cron` would produce for it, and with `None` for everything else.
-That is what keeps the pair honest: an operator who wrote their own expression under
-"Advanced" gets it back unchanged rather than rounded into the nearest rhythm.
-
-Weekdays are ISO here — 1 is Monday, 7 is Sunday — because that is the week an operator
-reads. Cron's own numbering (0 is Sunday) only exists inside `to_cron`/`from_cron`.
-
-They ride on three rhythms, not one: `weekly` needs them, `every_minutes` and `hourly` may
-carry them, and `daily` may not. The market is shut two days in seven, so a rhythm that
-repeats within a day needs a way to say so — while `daily` with weekdays would be `weekly`
-spelled differently, and one expression with two rhythms is what `from_cron` cannot have.
-"""
+"""The rhythm a schedule is described by, and its translation to the cron the clock runs — exactly once, or a repeat
+would eventually show something else. `from_cron` is narrow, so an operator's own expression comes back unrounded."""
 
 from __future__ import annotations
 
@@ -37,13 +18,8 @@ _REQUIRED: dict[RecurrenceKind, frozenset[str]] = {
     "monthly": frozenset({"hour", "minute", "day_of_month"}),
 }
 
-# Which fields a rhythm MAY carry. Weekdays on the two rhythms that repeat more often than
-# once a day, because the market is shut two days in seven and a rhythm without them wakes
-# a team up to ask a closed market what it is doing.
-#
-# `daily` is absent on purpose: daily plus weekdays produces exactly `weekly`'s expression,
-# and two rhythms for one expression would leave `from_cron` picking between them — the
-# operator would then be shown a rhythm other than the one they set (design.md, D1).
+# Which fields a rhythm MAY carry. Weekdays on the two that repeat more often than once a day, because the
+# market is shut two days in seven. `daily` is absent: daily plus weekdays is exactly `weekly`'s expression.
 _ALLOWED: dict[RecurrenceKind, frozenset[str]] = {
     "every_minutes": frozenset({"weekdays"}),
     "hourly": frozenset({"weekdays"}),
@@ -55,13 +31,8 @@ _EVERY_DAY = frozenset(range(1, 8))
 
 
 class Recurrence(BaseModel):
-    """One rhythm, in the operator's own words.
-
-    `kind` decides which of the other fields carry a value: each needs its own (`_REQUIRED`)
-    and the two that repeat within a day may also carry `weekdays` (`_ALLOWED`). Anything
-    else is refused rather than ignored. Weekdays are ISO — 1 Monday … 7 Sunday — and their
-    absence means every day.
-    """
+    """One rhythm, in the operator's own words. `kind` decides which of the other fields carry a value, and
+    anything else is refused rather than ignored. Weekdays are ISO, and their absence means every day."""
 
     kind: RecurrenceKind
     # `every_minutes` only. Cron's step form does not cross the hour, so neither does this:
@@ -69,9 +40,8 @@ class Recurrence(BaseModel):
     minutes: int | None = Field(default=None, ge=1, le=59)
     minute: int | None = Field(default=None, ge=0, le=59)
     hour: int | None = Field(default=None, ge=0, le=23)
-    # ISO weekdays: 1 Monday … 7 Sunday. Required by `weekly`, optional on the two rhythms
-    # that repeat within a day, absent everywhere else (`_ALLOWED`). `None` means every day,
-    # and every day named normalises back to `None` — see the validator.
+    # ISO weekdays: 1 Monday … 7 Sunday. Required by `weekly`, optional on the two that repeat within a
+    # day. `None` means every day, and every day named normalises back to `None`.
     weekdays: list[int] | None = None
     day_of_month: int | None = Field(default=None, ge=1, le=31)
 
@@ -99,11 +69,8 @@ class Recurrence(BaseModel):
                 raise ValueError("weekdays are 1 (Monday) through 7 (Sunday)")
             if len(set(self.weekdays)) != len(self.weekdays):
                 raise ValueError("weekdays must not repeat")
-            # Every day named is the same trigger as no day named, and a rhythm this module
-            # would hand back in a shape other than the one it stored is a rhythm the
-            # operator did not set. Normalised here rather than in `to_cron`, because this
-            # model is what a reader gets back (design.md, D2). Not for `weekly`, whose
-            # seven days are a different expression from `daily`'s and stay their own.
+            # Every day named is the same trigger as no day named, and a rhythm handed back in another
+            # shape is one the operator did not set. Not for `weekly`, whose seven days are their own.
             if self.kind != "weekly" and set(self.weekdays) == _EVERY_DAY:
                 self.weekdays = None
         return self
@@ -120,12 +87,8 @@ def _iso_weekday(cron_day: int) -> int:
 
 
 def _cron_days(weekdays: list[int] | None) -> str:
-    """The fifth field for these days — `*` for "no day named", which is every day.
-
-    A list rather than a range (`1,2,3,4,5`, not `1-5`), because one canonical spelling per
-    trigger is what lets `from_cron` answer with one rhythm. An operator who wrote the range
-    themselves gets it back untouched, under "Advanced" (design.md, D4).
-    """
+    """The fifth field for these days — `*` for "no day named", which is every day. A list rather than a
+    range, because one canonical spelling per trigger is what lets `from_cron` answer with one rhythm."""
     if weekdays is None:
         return "*"
     return ",".join(str(day) for day in sorted(_cron_weekday(d) for d in weekdays))
@@ -147,12 +110,8 @@ def to_cron(recurrence: Recurrence) -> str:
 
 
 def from_cron(expression: str) -> Recurrence | None:
-    """The rhythm this expression is, or `None` when it is not one of them.
-
-    Every candidate is checked by generating it back: a rhythm is returned only when
-    `to_cron` of it is this expression again. That is one line of proof instead of five
-    parsers each having to be as strict as the writer that produced them.
-    """
+    """The rhythm this expression is, or `None` when it is not one of them. Every candidate is checked by
+    generating it back — one line of proof instead of five parsers each as strict as the writer."""
     fields = expression.split()
     if len(fields) != 5:
         return None
@@ -172,9 +131,8 @@ def _iso_days(weekday: str) -> list[int]:
 
 def _candidate(minute: str, hour: str, day_of_month: str, weekday: str) -> Recurrence | None:
     try:
-        # The two rhythms that repeat within a day read the same whether the fifth field
-        # names days or not, so both shapes are one branch each. They come before the
-        # `weekly` branch below, which would otherwise take a `*` hour to `int()`.
+        # The two rhythms that repeat within a day read the same whether the fifth field names days or
+        # not. They come before the `weekly` branch, which would otherwise take a `*` hour to `int()`.
         if minute.startswith("*/") and (hour, day_of_month) == ("*", "*"):
             days = None if weekday == "*" else _iso_days(weekday)
             return Recurrence(kind="every_minutes", minutes=int(minute[2:]), weekdays=days)
@@ -198,8 +156,7 @@ def _candidate(minute: str, hour: str, day_of_month: str, weekday: str) -> Recur
                 day_of_month=int(day_of_month),
             )
     except ValueError:
-        # A field that is not a plain number (a range, a list, a step outside the minute
-        # field) is simply not one of these rhythms — the same answer as a shape nobody
-        # here recognises.
+        # A field that is not a plain number is simply not one of these rhythms — the same answer as a
+        # shape nobody here recognises.
         return None
     return None

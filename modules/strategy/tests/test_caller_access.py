@@ -1,9 +1,5 @@
-"""Which caller may reach which surface, and the default that makes the record worth having.
-
-The important test here is the last one in `TestTheRecord`: the record is held against the
-published document, so a route added without deciding which surface it belongs to fails
-CI rather than quietly becoming reachable by whoever is already through the door.
-"""
+"""Which caller may reach which surface, and the default that makes the record worth having: the record is
+held against the published document, so an undecided route fails CI rather than becoming reachable."""
 
 from __future__ import annotations
 
@@ -104,9 +100,8 @@ class TestWhoGetsIn:
         assert response.json() == {"detail": "not authenticated"}
 
     async def test_the_rest_caller_reaches_rest(self, guarded) -> None:
-        # The root rather than `/strategies`, which the refusals below use: what is under
-        # test is the gate, and the gate is the only thing this application has that can
-        # answer without a database behind it.
+        # The root rather than `/strategies`, which the refusals below use: what is under test is the gate, and it is
+        # the only thing this application has that can answer without a database behind it.
         response = await guarded.get("/", headers=principal("terminal-app-id"))
 
         assert response.status_code == 200
@@ -132,9 +127,8 @@ class TestWhoGetsIn:
     async def test_a_principal_header_naming_a_person_is_not_an_application(
         self, guarded
     ) -> None:
-        """Measured on market-data in production on 19 August 2026: for a delegated token
-        the principal-id header carries the signed-in *person's* object id, so a record of
-        application identifiers can never match it."""
+        """Measured on market-data in production on 19 August 2026: for a delegated token the principal-id header
+        carries the signed-in *person's* object id, so a record of application identifiers can never match it."""
         response = await guarded.get(
             "/strategies", headers={"x-ms-client-principal-id": "terminal-app-id"}
         )
@@ -150,12 +144,6 @@ class TestWithoutAPlatformInFront:
 
 
 def _published(app) -> set[str]:
-    """Every path in the document this application publishes.
-
-    Read off `app.openapi()` rather than walked out of `app.router.routes`: newer FastAPI
-    versions wrap an included router in a holder with no `path` of its own, so walking the
-    internals silently found four framework routes and none of this module's — a check that
-    passes by looking at nothing. The document is what a consumer actually reads, and it is
-    the thing the record is supposed to agree with.
-    """
+    """Every path in the document this application publishes. Read off `app.openapi()` rather than walked
+    out of the router: newer FastAPI wraps an included router, and walking it found four framework routes."""
     return set(app.openapi()["paths"])

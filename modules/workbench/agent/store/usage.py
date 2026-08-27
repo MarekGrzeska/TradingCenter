@@ -1,8 +1,5 @@
-"""What each turn cost, written once and read back two ways.
-
-The write and the aggregates were 250 lines apart in the single-file store, with the
-whole tool-call section wedged between them. They are one table and one subject.
-"""
+"""What each turn cost, written once and read back two ways. The write and the aggregates were 250 lines
+apart in the single-file store; they are one table and one subject."""
 
 from __future__ import annotations
 
@@ -69,10 +66,8 @@ async def record_usage(
     return _usage_from_row(row)
 
 
-# Every aggregate is scoped to the caller's own sessions (the `JOIN sessions` filters on
-# `owner_principal`) — usage belongs to whoever the session belongs to, same as the
-# transcript does. `SUM` ignores NULL rows on its own; `unknown_count` is what a caller
-# would otherwise never learn it silently dropped.
+# Every aggregate is scoped to the caller's own sessions — usage belongs to whoever the session belongs
+# to. `SUM` ignores NULL rows on its own; `unknown_count` is what a caller would never learn it dropped.
 
 _AGGREGATE_COLUMNS = """
     COALESCE(SUM(u.input_tokens), 0)::bigint AS input_tokens,

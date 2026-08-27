@@ -22,10 +22,8 @@ function groupResolutionsBySymbol(pairs: TrackedPair[]): Map<string, Resolution[
 }
 
 export function GridView() {
-  // The layout and the active slot, not the whole config. Six charts hang off this
-  // component, and reading the config whole re-rendered all six every time one slot's
-  // symbol, resolution or indicators changed — a subscription is per value, so the
-  // narrowest one that answers the question is the one to take.
+  // The layout and the active slot, not the whole config: six charts hang off this component, and reading it
+  // whole re-rendered all six whenever one slot changed. A subscription is per value.
   const layout = useSyncExternalStore(gridStore.subscribe, () => gridStore.getSnapshot().layout);
   const activeSlot = useSyncExternalStore(
     gridStore.subscribe,
@@ -98,17 +96,11 @@ export function GridView() {
   );
 }
 
-/** What is drawn on a slot's instrument, ready for the chart — by symbol, not by slot, so
- *  two slots showing the same instrument read the same entry and show the same objects
- *  (`agent-chart-drawings` spec, "Ten sam poziom w dwóch slotach"). Null while the slot
- *  has no instrument: there is nothing to have objects on.
- *
- *  The store, not a hook-local fetch: the agent panel re-reads every loaded symbol after
- *  a turn, and a per-slot fetch would leave the chart showing the list from before it. */
+/** What is drawn on a slot's instrument, by symbol rather than by slot, so two slots on one instrument show the
+ *  same objects. The store, not a hook-local fetch: the agent re-reads every loaded symbol after a turn. */
 function useSlotDrawings(symbol: string | null): ChartDrawings | null {
-  // This symbol's entry, not the whole snapshot: the agent re-reads every loaded symbol
-  // after a turn, and a slot watching all of them re-rendered its chart for an
-  // instrument it is not showing.
+  // This symbol's entry, not the whole snapshot: the agent re-reads every loaded symbol after a turn, and a
+  // slot watching all of them re-rendered its chart for an instrument it is not showing.
   const entry = useSyncExternalStore(drawingsStore.subscribe, () =>
     symbol === null ? undefined : drawingsStore.getSnapshot()[symbol],
   );
@@ -153,24 +145,15 @@ function Slot({
     () => gridStore.getSnapshot().slots[slotId],
   );
   const allowedResolutions = slot.symbol ? resolutionsBySymbol.get(slot.symbol) : undefined;
-  // A separate subscription from the config above: setting a focus request must not
-  // re-render every slot watching the persisted layout, only the one it is for
-  // (`gridStore`, "Kadr musi obudzić Chart... jako pole przejściowe").
+  // A separate subscription from the config above: setting a focus request must not re-render every slot
+  // watching the persisted layout, only the one it is for (`gridStore`).
   const focusRequest = useSyncExternalStore(gridStore.subscribeFocusRequest, () =>
     gridStore.getFocusRequest(slotId),
   );
   const drawings = useSlotDrawings(slot.symbol);
 
-  // Only a definite "no" — a fetch that actually finished and came back
-  // without this pair — counts as stale. `unreachable` must never read as
-  // "no longer archived": the slot keeps showing what it already had
-  // (terminal-grid spec, "Listy archiwizowanych nie da się odczytać").
-  //
-  // The resolution counts as much as the symbol. A slot remembering US100
-  // `MINUTE_5` after only `HOUR_4` was left archived for US100 would otherwise
-  // chart a pair nobody collects while its own selector — narrowed to the
-  // archived ones — displayed a different resolution entirely, each
-  // contradicting the other.
+  // Only a definite "no" — a fetch that finished without this pair — counts as stale; `unreachable` must never
+  // read as "no longer archived". The resolution counts as much as the symbol, or slot and selector disagree.
   const answered = slot.symbol !== null && archivedStatus === "ready";
   const staleSymbol = answered && allowedResolutions === undefined;
   const staleResolution =
@@ -178,9 +161,8 @@ function Slot({
   const stale = staleSymbol || staleResolution;
 
   return (
-    // Marking the slot the moment focus lands anywhere inside it, not just on
-    // a click, so keyboard users get the same "actions land here" signal
-    // (terminal-grid spec, "Który slot jest aktywny").
+  // Marking the slot the moment focus lands anywhere inside it, not just on a click, so keyboard users get
+  // the same "actions land here" signal (terminal-grid spec, "Który slot jest aktywny").
     <div
       onMouseDown={() => gridStore.setActiveSlot(slotId)}
       onFocusCapture={() => gridStore.setActiveSlot(slotId)}
@@ -273,14 +255,8 @@ function SlotPicker({ slotId, picker }: { slotId: SlotId; picker: PickerSource }
   );
 }
 
-/** A slot whose remembered pair stopped being archived between sessions —
- *  recognized rather than left to loop on a subscription the archive will
- *  keep refusing (terminal-grid spec, "Slot zapamiętany traci ważność, gdy
- *  instrument przestaje być archiwizowany").
- *
- *  `resolution` is set only when the symbol is still archived and it is this
- *  resolution that is gone; then `stillArchivedAt` carries the ones that are
- *  left, so switching is one click rather than a re-pick. */
+/** A slot whose remembered pair stopped being archived between sessions, recognized rather than left looping on a
+ *  subscription the archive keeps refusing. `stillArchivedAt` carries what is left, so switching is one click. */
 function StaleSlot({
   slotId,
   symbol,

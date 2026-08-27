@@ -1,24 +1,5 @@
-"""A run of a team revision, the per-agent steps it goes through, and the tool calls
-each step makes.
-
-A run always names the revision it ran on (specs/teams-runs, "Przebieg odbywa się na
-rewizji, nie na zespole") — editing a team after a run starts MUST NOT change what that
-run is judged against, which is the whole reason `team_revisions` is append-only.
-
-`run_steps` is one row per agent that participates in a run, not one row per round of
-that agent's own model-tool loop: what an operator watching a run needs is which agent
-is waiting, which is working, and which has finished (specs/teams-runs, "Postęp przebiegu
-widać w trakcie, a nie dopiero po nim") and what each agent handed to its dependents
-(specs/teams-runs, "Agent widzi wypowiedzi poprzedników, a nie całą historię przebiegu") —
-both are per-agent facts. The rounds inside one agent's own loop are where `tool_calls`
-lives, the same split agent's own `messages` (the reply) and `tool_calls` (how it got
-there) already make.
-
-The cross-field CHECKs on `runs` and `run_steps` below exist for the same reason agent's
-`messages_model_fields_match_role` does: a row that could be inserted in a self-
-contradictory state (finished with no timestamp, stopped with no reason) is a row a bug
-can actually produce, and the trace this module exists to keep has to be trustworthy
-enough to judge an experiment by.
+"""A run of a team revision, its per-agent steps and their tool calls. A run always names the revision it ran on, which
+is the whole reason `team_revisions` is append-only; `run_steps` is one row per agent rather than per round.
 
 Revision ID: 0002
 Revises: 0001
@@ -56,15 +37,12 @@ def upgrade() -> None:
             sa.ForeignKey("team_revisions.id", name="runs_team_revision_id_fkey"),
             nullable=False,
         ),
-        # Ownership mirrors `teams.owner_principal` rather than being read through the
-        # revision → team chain: a run's own access check MUST NOT depend on a join
-        # (specs/teams-browser-access, "Zespół i jego przebiegi należą do operatora,
-        # który je zapisał").
+        # Ownership mirrors `teams.owner_principal` rather than being read through the revision chain: a
+        # run's own access check MUST NOT depend on a join.
         sa.Column("owner_principal", sa.Text(), nullable=False),
         sa.Column("status", sa.Text(), nullable=False, server_default="pending"),
-        # Set exactly when status lands on `failed` or `cancelled` — names the cost
-        # limit, the time limit, a tool-access refusal, or the operator's own
-        # interruption (specs/teams-runs, specs/teams-usage).
+        # Set exactly when status lands on `failed` or `cancelled` — names the cost limit, the time
+        # limit, a tool-access refusal, or the operator's own interruption.
         sa.Column("stopped_reason", sa.Text(), nullable=True),
         sa.Column("started_at", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.Column("finished_at", sa.TIMESTAMP(timezone=True), nullable=True),
@@ -129,10 +107,8 @@ def upgrade() -> None:
     op.create_table(
         "tool_calls",
         sa.Column("id", sa.BigInteger(), sa.Identity(), primary_key=True),
-        # Denormalized alongside `run_step_id`, same shape as agent's own `tool_calls`
-        # carrying both `session_id` and `message_id`: the one read this table exists
-        # for is "everything a run called", and that should not need a join through
-        # `run_steps` to answer.
+        # Denormalized alongside `run_step_id`, the same shape agent's own `tool_calls` has: the one read
+        # this table exists for is "everything a run called", which should need no join to answer.
         sa.Column(
             "run_id",
             sa.BigInteger(),

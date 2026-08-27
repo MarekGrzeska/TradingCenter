@@ -1,14 +1,5 @@
-"""What the provider says, and what leaves the module as a result.
-
-The translation is tested without a socket: `_on_message` is fed the frames capital.com
-sends and the emitted events are collected.
-
-The connection loop is tested against a scripted socket, which proves only what a scripted
-socket can prove: that `_run` connects, subscribes, reports state, and comes back after a
-drop instead of dying quietly. That the provider accepts those frames is a separate claim,
-and it belongs to the live smoke tests — a fake would happily accept a subscription
-capital.com refuses.
-"""
+"""What the provider says, and what leaves the module as a result. The loop is tested against a
+scripted socket, which proves only that: whether capital.com accepts the frames is the live suite's."""
 
 from __future__ import annotations
 
@@ -212,21 +203,13 @@ def test_the_ping_interval_leaves_room_under_the_provider_limit() -> None:
     assert upstream_module.PING_INTERVAL_SECONDS <= 5 * 60
 
 
-# --- the connection loop ---------------------------------------------------------------
-#
-# `_run` and `_session` are the reconnection policy. What follows drives them against a
-# scripted socket, so the claim is narrow on purpose: the loop reconnects, resubscribes
-# and reports what happened. Whether capital.com accepts those frames is the live suite's
-# claim, not this one.
+# `_run` and `_session` are the reconnection policy, driven here against a scripted socket. The
+# claim is narrow on purpose: the loop reconnects, resubscribes and reports what happened.
 
 
 class ScriptedSocket:
-    """A socket that hands over scripted frames and then ends the way the script says.
-
-    ``ending="drop"`` raises what a real disconnect raises out of ``async for``;
-    ``ending="hang"`` stays open and silent, which is what a healthy idle feed looks like
-    and what keeps the loop parked instead of spinning.
-    """
+    """A socket that hands over scripted frames and then ends the way the script says. ``hang``
+    stays open and silent, which is what a healthy idle feed looks like."""
 
     def __init__(self, frames: list[str] | None = None, ending: str = "hang") -> None:
         self._frames = deque(frames or [])
@@ -255,11 +238,8 @@ class ScriptedSocket:
 
 
 class Provider:
-    """Stands in for ``websockets.connect``, handing out sockets in order.
-
-    Runs out into silent sockets rather than raising, so a test asserting on the second
-    connection is not also asserting on how many the loop makes after that.
-    """
+    """Stands in for ``websockets.connect``, handing out sockets in order. Runs out into silent
+    sockets rather than raising, so a test on the second connection asserts nothing about later ones."""
 
     def __init__(self, sockets: list[ScriptedSocket]) -> None:
         self._queue = deque(sockets)
@@ -416,9 +396,8 @@ async def test_stopping_ends_the_loop_without_reporting_a_failure(
     await up.stop()
     await asyncio.sleep(0.05)
 
-    # The last subscriber leaving is not a fault. Emitting an error here would publish a
-    # failure to a room being torn down, and reconnecting would hold a connection open
-    # for an audience that has gone.
+    # The last subscriber leaving is not a fault. An error here would publish a failure to a
+    # room being torn down, and reconnecting would hold a connection open for a gone audience.
     assert len(provider.opened) == 1
     assert [e["kind"] for e in emitted] == ["status"]
     assert up._task is None
@@ -440,13 +419,8 @@ async def test_the_keepalive_stops_with_the_session(monkeypatch: pytest.MonkeyPa
     assert len(socket.sent) == after_stop
 
 
-# --- backing off a run of failures ---------------------------------------------------
-#
-# The loop's other job, and the one it did not do until 18 August 2026. A drop over hours
-# is what `RECONNECT_DELAY_SECONDS` was chosen for; a session the provider will not renew
-# at all is the other case, and there three seconds flat means asking a settled question
-# 20 times a minute for as long as the room exists — through an allowance of 10
-# requests/second that the whole account shares.
+# The loop's other job, and the one it did not do until 18 August 2026: a session the provider will
+# not renew at all means asking a settled question 20 times a minute, against a shared allowance.
 
 
 def test_a_run_of_failures_backs_off_towards_the_ceiling() -> None:
@@ -469,9 +443,8 @@ def test_a_session_that_stood_up_starts_the_next_drop_from_the_short_delay() -> 
 
 
 def test_a_session_that_died_on_arrival_is_not_read_as_healthy() -> None:
-    """Dead tokens are answered with an error frame and a close, which reaches `_run` as
-    a session that *ended cleanly* — the reason the reset is decided on how long the
-    session lasted rather than on whether it raised."""
+    """Dead tokens are answered with an error frame and a close, which reaches `_run` as a session
+    that ended cleanly — the reason the reset is decided on how long it lasted, not on a raise."""
     grown = upstream_module.next_reconnect_delay(
         upstream_module.RECONNECT_DELAY_SECONDS, session_lasted=0.05
     )
@@ -510,18 +483,13 @@ async def test_the_loop_grows_its_wait_between_consecutive_failures(
     assert all(lasted < upstream_module.HEALTHY_SESSION_SECONDS for _delay, lasted in asked)
 
 
-# --- a connection that is open and says nothing -----------------------------------------
-#
-# The failure of 24 August 2026. One room received nothing for fourteen hours while 28
-# others on the same session carried 47 to 265 quotes per 25 seconds; the socket stayed
-# open the whole time, so every check the loop had — an exception, a close — said the feed
-# was fine.
+# The failure of 24 August 2026: one room received nothing for fourteen hours while 28 others on
+# the same session carried 47 to 265 quotes per 25 seconds, and the socket stayed open throughout.
 
 
 async def test_a_keepalive_answer_is_not_evidence_the_subscription_lives() -> None:
-    """The distinction the watchdog rests on. The provider answers a keepalive whether or
-    not it is still serving the subscription, so a watchdog fed by any frame at all would
-    have sat through all fourteen hours."""
+    """The distinction the watchdog rests on: the provider answers a keepalive whether or not it is
+    still serving the subscription, so a watchdog fed by any frame would have sat through it."""
     up, _ = make_upstream()
 
     assert await up._on_message(json.dumps({"status": "OK", "destination": "ping"})) is False
@@ -579,9 +547,8 @@ async def test_a_connection_still_carrying_data_is_left_alone(
 
 
 def test_a_run_of_silent_sessions_widens_the_tolerance_towards_the_ceiling() -> None:
-    """A closed market is silent by definition and can stay shut all weekend. At the
-    ceiling the 29 rooms this account runs cost about 0.05 requests a second; at a flat
-    two minutes they would cost ten times that, for two days."""
+    """A closed market is silent by definition and can stay shut all weekend. At the ceiling the 29
+    rooms cost about 0.05 requests a second; at a flat two minutes, ten times that for two days."""
     tolerances = [upstream_module.SILENCE_TOLERANCE_SECONDS]
     for _ in range(5):
         tolerances.append(

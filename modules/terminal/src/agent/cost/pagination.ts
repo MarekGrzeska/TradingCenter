@@ -1,11 +1,6 @@
 /**
- * Page arithmetic for the cost tables, kept out of the component so the awkward part —
- * what happens to the page you are on when the rows underneath change — is something a
- * test can state rather than something a render has to survive.
- *
- * The page is derived, never stored clamped: a range change can shrink a table from forty
- * rows to two while state still says "page 4", and correcting that with an effect means
- * one render showing an empty table first.
+ * Page arithmetic kept out of the component, so what happens to the page you are on when the rows change is
+ * something a test can state. Derived, never stored clamped: correcting it in an effect renders an empty table first.
  */
 
 export interface Page<T> {

@@ -1,10 +1,6 @@
 /**
- * The terminal's one way of saying something that is not attached to a place on screen.
- *
- * A store rather than a context, for the same reason `gridStore` is one: what raises a
- * toast is usually an effect deep in a chart slot, and threading a provider down to it
- * buys nothing over calling a function. `Toaster` is mounted once in `Shell` and reads
- * this; nothing else renders toasts (`toastsComeFromOnePlace.test.ts`).
+ * A store rather than a context, for the reason `gridStore` is one: what raises a toast is usually an effect deep in a
+ * chart slot, and threading a provider down to it buys nothing over calling a function.
  */
 
 export type ToastSeverity = "error" | "info";

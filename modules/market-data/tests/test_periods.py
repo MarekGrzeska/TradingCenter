@@ -21,10 +21,8 @@ def test_a_timestamp_with_an_offset_becomes_the_same_instant() -> None:
 
 
 def test_a_timestamp_without_a_zone_is_read_as_utc() -> None:
-    # A candle the provider gave no `snapshotTimeUTC` for reaches the gateway as broker
-    # local time with no marker. Reading it as UTC is the same assumption the gateway
-    # makes parsing its own output back, so the two are wrong together or right
-    # together — never quietly a couple of hours apart.
+    # A candle with no `snapshotTimeUTC` reaches the gateway as broker local time with no marker.
+    # Reading it as UTC is the gateway's own assumption, so the two are wrong or right together.
     assert from_iso("2026-08-07T12:00:00") == MOMENT
 
 

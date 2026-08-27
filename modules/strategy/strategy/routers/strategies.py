@@ -1,10 +1,5 @@
-"""The catalogue, the parameter sets and the watches — everything the operator sets.
-
-The catalogue this router publishes is both sources at once: the entries in the deployed
-image and the revisions written down. `source` on every row says which, because the two
-differ in exactly one way an operator can act on — a coded entry has no revisions and
-cannot be edited from a screen (`terminal-strategy-configurator`).
-"""
+"""The catalogue, the parameter sets and the watches — everything the operator sets. The catalogue is both
+sources at once, and `source` on every row says which: a coded entry cannot be edited from a screen."""
 
 from __future__ import annotations
 

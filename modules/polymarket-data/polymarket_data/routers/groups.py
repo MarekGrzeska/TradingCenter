@@ -1,9 +1,5 @@
-"""Observation groups — this module's own categories.
-
-Not the provider's tags. A tag describes the public database and is what browsing filters on;
-a group describes what we watch, and the two are kept apart on purpose because an operator
-sorting their own screen is a different act from searching somebody else's index.
-"""
+"""Observation groups — this module's own categories, not the provider's tags. A tag describes the
+public database; a group describes what we watch, and the two acts are different."""
 
 from __future__ import annotations
 

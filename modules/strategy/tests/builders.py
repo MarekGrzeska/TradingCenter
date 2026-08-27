@@ -1,8 +1,5 @@
-"""Facts by hand, so a strategy test says what it is about and nothing else.
-
-Every strategy test is "given these readings, what did it decide", and the readings are the
-data. Building them inline would bury one changed number under twenty unchanged ones.
-"""
+"""Facts by hand, so a strategy test says what it is about and nothing else: every one is "given these readings,
+what did it decide", and building them inline would bury the one changed number under twenty unchanged ones."""
 
 from __future__ import annotations
 

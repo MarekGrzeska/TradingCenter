@@ -39,9 +39,8 @@ def upgrade() -> None:
         "tracked_pairs",
         sa.Column("symbol", sa.Text(), nullable=False),
         sa.Column("resolution", sa.Text(), nullable=False),
-        # Untracking flips this rather than deleting the row. Two reasons: the candles
-        # already collected stay readable either way, and tracking the pair again needs to
-        # know when collection stopped in order to close the gap it left.
+        # Untracking flips this rather than deleting the row: the candles stay readable, and tracking
+        # again needs to know when collection stopped in order to close the gap.
         sa.Column("state", sa.Text(), nullable=False, server_default="tracked"),
         sa.Column(
             "added_at",
@@ -57,9 +56,8 @@ def upgrade() -> None:
             _in_list("resolution", RESOLUTIONS), name="tracked_pairs_resolution_known"
         ),
         sa.CheckConstraint(_in_list("state", STATES), name="tracked_pairs_state_known"),
-        # A pair that is tracked cannot also carry the moment it stopped being tracked, and
-        # one that stopped must say when. Without this the gap a re-added pair has to close
-        # is guesswork, and the guess is silent.
+        # A tracked pair cannot also carry the moment it stopped, and one that stopped must say when.
+        # Without this the gap a re-added pair has to close is guesswork, and the guess is silent.
         sa.CheckConstraint(
             "(state = 'tracked' AND untracked_at IS NULL)"
             " OR (state = 'untracked' AND untracked_at IS NOT NULL)",

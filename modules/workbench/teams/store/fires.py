@@ -1,9 +1,5 @@
-"""What a schedule or a trigger produced when its turn came, whether or not a run started.
-
-One table for both sources, and it carries more than a log: `runs` has no `schedule_id` or
-`trigger_id` (design.md, "Trzy nowe tabele, zero zmian w tabelach fazy 1"), so a fire is the
-only record of which run belongs to which schedule or trigger.
-"""
+"""What a schedule or a trigger produced when its turn came, whether or not a run started. One table for
+both sources: `runs` has no column pointing back, so a fire is the only record of which run belongs to which."""
 
 from __future__ import annotations
 
@@ -31,9 +27,8 @@ async def record_fire(
     run_id: int | None = None,
     skipped_count: int = 0,
 ) -> asyncpg.Record:
-    """One row for a fire attempt from either source, whether or not it started a run —
-    `outcome != 'started'` with no run at all is exactly what specs/teams-schedules asks
-    to be kept ("Wyzwolenie bez przebiegu zostawia zapisany powód")."""
+    """One row for a fire attempt from either source, whether or not it started a run — an outcome other
+    than `started` with no run at all is exactly what has to be kept."""
     return await fetch_one(
         conn, _INSERT_FIRE, schedule_id, trigger_id, outcome, reason, run_id, skipped_count
     )

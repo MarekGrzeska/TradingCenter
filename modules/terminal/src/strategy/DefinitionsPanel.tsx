@@ -5,17 +5,8 @@ import { DefinitionDialog } from "./DefinitionDialog";
 import type { Definition, Revision, Strategy, StrategyApi, Watch } from "./strategyApi";
 
 /**
- * The rules somebody wrote, and which revision each watch is actually computing.
- *
- * **A coded entry is named as one and has no edit control.** Greyed-out buttons with no
- * explanation read as a fault; saying "kod w obrazie" says it is a decision. The rule of a
- * coded entry lives in the repository under that id, which is where somebody changes it
- * (`terminal-strategy-configurator`, "Konfigurator nie obiecuje wykonania ani nie udaje
- * edycji kodu").
- *
- * **A newer revision does not move a running watch**, and this panel says so where it would
- * otherwise be discovered: a watch pinned to revision 2 next to a definition at revision 4
- * is the ordinary state, not a fault.
+ * **A coded entry is named as one and has no edit control** — its rule is in the repository under that id. **A newer
+ * revision does not move a running watch**, said here rather than discovered: revision 2 beside 4 is ordinary.
  */
 
 const NO_DEFINITIONS: Definition[] = [];

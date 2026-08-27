@@ -1,10 +1,5 @@
-"""Doubles for the one thing this module reaches outward to.
-
-The archive is an HTTP contract, so most tests double it at the transport with `respx` —
-that is what `test_archive.py` does, and it is the only honest way to test the client
-itself. Above the client, where what matters is what the loop does with an answer rather
-than how the answer was parsed, this fake stands in its place.
-"""
+"""Doubles for the one thing this module reaches outward to. `respx` at the transport is the only honest
+way to test the client; above it, where the wire is no longer the question, this fake stands in."""
 
 from __future__ import annotations
 
@@ -37,11 +32,8 @@ DEFAULT_CATALOGUE = {
 
 
 class FakeArchive:
-    """An archive that answers whatever the test put in it, and remembers what it was asked.
-
-    `raises` covers the case the loop cares about most: a read that fails is not an empty
-    read, and the decision recorded has to say so.
-    """
+    """An archive that answers whatever the test put in it and remembers what it was asked. `raises` covers the case
+    the loop cares about most: a read that fails is not an empty read, and the decision has to say so."""
 
     def __init__(
         self,
@@ -58,9 +50,8 @@ class FakeArchive:
         self.last_bar = last_bar
         self.facts = facts
         self.gaps = gaps
-        # `raises` fails everything; `facts_raises` fails only the read of the facts, which
-        # is the more interesting half — the bar can be had, so there is something to
-        # record the refusal against.
+        # `raises` fails everything; `facts_raises` fails only the read of the facts, which is the more interesting
+        # half — the bar can be had, so there is something to record the refusal against.
         self.raises = raises
         self.facts_raises = facts_raises
         self.indicators = indicators

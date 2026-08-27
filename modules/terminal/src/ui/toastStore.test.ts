@@ -93,9 +93,8 @@ describe("toastStore", () => {
     const store = createToastStore();
     for (const key of ["a", "b", "c", "d", "e"]) store.show({ key, title: key });
 
-    // `a`'s own timer must have been cancelled with it; firing later, it would remove
-    // whichever toast happened to hold its id by then — except ids are never reused, so
-    // the visible failure is subtler: nothing at all, and a leaked timer.
+    // `a`'s own timer must have been cancelled with it: firing later it would remove whichever toast held its id —
+    // except ids are never reused, so the visible failure is subtler, nothing at all and a leaked timer.
     vi.advanceTimersByTime(DISMISS_AFTER_MS.info);
     expect(store.getSnapshot()).toEqual([]);
   });

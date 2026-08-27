@@ -21,12 +21,8 @@ export function useTeams(api: TeamsApi): Loaded<TeamSummary[]> {
 }
 
 /**
- * What the pickers in the agent panel are built from: the module's model catalogue and
- * whatever its tool server announces. Neither list is ever written down in this
- * terminal (`terminal-teams`, "terminal MUST NOT nieść własnej listy jednych ani
- * drugich") — which is also why the editor waits for the models to arrive before it
- * opens a team at all: a new agent needs a model id, and the only place to get one is
- * here.
+ * The pickers are built from the module's model catalogue and whatever its tool server announces; neither list is
+ * written down here. Which is why the editor waits for models: a new agent needs a model id from somewhere.
  */
 export function useModels(api: TeamsApi): Loaded<TeamsModel[]> {
   return useRead({

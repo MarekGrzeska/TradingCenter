@@ -27,20 +27,8 @@ import { readChartColors, type ChartColors } from "./theme";
 const OWN_PANE_STRETCH = 1;
 
 /**
- * Every indicator instance the operator chose, drawn and kept in step with what the
- * archive last answered.
- *
- * One series, pane, marker plugin or primitive per instance — keyed by the instance, so
- * the same catalogue entry chosen twice draws twice, and changing one instance's period
- * moves its own line rather than tearing a series down and building it again. The maps
- * live here rather than in `Chart.tsx` because nothing else may touch them: the drawings
- * keep their own primitives on purpose, and sharing these would be one line of code and
- * one bug that looks like supports vanishing (design.md, "Rysunki i wskaźniki dzielą
- * prymitywy, ale nie cykl życia").
- *
- * `clear()` is what the chart's own teardown calls: `chart.remove()` has already freed
- * all of this, and emptying the maps only stops the effect from reaching for a series
- * that is gone.
+ * One series, pane, marker plugin or primitive per instance, keyed by the instance — the same entry chosen
+ * twice draws twice. `clear()` only empties the maps; `chart.remove()` has already freed what they held.
  */
 export function useIndicatorLayers({
   chartRef,
@@ -63,40 +51,29 @@ export function useIndicatorLayers({
   const indicatorSeriesRef = useRef<Map<string, ISeriesApi<"Line"> | ISeriesApi<"Histogram">>>(
     new Map(),
   );
-  // One pane per (indicator, params) whose `render.pane` is "own" — RSI and MACD
-  // each get their own row, the way every other charting platform draws them,
-  // rather than sharing one oscillator pane between indicators that disagree
-  // about scale.
+  // One pane per (indicator, params) whose `render.pane` is "own": RSI and MACD each get a row rather
+  // than sharing one oscillator pane between indicators that disagree about scale.
   const ownPanesRef = useRef<Map<string, IPaneApi<Time>>>(new Map());
-  // The catalogue's reference-level hint (RSI's 30/70, …) drawn once per
-  // (indicator, params) rather than recomputed every render — the levels never
-  // change while the selection is active, only the lines they sit behind do.
+  // The catalogue's reference-level hint (RSI's 30/70, …) drawn once per (indicator, params) — the levels
+  // never change while the selection is active, only the lines they sit behind do.
   const levelLinesRef = useRef<
     Map<string, { series: ISeriesApi<"Line"> | ISeriesApi<"Histogram">; lines: IPriceLine[] }>
   >(new Map());
-  // One `createSeriesMarkers` plugin per (indicator, params) whose output is
-  // `markers` — `swing_points`, so far — attached to the price series, since
-  // `canDrawIndicator` only offers markers/levels entries drawn on it.
+  // One `createSeriesMarkers` plugin per (indicator, params) whose output is `markers`, attached to the
+  // price series: `canDrawIndicator` only offers markers/levels entries drawn on it.
   const markerPluginsRef = useRef<Map<string, ISeriesMarkersPluginApi<Time>>>(new Map());
-  // One `RayPrimitive` per (indicator, params) whose output is `levels` and
-  // whose `render.style` is not `"histogram"` — `htf_levels_*`, `pivots_*`,
-  // `level_clusters` — replacing its levels wholesale on every recompute
-  // rather than being torn down and rebuilt.
+  // One `RayPrimitive` per (indicator, params) whose output is `levels` and whose style is not a histogram,
+  // replacing its levels wholesale on every recompute rather than being torn down and rebuilt.
   const rayPrimitivesRef = useRef<Map<string, RayPrimitive>>(new Map());
   // One `ZonePrimitive` per (indicator, params) whose output is `zones` —
   // `range_gap`, `body_gap`, `session_range_*`, `opening_range` (task 4.7).
   const zonePrimitivesRef = useRef<Map<string, ZonePrimitive>>(new Map());
-  // One `TimeProfilePrimitive` per (indicator, params) whose output is
-  // `levels` with `render.style === "histogram"` — `time_profile`, the one
-  // entry that draws a histogram rather than reference rays (task 5.4).
+  // One `TimeProfilePrimitive` per (indicator, params) whose `levels` render as a histogram —
+  // `time_profile`, the one entry that draws one rather than reference rays.
   const timeProfilePrimitivesRef = useRef<Map<string, TimeProfilePrimitive>>(new Map());
 
-  // --- indicators: one Line series per (instance, line key), synced to what the archive
-  // last answered. A price-pane entry draws on the candles' own pane; an own-pane entry
-  // (RSI, ATR, MACD, …) gets a pane of its own, one per instance rather than one shared
-  // by every oscillator — see `canDrawIndicator`. Keyed by the instance, so the same
-  // entry chosen twice draws twice and changing one instance's period moves its own line
-  // rather than tearing a series down and building it again.
+  // Keyed by the instance, so the same entry chosen twice draws twice and changing one instance's period
+  // moves its own line rather than tearing a series down and building it again.
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
@@ -106,9 +83,8 @@ export function useIndicatorLayers({
     const activeOwnPanes = new Set<string>();
     const activeResults = new Set<string>();
 
-    // The snapshot's own pairing: `results[i]` answers `selections[i]`
-    // (`market-data-indicators` spec, "Kolejność wyników"). Nothing else binds the two —
-    // two instances of one entry with the same params are identical on the wire.
+    // The snapshot's own pairing: `results[i]` answers `selections[i]` (`market-data-indicators` spec,
+    // "Kolejność wyników"). Nothing else binds them — two instances with the same params are identical on the wire.
     const drawable = drawnInstances(
       indicatorsState.selections,
       indicatorsState.results,
@@ -148,17 +124,14 @@ export function useIndicatorLayers({
       }
 
       if (entry.output === "levels" && entry.render.style === "histogram") {
-        // `time_profile`, so far the only entry that pairs the two — a
-        // histogram panel instead of the reference rays every other `levels`
-        // entry draws (task 5.4).
+        // `time_profile`, so far the only entry pairing levels with a histogram panel instead of the
+        // reference rays every other `levels` entry draws.
         if (!result.levels) continue;
         activeResults.add(ownPaneKey);
         const priceSeries = seriesRef.current;
         if (!priceSeries) continue;
-        // `indicatorLines[0]` is `--color-accent` — the categorical palette's
-        // first slot (`theme.ts`), reused here rather than drawing from the
-        // per-line cycle: the point of control is one highlight, not a series
-        // of same-role lines that need to stay distinguishable from each other.
+        // `indicatorLines[0]` is `--color-accent`, reused rather than drawn from the per-line cycle: the
+        // point of control is one highlight, not a series of same-role lines that must stay distinguishable.
         const profileColors = { bar: colors.inkMuted, pointOfControl: colors.indicatorLines[0] };
         let profile = timeProfilePrimitivesRef.current.get(ownPaneKey);
         if (!profile) {
@@ -167,9 +140,8 @@ export function useIndicatorLayers({
           timeProfilePrimitivesRef.current.set(ownPaneKey, profile);
         }
         profile.setColors(profileColors);
-        // `VAH`/`VAL` carry `count: null` — summary edges, not buckets, and
-        // the histogram itself has nothing to draw for them (`ProfileBar`'s
-        // own doc).
+        // `VAH`/`VAL` carry `count: null` — summary edges, not buckets, and the histogram has nothing to
+        // draw for them (`ProfileBar`'s own doc).
         const bars: ProfileBar[] = result.levels
           .filter((level) => level.count !== null)
           .map((level) => ({
@@ -237,12 +209,8 @@ export function useIndicatorLayers({
         activeOwnPanes.add(ownPaneKey);
         let pane = ownPanesRef.current.get(ownPaneKey);
         if (!pane) {
-          // `preserveEmptyPane: true` — without it, the chart removes a pane
-          // on its own the moment its last series does (`IPaneApi.
-          // preserveEmptyPane` docs), racing the explicit `chart.removePane`
-          // below: deselecting one of two own-pane indicators left the other's
-          // pane index stale and threw. This keeps removal singly-owned, by
-          // the cleanup loop, which already knows to look up a live index.
+          // `preserveEmptyPane: true`, or the chart removes a pane the moment its last series does and
+          // races the `removePane` below — which threw. Removal stays owned by the cleanup loop alone.
           pane = chart.addPane(true);
           pane.setStretchFactor(OWN_PANE_STRETCH);
           ownPanesRef.current.set(ownPaneKey, pane);
@@ -316,9 +284,8 @@ export function useIndicatorLayers({
         firstLine ??= series;
       });
 
-      // Reference levels (RSI's 30/70, …) — drawn once per instance on whichever
-      // line happens to be first, since every line an entry declares shares that
-      // pane's one price scale.
+      // Reference levels (RSI's 30/70, …) drawn once per instance on whichever line is first: every line
+      // an entry declares shares that pane's one price scale.
       const anchor = firstLine;
       if (entry.render.levels.length > 0 && anchor && !levelLinesRef.current.has(ownPaneKey)) {
         const priceLines = entry.render.levels.map((level) =>
@@ -343,9 +310,8 @@ export function useIndicatorLayers({
 
     for (const [ownPaneKey, pane] of ownPanesRef.current) {
       if (activeOwnPanes.has(ownPaneKey)) continue;
-      // Belt and braces alongside `preserveEmptyPane: true` above: a pane
-      // already gone (by whatever path) must not be handed to `removePane`
-      // again — that is what actually threw.
+      // Belt and braces beside `preserveEmptyPane`: a pane already gone by whatever path must not reach
+      // `removePane` again — that is what actually threw.
       if (chart.panes().includes(pane)) chart.removePane(pane.paneIndex());
       ownPanesRef.current.delete(ownPaneKey);
     }

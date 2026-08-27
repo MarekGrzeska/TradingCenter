@@ -15,22 +15,8 @@ resource "azuread_application" "this" {
   display_name    = var.display_name
   identifier_uris = [var.identifier_uri]
 
-  # The `api` block is here even when there is no scope inside it, and that is not tidiness.
-  # Leaving it out cost an interrupted apply on 13 August 2026 (market-mcp), with two
-  # failures from one cause:
-  #
-  #   1. Entra refused the registration — "InvalidUniqueTenantIdentifierAsPerAppPolicy: all
-  #      newly added URIs must contain a tenant verified domain, tenant ID, or app ID". The
-  #      tenant policy exempts applications asking for v2 tokens, which is why
-  #      `api://tradingcenter-market-data` was accepted and `api://tradingcenter-market-mcp`
-  #      was not.
-  #   2. Had it been accepted, the caller's token would have been rejected on arrival: Easy
-  #      Auth is configured against the `/v2.0` tenant endpoint, and a v1 token there fails
-  #      on its `iss` claim with an error naming no versions at all.
-  #
-  # The provider's default is 1. Every registration with a scope set 2 inside a block it
-  # needed anyway; the three without one needed the block for nothing else, which is exactly
-  # how it went missing. Unconditional here, so it cannot go missing again.
+  # The `api` block is here even with no scope inside it, and that is not tidiness: without it the provider defaults to
+  # v1 tokens, and Entra refuses such a registration under the tenant's URI policy — which cost an interrupted apply.
   api {
     requested_access_token_version = 2
 
@@ -73,10 +59,8 @@ resource "azuread_service_principal" "this" {
   client_id = azuread_application.this.client_id
 }
 
-# What Easy Auth reads as MICROSOFT_PROVIDER_AUTHENTICATION_SECRET. `end_date` is ignored
-# after creation: `timestamp()` moves on every plan, so without this the secret would be
-# rotated on every apply — and a rotation the app has not restarted for is an app rejecting
-# every token.
+# What Easy Auth reads as MICROSOFT_PROVIDER_AUTHENTICATION_SECRET. `end_date` is ignored after creation: `timestamp()`
+# moves on every plan, and a rotation the app has not restarted for is an app rejecting every token.
 resource "azuread_application_password" "this" {
   application_id = azuread_application.this.id
   display_name   = "easy-auth"

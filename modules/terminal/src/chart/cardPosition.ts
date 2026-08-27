@@ -6,12 +6,8 @@ const CARD_HEIGHT = 120;
 const GAP = 12;
 
 /**
- * Where the card describing the picked object stands.
- *
- * On the side of the click that has room for it: a card that always opened to the right
- * would fall off the pane for an object near the right edge, and an object near the right
- * edge is the one most often looked at (design.md, "Karta potrafi zasłonić obiekt, który
- * opisuje").
+ * Where the card describing the picked object stands: on the side of the click that has room for it. Always
+ * opening right would drop it off the pane for an object near the right edge, the one most often looked at.
  */
 export function cardPosition(
   at: { x: number; y: number } | null,

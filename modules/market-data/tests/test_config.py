@@ -17,8 +17,6 @@ def settings(**overrides) -> Settings:
     return Settings(**{**REQUIRED, **overrides}, _env_file=None)
 
 
-# --- the gateway must be this repository's gateway, never the provider directly -------
-
 
 @pytest.mark.parametrize(
     "url",
@@ -42,9 +40,8 @@ def test_a_stream_url_on_the_provider_refuses_to_start() -> None:
 
 
 def test_a_host_merely_mentioning_the_provider_in_its_path_is_allowed() -> None:
-    # The guard reads the host, not the whole string: a gateway deployed under a path
-    # that happens to carry the provider's name is still the gateway. Without this the
-    # rule above would be satisfied by a guard that refuses everything.
+    # The guard reads the host, not the whole string: a gateway deployed under a path carrying the
+    # provider's name is still the gateway. Without this, a guard refusing everything would pass.
     url = "https://gw.internal.test/proxy/capital.com"
     assert settings(gateway_base_url=url).gateway_base_url == url
 
@@ -61,9 +58,8 @@ def test_a_host_merely_mentioning_the_provider_in_its_path_is_allowed() -> None:
     ],
 )
 def test_no_database_user_with_a_remote_host_refuses_to_start(url: str) -> None:
-    # The quiet disaster this refuses: a .env aimed at production while nothing selects
-    # an identity — the module would otherwise write to the wrong database, or worse,
-    # authenticate as whatever ambient credential the machine happens to hold.
+    # The quiet disaster this refuses: a .env aimed at production while nothing selects an identity,
+    # so the module writes to the wrong database or authenticates as an ambient credential.
     with pytest.raises(ValidationError) as err:
         settings(database_user=None, database_url=url)
     assert "DATABASE_USER" in str(err.value)
@@ -94,9 +90,8 @@ def test_a_database_url_that_does_not_require_tls_refuses_to_start(url: str) -> 
     assert "TLS" in str(err.value)
 
 
-# specs/market-data-database-connection/spec.md, "Moduł przedstawia się tożsamością, nie
-# hasłem" — a credential in the URL is not read, so leaving one there is rejected rather
-# than silently ignored.
+# specs/market-data-database-connection, "Moduł przedstawia się tożsamością, nie hasłem" — a
+# credential in the URL is not read, so leaving one there is rejected rather than silently ignored.
 @pytest.mark.parametrize(
     "url",
     [

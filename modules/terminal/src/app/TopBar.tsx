@@ -12,16 +12,14 @@ const HEALTH_LABEL: Record<SourceHealth, string> = {
   "signed-out": "needs sign-in",
 };
 
-// Chrome status, not market direction: these used to borrow `up` and `down`, which made a
-// reachable back end the same teal as a rising candle and left the screen looking like it
-// owned three colours. `good`/`critical` say nothing about a price.
+// Chrome status, not market direction: these used to borrow `up` and `down`, which made a reachable back
+// end the same teal as a rising candle. `good`/`critical` say nothing about a price.
 const HEALTH_DOT: Record<SourceHealth, string> = {
   checking: "bg-ink-muted",
   reachable: "bg-good",
   unreachable: "bg-critical",
-  // Amber, not red: nothing here is broken. The back end is fine and simply
-  // does not know who is asking, and a red dot on it is a claim about Azure
-  // that the terminal has no evidence for.
+  // Amber, not red: nothing here is broken. The back end is fine and does not know who is asking, and a
+  // red dot on it is a claim about Azure the terminal has no evidence for.
   "signed-out": "bg-warning",
 };
 
@@ -51,12 +49,8 @@ export function TopBar() {
           candles anywhere, while no gateway means the instrument search stops
           and the charts carry on. An operator has to be able to tell which. */}
       <div className="ml-auto flex items-center gap-4 text-sm text-ink-muted">
-        {/* Sign-in sits beside them and not among them, because it is not a
-            back end — and it is the first thing to read when nothing is
-            arriving. An expired session and an archive that is down empty the
-            same screen; only one of them is fixed from here. Absent entirely
-            when no identity is configured: there is nothing to be signed out
-            of, and an indicator saying so would be noise on every dev run. */}
+        {/* Sign-in sits beside them and not among them, because it is not a back end — and it is the
+            first thing to read when nothing is arriving. Absent entirely when no identity is configured. */}
         {signedIn !== "unconfigured" && <SignInState signedIn={signedIn === "signed-in"} />}
         {marketData.parts.map((part) => (
           <PartHealth key={part.id} part={part} health={health[part.id] ?? "checking"} />
@@ -100,9 +94,8 @@ function PartHealth({ part, health }: { part: SourcePart; health: SourceHealth }
         {part.label} {HEALTH_LABEL[health]}
       </span>
       {health === "unreachable" && (
-        // Silence on the feed has to look different from a flat market, and an
-        // operator needs to know what has stopped — naming the casualty rather
-        // than declaring the whole terminal offline.
+        // Silence on the feed has to look different from a flat market, and an operator needs to know
+        // what has stopped — naming the casualty rather than declaring the whole terminal offline.
         <span className="text-critical">— {part.whenUnreachable}</span>
       )}
     </span>

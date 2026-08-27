@@ -1,22 +1,10 @@
 /**
- * One tool call the agent made, and the one mapper that produces it.
- *
- * Its own file rather than a corner of `agentApi.ts` because both wire paths need it and
- * they need each other: a call arrives mid-turn through `stream.ts` and again, identical,
- * on a reloaded transcript through `agentApi.ts`. The module publishes a single shape for
- * both (`agent/contract.py`, `ToolCallOut`), and mapping it in one place is what makes
- * "what the stream showed" and "what the transcript holds" the same object here too.
+ * One tool call and the one mapper that produces it, in its own file because both wire paths need it: a call arrives
+ * mid-turn and again, identical, on a reloaded transcript.
  */
 
-/** The four the module distinguishes (`ToolOutcomeKind` in `agent/tools/client.py`), plus
- *  a name for one it does not yet. A kind arriving that this build has never heard of must
- *  not be silently rendered as one of the four — an unreachable server shown as a refusal
- *  reads as "the archive says no", which is the confusion this whole panel exists to
- *  prevent.
- *
- *  `unknown` used to be that catch-all and is now a real answer: the call may have gone
- *  through and nobody knows (`agent-trading` spec). The catch-all is `unrecognised`, so the
- *  two never get the same badge. */
+/** A kind this build has never heard of must not be silently rendered as one of the four. `unknown` used to be that
+ *  catch-all and is now a real answer — the call may have gone through — so `unrecognised` carries the role. */
 export type ToolOutcome = "ok" | "refused" | "unavailable" | "unknown" | "unrecognised";
 
 /** Which one ran the call — the module's own `set_chart`, or one market-mcp announced

@@ -26,14 +26,11 @@ line-length = 100
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
 [tool.pyright]
-# The module itself. The suite is deliberately outside: its fakes are structural on
-# purpose — a class with the three methods a caller actually uses — and satisfying a
-# checker there would mean a Protocol per seam, bought with nothing the tests do not
-# already prove by running.
+# The module itself. The suite is deliberately outside: its fakes are structural on purpose, and satisfying a
+# checker there would mean a Protocol per seam, bought with nothing the tests do not already prove by running.
 include = ["capital_gateway"]
-# Basic, not strict, and that is the whole point of the step. Basic reads the code as
-# written and asks whether it holds together; strict would additionally demand an
-# annotation on everything, which is a different project with a different payoff.
+# Basic, not strict: basic reads the code as written and asks whether it holds together, where strict would also
+# demand an annotation on everything — a different project with a different payoff.
 typeCheckingMode = "basic"
 
 [tool.pytest.ini_options]
@@ -47,18 +44,13 @@ markers = [
 
 [dependency-groups]
 dev = [
-    # Pinned exactly, unlike the rest of this list. A type checker that upgrades itself
-    # decides when this repository's CI turns red, and it does so between two runs of the
-    # same commit — the one kind of failure that teaches nothing. Raised deliberately.
+    # Pinned exactly, unlike the rest of this list: a checker that upgrades itself decides when CI turns red, and
+    # does so between two runs of the same commit.
     "pyright==1.1.411",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "respx>=0.21",
-    # Pinned exactly, not a floor. `>=0.7` meant CI took whatever was newest, which today
-    # resolves to 0.16.2 with 413 rules active — a far wider set than anything 0.7 ran by
-    # default. New rules have been worth having (UP037 caught a real defect in
-    # market-data's config.py), but with a floor it is the linter's publisher who decides
-    # when a commit that was green turns red. Raised deliberately, and in step with the
-    # other module: two modules linting at different versions is two standards.
+    # Pinned exactly, not a floor. New rules have been worth having — UP037 caught a real defect — but with a floor
+    # it is the linter's publisher who decides when a green commit reddens. In step with the other modules.
     "ruff==0.16.2",
 ]

@@ -45,9 +45,8 @@ def upgrade() -> None:
             server_default=sa.text("now()"),
         ),
         sa.Column("candles_removed", sa.Integer(), nullable=False),
-        # Both null together when nothing had ever been collected for this pair — a
-        # deletion is still worth recording (`market-data-tracking` spec, "Skasowanie
-        # pary bez ani jednej świecy") even though there is no range to name.
+        # Both null together when nothing had ever been collected for this pair — a deletion is
+        # still worth recording even though there is no range to name.
         sa.Column("removed_from", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.Column("removed_to", sa.TIMESTAMP(timezone=True), nullable=True),
         sa.CheckConstraint(

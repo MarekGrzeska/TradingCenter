@@ -1,9 +1,5 @@
-"""The arithmetic and the sentences behind the tool replies, called directly.
-
-Three units that never needed a server between them and a test: the reduction that keeps
-a reply under its ceiling, the sentences saying what the archive does not know, and the
-`mode="latest"` line statistics — where an off-by-one is invisible once rendered.
-"""
+"""The arithmetic and the sentences behind the tool replies, called directly — three units that never
+needed a server between them and a test."""
 
 from __future__ import annotations
 
@@ -16,8 +12,6 @@ from market_data.tools.uncertainty import (
     empty_series_sentence,
     uncovered_sentence,
 )
-
-# --- reduce: keeping a reply under its ceiling ----------------------------------------
 
 
 def _candle(time: str, open_: float, high: float, low: float, close: float) -> dict:
@@ -80,8 +74,6 @@ def test_truncate_over_limit_names_what_it_drops() -> None:
     assert dropped == 20
 
 
-# --- uncertainty: saying what the archive does not know -------------------------------
-
 
 def test_no_gaps_is_silent() -> None:
     assert uncovered_sentence([]) is None
@@ -117,8 +109,6 @@ def test_tracked_pair_with_no_candle_points_at_coverage() -> None:
     assert "is tracked" in sentence
     assert "describe_coverage" in sentence
 
-
-# --- indicator line statistics, the arithmetic behind `mode="latest"` -----------------
 
 START = datetime(2026, 1, 1, tzinfo=UTC)
 

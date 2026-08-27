@@ -1,14 +1,5 @@
-"""What a run cost — computed once, on the way in, and only ever summed afterwards.
-
-The write sits beside the reads because one property binds them: `record_usage` is the
-single place a cost is ever computed, and every read here sums `cost` as it was written.
-Nothing recomputes from tokens and rates — a cennik changed after a run MUST NOT reprice it
-(specs/teams-usage, "Koszt jest przypisany do wiersza w chwili zapisu"), and a SUM over a
-column is the only shape that cannot accidentally do otherwise.
-
-`owner_principal` rides on `runs`, so every read is owner-scoped without a join through the
-catalogue — and a retired team's runs still answer.
-"""
+"""What a run cost — computed once, on the way in, and only ever summed afterwards. Nothing recomputes from
+tokens and rates: a cennik changed after a run must not reprice it, and a SUM cannot accidentally do otherwise."""
 
 from __future__ import annotations
 
@@ -43,13 +34,8 @@ async def record_usage(
     input_rate_per_1m: Decimal,
     output_rate_per_1m: Decimal,
 ) -> asyncpg.Record:
-    """The one place a cost is computed, and the only moment it ever is — never again at
-    read time (specs/teams-usage, "Koszt jest przypisany do wiersza w chwili zapisu").
-
-    A call the provider reported nothing for leaves a row with no tokens and no cost: the
-    call happened and is part of the trace, and a zero there would be a claim that it was
-    free (specs/teams-usage, "Brak informacji o zużyciu jest zapisany jako brak").
-    """
+    """The one place a cost is computed, and the only moment it ever is. A call the provider reported nothing
+    for leaves a row with no tokens and no cost: a zero there would be a claim that it was free."""
     cost = None
     if input_tokens is not None and output_tokens is not None:
         cost = (Decimal(input_tokens) / 1_000_000 * input_rate_per_1m) + (
@@ -79,9 +65,8 @@ _TEAM_COST_SINCE = """
      WHERE v.team_id = $1 AND r.owner_principal = $2 AND u.created_at >= $3
 """
 
-# `unknown_count` is what keeps a total honest: rows the provider reported no tokens for
-# are counted, not dropped and not summed as zero, so an operator can see that a number is
-# a floor rather than the whole bill (specs/teams-usage, "Brak informacji o zużyciu").
+# `unknown_count` is what keeps a total honest: rows the provider reported no tokens for are counted, not
+# dropped and not summed as zero, so an operator can see a number is a floor rather than the whole bill.
 _AGGREGATE_COLUMNS = """
            COALESCE(SUM(u.input_tokens), 0)::bigint AS input_tokens,
            COALESCE(SUM(u.output_tokens), 0)::bigint AS output_tokens,

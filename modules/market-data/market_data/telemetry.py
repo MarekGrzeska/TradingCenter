@@ -1,19 +1,5 @@
-"""Application Insights: the metric the most important alert stands on.
-
-Only the newest candle's age, per pair, and only for pairs a shut market would make it
-noisy to complain about — a market closed since Friday leaves its "newest candle" a
-Monday morning old, and that is the schedule, not staleness. `collection_state` already
-tells the two apart (`STALLED` vs `MARKET_CLOSED`); this reads the same distinction
-rather than inventing a second one.
-
-An OpenTelemetry observable gauge's callback runs synchronously, on the exporter's own
-schedule — it cannot itself await a database query. So the read happens in
-`refresh_loop`, on its own schedule, and the callback only reports what that loop last
-found. Unset `APPLICATIONINSIGHTS_CONNECTION_STRING` (every local run) is not a special
-case here: `configure()` is simply never called, and `opentelemetry.metrics.get_meter`
-falls back to its built-in no-op provider, so every call below still succeeds — it just
-reports nothing.
-"""
+"""Application Insights: the metric the most important alert stands on — the newest candle's age per
+pair. An observable gauge's callback cannot await, so `refresh_loop` reads and the callback reports."""
 
 from __future__ import annotations
 
@@ -46,26 +32,14 @@ log = logging.getLogger(__name__)
 # status this module already has cached, for no fresher an answer.
 REFRESH_INTERVAL_SECONDS = 60
 
-# Libraries that talk at INFO about their own plumbing, held to WARNING once the root
-# logger has a level at all.
-#
-# `azure` is the one that matters, and it is not merely noise: the Application Insights
-# exporter logs each telemetry upload — "Transmission succeeded: Item received: 3" — and
-# that log line is itself telemetry, which is uploaded, which is logged. A quiet process
-# produced 165 entries in fifteen minutes, nearly all of them the exporter describing
-# itself. `azure.identity` adds three lines per token, several times a second at startup.
-#
-# The rest is ordinary volume: one line per outbound gateway request, which this module
-# already reports in terms of what the request was *for*.
+# Libraries that talk at INFO about their own plumbing. `azure` is not merely noise: the exporter logs
+# each upload, and that line is telemetry, uploaded, logged. 165 entries in fifteen quiet minutes.
 NOISY_LOGGERS = ("azure", "httpx", "httpcore", "urllib3")
 
 
 class CandleAgeGauge:
-    """The last-computed age, in seconds, of each pair's newest candle — for pairs whose
-    market isn't known to be closed. Written by `refresh_loop`; read by `observe`, which
-    OpenTelemetry calls whenever it is ready to export, not on any schedule this class
-    controls.
-    """
+    """The last-computed age of each pair's newest candle, for pairs whose market isn't known to be
+    closed. Written by `refresh_loop`, read whenever OpenTelemetry is ready to export."""
 
     def __init__(self) -> None:
         self._ages: dict[tuple[str, str], float] = {}
@@ -81,10 +55,8 @@ class CandleAgeGauge:
 
 
 class CandlePeriodsLateGauge:
-    """The same staleness as `CandleAgeGauge`, in periods of each pair's own resolution
-    instead of seconds — the unit `alert-candle-age-stale` actually alerts on, since a
-    single second threshold cannot mean the same thing for `MINUTE` and for `WEEK`.
-    """
+    """The same staleness in periods of each pair's own resolution — the unit the alert uses, since one
+    second threshold cannot mean the same thing for `MINUTE` and for `WEEK`."""
 
     def __init__(self) -> None:
         self._periods: dict[tuple[str, str], float] = {}
@@ -100,25 +72,15 @@ class CandlePeriodsLateGauge:
 
 
 def periods_late(age_seconds: float, resolution: Resolution) -> float:
-    """How far behind a pair's newest candle sits, in periods of its own resolution, past
-    the delivery grace `tracking.py` already measured (`DELIVERY_GRACE`). Floored to zero
-    so a candle that just arrived does not read negative — the raw ratio without the grace
-    subtracted first would put every healthy `MINUTE` pair near four "periods" late.
-    """
+    """How far behind a pair's newest candle sits, past the delivery grace `tracking.py` measured.
+    Floored to zero: the raw ratio would put every healthy `MINUTE` pair near four periods late."""
     behind = age_seconds - DELIVERY_GRACE.total_seconds()
     return max(0.0, behind / period_length(resolution).total_seconds())
 
 
 def configure() -> None:
-    """Wires up logging, and Application Insights when there is one to wire to.
-
-    Called once, at import time in `app.py`, before `from fastapi import FastAPI` — not
-    merely before `FastAPI(...)` is called, and not from `lifespan`.
-    `configure_azure_monitor()`'s FastAPI auto-instrumentation patches the `fastapi.FastAPI`
-    class *attribute*; a `from fastapi import FastAPI` that already ran binds a name to
-    whatever the attribute held at that moment; regardless of where `FastAPI(...)` is later
-    called, that name never repoints itself.
-    """
+    """Wires up logging, and Application Insights when there is one. Called at import time in `app.py`
+    before `from fastapi import FastAPI`: the instrumentation patches the class attribute."""
     configure_logging()
     if not os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING"):
         return
@@ -128,22 +90,8 @@ def configure() -> None:
 
 
 def configure_logging() -> None:
-    """Give the root logger a level and somewhere to write, because nothing else does.
-
-    Uvicorn configures its own three loggers and leaves the root alone, so a deployed
-    container printed `GET /pairs 200` and not one line this module wrote: the root
-    logger's default level is WARNING, and it had no handler regardless. Application
-    Insights was no better — the handler Azure Monitor attaches to the root logger is
-    gated by that same level, so `INFO` never reached it either.
-
-    What that cost, concretely: a collection job that never started looked exactly like
-    one running quietly, because `chunk N done: wrote X candles` had nowhere to go. The
-    module was not silent — nobody had told it where to speak.
-
-    `LOG_LEVEL` overrides, for turning the volume down without a deploy. `basicConfig` is
-    a no-op if the root logger already has a handler, which is the right behaviour: a
-    caller who configured logging themselves keeps their configuration.
-    """
+    """Give the root logger a level and somewhere to write, because nothing else does. A deployed
+    container printed uvicorn's lines and none of this module's — not silent, just never told where."""
     logging.basicConfig(
         level=os.environ.get("LOG_LEVEL", "INFO").upper(),
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -181,20 +129,12 @@ async def compute_ages(
     market_status: MarketStatus,
     now: datetime | None = None,
 ) -> dict[tuple[str, str], float]:
-    """One read of every tracked pair's newest-candle age, keyed by (symbol, resolution),
-    excluding pairs the gateway says are `MARKET_CLOSED`.
-
-    A pair still `NEVER_COLLECTED` or `UNKNOWN` is included: the first has no candle to
-    age (nothing to observe), and the second is exactly the case an operator should be
-    told about rather than have silently excluded.
-    """
+    """One read of every tracked pair's newest-candle age, excluding pairs the gateway calls closed.
+    `NEVER_COLLECTED` and `UNKNOWN` stay in: the second is exactly what an operator should hear about."""
     moment = now or datetime.now(UTC)
     async with pool.acquire() as conn:
-        # A pool hands out a proxy that forwards everything to a connection without being
-        # one, so every signature in this module naming `asyncpg.Connection` is wrong
-        # about pooled callers by the letter and right by every method it uses. This is
-        # the only place that mismatch is visible — the routers reach the pool through an
-        # untyped dependency — and it is a narrowing here, not a widening everywhere.
+        # A pool hands out a proxy that forwards to a connection without being one, so every
+        # signature naming `asyncpg.Connection` is wrong by the letter and right by every method used.
         statuses = await read_status(cast(asyncpg.Connection, conn), now=moment)
     decided = await decide_late_pairs(instruments, market_status, statuses, moment)
 
@@ -216,11 +156,8 @@ async def refresh_loop(
     periods_gauge: CandlePeriodsLateGauge,
     interval: float = REFRESH_INTERVAL_SECONDS,
 ) -> None:
-    """Runs for the life of the application, updating both gauges every `interval` seconds.
-
-    A failed read is logged and skipped rather than raised — one bad refresh should not
-    take down the loop that is, itself, half of the monitoring for everything else.
-    """
+    """Runs for the life of the application, updating both gauges every `interval` seconds. A failed
+    read is logged and skipped: one bad refresh should not take down half the monitoring."""
     while True:
         try:
             ages = await compute_ages(pool, instruments, market_status)

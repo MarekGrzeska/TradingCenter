@@ -25,21 +25,8 @@ import { candlestickColors, readChartColors, type ChartColors } from "./theme";
 const PRICE_PANE_STRETCH = 4;
 
 /**
- * The chart instance itself: created once, torn down once, and never re-created for
- * data. Everything else in `Chart.tsx` finds it through `chartRef`.
- *
- * **Where this has to be called, and why it is not obvious.** Effects run in the order
- * they were declared, so every hook that draws *onto* the chart — the indicator layers,
- * the drawing layers — must be declared below this call, or its first run finds no chart
- * to draw on. That constraint used to make this effect impossible to move: its cleanup
- * calls `clearIndicatorLayers`, which comes from one of those hooks below, and naming it
- * in the dependency array read it before it existed. Listing it, as
- * `react-hooks/exhaustive-deps` asked, took all 121 chart tests down at once.
- *
- * `clearIndicatorLayers` arrives as a **ref** instead, which is what unties it: a
- * dependency array is read during render, and a ref's contents are not. The component
- * fills it after the layers hook has returned, and this cleanup — which runs at unmount,
- * long after — reads whatever is in it by then. Same node, solved from the other side.
+ * Created once, torn down once, never re-created for data. Every hook that draws onto it must be declared
+ * below; its cleanup takes `clearIndicatorLayers` as a **ref**, since a dependency array reads during render.
  */
 export function useChartInstance({
   containerRef,
@@ -83,9 +70,8 @@ export function useChartInstance({
         horzLines: { color: colors.grid },
       },
       rightPriceScale: { borderColor: colors.axis },
-      // Both formatters read Warsaw's calendar instead of the library's own UTC one —
-      // the candles' timestamps are untouched, only their labels (design.md, "Strefa:
-      // formatowanie, nie przesuwanie znaczników").
+      // Both formatters read Warsaw's calendar instead of the library's own UTC one — the labels only,
+      // never the timestamps (design.md, "Strefa: formatowanie, nie przesuwanie znaczników").
       localization: {
         timeFormatter: (time: Time) => formatCrosshairTime(time as number),
       },
@@ -103,13 +89,8 @@ export function useChartInstance({
     });
     const series = chart.addSeries(CandlestickSeries, {
       ...candlestickColors(colors),
-      // Both of the series' own price markers are off, and one of them is the
-      // point: the price-axis label the library draws is sourced from the last
-      // *visible* bar (`SeriesPriceAxisView` asks for `lastValueData(false)`,
-      // whatever `priceLineSource` says), so panning into history left the
-      // right-hand scale announcing the price of whatever candle happened to be
-      // at the edge of the viewport. The chart draws its own instead, always at
-      // the newest candle.
+      // The library's price-axis label is sourced from the last *visible* bar whatever `priceLineSource`
+      // says, so panning into history announced that bar's price. The chart draws its own at the newest candle.
       lastValueVisible: false,
       priceLineVisible: false,
     });
@@ -126,11 +107,8 @@ export function useChartInstance({
       chart.timeScale().fitContent();
     }
 
-    // Panning towards the left edge of what is drawn is the whole trigger for
-    // loading older candles (terminal-chart spec, "Wykres dociąga starszą
-    // historię przy przewijaniu w lewo"). How much gets loaded is not decided
-    // here: the pager keeps asking until `needsMore` says the margin is
-    // filled, which is what stops it looping on its own frame correction.
+    // Panning towards the left edge is the whole trigger for loading older candles. How much is not decided
+    // here: the pager asks until `needsMore` says the margin is filled, which stops it looping on frame correction.
     const onRangeChange = (range: LogicalRange | null) => {
       if (range && range.from < OLDER_MARGIN_BARS) requestOlderRef.current();
       // Panning off the computed window is what asks for a new one — the operator who
@@ -160,26 +138,21 @@ export function useChartInstance({
       observer.disconnect();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChange);
       chart.remove();
-      // Both refs below are read here rather than copied into a variable when the effect
-      // ran, which is what `react-hooks/exhaustive-deps` asks for and is the opposite of
-      // what these two want: the value that matters is whatever is current at unmount —
-      // the parent's latest callback, and a clear function that did not exist yet when
-      // this effect started.
+      // Both refs are read here rather than copied when the effect ran — the opposite of what
+      // `exhaustive-deps` asks — because what matters is whatever is current at unmount.
       // eslint-disable-next-line react-hooks/exhaustive-deps
       onVisibleRangeChangeRef.current?.(null);
       chartRef.current = null;
       seriesRef.current = null;
       // The line belonged to the series that just went away with the chart.
       priceLineRef.current = null;
-      // Every indicator series, pane, reference level, marker plugin and
-      // primitive belonged to it too — `chart.remove()` already freed them,
-      // this only stops the sync effect from reaching for one that is gone.
+      // `chart.remove()` already freed every series, pane, level, marker and primitive; this only stops
+      // the sync effect from reaching for one that is gone.
       // eslint-disable-next-line react-hooks/exhaustive-deps
       clearIndicatorLayersRef.current();
     };
-    // Empty on purpose: one chart per mount. Every ref above is stable, and the one
-    // thing that is not a ref — what to clear on the way out — is reached through one
-    // for exactly that reason.
+    // Empty on purpose: one chart per mount. Every ref above is stable, and the one thing that is not —
+    // what to clear on the way out — is reached through a ref for exactly that reason.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 }

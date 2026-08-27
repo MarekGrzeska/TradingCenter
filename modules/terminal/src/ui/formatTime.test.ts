@@ -26,9 +26,8 @@ describe("formatInstant", () => {
   });
 
   it("crosses into the next Warsaw day before UTC does", () => {
-    // The bug a formatter reading the process's own default zone (UTC in CI)
-    // instead of an explicit `Europe/Warsaw` would show: this instant's UTC
-    // calendar day is still the 10th.
+    // The bug a formatter reading the process's own default zone (UTC in CI) instead of an explicit `Europe/Warsaw`
+    // would show: this instant's UTC calendar day is still the 10th.
     expect(formatInstant(CROSSING)).toBe("2026-08-11 01:30 CEST");
   });
 });

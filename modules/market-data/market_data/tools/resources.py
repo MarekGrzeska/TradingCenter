@@ -1,9 +1,5 @@
-"""MCP resources and the one prompt the tool surface publishes.
-
-A resource is read by URI, not called with arguments — cheaper for a client that
-wants to look something up once and hold onto it, rather than pay a tool-call round
-trip for the same catalogue on every turn.
-"""
+"""MCP resources and the one prompt the tool surface publishes. A resource is read by URI, which is
+cheaper for a client that wants to look something up once than a tool call every turn."""
 
 from __future__ import annotations
 

@@ -1,33 +1,12 @@
 #!/usr/bin/env bash
 #
-# Keeps an archived OpenSpec change down to what nothing else holds.
-#
-# A change is archived with five artifacts, and two of them say a second time what is
-# already written somewhere better:
-#
-#   specs/     the delta. Its content was merged into openspec/specs/ at archiving time —
-#              that merge is what archiving *is* — so the delta is a copy of the truth,
-#              frozen at the moment it stopped being the newest version of it.
-#   tasks.md   a checklist with every box ticked. What was done and when is git's job, and
-#              git does it better: with the diffs attached.
-#
-# What stays is what git cannot hand back in readable form:
-#
-#   proposal.md   why the change was opened
-#   design.md     which alternatives were weighed, and why this one
-#   review.md     how the result was judged, and against which tests
-#   .openspec.yaml
-#
-# Measured on 10 August 2026, before the first run: 4,010 lines of delta specs and 1,201
-# lines of ticked tasks across fourteen changes, growing by roughly 400 a change. The
-# archive is not deleted, it is trimmed — and this script is the trimming, so the rule is
-# a command rather than something to remember (openspec/config.yaml, archive guidance).
+# Keeps an archived OpenSpec change down to what nothing else holds: the delta specs were merged into
+# `openspec/specs/` by archiving itself, and a ticked `tasks.md` is what git records better, with the diffs attached.
+# What stays is proposal, design and review. Measured before the first run: 5,211 lines across fourteen changes.
 #
 # Usage:
 #   scripts/trim-openspec-archive.sh            trim, and say what went
 #   scripts/trim-openspec-archive.sh --check    say what would go; exit 1 if anything would
-#
-# Written for bash 3.2, the version macOS ships.
 
 set -eu
 

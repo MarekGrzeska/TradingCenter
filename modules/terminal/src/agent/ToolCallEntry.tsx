@@ -3,13 +3,8 @@ import { useState } from "react";
 import type { AgentToolCall, ToolOutcome } from "./agentApi";
 
 /**
- * One tool call, in the transcript where it happened rather than in a panel beside it.
- * It is part of how the reply was reached, and a diagnostic drawer somewhere else is a
- * place nobody looks until they already suspect something (`terminal-agent-chat` spec,
- * "Wywołanie MUST stać w transkrypcie tam, gdzie padło").
- *
- * Collapsed by default and expanded one at a time: a turn is allowed eight calls, and
- * eight open results would bury the rozmowa they were made for.
+ * One tool call in the transcript where it happened: it is part of how the reply was reached, and a drawer
+ * elsewhere is a place nobody looks. Collapsed and expanded one at a time — eight open results bury the turn.
  */
 
 const OUTCOME_LABEL: Record<ToolOutcome, string> = {
@@ -21,16 +16,8 @@ const OUTCOME_LABEL: Record<ToolOutcome, string> = {
 };
 
 /**
- * The four the module distinguishes never collapse into fewer, and the colours carry that:
- * a refusal is the archive answering "not like that" — worth noticing, not an alarm — while
- * an unreachable server means nothing was asked and nothing is known either way. Reading
- * the second as the first is how "the archive has no data" gets said about data the
- * archive has.
- *
- * `unknown` is the loudest of the four, and it is not an outage: it means a call that could
- * have changed the account went out and nobody knows whether it landed (`agent-trading`
- * spec). An operator scanning this column has to stop on it, so it gets the alarm colour
- * and a label that reads as a question rather than a status.
+ * The four the module distinguishes never collapse into fewer: a refusal is the archive answering "not like that",
+ * unreachable means nothing was asked. `unknown` is loudest — a call that could have changed the account.
  */
 const OUTCOME_STYLE: Record<ToolOutcome, string> = {
   ok: "text-ink-muted",
@@ -61,10 +48,8 @@ export function ToolCallEntry({ call }: { call: AgentToolCall }) {
           </span>
           <span className="truncate font-mono text-ink-secondary">{call.name}</span>
           {call.source === "module" && (
-            // Server calls are the common case and say nothing extra; the one tool this
-            // module runs itself is the exception worth naming, the same way a badge
-            // elsewhere on this panel only appears for what stands out (`agent-tools`
-            // spec, "ślad wywołania mówi, które z nich zostało wykonane przez ten moduł").
+            // Server calls are the common case and say nothing extra; the one tool this module runs
+            // itself is the exception worth naming.
             <span
               title="Run by this module, not the tool server"
               className="shrink-0 rounded border border-primary-line px-1 text-[10px] tracking-wide text-primary uppercase"
@@ -92,11 +77,8 @@ export function ToolCallEntry({ call }: { call: AgentToolCall }) {
 }
 
 /**
- * `<pre>` and `wrap-break-word` together: a tool's answer is JSON often enough that
- * collapsing its whitespace would make it unreadable, and long enough that letting it set
- * the panel's width would push the rozmowa off-screen. Rendered as text — this is a
- * string from the archive and never markup, the same rule the agent's own reply follows
- * in `MessageBody`.
+ * `<pre>` and `wrap-break-word` together: a tool's answer is JSON often enough that collapsed whitespace is
+ * unreadable, and long enough to push the conversation off-screen. Text — this is a string, never markup.
  */
 function ToolCallDetail({ label, body }: { label: string; body: string }) {
   return (

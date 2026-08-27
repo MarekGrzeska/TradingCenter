@@ -1,11 +1,5 @@
-"""Entry point: `python -m trading_mcp`.
-
-One transport, one mode — see `server.py`'s docstring for why there is no `stdio` to
-choose between. The demo-environment check runs before uvicorn starts listening: a
-process that never opens a port cannot be reached by anything, which is a stronger
-guarantee than refusing inside the first request (specs/trading-mcp-upstream-access,
-"Moduł pracuje wyłącznie na rachunku demonstracyjnym").
-"""
+"""Entry point: `python -m trading_mcp`. The demo-environment check runs before uvicorn listens: a
+process that never opens a port cannot be reached, which beats refusing inside the first request."""
 
 from __future__ import annotations
 

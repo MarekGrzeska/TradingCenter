@@ -82,9 +82,8 @@ describe("RayPrimitive", () => {
 
     expect(ctx.moveTo).toHaveBeenCalledWith(40, 90.5);
     expect(ctx.lineTo).toHaveBeenCalledWith(200, 90.5);
-    // On a plate rather than straight on the chart: the caption sits above the line, and
-    // the plate under it is what keeps it readable over the wicks (`terminal-chart` spec,
-    // "Etykieta MUST być czytelna nad świecami").
+    // On a plate rather than straight on the chart: the caption sits above the line, and the plate under
+    // it is what keeps it readable over the wicks.
     expect(ctx.fillRect).toHaveBeenCalledWith(40, 73.5, 26, 14);
     expect(ctx.fillText).toHaveBeenCalledWith("PDH", 44, 80.5);
   });

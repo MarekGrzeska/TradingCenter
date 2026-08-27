@@ -21,12 +21,8 @@ type Open =
   | { kind: "memory"; teamId: number; teamName: string };
 
 /**
- * The teams tab: the catalogue, one team open on the canvas, and one run watched on it.
- *
- * The model catalogue is read here rather than inside the editor because both children
- * need it — the canvas to label a node with a model's name, the panel to offer the
- * picker — and because a team cannot be opened without it: a new agent needs a model id,
- * and this terminal has none of its own to fall back on (`terminal-teams`).
+ * The catalogue, one team open on the canvas, one run watched on it. The model catalogue is read here because
+ * both children need it and a team cannot be opened without it — this terminal has no model id of its own.
  */
 export function TeamsView({ api = teamsApi }: { api?: TeamsApi } = {}) {
   const teams = useTeams(api);
@@ -34,15 +30,8 @@ export function TeamsView({ api = teamsApi }: { api?: TeamsApi } = {}) {
   const tools = useTools(api);
   const [open, setOpen] = useState<Open>({ kind: "catalogue" });
 
-  // A chat can create and revise teams since `teams-mcp`, and that write never passes
-  // through this tab — so a team the model made existed everywhere except on screen until
-  // the operator reloaded the page. The catalogue is a read and re-reads freely
-  // (`agentActivity.ts`).
-  //
-  // Only the catalogue. A team open on the canvas is a draft the operator may be typing
-  // into, and re-reading it here would throw that away to show a revision they did not ask
-  // for — the editor keeps its own rule that `saved` only ever comes from something the
-  // module answered *this* editor with.
+  // A chat can create and revise teams, and that write never passes through this tab, so a team the model made
+  // existed everywhere but on screen. Only the catalogue: a team open on the canvas is a draft being typed into.
   useAgentTurns(teams.reload);
 
   if (models.status === "loading") {

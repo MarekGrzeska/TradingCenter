@@ -1,15 +1,6 @@
 /**
- * Turning a probability into something an operator reads, in one place.
- *
- * **The scale is 0..1 everywhere behind this file**, and this is where — and only where —
- * it becomes a percentage on screen. Written once because the mistake it guards against is
- * silent: 0,62 read as 62 is wrong by two orders of magnitude and throws nothing on the
- * way, so a second place that multiplied by a hundred would be a second place that could
- * forget to (specs/terminal-polymarket, "Lista pokazuje wydarzenie, nie pojedynczą
- * monetę").
- *
- * Everything here answers `null` rather than a zero or a dash of its own, so a view can
- * decide how absence looks and cannot mistake it for a value.
+ * Where — and only where — a 0..1 scale becomes a percentage on screen: 0,62 read as 62 is wrong by two orders of
+ * magnitude and throws nothing, so a second place that multiplied would be a second place that could forget to.
  */
 
 /** How stale a price has to be before the view says so, rather than showing it as now.
@@ -66,23 +57,8 @@ export function formatAge(priceAt: Date | null, now: Date = new Date()): string 
   return `${Math.round(hours / 24)} d ago`;
 }
 
-/** The five bands a probability's colour comes from.
- *
- *  Colour repeats what length already says, and that is the point: a column of bars is
- *  scanned, not read, and a hue tells you *which end of the scale* a row is at before you
- *  have measured anything. The bands are the operator's own reading of the scale — unlikely,
- *  leaning against, even, leaning for, likely.
- *
- *  The five hues were **stepped by the validator, not by eye** (dataviz skill,
- *  `validate_palette.js`, dark mode against `--color-panel`). The first attempt paired the
- *  terminal's own warning orange with its amber and failed the normal-vision floor at ΔE 8.3
- *  against a floor of 15 — two bands nobody could tell apart, colour-blind or not. These pass
- *  adjacent-pair separation for protan, deutan and tritan, the normal-vision floor at 15.9,
- *  and contrast against the surface. The lightness-band check the same report runs is scoped
- *  to categorical palettes; an ordered ramp is supposed to move through lightness.
- *
- *  Never colour alone: the percentage is written beside every bar, and the bands are ordered
- *  along the same axis the length uses. */
+/** The five bands a probability's colour comes from, repeating what length says because a column of bars is
+ *  scanned rather than read. **Stepped by the validator, not by eye** — the first pair failed ΔE 8.3 against 15. */
 export interface ProbabilityBand {
   /** Inclusive lower edge, on 0..1. */
   from: number;

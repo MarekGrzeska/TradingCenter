@@ -1,18 +1,5 @@
-"""Smoke tests that trade on the capital.com demo account.
-
-Separate from ``test_live.py`` and behind ``--run-live-trading``, because these write:
-they open a position, amend it, close it, rest an order and cancel it. Nothing here is
-left behind on purpose — every position is closed in a ``finally`` — but an account that
-somebody is watching will show the round trip.
-
-Why they exist at all: the order path was proven only against ``respx``, which proves this
-module is consistent with the payloads recorded in July 2026. It cannot catch capital.com
-changing a dealing rule, renaming a status, or refusing a shape it used to accept. That is
-the entire class of failure a gateway has, and mocks are structurally blind to it.
-
-A demo fill is still a simulated fill. What this proves is the contract — request accepted,
-reference settled, status reported — not the execution.
-"""
+"""Smoke tests that trade on the capital.com demo account, behind ``--run-live-trading`` because
+they write. Mocks cannot catch a renamed status or a changed dealing rule; a demo fill is simulated."""
 
 from __future__ import annotations
 
@@ -44,12 +31,8 @@ async def adapter(settings: Settings):
 
 
 async def dealing(adapter: CapitalAdapter) -> tuple[float, float]:
-    """The smallest size the provider will accept, and the current bid.
-
-    Read rather than hard-coded: a minimum deal size is a provider setting, and a test
-    carrying last quarter's copy of it fails as a rejected order that looks like a bug in
-    this module.
-    """
+    """The smallest size the provider will accept, and the current bid. Read rather than hard-coded:
+    a stale copy fails as a rejected order that looks like a bug in this module."""
     r = await adapter._c.market(EPIC)
     assert r.is_success, f"cannot read {EPIC}: {r.status_code} {r.text[:200]}"
     market = r.json()
@@ -69,9 +52,8 @@ async def test_a_market_order_opens_amends_and_closes_a_position(
     order = await adapter.place_order(
         PlaceOrderRequest(symbol=EPIC, direction=Direction.BUY, size=size)
     )
-    # FILLED and not PENDING: the deal settled inside the confirm attempts the adapter
-    # allows. If this ever comes back PENDING the settlement budget is too tight for the
-    # real provider, which no mocked confirm can tell us.
+    # FILLED and not PENDING: the deal settled inside the confirm attempts the adapter allows.
+    # PENDING here would mean the settlement budget is too tight for the real provider.
     assert order.status is OrderStatus.FILLED, f"provider refused: {order.reason}"
     assert order.id
 
@@ -130,14 +112,8 @@ async def test_a_resting_order_is_listed_and_cancelled(adapter: CapitalAdapter) 
 async def test_an_order_the_provider_refuses_comes_back_rejected(
     adapter: CapitalAdapter,
 ) -> None:
-    """A size no demo balance covers.
-
-    There are two shapes of refusal and this is the harder one: the provider *accepts*
-    the request, hands back a ``dealReference``, and only the confirm says the deal was
-    refused. (The other — an outright error with no reference at all — is covered against
-    ``respx``.) So the claim here is that a rejection surviving as far as settlement still
-    arrives as REJECTED with a cause, rather than as a fill nobody has.
-    """
+    """A size no demo balance covers — the harder refusal shape: the provider accepts the request,
+    hands back a reference, and only the confirm says it was refused."""
     size, _ = await dealing(adapter)
 
     order = await adapter.place_order(
@@ -150,8 +126,7 @@ async def test_an_order_the_provider_refuses_comes_back_rejected(
     assert order.reason, "the provider refused without saying why"
     assert order.reference
 
-    # capital.com assigns a dealId even to a deal it refuses, so an id here proves
-    # nothing. What matters is that nothing opened: a rejection that quietly left a
-    # position behind is the failure this test is for.
+    # capital.com assigns a dealId even to a deal it refuses, so an id proves nothing. What
+    # matters is that nothing opened: a rejection that left a position behind is the failure.
     positions = await adapter.list_positions()
     assert all(p.id != order.id for p in positions)

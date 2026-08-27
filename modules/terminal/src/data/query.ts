@@ -2,20 +2,14 @@ import { QueryClient, useQuery, type QueryKey } from "@tanstack/react-query";
 import { useCallback } from "react";
 
 /**
- * The one client every read in the terminal goes through.
- *
- * It is passed to `useQuery` explicitly rather than hung on a `QueryClientProvider`,
- * and that is deliberate: the tests render views directly — `render(<InstrumentsView />)`
- * — so a provider would be a wrapper repeated in every test file, carrying no behaviour
- * of its own. `src/test/setup.ts` clears the cache between tests and turns retries off
- * there, which is the only thing a per-test client would have bought.
+ * Passed to `useQuery` explicitly rather than hung on a provider: the tests render views directly, so a provider
+ * would be a wrapper in every test file. `src/test/setup.ts` clears the cache and turns retries off there.
  */
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      // A back end that is not running is a normal state here (see `vite.config.ts`),
-      // and four backoffs of it hold the view in "loading" for seconds. One retry,
-      // quickly — enough to ride out a restart, short enough to report the truth.
+      // A back end that is not running is a normal state here (see `vite.config.ts`), and four backoffs hold
+      // the view in "loading" for seconds. One retry: enough to ride out a restart, short enough to be honest.
       retry: 1,
       retryDelay: 400,
       // The terminal polls what needs polling on its own interval; a tab regaining
@@ -48,23 +42,14 @@ export interface ReadOptions<T> {
   /** Set to re-ask on an interval. Absent means once, plus whatever `reload()` asks for. */
   pollMs?: number;
   enabled?: boolean;
-  /** What happens to an answer already on screen when a re-read fails.
-   *
-   *  `"keep"` — the default — reports the failure beside rows that are still worth
-   *  reading. `"forget"` drops them, and is for the reads where a stale answer taken
-   *  for a current one is itself the failure: the cost tab MUST NOT show numbers from
-   *  before an outage as current (`terminal-agent-cost` spec). */
+  /** `"keep"` reports the failure beside rows still worth reading. `"forget"` is for reads where a stale answer
+   *  taken for a current one is itself the failure — the cost tab MUST NOT show pre-outage numbers as current. */
   onFailure?: "keep" | "forget";
 }
 
 /**
- * A read of a back end, cached, deduplicated and retried by TanStack Query.
- *
- * `status` keeps "nothing there" apart from "nobody could be asked" — both are an empty
- * array, and only one means the operator has nothing set up. A failed re-read does not
- * blank what is already on screen: once an answer has arrived the status stays `ready`
- * and the failure is reported beside the rows, because slightly stale rows beat an error
- * where real data was.
+ * `status` keeps "nothing there" apart from "nobody could be asked" — both are an empty array, and only one means
+ * the operator has nothing set up. A failed re-read reports beside the rows rather than blanking them.
  */
 export function useRead<T>({
   key,

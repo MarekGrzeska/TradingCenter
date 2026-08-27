@@ -1,14 +1,5 @@
-"""What the tool surface reads, doubled — the seam that used to be an HTTP client.
-
-The tool tests moved here from a separate module, where they mocked `market-data` with
-`respx` and handed back JSON. There is no request to mock now, so the double sits one
-layer in: the four `reads` functions and the indicator service, which is exactly the set
-a tool can reach the archive through.
-
-Deliberately not a fake database. What these tests are about is the reduction, the
-ceilings and the sentences — given an archive answer, what does the model receive. The
-archive answering correctly is what `-m db` tests cover, against a real PostgreSQL.
-"""
+"""What the tool surface reads, doubled — the seam that used to be an HTTP client. Deliberately not a
+fake database: these tests are about the reduction, the ceilings and the sentences."""
 
 from __future__ import annotations
 
@@ -87,12 +78,8 @@ def tracked(
 
 @dataclass
 class FakeArchive:
-    """Every answer the tools can get, set per test.
-
-    `series_by_call` exists for the two tools that read twice — `get_last_price` falls back
-    from the forming period to the newest settled candle, and `compute_indicators` reads
-    closes after computing. A single `series` would make those two indistinguishable.
-    """
+    """Every answer the tools can get, set per test. `series_by_call` exists for the two tools that read
+    twice; a single `series` would make those two indistinguishable."""
 
     series: Series = field(default_factory=lambda: Series(candles=[], derived=False, uncovered=[]))
     series_by_call: list[Series] | None = None
@@ -161,11 +148,8 @@ def forming(
     market_open: bool | None = None,
     symbol: str = "US100",
 ) -> Forming:
-    """What `read_forming` answers, in the four shapes it has.
-
-    A candle only when `close` is given: the three no-candle states are the interesting
-    half of this read, and building one for them would hide which state is under test.
-    """
+    """What `read_forming` answers, in the four shapes it has. A candle only when `close` is given: the
+    three no-candle states are the interesting half of this read."""
     built = None
     if close is not None:
         built = candle(

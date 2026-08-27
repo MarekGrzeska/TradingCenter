@@ -1,10 +1,5 @@
-"""Who may reach which surface.
-
-The record and its failure modes. A list with no test of its failure mode is a list nobody
-knows works, and here the failure mode that matters is not the obvious one: the tool caller
-*is* allowed to write — to the list of observations — so what the record has to keep it away
-from is deleting collected history, which nothing can undo.
-"""
+"""Who may reach which surface. The failure mode that matters here is not the obvious one: the tool caller
+*is* allowed to write, so what the record keeps it away from is deleting collected history."""
 
 from __future__ import annotations
 
@@ -48,9 +43,8 @@ async def guarded(app, pool, settings):
 
 class TestTheRecordItself:
     def test_every_published_rest_path_is_in_the_record(self, app) -> None:
-        """A route derived from the application could never disagree with it, and
-        disagreeing is the whole job: a new route stays unreachable until somebody decides
-        which surface it belongs to."""
+        """A route derived from the application could never disagree with it, and disagreeing is the whole
+        job: a new route stays unreachable until somebody decides which surface it belongs to."""
         published = set(app.openapi()["paths"])
         recorded = set(REST_PATHS) | OPEN_PATHS
         assert published <= recorded, (
@@ -76,9 +70,8 @@ class TestRefusals:
         assert (await guarded.get("/events")).status_code == 401
 
     async def test_the_tool_caller_cannot_delete_collected_history(self, guarded) -> None:
-        """The pair that matters in this module. The tool caller writes by design — it
-        starts and stops observations — so the boundary is not "may it write" but "may it
-        reach the one act nobody can undo"."""
+        """The pair that matters in this module. The tool caller writes by design, so the boundary is not
+        "may it write" but "may it reach the one act nobody can undo"."""
         response = await guarded.delete(
             "/events/e-1/history", headers=principal_header(WORKBENCH)
         )

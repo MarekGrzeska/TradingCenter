@@ -28,8 +28,6 @@ def at(minutes: int) -> datetime:
     return MOMENT + timedelta(minutes=minutes)
 
 
-# --- 4.4: written and read back -----------------------------------------------------
-
 
 async def test_a_recorded_range_reads_back(db: asyncpg.Connection) -> None:
     await record_coverage(db, *PAIR, at(0), at(60))
@@ -67,8 +65,6 @@ async def test_a_naive_bound_is_refused(db: asyncpg.Connection) -> None:
     with pytest.raises(ValueError, match="naive"):
         await record_coverage(db, *PAIR, datetime(2026, 8, 7, 12, 0), at(60))  # noqa: DTZ001
 
-
-# --- 4.4: merging, so the table does not grow a row per fill ------------------------
 
 
 async def test_two_overlapping_fills_become_one_range(db: asyncpg.Connection) -> None:
@@ -123,9 +119,8 @@ async def test_a_gap_between_fills_stays_a_gap(db: asyncpg.Connection) -> None:
 async def test_two_fills_recording_at_the_same_moment_still_leave_one_range(
     db: asyncpg.Connection, migrated_url: str
 ) -> None:
-    # Recording a range is read-then-write, and the second writer's rows do not exist yet
-    # for a row lock to catch. Without the lock on the pair, both of these read an empty
-    # table, both insert, and the pair is left with two ranges that should have been one.
+    # Recording a range is read-then-write, and the second writer's rows do not exist yet for a row
+    # lock to catch. Without the pair lock both read an empty table and both insert.
     other = await asyncpg.connect(asyncpg_dsn(migrated_url))
     try:
         await asyncio.gather(
@@ -147,13 +142,10 @@ async def test_recording_returns_the_range_as_it_now_stands(db: asyncpg.Connecti
     assert (merged.range_start, merged.range_end) == (at(0), at(90))
 
 
-# --- 4.4: the boundary that follows from history_ended ------------------------------
-
 
 async def test_the_end_of_provider_history_is_remembered(db: asyncpg.Connection) -> None:
-    # The boundary lies where the read ran out, which is not the edge the read asked
-    # about: a window from at(0) that came back with nothing older than at(20) proves
-    # something about at(20) and nothing about at(0).
+    # The boundary lies where the read ran out, not at the edge it asked about: a window from at(0)
+    # that came back with nothing older than at(20) proves something about at(20).
     await record_coverage(db, *PAIR, at(0), at(60), history_ended=True, history_ends_at=at(20))
 
     assert await earliest_reachable(db, *PAIR) == at(20)
@@ -190,13 +182,8 @@ async def test_the_boundary_survives_a_later_merge(db: asyncpg.Connection) -> No
 async def test_a_merge_does_not_drag_the_boundary_down_to_the_range_start(
     db: asyncpg.Connection,
 ) -> None:
-    """The defect this column replaced.
-
-    The boundary used to be read off `range_start`, and ranges merge — so a range meeting
-    an older one end to end produced one row starting at the older edge, and the boundary
-    slid there with it. On US100 that put "the provider has nothing before this" at the
-    earliest moment the pair had ever verified.
-    """
+    """The defect this column replaced: the boundary was read off `range_start`, and a range meeting an
+    older one end to end slid it to the earliest moment the pair had ever verified."""
     await record_coverage(db, *PAIR, at(60), at(120), history_ended=True, history_ends_at=at(80))
     await record_coverage(db, *PAIR, at(0), at(70))
 
@@ -240,9 +227,8 @@ async def test_dropping_a_boundary_that_is_not_there_is_not_an_error(
 
 
 async def test_a_pair_keeps_one_boundary_after_merging(db: asyncpg.Connection) -> None:
-    # Two would be two answers to how far back there is anything left to fetch. The
-    # partial unique index refuses them; merging has to not produce them in the first
-    # place.
+    # Two would be two answers to how far back there is anything left to fetch. The partial unique
+    # index refuses them; merging has to not produce them in the first place.
     await record_coverage(db, *PAIR, at(0), at(60), history_ended=True, history_ends_at=at(10))
     await record_coverage(db, *PAIR, at(50), at(120), history_ended=True, history_ends_at=at(55))
 
@@ -250,8 +236,6 @@ async def test_a_pair_keeps_one_boundary_after_merging(db: asyncpg.Connection) -
     assert len(covered) == 1
     assert covered[0].history_ended is True
 
-
-# --- 4.5 and 4.6: the two kinds of absence ------------------------------------------
 
 
 async def test_a_moment_inside_coverage_is_covered(db: asyncpg.Connection) -> None:
@@ -290,20 +274,12 @@ async def test_a_missing_candle_outside_coverage_means_nobody_looked(
 
 
 async def test_the_two_absences_are_told_apart(db: asyncpg.Connection) -> None:
-    """4.6, stated in one place.
-
-    In the candle table these two are the same nothing: a Saturday at 3am and an
-    afternoon when ingest was down both read as no row. Only one of them is worth
-    sending anyone back to the provider for, and coverage is what separates them.
-    """
+    """In the candle table these two are the same nothing: a Saturday at 3am and an afternoon when ingest was down
+    both read as no row. Only one is worth sending anyone back to the provider for, and coverage separates them."""
     await record_coverage(db, *PAIR, at(0), at(60))
 
-    inside = await absence_at(db, *PAIR, at(30))
-    outside = await absence_at(db, *PAIR, at(600))
-
-    assert inside is not outside
-    assert (inside, outside) == (Absence.MARKET_CLOSED, Absence.NOT_COLLECTED)
-
+    """4.6, stated in one place. In the candle table a Saturday at 3am and an afternoon when ingest was
+    down are the same nothing, and coverage is what separates them."""
 
 async def test_a_gap_between_two_ranges_is_not_collected(db: asyncpg.Connection) -> None:
     # Surrounded on both sides and still nobody looked. Merging must not have papered

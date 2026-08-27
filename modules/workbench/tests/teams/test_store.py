@@ -1,9 +1,5 @@
-"""The catalogue's queries against a real PostgreSQL — `store/catalogue.py`.
-
-Against the container rather than a fake: what is under test here is append-only-ness,
-the owner filter and what survives retiring a team, and all three are properties of the
-statements themselves.
-"""
+"""The catalogue's queries against a real PostgreSQL. Against the container rather than a fake: what is
+under test is append-only-ness, the owner filter and what survives retiring a team."""
 
 from __future__ import annotations
 
@@ -124,9 +120,8 @@ async def test_retiring_a_team_takes_it_off_the_catalogue_and_leaves_its_runs(
 ) -> None:
     # specs/teams-catalogue, "Zespół wycofany z katalogu nie zabiera ze sobą przebiegów".
     team, revision = await _team(db)
-    # `finished_at` in the same statement as `status`: `runs_status_fields_match` refuses
-    # a completed run without one, so a row written any other way is a shape only this
-    # test could produce.
+    # `finished_at` in the same statement as `status`: the CHECK refuses a completed run without one, so a
+    # row written any other way is a shape only this test could produce.
     run_id = await db.fetchval(
         "INSERT INTO runs (team_revision_id, owner_principal, status, finished_at) "
         "VALUES ($1, $2, 'completed', now()) RETURNING id",

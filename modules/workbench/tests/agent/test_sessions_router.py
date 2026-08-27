@@ -1,8 +1,5 @@
-"""HTTP-level wiring for the session routes and their SSE stream.
-
-The provider is swapped for a scripted fake after the app's own lifespan has already
-built a real pool against the throwaway database — nothing here calls OpenAI.
-"""
+"""HTTP-level wiring for the session routes and their SSE stream. The provider is swapped for a scripted
+fake after the app's own lifespan has built a real pool — nothing here calls OpenAI."""
 
 from __future__ import annotations
 
@@ -52,9 +49,8 @@ class _FakeProvider:
 
 
 class _BlockingProvider:
-    """Yields its first chunk, then waits to be let go — long enough for another request
-    to reach the stop route while this turn is genuinely in flight. `started` says the
-    turn is inside the provider; `release` lets it produce the rest."""
+    """Yields its first chunk, then waits to be let go — long enough for another request to reach the stop
+    route while this turn is genuinely in flight."""
 
     def __init__(self, chunks: list) -> None:
         self._chunks = chunks
@@ -107,9 +103,8 @@ def test_a_session_with_no_messages_is_not_listed() -> None:
 
 
 def test_a_foreign_or_missing_session_reads_the_same_404() -> None:
-    # specs/agent-browser-access, "Odmowa dostępu do cudzej sesji MUST być
-    # nieodróżnialna od odpowiedzi o sesji nieistniejącej" — this suite only has one
-    # principal, so a session id that was never created stands in for "someone else's".
+    # A stranger's session must be indistinguishable from one that never existed, and this suite has one
+    # principal, so an id that was never created stands in for "someone else's".
     with TestClient(app) as client:
         response = client.get("/sessions/999999")
     assert response.status_code == 404
@@ -158,8 +153,6 @@ def test_changing_to_an_unknown_model_is_refused() -> None:
         response = client.patch(f"/sessions/{session_id}", json={"model_id": "not-a-real-model"})
     assert response.status_code == 422
 
-
-# --- renaming ---
 
 
 def test_renaming_a_session_replaces_the_derived_title() -> None:
@@ -216,8 +209,6 @@ def test_model_and_title_can_change_in_one_request() -> None:
     assert response.json()["title"] == "both"
 
 
-# --- deleting ---
-
 
 def test_a_deleted_session_leaves_the_list_and_reads_as_missing() -> None:
     with TestClient(app) as client:
@@ -268,9 +259,7 @@ def test_deleting_a_session_does_not_reduce_the_bill() -> None:
 def test_required_authentication_refuses_before_touching_the_model(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # specs/agent-browser-access, "Moduł nie bierze na wiarę warstwy przed sobą" — the
-    # refusal must land before the model is ever called, not merely before the reply
-    # finishes.
+    # The refusal must land before the model is ever called, not merely before the reply finishes.
     with TestClient(app) as client:
         session_id = client.post("/sessions", json={}).json()["id"]
 
@@ -289,9 +278,8 @@ def test_required_authentication_refuses_before_touching_the_model(
 
 
 class _ScriptedProvider:
-    """One entry per model call, unlike `_FakeProvider`'s single reusable script — a turn
-    that asks for a tool calls the model more than once, and a script that repeated itself
-    would ask for the same tool forever."""
+    """One entry per model call, unlike `_FakeProvider`'s single reusable script — a turn that asks for a
+    tool calls the model more than once, and a repeating script would ask for the same tool forever."""
 
     def __init__(self, script: list[list]) -> None:
         self._script = script
@@ -305,9 +293,8 @@ class _ScriptedProvider:
 
 
 class _FakeToolServer:
-    """Both methods take the operator's token, because the real registry does and the
-    turn forwards it. A fake that could not accept it made the turn task raise, which the
-    stream then waited on forever — a hang rather than a failed assertion."""
+    """Both methods take the operator's token, because the real registry does. A fake that could not accept
+    it made the turn task raise, which the stream then waited on forever."""
 
     def __init__(self, outcomes: dict[str, ToolOutcome] | None = None) -> None:
         self._outcomes = outcomes or {}
@@ -430,9 +417,8 @@ def test_unclaimed_tool_calls_are_empty_for_a_turn_that_reached_its_reply() -> N
 
 
 def test_an_order_that_outlived_its_turn_reaches_the_wire() -> None:
-    """specs/agent-trading — the row survives a turn that never reached a reply, and the
-    operator can read it. Published in the same shape as every other call, so a panel needs
-    one branch rather than a second renderer."""
+    """The row survives a turn that never reached a reply, and the operator can read it. Published in the
+    same shape as every other call, so a panel needs one branch rather than a second renderer."""
 
     class _DyingTradingServer(_FakeToolServer):
         def moves_the_account(self, name: str) -> bool:
@@ -503,8 +489,6 @@ def test_a_broken_stream_reports_error_and_saves_the_partial_reply() -> None:
     assert messages[-1]["incomplete"] is True
 
 
-# --- what the terminal is drawing as it asks -----------------------------------------
-
 
 def test_a_turn_carrying_a_chart_snapshot_hands_it_to_the_model() -> None:
     # specs/agent-chat, "Tura wie, co terminal właśnie rysuje"
@@ -544,9 +528,8 @@ def test_a_turn_without_a_snapshot_runs_the_prompt_untouched() -> None:
 
 
 def test_a_turn_that_dies_before_it_can_report_closes_the_stream() -> None:
-    """A turn raising before `run_turn`'s own guard used to leave the stream waiting on
-    an event that never came — a hang held open by keep-alives, not an error. Found when
-    a tool-server stub had the wrong signature; the defect was older than that."""
+    """A turn raising before `run_turn`'s own guard used to leave the stream waiting on an event that never
+    came — a hang held open by keep-alives, not an error."""
 
     class _BrokenToolServer:
         async def list_tools(self, operator_principal: str | None = None):
@@ -595,9 +578,8 @@ def test_stopping_a_turn_ends_the_stream_and_marks_the_reply() -> None:
         messages = client.get(f"/sessions/{session_id}/messages").json()
 
     assert stopped.status_code == 204
-    # The fragment already in flight when the click landed is kept and forwarded — the
-    # boundary is between one chunk and the next, and text that was generated and billed
-    # is not thrown away for being late (design.md, D3).
+    # The fragment already in flight when the click landed is kept and forwarded: the boundary is between
+    # one chunk and the next, and text that was generated and billed is not thrown away for being late.
     assert [kind for kind, _ in events] == ["fragment", "fragment", "stopped"]
     assert messages[-1]["content"] == "half an answer"
     assert messages[-1]["stopped"] is True

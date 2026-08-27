@@ -34,12 +34,8 @@ export interface GridStore {
   /** Consumed once applied — or once given up on. A request nobody clears would replay
    *  itself on the next unrelated re-render. */
   clearFocusRequest(slot: SlotId): void;
-  /** What a slot's chart last reported as visible — written by `Chart`'s own
-   *  `onVisibleRangeChange` on every pan and zoom, read only when a turn is about to ask
-   *  a question. No subscription at all, unlike the focus request above: nothing needs
-   *  to react to this changing, only to read whatever it last held (design.md, "kadr
-   *  reaktywny, widok nie") — a `subscribe` nobody calls is a `subscribe` that does not
-   *  belong here. */
+  /** Written by `Chart`'s `onVisibleRangeChange` on every pan, read only when a turn is about to ask a question.
+   *  No subscription, unlike the focus request: nothing reacts to this changing (design.md, "kadr reaktywny…"). */
   getVisibleRange(slot: SlotId): VisibleTimeRange | null;
   setVisibleRange(slot: SlotId, range: VisibleTimeRange | null): void;
 }

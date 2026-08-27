@@ -1,20 +1,5 @@
-"""What can be asked for, and how to compute it — one entry per indicator.
-
-An entry is the whole contract between this module and everyone reading `GET
-/indicators`: id, parameters, the shape it answers in, how to draw it, and the function
-that produces it. A consumer never needs to know an indicator by name to offer it — it
-reads this list (`market-data-indicators` spec, "Katalog wystarcza do zbudowania
-wybieraka").
-
-A package rather than one file, and the split is by group, not by output shape: adding
-another oscillator touches `oscillators.py` and nothing else — not this file, not
-`spec.py`, not the router, not the terminal. `spec.py` holds the entry shape, every other
-module holds entries of it, and this one only orders them.
-
-Kept separate from `kernel.py` on purpose: these modules know about parameters, defaults
-and render hints, which are publishing concerns the kernel has no business with. They
-stay free of FastAPI and asyncpg too, same as the kernel.
-"""
+"""What can be asked for, and how to compute it — one entry per indicator, which is the whole
+contract with `GET /indicators`. Split by group, so another oscillator touches one file."""
 
 from __future__ import annotations
 
@@ -58,16 +43,12 @@ from .structure import STRUCTURE
 from .volatility import VOLATILITY
 from .zones import ZONES
 
-# Bumped whenever a formula in this package changes — never when an entry is only added.
-# Carried in the catalogue and in every computed response (`market-data-indicators` spec,
-# "Zmiana wzoru jest widoczna w odpowiedzi").
+# Bumped whenever a formula in this package changes — never when an entry is only added. Carried
+# in the catalogue and in every computed response.
 ALGORITHM_VERSION = 1
 
-# Ordered as it is meant to be offered — averages first, since `sma` and `ema` are the
-# entries every future indicator in that group will sit beside. Group order is the whole
-# reason this tuple is written out rather than collected by walking the package: the
-# picker lists entries in exactly this order, and a directory listing is not an order
-# anyone chose.
+# Ordered as it is meant to be offered, which is why it is written out rather than collected by
+# walking the package: the picker lists entries in this order, and a directory listing is not one.
 CATALOGUE: tuple[IndicatorSpec, ...] = (
     *AVERAGES,
     *VOLATILITY,

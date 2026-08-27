@@ -1,8 +1,5 @@
-"""One copy of what all three MCP modules' `client.py` carried before 18 August 2026.
-
-Was tested only indirectly, through each module's own upstream client — this is the first
-place it is tested as itself.
-"""
+"""One copy of what all three MCP modules' `client.py` carried before 18 August 2026, tested here as
+itself rather than indirectly through each module's own upstream client."""
 
 from __future__ import annotations
 

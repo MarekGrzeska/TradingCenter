@@ -73,9 +73,8 @@ class TestOnePass:
 
 class TestWhenItCannotSee:
     async def test_an_unreachable_archive_is_recorded_rather_than_swallowed(self, pool) -> None:
-        """A strategy that could not see is not a strategy that saw nothing. The operator's
-        question three weeks later is "why did nothing happen", and silence is the one
-        answer that cannot be given."""
+        """A strategy that could not see is not a strategy that saw nothing. The operator's question three weeks later
+        is "why did nothing happen", and silence is the one answer that cannot be given."""
         watch = await a_watch(pool)
         # The bar can be had; the facts cannot — so there is a bar to record against.
         archive = FakeArchive(
@@ -132,8 +131,7 @@ class TestWhenItCannotSee:
 
 class TestEveryWatch:
     async def test_watches_are_independent(self, pool) -> None:
-        """One strategy raising must not stop the others: they are independent by
-        construction, and a platform that stops watching everything because one entry
+        """One strategy raising must not stop the others: a platform that stops watching everything because one entry
         failed fails in the least useful way."""
         await a_watch(pool, symbol="US100")
         await a_watch(pool, strategy_id="a_strategy_that_left", symbol="EURUSD")

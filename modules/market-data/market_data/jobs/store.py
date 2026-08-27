@@ -1,9 +1,5 @@
-"""The only door to `collection_jobs` and `collection_job_chunks`.
-
-Nothing here decides what a chunk's window should be — that is `plan.py` — or runs a
-fetch — that is `runner.py`. This module only ever moves a job or a chunk between the
-states `models.py` defines, and reads them back.
-"""
+"""The only door to `collection_jobs` and `collection_job_chunks`. Nothing here decides what a chunk
+covers or runs a fetch; it only moves a job or chunk between the states `models.py` defines."""
 
 from __future__ import annotations
 
@@ -62,9 +58,8 @@ _SELECT_CHUNKS_FOR_JOB = """
      ORDER BY id
 """
 
-# Every job that has at least one chunk on the requested pair — or every job there is,
-# when neither filter is given. Newest job first, matching how an operator reads a list:
-# the thing that just happened belongs at the top.
+# Every job with at least one chunk on the requested pair, or every job when neither filter is
+# given. Newest first, matching how an operator reads a list.
 _SELECT_MATCHING_JOB_IDS = """
     SELECT DISTINCT j.id, j.created_at
       FROM collection_jobs j
@@ -108,10 +103,8 @@ _MARK_FAILED = """
      WHERE id = $1
 """
 
-# Every chunk of a pair, across every job, still pending — not `running`, which a worker
-# already claimed and `execute_chunk`'s own tracked-pair check is what stops from
-# writing (`market-data-tracking` spec, "Kawałek nigdy nie zapisuje dla pary, której
-# nikt nie zbiera").
+# Every chunk of a pair still pending — not `running`, which a worker already claimed and
+# `execute_chunk`'s own tracked-pair check is what stops from writing.
 _SKIP_PENDING_FOR_PAIR = """
     UPDATE collection_job_chunks
        SET state = 'skipped', finished_at = now()
@@ -119,9 +112,8 @@ _SKIP_PENDING_FOR_PAIR = """
     RETURNING id
 """
 
-# Every chunk of this job, for this pair, that is still pending and lies entirely at or
-# before the boundary just discovered. `chunk_end <= boundary` is deliberately not
-# `<`: a chunk touching the boundary exactly has nothing on its far side either.
+# Every pending chunk of this job and pair lying at or before the boundary just discovered.
+# `chunk_end <= boundary` deliberately, not `<`: one touching it exactly has nothing beyond either.
 _SKIP_BEYOND_HISTORY = """
     UPDATE collection_job_chunks
        SET state = 'skipped', finished_at = now()
@@ -141,10 +133,8 @@ _BUMP_JOB_ATTEMPT = """
     UPDATE collection_jobs SET attempt = attempt + 1 WHERE id = $1 RETURNING attempt
 """
 
-# `FOR UPDATE` on both, and that is the whole race. `_CLAIM_PENDING_CHUNK` claims with
-# `FOR UPDATE SKIP LOCKED`, so a chunk this transaction holds is one the runner skips
-# rather than claims — without the lock, "nothing is open here" can be true when it is
-# read and false by the time the delete lands, leaving a running chunk whose job is gone.
+# `FOR UPDATE` on both, and that is the whole race: without it "nothing is open here" can be true
+# when read and false by the time the delete lands, leaving a running chunk whose job is gone.
 _LOCK_JOB = """
     SELECT id FROM collection_jobs WHERE id = $1 FOR UPDATE
 """
@@ -153,9 +143,8 @@ _LOCK_CHUNK_STATES = """
     SELECT state FROM collection_job_chunks WHERE job_id = $1 FOR UPDATE
 """
 
-# No `ON DELETE CASCADE` on the chunks' foreign key (`0005_collection_jobs`), on purpose:
-# this is the only place allowed to remove a chunk, and a cascade would put that fact in
-# a migration nobody reads instead of here, beside the rest of these two tables' SQL.
+# No `ON DELETE CASCADE` on the chunks' foreign key, on purpose: this is the only place allowed to
+# remove a chunk, and a cascade would put that fact in a migration nobody reads.
 _DELETE_CHUNKS_FOR_JOB = """
     DELETE FROM collection_job_chunks WHERE job_id = $1
 """
@@ -194,12 +183,8 @@ def _chunk(row: asyncpg.Record) -> Chunk:
 async def create_job(
     conn: asyncpg.Connection, requested_from: datetime, plans: list[ChunkPlan]
 ) -> Job:
-    """Record a job and the chunks it was planned into, as one write.
-
-    `plans` may be empty — every pair in the decision was already fully covered — and
-    the job is still created, so the operator's decision has a record even when there
-    was nothing left to fetch for it.
-    """
+    """Record a job and the chunks it was planned into, as one write. `plans` may be empty and the job
+    is still created, so an operator's decision has a record even with nothing left to fetch."""
     async with conn.transaction():
         row = await fetch_one(conn, _INSERT_JOB, requested_from)
         job_id = row["id"]
@@ -243,13 +228,8 @@ async def list_jobs(
     symbol: str | None = None,
     resolution: Resolution | None = None,
 ) -> list[JobPairView]:
-    """Every job, narrowed to one row per pair it touched, newest job first.
-
-    Filtering by pair does not hide a job's other pairs from existing — it only decides
-    which jobs are worth returning at all. A row for a filtered-in job still carries only
-    the chunks of the pair asked about, never chunks belonging to another pair the same
-    job also covered; `read_job` is what shows a job whole.
-    """
+    """Every job, narrowed to one row per pair it touched, newest first. A filtered-in job's row still
+    carries only that pair's chunks; `read_job` is what shows a job whole."""
     ids = await conn.fetch(
         _SELECT_MATCHING_JOB_IDS, symbol, resolution.value if resolution else None
     )
@@ -268,24 +248,15 @@ async def list_jobs(
 
 
 async def interrupt_orphaned_chunks(conn: asyncpg.Connection) -> int:
-    """Flip every chunk left `pending` or `running` to `interrupted`.
-
-    Called once at startup, before anything else touches the job tables. No runner
-    survives a restart, so any chunk not yet settled at this moment was left mid-flight
-    or waiting in line behind one — either way, nothing in this process is working it,
-    and reporting it as still running would be a lie the next 30-second poll repeats.
-    """
+    """Flip every chunk left `pending` or `running` to `interrupted`, once at startup. No runner
+    survives a restart, so reporting one as running would be a lie the next poll repeats."""
     rows = await conn.fetch(_INTERRUPT_OPEN_CHUNKS)
     return len(rows)
 
 
 async def claim_pending_chunk(conn: asyncpg.Connection) -> Chunk | None:
-    """Take the oldest pending chunk across every job, and mark it running.
-
-    `FOR UPDATE SKIP LOCKED` is what lets more than one worker call this at once without
-    two of them claiming the same chunk — the second simply skips the row the first is
-    holding and finds the next.
-    """
+    """Take the oldest pending chunk across every job, and mark it running. `FOR UPDATE SKIP LOCKED`
+    is what lets more than one worker call this without two claiming the same chunk."""
     row = await conn.fetchrow(_CLAIM_PENDING_CHUNK)
     return _chunk(row) if row else None
 
@@ -311,11 +282,8 @@ async def finish_chunk_failed(
 async def skip_pending_chunks_for_pair(
     conn: asyncpg.Connection, symbol: str, resolution: Resolution
 ) -> int:
-    """Every not-yet-claimed chunk of a pair, across every job it belongs to, settled as
-    skipped rather than run. Called right before deleting a pair's data, so nothing
-    claims new work for a pair whose data is about to disappear. Returns how many were
-    skipped.
-    """
+    """Every not-yet-claimed chunk of a pair settled as skipped rather than run, right before deleting
+    that pair's data. Returns how many were skipped."""
     rows = await conn.fetch(_SKIP_PENDING_FOR_PAIR, symbol, resolution.value)
     return len(rows)
 
@@ -327,29 +295,15 @@ async def skip_chunks_beyond_history(
     resolution: Resolution,
     boundary: datetime,
 ) -> int:
-    """Once one chunk discovers the provider's own boundary, every chunk still queued
-    behind it — by construction older, by construction past that boundary, since chunks
-    run newest-first (`plan.py`, `split_into_windows`) — is skipped without ever being
-    claimed. Returns how many were skipped.
-    """
+    """Once one chunk discovers the provider's boundary, every chunk still queued behind it is older
+    by construction and skipped without being claimed. Returns how many."""
     rows = await conn.fetch(_SKIP_BEYOND_HISTORY, job_id, symbol, resolution.value, boundary)
     return len(rows)
 
 
 async def delete_job(conn: asyncpg.Connection, job_id: int) -> None:
-    """Remove a job and its chunks from the history, leaving every candle alone.
-
-    Deleting the record of work does not undo the work: the candles this job wrote, and
-    the coverage that follows from them, stay exactly as they are (`market-data-jobs`
-    spec, "Wpis historii zlecenia da się usunąć"). Removing data is
-    `deletion.delete_pair_data`, which is a different operation and the one that leaves
-    a trace of itself.
-
-    Raises `UnknownJob` for an id nobody created and `JobStillRunning` while any chunk is
-    `pending` or `running`. `pending` counts the same as `running` — it is a chunk the
-    runner will claim in a moment, and its result would be written against a job that no
-    longer exists.
-    """
+    """Remove a job and its chunks from the history, leaving every candle alone — deleting the record
+    of work does not undo it. `pending` blocks it like `running`: the runner will claim it in a moment."""
     async with conn.transaction():
         if await conn.fetchrow(_LOCK_JOB, job_id) is None:
             raise UnknownJob(f"no collection job with id {job_id}")
@@ -366,12 +320,8 @@ async def delete_job(conn: asyncpg.Connection, job_id: int) -> None:
 
 
 async def retry_job(conn: asyncpg.Connection, job_id: int) -> Job:
-    """Reset every failed or interrupted chunk of a job to `pending`, on a new attempt.
-
-    Raises `UnknownJob` for an id nobody created, and `NothingToRetry` for a job with
-    nothing to retry — succeeding outright, or still running. Both are refusals an
-    operator can read the reason for; neither leaves the job touched.
-    """
+    """Reset every failed or interrupted chunk of a job to `pending`, on a new attempt. Refuses an
+    unknown id and a job with nothing to retry, and leaves the job untouched either way."""
     job = await read_job(conn, job_id)
     if job is None:
         raise UnknownJob(f"no collection job with id {job_id}")

@@ -1,9 +1,5 @@
-"""How much of the read range's own time each price bucket held.
-
-A TPO reading, not a volume profile: this archive's volume is not reliably populated for
-a CFD provider, so the weight is time (`market-data-indicators` spec, "Profil czasowy
-liczy udział czasu, nie wolumenu").
-"""
+"""How much of the read range's own time each price bucket held. A TPO reading, not a volume
+profile: this archive's volume is not reliably populated for a CFD provider, so the weight is time."""
 
 from __future__ import annotations
 
@@ -19,20 +15,8 @@ from .spec import IndicatorSpec, Param, ProfileLevel, Render, Series, TimeProfil
 def _time_profile_levels(
     s: Series, times: Sequence[datetime], p: Mapping[str, float]
 ) -> list[ProfileLevel]:
-    """Buckets each minute bar by its typical price `(H+L+C)/3` into a bucket
-    `bucket_atr` fractions of ATR wide — resolving design.md's open question in
-    favour of an ATR fraction, the same unit `level_clusters`' tolerance
-    already uses, over a fixed multiple of the instrument's own tick step this
-    module has no per-instrument table for. One bar, one bucket: splitting a
-    bar's own high-low range across every bucket it touches is a legitimate
-    reading too, but this one is the one a hand recount of a small sample can
-    actually check (task 5.5), which a fractional split cannot promise.
-
-    The point of control is the single busiest bucket; the value area expands
-    outward from it, always into whichever open neighbour currently holds
-    more, until it covers `value_area_pct` of the bars read — the standard
-    TPO rule, weighed by bar count in place of traded size.
-    """
+    """Buckets each minute bar by its typical price into a bucket `bucket_atr` fractions of ATR wide.
+    One bar, one bucket: a fractional split across every bucket a bar touches cannot be hand-checked."""
     n = len(s)
     if n == 0:
         return []

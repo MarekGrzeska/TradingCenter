@@ -1,30 +1,5 @@
-"""What a team learned, kept where the next run can read it.
-
-Beside the revision rather than inside it, for the same reason `team_layouts` is
-(migration 0004) and one more. The shared reason: a definition is immutable once saved
-and is what a run points at, so a note written into that JSONB would mint a revision per
-note. The extra one is the whole point of the feature — two runs of the same revision are
-comparable *because* the revision did not move between them, and a team that learns by
-minting revisions can never be run twice on the same one.
-
-Keyed by team, so the memory outlives both the run that wrote it and the revision that
-was current at the time (specs/teams-memory, "Pamięć należy do zespołu i przeżywa
-przebieg"). The owner is reached by joining `teams`, which is what keeps the owner filter
-inside every statement rather than in a route that could forget it.
-
-`author_agent_key` and `run_id` are legibility, never permission: nothing decides who may
-read an entry from either of them. `run_id` is nullable and `ON DELETE SET NULL` — an
-entry that outlives its run is still true, and the column leaves room for an entry the
-operator writes by hand, which this change does not add.
-
-Rows are never updated. A correction is the next entry (specs/teams-memory, "Wpis raz
-zapisany się nie zmienia"), so a run's trace read a week later matches the memory the team
-actually had, not the memory it has now. Only the operator deletes, one entry at a time,
-through a route — no tool handed to an agent removes anything.
-
-The length ceiling is stated here as well as in the module because it is the only one of
-the three whose breach would land on disk. `MEMORY_ENTRY_MAX_CHARS` in `teams/contract.py`
-is the same number, and a test fails when the two drift apart.
+"""What a team learned, kept beside the revision rather than inside it: a note in that immutable blob would mint a
+revision per note. Rows are never updated, so a trace read a week later matches the memory the team actually had.
 
 Revision ID: 0008
 Revises: 0007

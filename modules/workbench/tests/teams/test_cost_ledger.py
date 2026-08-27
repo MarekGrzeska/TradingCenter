@@ -22,9 +22,8 @@ pytestmark = pytest.mark.db
 
 OWNER = "operator-1"
 
-# With the catalogue below (1 per 1M in, 6 per 1M out) a 100/20-token call costs
-# 0.0001 + 0.00012 = 0.00022. Every limit in this file is written against that number
-# rather than a round one, so a test that fails says which call went through.
+# With the catalogue below a 100/20-token call costs 0.00022. Every limit in this file is written against
+# that number rather than a round one, so a test that fails says which call went through.
 ONE_CALL = Decimal("0.00022")
 
 

@@ -1,13 +1,5 @@
-"""One FastMCP instance, mounted at `/mcp` in this module's own application.
-
-The same shape as `market-data`'s, down to the two production failures that shaped it — a
-mounted transport whose path doubles, and a mounted lifespan that never runs. Both are
-written out below rather than inherited silently, because a module that copies the fix
-without the reason loses it at the next edit.
-
-`/health` is left to `routers/meta.py`: the platform's probe reaches this application, not
-this route.
-"""
+"""One FastMCP instance, mounted at `/mcp` in this module's own application — the same shape as
+`market-data`'s, down to the two production failures that shaped it, written out rather than inherited."""
 
 from __future__ import annotations
 
@@ -36,39 +28,23 @@ def build_server(app) -> FastMCP:
     mcp = FastMCP(
         "polymarket-data",
         instructions=INSTRUCTIONS,
-        # Off, explicitly. FastMCP turns DNS-rebinding protection on whenever its `host` is
-        # a loopback one, which it is by default, and then answers `421 Invalid Host header`
-        # to every request not addressed to localhost — which, mounted inside this module,
-        # is every request there is. The protection guards a server a browser can reach
-        # without credentials; this one is behind Easy Auth and this module's own caller
-        # record, and a page cannot mint an Entra token for it.
+        # Off, explicitly: FastMCP turns DNS-rebinding protection on for a loopback host and then
+        # answers 421 to every request. Behind Easy Auth a page cannot mint a token, so it buys nothing.
         transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
     )
 
     tools.register(mcp, ToolContext(app=app))
 
-    # Every tool's schema, minus what pydantic writes for its own sake: field titles
-    # repeating field names, an `anyOf` of bare types where a type list says the same, and
-    # defaults on a reply nobody constructs. The whole set is read by the model in every
-    # turn of a conversation, and this is the third such set in the system.
+    # Every tool's schema, minus what pydantic writes for its own sake. The whole set is read by the
+    # model in every turn of a conversation, and this is the third such set in the system.
     slim_tool_schemas(mcp)
 
     return mcp
 
 
 def build_mcp_app(app) -> tuple[FastMCP, ASGIApp]:
-    """The streamable-http transport and the server behind it, to be mounted under `/mcp`.
-
-    Both, because mounting one is not enough:
-
-    * **The path.** `streamable_http_app()` puts its endpoint at
-      `settings.streamable_http_path`, `/mcp` by default. Mounted under `/mcp` that becomes
-      `/mcp/mcp`, and every caller's configured address answers `307` into a `404`. Set to
-      `/` here, so the mount decides the address and nothing else does.
-    * **The lifespan.** The Starlette app returned carries a lifespan that starts the
-      session manager's task group, and a mounted application's lifespan is never run. So
-      the caller gets the server too and runs `session_manager.run()` in its own lifespan.
-    """
+    """The streamable-http transport and the server behind it, to be mounted under `/mcp`. Both, because
+    the path becomes `/mcp/mcp` unset, and a mounted app's lifespan never runs to start its task group."""
     mcp = build_server(app)
     mcp.settings.streamable_http_path = "/"
     return mcp, mcp.streamable_http_app()
@@ -78,23 +54,15 @@ MOUNT_PATH = "/mcp"
 
 
 def tool_surface_session(app) -> AbstractAsyncContextManager:
-    """The session manager's lifetime, held open for as long as the app serves.
-
-    `nullcontext` when nothing was mounted: the suites that drive the lifespan build their
-    own applications, and one without a tool surface has nothing to start.
-    """
+    """The session manager's lifetime, held open for as long as the app serves. `nullcontext` when
+    nothing was mounted: a suite's own application without a tool surface has nothing to start."""
     mcp = getattr(app.state, "mcp_server", None)
     return nullcontext() if mcp is None else mcp.session_manager.run()
 
 
 class ToolSurfaceAddress:
-    """Makes `/mcp` and `/mcp/` the same address, in front of routing.
-
-    A mount matches `/mcp/...`; a request to `/mcp` itself matches nothing and Starlette
-    answers `307` to `/mcp/`. An MCP client posts to the address it was configured with and
-    does not follow a redirect on a POST, so that 307 is a dead end — and `/mcp` is the
-    address this module publishes.
-    """
+    """Makes `/mcp` and `/mcp/` the same address, in front of routing. Starlette answers `/mcp` with a
+    307 to `/mcp/`, and an MCP client does not follow a redirect on a POST."""
 
     def __init__(self, app: ASGIApp) -> None:
         self._app = app

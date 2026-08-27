@@ -1,15 +1,5 @@
-"""Reaching back for what the archive does not have.
-
-Two rules shape this. The gateway pages past the provider's thousand-candle ceiling and
-owns the rate gate, so there is no paging here — one request per fill, however deep. And
-a deep fill is dozens of provider calls behind that one request, so fills run under a
-budget: two of them together are enough to starve the chart an operator is looking at
-right now, and that operator's reads go through the same ten-requests-a-second gate.
-
-The other half of the job is knowing when *not* to ask. An archive that refetches the
-same closed weekend every night is worse than one that is merely behind, because it
-spends the budget that would have closed a real gap.
-"""
+"""Reaching back for what the archive does not have. One request per fill, however deep, under a
+budget — and the other half of the job is knowing when *not* to ask."""
 
 from __future__ import annotations
 
@@ -31,19 +21,14 @@ log = logging.getLogger(__name__)
 # validation error rather than being clamped, so it is clamped here.
 MAX_BARS_PER_FILL = 50_000
 
-# A little overlap on every fill, so the seam between what the archive holds and what it
-# is fetching is covered twice rather than nearly. Refetching a period costs nothing —
-# the store overwrites it, and a history value is the one that should win anyway.
+# A little overlap on every fill, so the seam between what the archive holds and what it fetches is
+# covered twice rather than nearly. Refetching costs nothing: a history value should win anyway.
 OVERLAP_BARS = 2
 
 
 class FillOutcome(BaseModel):
-    """What one fill did, in terms an operator can act on.
-
-    Both halves matter. `written` says whether the archive actually gained anything, and
-    `requests` says what it cost upstream — a fill that took thirty provider calls to
-    write four candles is working correctly and still worth seeing.
-    """
+    """What one fill did, in terms an operator can act on. `written` says whether the archive gained
+    anything and `requests` what it cost upstream — thirty calls for four candles is worth seeing."""
 
     symbol: str
     resolution: Resolution
@@ -85,21 +70,8 @@ def bars_to_close_gap(
     default_bars: int,
     collect_from: datetime,
 ) -> int:
-    """How many candles to ask for, or zero when the archive is already current.
-
-    A pair that has collected nothing reaches back `default_bars` — but never further
-    than `collect_from`, the moment this pair's history is meant to reach back to. For a
-    pair tracked without an explicit one, `collect_from` was itself computed from
-    `default_bars` (`tracking.default_collect_from`), so the two agree and nothing here
-    changes; the clamp only ever bites for a pair given a shallower, explicit moment. A
-    pair that has been collecting asks only for what it missed, which cannot run past
-    `collect_from` in the first place.
-
-    Zero is the important answer. At any moment the newest closed candle is up to one
-    period old — the current period has not finished, so the provider does not have it
-    either — and treating that as a gap would send a request every period, forever, for
-    a candle nobody has yet.
-    """
+    """How many candles to ask for, or zero when the archive is already current. Zero is the important
+    answer: the newest closed candle is up to one period old, and treating that as a gap never ends."""
     if latest_candle is None:
         return min(default_bars, MAX_BARS_PER_FILL, periods_between(resolution, collect_from, now))
 
@@ -121,12 +93,8 @@ async def fill_gap(
     limiter=None,
     now: datetime | None = None,
 ) -> FillOutcome:
-    """Close whatever gap this pair has, and record what was verified.
-
-    `limiter` is the budget — an `asyncio.Semaphore` shared by every fill in the process.
-    It is taken only around the provider call, so reading the archive to work out whether
-    a call is needed at all never waits behind another pair's deep fill.
-    """
+    """Close whatever gap this pair has, and record what was verified. `limiter` is taken only around
+    the provider call, so reading the archive never waits behind another pair's deep fill."""
     moment = now or datetime.now(UTC)
 
     async with pool.acquire() as conn:
@@ -134,9 +102,8 @@ async def fill_gap(
         collect_from = await read_collect_from(conn, symbol, resolution)
 
     if collect_from is None:
-        # Untracked in the gap between `PairIngest.run()`'s own `still_tracked()` check
-        # and this read — nothing to fetch for a pair nobody is tracking anymore, never
-        # a fall-back to the old unclamped depth.
+        # Untracked between `PairIngest.run()`'s own check and this read — nothing to fetch for a
+        # pair nobody collects, and never a fall-back to the old unclamped depth.
         outcome = FillOutcome(symbol=symbol, resolution=resolution, requested=0, finished_at=moment)
         log.info(outcome.describe())
         return outcome
@@ -156,9 +123,8 @@ async def fill_gap(
         else:
             page = await history.history(symbol, resolution, bars, after=collect_from)
     except GatewayError as err:
-        # Named rather than raised on. A pair whose fill failed is not a reason to stop
-        # collecting the others, and the reason has to survive to somewhere an operator
-        # reads.
+        # Named rather than raised on: one pair's failed fill is not a reason to stop collecting
+        # the others, and the reason has to survive to somewhere an operator reads.
         outcome = FillOutcome(
             symbol=symbol,
             resolution=resolution,
@@ -169,16 +135,8 @@ async def fill_gap(
         log.warning(outcome.describe())
         return outcome
 
-    # Nothing older than what this pair was asked to reach back to, whatever came back.
-    # `bars` counts candles and `collect_from` is a moment, and for an instrument shut
-    # part of the week the two do not line up — the gateway is asked to bound the read
-    # and does, but a promise about what the archive stores is not one to delegate.
-    # Two filters, and they answer different questions. `collect_from` is how far back
-    # this pair was asked to reach; `forming` is whether a period is over. The second one
-    # is why the fill's own arithmetic works: `bars_to_close_gap` measures the gap from
-    # the newest candle held, so storing the period in progress would make the pair look
-    # current and stop the next fill from asking — leaving the partial values in place
-    # until they aged out two periods later.
+    # Nothing older than this pair was asked to reach back to, whatever came back: a promise about
+    # what the archive stores is not one to delegate. And nothing forming, or the gap looks closed.
     within = [c for c in page.candles if c.period_start >= collect_from and not c.forming]
 
     written = 0
@@ -193,15 +151,12 @@ async def fill_gap(
                 symbol=symbol,
                 resolution=resolution,
                 covered_from=oldest,
-                # Verified up to the moment of the read, not up to the newest candle. The
-                # two differ exactly when the market was shut for the tail of the window —
-                # and recording only as far as the last candle is what would send this
-                # same request again tomorrow, and every day after.
+                # Verified up to the moment of the read, not the newest candle. The two differ when
+                # the market was shut for the tail, and the shorter one re-sends this request daily.
                 covered_to=max(newest + period_length(resolution), moment),
                 history_ended=page.history_ended,
-                # Where the read ran out, which for a fill is the oldest candle it came
-                # back with. Never the moment it was clipped to: that is the caller's own
-                # bound and says nothing about what the provider holds below it.
+                # Where the read ran out, which for a fill is the oldest candle it came back with —
+                # never the moment it was clipped to, which says nothing about the provider.
                 history_ends_at=oldest if page.history_ended else None,
             )
             written = committed.written

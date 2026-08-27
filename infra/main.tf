@@ -16,15 +16,8 @@ terraform {
     }
   }
 
-  # Created once by infra/bootstrap/ — see that root for why this cannot bootstrap
-  # itself. Values match its `backend_config` output exactly.
-  #
-  # `use_azuread_auth` reads/writes the state blob with an Azure AD token instead of the
-  # storage account's access key — the local developer's own `az login` token locally,
-  # the GitHub Actions OIDC token in CI (github-oidc.tf grants that identity, and the
-  # operator, Storage Blob Data Contributor on this account). No storage key is ever
-  # handled by either. Flipped on only after that role assignment exists — see
-  # github-oidc.tf's comment on `operator_tfstate` for the bootstrapping order.
+  # Created once by infra/bootstrap/ — see that root for why this cannot bootstrap itself. `use_azuread_auth` reads the
+  # state blob with an Entra token instead of the account key, so no storage key is ever handled by either caller.
   backend "azurerm" {
     resource_group_name  = "rg-tradingcenter-tfstate"
     storage_account_name = "sttradingcenterstate"
@@ -34,13 +27,8 @@ terraform {
   }
 }
 
-# `use_oidc` and the client/tenant/subscription ids are deliberately absent here: they
-# come from the `ARM_USE_OIDC`/`ARM_CLIENT_ID`/`ARM_TENANT_ID`/`ARM_SUBSCRIPTION_ID`
-# environment variables, which the provider reads on its own. Locally none of those are
-# set, so the provider falls back to the ambient `az login` session; the Terraform
-# workflow (group 7) sets them from repository *vars* (never secrets — design.md) so the
-# same code authenticates through the federated credential in github-oidc.tf instead.
-# Hardcoding `use_oidc = true` here would break every local `terraform` run.
+# `use_oidc` and the client/tenant/subscription ids are deliberately absent: the provider reads them from `ARM_*`, which
+# the workflow sets and a local run does not. Hardcoding `use_oidc = true` would break every local `terraform`.
 provider "azurerm" {
   features {
     key_vault {

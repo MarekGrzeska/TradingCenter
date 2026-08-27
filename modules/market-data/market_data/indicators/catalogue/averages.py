@@ -1,8 +1,5 @@
-"""Averages: bias and a reference point, all from the same handful of primitives.
-
-`sma` and `ema` come first in the catalogue on purpose — they are the entries every
-future average will sit beside (docs/wskazniki-plan-wdrozenia.html, "Średnie").
-"""
+"""Averages: bias and a reference point, all from the same handful of primitives. `sma` and `ema`
+come first in the catalogue: they are the entries every future average will sit beside."""
 
 from __future__ import annotations
 
@@ -36,8 +33,6 @@ _EMA = IndicatorSpec(
     computer=Lines(lambda s, p: {"ema": kernel.ema(s.close, int(p["period"]))}),
 )
 
-
-# and `ema` are already in the catalogue from the first stage. ---
 
 _WMA = IndicatorSpec(
     id="wma",
@@ -78,9 +73,8 @@ _HMA = IndicatorSpec(
     params=(Param(name="period", type="int", default=20, min=4, max=5000),),
     lines=(LineSpec(key="hma", label="HMA {period}"),),
     render=Render(pane="price", style="line"),
-    # `raw` needs `period` bars from the larger `wma` call inside it; the final
-    # `wma` needs `sqrt_period` more valid `raw` values on top of that — the same
-    # "sum of consecutive windows" rule `ulcer` and `stoch` use.
+    # `raw` needs `period` bars from the larger `wma` inside it; the final `wma` needs
+    # `sqrt_period` more on top — the same "sum of consecutive windows" rule `ulcer` uses.
     warmup=Warmup(
         kind="fixed", bars=lambda p: int(p["period"]) + round(math.sqrt(int(p["period"])))
     ),

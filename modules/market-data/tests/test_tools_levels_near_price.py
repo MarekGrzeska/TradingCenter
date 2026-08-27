@@ -1,9 +1,5 @@
-"""One list of everything the catalogue can put on a chart near the current price.
-
-Against the real catalogue, so the survey is the real one: sixteen entries produce levels,
-zones or markers, which is two chunks of ten rather than the one a fabricated catalogue
-used to give. What each chunk answers is the double's, since computing needs a database.
-"""
+"""One list of everything the catalogue can put on a chart near the current price. Against the real
+catalogue, so the survey is the real one: sixteen entries, which is two chunks rather than one."""
 
 from __future__ import annotations
 
@@ -26,9 +22,8 @@ from market_data.indicators import service
 
 START = datetime(2026, 1, 1, tzinfo=UTC)
 
-# What each of the three shapes answers with, when a test wants that entry to say
-# something. Everything else answers empty — an empty shape is a valid result and the
-# only way to say "this indicator found nothing here".
+# What each of the three shapes answers with when a test wants that entry to say something. Everything
+# else answers empty — an empty shape is the only way to say "this indicator found nothing here".
 SPOKEN = {
     "htf_levels_day": [IndicatorLevelOut(from_=START, price=103.0, label="PDH")],
     "range_gap": [

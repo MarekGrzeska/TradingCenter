@@ -25,17 +25,8 @@ import type {
 import { Button } from "../ui/Button";
 
 /**
- * Where a schedule is made: a rhythm, a time of day, and the days it applies to — no cron
- * expression unless the operator goes looking for one (specs/terminal-teams-schedules,
- * "Harmonogram układa się rytmem i godziną, nie wyrażeniem czasowym").
- *
- * **Nothing here works out when the schedule fires.** The preview under the form is the
- * module's own answer for the draft as it stands (`api.previewNextFires`), which is also
- * what makes it trustworthy: it is computed by the same code the clock runs, in the same
- * zone, rather than by a second implementation that agrees until it doesn't.
- *
- * The expression is still reachable, under "Advanced" — a schedule the wizard cannot
- * describe (a range, two hours in one line) opens there and MUST leave unchanged.
+ * A rhythm, a time and the days it applies to — no cron expression unless the operator goes looking. Nothing
+ * here works out when it fires: the preview is the module's own answer, computed by the code the clock runs.
  */
 export function ScheduleWizardDialog({
   api,

@@ -14,23 +14,8 @@ import {
 } from "./identity";
 
 /**
- * The only file that knows Entra exists; everything else takes an `Identity` and asks it
- * for a token.
- *
- * **One session, one `Identity` per module.** Every back end this terminal calls stands
- * behind its own gate and accepts a token minted for its own audience, so `for(scope)`
- * hands out an `Identity` bound to one of them. They share the account, the state and the
- * listeners — there is one operator signed in, not four — and differ only in what they
- * ask Entra for. Until 22 August 2026 there was one token with the archive's audience,
- * sent to all three back ends, and the gateway had been configured to accept it; the
- * pre-authorizations for asking by name had been standing unused since (`infra/entra.tf`).
- *
- * Redirect, not a popup: a popup dies under a blocker and leaves an operator staring at
- * a terminal that will not load. The full page load it costs is affordable — the grid
- * layout is in `localStorage` and MSAL returns to the address it left from.
- *
- * `sessionStorage`, because memory would send the operator through sign-in on every
- * reload and `localStorage` would keep the account after the tab is closed.
+ * The only file that knows Entra exists. One `Identity` per module, sharing the account and the state: each back end
+ * accepts a token minted for its own audience. Redirect over popup, `sessionStorage` over either alternative.
  */
 export interface EntraIdentities {
   /** Resolves the redirect the operator is arriving back from. Called once, by
@@ -51,11 +36,8 @@ export function createEntraIdentities(config: EntraConfig): EntraIdentities {
     auth: {
       clientId: config.clientId,
       authority: `https://login.microsoftonline.com/${config.tenantId}`,
-      // Spelled out rather than left to MSAL's default of
-      // `window.location.origin`, which has no trailing slash — and Azure will
-      // not register a redirect URI without one when there is no path segment
-      // (`infra/entra.tf`). The two have to be the same string, and only one of
-      // them can be registered.
+      // Spelled out rather than left to MSAL's default, which has no trailing slash — and Azure will not
+      // register a redirect URI without one when there is no path segment.
       redirectUri: `${window.location.origin}/`,
     },
     cache: { cacheLocation: "sessionStorage" },
@@ -76,12 +58,8 @@ export function createEntraIdentities(config: EntraConfig): EntraIdentities {
     moveTo(next ? "signed-in" : "signed-out");
   }
 
-  /** Resolves the redirect the operator is arriving back from, if they are, and
-   *  otherwise picks up a session already in `sessionStorage`.
-   *
-   *  Must finish before the app mounts. The first render subscribes to candles,
-   *  which asks for a token, and a token asked for mid-redirect belongs to
-   *  nobody yet. */
+  /** Resolves the redirect the operator is arriving back from, and otherwise picks up a session already in
+   *  storage. Must finish before the app mounts: a token asked for mid-redirect belongs to nobody yet. */
   async function initialize(): Promise<void> {
     await msal.initialize();
     const redirect = await msal.handleRedirectPromise();
@@ -106,11 +84,8 @@ export function createEntraIdentities(config: EntraConfig): EntraIdentities {
         throw new SignedOut();
       }
 
-      // Interaction required is **per resource** now that each module has its own audience.
-      // Dropping the shared account here would mean a missing consent for one back end
-      // signing the operator out of the whole terminal — a tab they never opened taking the
-      // chart down with it. Only the scope the session was established against says
-      // anything about the session.
+      // Interaction required is *per resource* now that each module has its own audience. Dropping the
+      // shared account here would let a missing consent for one back end sign the operator out of all of them.
       if (cause instanceof InteractionRequiredAuthError) {
         if (scope === config.scopes.archive) {
           adopt(null);
@@ -119,9 +94,8 @@ export function createEntraIdentities(config: EntraConfig): EntraIdentities {
         throw cause;
       }
 
-      // Anything else — a network blip on the token endpoint — is not a signed-out session
-      // and must not be reported as one, or a flaky minute would send somebody through a
-      // sign-in they did not need.
+      // Anything else — a network blip on the token endpoint — is not a signed-out session and must not be
+      // reported as one, or a flaky minute would send somebody through a sign-in they did not need.
       throw cause;
     }
   }
@@ -138,10 +112,8 @@ export function createEntraIdentities(config: EntraConfig): EntraIdentities {
   }
 
   function signIn(): void {
-    // The archive's scope, because sign-in has to name one resource and this is the one
-    // every deployment configures. The rest are acquired silently afterwards, which the
-    // pre-authorizations in `infra/entra.tf` are what make possible without a second
-    // consent screen.
+    // The archive's scope, because sign-in has to name one resource and this is the one every deployment
+    // configures. The rest are acquired silently, which the pre-authorizations are what make possible.
     void msal.loginRedirect({ scopes: [config.scopes.archive] });
   }
 

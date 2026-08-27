@@ -33,26 +33,13 @@ import type {
 import type { ArchiveAdmin, CandleSource, HistoryRequest, IndicatorSource } from "./source";
 
 /**
- * The candle side of the terminal's source: `market-data`, over its HTTP contract and
- * its subscription.
- *
- * The subscription is why this module has the shape it does. Its first message is the
- * series itself, read while the archive holds its room still, so there is nothing to
- * splice, nothing to fetch after a reconnect and no duplicate to filter (design.md,
- * "Archiwum jest dla terminala jedynym źródłem świec i strumienia").
- *
- * `market-data`'s wire shapes (snake_case, per its OpenAPI schema) are private to this
- * file. Nothing outside it ever sees one.
+ * The candle side of the terminal's source. The subscription's first message is the series itself, read while
+ * the archive holds its room still, so there is nothing to splice and no duplicate to filter (design.md).
  */
 
 /**
- * The wire shapes, taken from market-data's own OpenAPI document rather than described
- * again here — thirteen hand-written interfaces were thirteen chances to disagree with
- * the server silently, a renamed field arriving as `undefined` and showing up as a blank
- * cell. Now a rename stops this file compiling, on the line that reads the field.
- *
- * Regenerate with `pnpm contract:generate` after changing a model in `contract.py`;
- * `pnpm contract:check` fails when the committed file is stale.
+ * Taken from market-data's own OpenAPI rather than described again: thirteen hand-written interfaces were
+ * thirteen chances to disagree silently. Regenerate with `pnpm contract:generate` after changing a model.
  */
 type Wire = components["schemas"];
 
@@ -294,11 +281,8 @@ function mapTrackPairsResult(raw: RawTrackPairsResult): TrackPairsResult {
   };
 }
 
-/** What each refusal means, said once. The archive is careful about its status
- *  codes and each of them asks something different of whoever reads it: 409 is
- *  a ceiling to raise deliberately, 422 a pair it will not take on, and 502/504
- *  the *gateway* being unreachable — which is worth retrying and says nothing
- *  about the archive itself. */
+/** What each refusal asks of whoever reads it: 409 is a ceiling to raise deliberately, 422 a pair the archive
+ *  will not take on, and 502/504 the *gateway* being unreachable — worth retrying, and not about the archive. */
 const mapStatus = statusMapper({
   404: "not-found",
   409: "refused",
@@ -342,9 +326,8 @@ export function translateMessage(raw: string): StreamEvent[] {
   if (message.kind === "candle") {
     const candle = message.candle as RawStreamCandle | undefined;
     if (!candle) return [];
-    // `forming` travels on the candle rather than the frame: one message kind
-    // covers both states, marked, because a consumer upserts by period start
-    // and two kinds would only make it reconcile them itself.
+    // `forming` travels on the candle rather than the frame: a consumer upserts by period start, and two
+    // message kinds would only make it reconcile them itself.
     const bar = toBar(candle, Boolean(candle.forming));
     return bar ? [{ kind: "bar", bar }] : [];
   }
@@ -365,12 +348,8 @@ const DIAGNOSIS_TIMEOUT_MS = 5_000;
 const TICKET_TIMEOUT_MS = 5_000;
 
 /**
- * What the tracked-pair list says about a subscription that would not open, or
- * `null` if it says nothing that should stop the retrying.
- *
- * Split out from the request that fetches the list because this is the part
- * with a judgement in it: a pair absent from the list is a settled answer, and
- * everything else — including a list that could not be read — is not.
+ * What the tracked-pair list says about a subscription that would not open. Split out because the judgement
+ * is here: a pair absent from the list is a settled answer, and everything else is not.
  */
 export function readRefusalFromPairs(
   pairs: TrackedPair[],
@@ -397,19 +376,12 @@ export function createArchiveSource(
   }
 
   /**
-   * Why a subscription that would not open is going to stay shut.
-   *
-   * The archive refuses an uncollected pair before the handshake, so the refusal is an
-   * HTTP status the browser will not show — what reaches the page looks exactly like an
-   * archive that is down, and the two deserve opposite responses. So the question is
-   * asked a second way: a pair missing from `/pairs` is a settled answer. Anything else,
-   * including `/pairs` being unreachable, returns `null` and the hub goes on retrying.
+   * The archive refuses an uncollected pair before the handshake, so what reaches the page looks exactly like
+   * an archive that is down. Asked a second way: missing from `/pairs` is settled, anything else keeps retrying.
    */
   async function whyRefused(symbol: string, resolution: Resolution): Promise<string | null> {
-    // The question gets a deadline. An archive that accepts the request and
-    // never answers is an archive worth retrying, and without this the retry
-    // loop would wait on it forever instead — the diagnosis would have become
-    // the outage.
+    // The question gets a deadline: without it, an archive that accepts and never answers would have the
+    // retry loop waiting forever — the diagnosis would have become the outage.
     const abort = new AbortController();
     const deadline = setTimeout(() => abort.abort(), DIAGNOSIS_TIMEOUT_MS);
     try {
@@ -420,20 +392,12 @@ export function createArchiveSource(
   }
 
   /**
-   * Where one pair's stream lives — not a constant, because opening it costs a ticket.
-   *
-   * A browser cannot put a header on a WebSocket handshake, so the token cannot reach
-   * it. The archive's answer is a one-time ticket, asked for here over HTTP where the
-   * header works normally. The token itself never goes near the address: addresses end
-   * up in server logs, and a token stays good for the better part of an hour.
-   *
-   * One ticket per attempt, never cached — a spent ticket is refused, and a reconnect
-   * reusing the last one would fail every time and look like an archive that had gone.
+   * Not a constant, because opening it costs a ticket: a browser cannot put a header on a WebSocket handshake,
+   * so the archive mints one over HTTP. One per attempt, never cached — a spent ticket is refused.
    */
   async function streamUrl(symbol: string, resolution: Resolution): Promise<string> {
-    // No caller-supplied signal: this runs inside the hub's reconnect loop,
-    // which has no request to attach to. The deadline is its own, and its
-    // failure is a failed attempt like any other — the hub retries it.
+    // No caller-supplied signal: this runs inside the hub's reconnect loop, which has no request to attach
+    // to. Its failure is a failed attempt like any other.
     const abort = new AbortController();
     const deadline = setTimeout(() => abort.abort(), TICKET_TIMEOUT_MS);
     let ticket: string;

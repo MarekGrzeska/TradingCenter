@@ -25,9 +25,8 @@ from .deps import hub
 
 log = logging.getLogger(__name__)
 
-# How many settled candles a new subscriber is handed before the changes start. Enough for
-# a chart to draw something immediately; a consumer wanting more asks the range endpoint,
-# which is what it is for.
+# How many settled candles a new subscriber is handed before the changes start. Enough for a chart to
+# draw immediately; a consumer wanting more asks the range endpoint.
 SNAPSHOT_CANDLES = 500
 
 # What a platform authenticator puts on every request it lets through. The id is the
@@ -42,10 +41,8 @@ UNAUTHENTICATED = "anonymous"
 router = APIRouter()
 
 
-# The path deliberately does **not** begin with `/ws`. That prefix is where the one path
-# exempted from Easy Auth lives (`infra/app-service.tf`, `excluded_paths`), and a ticket
-# factory sitting next to it is one careless prefix match away from being exempt too —
-# which would be an open stream wearing the clothes of a protected one.
+# The path deliberately does not begin with `/ws`: that prefix is where the one Easy Auth exemption
+# lives, and a ticket factory beside it is one careless prefix match from being exempt too.
 @router.post(
     "/stream-tickets",
     tags=["stream"],
@@ -88,15 +85,12 @@ async def candle_feed(websocket: WebSocket, the_hub: Hub = Depends(hub)) -> None
 
     The subscription is the query string, so there is no client protocol to get wrong.
     """
-    # First, and before the database is touched. This path is the one outside Easy Auth
-    # (`infra/app-service.tf`, `excluded_paths`), so the ticket is the whole of what
-    # stands between the internet and the stream — and an unauthenticated caller must not
-    # get so much as a query out of it.
+    # First, and before the database is touched. This path is outside Easy Auth, so the ticket is all
+    # that stands between the internet and the stream.
     ticket = websocket.app.state.tickets.spend(websocket.query_params.get("ticket"))
     if ticket is None:
-        # One message for all four cases — missing, unknown, expired, already spent.
-        # Which one it was is not the caller's business, and telling them turns the
-        # refusal into an oracle.
+        # One message for all four cases — missing, unknown, expired, already spent. Which one it
+        # was is not the caller's business, and saying turns the refusal into an oracle.
         log.warning("stream handshake refused: no valid ticket")
         await websocket.close(code=1008, reason="a valid stream ticket is required")
         return
@@ -116,10 +110,8 @@ async def candle_feed(websocket: WebSocket, the_hub: Hub = Depends(hub)) -> None
     db = websocket.app.state.pool
     async with db.acquire() as conn:
         if not await is_tracked(conn, symbol, resolution):
-            # Refused before the handshake. Accepting and then closing would look like a
-            # feed that died rather than a pair nobody chose to collect — and subscribing
-            # must not quietly start collecting it, because that is the decision the
-            # ceiling exists to keep deliberate.
+            # Refused before the handshake: accepting and closing would look like a feed that died.
+            # And subscribing must not quietly start collecting a pair nobody chose.
             await websocket.close(
                 code=1008, reason=f"{symbol} {resolution.value} is not being collected"
             )

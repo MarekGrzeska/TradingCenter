@@ -1,9 +1,5 @@
-"""specs/market-data-api: the catalogue proxy methods on GatewayInstruments.
-
-Unread pass-through is the whole point — these assert the request reaches the gateway's
-real routes and the gateway's response comes back exactly as it arrived, plus the caller
-key on every request.
-"""
+"""specs/market-data-api: the catalogue proxy methods. Unread pass-through is the whole point — the
+request reaches the gateway's real routes and its response comes back exactly as it arrived."""
 
 from __future__ import annotations
 

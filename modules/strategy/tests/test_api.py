@@ -103,9 +103,8 @@ class TestWatches:
     async def test_a_strategy_whose_facts_the_archive_does_not_announce_is_refused(
         self, api, app
     ) -> None:
-        """Registration is where a strategy's facts are checked against what the archive
-        actually has. Refused by name, because the remedy is either a spelling fix or an
-        indicator the archive has to grow."""
+        """Registration is where a strategy's facts are checked against what the archive actually has. Refused by
+        name, because the remedy is either a spelling fix or an indicator the archive has to grow."""
         app.state.archive = FakeArchive(indicators=frozenset({"ema"}))
 
         response = await api.post(
@@ -200,13 +199,8 @@ class TestDecisions:
     async def test_a_decision_names_the_parameter_version_it_was_decided_under(
         self, api, pool
     ) -> None:
-        """And that version still reads the way it read then, resolved.
-
-        Written through the route rather than into the store, because that is where a
-        parameter set is resolved — defaults filled in before it is stored, so a decision
-        made under it means the same thing after this image's defaults change. The store
-        itself writes what it is handed; the two callers that write both resolve first.
-        """
+        """And that version still reads the way it read then, resolved. Written through the route rather
+        than into the store, because that is where a parameter set is resolved."""
         written = await api.post(
             "/parameter-sets", json={"strategy_id": "baseline_ma_cross", "params": {}}
         )

@@ -1,9 +1,5 @@
-"""What the migrations actually build.
-
-Every test here runs against a database the real migrations were applied to, never
-against a schema the fixture wrote itself — a hand-built table would prove that the test
-knows what it wants and leave the migration, the thing a deployment runs, untried.
-"""
+"""What the migrations actually build. Every test here runs against a database the real migrations were
+applied to: a hand-built table would prove the test knows what it wants and leave the migration untried."""
 
 from __future__ import annotations
 
@@ -34,8 +30,6 @@ async def _table_names(conn: asyncpg.Connection) -> set[str]:
     return {row["tablename"] for row in rows}
 
 
-# --- the candle table (2.1) ---------------------------------------------------------
-
 
 async def test_the_migrations_build_the_three_tables(db: asyncpg.Connection) -> None:
     assert {"candles", "tracked_pairs", "coverage_ranges"} <= await _table_names(db)
@@ -48,8 +42,6 @@ async def test_a_candle_is_identified_by_symbol_resolution_and_period_start(
     assert [row["column_name"] for row in rows] == ["symbol", "resolution", "period_start"]
 
 
-# --- tracked pairs (2.2) ------------------------------------------------------------
-
 
 async def test_a_tracked_pair_is_identified_by_symbol_and_resolution(
     db: asyncpg.Connection,
@@ -58,19 +50,13 @@ async def test_a_tracked_pair_is_identified_by_symbol_and_resolution(
     assert [row["column_name"] for row in rows] == ["symbol", "resolution"]
 
 
-# --- collection jobs (2.4) ----------------------------------------------------------
-
 
 async def test_the_migrations_build_the_job_tables(db: asyncpg.Connection) -> None:
     assert {"collection_jobs", "collection_job_chunks"} <= await _table_names(db)
 
 
-# --- the one constraint that is a rule, not a type ------------------------------------
-
-# The enum and DEFAULT tests that stood here are gone: they asked whether PostgreSQL
-# honours a CHECK, and every store test crosses these tables anyway. This one stays
-# because a *partial* unique index is not a type — it is the rule that "how far back is
-# there anything left to fetch" has one answer, and nothing else in the suite says so.
+# The enum and DEFAULT tests that stood here are gone: they asked whether PostgreSQL honours a CHECK.
+# This one stays because a partial unique index is a rule, not a type, and nothing else says it.
 
 
 async def test_a_pair_has_at_most_one_end_of_provider_history(db: asyncpg.Connection) -> None:
@@ -92,8 +78,6 @@ async def test_a_pair_has_at_most_one_end_of_provider_history(db: asyncpg.Connec
         )
 
 
-# --- the migrations themselves ------------------------------------------------------
-
 
 @pytest.fixture
 async def scratch_database_url(postgres_url: str) -> AsyncIterator[str]:
@@ -111,12 +95,8 @@ async def scratch_database_url(postgres_url: str) -> AsyncIterator[str]:
 
 
 async def test_the_migrations_run_forwards_and_back(scratch_database_url: str) -> None:
-    """Reversibility, checked once rather than discovered during an incident.
-
-    This is the repository's first module with state it cannot afford to lose, so a
-    downgrade that fails is not a theoretical inconvenience — it is the moment a bad
-    deploy has to go forwards through a broken migration instead of backwards.
-    """
+    """Reversibility, checked once rather than discovered during an incident. A downgrade that fails is
+    the moment a bad deploy has to go forwards through a broken migration instead of backwards."""
     import asyncio
 
     from alembic import command

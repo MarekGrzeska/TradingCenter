@@ -1,16 +1,5 @@
-"""The step every `deploy-*.yml` ends in: is this commit's image the one serving?
-
-Two questions, and the second is the one that used to go unasked. The control plane says
-which image App Service *will* serve; it does not say whether the process inside came up.
-On 16 August 2026 `az webapp show` read `Running` for the better part of an hour while the
-agent's container exited with code 3 on every restart, and the deploy that reported green
-over it was worse than one reporting nothing.
-
-So the loop asks both, and it lives here rather than inside seven copies of a YAML `run:`
-block for one reason: the failure mode above is a thing a test can produce in a millisecond
-and a deployment can only produce by breaking. `wait_until_serving` takes the two questions
-as arguments; `main` substitutes `az` and `httpx` under them.
-"""
+"""Is this commit's image the one serving, and did the process inside come up? The second question used
+to go unasked: on 16 August 2026 the control plane read `Running` for an hour over a crash loop."""
 
 from __future__ import annotations
 
@@ -25,26 +14,15 @@ from dataclasses import dataclass
 # than a constant so a test never depends on it.
 DEFAULT_RESOURCE_GROUP = "rg-tradingcenter"
 
-# How much of a response body reaches the log. The check itself reads all of it — the shell
-# version grepped the same 200 bytes it printed, which would have missed a key that arrived
-# late in a longer body.
+# How much of a response body reaches the log. The check itself reads all of it — the shell version
+# grepped the same 200 bytes it printed, which would have missed a key arriving late in a body.
 BODY_LOG_LIMIT = 200
 
 
 @dataclass(frozen=True)
 class ProbeSpec:
-    """What "serving" means for one app.
-
-    `probe_path` empty is not a missing setting: it is capital-gateway, which admits only
-    market-data's and trading-mcp's addresses, so a GitHub runner cannot reach it at all
-    and the control plane is the only question its deploy can ask. That app gets the weaker
-    check because it is the only one available, which is exactly why the site state is
-    required alongside the image tag there and nowhere else.
-
-    `body_contains` empty means the status code alone decides. Nothing uses that today —
-    all six reachable apps name a key their own handler returns — and it stays available
-    because a future app may answer something that is not JSON.
-    """
+    """What "serving" means for one app. An empty `probe_path` is capital-gateway, which a GitHub runner
+    cannot reach at all, so the control plane is the only question its deploy can ask."""
 
     app_name: str
     expected_image: str
@@ -56,9 +34,8 @@ class ProbeSpec:
     failure_hint: str = ""
 
 
-# What the control plane hands back, and what an HTTP attempt saw. `state` is only read in
-# the control-plane-only variant, so it is None everywhere else rather than fetched and
-# ignored.
+# What the control plane hands back, and what an HTTP attempt saw. `state` is only read in the
+# control-plane-only variant, so it is None elsewhere rather than fetched and ignored.
 ImageReader = Callable[[], str | None]
 StateReader = Callable[[], str | None]
 Prober = Callable[[], tuple[int, str]]
@@ -82,12 +59,8 @@ def wait_until_serving(
     sleep: Callable[[float], None] = time.sleep,
     log: Callable[[str], None] = print,
 ) -> bool:
-    """True once this commit's image is serving; False when `spec.attempts` ran out.
-
-    `probe` is None for the control-plane-only variant, and then `site_state` carries the
-    second half of the question. Both are arguments rather than imports so the 16 August
-    failure — right state, right-looking response, wrong image — is a two-line test.
-    """
+    """True once this commit's image is serving; False when `spec.attempts` ran out. Both questions are
+    arguments rather than imports, so "right state, wrong image" is a two-line test."""
     if probe is None and site_state is None:
         raise ValueError(
             f"{spec.app_name}: neither an HTTP probe nor a state reader was given, so this "
@@ -140,12 +113,8 @@ def _failure_message(
     state: str | None,
     probe_ran: bool,
 ) -> str:
-    """Name the condition that did not hold, not merely that something did not.
-
-    A deploy failing because the old container is still answering wants a different next
-    step from one failing because the new container answers 500, and the log is where the
-    operator finds out which.
-    """
+    """Name the condition that did not hold, not merely that something did not: an old container still
+    answering wants a different next step from a new one answering 500."""
     waited = int(spec.attempts * spec.sleep_seconds)
     reasons: list[str] = []
 

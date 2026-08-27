@@ -1,9 +1,5 @@
-"""Managing what is collected, and the refusals that name themselves.
-
-`market-data-api` 8.6 and 8.7, plus the catalogue proxy from `market-data-api`. The
-refusals are the half worth reading twice: every one of them says which pair and why, so
-a consumer can act on it rather than retry a request that will never be honoured.
-"""
+"""Managing what is collected, and the refusals that name themselves. The refusals are the half worth
+reading twice: each says which pair and why, so a consumer can act rather than retry forever."""
 
 from __future__ import annotations
 
@@ -28,8 +24,6 @@ from market_data.tracking import track
 pytestmark = pytest.mark.db
 
 
-# --- 8.6: managing what is collected --------------------------------------------------
-
 
 async def test_a_pair_can_be_taken_on_over_the_contract(api, pool) -> None:
     response = await api.post("/pairs", json={"symbol": "US100", "resolution": "MINUTE"})
@@ -46,12 +40,8 @@ async def test_a_pair_can_be_taken_on_over_the_contract(api, pool) -> None:
 async def test_asking_deeper_than_the_boundary_drops_it_and_plans_the_whole_range(
     api, pool
 ) -> None:
-    """The recovery path, and the only one an operator has: asking again.
-
-    US100 held a boundary at January 2026 and every request to reach 2024 was silently
-    raised to it, planned nothing, and reported itself done. There is no button for this
-    and there should not be — reaching deeper *is* the instruction to measure again.
-    """
+    """The recovery path, and the only one an operator has: asking again. US100 held a boundary at
+    January 2026 and every request to reach 2024 was silently raised to it and reported done."""
     boundary = NOW - timedelta(days=30)
     async with pool.acquire() as conn:
         await record_coverage(
@@ -83,10 +73,8 @@ async def test_asking_deeper_than_the_boundary_drops_it_and_plans_the_whole_rang
 
 
 async def test_re_adding_a_pair_without_a_date_leaves_the_boundary_alone(api, pool) -> None:
-    """A pair's `collect_from` is the deepest moment it was *ever* asked to reach, kept by
-    `LEAST` so re-tracking cannot abandon history already promised. Read as this request's
-    intent it makes every re-add look like a deeper one — dropping a boundary nobody
-    questioned, and replanning the whole span below it."""
+    """A pair's `collect_from` is the deepest moment it was *ever* asked to reach, kept by `LEAST`. Read
+    as this request's intent it makes every re-add look deeper, dropping a boundary nobody questioned."""
     boundary = NOW - timedelta(days=30)
     async with pool.acquire() as conn:
         await track(conn, "US100", Resolution.MINUTE, LIMIT, collect_from=NOW - timedelta(days=90))
@@ -155,11 +143,8 @@ async def test_the_list_carries_how_collection_is_going(api, pool) -> None:
 
 
 async def test_the_list_carries_how_far_back_the_data_reaches(api, pool) -> None:
-    """The panel's "data since", answered without a request per pair.
-
-    It rides on the list because the alternative is the panel asking for coverage once
-    per tracked pair just to draw its rows.
-    """
+    """The panel's "data since", answered without a request per pair. It rides on the list because the
+    alternative is the panel asking for coverage once per tracked pair just to draw its rows."""
     async with pool.acquire() as conn:
         await track(conn, "US100", Resolution.MINUTE, LIMIT)
         await write_candles(conn, [candle(0), candle(30)])
@@ -193,17 +178,8 @@ async def test_a_pair_with_nothing_collected_reports_zero_candles(api, pool) -> 
 
 
 async def test_a_late_pair_with_the_market_open_is_reported_stalled(app, api, pool) -> None:
-    """The state the panel exists to show, reaching the panel at last — and the only test
-    of it that runs end to end.
-
-    `collection_state` could always tell `STALLED` from `MARKET_CLOSED`, and was tested
-    doing so — but nothing supplied the one thing it needs, so every late pair came out
-    `UNKNOWN` and the distinction never left the unit test. What this pins is the wiring:
-    that the route reaches a market-status source at all. The rules it decides by —
-    market shut, gateway silent, one question per symbol, the cached answer — are
-    `test_market_status.py`'s, tested there against `decide_late_pairs` directly rather
-    than a fourth time through HTTP and a database.
-    """
+    """The state the panel exists to show, reaching the panel at last. What this pins is the wiring —
+    that the route reaches a market-status source at all; the rules it decides by are tested once."""
     app.state.instruments = FakeInstruments(market_open=True)
     async with pool.acquire() as conn:
         await track(conn, "US100", Resolution.MINUTE, LIMIT)
@@ -279,8 +255,6 @@ async def test_reading_deletions_with_none_recorded_is_an_empty_list(api) -> Non
     assert response.json() == []
 
 
-# --- 8.7: refusals that name themselves -----------------------------------------------
-
 
 async def test_going_over_the_ceiling_is_refused_with_the_reason(app, api, pool) -> None:
     app.state.settings = Settings(
@@ -331,10 +305,7 @@ async def test_a_failure_never_carries_a_raw_database_error(api, pool) -> None:
         assert leak not in detail
 
 
-# --- specs/market-data-api: the catalogue proxy ----------------------------------------
-#
-# capital-gateway is not public, so the terminal reaches the catalogue through here
-# instead — see design.md, "Terminal osiąga katalog instrumentów przez market-data".
+# capital-gateway is not public, so the terminal reaches the catalogue through here instead.
 
 
 async def test_the_catalogue_is_the_gateways_own_shape_unread(api) -> None:
@@ -374,9 +345,8 @@ async def test_asset_classes_are_the_gateways_own_list(api) -> None:
 
 
 async def test_a_gateway_refusal_on_the_catalogue_is_not_an_empty_result(app, api) -> None:
-    """specs/market-data-api: an odmowa (the gateway's 401 for a missing or wrong caller
-    key, or any other refusal) must be distinguishable from an honest empty search — never
-    silently turned into one."""
+    """An odmowa — the gateway's 401 for a missing or wrong caller key, or any other refusal — must be
+    distinguishable from an honest empty search, never silently turned into one."""
     app.state.instruments = FakeInstruments(error=GatewayRefused(401, "missing or invalid caller key"))
 
     response = await api.get("/instruments/search", params={"q": "gold"})

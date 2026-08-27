@@ -1,6 +1,5 @@
-# Multi-stage: uv resolves and builds the venv, the runtime stage only ever ships
-# that venv and the source — no compiler toolchain, no uv binary, no lockfile parsing
-# at container start.
+# Multi-stage: uv resolves and builds the venv, the runtime stage ships only that venv and the source — no compiler
+# toolchain, no uv binary, no lockfile parsing at container start.
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 WORKDIR /app
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
@@ -22,7 +21,6 @@ ENV PATH="/app/.venv/bin:$PATH"
 # infra/app-service.tf, which sets no WEBSITES_PORT override.
 EXPOSE 80
 
-# No --reload, no dev server: config.py's own guards (production refuses /docs and
-# /openapi.json, GATEWAY_ENV, the caller-key check) are what make this safe to run
-# with real capital.com credentials, not anything in this image.
+# No --reload and no dev server: what makes this safe to run against real capital.com credentials is config.py's own
+# guards — production refuses /docs, GATEWAY_ENV, the caller-key check — and nothing in this image.
 CMD ["uvicorn", "capital_gateway.app:app", "--host", "0.0.0.0", "--port", "80"]

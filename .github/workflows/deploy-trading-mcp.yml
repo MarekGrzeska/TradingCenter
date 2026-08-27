@@ -7,20 +7,16 @@ on:
     branches: [main]
     paths:
       - "modules/trading-mcp/**"
-      # Path dependencies are baked into this image (see the Dockerfile), so a merged
-      # package fix that never redeploys its consumers is a fix that never reaches
-      # production. Exactly the packages this module's pyproject.toml names.
+      # Path dependencies are baked into this image, so a merged package fix that never redeploys its
+      # consumers never reaches production. Exactly the packages this module's pyproject.toml names.
       - "packages/tc-mcp-kit/**"
       - ".github/workflows/deploy-trading-mcp.yml"
       - ".github/workflows/_deploy-app-service.yml"
       - "scripts/deploy_probe.py"
   workflow_dispatch: {}
 
-# Declared on the caller, and this is where it has to be: a reusable workflow can only
-# *narrow* the caller's GITHUB_TOKEN, never widen it. This repository's default workflow
-# permission is `read`, and `id-token` is never granted by default at all — so a caller
-# without this block hands the shared workflow a token that cannot push to GHCR and cannot
-# exchange an OIDC assertion, and every deploy fails at `azure/login`.
+# Declared on the caller, and nowhere else will do: a reusable workflow can only *narrow* the caller's token,
+# and `id-token` is never granted by default — without this every deploy fails at `azure/login`.
 permissions:
   contents: read
   id-token: write # azure/login's OIDC exchange
@@ -32,17 +28,9 @@ jobs:
     with:
       module: trading-mcp
       app_name: app-tradingcenter-trading-mcp
-      # `/health` is excluded from Easy Auth (infra/app-service.tf, `excluded_paths`) and
-      # answers a plain 200 with a JSON body (specs/trading-mcp-transport, "Zdrowie modułu
-      # da się sprawdzić bez sesji MCP").
-      #
-      # For this module the probe proves more than liveness, and that is why it is worth the
-      # three minutes: `__main__.py` asks capital-gateway `GET /capabilities` and refuses to
-      # open a port at all unless the answer says `demo`
-      # (specs/trading-mcp-upstream-access). A process answering here has therefore already
-      # reached the gateway with the shared key, through its firewall, and been told it is a
-      # demo session. A container that could not do any of those three never listens, and
-      # this check is what turns that into a failed deploy rather than a silent one.
+      # `/health` is excluded from Easy Auth and answers plain JSON. It proves more than liveness here:
+      # `__main__.py` refuses to open a port until the gateway says `demo`, so a process answering has already
+      # reached the gateway with the shared key and been told it is a demo session.
       probe_path: /health
       expected_status: 200
       body_contains: '"status"'

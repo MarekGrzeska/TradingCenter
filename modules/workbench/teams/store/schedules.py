@@ -1,9 +1,5 @@
-"""Schedules — a team started by the clock.
-
-Here rather than in `recurring.py` is only what a trigger has no version of: this table's
-own INSERT and UPDATE. Every rule the two hold in common is one statement on `SCHEDULES`,
-written once.
-"""
+"""Schedules — a team started by the clock. Here rather than in `recurring.py` is only what a trigger has
+no version of: this table's own INSERT and UPDATE."""
 
 from __future__ import annotations
 
@@ -94,15 +90,8 @@ async def set_schedule_enabled(
 
 
 async def delete_schedule(conn: Conn, *, schedule_id: int, owner_principal: str) -> bool:
-    """Whether a row was deleted — `False` covers both "not there" and "not yours", which
-    the owner filter inside the statement makes the same answer.
-
-    The fire history goes with it, by `ON DELETE CASCADE` in migration `0007` rather than
-    by a second statement here: the same rule written twice drifts the first time a caller
-    forgets half of it. Runs are untouched — nothing in `runs` points at a schedule, it is
-    the fire rows that point at runs (specs/teams-schedules, "Harmonogram i wyzwalacz dają
-    się usunąć").
-    """
+    """Whether a row was deleted — `False` covers both "not there" and "not yours". The fire history goes
+    with it by cascade rather than a second statement, and runs are untouched: nothing in `runs` points here."""
     row = await conn.fetchrow(SCHEDULES.delete, schedule_id, owner_principal)
     return row is not None
 

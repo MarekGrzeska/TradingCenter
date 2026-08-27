@@ -1,26 +1,5 @@
-"""Seeds `"v11"`: the same prompt, plus what to do with the trading tools — and one
-sentence corrected, because it had become false.
-
-No schema change; the whole of this migration is one row, the shape `0005` set.
-
-Two edits, and the second is the one that matters more:
-
-- **A new paragraph.** The agent gained a third tool server, and four of its tools change
-  the account. Told badly they are told nothing: the model would send an order nobody
-  asked for, describe one it did not send in full, or — the failure this paragraph is
-  really written for — retry a call whose outcome came back unknown, which is a second
-  position rather than a second attempt (specs/agent-trading, "Agent nie potwierdza
-  zlecenia, którego skutku nie zna").
-- **`"you cannot ... place an order"` had to go.** Every prompt from `v4` onward told the
-  model it could not place an order. It can now. A prompt asserting the opposite of what
-  the tool list shows is worse than one saying nothing: the model would refuse a request
-  it has the means to satisfy, and be right to, because the prompt said so.
-
-The paragraph rides in **both** bodies, for the reason `0010` gives about its own: the
-three tool servers are configured and fail independently, so an unreachable archive says
-nothing about whether the account can be reached.
-
-The paragraphs are repeated whole rather than patched, for the reason `0005` gives.
+"""Seeds `"v11"`: the trading tools paragraph, written for one failure above all — retrying a call whose outcome came
+back unknown, which is a second position rather than a second attempt. One sentence is corrected, having become false.
 
 Revision ID: 0012
 Revises: 0011

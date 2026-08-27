@@ -7,10 +7,8 @@ from tc_runtime.schema_version import SchemaMismatch
 
 from workbench.app import app
 
-# The lifespan now opens a real pool — it did not, back when this file's tests were
-# first written, and their env carried a DATABASE_URL nothing was listening on. A `db`
-# test since group 4 (`app.state.agent.pool`, `POST /sessions` etc.), pointed at the
-# throwaway container `migrated_url` gives.
+# The lifespan now opens a real pool — it did not when this file's tests were written, and their env
+# carried a DATABASE_URL nothing was listening on. A `db` test since group 4.
 pytestmark = pytest.mark.db
 
 _ENV = {
@@ -34,9 +32,8 @@ def _env(workbench_env: None, migrated_url: str, db, monkeypatch: pytest.MonkeyP
 
 
 def test_health() -> None:
-    """`/health` belongs to the process, not to either surface — one test for it, not one
-    per surface. It also takes no identity: nothing is sent here and nothing is required,
-    because the deploy probe reads this route from outside Easy Auth."""
+    """`/health` belongs to the process, not to either surface — one test for it, not one per surface. It
+    takes no identity: the deploy probe reads this route from outside Easy Auth."""
     with TestClient(app) as client:
         response = client.get("/health")
     assert response.status_code == 200
@@ -46,10 +43,8 @@ def test_health() -> None:
 def test_a_schema_the_image_was_not_built_for_refuses_to_start(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # The wiring, not the comparison — `test_schema_version.py` owns the comparison. What
-    # this proves is that a mismatch reaches the lifespan and stops it, which is the whole
-    # value: the check ran on 15 August's production database too, in the sense that
-    # nothing called it.
+    # The wiring, not the comparison — `test_schema_version.py` owns that. What this proves is that a
+    # mismatch reaches the lifespan and stops it, which is the whole value.
     monkeypatch.setattr(
         schema_version, "expected_heads", lambda _migrations: {"9999_from_a_newer_image"}
     )

@@ -1,10 +1,5 @@
-"""The indicator catalogue and computation, over HTTP.
-
-Everything this used to hold moved to `market_data/indicators/service.py` when the tool
-surface arrived and gave it a second caller. What stays here is the part that is genuinely
-about this transport: the paths, the response models, and turning the service's refusal
-into the status code a REST caller reads.
-"""
+"""The indicator catalogue and computation, over HTTP. Everything else moved to
+`indicators/service.py` when the tool surface gave it a second caller; what stays is this transport."""
 
 from __future__ import annotations
 

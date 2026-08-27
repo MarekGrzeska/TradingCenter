@@ -67,12 +67,8 @@ async def test_get_instrument_terms_for_an_unknown_symbol_is_a_refusal(server) -
 async def test_the_run_that_prompted_this_sized_against_the_contract_not_the_deposit(
     server,
 ) -> None:
-    """The measured case: 2% of 95 306,83 USD into US100 at 30 174,5.
-
-    The agent sent 0.0631704 — the deposit divided by the price, which is 2% of the
-    account as *contract value* and one twentieth of it as deposit. Sized against the
-    provider's 5%, the same 1 906,1366 USD is 1.263.
-    """
+    """The measured case: 2% of 95 306,83 USD into US100 at 30 174,5. The agent sent the deposit divided
+    by the price — 2% of the account as contract value, a twentieth of it as deposit."""
     mcp = server
     mock_terms()
 

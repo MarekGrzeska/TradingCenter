@@ -1,27 +1,10 @@
-# The database, and only the database.
-#
-# Deleted when local work moved onto the Azure server, restored verbatim when that
-# decision was reversed (openspec/changes/local-dev-database-in-docker) — the standing
-# tax of a remote dev database turned out to cost more than the production fidelity it
-# bought. Production stays in Azure; this file is the development database.
-#
-# The services run on the host — `uv run` and `vite` reload on save, attach to a
-# debugger and read the `.env` sitting next to them, and none of that survives being
-# put in a container for the sake of symmetry. PostgreSQL is the opposite case: it
-# has no source to reload, it is the one dependency that is a chore to install per
-# machine, and every developer wanting the same version is the whole point.
-#
-# So: services locally, state in a container.
+# The database, and only the database: services run on the host, where `uv run` and `vite` reload on save and read
+# the `.env` beside them, while PostgreSQL is the one dependency that is a chore to install per machine.
 #
 #     docker compose up -d db          # or ./scripts/dev.sh, which does it for you
-#     docker compose down              # stop, keep the data
 #     docker compose down -v           # stop, and forget everything collected
 #
-# The credentials match `modules/market-data/.env.example` exactly, so a fresh
-# checkout that copies that file needs no further edit. They are development
-# credentials in a file in a public repository — nothing here is a secret, and
-# nothing here should ever be reachable from outside the machine, which is why the
-# port is bound to loopback rather than to every interface.
+# The credentials match `modules/market-data/.env.example` exactly, so a fresh checkout needs no further edit.
 
 name: tradingcenter
 
@@ -34,36 +17,21 @@ services:
       POSTGRES_USER: market_data
       POSTGRES_PASSWORD: change-me
       POSTGRES_DB: market_data
-      # The archive keys everything on instants and stores them as timestamptz.
-      # A container whose clock reads local time would still store the right
-      # moment, but every psql session inspecting a candle would print it shifted,
-      # which is a confusing hour to spend.
+      # The archive keys everything on instants and stores them as timestamptz. A container on local time would
+      # store the right moment and print every candle shifted, which is a confusing hour to spend.
       TZ: UTC
       PGTZ: UTC
     ports:
-      # 55432 on the host, deliberately nowhere near 5432.
-      #
-      # A developer machine very often already has PostgreSQL of its own, and it
-      # does not announce itself — `lsof` run as you does not even list it,
-      # because it belongs to another user. Worse, Postgres.app runs one instance
-      # per installed major version on *consecutive* ports, so the machine this
-      # was written on answered on both 5432 and 5433, and 5434 was only free
-      # until the next version was installed. Picking a slightly unusual port
-      # inside that range just moves the collision.
-      #
-      # Colliding fails at best. At worst it succeeds, and the archive quietly
-      # migrates and fills a database belonging to something else.
-      #
-      # 127.0.0.1 on purpose: bound to 0.0.0.0 this is a database with a published
-      # password offered to every machine on the café wifi.
+      # 55432 on the host, deliberately nowhere near 5432: a developer machine often already runs PostgreSQL of its
+      # own — Postgres.app runs one per major version on consecutive ports — and colliding succeeds at worst, with
+      # the archive migrating and filling a database belonging to something else. 127.0.0.1, or this is a database
+      # with a published password offered to the café wifi.
       - "127.0.0.1:${DB_PORT:-55432}:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
-      # `pg_isready` alone answers before the server finishes its first-boot
-      # initialisation, so the dev scripts would race it and fail their first
-      # migration. Naming the user and database makes it answer only once the
-      # thing that will actually be connected to is there.
+      # `pg_isready` alone answers before first-boot initialisation finishes, so the dev scripts would race it.
+      # Naming the user and database makes it answer only once the thing to be connected to is there.
       test: ["CMD-SHELL", "pg_isready -U market_data -d market_data -q"]
       interval: 2s
       timeout: 3s
@@ -72,9 +40,6 @@ services:
 
 volumes:
   db-data:
-    # Named, so `docker compose down` keeps the archive and only `down -v` throws
-    # it away. Re-collecting three years of minute candles for a hundred
-    # instruments costs about twenty-seven hours of provider calls, and while a
-    # development database is rarely that full, the habit is worth having in the
-    # one place the cost is real.
+    # Named, so `docker compose down` keeps the archive and only `down -v` throws it away. Re-collecting three years
+    # of minute candles for a hundred instruments costs about twenty-seven hours of provider calls.
     name: tradingcenter-db-data

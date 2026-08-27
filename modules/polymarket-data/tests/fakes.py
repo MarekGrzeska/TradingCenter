@@ -1,8 +1,5 @@
-"""Stand-ins for the provider, so ingest can be tested without a third party's uptime.
-
-Structural rather than a subclass: what `Ingest` uses is three methods, and a Protocol per
-seam would buy nothing the tests do not already prove by running.
-"""
+"""Stand-ins for the provider, so ingest can be tested without a third party's uptime. Structural rather
+than a subclass: what `Ingest` uses is three methods."""
 
 from __future__ import annotations
 

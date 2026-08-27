@@ -1,8 +1,5 @@
-"""`market-data-indicators` spec, "Strefy mają granice, kierunek i moment domknięcia" —
-the W2 layer (`docs/wskazniki-plan-wdrozenia.html`), tested the way `test_indicators_
-structure.py` tests W1: small, hand-computed series, not the synthetic one
-`test_indicators_catalogue.py` uses for golden snapshots.
-"""
+"""`market-data-indicators`, "Strefy mają granice, kierunek i moment domknięcia" — small, hand-computed
+series, tested the way `test_indicators_structure.py` tests W1."""
 
 from __future__ import annotations
 
@@ -107,9 +104,8 @@ class TestRangeGap:
         assert zone.end_bar is None
 
     def test_a_gap_never_touches_itself_at_formation(self):
-        """The bar that forms the gap's own far edge must not count as the bar
-        that later touches it — regression for the off-by-one where the
-        touch/fill scan started at the gap's own third bar instead of after it."""
+        """The bar that forms the gap's own far edge must not count as the bar that later touches it —
+        regression for the off-by-one where the scan started at the gap's own third bar."""
         entry = get("range_gap")
         zones = _own_series_zones(
             entry,
@@ -178,9 +174,8 @@ class TestSessionRange:
         return local.astimezone(UTC)
 
     def test_recognises_the_same_local_hours_across_a_dst_change(self):
-        """Task 4.9: the UK springs forward at 01:00 UTC on 2026-03-29, so
-        local 08:00 is 08:00 UTC on the 28th and 07:00 UTC on the 30th. A
-        window keyed on a fixed UTC offset would get one of the two wrong."""
+        """The UK springs forward at 01:00 UTC on 2026-03-29, so local 08:00 is 08:00 UTC on the 28th and 07:00 on
+        the 30th: a window keyed on a fixed UTC offset would get one of the two wrong."""
         times = [
             self._minute(7.5, day=28),  # before the session, pre-DST
             self._minute(8.0, day=28),  # inside, pre-DST (GMT, UTC+0)
@@ -198,9 +193,8 @@ class TestSessionRange:
         assert zones[0].top == pytest.approx(2.0)
         assert zones[1].start_bar == 3
         assert zones[1].top == pytest.approx(4.0)
-        # Two calendar days apart is 48 hours; these are 47 — the same local
-        # clock time landed an hour earlier in UTC because the offset itself
-        # moved under it (GMT, UTC+0, to BST, UTC+1).
+        # Two calendar days apart is 48 hours; these are 47, because the same local clock time landed
+        # an hour earlier in UTC when the offset moved under it (GMT to BST).
         assert times[3] - times[1] == timedelta(hours=47)
 
     def test_window_still_forming_stays_open(self):
@@ -215,9 +209,8 @@ class TestSessionRange:
         assert zone.bottom == pytest.approx(1.0)
 
     def test_two_consecutive_days_never_merge_into_one_zone(self):
-        """A window that closes right at midnight (in-window on the last bar
-        of one day, in-window again on the first bar of the next) must still
-        produce two zones, not one that silently spans the boundary."""
+        """A window closing right at midnight — in-window on the last bar of one day and the first of the next —
+        must still produce two zones, not one that silently spans the boundary."""
         entry = get("session_range_london")
         # 23:00 local both days is inside a 22:00-23:30 window.
         times = [self._minute(23.0, day=28), self._minute(23.0, day=29)]

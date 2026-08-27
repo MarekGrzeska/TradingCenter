@@ -1,9 +1,5 @@
-"""The backtest: history walked through the very function the loop calls.
-
-`run` is the whole of it — read the range once, decide every bar, resolve every setup
-against the bars that followed, and measure. Everything it needs is either in this package
-or is the strategy's own; there is no second implementation of any rule here.
-"""
+"""The backtest: history walked through the very function the loop calls. Everything `run` needs is in
+this package or is the strategy's own; there is no second implementation of any rule."""
 
 from __future__ import annotations
 
@@ -36,9 +32,8 @@ __all__ = [
     "slice_at",
 ]
 
-# How many bars a setup is given to resolve before it is closed at the market. Long enough
-# that a slow winner is not cut off, short enough that a forgotten position does not sit in
-# the accounting for a year pretending to be an open trade.
+# How many bars a setup is given to resolve before it is closed at the market. Long enough that a slow
+# winner is not cut off, short enough that a forgotten position stops pretending to be an open trade.
 RESOLUTION_LIMIT_BARS = 500
 
 
@@ -55,18 +50,8 @@ async def run(
     revision: int | None = None,
     revision_id: int | None = None,
 ) -> Report:
-    """One strategy over one range, with the costs stated.
-
-    The read happens once for the whole range and every bar is then decided off it — see
-    `replay.slice_at` for the masking that makes that honest, and `test_backtest.py` for
-    the comparison against the bar-by-bar driver that proves it.
-
-    An id names an entry in this image's catalogue and is looked up here, which is what
-    keeps a run of the strategy of reference possible with no database anywhere in reach
-    (`strategy-configurator`, "Wpis kodowy bez bazy"). A written rule arrives already
-    resolved, as a `StrategySpec` with its revision named — resolving it needs a connection,
-    and a backtest has no business holding one.
-    """
+    """One strategy over one range, with the costs stated. The read happens once and every bar is decided
+    off it. An id names an entry in this image's catalogue, so a run of the reference needs no database."""
     spec = strategy if isinstance(strategy, StrategySpec) else get(strategy)
     resolved = spec.resolve_params(params)
     read = await archive.read_facts(spec, symbol, resolved, as_of=end, bars_from=start)

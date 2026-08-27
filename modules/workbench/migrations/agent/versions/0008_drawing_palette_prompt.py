@@ -1,17 +1,5 @@
-"""Seeds `"v8"`: the same prompt, with the drawings paragraph naming the palette a
-drawing is actually drawn from.
-
-No schema change at all — the whole of this migration is one row. `draw_on_chart` stopped
-offering the indicator palette for objects that are not indicators
-(`agent/tools/drawings.py`), and a prompt that keeps promising "the same palette
-set_chart's indicators use" sends the model to pick a colour it will then be refused
-(specs/agent-chart-drawings, "Kolor spoza palety rysunków").
-
-Nothing in `chart_drawings` moves. Rows saved with an indicator token keep it and keep
-drawing in it: the terminal resolves both palettes, and rewriting colours the operator
-never asked to change would be a loss dressed as a migration.
-
-The prompt paragraph is repeated whole rather than patched, for the reason `0005` gives.
+"""Seeds `"v8"`: the drawings paragraph now names the palette a drawing is actually drawn from, since a prompt
+promising the indicator one sends the model to pick a colour it will be refused. Nothing in `chart_drawings` moves.
 
 Revision ID: 0008
 Revises: 0007

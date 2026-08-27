@@ -1,10 +1,5 @@
-"""Rare events and reference lines: swings, clusters, and levels from a coarser series.
-
-Two halves that share nothing but their output shapes. The first computes from the
-series being drawn over; the second is handed one closed candle of a higher resolution
-by the router and never sees a series at all (docs/wskazniki-plan-wdrozenia.html,
-"W1 — punkty i poziomy").
-"""
+"""Rare events and reference lines: swings, clusters, and levels from a coarser series. Two halves
+that share nothing but their output shapes — the second never sees a series at all."""
 
 from __future__ import annotations
 
@@ -31,18 +26,10 @@ from .spec import (
     Warmup,
 )
 
-# side make a fractal — and every entry below takes it as its own parameter
-# rather than assuming a shared default, so a caller composing e.g. `swing_points`
-# with `level_clusters` is the one who decides they agree. ---
-
 
 def _swing_extremes(high: np.ndarray, low: np.ndarray, n: int) -> tuple[np.ndarray, np.ndarray]:
-    """Bar `i` is a swing high when `high[i]` is strictly greater than each of the
-    `n` bars on both sides — a Williams fractal. `True` only once those `n` bars
-    *after* `i` exist in the array; turning "not yet confirmed" into a gap rather
-    than a repainted answer is the caller's job (`_compute_swing_points`,
-    `_last_swing_series`), not this function's.
-    """
+    """Bar `i` is a swing high when `high[i]` is strictly greater than each of the `n` bars on both
+    sides. Turning "not yet confirmed" into a gap rather than a repainted answer is the caller's job."""
     length = len(high)
     if n < 1 or length < 2 * n + 1:
         return np.zeros(length, dtype=bool), np.zeros(length, dtype=bool)
@@ -83,10 +70,8 @@ _SWING_POINTS = IndicatorSpec(
 
 
 def _last_swing_series(is_extreme: np.ndarray, price_at_extreme: np.ndarray, n: int) -> np.ndarray:
-    """The most recently *confirmed* extreme's price, carried forward as a step.
-    Confirmation lands `n` bars after the extreme itself, so the step moves at
-    bar `i + n`, never at `i` — the value at any bar only ever uses what a reader
-    stopping at that bar could already have known; nothing here repaints."""
+    """The most recently *confirmed* extreme's price, carried forward as a step. Confirmation lands
+    `n` bars after the extreme, so the step moves at bar `i + n` — nothing here repaints."""
     length = len(is_extreme)
     out = np.full(length, np.nan, dtype=np.float64)
     last_value = np.nan
@@ -157,10 +142,8 @@ _ROLLING_EXTREME = IndicatorSpec(
 def _cluster_points(
     points: list[tuple[int, float]], tolerance: float, label: str
 ) -> list[ClusterLevel]:
-    """Greedy 1-D clustering, closest price first: a point joins the running
-    cluster while it sits within `tolerance` of that cluster's *first* (lowest)
-    member, else it starts a new one. `bar` reported is the second-earliest
-    member's — the moment a cluster of two or more extrema first exists."""
+    """Greedy 1-D clustering, closest price first: a point joins the running cluster while it sits
+    within `tolerance` of that cluster's lowest member. `bar` is the second-earliest member's."""
     if tolerance <= 0 or len(points) < 2:
         return []
     ordered = sorted(points, key=lambda pt: pt[1])
@@ -222,16 +205,9 @@ _LEVEL_CLUSTERS = IndicatorSpec(
     computer=ClusterLevels(_compute_level_clusters),
 )
 
-# --- levels from a higher interval: a cross-resolution read of one closed period
-# — a single DAY/WEEK candle, four or seven rays drawn out of it
-# (docs/wskazniki-plan-wdrozenia.html, "htf_levels(okres)" and "pivots(typ, okres)").
-# The period is a choice of catalogue id here, not a numeric parameter — the same
-# choice `bbands_percent_b` already makes for its output shape instead of taking it
-# as a `mode`. The service (`indicators/service.py`) reads the series named in
-# `higher_resolution` separately and hands the OHLC tuple of one closed candle down
-# ready — none of the functions below ever sees the database. ---
 
-
+# The period is a choice of catalogue id, not a numeric parameter, and the service reads the
+# coarser series itself — none of the functions below ever sees the database.
 def _htf_ohlc_levels(ohlc: tuple[float, float, float, float], prefix: str) -> list[HtfLevel]:
     o, h, lo, c = ohlc
     return [

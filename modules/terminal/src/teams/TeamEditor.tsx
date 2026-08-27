@@ -28,23 +28,8 @@ import type {
 } from "./teamsApi";
 
 /**
- * One team, on the canvas, with the team's own limits in the panel beside it and each
- * agent's settings in a dialog over it.
- *
- * The agents used to share that 20rem panel, one at a time. They no longer do: an agent has
- * a prompt, a guidance note, a tool list and its dependencies, and a column that narrow
- * made all four small at once. The gear on each box opens them in a wide dialog instead,
- * which leaves the panel to the one thing that belongs to the team rather than to any agent
- * — its trading limits, which are now always where they were rather than behind a button.
- *
- * `saved` is only ever set from something the module answered with — never from what is
- * being typed — so a refused save leaves the last confirmed revision to compare against
- * and the Save button keeps saying there is something unsaved. `PromptManagementView`
- * holds the same rule for the same reason.
- *
- * Nothing here checks whether the draft is valid. The module decides that, and its
- * refusal is put next to the agent or the dependency it names (`refusal.ts`); a second
- * opinion in the browser would only be a second thing that can be wrong.
+ * One team on the canvas: the team's limits in the panel, each agent's settings in a dialog, because a 20rem
+ * column made a prompt, a note, a tool list and dependencies all small at once. Validity is the module's call.
  */
 export function TeamEditor({
   api,
@@ -70,10 +55,8 @@ export function TeamEditor({
    *  for a team that does not exist yet — it has no runs to look at. */
   onRuns(runId: number | null, teamName: string): void;
 }) {
-  // The cheapest model in the catalogue is what a new agent starts on — the module
-  // publishes the order, so the terminal picks a position in it rather than a name
-  // (`terminal-teams`, "terminal nie ma w swoim kodzie ani jednego identyfikatora
-  // modelu").
+  // The cheapest model in the catalogue is what a new agent starts on — the module publishes the order, so
+  // the terminal picks a position rather than a name (`terminal-teams`, no model identifier in this code).
   const defaultModelId = [...models].sort((a, b) => a.costRank - b.costRank)[0]?.id ?? "";
 
   const [name, setName] = useState("");
@@ -88,10 +71,8 @@ export function TeamEditor({
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  // Where the operator left each agent. Kept beside the draft rather than in it: the
-  // module stores it beside the revision for the same reason, and a moved node must not
-  // make the Save button light up (specs/terminal-teams, "Przesunięcie nie jest zmianą
-  // definicji").
+  // Where the operator left each agent, beside the draft rather than in it: a moved node must not light up
+  // the Save button (specs/terminal-teams, "Przesunięcie nie jest zmianą definicji").
   const [places, setPlaces] = useState<TeamLayout>(new Map());
   // What one step back restores, deepest last. Emptied when another team is opened: this
   // is the history of what the operator did to *this* draft.
@@ -144,9 +125,8 @@ export function TeamEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api, teamId]);
 
-  // Ctrl+Z on the document, so it reaches the draft wherever the operator's hands are —
-  // except inside something being typed into, where the browser's own undo is the better
-  // one and taking it away would be a worse trade than not having the shortcut at all.
+  // Ctrl+Z on the document, so it reaches the draft wherever the hands are — except inside a field, where
+  // the browser's own undo is better and taking it away would be the worse trade.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key.toLowerCase() !== "z" || !(event.ctrlKey || event.metaKey)) return;
@@ -168,9 +148,8 @@ export function TeamEditor({
   function edit(next: TeamDefinition, kind = "structure") {
     if (draft) setHistory((current) => remember(current, { definition: draft, places }, kind));
     setDraft(next);
-    // The refusal described the definition that was sent, so the first edit after it
-    // retires it — leaving it on would keep a node marked for a reason that may already
-    // be gone, which is worse than saying nothing.
+    // The refusal described the definition that was sent, so the first edit after it retires it: a node
+    // marked for a reason that may already be gone is worse than saying nothing.
     setRefusal(null);
   }
 
@@ -188,9 +167,8 @@ export function TeamEditor({
     // A team that does not exist yet has nowhere to put this; it is saved with the rest
     // of the arrangement the first time the operator drags something after creating it.
     if (teamId === null) return;
-    // Fire and forget on purpose, and the failure is deliberately quiet: the node is
-    // already where the operator put it, and an error banner over a position is louder
-    // than what was lost.
+    // Fire and forget, and the failure is deliberately quiet: the node is already where the operator put
+    // it, and an error banner over a position is louder than what was lost.
     void api.saveLayout(teamId, moved, new AbortController().signal).catch(() => {});
   }
 
@@ -248,9 +226,8 @@ export function TeamEditor({
     );
   }
 
-  // Looked up in the draft rather than trusted from state: an agent removed by `Undo` while
-  // its settings are open takes the dialog with it, instead of leaving one over fields that
-  // edit an agent the definition no longer has.
+  // Looked up in the draft rather than trusted from state: an agent removed by `Undo` takes its open
+  // dialog with it, instead of leaving fields that edit an agent the definition no longer has.
   const settingsAgent = draft.agents.find((agent) => agent.key === settingsKey) ?? null;
   const dirty = saved === null || hasChanges(draft, saved);
 

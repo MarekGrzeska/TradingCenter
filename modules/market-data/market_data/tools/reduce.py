@@ -1,7 +1,5 @@
-"""Turning "more than the ceiling" into "the ceiling, and a note about it" — the one
-place a tool's aggregation and truncation happens, so "nic nie znika po cichu"
-(specs/market-data-answers) is satisfied once instead of once per tool.
-"""
+"""Turning "more than the ceiling" into "the ceiling, and a note about it" — the one place a tool's
+aggregation and truncation happens, so nothing disappears quietly."""
 
 from __future__ import annotations
 
@@ -18,11 +16,8 @@ class Aggregation:
 def aggregate_candles(
     candles: list[dict], target_count: int
 ) -> tuple[list[dict], Aggregation | None]:
-    """Buckets `candles` down to roughly `target_count` entries, OHLC-merged.
-
-    A no-op when the series already fits — aggregating a series that did not need it
-    would answer a request for detail with less than was asked for.
-    """
+    """Buckets `candles` down to roughly `target_count` entries, OHLC-merged, and a no-op when the series already
+    fits: aggregating one that did not need it would answer a request for detail with less than was asked for."""
     n = len(candles)
     if n <= target_count or target_count <= 0:
         return candles, None
@@ -54,10 +49,8 @@ def truncate(items: list, limit: int) -> tuple[list, int]:
 
 
 def thin_series(values: list, target_count: int) -> tuple[list, int | None]:
-    """Every `stride`-th value, keeping the series' shape recognizable instead of its
-    every point — for a full-resolution series, not the OHLC series `aggregate_candles`
-    bucket-merges. `stride` is `None` when the series already fits.
-    """
+    """Every `stride`-th value, keeping the series' shape recognizable instead of its every point — for a
+    full-resolution series, not the OHLC series `aggregate_candles` merges. `None` when it already fits."""
     n = len(values)
     if n <= target_count or target_count <= 0:
         return values, None
@@ -65,8 +58,5 @@ def thin_series(values: list, target_count: int) -> tuple[list, int | None]:
     return values[::stride], stride
 
 
-# `cap_by_freshness(items, time_key, limit)` stood here until the tools moved into
-# market-data. It indexed its items as dicts, which was true while they arrived as JSON off
-# a wire and stopped being true when they arrived as models — and it had no test, so nothing
-# said so. Its two callers now sort explicitly and call `truncate`, which reads the same as
-# the third branch beside them, whose key is a fallback no shared helper could express.
+# `cap_by_freshness` stood here until the tools moved in. It indexed its items as dicts, which stopped
+# being true when they arrived as models, and it had no test to say so.

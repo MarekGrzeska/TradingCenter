@@ -21,13 +21,8 @@ export type OptionsFetcher<T> = (query: string, signal: AbortSignal) => Promise<
 const IDLE: AsyncOptionsState<never> = { status: "idle", options: [], truncated: false, error: null };
 
 /**
- * Debounce, plus protection against a stale answer overtaking a newer one: each run owns
- * a `cancelled` flag its cleanup sets. Shared by every autocomplete in the terminal
- * (terminal-instruments spec, "Podpowiadanie zachowuje się wszędzie tak samo").
- *
- * `fetch` is read through a ref rather than listed as a dependency — a caller's inline
- * closure is new every render, and refetching on it would defeat the debounce. Only
- * `query`, `enabled` and `retry()` restart the fetch.
+ * Debounce, plus protection against a stale answer overtaking a newer one: each run owns a `cancelled` flag. `fetch` is
+ * read through a ref rather than a dependency — a caller's inline closure is new every render and would defeat both.
  */
 export function useAsyncOptions<T>(
   fetch: OptionsFetcher<T>,
