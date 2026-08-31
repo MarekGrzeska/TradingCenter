@@ -46,10 +46,10 @@
 
 ## 7. Powierzchnia MCP
 
-- [ ] 7.1 `mcp_app.py` — montaż `/mcp` i sesja narzędziowa w `lifespan`
-- [ ] 7.2 Narzędzie wysyłające i narzędzie wyliczające adresatów
-- [ ] 7.3 Odmowa narzędzia, gdy brama nie zna żadnego adresata
-- [ ] 7.4 Test: powierzchnia narzędziowa nie zawiera zakładania, kasowania ani wiązania
+- [x] 7.1 `mcp_app.py` — montaż `/mcp` i sesja narzędziowa w `lifespan`
+- [x] 7.2 Narzędzie wysyłające i narzędzie wyliczające adresatów
+- [x] 7.3 Odmowa narzędzia, gdy brama nie zna żadnego adresata
+- [x] 7.4 Test: powierzchnia narzędziowa nie zawiera zakładania, kasowania ani wiązania
 
 ## 8. Dostęp wywołujących
 

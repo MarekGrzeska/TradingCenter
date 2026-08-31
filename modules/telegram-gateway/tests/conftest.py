@@ -9,6 +9,7 @@ from pathlib import Path
 
 import asyncpg
 import pytest
+from fakes import FakeBotApi
 from tc_runtime.db import asyncpg_dsn, sqlalchemy_url
 
 from telegram_gateway.app import create_app
@@ -144,6 +145,16 @@ async def pool(migrated_url: str):
             async with created.acquire() as conn:
                 await conn.execute(f"TRUNCATE {', '.join(TABLES)}")
         yield created
+
+
+@pytest.fixture
+async def tool_server(app, pool, settings):
+    """The FastMCP server this module publishes, wired to a real database and built from the same
+    application `create_app()` builds — a server assembled here would be a ceiling on nothing."""
+    app.state.pool = pool
+    app.state.settings = settings
+    app.state.telegram = FakeBotApi()
+    return app.state.mcp_server
 
 
 @pytest.fixture

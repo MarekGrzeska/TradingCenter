@@ -13,7 +13,7 @@ from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
-from . import redaction
+from . import mcp_app, redaction
 from .binding import Watcher
 from .bot_api import bot_api
 from .config import Settings
@@ -73,14 +73,17 @@ async def lifespan(app: FastAPI):
         app.state.watcher = watcher
         await watcher.start()
 
-        log.info(
-            "telegram-gateway is serving; creating bots is %s",
-            "available" if settings.can_create_bots else "unavailable (no account session)",
-        )
-        try:
-            yield
-        finally:
-            await watcher.stop()
+        # The tool surface's session manager: a mounted application's lifespan is never run, so the
+        # task group has to be started here or every tool call fails.
+        async with mcp_app.tool_surface_session(app):
+            log.info(
+                "telegram-gateway is serving; creating bots is %s",
+                "available" if settings.can_create_bots else "unavailable (no account session)",
+            )
+            try:
+                yield
+            finally:
+                await watcher.stop()
 
 
 def create_app() -> FastAPI:
@@ -95,6 +98,14 @@ def create_app() -> FastAPI:
     app.include_router(messages.router)
     app.include_router(bots.router)
     app.include_router(destinations.router)
+
+    server, tool_app = mcp_app.build_mcp_app(app)
+    app.state.mcp_server = server
+    app.mount(mcp_app.MOUNT_PATH, tool_app)
+
+    # In front of the whole application: the address fix runs before routing, so `/mcp` and `/mcp/`
+    # are one address rather than a redirect an MCP client will not follow on a POST.
+    app.add_middleware(mcp_app.ToolSurfaceAddress)
     return app
 
 
