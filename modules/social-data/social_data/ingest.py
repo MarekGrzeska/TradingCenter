@@ -58,6 +58,7 @@ class Ingest:
         interval_seconds: int,
         window_hours: int,
         enrich: Callable[[datetime], object] | None = None,
+        announce: Callable[[datetime], object] | None = None,
         clock: Callable[[], datetime] = _now,
     ) -> None:
         self._pool = pool
@@ -65,6 +66,7 @@ class Ingest:
         self._interval = interval_seconds
         self._window = timedelta(hours=window_hours)
         self._enrich = enrich
+        self._announce = announce
         self._clock = clock
         self._task: asyncio.Task | None = None
 
@@ -98,10 +100,11 @@ class Ingest:
             await asyncio.sleep(self._interval)
 
     async def tick(self) -> list[Collected]:
-        """One pass over every source, then whatever enrichment the module is configured for."""
+        """One pass over every source, then the enrichment and the alerts this module is configured
+        for — in that order, because a post is only worth announcing once a model has read it."""
         results = [await self.collect(source) for source in self._sources]
+        since = self._clock() - self._window
         if self._enrich is not None:
-            since = self._clock() - self._window
             try:
                 await self._enrich(since)  # type: ignore[misc]
             except asyncio.CancelledError:
@@ -110,6 +113,15 @@ class Ingest:
                 # A model that will not answer costs the readings, never the collection: the posts
                 # are already stored, and the next pass picks up whatever stayed unread.
                 log.exception("enrichment failed for this round")
+        if self._announce is not None:
+            try:
+                await self._announce(since)  # type: ignore[misc]
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # And a gateway that will not answer costs the notification only. No marker was
+                # written, so the next round offers the same posts again.
+                log.exception("announcing failed for this round")
         return results
 
     async def collect(self, source: PostSource) -> Collected:

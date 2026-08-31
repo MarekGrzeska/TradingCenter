@@ -91,6 +91,10 @@ async def test_the_state_says_since_when_it_collects_and_whether_a_model_is_conf
     body = (await api.get("/state")).json()
 
     assert body["model_configured"] is False
+    # And whether it can tell anybody: an archive that collects and says nothing looks from
+    # outside exactly like one whose gateway is broken.
+    assert body["alerts_configured"] is False
+    assert body["alert_min_impact_score"] == 8
     assert body["posts_in_window"] == 1
     [source] = body["sources"]
     assert source["source"] == TRUTH_SOCIAL

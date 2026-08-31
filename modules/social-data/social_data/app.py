@@ -14,7 +14,7 @@ from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
-from . import enrichment, mcp_app
+from . import alerts, enrichment, mcp_app
 from .caller_access import CallerAccess
 from .config import Settings
 from .ingest import Ingest
@@ -76,6 +76,11 @@ async def lifespan(app: FastAPI):
         enricher = enrichment.build(pool, settings)
         app.state.enrichment = enricher
 
+        # `None` without a gateway, and the module runs anyway: collecting without telling anybody
+        # is a supported state, which `/state` names rather than leaving the screen to guess at.
+        announcer = alerts.build(pool, settings)
+        app.state.alerts = announcer
+
         # After the migration and not before it: a pass started earlier would write into a schema
         # it does not know, and a bad write is not undone by a later error response.
         ingest = Ingest(
@@ -84,6 +89,7 @@ async def lifespan(app: FastAPI):
             interval_seconds=settings.collect_interval_seconds,
             window_hours=settings.collect_window_hours,
             enrich=None if enricher is None else enricher.run,
+            announce=None if announcer is None else announcer.run,
         )
         app.state.ingest = ingest
         await ingest.start()

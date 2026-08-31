@@ -76,11 +76,11 @@
 
 ## 12. Wywołujący: social-data
 
-- [ ] 12.1 Migracja dokładająca znacznik „już powiedziane" przy poście
-- [ ] 12.2 Klient bramy w kształcie `strategy/archive.py`, z tożsamością zarządzaną
-- [ ] 12.3 Próg oceny wpływu jako ustawienie; wysyłka po zbiórce, znacznik po powodzeniu
-- [ ] 12.4 Test: brak adresu bramy zostawia zbiórkę nietkniętą
-- [ ] 12.5 Test: nieudana wysyłka nie stawia znacznika, a następny przebieg ponawia
+- [x] 12.1 Migracja dokładająca znacznik „już powiedziane" przy poście
+- [x] 12.2 Klient bramy w kształcie `strategy/archive.py`, z tożsamością zarządzaną
+- [x] 12.3 Próg oceny wpływu jako ustawienie; wysyłka po zbiórce, znacznik po powodzeniu
+- [x] 12.4 Test: brak adresu bramy zostawia zbiórkę nietkniętą
+- [x] 12.5 Test: nieudana wysyłka nie stawia znacznika, a następny przebieg ponawia
 
 ## 13. Wywołujący: strategy
 

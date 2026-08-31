@@ -911,40 +911,51 @@ resource "azurerm_linux_web_app" "social_data" {
     }
   }
 
-  app_settings = {
-    # No credential in the URL and no AZURE_* triple — config.py refuses one when DATABASE_USER is set, and the
-    # identity is ambient. That user is the role `scripts/grant-schema-ownership.sql` creates, named after this app.
-    DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.social.name}?sslmode=require"
-    DATABASE_USER = local.social_data_app_name
+  # Merged, because the gateway is the setting whose *absence* is a working configuration: without it this
+  # module collects and reads exactly as before and tells nobody, which `/state` reports.
+  app_settings = merge(
+    {
+      # No credential in the URL and no AZURE_* triple — config.py refuses one when DATABASE_USER is set, and the
+      # identity is ambient. That user is the role `scripts/grant-schema-ownership.sql` creates, named after this app.
+      DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.social.name}?sslmode=require"
+      DATABASE_USER = local.social_data_app_name
 
-    # The feed, set here rather than left to the module's default for the reason every other upstream address is:
-    # it is somebody's side project, and the day it moves is a deployment.
-    TRUTH_SOCIAL_FEED_URL = "https://www.trumpstruth.org/feed"
-    PROVIDER_USER_AGENT   = "tradingcenter-social-data/0.1 (+https://github.com/MarekGrzeska)"
+      # The feed, set here rather than left to the module's default for the reason every other upstream address is:
+      # it is somebody's side project, and the day it moves is a deployment.
+      TRUTH_SOCIAL_FEED_URL = "https://www.trumpstruth.org/feed"
+      PROVIDER_USER_AGENT   = "tradingcenter-social-data/0.1 (+https://github.com/MarekGrzeska)"
 
-    # The conversation's key, read from Key Vault like the workbench reads its two — a reference, never a value in
-    # this file. **Shared rather than a third secret**, so the readings arrive on the same line of the bill as the
-    # chat; splitting them is one more `key_vault_secret_names` entry and one edit here, the day that matters.
-    OPENAI_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.openai_api_key})"
+      # The conversation's key, read from Key Vault like the workbench reads its two — a reference, never a value in
+      # this file. **Shared rather than a third secret**, so the readings arrive on the same line of the bill as the
+      # chat; splitting them is one more `key_vault_secret_names` entry and one edit here, the day that matters.
+      OPENAI_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.openai_api_key})"
 
-    # Left to config.py's defaults on purpose: which model reads a post is a decision to change by restarting,
-    # not one to redeploy for. Clearing OPENAI_API_KEY is the rollback — the module then collects and reads
-    # nothing, a state its own tests walk.
+      # Left to config.py's defaults on purpose: which model reads a post is a decision to change by restarting,
+      # not one to redeploy for. Clearing OPENAI_API_KEY is the rollback — the module then collects and reads
+      # nothing, a state its own tests walk.
 
-    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.social_data_easy_auth.password
+      MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.social_data_easy_auth.password
 
-    # The module checks the caller's identity itself rather than trusting the block above is switched on.
-    REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
+      # The module checks the caller's identity itself rather than trusting the block above is switched on.
+      REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
 
-    # Which caller reaches which surface, by the `azp` claim and never by `X-MS-CLIENT-PRINCIPAL-ID`.
-    TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
-    REST_CALLER_APPLICATION_IDS = join(",", [
-      azuread_application.terminal.client_id,
-      azuread_application.pocket.client_id,
-    ])
+      # Which caller reaches which surface, by the `azp` claim and never by `X-MS-CLIENT-PRINCIPAL-ID`.
+      TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
+      REST_CALLER_APPLICATION_IDS = join(",", [
+        azuread_application.terminal.client_id,
+        azuread_application.pocket.client_id,
+      ])
 
-    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
-  }
+      APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
+    },
+    # All three or none — config.py refuses every partial form, because each of them is silence that reads
+    # like a working configuration. The threshold is left to config.py's own default.
+    var.telegram_alert_destination == "" ? {} : {
+      TELEGRAM_GATEWAY_URL   = "https://${local.telegram_gateway_hostname}"
+      TELEGRAM_GATEWAY_SCOPE = "${local.telegram_gateway_api_uri}/.default"
+      ALERT_DESTINATION      = var.telegram_alert_destination
+    }
+  )
 
   lifecycle {
     ignore_changes = [site_config[0].application_stack[0].docker_image_name]

@@ -124,3 +124,10 @@ class StateOut(BaseModel):
         description="whether a model is configured at all — false means readings stay empty by "
         "configuration, not because nothing was worth reading"
     )
+    alerts_configured: bool = Field(
+        description="whether this archive can notify the operator at all — false means it "
+        "collects and says nothing by configuration, which is a supported state"
+    )
+    alert_min_impact_score: int = Field(
+        description="the reading a post needs before it is worth a notification"
+    )
