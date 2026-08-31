@@ -71,8 +71,8 @@
 
 ## 11. Wywołujący: workbench
 
-- [ ] 11.1 Piąta para `TELEGRAM_MCP_URL` / `_SCOPE` w `workbench/config.py` i `.env.example`
-- [ ] 11.2 Test: brak pary zostawia workbench bez tych narzędzi i nie wywraca startu
+- [x] 11.1 Piąta para `TELEGRAM_MCP_URL` / `_SCOPE` w `workbench/config.py` i `.env.example`
+- [x] 11.2 Test: brak pary zostawia workbench bez tych narzędzi i nie wywraca startu
 
 ## 12. Wywołujący: social-data
 

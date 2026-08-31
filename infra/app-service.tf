@@ -496,6 +496,11 @@ resource "azurerm_linux_web_app" "workbench" {
     SOCIAL_MCP_URL   = "https://${local.social_data_hostname}"
     SOCIAL_MCP_SCOPE = "${local.social_data_api_uri}/.default"
 
+    # The fifth, and the one whose tool acts outside this system: it sends a Telegram message. Same both-or-neither
+    # rule and the same rollback — clear the pair and restart, and the conversation notifies nobody.
+    TELEGRAM_MCP_URL   = "https://${local.telegram_gateway_hostname}"
+    TELEGRAM_MCP_SCOPE = "${local.telegram_gateway_api_uri}/.default"
+
     # The teams surface's own clock, in this app's `lifespan` rather than a timer calling in, which would need its own
     # registration. **The one setting here whose value is a decision**: config.py defaults it on, this states it.
     SCHEDULER_ENABLED = "true"

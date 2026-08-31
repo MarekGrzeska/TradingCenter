@@ -56,6 +56,12 @@ class Settings(BaseSettings):
     social_mcp_scope: str | None = None
     social_mcp_request_timeout_seconds: float = 15.0
 
+    # The fifth pair, and the one whose tools do something the operator can see on their phone. Its ceiling is
+    # trading-mcp's: a timeout here is a notification delivered and reported as failed, or sent again.
+    telegram_mcp_url: str | None = None
+    telegram_mcp_scope: str | None = None
+    telegram_mcp_request_timeout_seconds: float = 35.0
+
     # No `TEAMS_MCP_*`: the teams tools are a layer in this process now, so a `.env` from before this change carries
     # three settings that are read by nothing.
 
@@ -124,6 +130,9 @@ class Settings(BaseSettings):
             social_mcp_url=self.social_mcp_url,
             social_mcp_scope=self.social_mcp_scope,
             social_mcp_request_timeout_seconds=self.social_mcp_request_timeout_seconds,
+            telegram_mcp_url=self.telegram_mcp_url,
+            telegram_mcp_scope=self.telegram_mcp_scope,
+            telegram_mcp_request_timeout_seconds=self.telegram_mcp_request_timeout_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
         )
 
@@ -150,6 +159,9 @@ class Settings(BaseSettings):
             social_mcp_url=self.social_mcp_url,
             social_mcp_scope=self.social_mcp_scope,
             social_mcp_request_timeout_seconds=self.social_mcp_request_timeout_seconds,
+            telegram_mcp_url=self.telegram_mcp_url,
+            telegram_mcp_scope=self.telegram_mcp_scope,
+            telegram_mcp_request_timeout_seconds=self.telegram_mcp_request_timeout_seconds,
             run_timeout_seconds=self.run_timeout_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
             scheduler_enabled=self.scheduler_enabled,
