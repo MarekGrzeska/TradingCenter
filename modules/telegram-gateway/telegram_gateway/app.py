@@ -17,7 +17,7 @@ from . import redaction
 from .binding import Watcher
 from .bot_api import bot_api
 from .config import Settings
-from .routers import meta
+from .routers import bots, destinations, messages, meta, state
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
 log = logging.getLogger(__name__)
@@ -91,6 +91,10 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.include_router(meta.router)
+    app.include_router(state.router)
+    app.include_router(messages.router)
+    app.include_router(bots.router)
+    app.include_router(destinations.router)
     return app
 
 

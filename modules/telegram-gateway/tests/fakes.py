@@ -86,3 +86,21 @@ def botfather_success(token: str, username: str = "alertsbot") -> str:
         f"Use this token to access the HTTP API:\n{token}\n"
         "Keep your token secure and store it safely, it can be used by anyone to control your bot."
     )
+
+
+class RecordingWatcher:
+    """The long-poll supervisor as the routes use it — two calls, and a test that reads them back.
+
+    A real `Watcher` here would start a task polling a fake Telegram in a tight loop for as long as
+    the test ran.
+    """
+
+    def __init__(self) -> None:
+        self.watching: list[str] = []
+        self.forgotten: list[int] = []
+
+    def watch(self, bot) -> None:
+        self.watching.append(bot.username)
+
+    def forget(self, bot_id: int) -> None:
+        self.forgotten.append(bot_id)

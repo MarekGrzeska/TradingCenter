@@ -38,11 +38,11 @@
 
 ## 6. Powierzchnia REST
 
-- [ ] 6.1 `contract.py` — modele odpowiedzi, żadna nie niesie tokenu
-- [ ] 6.2 Trasy wysyłki
-- [ ] 6.3 Trasy zarządzania botami i adresatami
-- [ ] 6.4 Trasa stanu: sesja konta, liczba botów, liczba adresatów
-- [ ] 6.5 `openapi.py` — wydanie dokumentu, jak w pozostałych modułach
+- [x] 6.1 `contract.py` — modele odpowiedzi, żadna nie niesie tokenu
+- [x] 6.2 Trasy wysyłki
+- [x] 6.3 Trasy zarządzania botami i adresatami
+- [x] 6.4 Trasa stanu: sesja konta, liczba botów, liczba adresatów
+- [x] 6.5 `openapi.py` — wydanie dokumentu, jak w pozostałych modułach
 
 ## 7. Powierzchnia MCP
 
