@@ -32,12 +32,12 @@
 
 ## 5. Kontrakt REST
 
-- [ ] 5.1 `contract.py` — kształty odpowiedzi; pola odczytu zawsze obecne, puste gdy odczytu nie ma
-- [ ] 5.2 `routers/posts.py` — okno „ostatnie N godzin", okno jawne, zawężenia po źródle, ocenie i temacie, odczyt jednego posta
-- [ ] 5.3 `routers/meta.py` — stan modułu: ostatni zbiór, początek zbioru, czynne źródła, czy model skonfigurowany
-- [ ] 5.4 Odmowa z powodem dla okna bez sensu i zawężenia spoza zakresu
-- [ ] 5.5 `openapi.py` — druk dokumentu bez serwera i bez bazy
-- [ ] 5.6 Testy: jeden przez HTTP na dojście stanu do drutu, jedna odmowa, `test_openapi`
+- [x] 5.1 `contract.py` — kształty odpowiedzi; pola odczytu zawsze obecne, puste gdy odczytu nie ma
+- [x] 5.2 `routers/posts.py` — okno „ostatnie N godzin", okno jawne, zawężenia po źródle, ocenie i temacie, odczyt jednego posta
+- [x] 5.3 `routers/meta.py` — stan modułu: ostatni zbiór, początek zbioru, czynne źródła, czy model skonfigurowany
+- [x] 5.4 Odmowa z powodem dla okna bez sensu i zawężenia spoza zakresu
+- [x] 5.5 `openapi.py` — druk dokumentu bez serwera i bez bazy
+- [x] 5.6 Testy: jeden przez HTTP na dojście stanu do drutu, jedna odmowa, `test_openapi`
 
 ## 6. Narzędzia i dostęp
 

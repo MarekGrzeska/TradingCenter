@@ -138,6 +138,21 @@ async def pool(migrated_url: str):
 
 
 @pytest.fixture
+async def api(app, pool, settings):
+    """The application wired to a real database, with nothing reaching outward. The lifespan is
+    bypassed rather than run: it would start the collector, which would reach a third party."""
+    import httpx
+
+    app.state.pool = pool
+    app.state.settings = settings
+    app.state.enrichment = None
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://tests") as client:
+        yield client
+
+
+@pytest.fixture
 def app():
     """A fresh application per test. A fixture rather than an import: while the module-level `app` was in
     scope, a test that forgot to ask for this one still found something to mutate."""
