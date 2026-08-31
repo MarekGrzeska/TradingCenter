@@ -22,8 +22,12 @@ os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
 # Emptied between tests so one test's rows are never another's premise. TRUNCATE rather than
 # re-migrating, and named in full rather than left to CASCADE, so the statement says what it empties.
-# Empty while the schema is: the first migration fills it.
-TABLES: tuple[str, ...] = ()
+TABLES: tuple[str, ...] = (
+    "update_offsets",
+    "binding_nonces",
+    "destinations",
+    "bots",
+)
 
 # Generous, because Docker Desktop wakes its VM lazily and a first call after an idle spell
 # can take several seconds.

@@ -7,9 +7,9 @@
 
 ## 2. Baza
 
-- [ ] 2.1 Migracja `0001`: `bots`, `destinations`, `binding_nonces`, `update_offsets`
-- [ ] 2.2 `store.py` — wszystkie zapytania modułu, bez ORM
-- [ ] 2.3 Test: token bota nie jest zwracany przez żadną funkcję odczytową składu
+- [x] 2.1 Migracja `0001`: `bots`, `destinations`, `binding_nonces`, `update_offsets`
+- [x] 2.2 `store.py` — wszystkie zapytania modułu, bez ORM
+- [x] 2.3 Test: token bota nie jest zwracany przez żadną funkcję odczytową składu
 
 ## 3. Wysyłka
 
