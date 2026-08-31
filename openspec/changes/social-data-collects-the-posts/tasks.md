@@ -8,9 +8,9 @@
 
 ## 2. Przechowywanie
 
-- [ ] 2.1 Migracja `0001` — tabela postów z kluczem `(source, external_id)`, indeksami po czasie publikacji i po ocenie, oraz tabela zużycia modelu
-- [ ] 2.2 `store.py` — wstawienie pomijające duplikaty, odczyt oknem z zawężeniami, odczyt jednego posta, zapis odczytu modelu i zużycia
-- [ ] 2.3 Testy `-m db` na dedupie, oknie i porządku wyniku
+- [x] 2.1 Migracja `0001` — tabela postów z kluczem `(source, external_id)`, indeksami po czasie publikacji i po ocenie, oraz tabela zużycia modelu
+- [x] 2.2 `store.py` — wstawienie pomijające duplikaty, odczyt oknem z zawężeniami, odczyt jednego posta, zapis odczytu modelu i zużycia
+- [x] 2.3 Testy `-m db` na dedupie, oknie i porządku wyniku
 
 ## 3. Zbiór
 
