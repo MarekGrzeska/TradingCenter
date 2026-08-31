@@ -131,18 +131,18 @@ class Ingest:
                 log.warning("source %s did not answer for %s: %s", source.name, day, err)
                 break
 
-        in_window = [
-            post for post in fetched.values() if start <= post.published_at <= end
-        ]
+        in_window = [post for post in fetched.values() if start <= post.published_at <= end]
 
         async with self._pool.acquire() as conn:
-            inserted = await store.insert_new_posts(conn, in_window)
             if failure is None:
+                inserted = await store.insert_new_posts(conn, in_window)
                 await store.record_collection_success(conn, source.name, at=end)
             else:
-                await store.record_collection_failure(
-                    conn, source.name, at=end, reason=failure
-                )
+                # Nothing written, not even the dates that answered before the one that did not: a
+                # window is collected whole or not at all, and a half-written one is indistinguishable
+                # afterwards from a quiet stretch. The next pass asks for the same window again.
+                inserted = 0
+                await store.record_collection_failure(conn, source.name, at=end, reason=failure)
 
         log.info(
             "source %s: %d posts in the window, %d new%s",

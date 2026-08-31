@@ -73,10 +73,23 @@ describe("SocialView", () => {
 
     expect(await screen.findByText("TARIFFS.")).toBeInTheDocument();
     expect(screen.queryByText("GREAT ROUND OF GOLF.")).not.toBeInTheDocument();
+    // The window the list stands for, said rather than left to be inferred from the posts.
+    expect(screen.getByText(/ostatnie 24 h/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Pozostałe posty \(1\)/ }));
 
     expect(screen.getByText("GREAT ROUND OF GOLF.")).toBeInTheDocument();
+  });
+
+  it("shows no score at all on a post no model has read", async () => {
+    // Not a zero and not a dash: both read as a judgement, and there is none.
+    render(<SocialView api={api([post({ externalId: "unread", impactScore: null })])} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Pozostałe posty \(1\)/ }));
+
+    // Matched as a badge standing alone: the "nothing scored 6/10 or higher" line on the same
+    // screen holds that string too, and a looser pattern would pass on it.
+    expect(screen.queryByText(/^\d+\/10$/)).not.toBeInTheDocument();
   });
 
   it("says a day held nothing scored rather than looking empty", async () => {

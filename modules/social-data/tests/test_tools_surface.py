@@ -137,3 +137,12 @@ async def test_a_window_names_its_own_edges(tool_server, pool) -> None:
     )
 
     assert [post["external_id"] for post in listed] == ["inside"]
+
+
+@pytest.mark.db
+async def test_asking_for_a_post_that_is_not_there_is_an_answer_not_an_error(tool_server) -> None:
+    """A model asking about a post the archive never collected has to be able to say so."""
+    answer = await call(tool_server, "read_post", source=TRUTH_SOCIAL, external_id="never-seen")
+
+    assert "never-seen" in answer["refused"]
+    assert "recent_posts" in answer["do_first"]

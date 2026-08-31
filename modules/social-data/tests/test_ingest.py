@@ -3,6 +3,7 @@ answer does — and does not do — to what is already there."""
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
@@ -136,3 +137,63 @@ async def test_nothing_earlier_than_the_window_is_ever_asked_for(pool):
     await ingest.collect(source)
 
     assert min(source.asked) == date(2026, 8, 30)
+
+
+async def test_a_window_half_answered_writes_nothing_at_all(pool):
+    """The first date answers and the second does not. Writing the half that arrived would leave an
+    archive that cannot be told afterwards from a quiet stretch — and the next pass asks again."""
+    early = raw_post("early", published_at=datetime(2026, 8, 30, 23, 50, tzinfo=UTC))
+    source = FakeSource(
+        by_day={date(2026, 8, 30): [early]}, fails_on=date(2026, 8, 31), name=TRUTH_SOCIAL
+    )
+    ingest = Ingest(
+        pool, [source], interval_seconds=60, window_hours=24, clock=at(JUST_BEFORE_MIDNIGHT)
+    )
+
+    result = await ingest.collect(source)
+
+    assert result.inserted == 0
+    assert result.failure is not None
+    async with pool.acquire() as conn:
+        assert await store.post_by_external_id(conn, TRUTH_SOCIAL, "early") is None
+
+
+async def test_a_read_never_adds_to_the_archive(pool, api):
+    """The reversal this module is built on: in the application it came from, asking for a day's
+    posts fetched the feed and wrote what it found."""
+    source = FakeSource([raw_post("a", published_at=JUST_BEFORE_MIDNIGHT)])
+    ingest = Ingest(
+        pool, [source], interval_seconds=60, window_hours=24, clock=at(JUST_BEFORE_MIDNIGHT)
+    )
+    await ingest.collect(source)
+    asked_before = len(source.asked)
+
+    await api.get("/posts", params={"hours": 24})
+    await api.get(f"/posts/{TRUTH_SOCIAL}/a")
+    await api.get("/state")
+
+    assert source.asked == source.asked[:asked_before]
+    async with pool.acquire() as conn:
+        assert await store.count_in_window(
+            conn, start=JUST_BEFORE_MIDNIGHT - timedelta(days=1), end=JUST_BEFORE_MIDNIGHT
+        ) == 1
+
+
+async def test_the_loop_collects_without_anybody_asking(pool):
+    """Started and left alone, the pass runs on its own interval — the property every other test
+    here reaches past by calling `collect` directly."""
+    source = FakeSource([raw_post("a", minutes_ago=5)])
+    ingest = Ingest(pool, [source], interval_seconds=1, window_hours=24)
+
+    await ingest.start()
+    try:
+        for _ in range(100):
+            if source.asked:
+                break
+            await asyncio.sleep(0.02)
+    finally:
+        await ingest.stop()
+
+    assert source.asked, "the loop asked its source for nothing"
+    async with pool.acquire() as conn:
+        assert await store.post_by_external_id(conn, TRUTH_SOCIAL, "a") is not None

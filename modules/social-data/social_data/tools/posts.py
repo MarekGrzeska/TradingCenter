@@ -110,12 +110,20 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
     @mcp.tool(annotations=READ_ONLY)
     async def read_post(
         source: str, external_id: str, translated: bool = False
-    ) -> PostDetail | None:
+    ) -> PostDetail | dict:
         """One post in full, by the pair naming it. `translated` asks for the Polish reading too."""
         async with ctx.pool.acquire() as conn:
             post = await store.post_by_external_id(conn, source, external_id)
         if post is None:
-            return None
+            # A refusal that says so, not an empty answer: nothing collected and a tool that
+            # failed look the same to a model when the answer is nothing at all.
+            return {
+                "refused": f"no post {external_id!r} from {source!r} is in this archive",
+                "do_first": (
+                    "recent_posts or posts_in_window lists what is here, with the pair that "
+                    "names each one; social_archive_status says how far back the archive goes"
+                ),
+            }
         return PostDetail(
             source=post.source,
             external_id=post.external_id,

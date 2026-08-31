@@ -95,6 +95,9 @@ async def test_the_state_says_since_when_it_collects_and_whether_a_model_is_conf
     [source] = body["sources"]
     assert source["source"] == TRUTH_SOCIAL
     assert source["stale"] is False
+    # What a window before this moment is answered with: nothing, and the reason, because there
+    # is no backfill and nothing older will ever arrive.
+    assert source["collecting_since"] is not None
 
 
 async def test_an_archive_that_has_not_collected_for_a_long_time_says_so(api, pool):

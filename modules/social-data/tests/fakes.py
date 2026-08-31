@@ -18,11 +18,13 @@ class FakeSource:
         *,
         name: str = "truth_social",
         fails_with: str | None = None,
+        fails_on: date | None = None,
         by_day: dict[date, Sequence[RawPost]] | None = None,
     ) -> None:
         self._posts = list(posts)
         self._name = name
         self._fails_with = fails_with
+        self._fails_on = fails_on
         self._by_day = by_day
         self.asked: list[date] = []
 
@@ -32,6 +34,8 @@ class FakeSource:
 
     async def fetch(self, day: date) -> list[RawPost]:
         self.asked.append(day)
+        if self._fails_on is not None and day == self._fails_on:
+            raise SourceUnreachable(f"the feed did not answer for {day}")
         if self._fails_with is not None:
             raise SourceUnreachable(self._fails_with)
         if self._by_day is not None:
