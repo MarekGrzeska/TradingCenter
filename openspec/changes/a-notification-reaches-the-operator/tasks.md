@@ -29,12 +29,12 @@
 
 ## 5. Zakładanie botów
 
-- [ ] 5.1 Klient bota-twórcy za protokołem (Telethon), z fake'iem do testów
-- [ ] 5.2 Sesja konta jako ustawienie opcjonalne; odmowa nazywająca brak, gdy jej nie ma
-- [ ] 5.3 Sprawdzenie sufitu liczby botów przed odezwaniem się do bota-twórcy
-- [ ] 5.4 Rozpoznanie tokenu po kształcie; odpowiedź bez tokenu jako odmowa oddająca treść
-- [ ] 5.5 Kasowanie bota tą samą drogą
-- [ ] 5.6 Test: token nie wychodzi żadną trasą ani do logu, także tuż po założeniu
+- [x] 5.1 Klient bota-twórcy za protokołem (Telethon), z fake'iem do testów
+- [x] 5.2 Sesja konta jako ustawienie opcjonalne; odmowa nazywająca brak, gdy jej nie ma
+- [x] 5.3 Sprawdzenie sufitu liczby botów przed odezwaniem się do bota-twórcy
+- [x] 5.4 Rozpoznanie tokenu po kształcie; odpowiedź bez tokenu jako odmowa oddająca treść
+- [x] 5.5 Kasowanie bota tą samą drogą
+- [x] 5.6 Test: token nie wychodzi żadną trasą ani do logu, także tuż po założeniu
 
 ## 6. Powierzchnia REST
 

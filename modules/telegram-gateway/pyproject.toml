@@ -23,6 +23,10 @@ dependencies = [
     # Database, migrations, schema check, Easy Auth. Taken whole, like polymarket-data: the migrations
     # here are small and the lock wait is the ordinary one.
     "tc-runtime",
+    # MTProto, and the only thing in this list that serves the optional half. Creating a bot means
+    # talking to @BotFather, which is a bot on a chat — and only a *user account* may. Imported inside
+    # the method that uses it, so a deployment with no account session never loads it.
+    "telethon>=1.44.0",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.
