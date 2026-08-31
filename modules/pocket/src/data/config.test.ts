@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { archiveBase, entraConfig } from "./config";
+import { archiveBase, entraConfig, workbenchBase } from "./config";
 
 const COMPLETE = {
   VITE_ENTRA_CLIENT_ID: "client",
@@ -7,19 +7,23 @@ const COMPLETE = {
   VITE_ENTRA_SCOPE_POLYMARKET: "api://tradingcenter-polymarket-data/access_as_user",
 } as unknown as ImportMetaEnv;
 
-describe("where the archive answers", () => {
+describe("where each back end answers", () => {
   it("keeps a relative path as it is, minus the slash callers join onto", () => {
     expect(archiveBase("/polymarket-api/")).toBe("/polymarket-api");
     expect(archiveBase(undefined)).toBe("/polymarket-api");
+    expect(workbenchBase(undefined)).toBe("/workbench-api");
   });
 });
 
 describe("the sign-in configuration", () => {
-  it("is all three values or none of them", () => {
+  it("is the client, the tenant and the archive's scope, or none of them", () => {
     expect(entraConfig(COMPLETE)).toEqual({
       clientId: "client",
       tenantId: "tenant",
-      scope: "api://tradingcenter-polymarket-data/access_as_user",
+      scopes: {
+        archive: "api://tradingcenter-polymarket-data/access_as_user",
+        workbench: null,
+      },
     });
   });
 
@@ -27,5 +31,19 @@ describe("the sign-in configuration", () => {
     const partial = { ...COMPLETE, VITE_ENTRA_SCOPE_POLYMARKET: "" } as unknown as ImportMetaEnv;
     expect(entraConfig(partial)).toBeNull();
     expect(entraConfig({} as unknown as ImportMetaEnv)).toBeNull();
+  });
+
+  it("carries the conversation's audience separately, and its absence is a working build", () => {
+    const withAgent = {
+      ...COMPLETE,
+      VITE_ENTRA_SCOPE_WORKBENCH: "api://tradingcenter-agent/access_as_user",
+    } as unknown as ImportMetaEnv;
+
+    expect(entraConfig(withAgent)?.scopes.workbench).toBe(
+      "api://tradingcenter-agent/access_as_user",
+    );
+    // A token minted for the archive is never sent to the workbench, so the agent goes without one
+    // rather than borrowing it.
+    expect(entraConfig(COMPLETE)?.scopes.workbench).toBeNull();
   });
 });

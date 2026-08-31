@@ -151,6 +151,17 @@ resource "azuread_application" "pocket" {
       type = "Scope"
     }
   }
+
+  # The second, and the only other one it will ask for: the conversation. A token minted for the archive is never
+  # sent here, so the agent tab has an audience of its own or goes without — `data/config.ts` refuses to borrow.
+  required_resource_access {
+    resource_app_id = module.workbench_easy_auth.client_id
+
+    resource_access {
+      id   = module.workbench_easy_auth.scope_id
+      type = "Scope"
+    }
+  }
 }
 
 resource "azuread_service_principal" "pocket" {
@@ -163,6 +174,14 @@ resource "azuread_application_pre_authorized" "polymarket_data_pocket" {
   application_id       = module.polymarket_data_easy_auth.application_id
   authorized_client_id = azuread_application.pocket.client_id
   permission_ids       = [module.polymarket_data_easy_auth.scope_id]
+}
+
+# The conversation's, for the same reason and on the same day: the agent tab acquires this one silently, which is
+# exactly what a pre-authorization is for — without it the operator meets a consent prompt on a phone, mid-question.
+resource "azuread_application_pre_authorized" "workbench_pocket" {
+  application_id       = module.workbench_easy_auth.application_id
+  authorized_client_id = azuread_application.pocket.client_id
+  permission_ids       = [module.workbench_easy_auth.scope_id]
 }
 
 # The two values pocket's build needs that the terminal's does not already publish. Public by nature, like the

@@ -25,7 +25,7 @@ export class ArchiveError extends Error {
 
 export interface JsonRequest {
   signal: AbortSignal;
-  method?: "GET" | "POST" | "PUT" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
 }
 

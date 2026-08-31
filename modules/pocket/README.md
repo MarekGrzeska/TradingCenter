@@ -1,8 +1,8 @@
 # pocket
 
-The prediction-market screen on a phone. React+TS, one surface, one upstream: `polymarket-data`'s
-REST contract. Like the terminal it is a **consumer, not a peer** — it publishes nothing, owns no
-database, and reaches no other module.
+The prediction-market screen on a phone, and the agent that reads it. React+TS, two screens, two
+upstreams: `polymarket-data`'s REST contract and the workbench's conversation. Like the terminal it
+is a **consumer, not a peer** — it publishes nothing, owns no database, and reaches no other module.
 
 ```bash
 pnpm install
@@ -57,12 +57,42 @@ there is no pause, and the sheet says so rather than asking "are you sure".
 - Inputs are 16px, because iOS Safari zooms the page in on focus for anything smaller and never
   zooms back out.
 - `viewport-fit=cover` plus `env(safe-area-inset-*)`, so the sticky header clears the notch.
-- The list re-reads on `visibilitychange`: a phone spends most of its time with the screen off, and
-  coming back to a minute-old price labelled "just now" is the one lie this screen must not tell.
+- The list re-reads on `visibilitychange`, and **that is the read that matters**: every mobile
+  browser throttles a background tab and Safari suspends one outright, so the 60s poll is not a
+  guarantee. The header says when the archive last answered rather than implying it is current, and
+  the freshness line is itself the refresh control — a button that only refreshed would duplicate
+  both the poll and the pull.
+- Pull down from the top of the list to re-read. A refresh button in a corner is the desktop idiom;
+  this screen has no corner a thumb reaches.
 - A collapsed card renders **no** market rows. One measured event holds 128 markets.
 - Installable: `manifest.webmanifest` and an apple-touch-icon, so it can live on a home screen.
 
+## The agent, and why the browser never speaks MCP
+
+The second tab is a chat with the workbench. It is the only way this app reaches a tool, and that is
+not a shortcut avoided but the shape of the system: the workbench holds the model key and the tool
+servers' addresses, and `polymarket-data`'s tool surface admits **its managed identity** and no
+browser at all (`polymarket_data/caller_access.py`). A phone that called `/mcp` itself would be
+refused, and a phone that held an OpenAI key would be a leaked key.
+
+The turn arrives over SSE — `fetch` and a `ReadableStream`, not `EventSource`, which can neither
+`POST` nor carry an `Authorization` header. Fragments append as they land; **the transcript is
+re-read when the turn ends**, because the module's copy carries the ids, the tool calls as recorded
+and whether the turn finished. Stopping is the module's own route, never an aborted request: an
+abort leaves the turn running with nobody reading it, and the reply is finished and billed anyway.
+
+Every tool call is on screen — name, outcome, duration, and open, its arguments and the text the
+model itself was handed. That is the difference between a tool that answered nothing and one that
+was never asked, and it is the reason to have this tab on a phone at all.
+
+The conversation has **its own audience**: a token minted for the archive is never sent to the
+workbench. With no `VITE_ENTRA_SCOPE_WORKBENCH` the agent goes without a credential rather than
+borrowing one — locally that is correct, and against a deployed workbench it is a 401 the screen can
+name.
+
 ## Reading the archive
+
+Two tabs, kept mounted: switching must not throw away a half-typed question or restart the poll.
 
 `GET /events` and `GET /groups` on a 60s poll — the archive samples once a minute, so asking more
 often costs battery to redraw the same numbers. `GET /events/{id}/changes` only for cards that are

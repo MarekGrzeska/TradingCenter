@@ -32,6 +32,9 @@ describe("the observation screen", () => {
 
     expect(await screen.findByText("Rate cut in September")).toBeInTheDocument();
     expect(screen.getByText("62%")).toBeInTheDocument();
+    // A polled screen on a phone has to say when it last managed to poll: a background tab is
+    // throttled by every mobile browser and suspended outright by Safari.
+    expect(screen.getByRole("button", { name: /updated/i })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { expanded: false }));
 

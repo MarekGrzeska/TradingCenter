@@ -40,3 +40,9 @@ if (typeof globalThis.localStorage?.clear !== "function") {
     });
   }
 }
+
+// jsdom implements no scrolling at all, and the transcript keeps its newest line in view. Stubbed
+// rather than guarded in the component: the guard would be there for the tests and nothing else.
+if (typeof Element.prototype.scrollIntoView !== "function") {
+  Element.prototype.scrollIntoView = () => {};
+}

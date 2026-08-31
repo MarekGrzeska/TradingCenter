@@ -1,0 +1,21 @@
+.app {
+  /* `dvh`, not `vh`: on a phone the browser chrome collapses as you scroll, and `vh` leaves the tab
+     bar under the address bar for the first screenful. */
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* No scrolling here: each screen owns its own, because each has a header that stays and a middle
+   that moves — and the markets list needs the scroller itself for the pull gesture. */
+.pane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+/* Kept mounted and out of the way — `display: none` rather than unmounting, so a half-typed question
+   and the archive's poll both survive a tab switch. */
+.hidden {
+  display: none;
+}
