@@ -78,6 +78,10 @@ locals {
   # allows a browser to call from, and what the deploy builds against. Read rather than typed — SWA invents it.
   terminal_origin = "https://${azurerm_static_web_app.terminal.default_host_name}"
 
+  # The same three-way agreement for the phone screen, and it reaches exactly one back end: only
+  # polymarket-data's CORS names it, because only polymarket-data is asked for anything.
+  pocket_origin = "https://${azurerm_static_web_app.pocket.default_host_name}"
+
   kv_secret_uri = {
     for k, name in local.key_vault_secret_names :
     k => "${azurerm_key_vault.main.vault_uri}secrets/${name}/"
@@ -691,7 +695,7 @@ resource "azurerm_linux_web_app" "polymarket_data" {
     # **The preflight is answered by the platform, never by the app** — the fourth time this trap has been walked into,
     # measured again on 22 August 2026. `polymarket_data` MUST NOT add a middleware: two layers double the header.
     cors {
-      allowed_origins     = [local.terminal_origin]
+      allowed_origins     = [local.terminal_origin, local.pocket_origin]
       support_credentials = false
     }
 
@@ -731,11 +735,13 @@ resource "azurerm_linux_web_app" "polymarket_data" {
         module.polymarket_data_easy_auth.client_id,
       ]
 
-      # Two callers, named, each reaching exactly one of this module's two surfaces — the workbench the nine tools at
-      # `/mcp`, the terminal the REST contract. Being on this list is not what separates them; the settings below are.
+      # Three callers, named, each reaching exactly one of this module's two surfaces — the workbench the nine tools
+      # at `/mcp`, the terminal and pocket the REST contract. Being on this list is not what separates them; the
+      # settings below are. Easy Auth authorizes an application, not a route.
       allowed_applications = [
         data.azuread_service_principal.workbench_managed_identity.client_id,
         azuread_application.terminal.client_id,
+        azuread_application.pocket.client_id,
       ]
     }
 
@@ -768,7 +774,12 @@ resource "azurerm_linux_web_app" "polymarket_data" {
     # Which caller reaches which surface, by the `azp` claim and never by `X-MS-CLIENT-PRINCIPAL-ID`. What separates the
     # two is not reading from writing but that **removing collected history is a REST route**.
     TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
-    REST_CALLER_APPLICATION_IDS = azuread_application.terminal.client_id
+    # Comma-separated, which `config.py` splits: two browsers reach the REST contract now and the module's own record
+    # has to name both, or the second is refused by the module after the platform has already let it through.
+    REST_CALLER_APPLICATION_IDS = join(",", [
+      azuread_application.terminal.client_id,
+      azuread_application.pocket.client_id,
+    ])
 
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
   }
@@ -910,7 +921,12 @@ resource "azurerm_linux_web_app" "strategy" {
     # Which caller reaches which surface once Easy Auth has let it through, by the `azp`/`appid` claim naming the
     # application — never the principal-id header, which for a delegated token names the signed-in person.
     TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
-    REST_CALLER_APPLICATION_IDS = azuread_application.terminal.client_id
+    # Comma-separated, which `config.py` splits: two browsers reach the REST contract now and the module's own record
+    # has to name both, or the second is refused by the module after the platform has already let it through.
+    REST_CALLER_APPLICATION_IDS = join(",", [
+      azuread_application.terminal.client_id,
+      azuread_application.pocket.client_id,
+    ])
 
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
   }

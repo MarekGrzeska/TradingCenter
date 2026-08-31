@@ -28,6 +28,7 @@ package cannot give it, the change is wrong, not the rule.
 | `modules/polymarket-data` | the prediction-market archive. Owns its PostgreSQL, the only door to Polymarket. Two surfaces like market-data — but two of its tools **write**, and both only *add* to the list of observations; an observation is collected or removed with all its history, and removing is REST-only. |
 | `modules/strategy` | the strategy platform. A strategy is a catalogue entry — declared facts, parameters, one pure `evaluate` — and the entry is code in the image **or** an immutable revision the operator wrote. Owns its PostgreSQL, reads market-data's REST, and **never touches an account**: it decides, teams execute. |
 | `modules/terminal` | React+TS · the operator's screen. Consumes the others, publishes nothing — a consumer, not a peer. Call it the **terminal**, never a "console" or "dashboard". |
+| `modules/pocket` | React+TS · the archive on a phone: one screen over `polymarket-data`, mobile-first. A second consumer, sharing the terminal's generated contract and none of its code. |
 | `packages/tc-runtime` | database, migrations, schema check, Easy Auth. |
 | `packages/tc-mcp-kit` | speaking MCP: caller-identity middleware, the upstream-refusal helper, the tool-schema slimmer. |
 | `packages/tc-openai` | the streamed OpenAI call, with tools — one file, taken only by the workbench, whose two surfaces were 79,4% identical here. |
@@ -45,8 +46,8 @@ measured decision each — `docs/architecture.md`, "The order path".
 ## Commands
 
 From the module directory; nothing at the repo root builds or tests everything. Every Python
-module runs `uv run pytest` · `ruff check .` · `pyright`, the terminal `pnpm test` · `lint` ·
-`typecheck` · `contract:check`. What differs is how to start it:
+module runs `uv run pytest` · `ruff check .` · `pyright`, the terminal and `pocket` `pnpm test` ·
+`lint` · `typecheck` · `contract:check`. What differs is how to start it:
 
 | Module | |
 |---|---|
@@ -57,6 +58,7 @@ module runs `uv run pytest` · `ruff check .` · `pyright`, the terminal `pnpm t
 | `polymarket-data` | `uv run alembic upgrade head`, then `uv run uvicorn polymarket_data.app:app --reload --port 8070` |
 | `strategy` | `uv run alembic upgrade head`, then `uv run uvicorn strategy.app:app --reload --port 8080` |
 | `terminal` | `pnpm dev` (5173) |
+| `pocket` | `pnpm dev` (5174) · the dev scripts start it too; `--host` is what a phone on the same Wi-Fi needs |
 
 - `uv run pytest` alone runs unit tests; anything needing a database **skips** without Docker.
 - `-m db` — integration against a throwaway PostgreSQL (testcontainers, random port). CI runs these.
@@ -70,8 +72,8 @@ sits where it does are one table at the top of that file — `uv run python scri
 
 **Ports are fixed: 8010 gateway, 8020 market-data (REST *and* `/mcp`), 8030 workbench, 8060
 trading-mcp, 8070 polymarket-data (REST *and* `/mcp`), 8080 strategy (REST *and* `/mcp`),
-5173 terminal. 8040 and 8050 are nobody's** — a `.env` still pointing at either is a tool
-server that reads as down. 8070 was on that list until `polymarket-data-joins-the-stack`
+5173 terminal, 5174 pocket. 8040 and 8050 are nobody's** — a `.env` still pointing at
+either is a tool server that reads as down. 8070 was on that list until `polymarket-data-joins-the-stack`
 claimed it.
 
 ## Things that will bite you

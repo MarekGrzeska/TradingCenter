@@ -58,8 +58,11 @@ class Service:
     colour: str
     why: str
     health_path: str | None = None
-    # Only the terminal has one, for a machine with npm and no pnpm.
+    # Only a front end has one, for a machine with npm and no pnpm.
     fallback_command: tuple[str, ...] = ()
+    # Not waited for, dropped by `--no-terminal`, and started through whichever package manager is
+    # there. A property because two services answer to it now, and a name is not a kind.
+    front_end: bool = False
 
     @property
     def directory(self) -> Path:
@@ -89,6 +92,8 @@ BRIGHT_GREEN = "\033[92m"
 # And bright blue to the strategy platform. Two services sharing a colour is the one thing
 # this field exists to prevent — the logs interleave, and colour is how a reader tells them apart.
 BRIGHT_BLUE = "\033[94m"
+# And bright magenta to the phone screen, whose log interleaves with the terminal's cyan.
+BRIGHT_MAGENTA = "\033[95m"
 
 SERVICES: tuple[Service, ...] = (
     Service(
@@ -199,9 +204,27 @@ SERVICES: tuple[Service, ...] = (
         # Not waited for: vite is ready in a moment and nothing downstream needs it.
         health_path=None,
         why=(
-            "Last, because its charts read the archive — starting it first fills the "
-            "console with proxy errors that mean nothing."
+            "After the back ends, because its charts read the archive — starting it first "
+            "fills the console with proxy errors that mean nothing."
         ),
+        front_end=True,
+    ),
+    Service(
+        name="pocket",
+        module="pocket",
+        port=5174,
+        command=("pnpm", "exec", "vite", "--port", "5174", "--strictPort"),
+        fallback_command=("npx", "vite", "--port", "5174", "--strictPort"),
+        log_prefix="pocket  ",
+        colour=BRIGHT_MAGENTA,
+        health_path=None,
+        why=(
+            "After the terminal and for its reason, with one upstream rather than four: it "
+            "reads polymarket-data and nothing else. Bound to loopback like everything else "
+            "here — a phone on the same Wi-Fi needs `pnpm dev --host` in the module, which "
+            "publishes the dev server to the network and is nobody's default."
+        ),
+        front_end=True,
     ),
 )
 
@@ -279,10 +302,10 @@ class Environment:
     port_in_use: Callable[[int], bool]
     port_owner: Callable[[int], str] = lambda _: ""
     docker_daemon_answers: Callable[[], bool] = lambda: True
-    node_modules_present: Callable[[], bool] = lambda: True
+    node_modules_present: Callable[[str], bool] = lambda _: True
 
 
-def preflight(env: Environment, *, start_terminal: bool) -> list[str]:
+def preflight(env: Environment, *, start_front_ends: bool) -> list[str]:
     """Every reason not to start, in one list. Empty means go."""
     problems: list[str] = []
 
@@ -308,29 +331,33 @@ def preflight(env: Environment, *, start_terminal: bool) -> list[str]:
         if env.read_env(module) is None:
             problems.append(f"modules/{module}/.env is missing — {remedy}")
 
-    if start_terminal:
+    if start_front_ends:
         if not env.which("pnpm") and not env.which("npm"):
             problems.append(
-                "neither pnpm nor npm is on PATH (runs the terminal) — "
+                "neither pnpm nor npm is on PATH (runs the terminal and pocket) — "
                 "https://pnpm.io/installation"
             )
-        if not env.node_modules_present():
-            installer = "pnpm install" if env.which("pnpm") or not env.which("npm") else "npm install"
-            problems.append(
-                f"modules/terminal/node_modules is missing — run '{installer}' in modules/terminal"
-            )
+        installer = "pnpm install" if env.which("pnpm") or not env.which("npm") else "npm install"
+        # Once per front end, not once for the pair: two modules keep their own dependencies, and
+        # "node_modules is missing" without a name sends the operator to the wrong directory.
+        for service in SERVICES:
+            if service.front_end and not env.node_modules_present(service.module):
+                problems.append(
+                    f"modules/{service.module}/node_modules is missing — run "
+                    f"'{installer}' in modules/{service.module}"
+                )
 
-    problems += _port_problems(env, start_terminal=start_terminal)
+    problems += _port_problems(env, start_front_ends=start_front_ends)
     problems += _database_host_problems(env)
     problems += _gateway_key_problems(env)
     return problems
 
 
-def _port_problems(env: Environment, *, start_terminal: bool) -> list[str]:
+def _port_problems(env: Environment, *, start_front_ends: bool) -> list[str]:
     """A taken port is the commonest reason a run appears to hang: the new process cannot bind and the
     wait watches somebody else's service. Tested by connecting — a leftover may run as another user."""
     problems: list[str] = []
-    for service in services_to_start(start_terminal=start_terminal):
+    for service in services_to_start(start_front_ends=start_front_ends):
         if env.port_in_use(service.port):
             owner = env.port_owner(service.port)
             problems.append(
@@ -469,10 +496,12 @@ def advisories(env: Environment) -> list[str]:
 
 
 
-def services_to_start(*, start_terminal: bool) -> tuple[Service, ...]:
-    if start_terminal:
+def services_to_start(*, start_front_ends: bool) -> tuple[Service, ...]:
+    """`--no-terminal` keeps its name and drops both screens: neither is a back end, and a run with
+    one of the two and not the other is not a state anybody asked for."""
+    if start_front_ends:
         return SERVICES
-    return tuple(service for service in SERVICES if service.name != "terminal")
+    return tuple(service for service in SERVICES if not service.front_end)
 
 
 
@@ -718,7 +747,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--no-terminal",
         "-NoTerminal",
-        dest="start_terminal",
+        dest="start_front_ends",
         action="store_false",
         help="back end only, e.g. to run the live tests",
     )
@@ -770,7 +799,7 @@ def real_environment() -> Environment:
         port_in_use=port_in_use,
         port_owner=port_owner,
         docker_daemon_answers=docker_daemon_answers,
-        node_modules_present=lambda: (MODULES / "terminal" / "node_modules").is_dir(),
+        node_modules_present=lambda module: (MODULES / module / "node_modules").is_dir(),
     )
 
 
@@ -816,21 +845,22 @@ def _process_name(pid: int) -> str | None:
     return done.stdout.strip() or None
 
 
-def terminal_command(env: Environment) -> tuple[str, ...]:
-    """pnpm is what the module documents, but a machine with only npm can still run a dev
-    server, and refusing over the choice of package manager helps nobody."""
-    terminal = next(service for service in SERVICES if service.name == "terminal")
-    if env.which("pnpm"):
-        return terminal.command
-    return terminal.fallback_command
+def command_for(service: Service, env: Environment) -> tuple[str, ...]:
+    """pnpm is what the modules document, but a machine with only npm can still run a dev server,
+    and refusing over the choice of package manager helps nobody. Asked of every service rather
+    than of the front ends alone: a back end has no fallback, so its answer is its own command."""
+    if service.fallback_command and not env.which("pnpm"):
+        return service.fallback_command
+    return service.command
 
 
-def ready_lines(*, start_terminal: bool) -> list[str]:
+def ready_lines(*, start_front_ends: bool) -> list[str]:
     lines = []
-    if start_terminal:
+    if start_front_ends:
         lines += [
             "  Terminal            http://localhost:5173",
             "  Instruments panel   http://localhost:5173/instruments",
+            "  Pocket (phone)      http://localhost:5174",
         ]
     lines += [
         f"  market-data docs    http://{LOOPBACK}:8020/docs",
@@ -854,7 +884,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 0
 
     env = real_environment()
-    problems = preflight(env, start_terminal=args.start_terminal)
+    problems = preflight(env, start_front_ends=args.start_front_ends)
     if problems:
         fail("Cannot start:")
         for problem in problems:
@@ -869,10 +899,9 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     stack = Stack()
     try:
-        for service in services_to_start(start_terminal=args.start_terminal):
-            command = terminal_command(env) if service.name == "terminal" else service.command
+        for service in services_to_start(start_front_ends=args.start_front_ends):
             say(f"Starting {service.name} on port {service.port}...")
-            stack.start(service, command)
+            stack.start(service, command_for(service, env))
             health = service.health_url
             if health is not None and not wait_for_http(health, service.name):
                 return 1
@@ -881,7 +910,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
         print()
         ok("Ready:")
-        for line in ready_lines(start_terminal=args.start_terminal):
+        for line in ready_lines(start_front_ends=args.start_front_ends):
             print(line)
         print()
         note("Nothing is archived until a pair is added in the Archive panel — deliberate.")

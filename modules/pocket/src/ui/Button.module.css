@@ -1,0 +1,46 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  /* Every button in this app is at least a thumb wide and a thumb tall. */
+  min-height: var(--tap);
+  padding: 0 1rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.secondary {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-muted);
+}
+
+.secondary:hover:not(:disabled) {
+  background: var(--code-bg);
+  color: var(--text-h);
+}
+
+.danger {
+  background: #b91c1c;
+  color: #fff;
+}
+
+.button:hover:not(:disabled) {
+  opacity: 0.9;
+}

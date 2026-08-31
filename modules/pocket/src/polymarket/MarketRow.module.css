@@ -1,0 +1,76 @@
+.row {
+  padding: 0.6rem 0.85rem;
+  border-top: 1px solid var(--border);
+}
+
+.head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.question {
+  margin: 0 0 0.45rem;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  color: var(--text-h);
+  /* A market question is a sentence and a phone is narrow: it wraps, and a long unbroken slug
+     breaks rather than widening the card past the screen. */
+  overflow-wrap: anywhere;
+}
+
+.outcomes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.outcome {
+  display: grid;
+  /* Name, bar, price: the bar takes what the two texts leave, so every row's percentage lines up
+     down the card however long the names are. */
+  grid-template-columns: minmax(3.5rem, 7rem) 1fr auto;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.name {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.price {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+  min-width: 2.6rem;
+  text-align: right;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.age {
+  font-size: 0.68rem;
+  color: var(--text-soft);
+}
+
+/* A price nobody can date, or one older than two ticks, is said out loud rather than shown as now. */
+.ageStale {
+  font-size: 0.68rem;
+  color: var(--pill-warn-fg);
+}

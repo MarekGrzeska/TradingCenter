@@ -14,9 +14,9 @@ WORKFLOWS = Path(__file__).resolve().parents[2] / ".github" / "workflows"
 SHARED = WORKFLOWS / "_deploy-app-service.yml"
 SHARED_REF = "./.github/workflows/_deploy-app-service.yml"
 
-# Not an App Service: a Static Web App, deployed by a different action, with no image and no
-# container to probe. It is the one deploy workflow that is not a caller.
-NOT_A_CALLER = {"deploy-terminal.yml"}
+# Not App Services: Static Web Apps, deployed by a different action, with no image and no container to
+# probe. The two front ends are the deploy workflows that are not callers.
+NOT_A_CALLER = {"deploy-terminal.yml", "deploy-pocket.yml"}
 
 
 # `dict[Any, Any]`, not `dict[str, Any]`: `on:` parses as the boolean True under YAML 1.1,
