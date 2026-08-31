@@ -79,7 +79,7 @@
 
 ## 11. Infrastruktura i wdrożenie
 
-- [ ] 11.1 Terraform: App Service, baza, rejestracja Entra, `allowed_applications` i `TOOL_CALLER_APPLICATION_IDS` z tożsamością workbencha
-- [ ] 11.2 `deploy-social-data.yml` nad `_deploy-app-service.yml`, zakończony sondą wdrożenia na `/health`
-- [ ] 11.3 Adresy modułu w konfiguracji terminala i pocketa we wdrożeniu
+- [x] 11.1 Terraform: App Service, baza, rejestracja Entra, `allowed_applications` i `TOOL_CALLER_APPLICATION_IDS` z tożsamością workbencha
+- [x] 11.2 `deploy-social-data.yml` nad `_deploy-app-service.yml`, zakończony sondą wdrożenia na `/health`
+- [x] 11.3 Adresy modułu w konfiguracji terminala i pocketa we wdrożeniu
 - [ ] 11.4 Przejść kolejność z `design.md` — Migration Plan: ownership, `apply`, obraz, dopiero `SOCIAL_MCP_URL`

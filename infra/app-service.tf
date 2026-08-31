@@ -21,6 +21,7 @@ locals {
     "workbench"       = local.workbench_app_name
     "trading-mcp"     = local.trading_mcp_app_name
     "polymarket-data" = local.polymarket_data_app_name
+    "social-data"     = local.social_data_app_name
     "strategy"        = local.strategy_app_name
   }
 
@@ -33,6 +34,7 @@ locals {
   # Named after the module from the first day, which is the one thing `workbench_app_name` above cannot be — a
   # rename later is a new identity, a new Postgres role and an edit in every module that names the old one.
   polymarket_data_app_name = "app-tradingcenter-polymarket-data"
+  social_data_app_name     = "app-tradingcenter-social-data"
   strategy_app_name        = "app-tradingcenter-strategy"
 
   # Deterministic App Service hostnames, used ahead of `terraform apply` instead of waiting on the computed
@@ -42,6 +44,7 @@ locals {
   workbench_hostname       = "${local.workbench_app_name}.azurewebsites.net"
   trading_mcp_hostname     = "${local.trading_mcp_app_name}.azurewebsites.net"
   polymarket_data_hostname = "${local.polymarket_data_app_name}.azurewebsites.net"
+  social_data_hostname     = "${local.social_data_app_name}.azurewebsites.net"
   strategy_hostname        = "${local.strategy_app_name}.azurewebsites.net"
 
   # What `market-data` is called when it is the *resource* a token is asked for: the terminal asks Entra for
@@ -60,6 +63,11 @@ locals {
   # with a managed identity and the terminal as a person, so its door is asked to recognise both.
   polymarket_data_api_uri   = "api://tradingcenter-polymarket-data"
   polymarket_data_api_scope = "access_as_user"
+
+  # The post archive's own audience, with a delegated scope for polymarket-data's reason: the workbench reaches it
+  # with a managed identity and both screens reach it as the operator, so its door recognises both.
+  social_data_api_uri   = "api://tradingcenter-social-data"
+  social_data_api_scope = "access_as_user"
 
   # The strategy platform's own audience, without a delegated scope for the reason trading-mcp has none: its
   # callers are backend services presenting client credentials.
@@ -476,6 +484,11 @@ resource "azurerm_linux_web_app" "workbench" {
     POLYMARKET_MCP_URL   = "https://${local.polymarket_data_hostname}"
     POLYMARKET_MCP_SCOPE = "${local.polymarket_data_api_uri}/.default"
 
+    # The fourth, same rule and same rollback — clear this pair and restart, and the conversation runs without
+    # post tools, which is a state its own tests walk.
+    SOCIAL_MCP_URL   = "https://${local.social_data_hostname}"
+    SOCIAL_MCP_SCOPE = "${local.social_data_api_uri}/.default"
+
     # The teams surface's own clock, in this app's `lifespan` rather than a timer calling in, which would need its own
     # registration. **The one setting here whose value is a decision**: config.py defaults it on, this states it.
     SCHEDULER_ENABLED = "true"
@@ -501,6 +514,7 @@ locals {
     "workbench"       = azurerm_linux_web_app.workbench.identity[0].principal_id
     "trading-mcp"     = azurerm_linux_web_app.trading_mcp.identity[0].principal_id
     "polymarket-data" = azurerm_linux_web_app.polymarket_data.identity[0].principal_id
+    "social-data"     = azurerm_linux_web_app.social_data.identity[0].principal_id
     "strategy"        = azurerm_linux_web_app.strategy.identity[0].principal_id
   }
 }
@@ -798,6 +812,141 @@ resource "azurerm_linux_web_app" "polymarket_data" {
 output "polymarket_data_hostname" {
   value = azurerm_linux_web_app.polymarket_data.default_hostname
 }
+# social-data: the same door as polymarket-data, and one difference behind it — **nothing on either surface writes**.
+# What the record separates is which caller reaches which surface, not what either may change.
+module "social_data_easy_auth" {
+  source = "./modules/easy-auth-app"
+
+  display_name   = "app-tradingcenter-social-data-easyauth"
+  identifier_uri = local.social_data_api_uri
+  redirect_uri   = "https://${local.social_data_hostname}/.auth/login/aad/callback"
+
+  scope = {
+    value                      = local.social_data_api_scope
+    admin_consent_display_name = "Read the post archive"
+    admin_consent_description  = "Allows the app to read collected posts and what a model made of them."
+    user_consent_display_name  = "Read your post archive"
+    user_consent_description   = "Allows the app to read the posts this system has collected for you."
+  }
+}
+
+resource "azurerm_linux_web_app" "social_data" {
+  name                = local.social_data_app_name
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  service_plan_id     = azurerm_service_plan.main.id
+  https_only          = true
+
+  # The database through an Entra token fetched at connection time, and the GHCR pull token in Key Vault. The
+  # feed needs no credential, and the model key is a setting rather than an identity.
+  identity {
+    type = "SystemAssigned"
+  }
+
+  site_config {
+    always_on = true
+
+    # **The preflight is answered by the platform, never by the app** — the fifth time this trap has been walked
+    # into. This module MUST NOT add a middleware of its own: two layers double the header.
+    cors {
+      allowed_origins     = [local.terminal_origin, local.pocket_origin]
+      support_credentials = false
+    }
+
+    application_stack {
+      # Placeholder — `deploy-social-data.yml` pushes the real GHCR image; the
+      # lifecycle block below is what stops Terraform reverting it.
+      docker_image_name = "mcr.microsoft.com/appsvc/staticsite:latest"
+
+      docker_registry_url      = local.ghcr_registry_url
+      docker_registry_username = local.ghcr_registry_username
+      docker_registry_password = local.ghcr_registry_password
+    }
+  }
+
+  auth_settings_v2 {
+    auth_enabled           = true
+    require_authentication = true
+    unauthenticated_action = "Return401"
+    default_provider       = "azureactivedirectory"
+
+    # The health route and nothing else — the platform restarts the container off this response and speaks no
+    # Easy Auth, and `deploy_probe.py` reads the same path. It names the module and nothing it has collected.
+    excluded_paths = ["/"]
+
+    active_directory_v2 {
+      client_id                  = module.social_data_easy_auth.client_id
+      tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
+      client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
+
+      allowed_audiences = [
+        local.social_data_api_uri,
+        module.social_data_easy_auth.client_id,
+      ]
+
+      # Three callers, each reaching exactly one surface — the workbench the four tools at `/mcp`, the terminal
+      # and pocket the REST contract. Being on this list is not what separates them; the settings below are.
+      allowed_applications = [
+        data.azuread_service_principal.workbench_managed_identity.client_id,
+        azuread_application.terminal.client_id,
+        azuread_application.pocket.client_id,
+      ]
+    }
+
+    login {
+      token_store_enabled = true
+    }
+  }
+
+  app_settings = {
+    # No credential in the URL and no AZURE_* triple — config.py refuses one when DATABASE_USER is set, and the
+    # identity is ambient. That user is the role `scripts/grant-schema-ownership.sql` creates, named after this app.
+    DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.social.name}?sslmode=require"
+    DATABASE_USER = local.social_data_app_name
+
+    # The feed, set here rather than left to the module's default for the reason every other upstream address is:
+    # it is somebody's side project, and the day it moves is a deployment.
+    TRUTH_SOCIAL_FEED_URL = "https://www.trumpstruth.org/feed"
+    PROVIDER_USER_AGENT   = "tradingcenter-social-data/0.1 (+https://github.com/MarekGrzeska)"
+
+    # **Deliberately not set here.** Without OPENAI_API_KEY the module collects and leaves every reading empty,
+    # which is a supported state — and a model key belongs in Key Vault and in the operator's hands, not in a
+    # plan file that is committed.
+
+    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.social_data_easy_auth.password
+
+    # The module checks the caller's identity itself rather than trusting the block above is switched on.
+    REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
+
+    # Which caller reaches which surface, by the `azp` claim and never by `X-MS-CLIENT-PRINCIPAL-ID`.
+    TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
+    REST_CALLER_APPLICATION_IDS = join(",", [
+      azuread_application.terminal.client_id,
+      azuread_application.pocket.client_id,
+    ])
+
+    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
+  }
+
+  lifecycle {
+    ignore_changes = [site_config[0].application_stack[0].docker_image_name]
+  }
+}
+
+output "social_data_hostname" {
+  value = azurerm_linux_web_app.social_data.default_hostname
+}
+
+output "terminal_entra_scope_social" {
+  description = "The scope the terminal and pocket ask for when they want a token for social-data. Carried as a literal by both deploy workflows, like every other scope here."
+  value       = "${local.social_data_api_uri}/${local.social_data_api_scope}"
+}
+
+output "social_data_managed_identity_principal_id" {
+  description = "The operator's one-off Postgres role creation in the `social` database needs this object id (scripts/grant-schema-ownership.sql)."
+  value       = azurerm_linux_web_app.social_data.identity[0].principal_id
+}
+
 
 output "terminal_entra_scope_polymarket" {
   description = "The scope the terminal asks for when it wants a token for polymarket-data. `deploy-terminal.yml` carries this as a literal beside the four hostnames, like the workbench's and the gateway's — a repository variable per scope would be four chances to leave one unset, and the failure surfaces at sign-in as a message about an unknown resource."
