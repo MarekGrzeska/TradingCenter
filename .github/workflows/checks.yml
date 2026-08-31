@@ -30,6 +30,7 @@ jobs:
       strategy: ${{ steps.filter.outputs.strategy }}
       workbench: ${{ steps.filter.outputs.workbench }}
       terminal: ${{ steps.filter.outputs.terminal }}
+      pocket: ${{ steps.filter.outputs.pocket }}
       openspec: ${{ steps.filter.outputs.openspec }}
       packages: ${{ steps.filter.outputs.packages }}
       scripts: ${{ steps.filter.outputs.scripts }}
@@ -86,6 +87,9 @@ jobs:
           PATTERNS[terminal]='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/workbench/|^modules/polymarket-data/polymarket_data/(contract|openapi)\.py$|^modules/strategy/strategy/(contract|openapi|rule)\.py$'
           # market-data takes `tc-mcp-kit` since the tool surface moved in — the slimmer keeps eleven tools under their
           # ceiling. trading-mcp watches the gateway's *whole* directory: its snapshot is built from routes and DTOs both.
+          # The second front end, filtered on the one module it reads: it keeps its own generated copy of that
+          # schema, so `contract:check` there is the check for this seam exactly as it is for the terminal.
+          PATTERNS[pocket]='^modules/pocket/|^modules/polymarket-data/polymarket_data/(contract|openapi)\.py$'
           PATTERNS[trading-mcp]="^modules/trading-mcp/|^modules/capital-gateway/|$tc_mcp_kit"
           # The same two packages as market-data, for the same two reasons. It has no upstream in this repository, so
           # unlike trading-mcp there is no second module in this pattern.
@@ -320,6 +324,35 @@ jobs:
       - run: pnpm install --frozen-lockfile
       # Before the tests, not after. A stale generated contract means every conclusion the
       # suite reaches about the wire is drawn from an out-of-date premise.
+      - run: pnpm contract:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test
+
+  # The phone screen. Same shape as the terminal's job and for the same reason: its wire types are generated from
+  # polymarket-data's Python, so the check needs both toolchains and a stale contract fails before the suite runs.
+  pocket:
+    name: pocket
+    needs: changes
+    if: needs.changes.outputs.pocket == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/pocket
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: modules/pocket/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: modules/pocket/pnpm-lock.yaml
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: pnpm install --frozen-lockfile
       - run: pnpm contract:check
       - run: pnpm lint
       - run: pnpm typecheck

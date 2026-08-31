@@ -1,0 +1,125 @@
+.screen {
+  /* One column, and a max-width only so a desktop browser does not stretch a phone layout across
+     a monitor. The phone case needs no breakpoint — it is the default. */
+  width: 100%;
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 0 calc(0.75rem + var(--safe-left)) calc(1.5rem + var(--safe-bottom))
+    calc(0.75rem + var(--safe-right));
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: calc(0.6rem + var(--safe-top)) 0 0.6rem;
+  background: var(--bg);
+  /* The list scrolls under it, so the edge has to be drawn or the two blend where they meet. */
+  border-bottom: 1px solid var(--border);
+}
+
+.heading {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.headerActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.chips {
+  display: flex;
+  gap: 0.45rem;
+  /* One line that scrolls sideways rather than a block that wraps to four rows: on a phone the
+     chips are a strip, and the events are what the screen is for. */
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: 0.15rem;
+}
+
+.chips::-webkit-scrollbar {
+  display: none;
+}
+
+.chip {
+  flex-shrink: 0;
+  min-height: 2.25rem;
+  padding: 0 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.chipOn {
+  color: var(--pill-ok-fg);
+  background: var(--pill-ok-bg);
+  border-color: color-mix(in srgb, var(--pill-ok-fg) 30%, var(--pill-ok-bg));
+}
+
+.chipOff {
+  color: var(--text-muted);
+  background: var(--surface);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+}
+
+.state {
+  margin: 1.5rem 0;
+  text-align: center;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.notice,
+.error {
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.notice {
+  color: var(--pill-ok-fg);
+  background: color-mix(in srgb, var(--pill-ok-fg) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--pill-ok-fg) 28%, transparent);
+}
+
+.error {
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+}
