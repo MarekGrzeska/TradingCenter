@@ -1,0 +1,68 @@
+[project]
+name = "telegram-gateway"
+version = "0.1.0"
+description = "The one door to Telegram — a notification any module can send, and a bot the operator did not have to create"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "httpx>=0.27",
+    "pydantic-settings>=2.2",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    # Alembic drives migrations through SQLAlchemy Core; this module's own queries go straight through asyncpg. The
+    # `asyncio` extra pulls greenlet, without which an async engine raises at its first connect.
+    "sqlalchemy[asyncio]>=2.0",
+    # The database credential: an Entra token fetched at connection time, never a stored password. `azure.identity.aio`
+    # imports aiohttp lazily and fails at first use rather than at install, so it is named explicitly.
+    "azure-identity>=1.19",
+    "aiohttp>=3.10",
+    # `zoneinfo` falls back to this package where the OS ships no tz database: `python:3.12-slim-bookworm` ships none,
+    # and Windows never has.
+    "tzdata>=2024.1",
+    # Database, migrations, schema check, Easy Auth. Taken whole, like polymarket-data: the migrations
+    # here are small and the lock wait is the ordinary one.
+    "tc-runtime",
+]
+
+# Not a packaged library — uv only manages the venv and deps, no build step.
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+tc-runtime = { path = "../../packages/tc-runtime", editable = true }
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's Depends()/Query() in argument defaults are idiomatic, not the B008 bug.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
+[tool.pyright]
+# What runs in production: the module and the migrations the deploy applies before it.
+include = ["telegram_gateway", "migrations"]
+typeCheckingMode = "basic"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+    "db: needs a real PostgreSQL (a throwaway container, started on demand — see conftest)",
+    "live: talks to the real Telegram over the network (needs --run-live)",
+]
+
+[dependency-groups]
+dev = [
+    # Pinned exactly, like every other module here: a type checker that upgrades itself
+    # decides when CI turns red, and it does so between two runs of the same commit.
+    "pyright==1.1.411",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "respx>=0.21",
+    "ruff==0.16.2",
+    # A throwaway PostgreSQL per test session rather than a shared database: the schema is the thing under test, and
+    # a leftover table is indistinguishable from a migration that works.
+    "testcontainers[postgres]>=4.8",
+]
