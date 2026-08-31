@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { AgentApi } from "./agentApi";
 import { useConversation } from "./useConversation";
 import { ToolCallChip } from "./ToolCallChip";
+import { SessionsSheet } from "./SessionsSheet";
 import { Button } from "../ui/Button";
 import styles from "./AgentScreen.module.css";
 
@@ -12,10 +13,14 @@ const MAX_COMPOSER_ROWS = 5;
 export function AgentScreen({ api }: { api: AgentApi }) {
   const conversation = useConversation(api);
   const [draft, setDraft] = useState("");
+  const [picking, setPicking] = useState(false);
   const composer = useRef<HTMLTextAreaElement>(null);
   const foot = useRef<HTMLDivElement>(null);
 
   const streaming = conversation.streaming !== null;
+  const title =
+    conversation.sessions.find((session) => session.id === conversation.sessionId)?.title?.trim() ||
+    (conversation.sessionId === null ? "New conversation" : "This conversation");
 
   // The newest line, kept in view as it grows. `block: "end"` rather than a scrollTop sum: the
   // composer's own height changes under it, and a computed offset is wrong the moment it does.
@@ -34,22 +39,47 @@ export function AgentScreen({ api }: { api: AgentApi }) {
   return (
     <div className={styles.screen}>
       <header className={styles.header}>
-        <h1 className={styles.heading}>Agent</h1>
-        {conversation.models.length === 0 ? null : (
-          <select
-            className={styles.model}
-            aria-label="Model"
-            value={conversation.modelId ?? ""}
-            onChange={(event) => conversation.chooseModel(event.target.value)}
-          >
-            {conversation.modelId === null ? <option value="">default</option> : null}
-            {conversation.models.map((model) => (
-              <option key={model.id} value={model.id}>
-                {model.displayName}
-              </option>
-            ))}
-          </select>
-        )}
+        {/* The title is the picker. A phone header holds two things; a heading that only says
+            "Agent" would spend one of them saying what the tab bar already says. */}
+        <button
+          type="button"
+          className={styles.picker}
+          aria-label="Conversations"
+          aria-haspopup="dialog"
+          onClick={() => setPicking(true)}
+        >
+          <span className={styles.pickerTitle}>{title}</span>
+          <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden>
+            <path
+              d="M2.5 4.5 6 8 9.5 4.5"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+
+        <button
+          type="button"
+          className={styles.new}
+          aria-label="New conversation"
+          onClick={() => {
+            conversation.startNew();
+            setDraft("");
+          }}
+        >
+          <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden>
+            <path
+              d="M10 4v12M4 10h12"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
       </header>
 
       <div className={styles.transcript}>
@@ -146,6 +176,26 @@ export function AgentScreen({ api }: { api: AgentApi }) {
           </Button>
         )}
       </div>
+
+      {!picking ? null : (
+        <SessionsSheet
+          sessions={conversation.sessions}
+          current={conversation.sessionId}
+          models={conversation.models}
+          modelId={conversation.modelId}
+          onOpen={(id) => {
+            conversation.open(id);
+            setPicking(false);
+          }}
+          onNew={() => {
+            conversation.startNew();
+            setDraft("");
+            setPicking(false);
+          }}
+          onChooseModel={conversation.chooseModel}
+          onClose={() => setPicking(false)}
+        />
+      )}
     </div>
   );
 }

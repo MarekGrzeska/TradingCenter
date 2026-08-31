@@ -85,6 +85,11 @@ Every tool call is on screen — name, outcome, duration, and open, its argument
 model itself was handed. That is the difference between a tool that answered nothing and one that
 was never asked, and it is the reason to have this tab on a phone at all.
 
+The history is one sheet: the conversations newest first, the current one marked, and the model for
+this conversation at the top of it. **A new conversation is not created by the tap** — it exists once
+something has been said in it, which is what keeps the list free of rows nobody wrote in. Opening the
+tab resumes the newest rather than starting another.
+
 The conversation has **its own audience**: a token minted for the archive is never sent to the
 workbench. With no `VITE_ENTRA_SCOPE_WORKBENCH` the agent goes without a credential rather than
 borrowing one — locally that is correct, and against a deployed workbench it is a 401 the screen can

@@ -5,7 +5,13 @@ import { AgentScreen } from "./AgentScreen";
 import type { AgentApi, AgentMessage, AgentStreamEvent } from "./agentApi";
 import { ArchiveError } from "../data/http";
 
-const SESSION = { id: 7, title: null, currentModelId: "gpt-5", lastActiveAt: new Date() };
+const SESSION = { id: 7, title: "About the fed", currentModelId: "gpt-5", lastActiveAt: new Date() };
+const OLDER = {
+  id: 3,
+  title: "Silver in March",
+  currentModelId: "gpt-5",
+  lastActiveAt: new Date("2026-08-20T10:00:00Z"),
+};
 
 async function* streamOf(...events: AgentStreamEvent[]): AsyncGenerator<AgentStreamEvent> {
   for (const event of events) yield event;
@@ -97,5 +103,38 @@ describe("the agent screen", () => {
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent("this month's cost limit is spent");
+  });
+
+  it("opens a conversation from the history rather than starting over", async () => {
+    const api = anApi({
+      listSessions: vi.fn(async () => [SESSION, OLDER]),
+      listMessages: vi.fn(async (id: number) =>
+        id === OLDER.id ? [reply("Silver ended the week at 0.41.")] : [],
+      ),
+    });
+
+    render(<AgentScreen api={api} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Conversations" }));
+    await userEvent.click(screen.getByRole("button", { name: /silver in march/i }));
+
+    expect(await screen.findByText("Silver ended the week at 0.41.")).toBeInTheDocument();
+    expect(api.listMessages).toHaveBeenCalledWith(3, expect.anything());
+  });
+
+  it("starts a new conversation without creating one nobody has written in", async () => {
+    const api = anApi({
+      listSessions: vi.fn(async () => [SESSION]),
+      listMessages: vi.fn(async () => [reply("An older answer.")]),
+    });
+
+    render(<AgentScreen api={api} />);
+    expect(await screen.findByText("An older answer.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "New conversation" }));
+
+    expect(screen.queryByText("An older answer.")).not.toBeInTheDocument();
+    // The session is created by the first message, not by the tap: a conversation nobody said
+    // anything in is a row in the history for the operator to scroll past.
+    expect(api.createSession).not.toHaveBeenCalled();
   });
 });

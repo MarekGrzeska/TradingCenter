@@ -1,0 +1,83 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.select {
+  min-height: var(--tap);
+  padding: 0 0.75rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-h);
+  width: 100%;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  /* The sheet itself is capped at most of the screen; this keeps a hundred conversations from
+     pushing the buttons below the fold. */
+  max-height: 45dvh;
+  overflow-y: auto;
+}
+
+.row,
+.current {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0.4rem 0.7rem;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.current {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.85rem;
+  color: var(--text-h);
+  /* One line, ellipsised: a title is the whole first message, and three of those turn the list
+     into a page. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.when {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  color: var(--text-soft);
+}
+
+.empty {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}

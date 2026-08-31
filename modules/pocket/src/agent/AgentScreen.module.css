@@ -20,22 +20,45 @@
   background: var(--bg);
 }
 
-.heading {
-  margin: 0;
-  font-size: 1.15rem;
-  font-weight: 700;
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
+  min-height: var(--tap);
+  padding: 0 0.25rem;
+  border: none;
+  background: transparent;
   color: var(--text-h);
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
-.model {
-  max-width: 60%;
-  min-height: 2.25rem;
-  padding: 0 0.5rem;
-  background: var(--surface);
-  border: 1px solid var(--border);
+.pickerTitle {
+  min-width: 0;
+  font-size: 1.02rem;
+  font-weight: 700;
+  /* One line: a title is the whole first message, and wrapping it pushes the transcript down by
+     three rows on every conversation that started with a paragraph. */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.new {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--tap);
+  height: var(--tap);
+  border: none;
   border-radius: 10px;
-  color: var(--text-muted);
-  font-size: 0.8rem;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
 .transcript {
