@@ -49,6 +49,13 @@ locals {
     # experiments and the operator's chat arrive as one number. **One process since the merge, and still two keys.**
     teams_openai_api_key = "teams-openai-api-key"
 
+    # The operator's own Telegram account, which is the only identity allowed to talk to the bot that creates bots.
+    # Three secrets rather than one blob so each is rotated on its own, and the session string is the one that is a
+    # standing credential to a personal account — `telegram-gateway`'s own README says what it can and cannot do.
+    telegram_api_id   = "telegram-api-id"
+    telegram_api_hash = "telegram-api-hash"
+    telegram_session  = "telegram-session"
+
     # A GitHub token with `read:packages`, the only way App Service can pull from GHCR. The one credential here that
     # expires on a calendar rather than on demand; docs/rotacja-poswiadczen.html is where the renewal is written down.
     ghcr_pull_token = "ghcr-pull-token"

@@ -65,9 +65,9 @@
 
 ## 10. Infrastruktura
 
-- [ ] 10.1 App Service, baza `telegram`, rejestracja Entra i Easy Auth w `infra/app-service.tf`
-- [ ] 10.2 `TOOL_CALLER_APPLICATION_IDS` (workbench) i `REST_CALLER_APPLICATION_IDS` (social-data, strategy) plus `allowed_applications`
-- [ ] 10.3 Sekrety w Key Vault: `api_id`, `api_hash`, string sesji
+- [x] 10.1 App Service, baza `telegram`, rejestracja Entra i Easy Auth w `infra/app-service.tf`
+- [x] 10.2 `TOOL_CALLER_APPLICATION_IDS` (workbench) i `REST_CALLER_APPLICATION_IDS` (social-data, strategy) plus `allowed_applications`
+- [x] 10.3 Sekrety w Key Vault: `api_id`, `api_hash`, string sesji
 
 ## 11. Wywołujący: workbench
 

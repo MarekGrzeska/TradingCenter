@@ -18,3 +18,7 @@ operator_email = "you@example.com"
 
 # The agent's model catalogue has a working default in variables.tf. Override it only to change which models the agent
 # offers, confirming each against OpenAI's own list, since nothing here checks it. The key is not a variable at all.
+
+# Leave false until the three Telegram account secrets are in Key Vault. False is a working configuration: the
+# gateway sends, and refuses to create bots naming the settings it wants.
+telegram_account_session_configured = false
