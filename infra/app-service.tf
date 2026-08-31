@@ -909,9 +909,14 @@ resource "azurerm_linux_web_app" "social_data" {
     TRUTH_SOCIAL_FEED_URL = "https://www.trumpstruth.org/feed"
     PROVIDER_USER_AGENT   = "tradingcenter-social-data/0.1 (+https://github.com/MarekGrzeska)"
 
-    # **Deliberately not set here.** Without OPENAI_API_KEY the module collects and leaves every reading empty,
-    # which is a supported state — and a model key belongs in Key Vault and in the operator's hands, not in a
-    # plan file that is committed.
+    # The conversation's key, read from Key Vault like the workbench reads its two — a reference, never a value in
+    # this file. **Shared rather than a third secret**, so the readings arrive on the same line of the bill as the
+    # chat; splitting them is one more `key_vault_secret_names` entry and one edit here, the day that matters.
+    OPENAI_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.openai_api_key})"
+
+    # Left to config.py's defaults on purpose: which model reads a post is a decision to change by restarting,
+    # not one to redeploy for. Clearing OPENAI_API_KEY is the rollback — the module then collects and reads
+    # nothing, a state its own tests walk.
 
     MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.social_data_easy_auth.password
 

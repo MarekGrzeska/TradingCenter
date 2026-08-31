@@ -52,7 +52,9 @@ pay per question rather than once per post.
 
 **Without an API key the module collects and does not enrich.** That is a supported state, walked by
 its own tests: readings stay empty and `/state` says why, rather than the screen showing posts with
-no explanation.
+no explanation. It is also the rollback — clear the setting and restart. A deployment takes the key
+from Key Vault, the same secret the conversation uses, so what a reading costs is not on a line of
+its own yet; a separate secret is one entry and one edit the day that matters.
 
 ## Four tools, none of which write
 
