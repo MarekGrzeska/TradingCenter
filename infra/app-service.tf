@@ -1083,37 +1083,48 @@ resource "azurerm_linux_web_app" "strategy" {
     }
   }
 
-  app_settings = {
-    # The archive by its own hostname, and its REST contract rather than `/mcp`: that surface is narrowed for a model
-    # and too tight for a loop reading three hundred bars of three facts at once.
-    MARKET_DATA_URL = "https://${local.market_data_hostname}"
-    # What this module presents to the archive: a token of its own identity for the archive's audience. Set here
-    # because the absence of this setting is what selects local work, where there is no directory to ask.
-    MARKET_DATA_SCOPE = "${local.market_data_api_uri}/.default"
+  # Merged, because the gateway is the setting whose *absence* is a working configuration: without it this
+  # platform evaluates and records exactly as before and says nothing.
+  app_settings = merge(
+    {
+      # The archive by its own hostname, and its REST contract rather than `/mcp`: that surface is narrowed for a model
+      # and too tight for a loop reading three hundred bars of three facts at once.
+      MARKET_DATA_URL = "https://${local.market_data_hostname}"
+      # What this module presents to the archive: a token of its own identity for the archive's audience. Set here
+      # because the absence of this setting is what selects local work, where there is no directory to ask.
+      MARKET_DATA_SCOPE = "${local.market_data_api_uri}/.default"
 
-    # No credential in the URL and no AZURE_* triple: config.py refuses one, and the system-assigned identity is
-    # ambient. `DATABASE_USER` is the role the operator creates once for that identity, named after this app.
-    DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.strategy.name}?sslmode=require"
-    DATABASE_USER = local.strategy_app_name
+      # No credential in the URL and no AZURE_* triple: config.py refuses one, and the system-assigned identity is
+      # ambient. `DATABASE_USER` is the role the operator creates once for that identity, named after this app.
+      DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.strategy.name}?sslmode=require"
+      DATABASE_USER = local.strategy_app_name
 
-    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.strategy_easy_auth.password
+      MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.strategy_easy_auth.password
 
-    # The module does not take the block above on trust: were `auth_settings_v2` switched off by a careless edit,
-    # this setting is what keeps both surfaces from answering an unidentified caller.
-    REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
+      # The module does not take the block above on trust: were `auth_settings_v2` switched off by a careless edit,
+      # this setting is what keeps both surfaces from answering an unidentified caller.
+      REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
 
-    # Which caller reaches which surface once Easy Auth has let it through, by the `azp`/`appid` claim naming the
-    # application — never the principal-id header, which for a delegated token names the signed-in person.
-    TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
-    # Comma-separated, which `config.py` splits: two browsers reach the REST contract now and the module's own record
-    # has to name both, or the second is refused by the module after the platform has already let it through.
-    REST_CALLER_APPLICATION_IDS = join(",", [
-      azuread_application.terminal.client_id,
-      azuread_application.pocket.client_id,
-    ])
+      # Which caller reaches which surface once Easy Auth has let it through, by the `azp`/`appid` claim naming the
+      # application — never the principal-id header, which for a delegated token names the signed-in person.
+      TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
+      # Comma-separated, which `config.py` splits: two browsers reach the REST contract now and the module's own record
+      # has to name both, or the second is refused by the module after the platform has already let it through.
+      REST_CALLER_APPLICATION_IDS = join(",", [
+        azuread_application.terminal.client_id,
+        azuread_application.pocket.client_id,
+      ])
 
-    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
-  }
+      APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
+    },
+    # All three or none — config.py refuses every partial form. Only a decision naming a trade is announced,
+    # and only where it changes, so this channel speaks on the scale of setups rather than of bars.
+    var.telegram_alert_destination == "" ? {} : {
+      TELEGRAM_GATEWAY_URL   = "https://${local.telegram_gateway_hostname}"
+      TELEGRAM_GATEWAY_SCOPE = "${local.telegram_gateway_api_uri}/.default"
+      ALERT_DESTINATION      = var.telegram_alert_destination
+    }
+  )
 
   lifecycle {
     ignore_changes = [site_config[0].application_stack[0].docker_image_name]

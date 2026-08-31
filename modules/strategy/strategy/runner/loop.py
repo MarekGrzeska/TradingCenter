@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from .. import resolver
+from ..alerts import Alerts, is_new_setup
 from ..archive import Archive
 from ..errors import StrategyError
 from ..gates import ReasonKind, apply, coverage, reward_over_risk
@@ -38,12 +39,17 @@ class Evaluated:
     decision: Decision | None
     reason_kind: ReasonKind | None = None
     recorded: bool = False
+    # Whether the operator was told about this one. False covers three different things and
+    # deliberately does not tell them apart: not a trade, not a change, or nobody to tell.
+    announced: bool = False
     # Set when the pass could not get as far as a decision at all: no bars yet for this
     # pair, or a parameter set that has gone missing. Distinct from a decision to refuse.
     skipped: str | None = None
 
 
-async def evaluate_once(pool, archive: Archive, watch: Watch) -> Evaluated:
+async def evaluate_once(
+    pool, archive: Archive, watch: Watch, alerts: Alerts | None = None
+) -> Evaluated:
     """One watch, one bar, one decision — or the reason there was not one. The watch's own revision, never
     the newest: a definition may have moved on three times without changing what this watch decides."""
     async with pool.acquire() as conn:
@@ -109,8 +115,32 @@ async def evaluate_once(pool, archive: Archive, watch: Watch) -> Evaluated:
         facts_snapshot(read.facts, read.gaps),
         found.revision_id,
     )
+    announced = False
+    if recorded and alerts is not None and is_new_setup(decision, previous):
+        announced = await _announce(pool, alerts, watch, decision)
     return Evaluated(
-        watch=watch, as_of=as_of, decision=decision, reason_kind=reason_kind, recorded=recorded
+        watch=watch,
+        as_of=as_of,
+        decision=decision,
+        reason_kind=reason_kind,
+        recorded=recorded,
+        announced=announced,
+    )
+
+
+async def _announce(pool, alerts: Alerts, watch: Watch, decision) -> bool:
+    """The decision that was just written, told to the operator. Read back rather than returned by
+    the write: the id is needed only on this path, which is a handful of bars a day."""
+    async with pool.acquire() as conn:
+        written = await last_decision(conn, watch.strategy_id, watch.symbol)
+    if written is None:
+        return False
+    return await alerts.announce(
+        pool,
+        strategy_id=watch.strategy_id,
+        symbol=watch.symbol,
+        decision=decision,
+        decision_id=written.id,
     )
 
 
@@ -131,7 +161,7 @@ async def _write(
         )
 
 
-async def evaluate_all(pool, archive: Archive) -> list[Evaluated]:
+async def evaluate_all(pool, archive: Archive, alerts: Alerts | None = None) -> list[Evaluated]:
     """Every active watch, one after another. Sequential on purpose: the archive counts its budget against
     the whole system, and bars close on the scale of minutes."""
     async with pool.acquire() as conn:
@@ -140,7 +170,7 @@ async def evaluate_all(pool, archive: Archive) -> list[Evaluated]:
     results: list[Evaluated] = []
     for watch in watches:
         try:
-            results.append(await evaluate_once(pool, archive, watch))
+            results.append(await evaluate_once(pool, archive, watch, alerts))
         except Exception:
             # One watch's unexpected failure must not stop the others: a platform that stops watching everything
             # because one strategy raised fails in the least useful way.
@@ -154,10 +184,20 @@ class EvaluationLoop:
     """The clock. Wakes, evaluates every active watch, sleeps. In the module's own process rather than a
     scheduler outside it: a rhythm that lives outside the thing it drives is a second place to be wrong."""
 
-    def __init__(self, pool, archive: Archive, *, interval_seconds: int) -> None:
+    def __init__(
+        self,
+        pool,
+        archive: Archive,
+        *,
+        interval_seconds: int,
+        alerts: Alerts | None = None,
+    ) -> None:
         self._pool = pool
         self._archive = archive
         self._interval = interval_seconds
+        # `None` where no gateway is configured, which is a supported state: the platform decides
+        # either way, and being unable to say so is never a reason not to have decided.
+        self._alerts = alerts
         self._task: asyncio.Task | None = None
 
     @property
@@ -183,7 +223,7 @@ class EvaluationLoop:
         log.info("evaluation loop started, waking every %ds", self._interval)
         while True:
             try:
-                await evaluate_all(self._pool, self._archive)
+                await evaluate_all(self._pool, self._archive, self._alerts)
             except asyncio.CancelledError:
                 raise
             except Exception:

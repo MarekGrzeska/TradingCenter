@@ -84,10 +84,10 @@
 
 ## 13. Wywołujący: strategy
 
-- [ ] 13.1 Migracja dokładająca znacznik przy decyzji
-- [ ] 13.2 Klient bramy i ustawienia adresu ze scope'em
-- [ ] 13.3 Powiadomienie wyłącznie o decyzji wskazującej zagranie i wyłącznie przy zmianie względem poprzedniej
-- [ ] 13.4 Test: brak adresu bramy nie wpływa na decyzję ani na wynik przebiegu
+- [x] 13.1 Migracja dokładająca znacznik przy decyzji
+- [x] 13.2 Klient bramy i ustawienia adresu ze scope'em
+- [x] 13.3 Powiadomienie wyłącznie o decyzji wskazującej zagranie i wyłącznie przy zmianie względem poprzedniej
+- [x] 13.4 Test: brak adresu bramy nie wpływa na decyzję ani na wynik przebiegu
 
 ## 14. Dokumentacja
 

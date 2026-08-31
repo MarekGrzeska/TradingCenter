@@ -20,6 +20,7 @@ from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
+from . import alerts
 from .archive import Archive, http_client
 from .caller_access import CallerAccess
 from .config import Settings
@@ -72,8 +73,15 @@ async def lifespan(app: FastAPI):
 
         # Started last, once everything a pass could need is on the state. A platform with no active
         # watches starts and serves the same way — zero is supported, not degraded.
+        # `None` without a gateway, and the platform runs the same either way: deciding is its job,
+        # and saying so is something it does when there is somewhere to say it.
+        app.state.alerts = alerts.build(settings)
+
         loop = EvaluationLoop(
-            pool, app.state.archive, interval_seconds=settings.evaluation_interval_seconds
+            pool,
+            app.state.archive,
+            interval_seconds=settings.evaluation_interval_seconds,
+            alerts=app.state.alerts,
         )
         app.state.loop = loop
         loop.start()
