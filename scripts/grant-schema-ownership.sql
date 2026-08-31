@@ -24,10 +24,11 @@
 --                           modules became the workbench;
 --   with dbname=polymarket, role=app-tradingcenter-polymarket-data;
 --   with dbname=strategy,   role=app-tradingcenter-strategy;
---   and with dbname=social, role=app-tradingcenter-social-data.
+--   with dbname=social,     role=app-tradingcenter-social-data;
+--   and with dbname=telegram, role=app-tradingcenter-telegram-gateway.
 --
--- The six databases are `agent`, `market_data`, `teams`, `polymarket`, `strategy` and
--- `social` (infra/database.tf). `tradingcenter` is the *server*, not a database on it, and asking
+-- The seven databases are `agent`, `market_data`, `teams`, `polymarket`, `strategy`,
+-- `social` and `telegram` (infra/database.tf). `tradingcenter` is the *server*, not a database on it, and asking
 -- for it by that name is a FATAL.
 --
 -- **A brand-new, empty database still needs this.** Terraform creates it owned by the
@@ -54,6 +55,12 @@
 -- an advisory lock before it serves anything, so without them it starts, refuses, and the
 -- deploy probe reports what the container actually did rather than what the control plane
 -- thinks.
+--
+-- `telegram` is the same again, one change later (`a-notification-reaches-the-operator`):
+-- created empty by that apply and owed both steps below — the principal first, then this
+-- script. Without them the gateway starts, refuses on its first CREATE TABLE and the deploy
+-- probe says so; and because it is the door out, the symptom elsewhere is two modules that
+-- collect and decide normally and never manage to tell anybody.
 --
 -- The password is an Entra access token:
 --   az account get-access-token --resource https://ossrdbms-aad.database.windows.net \

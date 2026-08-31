@@ -97,6 +97,11 @@
 
 ## 15. Wdrożenie
 
+**Cztery kroki operatora, żaden do wykonania z tej strony** — wymagają Azure, konta Telegrama i
+decyzji, kiedy stos ma zamilknąć. Kolejność i dokładne polecenia są spisane w
+`modules/telegram-gateway/README.md` („Deploying it the first time"), a `telegram` ma własny akapit
+w nagłówku `scripts/grant-schema-ownership.sql`.
+
 - [ ] 15.1 `scripts/grant-schema-ownership.sql` na bazie `telegram` — jednorazowo, operator
 - [ ] 15.2 `apply` przed obrazami wywołujących; potwierdzić, że ustawienia dojechały przed obrazem
 - [ ] 15.3 Założyć pierwszego bota i związać pierwszego adresata przez kontrakt REST

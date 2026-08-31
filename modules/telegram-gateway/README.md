@@ -90,3 +90,28 @@ loopback; set, it names the Postgres role and the credential becomes an Entra to
 connection. `DATABASE_POOL_SIZE` is 4 rather than the usual 10 on purpose: seven logical databases
 share one `B_Standard_B1ms` whose `max_connections` is 35, and this module's work is one HTTP call
 per message rather than a query per row of a screen.
+
+## Deploying it the first time
+
+The order is the one `CLAUDE.md` calls non-negotiable — the operator's `apply` reaches the app
+before the image that enforces its settings — and it has one step nothing here can do for itself.
+
+1. **The role, then the database.** `scripts/grant-schema-ownership.sql` against `dbname=telegram`,
+   after creating the principal for this App Service's managed identity. Exactly once, before the
+   first deploy: the module migrates itself at startup and cannot alter what it does not own.
+2. **`terraform apply`**, which creates the App Service, the Entra registration and the `telegram`
+   database, and puts the workbench's `TELEGRAM_MCP_URL` in place. The first apply needs
+   `-target=azurerm_linux_web_app.telegram_gateway` once, because the firewall rule reads outbound
+   addresses that do not exist until the app does.
+3. **Deploy**, and `deploy_probe.py` reads `/` for `"telegram-gateway"`.
+4. **A bot and a destination**, through the REST contract: `POST /bots/adopted` with a token from
+   @BotFather (or `POST /bots/created` where the account session is configured), then
+   `POST /destinations` — and somebody taps the start link it answers with. Until that tap the
+   gateway holds an intention, not an address, and `GET /state` says `destinations_ready` is zero.
+5. **Only then the callers.** Set `telegram_alert_destination` in `terraform.tfvars` to the name
+   bound in step 4 and apply: `social-data` and `strategy` get their three settings and start
+   announcing. Setting it earlier is not an outage — the sends are refused, nothing is marked as
+   told, and each next pass tries again.
+
+Rolling back is the same lever in reverse: clear `telegram_alert_destination`, apply, and both
+callers collect and decide exactly as before while saying nothing. Their own tests walk that state.
