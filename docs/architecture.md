@@ -182,6 +182,51 @@ left to be discovered in the code. The line that *is* hard sits elsewhere and is
 caller record enforces: **no tool deletes collected history.** That is a REST route, and the
 one act in the module nobody can undo.
 
+## The post archive
+
+`social-data` arrived on 31 August 2026 with the same shape again — one module, its own
+database, a REST contract two front ends read and four MCP tools at `/mcp` — and one addition
+the two archives before it do not have: it keeps **what a model made of** each row beside the
+row.
+
+```
+                  a public feed
+              (trumpstruth.org, one source of several to come)
+                        │  public, no credential to present
+                        ▼
+        ┌──────────────────────────────┐
+        │  social-data                 │
+        │  collect · translate · score │
+        │  REST  ·  MCP tools at /mcp  │
+        └──────┬───────────────┬───────┘
+      posts,   │               │  the same posts, reduced for
+      state    │               │  a model — excerpt, then the text
+               │  ┌────────────┘
+               ▼  ▼
+     terminal · pocket   workbench
+       (the tab and       (the fourth tool server)
+        the phone screen)
+```
+
+**The reading is stored, not decided at question time**, and that is the decision the module
+turns on. A score computed when somebody asks cannot be filtered on, gives two answers to the
+same sentence in two conversations, and is paid for per question rather than once per post. So
+the module holds it — stamped with the model and the moment, which is what makes it a fact
+about what a model said rather than an opinion the module has. Re-reading overwrites: the
+history here is the post, and nobody reconstructs what a model thought last week about a post
+from last month. The judgement that stays the workbench's is the other one — whether any of it
+changes a position.
+
+**Nothing on either surface writes.** `polymarket-data` publishes writing tools because it has
+a list of observations an operator curates and a model may add to; here the source is collected
+whole and there is nothing to add. The caller record (`social_data/caller_access.py`) still
+splits the two surfaces for the reason it does there: the platform authorizes an application,
+not a route.
+
+**The archive starts where it started.** The feed answers questions about the past, so a
+backfill was available and was not taken: `collecting_since` is written once, and an archive
+that begins at a known moment is worth more than one beginning wherever the first pass reached.
+
 ## The order path
 
 The workbench's teams surface has one more edge than the diagram above draws, and it is

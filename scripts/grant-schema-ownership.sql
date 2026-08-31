@@ -23,10 +23,11 @@
 --                           because one App Service presents one identity since the two
 --                           modules became the workbench;
 --   with dbname=polymarket, role=app-tradingcenter-polymarket-data;
---   and with dbname=strategy, role=app-tradingcenter-strategy.
+--   with dbname=strategy,   role=app-tradingcenter-strategy;
+--   and with dbname=social, role=app-tradingcenter-social-data.
 --
--- The five databases are `agent`, `market_data`, `teams`, `polymarket` and `strategy`
--- (infra/database.tf). `tradingcenter` is the *server*, not a database on it, and asking
+-- The six databases are `agent`, `market_data`, `teams`, `polymarket`, `strategy` and
+-- `social` (infra/database.tf). `tradingcenter` is the *server*, not a database on it, and asking
 -- for it by that name is a FATAL.
 --
 -- **A brand-new, empty database still needs this.** Terraform creates it owned by the
@@ -43,7 +44,11 @@
 -- script against it is the one operator step that change carries — before the first
 -- deploy, or polymarket-data starts, tries to migrate and stops.
 --
--- `strategy` is the same again, one change later (`a-strategy-is-a-catalogue-entry`):
+-- `social` is the same again, one change later (`social-data-collects-the-posts`): created
+-- empty by that apply, owed the principal and then this script, and without them the module
+-- starts, refuses on its first CREATE TABLE and the deploy probe says so.
+--
+-- `strategy` is the same again, one change earlier (`a-strategy-is-a-catalogue-entry`):
 -- created empty by that apply, and owed both steps below — the principal first, then this
 -- script — before the deploy that gives it an image. The module's lifespan migrates under
 -- an advisory lock before it serves anything, so without them it starts, refuses, and the

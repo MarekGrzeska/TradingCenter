@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     polymarket_mcp_scope: str | None = None
     polymarket_mcp_request_timeout_seconds: float = 35.0
 
+    # The fourth pair, same shape as the three above: unset means neither surface can say what was posted.
+    # Its tools read one database and reach nothing outward, so the ceiling is the archive's, not the provider's.
+    social_mcp_url: str | None = None
+    social_mcp_scope: str | None = None
+    social_mcp_request_timeout_seconds: float = 15.0
+
     # No `TEAMS_MCP_*`: the teams tools are a layer in this process now, so a `.env` from before this change carries
     # three settings that are read by nothing.
 
@@ -115,6 +121,9 @@ class Settings(BaseSettings):
             polymarket_mcp_url=self.polymarket_mcp_url,
             polymarket_mcp_scope=self.polymarket_mcp_scope,
             polymarket_mcp_request_timeout_seconds=self.polymarket_mcp_request_timeout_seconds,
+            social_mcp_url=self.social_mcp_url,
+            social_mcp_scope=self.social_mcp_scope,
+            social_mcp_request_timeout_seconds=self.social_mcp_request_timeout_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
         )
 
@@ -138,6 +147,9 @@ class Settings(BaseSettings):
             polymarket_mcp_url=self.polymarket_mcp_url,
             polymarket_mcp_scope=self.polymarket_mcp_scope,
             polymarket_mcp_request_timeout_seconds=self.polymarket_mcp_request_timeout_seconds,
+            social_mcp_url=self.social_mcp_url,
+            social_mcp_scope=self.social_mcp_scope,
+            social_mcp_request_timeout_seconds=self.social_mcp_request_timeout_seconds,
             run_timeout_seconds=self.run_timeout_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
             scheduler_enabled=self.scheduler_enabled,

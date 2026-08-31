@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Trump's Truth</title>
+    <link>https://trumpstruth.org/</link>
+    <description>Statements</description>
+    <item>
+      <title>Statement</title>
+      <link>https://trumpstruth.org/statuses/1001</link>
+      <guid isPermaLink="false">1001</guid>
+      <pubDate>Sat, 30 Aug 2026 23:50:00 +0000</pubDate>
+      <description>&lt;p&gt;TARIFFS on China &amp;amp; Mexico take effect MONDAY. Our Country will be RICH again!&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>Statement</title>
+      <link>https://trumpstruth.org/statuses/1002</link>
+      <guid isPermaLink="false">1002</guid>
+      <pubDate>Sun, 31 Aug 2026 00:10:00 +0000</pubDate>
+      <description>RT by realDonaldTrump: &lt;p&gt;The Fed must cut rates NOW.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>Statement</title>
+      <link>https://trumpstruth.org/statuses/1003</link>
+      <guid isPermaLink="false"></guid>
+      <pubDate>Sun, 31 Aug 2026 01:00:00 +0000</pubDate>
+      <description>&lt;p&gt;An item with no identifier — dropped rather than guessed at.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>Statement</title>
+      <link>https://trumpstruth.org/statuses/1004</link>
+      <guid isPermaLink="false">1004</guid>
+      <pubDate>not a date at all</pubDate>
+      <description>&lt;p&gt;An item whose date cannot be read.&lt;/p&gt;</description>
+    </item>
+  </channel>
+</rss>

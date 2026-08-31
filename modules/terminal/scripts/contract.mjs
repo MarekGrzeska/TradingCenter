@@ -53,6 +53,19 @@ const SOURCES = [
 `,
   },
   {
+    name: "social-data",
+    moduleDir: resolve(terminal, "..", "social-data"),
+    pythonModule: "social_data.openapi",
+    output: join(terminal, "src", "data", "contract.social.generated.ts"),
+    banner: `/**
+ * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
+ *
+ * Printed from social-data's models by \`python -m social_data.openapi\`. Every reading field is present and
+ * null where no model has read the post — absent would be indistinguishable from a contract that moved.
+ */
+`,
+  },
+  {
     name: "strategy",
     moduleDir: resolve(terminal, "..", "strategy"),
     pythonModule: "strategy.openapi",

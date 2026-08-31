@@ -94,6 +94,9 @@ BRIGHT_GREEN = "\033[92m"
 BRIGHT_BLUE = "\033[94m"
 # And bright magenta to the phone screen, whose log interleaves with the terminal's cyan.
 BRIGHT_MAGENTA = "\033[95m"
+# And bright cyan to the post archive: every other colour here is taken, and two services sharing
+# one is the thing this field exists to prevent.
+BRIGHT_CYAN = "\033[96m"
 
 SERVICES: tuple[Service, ...] = (
     Service(
@@ -160,6 +163,22 @@ SERVICES: tuple[Service, ...] = (
         ),
     ),
     Service(
+        name="social-data",
+        module="social-data",
+        port=8090,
+        command=("uv", "run", "uvicorn", "social_data.app:app", "--reload", "--port", "8090"),
+        log_prefix="social  ",
+        colour=BRIGHT_CYAN,
+        health_path="/health",
+        why=(
+            "Independent of everything above it — its upstream is a public feed, and it "
+            "collects on its own loop whether or not anybody asks. Before the workbench "
+            "for the reason polymarket-data is: the tool list is read on the first turn "
+            "that wants one, and a server still coming up means a turn answered without "
+            "those tools rather than an error anyone would notice."
+        ),
+    ),
+    Service(
         name="strategy",
         module="strategy",
         port=8080,
@@ -187,7 +206,7 @@ SERVICES: tuple[Service, ...] = (
             "Last among the back ends: nothing else calls it, so nothing waits on it. The "
             "conversation and the teams catalogue are one process here — 8050 has belonged "
             "to nobody since `agent-and-teams-one-workbench`, and 8070 stopped being "
-            "nobody's when polymarket-data claimed it. It calls three tool servers now, "
+            "nobody's when polymarket-data claimed it. It calls four tool servers now, "
             "and each tool list is read on the first turn that wants one, so a server "
             "still coming up means a turn answered without those tools rather than an "
             "error anyone would notice."
@@ -235,12 +254,13 @@ MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
     ("workbench", "alembic-agent.ini"),
     ("workbench", "alembic-teams.ini"),
     ("polymarket-data", None),
+    ("social-data", None),
     ("strategy", None),
 )
 
 # Created here if missing rather than through docker-entrypoint-initdb.d, which only runs against
 # an empty volume and would never fire for a container from before these modules existed.
-LOGICAL_DATABASES = ("agent", "teams", "polymarket", "strategy")
+LOGICAL_DATABASES = ("agent", "teams", "polymarket", "social", "strategy")
 
 
 
@@ -289,6 +309,9 @@ REQUIRED_ENV: tuple[tuple[str, str], ...] = (
     # Nothing to fill in: Polymarket's two surfaces are public, so this module is the one
     # here whose example file is already a working configuration.
     ("polymarket-data", "copy .env.example; the defaults match compose.yaml and need no key"),
+    # A key is optional here and its absence is a supported state: without OPENAI_API_KEY the module
+    # collects posts and leaves every reading empty, which /state says out loud.
+    ("social-data", "copy .env.example; the defaults match compose.yaml, and the model key is optional"),
     ("strategy", "copy .env.example; the defaults match compose.yaml"),
 )
 
@@ -449,6 +472,15 @@ ADVISORIES: tuple[tuple[str, str, str, str], ...] = (
             "team assigning those tools refuses to run"
         ),
         "8070",
+    ),
+    (
+        "workbench",
+        "SOCIAL_MCP_URL",
+        (
+            "the agent cannot say what was posted, and a team assigning those tools "
+            "refuses to run"
+        ),
+        "8090",
     ),
 )
 
@@ -870,7 +902,7 @@ def ready_lines(*, start_front_ends: bool) -> list[str]:
         f"  Workbench docs      http://{LOOPBACK}:8030/docs",
         f"  Polymarket docs     http://{LOOPBACK}:8070/docs",
         (
-            "  Database            market_data, agent, teams, polymarket @ localhost:55432 "
+            "  Database            market_data, agent, teams, polymarket, social @ localhost:55432 "
             "(compose.yaml; 'docker compose down' keeps the data)"
         ),
     ]

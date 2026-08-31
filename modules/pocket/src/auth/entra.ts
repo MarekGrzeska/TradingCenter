@@ -23,6 +23,8 @@ export interface EntraIdentities {
   /** The conversation's. `noIdentity` when no scope is configured for it, which sends requests bare
    *  rather than carrying the archive's token to a module that would refuse it. */
   workbench: Identity;
+  /** The post archive's, on the same terms as the conversation's. */
+  posts: Identity;
 }
 
 export function createEntraIdentities(config: EntraConfig): EntraIdentities {
@@ -107,5 +109,6 @@ export function createEntraIdentities(config: EntraConfig): EntraIdentities {
     archive: identityFor(config.scopes.archive),
     workbench:
       config.scopes.workbench === null ? noIdentity : identityFor(config.scopes.workbench),
+    posts: config.scopes.posts === null ? noIdentity : identityFor(config.scopes.posts),
   };
 }

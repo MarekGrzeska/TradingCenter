@@ -106,7 +106,15 @@ resource "azuread_application_pre_authorized" "polymarket_data_terminal" {
   permission_ids       = [module.polymarket_data_easy_auth.scope_id]
 }
 
-# The fifth. The strategy platform shipped for machine callers, so its registration announced no delegated scope at all
+# The fifth, and it stands ready rather than in use for the reason the first three did: a `resource_access.id` must
+# be concrete at plan time, so the terminal's registration cannot name a scope this same apply creates.
+resource "azuread_application_pre_authorized" "social_data_terminal" {
+  application_id       = module.social_data_easy_auth.application_id
+  authorized_client_id = azuread_application.terminal.client_id
+  permission_ids       = [module.social_data_easy_auth.scope_id]
+}
+
+# The sixth. The strategy platform shipped for machine callers, so its registration announced no delegated scope at all
 # — the terminal was on its caller list and still met a 401, because there was nothing for a browser to ask for.
 resource "azuread_application_pre_authorized" "strategy_terminal" {
   application_id       = module.strategy_easy_auth.application_id
@@ -174,6 +182,13 @@ resource "azuread_application_pre_authorized" "polymarket_data_pocket" {
   application_id       = module.polymarket_data_easy_auth.application_id
   authorized_client_id = azuread_application.pocket.client_id
   permission_ids       = [module.polymarket_data_easy_auth.scope_id]
+}
+
+# The post archive's, for the same reason: a phone asked to consent mid-glance is a phone put back in a pocket.
+resource "azuread_application_pre_authorized" "social_data_pocket" {
+  application_id       = module.social_data_easy_auth.application_id
+  authorized_client_id = azuread_application.pocket.client_id
+  permission_ids       = [module.social_data_easy_auth.scope_id]
 }
 
 # The conversation's, for the same reason and on the same day: the agent tab acquires this one silently, which is

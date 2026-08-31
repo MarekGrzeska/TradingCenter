@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { archiveBase, entraConfig, workbenchBase } from "./config";
+import { archiveBase, entraConfig, postsBase, workbenchBase } from "./config";
 
 const COMPLETE = {
   VITE_ENTRA_CLIENT_ID: "client",
@@ -12,6 +12,7 @@ describe("where each back end answers", () => {
     expect(archiveBase("/polymarket-api/")).toBe("/polymarket-api");
     expect(archiveBase(undefined)).toBe("/polymarket-api");
     expect(workbenchBase(undefined)).toBe("/workbench-api");
+    expect(postsBase(undefined)).toBe("/social-api");
   });
 });
 
@@ -23,6 +24,7 @@ describe("the sign-in configuration", () => {
       scopes: {
         archive: "api://tradingcenter-polymarket-data/access_as_user",
         workbench: null,
+        posts: null,
       },
     });
   });
@@ -45,5 +47,17 @@ describe("the sign-in configuration", () => {
     // A token minted for the archive is never sent to the workbench, so the agent goes without one
     // rather than borrowing it.
     expect(entraConfig(COMPLETE)?.scopes.workbench).toBeNull();
+  });
+
+  it("carries the post archive's audience on the same terms", () => {
+    const withPosts = {
+      ...COMPLETE,
+      VITE_ENTRA_SCOPE_SOCIAL: "api://tradingcenter-social-data/access_as_user",
+    } as unknown as ImportMetaEnv;
+
+    expect(entraConfig(withPosts)?.scopes.posts).toBe(
+      "api://tradingcenter-social-data/access_as_user",
+    );
+    expect(entraConfig(COMPLETE)?.scopes.posts).toBeNull();
   });
 });

@@ -213,7 +213,7 @@ async def test_announced_snapshot_says_which_servers_have_no_address() -> None:
     # announcing something. The narrower claim the `None` used to make is this field.
     snapshot = await announced_snapshot(settings_for(None))
 
-    assert snapshot.unconfigured == ("market-mcp", "polymarket-mcp", "trading-mcp")
+    assert snapshot.unconfigured == ("market-mcp", "polymarket-mcp", "social-mcp", "trading-mcp")
     assert snapshot.configured_servers == ()
     assert snapshot.unreachable == []
 

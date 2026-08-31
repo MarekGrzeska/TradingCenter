@@ -128,10 +128,10 @@ def test_a_missing_database_url_names_itself(surface: str) -> None:
 
 
 # Parameterised over the servers rather than copied per server, since the rule is one `_checked_server` call each and
-# the third server added later would have been that copy. Each surface's own test_config keeps what is genuinely its own.
+# the third and fourth servers added later would each have been that copy. Each surface's own test_config keeps what is genuinely its own.
 
 
-@pytest.fixture(params=["market_mcp", "trading_mcp", "polymarket_mcp"])
+@pytest.fixture(params=["market_mcp", "trading_mcp", "polymarket_mcp", "social_mcp"])
 def server(request: pytest.FixtureRequest) -> str:
     return request.param
 

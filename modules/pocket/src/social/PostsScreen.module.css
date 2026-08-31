@@ -1,0 +1,103 @@
+.screen {
+  /* The header stays put and the list scrolls under it: on a phone the freshness line is what the
+     operator glances at while reading, and a header that scrolls away is a scroll back up. */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  width: 100%;
+  max-width: 40rem;
+  margin: 0 auto;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: calc(0.6rem + var(--safe-top)) 0.75rem 0.5rem;
+  background: var(--bg);
+}
+
+.heading {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.freshness {
+  align-self: flex-start;
+  min-height: 1.75rem;
+  padding: 0 0.15rem;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.scroller {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* The browser's own bounce would run underneath the pull gesture and both would move at once. */
+  overscroll-behavior-y: contain;
+}
+
+.pull {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 0.72rem;
+  font-weight: 600;
+  transition: height 0.15s ease-out;
+}
+
+.pullPending {
+  color: var(--text-soft);
+}
+
+.pullReady {
+  color: var(--accent);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0 0.75rem calc(1rem + var(--safe-bottom));
+}
+
+.note {
+  margin: 0.5rem 0.75rem;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.warning {
+  margin: 0.5rem 0.75rem;
+  color: var(--pill-warn-fg);
+  font-size: 0.85rem;
+}
+
+.error {
+  margin: 0.5rem 0.75rem;
+  color: var(--danger);
+  font-size: 0.85rem;
+}
+
+.more {
+  align-self: flex-start;
+  min-height: var(--tap);
+  padding: 0 0.15rem;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+}

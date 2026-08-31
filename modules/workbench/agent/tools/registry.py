@@ -37,6 +37,8 @@ class ToolServerRegistry:
                 # The prediction-market archive. Reads only: the three tools of its nine that write write
                 # a watch list, not an account.
                 ToolServer(settings, prefix="polymarket_mcp"),
+                # The post archive. Nothing on that surface writes at all.
+                ToolServer(settings, prefix="social_mcp"),
                 *(local_sources or []),
             ]
         )

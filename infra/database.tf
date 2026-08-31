@@ -83,7 +83,16 @@ resource "azurerm_postgresql_flexible_server_database" "polymarket" {
   charset   = "UTF8"
 }
 
-# A fifth, and the reasoning has still not changed. It needs the same one-off grant run in it before the first deploy
+# A fifth, same reason once more: a module owns its own schema, not its own server. Its role is the same one-off
+# grant, and without it the module starts, tries to migrate and stops — the intended failure rather than a quiet one.
+resource "azurerm_postgresql_flexible_server_database" "social" {
+  name      = "social"
+  server_id = azurerm_postgresql_flexible_server.main.id
+  collation = "en_US.utf8"
+  charset   = "UTF8"
+}
+
+# A sixth, and the reasoning has still not changed. It needs the same one-off grant run in it before the first deploy
 # migrates, or the module starts and refuses on a table it cannot alter.
 resource "azurerm_postgresql_flexible_server_database" "strategy" {
   name      = "strategy"
@@ -137,7 +146,18 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "polymarket_data_out
   end_ip_address   = each.value
 }
 
-# The fourth, and the last thing to say about the shape is that it repeats: `terraform apply
+# The fourth, same shape and same first convergence: `terraform apply -target=azurerm_linux_web_app.social_data`
+# once, then the normal unrestricted apply.
+resource "azurerm_postgresql_flexible_server_firewall_rule" "social_data_outbound" {
+  for_each = toset(azurerm_linux_web_app.social_data.possible_outbound_ip_address_list)
+
+  name             = "AllowSocialDataOutbound-${replace(each.value, ".", "-")}"
+  server_id        = azurerm_postgresql_flexible_server.main.id
+  start_ip_address = each.value
+  end_ip_address   = each.value
+}
+
+# The fifth, and the last thing to say about the shape is that it repeats: `terraform apply
 # -target=azurerm_linux_web_app.strategy` once, then the normal unrestricted apply.
 resource "azurerm_postgresql_flexible_server_firewall_rule" "strategy_outbound" {
   for_each = toset(azurerm_linux_web_app.strategy.possible_outbound_ip_address_list)
