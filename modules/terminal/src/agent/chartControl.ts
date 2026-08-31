@@ -87,17 +87,8 @@ function toSelections(command: AgentChartCommand): IndicatorSelection[] {
 }
 
 /**
- * Reads whatever the agent set since the terminal last looked, applies it to the active
- * slot, and moves the cursor past it.
- *
- * The cursor moves even for a command that could not be applied whole. A command the
- * terminal refuses is not a command it should retry on every load — the agent was told
- * why at the time it asked (`agent-chart-control`, "Odmowa narzędzia nazywa, co
- * poprawić"), and this side says so once, to the operator.
- *
- * Failure to read is not failure to draw: a rejected read leaves the cursor, the chart
- * and the conversation exactly as they were (`terminal-agent-chat` spec, "Nieudany odczyt
- * poleceń MUST NOT przerywać rozmowy ani czyścić wykresu").
+ * Applies whatever the agent set since the terminal last looked and moves the cursor past it, even for a command
+ * that could not be applied whole. A failed read leaves the cursor, the chart and the conversation as they were.
  */
 export async function syncAgentChart(
   overrides: Partial<ChartControlDeps> = {},
@@ -121,10 +112,8 @@ export async function syncAgentChart(
   let symbol = command.symbol;
   let resolution = command.resolution;
 
-  // Whether the pair half could not even be checked. Kept rather than returned on:
-  // a focus needs nothing from the archive — it names a moment, and moments are not
-  // collected — and throwing the whole command away over the half that does need it left
-  // the operator told the chart had moved while it sat still, with nothing said about why.
+  // Whether the pair half could not even be checked. Kept rather than returned on: a focus needs nothing
+  // from the archive, and throwing the command away left the operator told the chart had moved.
   let pairsUnknown = false;
   const allowed = new Map<string, Resolution[]>();
 
@@ -155,9 +144,8 @@ export async function syncAgentChart(
       skipped.push(`${symbol} is not collected`);
       symbol = null;
     }
-    // Checked against whichever symbol will actually end up on the slot, not the one just
-    // rejected above: a resolution the slot's *current* symbol collects fine must not be
-    // dropped for a reason that names an instrument the operator never asked for.
+    // Checked against whichever symbol will end up on the slot, not the one just rejected: a resolution
+    // the slot's current symbol collects fine must not be dropped over an instrument nobody asked for.
     const effectiveSymbol = symbol ?? slot.symbol;
     const effectiveResolutions = effectiveSymbol === null ? undefined : allowed.get(effectiveSymbol);
     if (
@@ -167,9 +155,8 @@ export async function syncAgentChart(
       skipped.push(`${resolution} is not collected${effectiveSymbol ? ` for ${effectiveSymbol}` : ""}`);
       resolution = null;
     }
-    // A symbol whose own collected resolutions do not include the slot's current one
-    // would draw nothing either: the symbol arrives with the resolution it can be drawn
-    // in, or not at all.
+      // A symbol whose own collected resolutions do not include the slot's current one would draw
+      // nothing either: the symbol arrives with the resolution it can be drawn in, or not at all.
     if (symbol !== null && resolution === null && resolutions !== undefined) {
       if (!resolutions.includes(slot.resolution)) {
         skipped.push(`${symbol} is not collected at ${slot.resolution}`);
@@ -195,10 +182,8 @@ export async function syncAgentChart(
     applied.push(`focus ${describeFocus(command.focus)}`);
   }
 
-  // Not moved when the pair half never got to be checked: that half is still owed, and
-  // the next successful sync is what pays it. Everything already applied above reapplies
-  // with it, which for a focus is the same jump twice and for the rest is a no-op — a
-  // smaller price than a symbol the operator asked for and never got.
+  // Not moved when the pair half never got to be checked: that half is still owed, and the next
+  // successful sync pays it. Everything already applied reapplies with it, which is a no-op or one jump.
   if (!pairsUnknown) writeCursor(deps.storage, command.sequence);
   return { applied, skipped };
 }
@@ -218,9 +203,8 @@ export function describeChartControl(result: ChartControlResult | null): string 
 }
 
 /**
- * What the active slot is drawing, for the model to read as it answers. Null when the
- * slot has no instrument yet: "nothing is on screen" is better said by sending nothing
- * than by sending a snapshot full of nulls.
+ * What the active slot is drawing, for the model to read as it answers. Null when the slot has no
+ * instrument yet: "nothing is on screen" is better said by sending nothing than by nulls.
  */
 export function activeChartSnapshot(grid: GridStore = gridStore): AgentChartSnapshot | null {
   const config = grid.getSnapshot();

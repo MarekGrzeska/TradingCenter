@@ -27,19 +27,14 @@ def upgrade() -> None:
     op.create_table(
         "sessions",
         sa.Column("id", sa.BigInteger(), sa.Identity(), primary_key=True),
-        # Who this rozmowa belongs to — the Easy Auth principal, or the constant "local"
-        # identity a module started without REQUIRE_AUTHENTICATED_PRINCIPAL assigns
-        # (specs/agent-browser-access). Every read is filtered by this; there is no
-        # session visible to nobody.
+        # Who this rozmowa belongs to — the Easy Auth principal, or the constant "local" identity a
+        # module started without the requirement assigns. Every read is filtered by this.
         sa.Column("owner_principal", sa.Text(), nullable=False),
-        # NULL until the first exchange — the same flag that keeps an empty session off
-        # the list (specs/agent-chat, "Pusta sesja nie zaśmieca historii"): a listing
-        # query is `WHERE title IS NOT NULL`, nothing more.
+        # NULL until the first exchange — the same flag that keeps an empty session off the list: a
+        # listing query is `WHERE title IS NOT NULL`, nothing more.
         sa.Column("title", sa.Text(), nullable=True),
-        # The model the *next* turn will use — mutable via PATCH. Each agent message
-        # additionally carries the model that actually produced it (below), because
-        # changing this MUST NOT rewrite what earlier turns were answered with
-        # (specs/agent-models, "Model jest wyborem sesji, a nie instalacji").
+        # The model the *next* turn will use. Each agent message carries the model that produced it,
+        # because changing this MUST NOT rewrite what earlier turns were answered with.
         sa.Column("current_model_id", sa.Text(), nullable=False),
         sa.Column(
             "created_at",
@@ -55,13 +50,8 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.text("now()"),
         ),
-        # Set when the operator removes a rozmowa. A stamp rather than a `DELETE`, and the
-        # reason is the ledger: `usage` rows below reference this session, and money that
-        # was spent MUST NOT stop being counted because the conversation it paid for was
-        # tidied away (specs/agent-usage, "Skasowanie rozmowy nie zmniejsza rachunku").
-        # Every read filters on `deleted_at IS NULL`, so a removed session answers exactly
-        # like a missing one — the same indistinguishability specs/agent-browser-access
-        # already requires of somebody else's session.
+        # Set when the operator removes a rozmowa. A stamp rather than a `DELETE`, because `usage` rows
+        # reference this session and money spent must not stop being counted. Every read filters on it.
         sa.Column("deleted_at", sa.TIMESTAMP(timezone=True), nullable=True),
     )
     op.create_index(
@@ -72,10 +62,8 @@ def upgrade() -> None:
 
     op.create_table(
         "messages",
-        # A plain Identity PK, not a per-session sequence: it is already globally
-        # monotonic, so ordering a session's transcript by `(session_id, id)` gives the
-        # repeatable order specs/agent-chat requires without a second counter to keep in
-        # step with it.
+        # A plain Identity PK, not a per-session sequence: it is already globally monotonic, so ordering
+        # a transcript by `(session_id, id)` is repeatable without a second counter.
         sa.Column("id", sa.BigInteger(), sa.Identity(), primary_key=True),
         sa.Column(
             "session_id",
@@ -85,14 +73,12 @@ def upgrade() -> None:
         ),
         sa.Column("role", sa.Text(), nullable=False),
         sa.Column("content", sa.Text(), nullable=False),
-        # Set on an agent message only — which model and which system prompt actually
-        # produced it, kept even after the model is retired from the catalogue or the
-        # prompt is revised (specs/agent-models, specs/agent-chat).
+        # Set on an agent message only — which model and which system prompt produced it, kept even
+        # after the model is retired from the catalogue.
         sa.Column("model_id", sa.Text(), nullable=True),
         sa.Column("prompt_version", sa.Text(), nullable=True),
-        # A stream that broke before the model finished still leaves this row — with
-        # whatever text arrived — marked so a reader can tell a cut answer from a
-        # complete one (specs/agent-chat, "Model przerywa w połowie").
+        # A stream that broke before the model finished still leaves this row, with whatever text
+        # arrived, marked so a reader can tell a cut answer from a complete one.
         sa.Column("incomplete", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column(
             "created_at",
@@ -132,11 +118,8 @@ def upgrade() -> None:
         sa.Column("output_tokens", sa.Integer(), nullable=True),
         sa.Column("cached_tokens", sa.Integer(), nullable=True),
         sa.Column("reasoning_tokens", sa.Integer(), nullable=True),
-        # The rate this row was priced at, snapshotted from the catalogue at write time —
-        # never re-read from current configuration (specs/agent-usage, "Koszt jest
-        # przypisany do wiersza w chwili zapisu"). Per 1,000,000 tokens, the unit the
-        # catalogue is configured in — 8 decimal places is far more than any per-million
-        # rate needs, and keeps the cost column below exact without float's rounding.
+        # The rate this row was priced at, snapshotted at write time and never re-read from current
+        # configuration. Per 1,000,000 tokens; 8 decimal places keeps the cost column exact.
         sa.Column("input_rate_per_1m", sa.Numeric(18, 8), nullable=False),
         sa.Column("output_rate_per_1m", sa.Numeric(18, 8), nullable=False),
         # NULL exactly when the tokens it would be computed from are — a cost cannot be

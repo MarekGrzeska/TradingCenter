@@ -8,11 +8,8 @@ import { DefinitionDialog } from "./DefinitionDialog";
 import type { StrategyApi } from "./strategyApi";
 
 /**
- * Writing a rule: where the pickers come from, and where the refusal lands.
- *
- * The first test is the load-bearing one. Nothing in this screen names an indicator, so an
- * indicator the archive grows appears in the picker with no change here — which is the whole
- * reason the catalogue is read rather than copied.
+ * Where the pickers come from, and where the refusal lands. The first test is load-bearing: nothing in this screen
+ * names an indicator, so one the archive grows appears with no change here.
  */
 
 function catalogue(...ids: string[]): IndicatorCatalogue {
@@ -125,10 +122,8 @@ describe("writing a rule", () => {
   });
 
   it("leaves the catalogue where every other reader of it looks", async () => {
-    // The query cache is shared and keyed by name alone. This dialog once read the
-    // catalogue under the chart's key while holding the whole document rather than its
-    // entries, and the screen that broke was the chart grid — a screen this one has nothing
-    // to do with. The assertion is the chart's own read, after this dialog has done its.
+    // The query cache is shared and keyed by name alone. This dialog once read the catalogue under the chart's
+    // key holding the whole document, and the screen that broke was the chart grid.
     const source = fakeSource();
     render(
       <DefinitionDialog

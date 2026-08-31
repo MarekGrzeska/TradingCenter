@@ -1,22 +1,5 @@
-"""Where the operator put each agent on the canvas.
-
-Beside the revision, deliberately not inside it. A definition is immutable once saved and
-is what a run points at (specs/teams-catalogue, "Rewizja raz zapisana się nie zmienia"),
-so coordinates living in that JSONB would mint a revision every time a node was dragged —
-and a catalogue where "v7 vs v8" is sometimes a different team and sometimes the same one
-moved sideways answers none of the questions it exists for. This table is mutable, keyed by
-team and agent key, and overwritten in place (specs/terminal-teams, "Rozmieszczenie agentów
-jest wyborem operatora i przeżywa zamknięcie widoku").
-
-One consequence, accepted: a layout belongs to the team, not to a revision, so it is shared
-by all of them. An agent the layout does not know — added since the last drag, or present
-only in the older revision a run is being watched on — gets a place computed from the
-dependencies instead. The layout is a remembered hint, never a claim about where something
-is.
-
-`agent_key` is the definition's own key rather than a foreign key to anything: agents are
-JSONB inside a revision, not rows, and a key that disappears from every revision simply
-leaves a row nobody reads.
+"""Where the operator put each agent on the canvas, beside the revision rather than inside it: coordinates in that
+immutable blob would mint a revision every time a node was dragged. A layout is a remembered hint, never a claim.
 
 Revision ID: 0004
 Revises: 0003

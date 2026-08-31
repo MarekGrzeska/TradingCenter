@@ -1,14 +1,5 @@
-"""Thin async client for the capital.com REST API.
-
-Low-level on purpose: every method hands back the raw ``httpx.Response``. Turning a
-payload into a DTO happens one layer up, in the adapter, so the two failure modes —
-"the provider said no" and "the provider said something we did not expect" — stay
-separable.
-
-What it does own is the session. capital.com authenticates statefully: ``POST /session``
-answers with ``CST`` and ``X-SECURITY-TOKEN`` as response *headers*, good for about ten
-idle minutes. Callers never see them.
-"""
+"""Thin async client for the capital.com REST API. Low-level on purpose: every method hands back
+the raw ``httpx.Response``, and it owns the stateful session tokens callers never see."""
 
 from __future__ import annotations
 
@@ -47,30 +38,15 @@ class CapitalClient:
         return self._s.capital_base_url
 
     def stream_tokens(self) -> tuple[str, str]:
-        """The pair the streaming protocol needs *inside* each message.
-
-        The stream cannot authenticate itself — it takes the tokens this client already
-        holds, which is why the streaming half is not a separate credential.
-        """
+        """The pair the streaming protocol needs *inside* each message. The stream cannot
+        authenticate itself, which is why the streaming half is not a separate credential."""
         if not self.authenticated:
             raise RuntimeError("no capital.com session yet — call login() first")
         return self._cst or "", self._security_token or ""
 
     async def login(self) -> httpx.Response:
-        """Log in, or join the login already running.
-
-        Without this, a burst of calls arriving with no session each starts its own login.
-        That used to be described here as fatal — every login killing the session before
-        it — which measurement on 10 August 2026 did not support: four sessions opened
-        with one key all kept working. What it costs is still real and still worth
-        avoiding: every login is a request against the account's 10/second budget, and the
-        callers end up spread across sessions that each expire on their own schedule. One
-        shared attempt turns a stampede into one request everybody waits on.
-
-        Deliberately a Task rather than a lock: awaiting the same Task hands every
-        waiter the same result, whereas a lock would let each waiter proceed to log in
-        again in turn.
-        """
+        """Log in, or join the login already running. A stampede costs one request each against
+        the account's 10/s budget; a Task rather than a lock hands every waiter the same result."""
         if self._login_inflight is None or self._login_inflight.done():
             self._login_inflight = asyncio.create_task(self._login())
         # Shielded so one caller's cancellation does not cancel the login the others
@@ -117,8 +93,6 @@ class CapitalClient:
             resp = await self._send(method, path, headers=self._headers(), **kwargs)
         return resp
 
-    # --- convenience wrappers, all returning the raw response ---
-
     async def session_details(self) -> httpx.Response:
         return await self.request("GET", f"{API_PREFIX}/session")
 
@@ -129,11 +103,8 @@ class CapitalClient:
         return await self.request("PUT", f"{API_PREFIX}/session", json={"accountId": account_id})
 
     async def top_up(self, amount: float) -> httpx.Response:
-        """Moves the demo account's balance by `amount`, positive or negative.
-
-        No account in the body: capital.com adjusts the session's active account, and a
-        parameter naming another one would promise a choice the provider does not offer.
-        """
+        """Moves the demo account's balance by `amount`, positive or negative. No account in the
+        body: capital.com adjusts the session's active one, and a parameter would promise a choice."""
         return await self.request(
             "POST", f"{API_PREFIX}/accounts/topUp", json={"amount": amount}
         )

@@ -97,9 +97,8 @@ describe("parseSseFrame", () => {
   });
 
   it("keeps an outcome it has no name for out of the four it does", () => {
-    // A fifth kind rendered as one of the four would say something the module did not:
-    // an unreachable server shown as a refusal reads as "the archive says no". And it must
-    // not land on `unknown` either — that one now means an order may be on the account.
+    // A fifth kind rendered as one of the four would say something the module did not — and it must not
+    // land on `unknown` either, which now means an order may be on the account.
     const frame =
       "event: tool_call\ndata: " +
       JSON.stringify({

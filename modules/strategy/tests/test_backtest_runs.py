@@ -59,9 +59,8 @@ class TestKeepingAReport:
 
 class TestARunChangesNothingElse:
     async def test_a_backtest_leaves_the_live_record_alone(self, pool) -> None:
-        """A replay must not be able to reach the decisions the loop wrote. It cannot,
-        structurally — `run` is handed an archive and never a pool — and this is the test
-        that says so rather than the docstring."""
+        """A replay must not be able to reach the decisions the loop wrote, and it cannot structurally — `run` is
+        handed an archive and never a pool. This is the test that says so rather than the docstring."""
         from strategy import backtest, store
         from strategy.spec import Decision
 
@@ -110,9 +109,8 @@ class TestTheRoutes:
         assert (await api.get("/backtests/9999")).status_code == 422
 
     async def test_there_is_no_route_that_starts_a_run(self, app) -> None:
-        """A run over years of bars is minutes of work and would hold a request open for
-        all of it — and a long run should not be something a caller can set off by
-        accident. It is a command."""
+        """A run over years of bars is minutes of work and would hold a request open for all of it — and a long run
+        should not be something a caller sets off by accident. It is a command."""
         paths = app.openapi()["paths"]
 
         assert "post" not in paths.get("/backtests", {})

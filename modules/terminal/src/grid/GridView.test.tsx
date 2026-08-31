@@ -50,9 +50,8 @@ class FakeArchive {
 let fakeArchive: FakeArchive;
 let fakeIndicators: FakeIndicatorSource | undefined;
 
-// A quiet candle source. The grid's job is layout and slot wiring, not data,
-// and a live source would push state updates into these tests at arbitrary
-// moments.
+// A quiet candle source. The grid's job is layout and slot wiring, not data, and a live source would push
+// state updates into these tests at arbitrary moments.
 vi.mock("../data/marketData", () => ({
   marketData: {
     parts: [],
@@ -66,22 +65,18 @@ vi.mock("../data/marketData", () => ({
   get archive() {
     return fakeArchive;
   },
-  // Undefined by default, same as a caller passing no `indicatorSource` at
-  // all — the grid's own tests are about layout and slot wiring, not the
-  // indicator picker, except the one that is.
+  // Undefined by default, same as a caller passing no `indicatorSource` at all — these tests are about
+  // layout and slot wiring, not the indicator picker, except the one that is.
   get indicators() {
     return fakeIndicators;
   },
 }));
 
-// The slot reads what is drawn on its instrument from this store, which reaches the
-// agent module — a road these tests have no business travelling. Stubbed empty: the grid's
-// own job is layout and slot wiring, and `DrawingList.test.tsx` is where the list itself
-// is proven.
+// The slot reads what is drawn on its instrument from this store, which reaches the agent module — a road
+// these tests have no business travelling. `DrawingList.test.tsx` proves the list itself.
 vi.mock("../agent/drawingsStore", () => {
-  // One frozen object, returned every time: `useSyncExternalStore` compares snapshots by
-  // identity, and a fresh `{}` per call is an infinite render loop — the same contract
-  // the real store keeps by holding its snapshot in a variable.
+  // One frozen object, returned every time: `useSyncExternalStore` compares snapshots by identity, and a
+  // fresh `{}` per call is an infinite render loop — the contract the real store keeps.
   const empty = Object.freeze({});
   return {
   drawingsStore: {
@@ -124,9 +119,8 @@ function renderGrid() {
 
 beforeEach(() => {
   window.localStorage.clear();
-  // gridStore is a module singleton holding state in memory, so clearing
-  // storage is not enough — put every slot back to defaults so one test's
-  // edits cannot leak into the next.
+  // gridStore is a module singleton holding state in memory, so clearing storage is not enough — put every
+  // slot back to defaults so one test's edits cannot leak into the next.
   const defaults = defaultGridConfig();
   gridStore.setLayout(defaults.layout);
   gridStore.setActiveSlot(defaults.activeSlot);
@@ -138,9 +132,8 @@ beforeEach(() => {
   }
 
   fakeArchive = new FakeArchive();
-  // Matches `defaultGridConfig`'s own slots, plus a couple of extra
-  // instruments the tests pick from the picker. `US100` carries a second
-  // resolution so the resolution-switch test still has one to switch to.
+  // Matches `defaultGridConfig`'s own slots plus a couple the tests pick from the picker. `US100` carries a
+  // second resolution so the resolution-switch test still has one to switch to.
   fakeArchive.pairs = [
     pair("US100", "MINUTE_5"),
     pair("US100", "HOUR_4"),
@@ -204,9 +197,8 @@ describe("GridView layout (terminal-grid spec)", () => {
     expect(screen.getByTestId("slot-s1")).toHaveAttribute("data-active", "false");
   });
 
-  // The mark used to be an `outline` on the slot, which paints with the slot's own
-  // background: a chart's opaque section covered it, so only an empty slot ever showed
-  // which one was active.
+  // The mark used to be an `outline` on the slot, which paints with the slot's own background: a chart's
+  // opaque section covered it, so only an empty slot ever showed which one was active.
   it("marks the active slot whether it holds a chart or is empty", async () => {
     const user = userEvent.setup();
     renderGrid();
@@ -370,9 +362,8 @@ describe("GridView slot — archived-only symbols (terminal-grid spec)", () => {
     expect(within(screen.getByTestId("slot-s2")).getByText("GOLD")).toBeInTheDocument();
   });
 
-  // The symbol surviving is not enough. Charting US100 MINUTE_5 while the slot's own
-  // selector — narrowed to what is archived — shows HOUR_4 would have each contradict
-  // the other.
+  // The symbol surviving is not enough: charting US100 MINUTE_5 while the slot's own selector — narrowed to
+  // what is archived — shows HOUR_4 would have each contradict the other.
   it("recognizes a remembered resolution that stopped being archived, and offers the ones left", async () => {
     const user = userEvent.setup();
     // US100 keeps HOUR_4 but loses MINUTE_5, which is what slot s1 remembers.

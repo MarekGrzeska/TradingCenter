@@ -1,6 +1,5 @@
-"""Runs over HTTP: starting one, reading its trace, watching it, interrupting it — and
-the property the whole module is built around, that a run is judged against the revision
-it started on."""
+"""Runs over HTTP: starting one, reading its trace, watching it, interrupting it — and the property the
+whole module is built around, that a run is judged against the revision it started on."""
 
 from __future__ import annotations
 
@@ -45,9 +44,8 @@ def _env(workbench_env: None, migrated_url: str, monkeypatch: pytest.MonkeyPatch
 
 @pytest.fixture
 def client(db: asyncpg.Connection) -> Iterator[TestClient]:
-    """The real app and the real lifespan, with the provider replaced afterwards — the
-    routes read it off `app.state` per request, so nothing here needs an OpenAI key to be
-    a real one."""
+    """The real app and the real lifespan, with the provider replaced afterwards — the routes read it off
+    `app.state` per request, so nothing here needs an OpenAI key to be a real one."""
     with TestClient(app) as started:
         app.state.teams.provider = ScriptedProvider(default=says("done."))
         yield started
@@ -241,8 +239,7 @@ def test_a_strangers_run_cannot_be_interrupted(client: TestClient) -> None:
 
 
 def test_the_stream_opens_with_where_the_run_is_now(client: TestClient) -> None:
-    """specs/teams-runs, "po ponownym otwarciu widać jego bieżący stan" — a viewer that
-    arrives after the fact still gets the whole picture, and the stream then closes rather
+    """A viewer that arrives after the fact still gets the whole picture, and the stream then closes rather
     than hanging on a run that will never move again."""
     team_id = _a_team(client)
     run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
@@ -262,13 +259,8 @@ def test_the_stream_opens_with_where_the_run_is_now(client: TestClient) -> None:
 def test_a_watcher_is_subscribed_before_the_snapshot_is_read(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Reading the snapshot first left a window with no owner: releasing the connection it
-    was read on is a suspension point, and an event published there is too late for the
-    snapshot and too early for a queue that does not exist yet. A run ending in that window
-    left the stream open for ever, because `finished` came off the same stale row.
-
-    The order is what is asserted, not the timing — the window is one turn of the event
-    loop and no test can sit inside it."""
+    """Reading the snapshot first left a window with no owner: releasing the connection is a suspension point, and an
+    event published there is too late for the snapshot and too early for the queue. The order is what is asserted."""
     team_id = _a_team(client)
     run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
     _wait_for_status(client, run_id, {"completed", "failed"})
@@ -299,9 +291,8 @@ def test_a_watcher_is_subscribed_before_the_snapshot_is_read(
 def test_a_stranger_who_is_refused_leaves_no_watcher_behind(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """The price of subscribing first: a queue held over a request that turns out to be a
-    404. It is given back, so a refused stranger cannot grow the watcher list of somebody
-    else's run."""
+    """The price of subscribing first: a queue held over a request that turns out to be a 404. It is given
+    back, so a refused stranger cannot grow somebody else's watcher list."""
     team_id = _a_team(client)
     run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
     _wait_for_status(client, run_id, {"completed", "failed"})
@@ -324,18 +315,11 @@ def test_a_strangers_stream_is_refused(client: TestClient) -> None:
         assert stream.status_code == 404
 
 
-# --- the daily order ceiling (specs/teams-trading) ------------------------------------
-
 
 @pytest.fixture
 def trading_client(db: asyncpg.Connection, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
-    """The app against a stand-in announcing one *write* tool.
-
-    A real announcing server rather than an `app.state.teams.tools` override, because the save
-    path does not read `app.state`: it asks whatever servers the settings name
-    (`announced_snapshot`), which is what keeps a saved definition checked against what
-    is actually published (specs/teams-tool-access).
-    """
+    """The app against a stand-in announcing one *write* tool. A real announcing server rather than an
+    override, because the save path asks whatever servers the settings name."""
     with serving_sync(("place_order",)) as url:
         monkeypatch.setenv("TRADING_MCP_URL", url)
         with TestClient(app) as started:
@@ -362,9 +346,8 @@ def _trading_team(client: TestClient, trading: dict) -> int:
 def test_a_team_that_used_up_its_daily_orders_is_refused_before_any_agent_runs(
     trading_client: TestClient,
 ) -> None:
-    """specs/teams-trading, "Granica dobowa jest sprawdzana przed utworzeniem przebiegu".
-    A run refused halfway is a run that already traded, so the count is read before
-    anything is created — and the refusal names the day, not the run."""
+    """A run refused halfway is a run that already traded, so the count is read before anything is created
+    — and the refusal names the day, not the run."""
     team_id = _trading_team(trading_client, {"orders_per_day": 1})
 
     first = trading_client.post(f"/teams/{team_id}/runs", headers=OWNER)
@@ -397,9 +380,8 @@ def test_a_team_with_no_daily_order_limit_keeps_starting_runs(
 def test_the_trades_of_a_run_are_readable_on_their_own_route(
     trading_client: TestClient,
 ) -> None:
-    """specs/teams-trading, "Odczyt zleceń przebiegu". Beside `/tool-calls`, not folded
-    into it: that route answers what the agents asked for, this one what happened to the
-    account."""
+    """Beside `/tool-calls`, not folded into it: that route answers what the agents asked for, this one
+    what happened to the account."""
     team_id = _trading_team(trading_client, {})
     run_id = trading_client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
     _wait_for_status(trading_client, run_id, {"completed", "failed"})

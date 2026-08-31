@@ -1,13 +1,5 @@
-"""Rooms: who is listening to what, and the one connection each room shares.
-
-The sharing is the point. Ten browser tabs on the same instrument are ten subscribers
-and one connection to capital.com — the provider limits how many a session may hold, and
-opening one per subscriber spends that limit on duplicate data.
-
-This is also where a provider event becomes a published message: the upstream emits
-sealed candles and quotes, the room folds them through its forming candle, and what
-leaves is the contract in ``messages``.
-"""
+"""Rooms: who is listening to what, and the one connection each room shares. Ten tabs on one
+instrument are ten subscribers and one provider session, whose per-session limit is the point."""
 
 from __future__ import annotations
 
@@ -34,54 +26,33 @@ log = logging.getLogger(__name__)
 Subscriber = Callable[[Message], Awaitable[None]]
 UpstreamFactory = Callable[[str, Resolution, Callable[[dict], Awaitable[None]]], Upstream]
 
-# Where the current period starts, as the provider reports it. Injected the same way the
-# upstream is, so this module still knows nothing about transports. ``None`` means the
-# provider could not say — a room then publishes no forming candle rather than guessing
-# one, which for a daily boundary is the whole point.
+# Where the current period starts, as the provider reports it. Injected like the upstream, so this
+# module knows no transports. ``None`` means a room publishes no forming candle rather than guessing.
 CurrentPeriod = Callable[[str, Resolution], Awaitable[Bar | None]]
 
-# How long a room waits before asking again where the current period starts. Without it a
-# provider that keeps answering with the period that just ended would be asked once per
-# quote — hundreds of times a minute on a liquid instrument, through the same rate gate
-# an operator's chart reads through. Every quote still moves the price; only the boundary
-# lookup is paced.
+# How long a room waits before asking again where the current period starts. Without it a provider
+# answering with the period that just ended is asked once per quote, through the same rate gate.
 BOUNDARY_RETRY_SECONDS = 30.0
 
-# Where that pacing ends up when the answer keeps being "not yet". It does not change from
-# one minute to the next — over a weekend it does not change for two days — and eight
-# session-bound rooms asking every 30 seconds is 960 requests an hour spent on a settled
-# question, out of an allowance of ten per second shared by the whole account.
+# Where that pacing ends up when the answer keeps being "not yet". Eight session-bound rooms asking
+# every 30 seconds is 960 requests an hour on a question that does not change over a weekend.
 MAX_BOUNDARY_RETRY_SECONDS = 10 * 60.0
 BOUNDARY_RETRY_FACTOR = 2.0
 
-# How often a room that is missing a boundary looks at whether it may ask again. Short,
-# because it is only a tick: what actually paces the asking is the window above. This is
-# what makes the boundary independent of quotes arriving at all — the failure of 24 August
-# 2026, where a room went quiet, so nothing called the boundary read, so the room had
-# nothing to publish even after the quotes came back.
+# How often a room missing a boundary looks at whether it may ask again. This is what makes the
+# boundary independent of quotes arriving — the failure of 24 August 2026, a quiet room with nothing.
 BOUNDARY_TICK_SECONDS = 5.0
 
 
 def next_boundary_wait(wait: float) -> float:
-    """How long to wait before asking about the boundary again, after being told "not yet".
-
-    A separate function for the same reason `next_reconnect_delay` is one: it is the whole
-    of the policy, and asking a question about arithmetic should not need a room, a
-    provider and a clock.
-    """
+    """How long to wait before asking about the boundary again, after being told "not yet". Its own
+    function because it is the whole of the policy, and arithmetic needs no room, provider or clock."""
     return min(wait * BOUNDARY_RETRY_FACTOR, MAX_BOUNDARY_RETRY_SECONDS)
 
 
 def _no_progress(offered: Bar, held: Bar, forming: FormingCandle) -> bool:
-    """Whether the provider's answer leaves the room no better off than before.
-
-    Which answer counts as progress depends on why the boundary was asked for, and
-    conflating the two cost a whole period's worth of chart. After a seal the held bar's
-    period is finished, so only a later one is any use. After a break in the feed nothing
-    says the period ended — the same period handed back *is* the confirmation being asked
-    for, and rejecting it left the room silent until the next day over a drop that lasted
-    seconds.
-    """
+    """Whether the provider's answer leaves the room no better off. After a seal only a later period
+    helps; after a break the same period *is* the confirmation, and rejecting it silenced the room."""
     return offered.time <= held.time if forming.period_is_over else offered.time < held.time
 
 
@@ -97,31 +68,20 @@ class Room:
         self.subscribers: set[Subscriber] = set()
         self.forming = FormingCandle(resolution)
         self.upstream: Upstream | None = None
-        # Remembered so a subscriber joining a live room is told the feed is up rather
-        # than waiting in silence for the next provider event.
+        # Remembered so a subscriber joining a live room is told the feed is up, rather than
+        # waiting in silence for the next provider event.
         self.state: StreamState = "connecting"
         self._current_period = current_period
         self._retry_boundary_after = 0.0
         self._retry_boundary_in = BOUNDARY_RETRY_SECONDS
-        # One read at a time. Two callers now reach this — a quote, and the room's own
-        # timer — and letting them overlap would spend two provider requests on one
-        # question and seed the room twice from answers taken at different moments.
+        # One read at a time: a quote and the room's own timer both reach here, and overlapping
+        # would spend two provider requests on one question and seed from two moments.
         self._boundary_lock = asyncio.Lock()
         self._boundary_timer: asyncio.Task | None = None
 
     async def place_boundary(self) -> None:
-        """Ask the provider where the current period starts, at most every so often.
-
-        Only ever reached for a resolution whose boundary follows the venue's session.
-        A provider that answers with the period that has already ended — which happens
-        between a period closing and the next one producing its first candle — leaves the
-        room silent and tries again later, because a bar placed by arithmetic here is the
-        candle this whole change exists to stop publishing.
-
-        The wait between attempts grows while the answer stays "not yet": that answer is
-        the same for as long as the market is shut, and asking it on the short window for
-        a whole weekend is the account's rate budget spent on nothing.
-        """
+        """Ask the provider where the current period starts, at most every so often. A bar placed by
+        arithmetic here is the candle this exists to stop publishing, so "not yet" waits, and longer."""
         if self._current_period is None:
             return
         async with self._boundary_lock:
@@ -130,9 +90,8 @@ class Room:
     async def _place_boundary(self) -> None:
         assert self._current_period is not None
         if not self.forming.needs_boundary:
-            # Answered while this call waited for the lock — the other caller's answer is
-            # this one's answer too, and asking again would be the duplicate request the
-            # lock exists to prevent.
+            # Answered while this call waited for the lock — the other caller's answer is this
+            # one's too, and asking again is the duplicate the lock exists to prevent.
             return
         now = time.monotonic()
         if now < self._retry_boundary_after:
@@ -152,9 +111,8 @@ class Room:
 
         held = self.forming.current
         if bar is None or (held is not None and _no_progress(bar, held, self.forming)):
-            # Nothing to seed from. Saying so is worth a line: it is the difference
-            # between "the provider is slow to open the next candle" and "this room is
-            # broken".
+            # Nothing to seed from. Worth a line: it is the difference between a slow provider
+            # and a broken room.
             self._wait_longer(now)
             log.info(
                 "%s %s: no period to build on yet; waiting",
@@ -162,9 +120,8 @@ class Room:
                 self.resolution.value,
             )
             return
-        # No pacing on success: a seeded room stops needing a boundary, so the next time
-        # one is wanted is news — a sealed period, a dropped feed, a period that ran out —
-        # rather than a retry, and the window starts short again for it.
+        # No pacing on success: a seeded room stops needing a boundary, so the next time one is
+        # wanted is news rather than a retry, and the window starts short again for it.
         self._retry_boundary_in = BOUNDARY_RETRY_SECONDS
         self._retry_boundary_after = 0.0
         self.forming.seed(bar)
@@ -175,17 +132,8 @@ class Room:
         self._retry_boundary_in = next_boundary_wait(self._retry_boundary_in)
 
     def watch_for_a_boundary(self) -> None:
-        """Give the room a clock of its own, for the resolutions that need one.
-
-        A quote is the obvious moment to notice that the boundary is missing, and it was
-        the only one — which made the boundary a hostage of the feed. A room that stops
-        being quoted stops asking, so the day the provider went quiet on one room, that
-        room had nothing to publish for fourteen hours and would have had nothing when the
-        quotes came back either.
-
-        Started only where the question can arise: a resolution whose period start comes
-        from the provider, in a hub that has something to ask.
-        """
+        """Give the room a clock of its own, for the resolutions that need one. A quote used to be
+        the only moment the missing boundary was noticed, which made it a hostage of the feed."""
         if self._current_period is None or not self.forming.boundary_comes_from_provider:
             return
         if self._boundary_timer is None:
@@ -217,12 +165,8 @@ class Room:
             await timer
 
     async def deliver(self, subscriber: Subscriber, message: Message) -> bool:
-        """Send to one subscriber, dropping it if the send fails.
-
-        Every send goes through here, including the welcome messages: a socket can die
-        between the connection being accepted and the subscription completing, and an
-        exception escaping there fails the subscribe call rather than that subscriber.
-        """
+        """Send to one subscriber, dropping it if the send fails. Every send comes here, welcomes
+        included: a socket can die between accept and subscribe, and that must fail one subscriber."""
         try:
             await subscriber(message)
         except Exception:  # noqa: BLE001 - a dead subscriber must not stop the rest
@@ -244,9 +188,8 @@ class Room:
             await self.broadcast(
                 QuoteMessage(symbol=self.epic, time=ts_ms, bid=bid, ask=float(event["ask"]))
             )
-            # The quote is published either way; only the candle needs a boundary. A
-            # market with no forming candle is still a market whose price is moving, and
-            # the two must not fail together.
+            # The quote is published either way; only the candle needs a boundary. A market with
+            # no forming candle still has a price moving, and the two must not fail together.
             if self.forming.needs_boundary:
                 await self.place_boundary()
             # The bid side, matching both the sealed candles and the REST history.
@@ -269,9 +212,8 @@ class Room:
         elif kind == "status":
             self.state = event["state"]
             if self.state != "connected":
-                # The period may roll over while the feed is down, and the bar in hand is
-                # then the wrong one to extend. Cheaper to re-read the boundary than to
-                # publish a day's candle stretched across two days.
+                # The period may roll over while the feed is down, and the bar in hand is then
+                # the wrong one to extend — cheaper to re-read than to stretch a day's candle.
                 self.forming.invalidate()
                 self._retry_boundary_after = 0.0
                 self._retry_boundary_in = BOUNDARY_RETRY_SECONDS
@@ -312,9 +254,8 @@ class Hub:
             self._rooms[key] = room
             room.upstream = self._make_upstream(epic, resolution, room.on_upstream)
             room.upstream.start()
-            # Before the first quote rather than because of it. A daily period is sealed
-            # once a day, so a room that waited for the provider to name the boundary
-            # published nothing for up to that long — the failure this answers.
+            # Before the first quote rather than because of it: a daily period is sealed once a
+            # day, so a room waiting for the provider to name the boundary published nothing.
             if room.forming.needs_boundary:
                 await room.place_boundary()
             # And from here on the room asks on its own clock, so the boundary no longer
@@ -324,11 +265,8 @@ class Hub:
         if not await room.deliver(subscriber, StatusMessage(state=room.state)):
             return
         if room.forming.current is not None:
-            # Whatever the room has built so far, so a late joiner sees a bar rather than
-            # an empty chart until the next quote — labelled with what it actually is. A
-            # bar whose period the provider has sealed is finished, and handing it over as
-            # forming would have a joiner chart a closed period as still moving. The
-            # window is small and real: between a daily seal and the next boundary read.
+            # Whatever the room has built so far, labelled with what it is: handing a sealed bar
+            # over as forming would have a joiner chart a closed period as still moving.
             settled = room.forming.held_is_sealed
             await room.deliver(subscriber, room.candle_message(room.forming.current, not settled))
 
@@ -340,8 +278,8 @@ class Hub:
         room.subscribers.discard(subscriber)
         if room.subscribers:
             return
-        # Nobody left: the connection is closed rather than kept warm. A stream held for
-        # an absent audience still counts against the provider's session limits.
+        # Nobody left: the connection is closed rather than kept warm. A stream held for an
+        # absent audience still counts against the provider's session limits.
         self._rooms.pop(key, None)
         await room.stop_watching()
         if room.upstream is not None:

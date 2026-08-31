@@ -1,13 +1,5 @@
-"""The clock firing schedules — `scheduler/clock.py` against a real database and a
-scripted model, exercising `Clock.tick()` the way the module's own background task
-would call it, every `SCHEDULER_POLL_INTERVAL_SECONDS`.
-
-`_fire_schedule` (module-private) is used directly in the two tests that need to await
-its failure-streak bookkeeping deterministically — `Clock.tick()` starts that bookkeeping
-as a detached task on purpose, the same as production, and a test asserting on it needs
-the handle `_fire_schedule` hands back (`test_run_loop.py` reaches into `runner.loop`'s
-own internals for the same reason: some properties are only checkable from inside).
-"""
+"""The clock firing schedules against a real database and a scripted model, exercising `Clock.tick()` as the background
+task would. `_fire_schedule` is used directly only where a test must await bookkeeping `tick()` detaches on purpose."""
 
 from __future__ import annotations
 
@@ -38,25 +30,8 @@ CRON = "*/5 * * * *"
 
 
 def _past(cron: str = CRON) -> datetime:
-    """A moment that is already due and has missed nothing — the schedule's own most
-    recent slot.
-
-    **Anchored to the cron grid, not to "a minute ago", and the difference is 20% of all
-    wall-clock times.** `now - 1 minute` puts a `*/5` boundary between the due moment and
-    now whenever the suite runs in the first minute after :00, :05, :10 … — so
-    `_next_fire_and_skipped` correctly reports one folded slot and
-    `test_a_due_schedule_starts_a_run_and_records_the_fire` correctly fails. It failed in
-    CI at 05:15 for exactly this reason, having passed every local run that happened not
-    to start on a boundary.
-
-    Reading back from the grid removes the window rather than narrowing it: no slot lies
-    between the last one and now, by construction.
-
-    The second added before asking is what closes the last hole. `get_prev` is strict, so
-    asked at exactly :05:00 it answers :00:00 — leaving the :05:00 slot between the due
-    moment and now, and one folded slot again. Asking from a second later makes it "the
-    last slot at or before now", which is the moment actually wanted.
-    """
+    """A moment already due that has missed nothing, anchored to the cron grid rather than to "a minute ago", which puts
+    a boundary between due and now for a fifth of all wall-clock times — it failed in CI at 05:15 for exactly that."""
     now = datetime.now(UTC)
     return croniter(cron, now + timedelta(seconds=1)).get_prev(datetime)
 
@@ -122,10 +97,8 @@ async def test_a_due_schedule_starts_a_run_and_records_the_fire(pool: asyncpg.Po
     schedule = await _schedule(pool, team_id=team_id, revision_id=revision_id, next_fire_at=_past())
 
     clock = _clock(pool, provider=ScriptedProvider(default=says("the trend is up")))
-    # `gather`-ed rather than left detached: `tick()` hands back the failure-streak
-    # tasks precisely so a test can know every write this wake will ever make has
-    # happened before the `pool` fixture tears down underneath a still-running one
-    # (`Clock.tick()`'s own docstring).
+    # `gather`-ed rather than left detached: `tick()` hands back the failure-streak tasks precisely so a
+    # test can know every write has happened before the `pool` fixture tears down underneath one.
     await asyncio.gather(*await clock.tick())
 
     fires = await _fires(pool, schedule_id=schedule["id"])
@@ -151,9 +124,8 @@ async def test_a_schedule_not_yet_due_is_left_alone(pool: asyncpg.Pool) -> None:
 
 
 def test_next_fire_and_skipped_folds_every_due_slot_into_one() -> None:
-    # Pure function, fixed instants — no wall-clock race, unlike the integration test
-    # below. specs/teams-schedules, "Moduł nie pracował przez sześć godzin": due at 09:00,
-    # now 15:30 — six hourly slots (10:00 through 15:00) are due, one fire, six folded in.
+    # Pure function, fixed instants — no wall-clock race, unlike the integration test below. Due at 09:00,
+    # now 15:30: six hourly slots are due, one fire, six folded in.
     due_at = datetime(2026, 1, 1, 9, 0, tzinfo=UTC)
     now = datetime(2026, 1, 1, 15, 30, tzinfo=UTC)
 
@@ -174,9 +146,8 @@ def test_next_fire_and_skipped_is_zero_for_a_schedule_right_on_time() -> None:
 
 
 async def test_a_schedule_far_overdue_still_produces_exactly_one_run(pool: asyncpg.Pool) -> None:
-    # The wall-clock counterpart of the two pure tests above: proves the engine actually
-    # calls `_next_fire_and_skipped` and persists its result, without pinning an exact
-    # count that a few milliseconds of test overhead near a cron boundary could flip.
+    # The wall-clock counterpart of the two pure tests above: it proves the engine calls the folding and
+    # persists its result, without pinning a count that milliseconds near a boundary could flip.
     team_id, revision_id = await _team_and_revision(pool, _definition())
     before = datetime.now(UTC)
     schedule = await _schedule(
@@ -270,9 +241,8 @@ async def test_the_daily_cost_limit_stops_a_schedule_before_it_spends(pool: asyn
 
 
 async def _fire_directly(pool: asyncpg.Pool, schedule_id: int, *, provider, settings) -> None:
-    """Calls `_fire_schedule` the way `Clock.tick()` does, and awaits the failure-streak
-    task it hands back — `tick()` itself lets that task run detached, which is correct
-    in production and untestable without this."""
+    """Calls `_fire_schedule` the way `Clock.tick()` does, and awaits the failure-streak task it hands back
+    — `tick()` lets that run detached, which is correct in production and untestable without this."""
     async with pool.acquire() as conn:
         await conn.execute("UPDATE schedules SET next_fire_at = $1 WHERE id = $2", _past(), schedule_id)
         row = await store.get_schedule(conn, schedule_id=schedule_id, owner_principal=OWNER)
@@ -343,10 +313,8 @@ async def test_a_disabled_clock_never_starts_a_background_task(pool: asyncpg.Poo
 async def test_the_daily_order_limit_stops_a_schedule_and_leaves_a_row_rather_than_a_traceback(
     pool: asyncpg.Pool,
 ) -> None:
-    """Phase 2 added a second daily ceiling to `start_run_on_revision` and the clock kept
-    catching only the first, so this fire used to raise out of `tick()`: no row in the
-    history, and every schedule and trigger after it in the same wake silently skipped.
-    """
+    """Phase 2 added a second daily ceiling and the clock kept catching only the first, so this fire used to
+    raise out of `tick()`: no row in the history, and every schedule after it silently skipped."""
     team_id, revision_id = await _team_and_revision(pool, _definition(orders_per_day=1))
 
     async with pool.acquire() as conn:
@@ -412,9 +380,8 @@ async def test_one_schedule_failing_does_not_silence_the_others_in_the_same_wake
 async def test_what_a_scheduled_run_remembers_belongs_to_the_schedules_owner(
     pool: asyncpg.Pool,
 ) -> None:
-    """specs/teams-runs, "Uruchomienie z harmonogramu". Nobody is asking for this run when
-    it starts, so the identity it writes under is the one the schedule carries — never the
-    process's own, which would leave the operator an entry they cannot read."""
+    """Nobody is asking for this run when it starts, so the identity it writes under is the one the schedule
+    carries — never the process's own, which would leave the operator an entry they cannot read."""
     definition = TeamDefinition(
         agents=[
             AgentDefinition(

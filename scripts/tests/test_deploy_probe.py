@@ -1,10 +1,5 @@
-"""The failure modes this probe exists to catch, each one called directly.
-
-Iteration 0 gave every deploy workflow an image-tag assertion and could not give it a test,
-because a loop inside a YAML `run:` block has nothing to call. These are that test — and the
-first one is 16 August 2026 reproduced: a healthy-looking answer from the container that was
-already there.
-"""
+"""The failure modes the probe exists to catch, each called directly — a loop inside a YAML `run:` block has
+nothing to call. The first is 16 August 2026 reproduced: a healthy answer from the container already there."""
 
 from __future__ import annotations
 

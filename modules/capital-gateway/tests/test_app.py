@@ -32,9 +32,8 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("CAPITAL_IDENTIFIER", SECRETS["identifier"])
     monkeypatch.setenv("CAPITAL_PASSWORD", SECRETS["password"])
     monkeypatch.setenv("GATEWAY_API_KEY", SECRETS["gateway_key"])
-    # Every route past "/" requires this header — see test_access_control.py for the
-    # middleware itself. Setting it as a default header here keeps every other test in
-    # this file about the route it names, not about authentication.
+    # Every route past "/" requires this header — see test_access_control.py for the middleware.
+    # A default header here keeps every other test in this file about the route it names.
     return TestClient(app, headers={API_KEY_HEADER: SECRETS["gateway_key"]})
 
 
@@ -48,8 +47,6 @@ def mock_login() -> None:
     )
     respx.get(f"{API}/session").mock(return_value=httpx.Response(200, json={"accountId": "a1"}))
 
-
-# --- the schema ---
 
 
 def test_every_route_appears_in_the_published_schema(client: TestClient) -> None:
@@ -122,9 +119,8 @@ def test_a_before_parameter_anchors_the_deep_read_in_the_past(client: TestClient
         )
 
     assert response.status_code == 200
-    # The route accepted the anchor and reached the provider at all — the window
-    # arithmetic itself is covered in test_history.py; this only proves the parameter is
-    # wired from the query string through to the adapter.
+    # The route accepted the anchor and reached the provider at all; the window arithmetic is
+    # covered in test_history.py. This only proves the parameter is wired through to the adapter.
     request_made = prices.calls.last.request
     assert "2024-01-14" in str(request_made.url) or "2024-01-15" in str(request_made.url)
 
@@ -173,8 +169,6 @@ def test_the_asset_classes_are_published(client: TestClient) -> None:
 
     assert set(body) == {"SHARES", "INDICES", "CRYPTO", "CURRENCIES", "COMMODITIES", "OTHER"}
 
-
-# --- nothing leaks ---
 
 
 @respx.mock
@@ -267,8 +261,6 @@ def test_a_resting_order_without_a_level_is_refused_by_the_schema(client: TestCl
     assert orders.call_count == 0
 
 
-# --- the stream ---
-
 
 @pytest.mark.parametrize(
     "query",
@@ -299,8 +291,6 @@ def test_a_subscriber_hears_the_room_state_and_no_tokens(client: TestClient) -> 
     assert SECRETS["cst"] not in json.dumps(first)
     assert SECRETS["security_token"] not in json.dumps(first)
 
-
-# --- the demo balance ---
 
 # One of the ids `accounts.json` carries, so a read-back can find it.
 ACTIVE_ACCOUNT_ID = "325778595166630174"
@@ -394,9 +384,8 @@ def test_a_top_up_of_zero_never_reaches_the_provider(client: TestClient) -> None
 
 
 def test_switching_accounts_says_it_drops_the_stream(client: TestClient) -> None:
-    """specs/capital-session, "Strumień po przełączeniu konta" — a route description is
-    contract, not commentary: the consumer reads the published document, and the
-    consequence of this call lands in a different module entirely."""
+    """specs/capital-session, "Strumień po przełączeniu konta" — a route description is contract,
+    not commentary: the consequence of this call lands in a different module entirely."""
     with client:
         schema = client.get("/openapi.json").json()
 

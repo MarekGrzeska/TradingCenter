@@ -1,13 +1,5 @@
-"""Adds `focus` to `chart_commands`, and seeds `"v6"`: the same prompt, with the chart
-tool's new field named in it.
-
-`focus` is nullable for the same reason `symbol`, `resolution` and `indicators` are:
-`None` means "leave the operator looking where they are", not "no command". The check
-constraint widens to match — a command that sets only the focus is still a command.
-
-The prompt paragraph is repeated whole rather than patched, for the reason `0005` gives:
-a migration that rewrites prose it reads at runtime would land differently depending on
-whether an operator had edited the prompt in between.
+"""Adds `focus` to `chart_commands` and seeds `"v6"`. Nullable for the same reason its neighbours are:
+`None` means "leave the operator looking where they are", not "no command".
 
 Revision ID: 0006
 Revises: 0005
@@ -149,9 +141,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Only this row: an operator's own revisions after it are theirs, and the current
-    # prompt is whichever has the highest id — dropping more would silently reinstate a
-    # text nobody chose.
+    # Only this row: an operator's own revisions after it are theirs, and the current prompt is whichever
+    # has the highest id — dropping more would silently reinstate a text nobody chose.
     op.execute(
         sa.delete(_prompt_revisions).where(_prompt_revisions.c.version == _SEED_VERSION)
     )

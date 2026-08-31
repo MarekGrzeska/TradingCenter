@@ -1,10 +1,8 @@
 import { useState, type ReactNode } from "react";
 
 /**
- * One named block of a page that can be gotten out of the way, header and body sharing
- * one border so the collapsed state still reads as a whole card and not a stray title.
- * The chevron carries the state visually; the button's own `aria-label` carries it to a
- * screen reader, the same split `ToolCallEntry` uses for a call in the transcript.
+ * Header and body share one border, so the collapsed state still reads as a card and not a stray title. The chevron
+ * carries the state visually and the `aria-label` carries it to a screen reader — the split `ToolCallEntry` uses.
  */
 export function CollapsibleSection({
   title,

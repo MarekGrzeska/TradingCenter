@@ -1,8 +1,5 @@
-"""The candle-age gauge: the arithmetic it reports, and that it is fed at all.
-
-Which pairs the gauge leaves out is not decided here — that is `decide_late_pairs`, and
-`test_market_status.py` is where the rule is tested, once.
-"""
+"""The candle-age gauge: the arithmetic it reports, and that it is fed at all. Which pairs it leaves out
+is `decide_late_pairs`, tested once in `test_market_status.py`."""
 
 from __future__ import annotations
 
@@ -29,8 +26,6 @@ class FakeInstruments:
         return self.market_open
 
 
-# --- CandleAgeGauge, no I/O ---
-
 
 def test_the_gauge_starts_empty() -> None:
     assert CandleAgeGauge().observe(options=None) == []
@@ -55,8 +50,6 @@ def test_a_later_set_replaces_the_earlier_one() -> None:
 
     assert symbols == {"GOLD"}
 
-
-# --- periods_late, no I/O ---
 
 
 def test_a_healthy_minute_pair_reports_less_than_one_period_late() -> None:
@@ -84,14 +77,10 @@ def test_a_candle_that_just_arrived_reports_zero_not_negative() -> None:
     assert periods_late(DELIVERY_GRACE.total_seconds(), Resolution.HOUR_4) == 0.0
 
 
-# --- compute_ages, against a real database ---
-
 
 class _FakePool:
-    """`compute_ages` only ever calls `pool.acquire()` — this wraps one already-open
-    test connection so a `db`-marked test does not need testcontainers to hand out a
-    second one.
-    """
+    """`compute_ages` only ever calls `pool.acquire()` — this wraps one already-open test connection so
+    a `db`-marked test does not need testcontainers to hand out a second."""
 
     def __init__(self, conn) -> None:
         self._conn = conn
@@ -125,10 +114,8 @@ async def _track_with_candle(conn, symbol: str, resolution: Resolution, latest: 
 
 @pytest.mark.db
 async def test_a_stalled_pair_is_reported(db) -> None:
-    """That the gauge is fed at all: a late pair reaches `compute_ages` with its age in
-    seconds. Which pairs the decision then keeps or drops — market shut, gateway silent,
-    nothing collected yet — is one rule tested once, in `test_market_status.py`, against
-    the decision itself rather than a third time through a database."""
+    """That the gauge is fed at all: a late pair reaches `compute_ages` with its age in seconds. Which
+    pairs the decision keeps or drops is one rule tested once, against the decision itself."""
     latest = NOW - timedelta(minutes=10)
     await _track_with_candle(db, "US100", Resolution.MINUTE, latest)
 
@@ -139,13 +126,8 @@ async def test_a_stalled_pair_is_reported(db) -> None:
 
 @pytest.mark.db
 async def test_a_pair_whose_market_is_shut_is_excluded(db) -> None:
-    """The one exclusion that is this function's own, not `decide_late_pairs`'.
-
-    The alert fed from here fires during trading hours, so a Friday-to-Monday gap on an
-    index must never read as staleness. `test_market_status.py` proves the rule for the
-    decision; `compute_ages` is a different function feeding a different gauge, and this
-    is the only test that it obeys the rule too.
-    """
+    """The one exclusion that is this function's own. The alert fed from here fires during trading hours,
+    so a Friday-to-Monday gap on an index must never read as staleness."""
     latest = NOW - timedelta(days=2)
     await _track_with_candle(db, "US100", Resolution.MINUTE, latest)
 
@@ -156,8 +138,6 @@ async def test_a_pair_whose_market_is_shut_is_excluded(db) -> None:
     # reported — the seconds gauge and this one fall quiet together.
     assert {(s, r): periods_late(a, Resolution(r)) for (s, r), a in ages.items()} == {}
 
-
-# --- logging configuration ------------------------------------------------------------
 
 
 def test_configure_logging_gives_the_root_logger_a_level_and_a_handler(monkeypatch) -> None:
@@ -174,9 +154,8 @@ def test_configure_logging_gives_the_root_logger_a_level_and_a_handler(monkeypat
 
 
 def test_configure_logging_silences_the_exporter_that_would_describe_itself(monkeypatch) -> None:
-    """The Application Insights exporter logs every telemetry upload, and that line is
-    itself telemetry — uploaded, then logged again. Left alone it fills the log with an
-    account of its own plumbing."""
+    """The Application Insights exporter logs every telemetry upload, and that line is itself telemetry —
+    uploaded, then logged again. Left alone it fills the log with an account of its own plumbing."""
     monkeypatch.setattr(logging.getLogger(), "handlers", [])
     logging.getLogger("azure").setLevel(logging.NOTSET)
 

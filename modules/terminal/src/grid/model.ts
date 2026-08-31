@@ -7,11 +7,8 @@ import {
 import { isIndicatorColorToken } from "../chart/theme";
 
 /**
- * Six slots exist at all times, with fixed identities; the layout only decides
- * how many of them are visible. That is what lets 3x2 → 2x2 → 3x2 come back
- * with the last two slots still configured (terminal-grid spec, "Przejście na
- * mniejszy układ"), and it keeps React keyed on a stable slot id so changing
- * the layout never remounts a chart onto different data.
+ * Six slots exist at all times with fixed identities; the layout only decides how many are visible. That is what
+ * lets 3x2 → 2x2 → 3x2 come back configured, and it keeps React keyed so a layout change remounts no chart.
  */
 export const LAYOUTS = {
   "1x1": { cols: 1, rows: 1 },
@@ -35,11 +32,8 @@ export interface SlotConfig {
    *  than rendering an empty chart. */
   symbol: string | null;
   resolution: Resolution;
-  /** The indicators chosen for this slot, the same way it remembers its
-   *  instrument and interval (terminal-grid spec, "Slot pamięta własny zestaw
-   *  wskaźników"). An entry whose `id` the catalogue no longer offers is
-   *  `Chart`'s problem to notice and skip, not this shape's to validate — this
-   *  file only checks that a saved value has the shape a selection ever had. */
+  /** The indicators chosen for this slot, as it remembers its instrument and interval. An entry the catalogue no
+   *  longer offers is `Chart`'s to skip — this file only checks that a saved value has the shape one ever had. */
   indicators: IndicatorSelection[];
 }
 
@@ -76,11 +70,8 @@ export function defaultGridConfig(): GridConfig {
 const RESOLUTION_SET = new Set<string>(RESOLUTIONS);
 
 /**
- * `key` and `colour` are both optional on the way in: a slot saved before an indicator
- * could be chosen twice, or given a colour, carries neither, and rejecting it would cost
- * the operator every indicator in every slot for two fields with obvious defaults
- * (terminal-grid spec, "Slot zapisany przed instancjami i kolorami"). A colour naming a
- * token this palette does not offer is read as no colour, for the same reason.
+ * `key` and `colour` are optional on the way in: a slot saved before either existed carries neither, and rejecting
+ * it would cost every indicator in every slot for two fields with obvious defaults. An unknown token is no colour.
  */
 function readIndicatorSelection(value: unknown): IndicatorSelection | null {
   if (typeof value !== "object" || value === null) return null;
@@ -114,10 +105,8 @@ function readSlotConfig(value: unknown): SlotConfig | null {
 }
 
 /**
- * Hand-written guard rather than a schema library — one shape, one place, no
- * dependency (design.md). Anything that does not pass is discarded whole: a
- * corrupt or older saved config must start the terminal at defaults, never
- * refuse to start (terminal-grid spec, "Zapisany stan jest nieczytelny").
+ * Hand-written guard rather than a schema library — one shape, one place, no dependency (design.md). Anything that
+ * does not pass is discarded whole: a corrupt saved config must start the terminal at defaults, never refuse to.
  */
 export function parseGridConfig(value: unknown): GridConfig | null {
   if (typeof value !== "object" || value === null) return null;

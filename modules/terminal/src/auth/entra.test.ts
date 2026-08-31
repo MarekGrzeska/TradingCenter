@@ -4,13 +4,8 @@ import type { EntraConfig } from "../data/config";
 import { SignedOut, type IdentityState } from "./identity";
 
 /**
- * One session, one `Identity` per back end — the property `terminal-identity` asks for
- * ("Dwa moduły o różnych publicznościach") and the one this file existed to break until
- * 22 August 2026: the terminal took a single token with the archive's audience and sent
- * it to every module, and the gateway had been configured to accept it.
- *
- * MSAL is stood in for rather than run: what is under test is which scope each identity
- * asks for, not that Microsoft's library can fetch a token.
+ * One session, one `Identity` per back end — the property this file exists to break, which held until 22 August 2026.
+ * MSAL is stood in for rather than run: what is under test is which scope each identity asks for.
  */
 
 const acquireTokenSilent = vi.fn();
@@ -100,9 +95,8 @@ describe("createEntraIdentities", () => {
     expect(identities.for(config.scopes.polymarket).state()).toBe("signed-in");
     expect(identities.shared.state()).toBe("signed-in");
 
-    // There is one operator and one session, so a sign-out discovered while asking for
-    // *one* audience reaches a subscriber watching another. Four sessions would leave the
-    // shell reporting signed-in until whichever module it happened to watch was called.
+    // There is one operator and one session, so a sign-out discovered while asking for *one* audience
+    // reaches a subscriber watching another.
     const seen: IdentityState[] = [];
     identities.for(config.scopes.gateway).subscribe((state) => seen.push(state));
     acquireTokenSilent.mockRejectedValueOnce(new InteractionRequiredAuthError("interaction_required", "sign in again"));

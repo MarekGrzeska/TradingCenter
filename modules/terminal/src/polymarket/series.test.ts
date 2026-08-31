@@ -28,9 +28,8 @@ describe("toLineData", () => {
   });
 
   it("breaks the line where the collected history stops and starts again", () => {
-    // Four one-minute readings, a day of nothing, then two more. Without the break the
-    // chart would draw a straight run across a day nobody measured — a claim about the
-    // market made out of the archive's silence.
+    // Four one-minute readings, a day of nothing, then two more. Without the break the chart would draw a
+    // straight run across a day nobody measured — a claim about the market made out of the archive's silence.
     const data = toLineData(points([
       [0, 0.5],
       [1, 0.51],

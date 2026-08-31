@@ -1,8 +1,5 @@
-"""Orders a run placed, and what came back (specs/teams-trading).
-
-Two statements per order rather than one, and the order between them is the whole of it —
-see `record_trade`.
-"""
+"""Orders a run placed, and what came back. Two statements per order rather than one, and the order between
+them is the whole of it — see `record_trade`."""
 
 from __future__ import annotations
 
@@ -64,14 +61,8 @@ async def record_trade(
     size: Decimal | None,
     level: Decimal | None,
 ) -> asyncpg.Record:
-    """Written **before** the call goes out, with `status` left at `sent`.
-
-    The order matters and it is the whole reason this function is separate from
-    `settle_trade`: a process that dies between the two leaves a row saying an order was
-    sent and its fate unknown, which is true. Writing once, afterwards, would leave
-    nothing at all — and "no row" reads as "no order", which is the one wrong answer
-    (specs/teams-trading, "Wiersz MUST powstać przed wysłaniem wywołania").
-    """
+    """Written *before* the call goes out, with `status` left at `sent`. A process that dies between the two
+    leaves a row saying an order was sent and its fate unknown, which is true — where no row reads as no order."""
     return await fetch_one(
         conn,
         _INSERT_TRADE,
@@ -104,13 +95,8 @@ async def settle_trade(
 async def team_trades_since(
     conn: Conn, *, team_id: int, owner_principal: str, since: datetime
 ) -> int:
-    """How many orders this team has placed since a moment — the daily ceiling's own
-    question (specs/teams-trading, "Granica dobowa jest sprawdzana przed utworzeniem
-    przebiegu").
-
-    Counts rows, not successes: an order whose result never came back was still placed,
-    and a ceiling that forgave it would be a ceiling an outage could walk through.
-    """
+    """How many orders this team has placed since a moment — the daily ceiling's own question. Counts rows,
+    not successes: an order whose result never came back was still placed."""
     placed = await conn.fetchval(_TEAM_TRADES_SINCE, team_id, owner_principal, since)
     return placed if placed is not None else 0
 

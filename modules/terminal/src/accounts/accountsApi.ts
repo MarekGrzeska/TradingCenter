@@ -1,24 +1,6 @@
 /**
- * The account, read straight from `capital-gateway`.
- *
- * Straight, and that is new: the gateway used to be unreachable from a browser, and the
- * one thing the terminal wanted from it — the instrument catalogue — came through
- * market-data. It still does. What this file reaches is the other half, the account, which
- * the gateway now opens to an authenticated browser and to nothing else it serves
- * (`capital_gateway/caller_access.py`).
- *
- * The credential is not here and must never be: the gateway's shared key belongs to the
- * modules that call it over the network. In development the dev server attaches it
- * (`vite.config.ts`); in production the browser's own token was meant to do the work.
- *
- * For its first days it did not, and the reason was never this file. The gateway's Easy Auth ran
- * `AllowAnonymous` — it could not require a token while two modules called that app with a
- * shared key and none — and under that setting it validated nothing and forwarded no principal,
- * so the module refused every browser request as an unidentified caller. A 401 arrives here as
- * "you are signed out", which is what the operator saw on 20 August 2026 and read as an expired
- * session. Both service callers moved onto tokens of their own, the door was closed behind them
- * (`the-gateway-door-authenticates`), and this screen started reading an account without a line
- * of it changing.
+ * The account, read straight from `capital-gateway` — the half it opens to an authenticated browser. The credential is
+ * not here and must never be: for its first days the gateway's Easy Auth forwarded no principal, which read as signed out.
  */
 
 import { noIdentity, type Identity } from "../auth/identity";
@@ -91,22 +73,19 @@ function mapPosition(raw: RawPosition): AccountPosition {
 
 export interface AccountsApi {
   listAccounts(signal: AbortSignal): Promise<DemoAccount[]>;
-  /** Open positions on the **active** account — the provider ties them to the session, so
-   *  there is no such thing as "the positions of an account that is not active" to ask
-   *  for. */
+  /** Open positions on the **active** account — the provider ties them to the session, so there is no such
+   *  thing as "the positions of an account that is not active" to ask for. */
   listPositions(signal: AbortSignal): Promise<AccountPosition[]>;
   /** Makes another account active, and answers with it. Every later order acts on it, and
    *  the provider ends the quote stream when this succeeds. */
   switchAccount(accountId: string, signal: AbortSignal): Promise<DemoAccount>;
-  /** Moves the demo balance by `amount` — negative takes funds away — and answers with the
-   *  account after the move. A refusal carries the provider's own reason: the balance
-   *  ceiling, the range of one adjustment, or the day's count. */
+  /** Moves the demo balance by `amount` — negative takes funds away — and answers with the account after.
+   *  A refusal carries the provider's own reason. */
   topUp(amount: number, signal: AbortSignal): Promise<DemoAccount>;
 }
 
-// 403: the gateway recognised this caller and this path is not the caller's — which for
-// this screen means a bug in it, not something the operator did. 422: the module read the
-// request and declined it, an amount of zero being the one it declines by itself.
+// 403: the gateway recognised this caller and this path is not the caller's, which for this screen means a
+// bug in it. 422: the module read the request and declined it, an amount of zero being the one it declines.
 const mapStatus = statusMapper({ 403: "refused", 404: "not-found", 422: "refused" });
 
 export function createAccountsApi(

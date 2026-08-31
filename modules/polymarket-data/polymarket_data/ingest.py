@@ -1,13 +1,5 @@
-"""How prices get into the archive: a tick, a backfill, and the gap a restart leaves.
-
-The tick is one request **per event**, not two per market, and that is the whole difference
-from the application this module replaces. Measured 22 August 2026: the metadata surface's
-`outcomePrices` is the order book's midpoint, to the digit, for every outcome of every market
-at once. A 128-market event costs one request here and 256 there.
-
-The same request also carries the event's structure, so a market the provider adds and a
-market it resolves are noticed by the tick rather than by a second loop with a second budget.
-"""
+"""How prices get into the archive: a tick, a backfill, and the gap a restart leaves. The tick is one request *per
+event* — measured, the metadata surface's `outcomePrices` is the order book's midpoint to the digit."""
 
 from __future__ import annotations
 
@@ -20,15 +12,12 @@ from .models import Sample, Surface
 
 log = logging.getLogger(__name__)
 
-# How far a returned point may sit outside a window's own edge and still be written. The
-# provider's spacing wobbles between 57 and 63 seconds, so an exact edge would drop the point
-# that lands on it; anything beyond this is the response overrunning the window, which it
-# does routinely because `endTs` is not honoured.
+# How far a returned point may sit outside a window's own edge and still be written. The provider's
+# spacing wobbles, and anything beyond this is the response overrunning `endTs`, which it ignores.
 EDGE_SLACK = timedelta(seconds=90)
 
-# How much older than the window's start the oldest returned point has to be before this
-# module concludes the provider has nothing older. Half a day: less than that is the series
-# simply not having a point in the first minutes, which is ordinary.
+# How much older than the window's start the oldest returned point must be before this module
+# concludes the provider has nothing older. Half a day: less is an ordinary thin first minute.
 NOTHING_OLDER_SLACK = timedelta(hours=12)
 
 
@@ -59,25 +48,13 @@ class Ingest:
         self._backfills: set[asyncio.Task] = set()
         self.started_at: datetime | None = None
 
-    # --- the loop --------------------------------------------------------------------
-
     async def start(self) -> None:
         self.started_at = _now()
         self._task = asyncio.create_task(self._run(), name="polymarket-sampler")
 
     def event_tracked(self, event_id: int) -> None:
-        """Start filling an event's past, now rather than at the next restart.
-
-        The route that brings an event under observation answers "the recent past is being
-        filled in", and `specs/polymarket-data-ingest` requires it to start on tracking.
-        Until this existed nothing called `backfill_event` outside its tests: sampling began
-        immediately and the ninety days arrived only when the process next restarted and
-        `close_gaps` happened to reach it.
-
-        Fire-and-forget on purpose — the operator's request should not wait on six requests
-        per outcome — but held in a set, because a bare `create_task` may be collected
-        mid-flight.
-        """
+        """Start filling an event's past, now rather than at the next restart. Fire-and-forget, but held
+        in a set: a bare `create_task` may be collected mid-flight."""
         task = asyncio.create_task(
             self._backfill_quietly(event_id), name=f"polymarket-backfill-{event_id}"
         )
@@ -107,13 +84,8 @@ class Ingest:
         self._task = None
 
     async def _run(self) -> None:
-        # The gap is closed **beside** the tick, not before it. Every stop leaves a period
-        # with no samples, and on this provider that period is not recoverable later — of
-        # five recently resolved markets, four returned no history at all — so closing it is
-        # a task rather than a nicety. But it is sequential per outcome and per window, so
-        # awaiting it first meant a restart with a full watch list collected nothing live
-        # for as long as the catch-up took: the spec's "uzupełnianie MUST NOT zagłodzić
-        # bieżącego próbkowania", broken by the one line that ordered them.
+        # The gap is closed *beside* the tick, not before it: it is sequential per outcome and per
+        # window, so awaiting it first meant a restart collected nothing live until the catch-up ended.
         catch_up = asyncio.create_task(self._close_gaps_quietly(), name="polymarket-catch-up")
         self._backfills.add(catch_up)
         catch_up.add_done_callback(self._backfills.discard)
@@ -137,8 +109,6 @@ class Ingest:
             # A failed catch-up must not stop the tick: yesterday's gap is already lost, and
             # refusing to collect today would lose today's too.
             log.exception("could not close the gap left by the last stop")
-
-    # --- one round -------------------------------------------------------------------
 
     async def tick(self) -> int:
         """One pass over every event still worth asking about. Returns samples written."""
@@ -168,9 +138,8 @@ class Ingest:
         prices = parsing.prices_from(payload)
 
         async with self._pool.acquire() as conn:
-            # The structure first: the same payload says whether a market has been added or
-            # answered, and refreshing before writing means a new market's prices land on an
-            # outcome that exists rather than being dropped.
+            # The structure first: the same payload says whether a market has been added or answered,
+            # so refreshing before writing lands a new market's prices on an outcome that exists.
             try:
                 await store.upsert_event(conn, parsing.event_from(payload))
             except parsing.ProviderPayloadUnusable as err:
@@ -190,12 +159,8 @@ class Ingest:
                 if token in tokens and (midpoint is not None or last_trade is not None)
             ]
             written = await store.record_samples(conn, samples)
-            # A tick is also a collected window — **the interval it stands for, not the
-            # instant it happened at.** Recorded as a point, two consecutive ticks never
-            # touched, so nothing ever merged: the table grew a row per outcome per minute,
-            # and `is_collected` answered false for the 59 seconds between them. Backdating
-            # the start by one interval makes each tick adjacent to the last, which is what
-            # `record_collected`'s merge is written for.
+            # A tick is also a collected window — the interval it stands for, not the instant it
+            # happened at. Recorded as a point, two ticks never touched and nothing ever merged.
             covered_from = observed_at - timedelta(seconds=self._interval)
             for sample in samples:
                 await store.record_collected(
@@ -209,15 +174,9 @@ class Ingest:
         async with self._pool.acquire() as conn:
             await store.note_sampling_failed(conn, event_id, reason)
 
-    # --- reaching backwards ------------------------------------------------------------
-
     async def backfill_event(self, event_id: int, *, since: datetime | None = None) -> int:
-        """Fills an event's past, window by window. Returns samples written.
-
-        Each window succeeds, fails and is retried on its own. A window that failed is not
-        recorded as collected — otherwise the gap it left would read as "nothing traded
-        then" for ever, and nothing would come back to it.
-        """
+        """Fills an event's past, window by window. Each window succeeds, fails and is retried on its
+        own: a failed window is not recorded as collected, or its gap would read as "nothing traded"."""
         async with self._pool.acquire() as conn:
             outcomes = await store.outcomes_of_event(conn, event_id)
         if not outcomes:
@@ -235,11 +194,8 @@ class Ingest:
     async def _backfill_outcome(
         self, outcome_id: int, token_id: str, since: datetime, oldest_available: datetime | None
     ) -> int:
-        # The boundary the provider taught us: nothing older than this exists, so asking for
-        # it again is a request that can only come back empty. The condition was inverted —
-        # `since >= oldest` then `max(since, oldest)` is `since`, a guaranteed no-op — so the
-        # boundary limited nothing and every restart re-requested the same known-empty
-        # windows.
+        # The boundary the provider taught us. The condition was inverted, so the boundary limited
+        # nothing and every restart re-requested the same known-empty windows.
         if oldest_available is not None and since < oldest_available:
             since = oldest_available
 
@@ -270,15 +226,12 @@ class Ingest:
             token_id, since=window_start, until=window_end
         )
         if not points:
-            # No boundary is written from an empty answer. Writing one here would record
-            # "the provider has nothing older" from a response that said nothing at all, and
-            # this module would then never ask again.
+            # No boundary is written from an empty answer: that would record "the provider has
+            # nothing older" from a response that said nothing at all, and it would never ask again.
             return 0
 
-        # Both edges are checked here rather than trusted to the request. `endTs` is not
-        # honoured by the provider — measured — so a response routinely runs to the present
-        # moment whatever window was asked for, and a point written outside the window makes
-        # "collected" a wider claim than what was verified.
+        # Both edges are checked here rather than trusted to the request: `endTs` is not honoured, so
+        # a response routinely runs to the present, and a point outside the window widens the claim.
         low = window_start - EDGE_SLACK
         high = window_end + EDGE_SLACK
         inside = [
@@ -304,19 +257,14 @@ class Ingest:
             written = await store.record_samples(conn, samples)
             await store.record_collected(conn, outcome_id, window_start, window_end)
             if oldest_returned - window_start > NOTHING_OLDER_SLACK:
-                # Written at the oldest point the read actually returned, never at the edge
-                # of the window asked for: those two are separated by everything the
-                # provider did not have.
+                # Written at the oldest point the read actually returned, never at the edge of the
+                # window asked for: those two are separated by everything the provider did not have.
                 await store.note_oldest_available(conn, outcome_id, oldest_returned)
         return written
 
     async def close_gaps(self) -> int:
-        """Fills the period between each outcome's newest sample and now.
-
-        Every stop leaves one, and on this provider it does not stay fillable: history for a
-        resolved market is often simply gone. An outcome with no sample at all is backfilled
-        to the configured depth instead.
-        """
+        """Fills the period between each outcome's newest sample and now. Every stop leaves one, and on
+        this provider it does not stay fillable — history for a resolved market is often simply gone."""
         async with self._pool.acquire() as conn:
             events = await store.sampleable_events(conn)
 

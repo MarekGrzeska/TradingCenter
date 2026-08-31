@@ -1,9 +1,5 @@
-"""`GET /models` — the catalogue a wybierak is built from, and nothing else
-(specs/teams-models, "Katalog modeli wystarcza do zbudowania wybieraka").
-
-The route body is `tc_runtime.routers.models_router`; what this surface supplies is its own
-`ModelOut` and where its catalogue sits on the shared application.
-"""
+"""`GET /models` — the catalogue a wybierak is built from, and nothing else. The route body is
+`tc_runtime.routers.models_router`; what this surface supplies is its own `ModelOut` and its catalogue."""
 
 from __future__ import annotations
 

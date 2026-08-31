@@ -1,14 +1,8 @@
 import type { EntraConfig } from "../data/config";
 
 /**
- * Who the operator is, as the rest of the terminal needs to know it. `entra.ts` is the
- * only file that knows Entra exists and this interface is the seam — which is also what
- * lets a test hand the data layer a two-line object instead of a sign-in flow.
- *
- * Three states, not two, and the third is not an error: a terminal against `localhost`
- * has no identity configured and must not ask anybody to sign in. Keeping that apart
- * from `signed-out` is what stops the shell telling a developer their local session
- * expired.
+ * Who the operator is, as the rest of the terminal needs to know it. Three states, and the third is not an error: a
+ * terminal against `localhost` has no identity configured and must not ask anybody to sign in.
  */
 export type IdentityState = "unconfigured" | "signed-out" | "signed-in";
 
@@ -50,10 +44,8 @@ export interface Identity {
 }
 
 /**
- * What the terminal runs on when nothing is configured — local development, and every
- * test that does not care about identity. `token()` answering `null` rather than
- * throwing is the whole of it: requests go out bare, and nothing anywhere has to branch
- * on "are we in local mode".
+ * What the terminal runs on when nothing is configured. `token()` answering `null` rather than throwing is
+ * the whole of it: requests go out bare, and nothing has to branch on "are we in local mode".
  */
 export const noIdentity: Identity = {
   state: () => "unconfigured",

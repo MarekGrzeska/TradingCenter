@@ -1,10 +1,5 @@
-"""The loop, against a scripted provider and a scripted tool server.
-
-Neither stand-in is a mock of an interface nobody checks: `FakeProvider` yields the same
-chunk types `OpenAIProvider` does, and `FakeToolServer` returns the same `ToolOutcome`
-`ToolServer` does — the shapes are the module's own, and `test_tool_server.py` proves
-the real client produces them against a real MCP server.
-"""
+"""The loop, against a scripted provider and a scripted tool server. Neither stand-in is a mock of an
+interface nobody checks: both produce the module's own shapes, and the real client is proved elsewhere."""
 
 from __future__ import annotations
 
@@ -56,10 +51,8 @@ class FakeProvider:
 
 
 class Stop:
-    """What the route sets when the operator clicks stop. `asyncio.Event` in production;
-    here a counter, so a test can say *when* the click lands: `after` is how many times
-    the graph may ask before the answer becomes yes. The graph asks once on entry to a
-    model call and once per chunk it reads."""
+    """What the route sets when the operator clicks stop. `asyncio.Event` in production; here a counter, so
+    a test can say *when* the click lands."""
 
     def __init__(self, after: int | None = None) -> None:
         self._left = after
@@ -108,12 +101,8 @@ class FakeToolServer:
 
 
 class RecordingAccountTrace:
-    """The trace the graph writes for a call that can move the account, without a database.
-
-    `settled` holds only the rows that were settled, so a test can tell "written and then
-    answered for" from "written and left as it was" — the difference the whole mechanism
-    exists to keep (specs/agent-trading).
-    """
+    """The trace the graph writes for a call that can move the account, without a database. `settled` holds
+    only the rows that were settled, so a test can tell "written and answered for" from "written and left"."""
 
     def __init__(self, *, fails_to_begin: bool = False) -> None:
         self.begun: list[tuple[int, int, str, dict]] = []
@@ -140,10 +129,8 @@ async def _run(
     account_trace=None,
     stop=None,
 ):
-    """`announced` collects `(call, position)` for every tool call the graph announced —
-    the events a caller watching the turn sees, as opposed to `result["calls"]`, which is
-    what the turn hands back at the end. A test passing a list is asking about the first;
-    every other test is asking about the second."""
+    """`announced` collects `(call, position)` for every tool call the graph announced — the events a caller
+    watching sees, as opposed to what the turn hands back at the end."""
     seen: list[str] = []
     announced_here: list[tuple[RecordedCall, int]] = announced if announced is not None else []
 
@@ -247,9 +234,8 @@ async def test_three_calls_in_one_turn_are_recorded_in_order() -> None:
 
 
 async def test_every_call_is_announced_as_it_resolves() -> None:
-    """The graph's own half of "Wywołanie narzędzia dociera w trakcie tury": three calls
-    reach the listener as three announcements, in the order they resolved, each carrying
-    the position `store.record_tool_calls` will write for it."""
+    """The graph's own half of "a tool call arrives mid-turn": three calls reach the listener as three
+    announcements, in the order they resolved, each carrying the position the store will write."""
     provider = FakeProvider(
         [
             [
@@ -407,8 +393,6 @@ async def test_a_provider_failure_after_a_tool_call_keeps_the_text_and_the_recor
     assert len(result["usages"]) == 2
 
 
-# --- tools this module runs itself ---------------------------------------------------
-
 CHART_TOOL = ToolDescriptor(
     name="set_chart",
     description="Set what the operator's chart shows.",
@@ -535,8 +519,6 @@ async def test_a_local_tool_that_raises_is_a_result_not_a_failed_turn() -> None:
     assert "connection reset" in call.text
 
 
-# --- ślad wywołań ruszających rachunek (specs/agent-trading) ---
-
 ORDER_TOOL = ToolDescriptor(
     name="place_order",
     description="Sends an order.",
@@ -623,8 +605,7 @@ async def test_a_turn_nobody_stopped_is_not_stopped() -> None:
 
 
 async def test_stopping_mid_stream_keeps_what_arrived_and_asks_the_model_no_more() -> None:
-    """specs/agent-chat, "Operator zatrzymuje odpowiedź w połowie". The click lands after
-    the first fragment: the second one is never read, and the tool the model had asked
+    """The click lands after the first fragment: the second is never read, and the tool the model had asked
     for is never sent — nothing had left yet."""
     provider = FakeProvider(
         [
@@ -651,8 +632,7 @@ async def test_stopping_mid_stream_keeps_what_arrived_and_asks_the_model_no_more
 
 
 async def test_stopping_during_a_tool_round_lets_the_call_finish_first() -> None:
-    """specs/agent-chat, "Zatrzymanie zastaje trwające wywołanie narzędzia" — the call was
-    already sent, so it resolves and is recorded; what does not happen is the model call
+    """The call was already sent, so it resolves and is recorded; what does not happen is the model call
     that would have read its result."""
     provider = FakeProvider(
         [

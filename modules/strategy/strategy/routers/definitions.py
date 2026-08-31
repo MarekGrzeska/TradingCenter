@@ -1,16 +1,5 @@
-"""Rules the operator wrote, and the revisions they went through.
-
-**Every write here is checked before it is written.** Against this image's catalogue, so a
-definition cannot claim an id reviewed code already uses, and against the archive's
-catalogue, so a rule naming an indicator that does not exist never becomes a strategy that
-records nothing (`strategy-configurator`, "Definicja jest odrzucana w chwili zapisu").
-
-**Nothing here starts anything.** Saving a rule creates no watch and changes no running one:
-a watch is pinned to the revision it was started with, and moving it is a call to
-`/watches`. That separation is the whole of decision 7 in design.md — a rule swapped
-underfoot produces decisions from before and after the change that look comparable and are
-not.
-"""
+"""Rules the operator wrote and the revisions they went through, every write checked before it is written. Nothing
+here starts anything: a watch is pinned to its revision, because a rule swapped underfoot produces false comparisons."""
 
 from __future__ import annotations
 
@@ -40,13 +29,8 @@ router = APIRouter()
 
 
 async def _checked(request: Request, rule: RuleDefinition) -> None:
-    """Refuse the rule now, against what the archive actually announces.
-
-    An archive that cannot be asked means the write is refused, not waved through: a
-    definition nobody could check is worse than no definition, and the operator has exactly
-    one move to make (design.md, decision 8). The refusal keeps the archive's own status —
-    it is the archive that is unavailable, and it is worth trying again.
-    """
+    """Refuse the rule now, against what the archive actually announces. An archive that cannot be asked
+    means the write is refused, not waved through — and the refusal keeps the archive's own status."""
     try:
         catalogue = await request.app.state.archive.announced_catalogue()
     except ArchiveUnreachable as err:
@@ -65,9 +49,8 @@ def _definition_out(row: store.StrategyDefinition) -> DefinitionOut:
 
 
 def _revision_out(row: store.StrategyRevision) -> RevisionOut:
-    # Parsed back into the vocabulary rather than handed over as the stored blob: what this
-    # route publishes is a rule, and a revision this image cannot read is something the
-    # caller should learn here rather than when a watch on it says nothing.
+    # Parsed back into the vocabulary rather than handed over as the stored blob: what this route
+    # publishes is a rule, and a revision this image cannot read is something the caller learns here.
     return RevisionOut(
         id=row.id,
         strategy_id=row.strategy_id,

@@ -1,8 +1,5 @@
-"""Whether there is a trend at all — the question the geometry ratios do not answer.
-
-A "break of structure" means nothing until something here says the market was trending
-in the first place (docs/wskazniki-plan-wdrozenia.html, "Reżim").
-"""
+"""Whether there is a trend at all — the question the geometry ratios do not answer. A "break of
+structure" means nothing until something here says the market was trending in the first place."""
 
 from __future__ import annotations
 
@@ -13,8 +10,6 @@ import numpy as np
 from .. import kernel, warmup
 from .arithmetic import safe_divide
 from .spec import IndicatorSpec, Lines, LineSpec, Param, Render, Series, Warmup
-
-# before it means anything (docs/wskazniki-plan-wdrozenia.html, "Reżim"). ---
 
 
 def _compute_adx(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
@@ -27,11 +22,8 @@ def _compute_adx(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
     tr_smoothed = kernel.rma(kernel.true_range(s.high, s.low, s.close), period)
     plus_di = 100 * safe_divide(kernel.rma(plus_dm, period), tr_smoothed)
     minus_di = 100 * safe_divide(kernel.rma(minus_dm, period), tr_smoothed)
-    # `+DI` and `-DI` both land on exactly 0 at bar 0 — there is no earlier bar to
-    # measure directional movement against — which makes their sum 0 too. Read as
-    # "no directional dominance either way" (0), not "undefined" (NaN): `rma` seeds
-    # recursively from bar 0, and a NaN seed would poison every bar after it,
-    # forever, rather than merely decaying the way a seed is meant to.
+    # `+DI` and `-DI` both land on 0 at bar 0, so their sum is 0 too. Read as "no directional
+    # dominance" rather than "undefined": `rma` seeds from bar 0, and a NaN seed never decays.
     di_sum = plus_di + minus_di
     dx = np.where(di_sum == 0, 0.0, 100 * np.abs(plus_di - minus_di) / np.where(di_sum == 0, 1.0, di_sum))
     return {"adx": kernel.rma(dx, period), "plus_di": plus_di, "minus_di": minus_di}
@@ -50,10 +42,8 @@ _ADX = IndicatorSpec(
         LineSpec(key="minus_di", label="-DI {period}"),
     ),
     render=Render(pane="own", style="line", scale="fixed", range=(0.0, 100.0), autoscale=False),
-    # Doubly smoothed — DX is already an `rma` of the directional movement, and ADX
-    # is an `rma` of DX on top — so the seed's influence takes roughly twice as long
-    # to decay below epsilon as one `rma` alone (design.md, "Głębokość archiwum":
-    # ADX(14) needs ~580 bars, close to 2 × rma_warmup_bars(14) ≈ 560).
+    # Doubly smoothed — DX is an `rma` of directional movement and ADX an `rma` of DX — so the
+    # seed takes roughly twice as long to decay as one `rma` alone. ADX(14) needs ~580 bars.
     warmup=Warmup(kind="decay", bars=lambda p: 2 * warmup.rma_warmup_bars(int(p["period"]))),
     computer=Lines(_compute_adx),
 )
@@ -82,11 +72,8 @@ _CHOPPINESS = IndicatorSpec(
 
 def _compute_aroon(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
     period = int(p["period"])
-    # A `period + 1`-bar window, not `period` — "days since the extreme" counts
-    # today as day zero and looks back `period` days from it, which is
-    # `period + 1` candles end to end (Chande's original definition, and
-    # TA-Lib's; a plain `period`-bar window can never report "the extreme is
-    # today", the one case this caught when checked against TA-Lib in 2.11).
+    # A `period + 1`-bar window, not `period`: "days since the extreme" counts today as day zero.
+    # A plain `period` window can never report "the extreme is today", which TA-Lib does.
     bars_since_high = kernel.rolling_argmax(s.high, period + 1)
     bars_since_low = kernel.rolling_argmin(s.low, period + 1)
     return {

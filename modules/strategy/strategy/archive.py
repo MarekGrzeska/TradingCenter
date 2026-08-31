@@ -1,20 +1,5 @@
-"""market-data, as this module consumes it — and the only place that talks to it.
-
-**The REST contract, not the tool surface.** `/mcp` is deliberately narrowed for a model —
-ten indicators a call, two hundred points a series — which is right for an agent and too
-tight for a loop that wants three hundred bars of three facts at once (design.md,
-decision 2).
-
-Two things are worth knowing before changing anything here:
-
-* **A read that fails is never an empty read.** The archive not answering, refusing, or
-  answering something unreadable are three different things for a caller to do about, and
-  none of them is "there was no signal". They arrive as exceptions; the loop turns them
-  into a refusal with a reason and records it.
-* **Uncovered stretches travel with the answer.** The archive marks the parts of a range
-  it never verified, and a fact computed across such a gap looks exactly like one computed
-  over real bars. The gate that reads this is in `gates.py`.
-"""
+"""market-data as this module consumes it, and the only place that talks to it — the REST contract, not `/mcp`, which
+is too tight for a loop reading three hundred bars. A read that fails is never an empty read."""
 
 from __future__ import annotations
 
@@ -34,14 +19,12 @@ from .spec import Candle, Fact, Facts, FactValue, Level, Marker, StrategySpec, Z
 
 log = logging.getLogger(__name__)
 
-# Connect stays short: an archive that is not listening should be reported now, not after
-# a minute of waiting. Read is generous because an indicator request over a long range is
-# a computation on the other side, not just a fetch.
+# Connect stays short: an archive that is not listening should be reported now, not after a minute.
+# Read is generous because an indicator request over a long range is a computation, not a fetch.
 DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=60.0, write=10.0, pool=5.0)
 
-# market-data refuses a request whose range exceeds this many bars, warmup included
-# (`indicators/service.py`, REQUEST_CEILING). Named here so the client can split a long
-# read rather than let the archive refuse one — the strategy asking never knows.
+# market-data refuses a request whose range exceeds this many bars, warmup included. Named here so the
+# client can split a long read rather than let the archive refuse one.
 REQUEST_CEILING_BARS = 200_000
 
 # Held back from the ceiling so a fact's own warmup — which the archive reads *before* the
@@ -50,17 +33,8 @@ CEILING_MARGIN_BARS = 1_000
 
 
 class _ManagedIdentityAuth(httpx.Auth):
-    """A bearer token on every request, from this module's own identity.
-
-    Per request rather than per client: a token read once at start-up would expire under a
-    process that runs for days. `DefaultAzureCredential` caches internally, so the cost of
-    asking every time is a dictionary lookup.
-
-    Unlike the gateway's twin, a token that cannot be had is **not** waved through on a
-    shared key — there is no shared key here. The request goes out unauthenticated and the
-    archive refuses it, which is the honest outcome: this module has no second credential
-    to fall back to.
-    """
+    """A bearer token on every request, from this module's own identity — per request, because one read
+    at start-up expires. Unlike the gateway's twin there is no shared key to fall back to."""
 
     def __init__(self, credential: DefaultAzureCredential, scope: str) -> None:
         self._credential = credential
@@ -81,12 +55,8 @@ class _ManagedIdentityAuth(httpx.Auth):
 def http_client(
     scope: str | None = None, timeout: httpx.Timeout = DEFAULT_TIMEOUT
 ) -> httpx.AsyncClient:
-    """A client for the archive, presenting this module's identity where it has one.
-
-    `scope` names the archive's audience. Left out — local work, and every test — nothing
-    is presented, which is a supported configuration rather than a degraded one: locally
-    the archive requires no principal at all.
-    """
+    """A client for the archive, presenting this module's identity where it has one. Left out — local
+    work, and every test — nothing is presented, which the archive supports."""
     auth = _ManagedIdentityAuth(DefaultAzureCredential(), scope) if scope else None
     return httpx.AsyncClient(timeout=timeout, auth=auth)
 
@@ -112,13 +82,8 @@ class AnnouncedParam:
 
 @dataclass(frozen=True)
 class AnnouncedIndicator:
-    """One catalogue entry of the archive, as much of it as this module has a use for.
-
-    Its `params` and `lines` are what makes a configurator possible without inventing a
-    second catalogue: the archive already publishes the ranges and the line keys, so the
-    picker on the screen and the refusal in `rule_validation.py` read the same source
-    (`strategy-configurator`, "Definicja jest odrzucana w chwili zapisu").
-    """
+    """One catalogue entry of the archive, as much of it as this module has a use for. Its `params` and
+    `lines` are what makes a configurator possible without inventing a second catalogue."""
 
     id: str
     name: str
@@ -147,33 +112,20 @@ class Archive:
         self._client = client
 
     async def announced_indicators(self) -> frozenset[str]:
-        """Every indicator id the archive's catalogue carries.
-
-        What a strategy's facts are checked against when it is registered — the check is
-        made where the answer can be had, rather than assumed at import.
-        """
+        """Every indicator id the archive's catalogue carries — what a strategy's facts are checked
+        against, where the answer can be had rather than assumed at import."""
         body = await self._get("/indicators", params={}, what="the indicator catalogue")
         return frozenset(str(entry["id"]) for entry in body.get("indicators", []))
 
     async def announced_catalogue(self) -> dict[str, AnnouncedIndicator]:
-        """The archive's indicator catalogue, keyed by id.
-
-        The same document `announced_indicators` reads, kept whole rather than reduced to a
-        set of ids: what a rule needs checking against is the parameters and their ranges,
-        the line keys and what kind of thing the indicator answers at all. Nothing here is
-        cached — a definition is written once in a while, and a stale copy of the ranges is
-        exactly the kind of second truth this module has no business holding.
-        """
+        """The archive's indicator catalogue, keyed by id, kept whole rather than reduced to ids: a rule
+        is checked against ranges and line keys. Nothing is cached — a stale copy is a second truth."""
         body = await self._get("/indicators", params={}, what="the indicator catalogue")
         return {entry.id: entry for entry in (_announced(row) for row in body.get("indicators", []))}
 
     async def last_closed_bar(self, symbol: str, resolution: str) -> datetime | None:
-        """When the most recent closed bar of this pair opened, or `None` if there is none.
-
-        `GET /candles` answers with closed bars only — the forming one has its own route —
-        so the last row of a recent window *is* the last closed bar. That is the whole
-        reason this module needs no rule of its own about when a period ends.
-        """
+        """When the most recent closed bar of this pair opened, or `None`. `GET /candles` answers with
+        closed bars only, which is why this module needs no rule about when a period ends."""
         period = period_length(resolution)
         # Three periods back: enough that a quiet market or a late write still yields a
         # bar, small enough that this stays a cheap query on every wake.
@@ -190,17 +142,8 @@ class Archive:
         as_of: datetime,
         bars_from: datetime | None = None,
     ) -> FactsRead:
-        """Everything `evaluate` will be handed, for the bar that opened at `as_of`.
-
-        One request per resolution rather than per fact: a strategy reading three averages
-        of one instrument at one resolution asks the archive once.
-
-        `bars_from` widens the read to cover a whole range of bars rather than one — what
-        a backtest wants, so that two years of decisions cost one read instead of
-        seventeen thousand. The warmup each fact asks for is added *before* it, so the
-        earliest bar in the range has as much history behind it as any other; the caller
-        gets the warmup prefix too and decides for itself where its range begins.
-        """
+        """Everything `evaluate` will be handed, for the bar that opened at `as_of` — one request per
+        resolution rather than per fact. `bars_from` widens it, with each fact's warmup added before it."""
         gaps: list[Gap] = []
         start, end = window_for(spec.resolution, last_bar=as_of, bars=spec.candles)
         if bars_from is not None:
@@ -219,8 +162,6 @@ class Archive:
             facts=Facts(symbol=symbol, as_of=as_of, candles=candles, values=values),
             gaps=tuple(gaps),
         )
-
-    # --- the two reads, and the splitting neither strategy nor loop should know about ---
 
     async def _candles(
         self, symbol: str, resolution: str, start: datetime, end: datetime
@@ -289,9 +230,8 @@ class Archive:
 
         values: dict[str, FactValue] = {}
         for fact, result in zip(facts, results, strict=True):
-            # The archive answers in the order it was asked. Checked rather than trusted:
-            # this is a contract across a module boundary, and a silent mismatch here would
-            # hand a strategy one indicator's numbers under another's name.
+            # The archive answers in the order it was asked. Checked rather than trusted: this is a
+            # contract across a module boundary, and a mismatch would rename one indicator's numbers.
             if result.get("id") != fact.indicator:
                 raise ArchiveRefused(
                     f"the archive answered {result.get('id')!r} where "
@@ -367,12 +307,8 @@ def _by_resolution(facts: Iterable[Fact]) -> dict[str, list[Fact]]:
 
 
 def _split(resolution: str, start: datetime, end: datetime) -> list[tuple[datetime, datetime]]:
-    """One range as however many the archive will accept.
-
-    The loop never reaches this — three hundred bars is three hundred bars. The backtest
-    does, over years of minutes, and the point of putting it here is that neither the
-    strategy nor the caller has to know the ceiling exists.
-    """
+    """One range as however many the archive will accept. The loop never reaches this; the backtest does,
+    and the point of putting it here is that neither the strategy nor the caller knows the ceiling exists."""
     allowed = REQUEST_CEILING_BARS - CEILING_MARGIN_BARS
     if bars_between(resolution, start, end) <= allowed:
         return [(start, end)]
@@ -388,8 +324,7 @@ def _split(resolution: str, start: datetime, end: datetime) -> list[tuple[dateti
 
 def _fact_value(fact: Fact, resolution: str, times: tuple[datetime, ...], result: Any) -> FactValue:
     if result.get("error"):
-        # One fact the archive could not compute — a series it does not hold at this
-        # resolution. Carried rather than raised: the other facts of this evaluation were
+        # One fact the archive could not compute. Carried rather than raised: the other facts were
         # answered, and it is the strategy's business whether it can decide without this one.
         return FactValue(key=fact.name, resolution=resolution, error=str(result["error"]))
 
@@ -441,12 +376,8 @@ def _level(row: Any) -> Level:
 
 
 def _instant(value: Any) -> datetime:
-    """One wire timestamp as an aware instant.
-
-    The archive writes UTC with a `Z`, which `fromisoformat` reads from 3.11 on. A naive
-    value would compare unequal to every aware one this module holds, so it is given the
-    zone it already meant rather than left to compare wrongly.
-    """
+    """One wire timestamp as an aware instant. A naive value would compare unequal to every aware one
+    this module holds, so it is given the zone it already meant."""
     parsed = value if isinstance(value, datetime) else datetime.fromisoformat(str(value))
     return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
 

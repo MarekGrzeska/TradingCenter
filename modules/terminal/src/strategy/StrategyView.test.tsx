@@ -8,13 +8,8 @@ import { StrategyView } from "./StrategyView";
 import type { Decision, Strategy, StrategyApi, Watch } from "./strategyApi";
 
 /**
- * The tab from the operator's seat, and the claim it exists to make: **the refusals are
- * the screen**. A strategy worth running says no to most bars, so a tab that showed only
- * setups would be blank on exactly the day somebody asks why nothing happened.
- *
- * The other thing asserted here is that the three kinds of no stay apart. They have three
- * different remedies, and flattening them into "no signal" is the mistake this column was
- * added to prevent.
+ * **The refusals are the screen**: a strategy worth running says no to most bars, so a tab of setups would be blank on
+ * the day somebody asks why nothing happened. The three kinds of no stay apart, because they have three remedies.
  */
 
 const STRATEGY: Strategy = {
@@ -237,9 +232,8 @@ describe("starting a watch", () => {
   });
 
   it("still starts when the catalogue arrives after the dialog does", async () => {
-    // The failure this is here for: against a cold module the catalogue read takes
-    // seconds, and an operator who opened the dialog inside that window was left with a
-    // select that filled itself and a "Zacznij" that never came back to life.
+    // The failure this is here for: against a cold module the catalogue read takes seconds, and an operator who
+    // opened the dialog inside that window got a select that filled itself and a "Zacznij" that never revived.
     let answer: (strategies: Strategy[]) => void = () => {};
     const api = fakeApi({
       listStrategies: vi.fn().mockReturnValue(

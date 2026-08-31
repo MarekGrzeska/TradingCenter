@@ -1,11 +1,5 @@
-"""The snapshot and what follows it, and the period still being built.
-
-`market-data-api` 8.3, 8.4 and 8.10. The property under test throughout is the seam:
-the snapshot is read while the room is held still and the subscriber attaches before it
-is released, so no candle falls between the two and none arrives twice.
-
-The forming candle is the other half — published, never stored.
-"""
+"""The snapshot and what follows it, and the period still being built. The property under test is the
+seam: the snapshot is read under the hold and the subscriber attaches before it is released."""
 
 from __future__ import annotations
 
@@ -28,8 +22,6 @@ from market_data.tracking import track
 
 pytestmark = pytest.mark.db
 
-
-# --- 8.3, 8.4 and 8.10: the snapshot and what follows it -------------------------------
 
 
 async def test_a_subscriber_is_handed_the_settled_series_first(pool) -> None:
@@ -87,18 +79,8 @@ async def test_changes_after_the_snapshot_say_whether_a_candle_has_closed(pool) 
 async def test_a_period_never_arrives_both_in_the_snapshot_and_after_it(
     pool, monkeypatch
 ) -> None:
-    """8.10, and the reason the hold exists.
-
-    Ingest stores a candle and then publishes it. If the store can commit outside the
-    hold, there is a moment between the two where a subscriber's snapshot query sees the
-    candle *and* the change carrying it is still to come — two bars for one period, on
-    every chart that happened to connect just then.
-
-    That moment is opened deliberately here rather than hoped for. Racing two tasks and
-    trusting the scheduler to hit a window a few microseconds wide is how a test comes to
-    pass against an implementation that has no hold at all, which this one did before it
-    was written this way.
-    """
+    """The reason the hold exists: without it there is a moment where a subscriber's snapshot sees the
+    candle *and* the change carrying it is still to come. Opened deliberately here rather than hoped for."""
     import market_data.app as app_module
 
     hub = Hub()
@@ -162,9 +144,8 @@ async def test_no_period_falls_between_the_snapshot_and_the_changes(pool) -> Non
 
 
 async def test_a_subscriber_that_fails_does_not_take_the_others_with_it(pool) -> None:
-    # A socket that dies *after* subscribing, which is the case that happens: a failure
-    # during the snapshot is the subscriber's own problem and is left to propagate, but
-    # one during a broadcast must cost only that subscriber.
+    # A socket that dies *after* subscribing, which is the case that happens: a failure during the
+    # snapshot is the subscriber's own problem, but one during a broadcast must cost only that subscriber.
     hub = Hub()
     good, collect_good = _collector()
     sent = 0
@@ -196,11 +177,8 @@ async def test_a_subscriber_stops_receiving_once_it_leaves(pool) -> None:
     assert not [m for m in received if isinstance(m, CandleChange)]
 
 
-# --- reading the period being built, without subscribing to it -------------------------
-#
-# specs/market-data-api, "Świeca w budowie jest oznaczona". The candle is the hub's, so
-# these tests put one there the way ingest does — `hub.publish` with `forming=True` — and
-# then read it over HTTP.
+# The candle is the hub's, so these tests put one there the way ingest does — `hub.publish` with
+# `forming=True` — and then read it over HTTP.
 
 
 async def _tracked(pool, *resolutions: Resolution) -> None:
@@ -319,9 +297,8 @@ async def test_reading_the_forming_candle_stores_nothing(app, api, pool) -> None
 
 
 async def test_reading_does_not_leave_a_room_behind(app, api) -> None:
-    """A read that created rooms would leave one per symbol anybody ever asked about, and
-    `unsubscribe` only collects rooms it finds — one nobody subscribed to is never
-    reached."""
+    """A read that created rooms would leave one per symbol anybody ever asked about, and `unsubscribe`
+    only collects rooms it finds."""
     before = app.state.hub.room_count()
 
     await api.get("/candles/GOLD/forming")

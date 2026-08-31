@@ -1,6 +1,4 @@
-"""Reading the account, and choosing and funding the one being read: get_positions,
-get_working_orders, get_balance, list_accounts, switch_active_account,
-top_up_demo_account."""
+"""Reading the account, and choosing and funding the one being read."""
 
 from __future__ import annotations
 
@@ -155,10 +153,8 @@ async def test_a_gateway_refusal_names_the_detail(server) -> None:
 
 @respx.mock
 async def test_a_read_the_gateway_would_not_serve_is_an_access_failure(server) -> None:
-    """A 401 or a 503 on a read means the read never happened. Answered as a refusal it
-    would read as an answer *about the account* — which is the one thing this module's
-    tools must never let a caller believe (specs/trading-mcp-tools, "Odmowa narzędzia
-    jest odróżnialna od awarii dostępu")."""
+    """A 401 or a 503 on a read means the read never happened. Answered as a refusal it would read as
+    an answer *about the account*, which these tools must never let a caller believe."""
     mcp = server
     respx.get(f"{BASE}/positions").mock(
         return_value=httpx.Response(401, json={"detail": "missing or invalid caller key"})
@@ -169,8 +165,6 @@ async def test_a_read_the_gateway_would_not_serve_is_an_access_failure(server) -
 
     assert "Nothing was read" in str(excinfo.value)
 
-
-# --- choosing the account, and funding it ---
 
 _ACCOUNTS = [
     {

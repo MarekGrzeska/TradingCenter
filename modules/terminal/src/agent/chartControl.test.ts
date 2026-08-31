@@ -1,9 +1,5 @@
 /**
- * What the agent set, applied to the slot the operator is on — once, in the bounds the
- * slot already has.
- *
- * `terminal-grid` spec, "Aktywny slot stosuje to, co ustawił agent"; `terminal-agent-chat`
- * spec, "Panel mówi, że wykres zmienił agent".
+ * What the agent set, applied to the slot the operator is on — once, in the bounds the slot already has.
  */
 
 import { beforeEach, describe, expect, it } from "vitest";

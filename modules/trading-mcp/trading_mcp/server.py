@@ -1,15 +1,5 @@
-"""One FastMCP instance, one transport — and it is the network one.
-
-Unlike `market-mcp`, which also wires up `stdio` for a client on a desk, this module
-publishes nothing over a locally spawned process: a process carries no caller identity
-of its own, and `allowed_applications` would stop meaning anything the moment a tool
-here can move money (specs/trading-mcp-transport, "Moduł wystawia jeden transport i
-jest nim transport sieciowy").
-
-`custom_route` puts `/health` on the same Starlette app `streamable_http_app()`
-builds, the same mechanism `market_mcp/server.py` uses for the same reason: the
-platform that restarts the container on a failed probe does not speak MCP.
-"""
+"""One FastMCP instance, one transport — and it is the network one. A locally spawned process carries
+no caller identity, and `allowed_applications` stops meaning anything once a tool can move money."""
 
 from __future__ import annotations
 
@@ -45,11 +35,8 @@ def build_server(settings: Settings, gateway: GatewayClient) -> FastMCP:
 
     tools.register(mcp, gateway)
 
-    # Every tool's schema, minus what pydantic writes for its own sake: field titles
-    # repeating field names, an `anyOf` of bare types where a type list says the same, and
-    # defaults on a reply nobody constructs. 22,6% of what this process announces in every
-    # turn of a conversation, and not one field, type or `required` entry with it
-    # (specs/trading-mcp-tools, "Powierzchnia narzędzi ma zapisany sufit").
+    # Every tool's schema, minus what pydantic writes for its own sake — 22,6% of what this process
+    # announces in every turn of a conversation, and not one field or `required` entry with it.
     slim_tool_schemas(mcp)
 
     return mcp

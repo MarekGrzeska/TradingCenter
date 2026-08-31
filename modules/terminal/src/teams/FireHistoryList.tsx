@@ -3,11 +3,8 @@ import type { ScheduleFire } from "./teamsApi";
 import { Button } from "../ui/Button";
 
 /**
- * A schedule's or a trigger's fire history — including a fire that started nothing.
- * Shared between both, since `ScheduleFire` already is (`terminal-teams-schedules`,
- * "Historia pokazuje także to, co się nie wydarzyło"): a schedule that is quiet because
- * nothing was due looks identical to one quiet because it keeps hitting the daily
- * ceiling, unless the difference is written down — and this is where it is.
+ * A schedule's or a trigger's fire history, including a fire that started nothing: quiet because nothing was
+ * due looks identical to quiet because of the daily ceiling (`terminal-teams-schedules`).
  */
 export function FireHistoryList({
   fires,

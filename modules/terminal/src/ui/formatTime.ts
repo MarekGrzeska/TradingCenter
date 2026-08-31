@@ -1,19 +1,14 @@
 import { TickMarkType } from "lightweight-charts";
 
 /**
- * Every date and time the terminal shows an operator is converted to this zone — the
- * wire and the internal representation stay UTC epoch seconds throughout (`time.ts`,
- * `terminal-market-data` spec); only rendering changes (`terminal-shell` spec, "Czas
- * jest pokazywany w polskiej strefie czasowej"). A terminal opened from any browser
- * timezone shows the same wall-clock time as one opened in Poland.
+ * Every date the terminal shows is converted to this zone; the wire and the internal representation stay UTC epoch
+ * seconds throughout. A terminal opened from any browser timezone shows the same wall-clock time as one in Poland.
  */
 const TIME_ZONE = "Europe/Warsaw";
 
 /**
- * `en-GB`, not `pl-PL`: with `timeZoneName: "short"`, `en-GB` gives the abbreviation
- * that actually tracks daylight saving — `CEST` in summer, `CET` in winter. `pl-PL`
- * (and any locale's `shortGeneric` variant) collapses both onto `CET` year-round, which
- * would make a summer instant look an hour off to anyone who trusted the label.
+ * `en-GB`, not `pl-PL`: with `timeZoneName: "short"` it gives the abbreviation that tracks daylight saving. `pl-PL`
+ * collapses both onto `CET` year-round, which makes a summer instant look an hour off to anyone trusting the label.
  */
 const ZONE_LOCALE = "en-GB";
 
@@ -77,12 +72,8 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-// --- the chart's own axis and crosshair ------------------------------------------
-//
-// `lightweight-charts` draws its time axis in UTC and knows nothing of a viewer's
-// zone; these two formatters are how it learns Warsaw's instead (design.md, "Strefa:
-// formatowanie, nie przesuwanie znaczników"). The candles' own timestamps are never
-// touched — only how the axis labels them.
+// `lightweight-charts` draws its time axis in UTC and knows nothing of a viewer's zone; these two formatters are how
+// it learns Warsaw's. The candles' own timestamps are never touched — only how the axis labels them.
 
 const CROSSHAIR_FORMAT = new Intl.DateTimeFormat(ZONE_LOCALE, {
   timeZone: TIME_ZONE,
@@ -134,8 +125,6 @@ export function formatTickMark(epochSeconds: number, tickMarkType: TickMarkType)
   }
 }
 
-// --- a date the operator picks, read and shown as a Warsaw calendar day ----------
-
 const DATE_INPUT_FORMAT = new Intl.DateTimeFormat("en-CA", {
   timeZone: TIME_ZONE,
   year: "numeric",
@@ -184,15 +173,8 @@ function part24(hour: string): number {
   return hour === "24" ? 0 : Number(hour);
 }
 
-/** A Warsaw calendar day (`YYYY-MM-DD`, what `<input type="date">` gives back) to the
- *  epoch second of its midnight in Warsaw — the moment `terminal-shell` spec's "Data
- *  podana przez operatora" scenario means when an operator picks a start date.
- *
- * Reads the zone's offset from a UTC-midnight guess at the same calendar day. The one
- * moment this could land on the wrong side of a daylight-saving transition is a day
- * whose Warsaw midnight and UTC midnight straddle it — Europe's own transitions land
- * at 01:00 UTC, safely after either midnight, so the guess is never wrong in practice.
- */
+/** A Warsaw calendar day to the epoch second of its midnight in Warsaw, which is what "Data podana przez operatora"
+ *  means. Europe's transitions land at 01:00 UTC, safely after either midnight, so the UTC guess is never wrong. */
 export function warsawMidnightEpochSeconds(dateInput: string): number {
   const utcGuessMs = Date.parse(`${dateInput}T00:00:00Z`);
   const offsetMinutes = warsawOffsetMinutesAt(utcGuessMs);

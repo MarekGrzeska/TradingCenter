@@ -156,9 +156,8 @@ describe("agentApi.getMessages", () => {
         modelId: null,
         promptVersion: null,
         incomplete: false,
-        // Neither `tool_calls` nor `stopped` is in this response at all, which is a module
-        // from before it published either. Empty and false, not undefined — the panel maps
-        // over the first and branches on the second.
+        // Neither `tool_calls` nor `stopped` is in this response at all, which is a module from before it
+        // published either. Empty and false, not undefined — the panel maps over one and branches on the other.
         stopped: false,
         createdAt: 1786442400,
         toolCalls: [],

@@ -1,21 +1,5 @@
-"""A real MCP server to test the clients against, not a mock of one.
-
-`market-mcp` and `trading-mcp` are not importable from here — no cross-module imports — so
-the stand-in is a FastMCP server built in this file and served by a real uvicorn on a real
-port. That is enough to prove what a client owes the run above it: a tool list it did not
-write, a refusal that arrives as a result, and a server that is not there arriving as
-something else again.
-
-Slower than the rest of this suite (a second or two, binding a port), and worth it: the one
-contract in this repository with no committed snapshot is this session, so a mocked session
-would be a test of the mock.
-
-One copy, at the root of `tests/`, because there is one process now. The teams suite kept
-this file and the conversation suite kept the same twenty lines of uvicorn-in-a-thread
-pasted inline, from back when they were two modules; the harness never had a surface of its
-own to belong to. What is still per-suite is `settings_for`, since each surface builds its
-own `Settings` — see `tests/teams/mcp_stand_in.py` and `tests/agent/test_tool_server.py`.
-"""
+"""A real MCP server to test the clients against — a FastMCP server built here and served by a real uvicorn, which is
+enough to prove what a client owes the run above it. One copy at the root of `tests/`, because there is one process now."""
 
 from __future__ import annotations
 
@@ -31,10 +15,8 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel
 
-# What market-mcp puts on every one of its tools (`market_mcp/tools/_shared.py`). The
-# stand-in carries it for the same reason it is a real server rather than a mock: a check
-# that reads annotations (`validation.check_unattended`) would otherwise be tested against
-# a catalogue nothing in production resembles.
+# What market-mcp puts on every one of its tools. The stand-in carries it for the same reason it is a real
+# server rather than a mock: a check that reads annotations would otherwise be tested against nothing real.
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True)
 
 STARTUP_ATTEMPTS = 100
@@ -56,15 +38,13 @@ def _register(mcp: FastMCP, name: str) -> None:
     """The stand-in's catalogue, keyed by name so a test can serve a subset — which is
     how "the server stopped announcing a tool" is reproduced without a second file."""
     if name == "get_last_price":
-        # Deliberately unannotated, and the only one here that is: `read_only=None` is a
-        # third answer market-mcp could give (a tool added without the hint), and
-        # `test_tools_route.py` pins that it travels as "unknown" rather than as a guess.
+        # Deliberately unannotated, and the only one here that is: `read_only=None` is a third answer
+        # market-mcp could give, and a test pins that it travels as "unknown" rather than as a guess.
         @mcp.tool(name=name, description="Returns the last price for a symbol, in UTC, bid side.")
         def get_last_price(symbol: str) -> str:
             if symbol != "US100":
-                # The shape market-mcp refuses in: a sentence naming what to change.
-                # Raising is how a FastMCP tool reports one, and it arrives as
-                # isError=True.
+                # The shape market-mcp refuses in: a sentence naming what to change. Raising is how a
+                # FastMCP tool reports one, and it arrives as isError=True.
                 raise ValueError(f"nobody collects {symbol}. Call list_tracked_pairs first.")
             return "US100 last traded at 21000.5 at 2026-08-12T10:00:00Z, 3 minutes ago."
 
@@ -155,9 +135,8 @@ def serving_sync(tools: tuple[str, ...] = DEFAULT_TOOLS) -> Iterator[str]:
 
 @asynccontextmanager
 async def serving_app(app, port: int) -> AsyncIterator[None]:
-    """One ASGI application on a port of the caller's choosing, for callers that build
-    their own stand-in — so the same port can be served twice, which is what a redeploy
-    looks like from the client's side."""
+    """One ASGI application on a port of the caller's choosing, for callers that build their own stand-in —
+    so the same port can be served twice, which is what a redeploy looks like from the client's side."""
     server, thread = _start(app, port)
     for _ in range(STARTUP_ATTEMPTS):
         if server.started:
@@ -178,11 +157,8 @@ async def serving(
     build: Callable[[FastMCP], None] | None = None,
     port: int | None = None,
 ) -> AsyncIterator[str]:
-    """A stand-in server on a free port for the duration of the block. Yields its URL.
-
-    `port` pins it, which is how a restart is reproduced: the same URL served by a second
-    server that never heard of the first one's sessions.
-    """
+    """A stand-in server on a free port for the duration of the block. `port` pins it, which is how a
+    restart is reproduced: the same URL served by a second server that never heard of the first."""
     port = free_port() if port is None else port
     async with serving_app(_build(tools, port, build).streamable_http_app(), port):
         yield f"http://127.0.0.1:{port}"

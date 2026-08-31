@@ -1,12 +1,5 @@
-"""Shared fixtures — chiefly the throwaway PostgreSQL the `db` tests run against.
-
-A container per test session rather than a shared development database, because the schema
-is part of what is under test. A table left behind by a previous run is indistinguishable
-from a migration that works.
-
-Docker is not assumed. Without it the `db` tests skip with a reason that says what to
-start, instead of failing with a connection error that reads like a bug in the code.
-"""
+"""Shared fixtures — chiefly the throwaway PostgreSQL the `db` tests run against, a container per
+session because the schema is part of what is under test. Without Docker they skip, saying what to start."""
 
 from __future__ import annotations
 
@@ -23,17 +16,12 @@ from polymarket_data.config import Settings
 
 MODULE_ROOT = Path(__file__).resolve().parent.parent
 
-# Testcontainers' reaper bind-mounts the Docker socket, which Docker Desktop for macOS
-# keeps under the user's home directory and its VM refuses to mount. The container fixture
-# is a context manager, so normal runs, failing runs and Ctrl-C all stop it anyway — only
-# a SIGKILL of pytest leaks one, and `docker rm` on a stray `postgres:17-alpine` is the
-# whole cleanup. Set the variable yourself to keep the reaper where it works.
+# Testcontainers' reaper bind-mounts the Docker socket, which Docker Desktop for macOS refuses. Safe
+# to disable here: the container fixture is a context manager, so only a SIGKILL of pytest leaks one.
 os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
-# Emptied between tests so that one test's rows are never another's premise. TRUNCATE
-# rather than dropping and re-migrating: the schema is the same for every test.
-#
-# Named in full rather than left to CASCADE, so the statement says what it empties.
+# Emptied between tests so one test's rows are never another's premise. TRUNCATE rather than
+# re-migrating, and named in full rather than left to CASCADE, so the statement says what it empties.
 TABLES: tuple[str, ...] = (
     "price_samples",
     "collected_ranges",
@@ -82,12 +70,8 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 
 def _reason_to_skip_db_tests() -> str | None:
-    """Why the `db` tests cannot run here, or `None` to let them run.
-
-    Only a machine with no Docker at all earns a skip. A daemon that is installed and
-    failing does not: a silent skip on a machine that was supposed to have Docker is
-    indistinguishable from a suite that passed.
-    """
+    """Why the `db` tests cannot run here, or `None` to let them run. Only a machine with no Docker at
+    all earns a skip: a silent skip where Docker was expected is indistinguishable from a pass."""
     try:
         import docker
     except ImportError:
@@ -120,15 +104,8 @@ def postgres_url() -> Iterator[str]:
 
 @pytest.fixture(scope="session")
 def migrated_url(postgres_url: str) -> str:
-    """The same database with the module's migrations applied.
-
-    Applied by running alembic itself rather than by a hand-written CREATE TABLE. A fixture
-    that builds its own schema tests a schema no deployment will ever have, and the
-    migration — the thing that has to work in production — goes unrun.
-
-    Synchronous on purpose: alembic's async environment calls `asyncio.run`, which needs a
-    thread with no loop already running.
-    """
+    """The same database with the module's migrations applied — by running alembic, because a fixture
+    that builds its own schema tests one no deployment will have. Synchronous: alembic calls `asyncio.run`."""
     from tc_runtime.migrate import upgrade_to_head
 
     from polymarket_data.runtime import MIGRATIONS
@@ -151,13 +128,8 @@ async def db(migrated_url: str) -> AsyncIterator[asyncpg.Connection]:
 
 @pytest.fixture
 def settings() -> Settings:
-    """What the application reads about itself, minus anything that reaches outward.
-
-    The database URL is metadata only — the pool a fixture builds is what actually reaches
-    PostgreSQL. A throwaway value that satisfies Settings' own rules (TLS required, no
-    embedded credential) rather than `migrated_url`, which as testcontainers hands it out
-    is neither.
-    """
+    """What the application reads about itself, minus anything that reaches outward. The database URL is
+    metadata only: a throwaway value satisfying Settings' rules, which `migrated_url` does not."""
     return Settings(
         database_url="postgresql://localhost:5432/test?sslmode=require",
         database_user="test-user",
@@ -177,12 +149,8 @@ async def pool(migrated_url: str):
 
 
 class RecordingIngest:
-    """Stands in for the sampler, and records what tracking asked it to fill.
-
-    The lifespan is bypassed here, so the real one never exists — but the two write paths
-    now start a backfill, and that call is the thing worth asserting: until it existed the
-    ninety days a caller is promised arrived only at the next process restart.
-    """
+    """Stands in for the sampler, and records what tracking asked it to fill. Until that call existed the
+    ninety days a caller is promised arrived only at the next process restart."""
 
     def __init__(self) -> None:
         self.backfilled: list[int] = []
@@ -193,11 +161,8 @@ class RecordingIngest:
 
 @pytest.fixture
 async def api(app, pool, settings):
-    """The app wired to a real database, with the provider faked.
-
-    The lifespan is bypassed rather than run: it would start the sampler, which would reach
-    a third party over the network. What is under test here is the contract.
-    """
+    """The app wired to a real database, with the provider faked. The lifespan is bypassed rather than
+    run: it would start the sampler, which would reach a third party over the network."""
     import fakes
     import httpx
 
@@ -213,12 +178,8 @@ async def api(app, pool, settings):
 
 @pytest.fixture
 async def tool_server(app, pool, settings):
-    """The FastMCP server this module publishes, wired to a real database.
-
-    Built from the same application `create_app()` builds, so the tools under test are the
-    tools that are actually served — a server assembled here would be a second surface, and
-    a ceiling measured on it would be a ceiling on nothing.
-    """
+    """The FastMCP server this module publishes, wired to a real database and built from the same
+    application `create_app()` builds — a server assembled here would be a ceiling on nothing."""
     import fakes
 
     app.state.pool = pool
@@ -230,10 +191,6 @@ async def tool_server(app, pool, settings):
 
 @pytest.fixture
 def app():
-    """A fresh application per test.
-
-    A fixture rather than an import: while `polymarket_data.app`'s module-level `app` was
-    in scope, a test that forgot to ask for this one still found something to mutate, and
-    every assignment survived into whatever ran next.
-    """
+    """A fresh application per test. A fixture rather than an import: while the module-level `app` was in
+    scope, a test that forgot to ask for this one still found something to mutate."""
     return create_app()

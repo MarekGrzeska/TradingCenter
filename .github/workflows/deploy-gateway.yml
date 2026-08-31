@@ -12,11 +12,8 @@ on:
       - "scripts/deploy_probe.py"
   workflow_dispatch: {}
 
-# Declared on the caller, and this is where it has to be: a reusable workflow can only
-# *narrow* the caller's GITHUB_TOKEN, never widen it. This repository's default workflow
-# permission is `read`, and `id-token` is never granted by default at all — so a caller
-# without this block hands the shared workflow a token that cannot push to GHCR and cannot
-# exchange an OIDC assertion, and every deploy fails at `azure/login`.
+# Declared on the caller, and nowhere else will do: a reusable workflow can only *narrow* the caller's token,
+# and `id-token` is never granted by default — without this every deploy fails at `azure/login`.
 permissions:
   contents: read
   id-token: write # azure/login's OIDC exchange
@@ -28,26 +25,12 @@ jobs:
     with:
       module: capital-gateway
       app_name: app-tradingcenter-gateway
-      # The one module whose build context is its own directory: it takes no package, and
-      # its Dockerfile copies `pyproject.toml` from the context root rather than from
-      # `modules/capital-gateway/`.
+      # The one module whose build context is its own directory: it takes no package, and its Dockerfile
+      # copies `pyproject.toml` from the context root.
       build_context: modules/capital-gateway
-      # This module went without an HTTP probe for two months, on a premise nobody checked.
-      # The comment here cited `ip_restriction_default_action = "Deny"` in
-      # infra/app-service.tf, admitting only market-data's and trading-mcp's outbound
-      # addresses, so a runner would get 403 whether the container was healthy or dead.
-      # **There is no such setting, and there never was**: `ip_restriction` appears nowhere in
-      # `infra/`, `az webapp config access-restriction show` answers `Allow` / "Allow all" for
-      # every App Service in the resource group, and this app's `/` answered a laptop on the
-      # first try (20 August 2026). So the deploy asked the control plane — the weaker
-      # question, and the one that reported `Running` over a crash-looping container on
-      # 16 August 2026 — for no reason at all.
-      #
-      # `/` is the health route, excluded from Easy Auth so that it answers without a
-      # credential (infra/app-service.tf, the same exclusion `/ws/stream` has). Matching on
-      # `capital-gateway` rather than on a status word is deliberate: the body carries this
-      # module's own name, so a 200 from anything else in front of the container cannot pass
-      # for it.
+      # This went without an HTTP probe for two months on a premise nobody checked — an IP restriction that
+      # appears nowhere in `infra/`. Matching on `capital-gateway` rather than a status word: the body carries
+      # this module's own name, so a 200 from anything else in front of the container cannot pass for it.
       probe_path: "/"
       expected_status: 200
       body_contains: "capital-gateway"

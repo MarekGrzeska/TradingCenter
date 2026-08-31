@@ -4,14 +4,8 @@ import { priceFields } from "./drawingFields";
 import { Button } from "../ui/Button";
 
 /**
- * The prices and the caption of one object, editable. Built from `priceFields`, so a
- * shape's own roles are the only ones it offers — the module refuses the others anyway,
- * and offering a field that can only be refused is a form that lies.
- *
- * One component for the list in the header and the card beside the object, because "Save"
- * has to mean the same thing in both. Two copies of these rules would be two answers to
- * what a blank caption does, and they would drift the first time one of them changed
- * (design.md, "Edytor pól jest tym samym komponentem").
+ * Built from `priceFields`, so a shape offers only its own roles — a field that can only be refused is a form
+ * that lies. One component for the list and the card, because "Save" has to mean the same thing in both.
  */
 export function DrawingEditor({
   drawing,

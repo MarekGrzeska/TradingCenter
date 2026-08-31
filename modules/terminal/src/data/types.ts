@@ -1,8 +1,6 @@
 /**
- * The terminal's own vocabulary — not the wire shapes of whoever answers. The
- * adapters (`archive.ts` for candles, `gatewaySource.ts` for instruments) are
- * the only places that ever see a payload; every other module speaks these
- * types. See design.md, "Terminal składa jedno źródło z dwóch".
+ * The terminal's own vocabulary, not the wire shapes of whoever answers: the adapters (`archive.ts`,
+ * `gatewaySource.ts`) are the only places that see a payload (design.md, "Terminal składa jedno źródło z dwóch").
  */
 
 export const RESOLUTIONS = [
@@ -18,11 +16,8 @@ export const RESOLUTIONS = [
 
 export type Resolution = (typeof RESOLUTIONS)[number];
 
-// Deliberately absent: a per-resolution period length. Nothing here needs to
-// know how long a candle lasts — timestamps come from the source, and a daily
-// candle starts at the venue's session open rather than UTC midnight, so
-// computing one locally would be wrong exactly where it mattered. See
-// design.md, Risks: "`DAY` i `WEEK` nie mają stałej długości okresu."
+// Deliberately absent: a per-resolution period length. A daily candle starts at the venue's session open
+// rather than UTC midnight, so computing one locally would be wrong exactly where it mattered (design.md).
 
 export type AssetClass =
   | "SHARES"
@@ -49,11 +44,8 @@ export interface InstrumentPage {
   truncated: boolean;
 }
 
-/** One candle, in the terminal's one time representation: epoch seconds at the
- *  start of the period, matching what lightweight-charts indexes by and what the
- *  WebSocket already sends. REST's ISO `ts` is converted on the way in — see
- *  time.ts — so nothing downstream of the source implementations ever sees an
- *  ISO string. */
+/** One candle, in the terminal's one time representation: epoch seconds at the start of the period, which is
+ *  what lightweight-charts indexes by. REST's ISO `ts` is converted on the way in — see time.ts. */
 export interface Bar {
   time: number;
   open: number;
@@ -72,12 +64,8 @@ export interface Bar {
 export type ConnectionState = "connecting" | "connected" | "reconnecting" | "closed";
 
 export type StreamEvent =
-  /** The series as it stands, always the first thing a subscription delivers
-   *  and delivered again after every reconnect. It is what replaced the
-   *  terminal's own history-plus-stream stitching: the archive reads it while
-   *  holding the room still and attaches the subscriber before letting go, so
-   *  no bar can fall between the snapshot and the changes, and none can arrive
-   *  twice (market-data README, "The subscription"). */
+  /** The series as it stands, delivered first and again after every reconnect: the archive reads it holding
+   *  the room still and attaches the subscriber before letting go, so no bar falls between or arrives twice. */
   | { kind: "snapshot"; bars: Bar[]; forming: Bar | null }
   | { kind: "bar"; bar: Bar }
   | { kind: "status"; state: ConnectionState }
@@ -93,12 +81,8 @@ export type MarketDataErrorKind =
   /** The archive answered, but on behalf of something behind it that did not.
    *  Retrying is worth doing; nothing about the request is wrong. */
   | "upstream"
-  /** Not you, rather than not that. Nothing about the request was wrong and
-   *  retrying it unchanged cannot help — the operator has to sign in. Kept
-   *  apart from `unreachable` for exactly that reason: one is a source that is
-   *  down and the other is a source that is fine and does not know who is
-   *  asking, and showing the second as the first sends somebody looking at
-   *  Azure for a problem that a sign-in would fix. */
+  /** Not you, rather than not that: retrying unchanged cannot help, the operator has to sign in. Kept apart
+   *  from `unreachable` because showing this as that sends somebody to Azure for what a sign-in would fix. */
   | "unauthenticated"
   | "unreachable"
   | "unknown";
@@ -116,17 +100,11 @@ export class MarketDataError extends Error {
   }
 }
 
-// --- what the archive is collecting, and how far it reaches ---
-//
-// Only the archive panel speaks these; the chart never sees one. They are here
-// rather than next to the panel because they are vocabulary the data layer
-// hands out, not shapes a view invented.
+// Only the archive panel speaks these; the chart never sees one. Here rather than beside the panel because
+// they are vocabulary the data layer hands out, not shapes a view invented.
 
-/** Whether data is actually arriving for a pair, as far as the archive can
- *  tell. Being on the list proves nothing — a subscription can die without a
- *  sound, and the only symptom is a series that stops growing. `unknown` is a
- *  third answer on purpose: behind, with nobody able to say whether the market
- *  is open. */
+/** Whether data is actually arriving for a pair. Being on the list proves nothing — a subscription can die
+ *  without a sound — and `unknown` is a third answer: behind, with nobody able to say whether the market is open. */
 export type CollectionState =
   | "never_collected"
   | "collecting"
@@ -176,11 +154,8 @@ export interface PairCoverage {
   earliestReachable: number | null;
 }
 
-// --- collection jobs: backfilling history, as something the operator orders and follows ---
-//
-// Only the Instruments tab's wizard and the Data History tab speak these — the
-// chart never sees one. `market-data-jobs` spec: a job is the decision, a
-// chunk is one pair, one window, one gateway request.
+// Only the Instruments wizard and the Data History tab speak these. `market-data-jobs` spec: a job is the
+// decision, a chunk is one pair, one window, one gateway request.
 
 /** One chunk's life. `interrupted` means the module restarted while this
  *  chunk was queued or in flight — never a failure of the chunk itself. */
@@ -297,11 +272,8 @@ export interface TrackPairsResult {
   jobId: number | null;
 }
 
-// --- deletion: kasowanie, a decision that removes data, not just a decision ---
-//
-// Only the Instruments tab (the Delete confirmation) and Data History tab (the
-// combined timeline) speak this. `market-data-tracking` spec, "Skasowanie
-// zostaje odnotowane".
+// Only the Instruments tab's Delete confirmation and Data History's timeline speak this
+// (`market-data-tracking` spec, "Skasowanie zostaje odnotowane").
 
 /** The trace one skasowanie leaves — what it removed, kept after the data
  *  itself is gone. `removedFrom`/`removedTo` are null together when the pair
@@ -315,13 +287,8 @@ export interface PairDeletion {
   removedTo: number | null;
 }
 
-// --- indicators: computed on the archive's own series ---
-//
-// Only the chart and its picker speak these. The catalogue is data, not a hand-kept
-// list — an indicator the archive starts offering shows up here without a terminal
-// release, as long as its output shape and render style are ones the chart already
-// knows how to draw (`market-data-indicators` spec, "Katalog wystarcza do zbudowania
-// wybieraka").
+// Only the chart and its picker speak these. The catalogue is data, not a hand-kept list: a new archive
+// indicator shows up without a terminal release (`market-data-indicators` spec, "Katalog wystarcza…").
 
 export type IndicatorParamType = "int" | "float";
 

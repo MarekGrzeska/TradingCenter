@@ -1,8 +1,5 @@
-"""run_team, read_run, list_runs — starting work and reading what it did.
-
-specs/teams-mcp-tools, "Zestaw odpowiada na pytania o to, co się wydarzyło": a trace a
-model can act on, and a partial one that says it is partial.
-"""
+"""run_team, read_run, list_runs — starting work and reading what it did (specs/teams-mcp-tools): a trace a model can
+act on, and a partial one that says it is partial."""
 
 from __future__ import annotations
 

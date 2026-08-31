@@ -1,6 +1,4 @@
-"""The tool surface, one submodule per concern — mirrors market-mcp's own
-`tools/` split (specs/trading-mcp-tools).
-"""
+"""The tool surface, one submodule per concern."""
 
 from __future__ import annotations
 

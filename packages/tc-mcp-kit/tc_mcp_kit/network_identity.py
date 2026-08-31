@@ -1,24 +1,5 @@
-"""Who may call this module over the network.
-
-One copy of what `market-mcp`, `teams-mcp` and `trading-mcp` each carried. Measured
-18 August 2026 at 76.9–86.2% identical, and the remainder was prose in every line: strip
-the docstrings and comments and the three bodies are the same 32 lines, character for
-character.
-
-This checks **who is calling**, not in whose name. The second question belongs to a module
-that has one (`teams_mcp/operator.py`), is asked per tool rather than per connection, and
-stays there — a caller this middleware trusts is still not allowed to act for an operator
-it cannot name.
-
-Raw ASGI middleware, not Starlette's `BaseHTTPMiddleware`: the streamable-http transport
-streams its response, and `BaseHTTPMiddleware` buffers a response body in some Starlette
-versions, which would break exactly the transport this wraps. A pass-through here touches
-nothing about the response; only a refusal builds one.
-
-Mirrors market-data's own check (`market_data/routers/stream.py`): same headers, same
-anonymous sentinel, same reasoning. That one is four lines inside a WebSocket route rather
-than a file, so it is not moved here.
-"""
+"""Who may call this module over the network — not in whose name, which belongs to a module that has
+one. Raw ASGI, not `BaseHTTPMiddleware`: that buffers a body, and this wraps a streaming transport."""
 
 from __future__ import annotations
 

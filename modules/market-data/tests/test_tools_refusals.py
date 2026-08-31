@@ -1,13 +1,5 @@
-"""One refusal shape for every tool, and the reasons an empty answer can have.
-
-This file changed more than any other in the move. A refusal used to arrive from across
-the wire: the tool asked for something market-data would not serve, market-data answered
-422, and `client.py` rewrote that one detail into a `ToolError`. Reading in-process there
-is no 422 to rewrite — the archive's own validation happened at the FastAPI boundary the
-tools no longer cross — so each refusal now has to be raised where the tool stands. The
-two that would otherwise pass silently are here by name: a reversed range, which a query
-answers with no rows, and an unknown resolution, which the enum answers with a ValueError.
-"""
+"""One refusal shape for every tool, and the reasons an empty answer can have. A refusal used to arrive
+from across the wire as a 422; in-process each one has to be raised where the tool stands."""
 
 from __future__ import annotations
 
@@ -18,9 +10,6 @@ from mcp.server.fastmcp.exceptions import ToolError
 from tools_double import candle, series, tracked
 
 from market_data.models import Resolution
-
-# --- one shape: whatever a tool refuses, it refuses as a sentence saying what to change ---
-
 
 RESOLUTION_TAKING = [
     ("get_candles", {"symbol": "US100", "resolution": "SECOND"}),
@@ -36,9 +25,8 @@ RESOLUTION_TAKING = [
 async def test_an_unknown_resolution_is_refused_by_every_tool_that_takes_one(
     tool_server, archive, tool_name: str, arguments: dict
 ) -> None:
-    """FastAPI used to refuse this before a handler ran, and the tool never saw it. Here
-    the enum is reached directly, and without `resolution_of` the tool would raise a bare
-    ValueError instead of answering."""
+    """FastAPI used to refuse this before a handler ran, and the tool never saw it. Here the enum is
+    reached directly, and without `resolution_of` the tool would raise a bare ValueError."""
     archive.with_series(series(3))
     archive.pairs = [tracked()]
 
@@ -61,10 +49,8 @@ WINDOW_TAKING = [
 async def test_a_reversed_range_is_refused_by_every_tool_that_takes_one(
     tool_server, tool_name: str, arguments: dict
 ) -> None:
-    """The regression this move could have shipped. Over the wire market-data answered
-    422 to a backwards range; in-process the query matches nothing, so the answer would
-    have been "no candles" — the archive's one certain wrong answer, dressed as a quiet
-    market."""
+    """The regression this move could have shipped: over the wire a backwards range was a 422; in-process
+    the query matches nothing, so the answer would have been "no candles" dressed as a quiet market."""
     with pytest.raises(ToolError) as refused:
         await tool_server.call_tool(
             tool_name,
@@ -85,8 +71,6 @@ async def test_too_large_a_series_is_refused_with_what_to_do_instead(
 
     assert "coarser resolution" in str(refused.value)
 
-
-# --- the three reasons for an empty answer, never collapsed into one ---
 
 
 async def test_reason_one_nobody_tracks_the_pair(tool_server, archive) -> None:
@@ -111,9 +95,8 @@ async def test_reason_two_the_window_is_unverified(tool_server, archive) -> None
 
 
 async def test_reason_three_the_archive_could_not_be_read(tool_server, archive) -> None:
-    """The read failing is not an empty window. It used to be a timeout against
-    market-data and is a database failure now; either way a tool that answered "no
-    candles" here would be reporting a quiet market it never looked at."""
+    """The read failing is not an empty window. It used to be a timeout and is a database failure now;
+    either way a tool answering "no candles" would report a quiet market it never looked at."""
     archive.series_error = RuntimeError("connection was closed in the middle of a query")
 
     with pytest.raises(ToolError, match="connection was closed"):

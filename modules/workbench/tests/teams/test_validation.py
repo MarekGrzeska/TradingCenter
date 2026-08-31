@@ -1,10 +1,5 @@
-"""The save-time checks that need something outside the JSON — `validation.py`.
-
-The shape half (cycles, isolated agents, unknown agent keys on an edge) belongs to
-`TeamDefinition` and is tested in `test_contract.py`; what is proven here is that a
-refusal over the model catalogue or the tool announcement names the agent it is about,
-which is what specs/teams-catalogue requires of every refusal.
-"""
+"""The save-time checks that need something outside the JSON; the shape half belongs to `TeamDefinition`. What is proven
+here is that a refusal over the catalogue or the tool announcement names the agent it is about."""
 
 from __future__ import annotations
 
@@ -63,10 +58,8 @@ def test_a_tool_no_server_announces_is_refused_naming_the_agent_and_the_tool() -
 
 
 def test_assigned_tools_with_no_tool_server_are_refused_and_say_so() -> None:
-    # Distinct from the case above on purpose: "no server to ask" is a configuration
-    # someone can fix, "no server has it" is a definition someone must change. The
-    # snapshot is no longer `None` for the first of those — some of what this module
-    # announces it serves itself — so the fact now travels as `unconfigured`.
+    # Distinct from the case above on purpose: "no server to ask" is a configuration someone can fix, "no server has it"
+    # is a definition someone must change — and the first now travels as `unconfigured` rather than as `None`.
     definition = TeamDefinition(agents=[_agent("scout", tools=["get_candles"])])
     announced = AnnouncedSnapshot(
         by_name={"memory_read": ["team-memory"]},
@@ -79,10 +72,8 @@ def test_assigned_tools_with_no_tool_server_are_refused_and_say_so() -> None:
         check_definition(definition, model_ids=MODELS, announced=announced)
 
     assert "scout" in str(err.value)
-    # Every setting the operator has to fill, derived from the labels rather than listed:
-    # a hand-kept list here named two on the day there were three. `\b` rather than a bare
-    # substring because `POLYMARKET_MCP_URL` *contains* `MARKET_MCP_URL` — a plain `in`
-    # passes here whether or not the archive's own setting was named at all.
+    # Every setting the operator has to fill, derived from the labels rather than listed: a hand-kept list named two on
+    # the day there were three. `\b` because `POLYMARKET_MCP_URL` *contains* `MARKET_MCP_URL`.
     assert re.search(r"\bMARKET_MCP_URL", str(err.value))
     assert re.search(r"\bTRADING_MCP_URL", str(err.value))
     assert re.search(r"\bPOLYMARKET_MCP_URL", str(err.value))
@@ -129,9 +120,8 @@ def test_a_name_two_servers_announce_is_refused_naming_both() -> None:
 
 
 def test_a_name_three_servers_announce_is_refused_naming_all_three() -> None:
-    """specs/teams-tool-access, "Kolizja obejmuje więcej niż dwa serwery" — on the save
-    path as well as the run path, and for the same reason: a message naming two of three
-    sends the operator round the same refusal twice."""
+    """specs/teams-tool-access, "Kolizja obejmuje więcej niż dwa serwery" — on the save path as well as the run path,
+    because a message naming two of three sends the operator round the same refusal twice."""
     definition = TeamDefinition(agents=[_agent("scout", tools=["get_event"])])
     announced = AnnouncedSnapshot(
         by_name={"get_event": ["market-mcp", "trading-mcp", "polymarket-mcp"]}, unreachable=[]

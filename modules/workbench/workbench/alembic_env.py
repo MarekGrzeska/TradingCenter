@@ -1,15 +1,5 @@
-"""How alembic reaches a database — one copy for both chains.
-
-`migrations/agent/env.py` and `migrations/teams/env.py` used to be byte-identical outside
-their comments and the name of the settings class they imported. They were two modules
-then. They are two directories of one module now, and a copy inside one module is a copy
-this repository removes: what differs is which of the two databases is being reached, and
-that is an argument.
-
-Alembic executes each `env.py` as a script, so the import below resolves against `sys.path`
-— which holds the module root under uvicorn (its working directory), under pytest
-(`pythonpath = ["."]`) and under the CLI (`prepend_sys_path = .` in both ini files).
-"""
+"""How alembic reaches a database — one copy for both chains, which were byte-identical outside their comments.
+Alembic executes each `env.py` as a script, so the import below resolves against `sys.path`."""
 
 from __future__ import annotations
 
@@ -37,9 +27,8 @@ def run(settings_for_surface: SurfaceSettings) -> None:
     config = context.config
 
     if config.config_file_name is not None:
-        # `disable_existing_loggers=False` — alembic runs in-process during tests, and the
-        # default would silently kill every logger already created by importing the
-        # package under test.
+        # `disable_existing_loggers=False` — alembic runs in-process during tests, and the default would silently kill
+        # every logger already created by importing the package under test.
         fileConfig(config.config_file_name, disable_existing_loggers=False)
 
     if context.is_offline_mode():
@@ -93,9 +82,8 @@ async def _run_online(config, settings_for_surface: SurfaceSettings) -> None:
     database_url = _database_url(config, settings_for_surface)
     connect_args, credential = _identity_connect_args(config, settings_for_surface)
     if credential is not None:
-        # See market_data's twin: SQLAlchemy's asyncpg dialect forwards a URL's query
-        # string as literal kwargs to asyncpg.connect(), which does not accept `sslmode=`
-        # — carried into connect_args as `ssl` instead.
+        # See market_data's twin: SQLAlchemy's asyncpg dialect forwards a URL's query string as literal kwargs to
+        # `asyncpg.connect()`, which does not accept `sslmode=` — carried into connect_args as `ssl` instead.
         parsed = urlparse(database_url)
         sslmode = parse_qs(parsed.query).get("sslmode", [None])[0]
         if sslmode:

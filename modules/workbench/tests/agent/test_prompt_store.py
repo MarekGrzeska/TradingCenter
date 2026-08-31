@@ -1,6 +1,4 @@
-"""`prompt_revisions`: the migration's seed row, and what `store.create_prompt_revision`
-does to the version and the history when an operator edits it
-(specs/agent-prompt-management)."""
+"""`prompt_revisions`: the migration's seed row, and what a save does to the version and the history."""
 
 from __future__ import annotations
 
@@ -29,10 +27,8 @@ async def test_with_tools_does_not_claim_to_have_none(db) -> None:
 async def test_with_tools_names_the_easy_over_readings(db) -> None:
     revision = await store.latest_prompt_revision(db)
     lowered = revision.with_tools_body.lower()
-    # The archive collects chosen pairs, an empty window is not silence, a price is only
-    # as current as its candle, and volume is not reliable enough to reason from — each
-    # one a conclusion market-mcp's own answers are shaped to prevent, and each one a
-    # model would otherwise reach.
+    # The archive collects chosen pairs, an empty window is not silence, a price is only as current as its
+    # candle, and volume is not reliable — each one a conclusion a model would otherwise reach.
     assert "not the whole market" in lowered
     assert "does not mean the market was quiet" in lowered
     assert "as current as the candle" in lowered
@@ -60,9 +56,8 @@ async def test_no_seeded_text_still_claims_the_agent_cannot_place_an_order(db) -
 async def test_without_tools_says_the_archive_is_out_of_reach(db) -> None:
     revision = await store.latest_prompt_revision(db)
     lowered = revision.without_tools_body.lower()
-    # Not "you have no tools" any more: the chart tool is this module's own and is
-    # offered whether or not market-mcp answers. What this variant must still say is
-    # that no market data can be read.
+    # Not "you have no tools" any more: the chart tool is this module's own and is offered whether or not
+    # market-mcp answers. What this variant must still say is that no market data can be read.
     assert "cannot reach the archive" in lowered
     assert "cannot see candles" in lowered
 
@@ -91,9 +86,8 @@ async def test_both_seeded_texts_rule_out_what_the_terminal_cannot_draw(db) -> N
 
 
 async def test_the_two_seeded_texts_differ_only_where_the_world_does(db) -> None:
-    # Same limits, word for word — a drift here is how one of the two quietly loses a
-    # rule the other keeps. True of the seed; an operator's own edit is theirs to keep
-    # this way or not — `agent-prompt-management`'s Non-Goals.
+    # Same limits, word for word — a drift here is how one of the two quietly loses a rule the other keeps.
+    # True of the seed; an operator's own edit is theirs.
     revision = await store.latest_prompt_revision(db)
     for body in (revision.with_tools_body, revision.without_tools_body):
         assert "the decision is always theirs" in body
@@ -144,9 +138,8 @@ async def test_both_seeded_texts_name_the_focus_field(db) -> None:
 
 
 async def test_both_seeded_texts_name_the_drawing_tools(db) -> None:
-    # Both variants, because `list_chart_drawings` reads this module's own table and
-    # `draw_on_chart` says for itself when it cannot check a symbol — neither one goes
-    # away with the archive (specs/agent-tools, "Brak serwera narzędzi").
+    # Both variants, because `list_chart_drawings` reads this module's own table and `draw_on_chart` says
+    # for itself when it cannot check a symbol — neither goes away with the archive.
     revision = await store.latest_prompt_revision(db)
     for body in (revision.with_tools_body, revision.without_tools_body):
         assert "draw_on_chart" in body
@@ -154,19 +147,16 @@ async def test_both_seeded_texts_name_the_drawing_tools(db) -> None:
 
 
 async def test_the_drawing_paragraph_tells_a_drawing_apart_from_a_computed_level(db) -> None:
-    # The one confusion the paragraph exists to prevent: `levels_near_price` computes
-    # support and resistance from the archive on every call, and a drawing is what the
-    # operator asked to keep. A model that conflates them reads one when asked about the
-    # other (design.md, "Prompt dostaje rewizję i jedno zdanie o rozróżnieniu").
+    # The one confusion the paragraph exists to prevent: `levels_near_price` computes support from the
+    # archive on every call, and a drawing is what the operator asked to keep.
     revision = await store.latest_prompt_revision(db)
     for body in (revision.with_tools_body, revision.without_tools_body):
         assert "levels_near_price" in body
 
 
 async def test_the_drawing_paragraph_says_it_is_incremental(db) -> None:
-    # The inversion of set_chart's rule, and the one a model carries over by habit if the
-    # prompt does not say otherwise (specs/agent-chart-drawings, "Agent nie kasuje przez
-    # pominięcie").
+    # The inversion of set_chart's rule, and the one a model carries over by habit if the prompt does not
+    # say otherwise.
     revision = await store.latest_prompt_revision(db)
     for body in (revision.with_tools_body, revision.without_tools_body):
         lowered = body.lower()
@@ -175,10 +165,8 @@ async def test_the_drawing_paragraph_says_it_is_incremental(db) -> None:
 
 
 async def test_the_drawing_paragraph_no_longer_promises_the_indicator_palette(db) -> None:
-    # `draw_on_chart` stopped accepting indicator tokens, so a prompt still pointing at
-    # "the same palette set_chart's indicators use" sends the model to pick a colour it
-    # will then be refused (specs/agent-chart-drawings, "Paleta rysunków MUST być
-    # odrębna").
+    # `draw_on_chart` stopped accepting indicator tokens, so a prompt still pointing at "the same palette
+    # set_chart's indicators use" sends the model to pick a colour it will be refused.
     revision = await store.latest_prompt_revision(db)
     for body in (revision.with_tools_body, revision.without_tools_body):
         assert "same palette set_chart" not in body
@@ -186,9 +174,8 @@ async def test_the_drawing_paragraph_no_longer_promises_the_indicator_palette(db
 
 
 async def test_the_drawing_paragraph_says_hiding_is_undoable_and_removing_is_not(db) -> None:
-    # A model that does not know hiding exists deletes to clear the chart, which is the
-    # loss this whole change exists to prevent (specs/agent-chart-drawings, "Agent gasi
-    # rysunek zamiast go kasować").
+    # A model that does not know hiding exists deletes to clear the chart, which is the loss this whole
+    # change exists to prevent.
     revision = await store.latest_prompt_revision(db)
     for body in (revision.with_tools_body, revision.without_tools_body):
         lowered = body.lower()
@@ -198,9 +185,8 @@ async def test_the_drawing_paragraph_says_hiding_is_undoable_and_removing_is_not
 
 
 async def test_both_seeded_texts_name_the_trading_tools(db) -> None:
-    # A tool the prompt does not mention is a tool the model does not reach for. Both
-    # variants, for the reason `0012` gives: the three tool servers fail independently, so
-    # an unreachable archive says nothing about whether the account can be reached.
+    # A tool the prompt does not mention is a tool the model does not reach for. Both variants: the three
+    # tool servers fail independently, so an unreachable archive says nothing about the account.
     revision = await store.latest_prompt_revision(db)
     for body in (revision.with_tools_body, revision.without_tools_body):
         for tool in ("get_positions", "get_balance", "place_order", "close_position"):

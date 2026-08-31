@@ -1,9 +1,5 @@
-"""The transcript — one row per turn, operator's and agent's alike.
-
-`_TOUCH_SESSION` lives here rather than with the sessions it writes to, because this is
-the only place that fires it: appending the first operator message is what gives a
-session its title and its place in the list.
-"""
+"""The transcript — one row per turn, operator's and agent's alike. `_TOUCH_SESSION` lives here because
+this is the only place that fires it: the first operator message is what gives a session its title."""
 
 from __future__ import annotations
 
@@ -50,10 +46,8 @@ async def get_messages(conn: Conn, *, session_id: int) -> list[Message]:
 async def append_operator_message(
     conn: Conn, *, session_id: int, content: str
 ) -> Message:
-    """Written before the model is ever called (specs/agent-chat, "Wypowiedź operatora
-    MUST być zapisana zanim moduł zawoła model") — what the operator typed survives a
-    failed call. The session's title is set here if this is its first exchange, in the
-    same transaction as the message it is derived from."""
+    """Written before the model is ever called, so what the operator typed survives a failed call. The
+    title is set here if this is the first exchange, in the same transaction as the message."""
     async with conn.transaction():
         row = await fetch_one(
             conn,
@@ -80,9 +74,8 @@ async def append_agent_message(
     incomplete: bool,
     stopped: bool = False,
 ) -> Message:
-    """One row, however the turn ended. `stopped` is the operator's own ending — always
-    alongside `incomplete`, never instead of it: a stopped reply is not the whole answer
-    either, and a reader filtering on `incomplete` MUST NOT stop seeing it."""
+    """One row, however the turn ended. `stopped` is the operator's own ending — always alongside
+    `incomplete`, never instead of it: a reader filtering on `incomplete` MUST NOT stop seeing it."""
     async with conn.transaction():
         row = await fetch_one(
             conn,

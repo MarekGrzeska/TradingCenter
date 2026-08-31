@@ -1,20 +1,5 @@
-"""Running a team: the trace, the statuses, the ceiling on time, and who is watching.
-
-One function does the work (`execute_run`) and one object keeps what a running run needs
-from outside itself (`RunRegistry`): the task, so an operator can interrupt it, and the
-queues of whoever is watching, so progress reaches them without the run depending on any
-of them being read.
-
-Everything here is written **as it happens**, never assembled at the end. A run that broke
-in the middle is a result too — more often the interesting one — and a trace written at
-the end would be missing exactly when it is needed (specs/teams-runs, "Ślad przebiegu
-zostaje niezależnie od tego, jak przebieg się skończył").
-
-The registry lives in this process, which is what the deployment is: one worker, on
-purpose (`infra/app-service.tf`). A second instance would need the queues to travel, and
-`store.fail_unfinished_runs` — the start-up half of the same fact — is what keeps a run
-whose process died from reading as one that is still working.
-"""
+"""Running a team: the trace, the statuses, the ceiling on time, and who is watching. Everything is written as it happens,
+because a run that broke in the middle is a result too — and the registry lives in this one worker, on purpose."""
 
 from __future__ import annotations
 
@@ -50,8 +35,6 @@ from .trading import OrderTooLarge, TradeGuard, TradeLimitReached
 log = logging.getLogger(__name__)
 
 
-# --- what a watcher sees -------------------------------------------------------------
-
 
 @dataclass(frozen=True)
 class StepStarted:
@@ -81,12 +64,8 @@ RunEvent = StepStarted | StepFinished | ToolCalled | RunFinished
 
 
 class RunRegistry:
-    """The running runs of this process, and who is watching each.
-
-    Queues are unbounded and written with `put_nowait`, which is the whole of "a dropped
-    viewer does not stop the run" (specs/teams-runs, "Zerwanie połączenia odbierającego
-    postęp MUST NOT przerwać przebiegu"): nothing here ever waits for a reader.
-    """
+    """The running runs of this process, and who is watching each. Queues are unbounded and written with
+    `put_nowait`, which is the whole of "a dropped viewer does not stop the run"."""
 
     def __init__(self) -> None:
         self._tasks: dict[int, asyncio.Task] = {}
@@ -102,9 +81,8 @@ class RunRegistry:
         return run_id in self._tasks
 
     def cancel(self, run_id: int) -> bool:
-        """Asks the run to stop. `execute_run` is what writes the status — cancelling here
-        and reporting "cancelled" from the route would tell the operator a run had stopped
-        before anything had recorded that it did."""
+        """Asks the run to stop. `execute_run` is what writes the status — reporting "cancelled" from the
+        route would tell the operator a run had stopped before anything had recorded that it did."""
         task = self._tasks.get(run_id)
         if task is None:
             return False
@@ -131,8 +109,6 @@ class RunRegistry:
             queue.put_nowait(event)
 
 
-# --- running one team ----------------------------------------------------------------
-
 _TIME_LIMIT_REASON = "the run exceeded its time limit"
 _CANCELLED_REASON = "the operator interrupted the run"
 
@@ -150,13 +126,8 @@ async def execute_run(
     settings: Settings,
     registry: RunRegistry,
 ) -> None:
-    """The whole of a run, from `pending` to one of `completed`, `failed`, `cancelled`.
-
-    Never raises for anything the run itself did — a broken agent, an unreachable tool
-    server and the time limit all end as a status with a reason. `asyncio.CancelledError`
-    is the one exception that goes back out, after the status is written: swallowing it
-    would tell the event loop the task chose to keep running.
-    """
+    """The whole of a run, from `pending` to one of `completed`, `failed`, `cancelled`. Never raises for
+    anything the run itself did. `CancelledError` goes back out after the status is written."""
     async with pool.acquire() as conn:
         await store.mark_run_running(conn, run_id=run_id)
 
@@ -164,32 +135,25 @@ async def execute_run(
     reason: str | None = "the run ended without a result"
     try:
         try:
-            # Before anything else, and before a single agent is called: a team that
-            # assigns no tools never touches a server at all, and one that does is
-            # refused here rather than three agents into the run. `plan` remembers
-            # which server announced each assigned name, so no agent's own call needs
-            # to ask again (`ToolPlan.call`).
+            # Before anything else, and before a single agent is called: a team that assigns no tools
+            # never touches a server, and one that does is refused here rather than three agents in.
             plan = await plan_tools(
                 definition,
                 tool_registry,
-                # Which team is remembering, on whose behalf, in which run — bound onto
-                # the in-process tools here because this is the first point where all
-                # three are known together.
+                # Which team is remembering, on whose behalf, in which run — bound onto the in-process
+                # tools here, because this is the first point where all three are known together.
                 memory=MemoryScope(
                     team_id=team_id, owner_principal=owner_principal, run_id=run_id
                 ),
             )
         except ToolAccessError as err:
-            # Named as tool access rather than as a generic failure, and refused before a
-            # single agent is called — nothing is paid for a run that cannot check
-            # anything (specs/teams-tool-access, "Brak serwera narzędzi zatrzymuje
-            # przebieg").
+            # Named as tool access rather than as a generic failure, and refused before a single agent is
+            # called: nothing is paid for a run that cannot check anything.
             status, reason = "failed", f"tool access: {err}"
             return
 
-        # One guard of each kind for the whole run, shared by every agent in it: both
-        # ceilings are on what the *run* does, not on what any one role does
-        # (specs/teams-usage, specs/teams-trading).
+        # One guard of each kind for the whole run, shared by every agent in it: both ceilings are on
+        # what the *run* does, not on what any one role does.
         guard = CostGuard(limit_from(definition.limits.run_limit))
         trades = TradeGuard(definition.trading)
         run = _Run(
@@ -211,37 +175,29 @@ async def execute_run(
             status, reason = "failed", _TIME_LIMIT_REASON
             return
         except CostLimitReached as err:
-            # Failed, and the reason names the number — an operator whose run stopped over
-            # money has one question, and it is "how much of what" (specs/teams-usage,
-            # "statusem nazywającym koszt jako przyczynę"). Everything written up to here
-            # stays: a run stopped by its budget is a result like any other.
+            # Failed, and the reason names the number — an operator whose run stopped over money asks
+            # "how much of what". Everything written up to here stays.
             status, reason = "failed", str(err)
             return
         except TradeLimitReached as err:
-            # A separate branch from the one above, and the sentence it writes is the
-            # difference: an operator reads "cost" and buys more budget, reads "orders"
-            # and learns their team wanted to trade more than they allowed — which is a
-            # result of the experiment, not a fault in it (specs/teams-runs, "Powód
-            # zatrzymania odróżnia granicę zleceń od granicy kosztu").
+            # A separate branch from the one above, and the sentence is the difference: an operator reads
+            # "orders" and learns their team wanted to trade more than they allowed.
             status, reason = "failed", str(err)
             return
         except AgentFailed as err:
             status, reason = "failed", str(err)
             return
         except Exception as err:
-            # A broken run is a status, not a crash: whatever went wrong outside an
-            # agent's own work — the graph, the pool, a bug here — still leaves a trace
-            # and a reason rather than a task that vanished.
+            # A broken run is a status, not a crash: whatever went wrong outside an agent's own work
+            # still leaves a trace and a reason rather than a task that vanished.
             log.exception("run %s failed outside an agent's own work", run_id)
             status, reason = "failed", f"the run failed: {err}"
             return
         status, reason = "completed", None
     except asyncio.CancelledError:
         status, reason = "cancelled", _CANCELLED_REASON
-        # Shielded, because this task is already cancelled: without it the first await
-        # below raises again and the run would be left `running` for ever — which is the
-        # one state `store.fail_unfinished_runs` exists to clean up after a *crash*, not
-        # after an interruption the module handled.
+        # Shielded, because this task is already cancelled: without it the first await raises again and
+        # the run is left `running` for ever, which is the state start-up cleans up after a crash.
         await asyncio.shield(_close(pool, run_id=run_id, status=status, reason=reason, registry=registry))
         raise
     finally:
@@ -257,13 +213,8 @@ async def _close(
     reason: str | None,
     registry: RunRegistry,
 ) -> None:
-    """One status, one set of closing rows, one last event.
-
-    A step still `running` is closed as failed: whatever it was doing stopped when the run
-    did, and a step left claiming to work would outlive the process that could have
-    finished it. A step still `pending` stays pending — it never started, and saying it
-    failed would put work in the trace that nobody attempted.
-    """
+    """One status, one set of closing rows, one last event. A step still `running` is closed as failed; one
+    still `pending` stays pending, because saying it failed would put work in the trace nobody attempted."""
     async with pool.acquire() as conn:
         await store.fail_running_steps(conn, run_id=run_id)
         closed = await store.finish_run(conn, run_id=run_id, status=status, stopped_reason=reason)
@@ -277,13 +228,8 @@ async def _close(
 
 @dataclass(frozen=True)
 class _Run:
-    """What every agent in one run shares: the pool, the plan, the two guards, and the
-    id everything it writes points at.
-
-    One of these per run, handed to the graph as `run_agent_step` — the callable
-    `compile_team` calls once per node. Frozen because none of it changes during a run;
-    what does change belongs to one step and lives on `_StepRunner`.
-    """
+    """What every agent in one run shares: the pool, the plan, the two guards, and the id everything points
+    at. Frozen because none of it changes during a run; what does belongs to one step."""
 
     pool: asyncpg.Pool
     run_id: int
@@ -301,20 +247,8 @@ class _Run:
 
 
 class _StepRunner:
-    """One agent's step: the row it writes, the guards it asks, and the trade it is
-    holding while it waits for the reply that settles it.
-
-    The four callbacks `run_agent` takes were closures over this same state, and
-    `pending_trade` was a `nonlocal` between two of them — `_before_write_call` sets it,
-    the next `_on_tool_call` settles it and clears it. That ordering is the whole of how
-    a sent order finds its own row again, and as a `nonlocal` it could only be read by
-    following the closures in the order they happened to be defined. As a field it is a
-    fact about the step, stated once and readable where it is declared.
-
-    One instance per agent per run, which is what makes a plain field correct here at
-    all: agents run concurrently, but each holds its own of these, and one agent's calls
-    are sequential (`loop.py` walks a round's requests in order).
-    """
+    """One agent's step: the row it writes, the guards it asks, and the trade it holds while waiting. `pending_trade` was
+    a `nonlocal` between two closures; one instance per agent per run is what makes a plain field correct."""
 
     def __init__(self, run: _Run, agent: AgentDefinition) -> None:
         self._run = run
@@ -335,9 +269,8 @@ class _StepRunner:
             briefing=briefing_for(agent, given),
             provider=run.provider,
             tools=run.plan.for_agent(agent.key),
-            # Bound to this agent, so the plan can refuse a name this agent was not
-            # assigned — being offered a narrower list is not the same as being held to it
-            # (`ToolPlan.call`).
+            # Bound to this agent, so the plan can refuse a name this agent was not assigned — being
+            # offered a narrower list is not the same as being held to it.
             call_tool=self._call_tool,
             on_tool_call=self._on_tool_call,
             before_model_call=self._before_model_call,
@@ -409,13 +342,8 @@ class _StepRunner:
         run.registry.publish(run.run_id, ToolCalled(agent_key=self._agent.key, call=call))
 
     async def _before_write_call(self, name: str, arguments: dict) -> str | None:
-        """The order ceiling, and the row that outlives whatever happens next.
-
-        Order matters twice over: the guard is asked first, so a refused call leaves no
-        row for an order that was never sent; and the row is written before the call goes
-        out, so an order whose reply never comes back is still in the trace
-        (specs/teams-trading, "Wiersz MUST powstać przed wysłaniem wywołania").
-        """
+        """The order ceiling, and the row that outlives whatever happens next. Order matters twice: the
+        guard is asked first, so a refused call leaves no row; and the row is written before the call goes out."""
         run = self._run
         try:
             run.trades.check(arguments)
@@ -444,9 +372,8 @@ class _StepRunner:
         self._run.guard.check()
 
     async def _on_model_call(self, usage) -> None:
-        """One row per model call, written as the call finishes rather than when the
-        agent does — which is what makes the guard's own total current enough to stop the
-        *next* call (specs/teams-usage)."""
+        """One row per model call, written as the call finishes rather than when the agent does — which is
+        what makes the guard's own total current enough to stop the *next* call."""
         run = self._run
         async with run.pool.acquire() as conn:
             row = await store.record_usage(
@@ -464,13 +391,8 @@ class _StepRunner:
         run.guard.add(row["cost"])
 
 
-# --- reading a write call's own arguments and reply (specs/teams-trading) -------------
-#
-# Best effort by design, and the trace is why: `tool_calls` already holds the arguments
-# and the reply verbatim, so nothing is lost when a field cannot be read here. What this
-# produces is the *queryable* half — the columns a daily count and a terminal list are
-# built from — and a `place_order` shape that changed upstream must degrade to a row with
-# nulls rather than to no row at all.
+# Best effort by design, and the trace is why: `tool_calls` already holds the arguments and the reply
+# verbatim. This is the queryable half, and a shape that changed upstream degrades to nulls, not to no row.
 
 
 @dataclass(frozen=True)
@@ -482,22 +404,15 @@ class _Settlement:
 
 
 def _read_settlement(call: RecordedCall) -> _Settlement:
-    """What the trade row should say now that the call has come back.
-
-    `unknown` is the answer whenever the reply does not establish otherwise, and that
-    includes an outcome this module cannot parse: an order this module cannot account for
-    is exactly what the status is for (specs/teams-trading, "Wywołanie, którego skutek
-    pozostał nieznany, MUST zostać zapisane jako nieznany").
-    """
+    """What the trade row should say now that the call has come back. `unknown` is the answer whenever the
+    reply does not establish otherwise, an outcome this module cannot parse included."""
     if call.outcome == str(ToolOutcomeKind.UNAVAILABLE):
         # The call failed in a way that says nothing about whether it arrived — the one
         # case the whole "row before the call" arrangement exists for.
         return _Settlement("unknown")
     if call.outcome == str(ToolOutcomeKind.REFUSED):
-        # The server answered no. `trading-mcp` refuses before touching the account for a
-        # bad request, and turns a provider REJECTED into a refusal too; either way
-        # nothing was placed. Its access-failure refusals are the exception, and they say
-        # so in their own words.
+        # The server answered no. `trading-mcp` refuses before touching the account for a bad request and
+        # turns a provider REJECTED into a refusal too. Its access-failure refusals say so themselves.
         if "access failure" in call.text:
             return _Settlement("unknown")
         return _Settlement("refused")
@@ -537,8 +452,6 @@ def _decimal_arg(arguments: dict, key: str) -> Decimal | None:
         parsed = Decimal(str(value))
     except (InvalidOperation, ValueError):
         return None
-    # The column refuses a non-positive size (`0004_trades.py`), and a model is free to
-    # ask for one — dropped to NULL here rather than allowed to fail the insert, which
-    # would cost the run a trace row over an argument `trading-mcp` is about to refuse
-    # anyway.
+    # The column refuses a non-positive size, and a model is free to ask for one — dropped to NULL rather
+    # than allowed to fail the insert, which would cost a trace row over an argument about to be refused.
     return parsed if key != "size" or parsed > 0 else None

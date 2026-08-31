@@ -28,10 +28,8 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
-# Its own flag rather than a stronger --run-live, because the two differ in kind and not
-# in degree: everything under `live` reads, and everything under `live_trading` writes to
-# an account. A read that runs by accident costs a request; a trade that runs by accident
-# leaves a position open on an account somebody is looking at.
+# Its own flag rather than a stronger --run-live: a read that runs by accident costs a request,
+# a trade that runs by accident leaves a position open on an account somebody is looking at.
 _GATES = (("live", "--run-live"), ("live_trading", "--run-live-trading"))
 
 
@@ -47,11 +45,8 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
 
 @pytest.fixture(autouse=True)
 def _no_ambient_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep a developer's real .env out of the tests.
-
-    ``Settings`` reads the environment and the .env file, so without this a machine
-    holding credentials and a machine without them run different tests.
-    """
+    """Keep a developer's real .env out of the tests, so a machine holding credentials and a
+    machine without them run the same ones."""
     for name in (
         "CAPITAL_API_KEY",
         "CAPITAL_IDENTIFIER",
@@ -66,12 +61,8 @@ def _no_ambient_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def settings(_no_ambient_credentials: None, monkeypatch: pytest.MonkeyPatch) -> Settings:
-    """Real credentials, for the live suites only.
-
-    Depends on ``_no_ambient_credentials`` explicitly so the order is stated rather than
-    inherited: that fixture strips the environment for the whole suite, and this one puts
-    back exactly what a live test needs.
-    """
+    """Real credentials, for the live suites only. Depends on ``_no_ambient_credentials`` explicitly
+    so the order is stated rather than inherited."""
     for name in ("CAPITAL_API_KEY", "CAPITAL_IDENTIFIER", "CAPITAL_PASSWORD"):
         value = os.environ.get(name)
         if value:
@@ -80,12 +71,8 @@ def settings(_no_ambient_credentials: None, monkeypatch: pytest.MonkeyPatch) -> 
 
 
 async def until(predicate: Callable[[], bool], timeout: float = 2.0) -> None:
-    """Let a loop run until it has done the thing, or fail the test saying it did not.
-
-    Here rather than in one test module because two of them drive background tasks — the
-    connection loop and the room's boundary clock — and both need the same "wait for the
-    effect, not for a number of seconds".
-    """
+    """Let a loop run until it has done the thing, or fail saying it did not. Here because two
+    modules drive background tasks and both wait for the effect, not for a number of seconds."""
 
     async def poll() -> None:
         while not predicate():

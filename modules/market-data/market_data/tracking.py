@@ -1,19 +1,5 @@
-"""Which pairs are collected — the operator's standing decision, and how it is going.
-
-Nothing is archived because somebody looked at a chart. Collecting a pair means holding a
-provider connection open around the clock, and the provider limits how many a session may
-hold, so spending one is a decision rather than a side effect of browsing. That is the
-whole reason this module exists instead of a list in a configuration file: a file needs
-access to the machine and a restart, and neither belongs in the loop of "archive this
-too".
-
-Untracking stops collection and keeps every candle: the row is flipped rather than
-deleted, which also leaves the record of when collection stopped, and that is the gap a
-later re-add has to close. An archive MUST NOT discard data on its own — not on a
-configuration change, not on a restart — but an operator can ask for it directly, which
-is a different, explicit operation: `deletion.py`, built on top of `untrack` here rather
-than replacing it.
-"""
+"""Which pairs are collected — the operator's standing decision, and how it is going. Untracking flips
+the row and keeps every candle; discarding data is explicit and separate (`deletion.py`)."""
 
 from __future__ import annotations
 
@@ -31,36 +17,18 @@ from .market_status import MarketStatus
 from .models import Resolution, TrackedPairState
 from .periods import period_length
 
-# How far behind the newest candle may fall before collection is called stalled. Two
-# periods rather than one: a candle is only written once its period closes, so at any
-# moment the newest one is legitimately up to one period old, and a threshold of one
-# would call every healthy pair broken every period.
+# How far behind the newest candle may fall before collection is called stalled. Two periods rather
+# than one: a candle is written once its period closes, so the newest is legitimately one period old.
 STALE_AFTER_PERIODS = 2
 
-# Plus however long the candle takes to arrive once its period has closed, which is not
-# zero and does not scale with the resolution — it is the provider sealing the candle, the
-# gateway relaying it and this module storing it, and those take the same few seconds
-# whether the period was a minute or a day.
-#
-# **Measured, because two periods alone was wrong.** Watched against the live feed on
-# 2026-08-08: a closed minute candle appeared 52 to 169 seconds after its period ended, so
-# a healthy `MINUTE` pair sat 112–229 seconds behind against a threshold of 120. The state
-# flipped between `COLLECTING` and `STALLED` from one read to the next while nothing at all
-# was wrong, which is worse than having no indicator: an operator learns to ignore it.
-#
-# A fixed span rather than a third period, because a third period is nothing at `MINUTE`
-# and four extra hours at `HOUR_4`. Three minutes covers the slowest arrival seen with room
-# to spare, and costs a genuinely dead `MINUTE` pair three minutes of extra doubt.
+# Plus however long the candle takes to arrive once the period closed, which does not scale with the
+# resolution. Measured 2026-08-08: 52 to 169 seconds, so two periods alone flipped MINUTE pairs at random.
 DELIVERY_GRACE = timedelta(minutes=3)
 
 
 class TrackingRefused(Exception):
-    """A pair was not taken on, and this says why.
-
-    Refusals are named rather than returned as a bare false, because every one of them is
-    something an operator has to read and act on: a symbol the provider does not know, or
-    a ceiling that has to be raised deliberately.
-    """
+    """A pair was not taken on, and this says why. Refusals are named rather than returned as a bare
+    false, because each is something an operator has to read and act on."""
 
 
 class UnknownPair(TrackingRefused):
@@ -68,20 +36,13 @@ class UnknownPair(TrackingRefused):
 
 
 class LimitReached(TrackingRefused):
-    """The configured ceiling on tracked pairs is full.
-
-    The ceiling is real: the gateway holds one provider connection per pair and the
-    provider limits sessions. Refusing loudly is the point — the alternative is accepting
-    the pair and quietly not collecting some of them.
-    """
+    """The configured ceiling on tracked pairs is full. Refusing loudly is the point: the alternative
+    is accepting the pair and quietly not collecting some of them."""
 
 
 class CollectionState(str, Enum):
-    """Whether data is actually arriving, as far as the archive can tell.
-
-    Being on the list proves nothing. A subscription can die without a sound, and the
-    only visible symptom is a series that stops growing while the market is open.
-    """
+    """Whether data is actually arriving, as far as the archive can tell. Being on the list proves
+    nothing — a subscription can die without a sound."""
 
     NEVER_COLLECTED = "never_collected"
     COLLECTING = "collecting"
@@ -111,33 +72,24 @@ class TrackedPairStatus(BaseModel):
     resolution: Resolution
     added_at: datetime
     collect_from: datetime
-    # The oldest period collected, which is how far back the data actually reaches —
-    # `collect_from` is only where it was asked to reach, and a job that has not finished
-    # (or a provider whose history ends later) leaves the two far apart.
+    # The oldest period collected, which is how far back the data actually reaches. `collect_from` is
+    # only where it was asked to reach, and an unfinished job leaves the two far apart.
     earliest_candle: datetime | None
     latest_candle: datetime | None
     collection: CollectionState
-    # How many candles are actually collected — the date range alone cannot say, since a
-    # pair with a wide range and a thin scatter of candles inside it looks the same as one
-    # collected densely. Defaulted rather than required: most call sites build this from
-    # `_SELECT_STATUS`, which always has the real count, but a handful construct one to
-    # describe a pair's timing alone.
+    # How many candles are actually collected: a wide range with a thin scatter inside it looks the
+    # same as one collected densely. Defaulted because a handful of call sites describe timing alone.
     candle_count: int = 0
 
 
 def default_collect_from(resolution: Resolution, default_bars: int, now: datetime) -> datetime:
-    """Where history starts for a pair nobody gave an explicit moment for.
-
-    The same depth a single fill without a job has always reached back to — this is
-    what makes a plain `track()` call (no wizard, no job) behave exactly as it did
-    before `collect_from` existed.
-    """
+    """Where history starts for a pair nobody gave an explicit moment for — the same depth a single fill
+    has always reached back to, so a plain `track()` behaves as it did before `collect_from` existed."""
     return now - period_length(resolution) * default_bars
 
 
-# A single key rather than one per pair: the ceiling counts every tracked pair, so two
-# additions racing each other have to be serialised against the same thing, not against
-# their own rows. `hashtextextended` gives the bigint the advisory lock functions take.
+# A single key rather than one per pair: the ceiling counts every tracked pair, so two additions
+# racing each other have to be serialised against the same thing, not against their own rows.
 _LOCK_TRACKING = "SELECT pg_advisory_xact_lock(hashtextextended('market_data.tracked_pairs', 0))"
 
 _COUNT_TRACKED = "SELECT count(*) AS tracked FROM tracked_pairs WHERE state = 'tracked'"
@@ -180,13 +132,8 @@ _SELECT_COLLECT_FROM = """
      LIMIT 1
 """
 
-# One query for every tracked pair's oldest and newest candle rather than one query per
-# pair. The left join keeps a pair that has never collected anything, which is a state an
-# operator needs to see rather than a row that quietly goes missing.
-#
-# `count(c.period_start)`, not `count(*)`: with a LEFT JOIN, `count(*)` counts the joined
-# row even when every one of its columns is NULL, so a pair with nothing collected would
-# report one candle instead of zero.
+# One query for every pair's oldest and newest candle. `count(c.period_start)`, not `count(*)`: with a
+# LEFT JOIN the latter counts the joined all-NULL row, so a pair with nothing reports one candle.
 _SELECT_STATUS = """
     SELECT t.symbol, t.resolution, t.added_at, t.collect_from,
            min(c.period_start) AS earliest_candle,
@@ -220,26 +167,14 @@ async def track(
     collect_from: datetime | None = None,
     default_bars: int = 5000,
 ) -> TrackedPair:
-    """Start collecting a pair, or raise `LimitReached` saying why not.
-
-    Re-tracking a pair that was untracked flips it back and keeps its original `added_at`,
-    because it is the same standing decision resumed rather than a new one. Its candles
-    were never touched, so what it needs on resumption is the gap closed, not a fresh
-    start — which is what the preserved `untracked_at` was for.
-
-    `collect_from` is the moment history should reach back to. Left unset, it is worked
-    out from `default_bars` — the same depth a plain fill has always reached back to —
-    so a caller that never heard of jobs or wizards gets the old behaviour unchanged.
-    Re-tracking (or tracking again with an earlier moment) can only pull it earlier,
-    never push it later: see `_TRACK`'s `LEAST`.
-    """
+    """Start collecting a pair, or raise `LimitReached` saying why not. Re-tracking keeps the original
+    `added_at` and can only pull `collect_from` earlier, never push it later."""
     resolved_from = collect_from or default_collect_from(
         resolution, default_bars, datetime.now(UTC)
     )
 
-    # The count and the insert have to be one atomic thing. Two additions racing each
-    # other would otherwise both read `limit - 1` and both succeed, putting the archive one
-    # provider connection over a ceiling that exists because the provider enforces it.
+    # The count and the insert have to be one atomic thing: two additions racing each other would
+    # both read `limit - 1` and both succeed, putting the archive one connection over the ceiling.
     async with conn.transaction():
         await conn.execute(_LOCK_TRACKING)
 
@@ -260,22 +195,15 @@ async def track(
 async def untrack(
     conn: asyncpg.Connection, symbol: str, resolution: Resolution
 ) -> TrackedPair | None:
-    """Stop collecting a pair. Returns `None` if it was not being collected.
-
-    The candles stay, and so does the row: the moment collection stopped is the left edge
-    of the gap that tracking it again will have to close. This is the flip alone — an
-    operator who wants the data gone too is `deletion.close_for_deletion`, which calls
-    this and adds skipping the pair's queued chunks, both in one transaction.
-    """
+    """Stop collecting a pair. The candles stay, and so does the row: the moment collection stopped is
+    the left edge of the gap that tracking it again has to close."""
     row = await conn.fetchrow(_UNTRACK, symbol, resolution.value)
     return _pair(row) if row else None
 
 
 async def read_tracked(conn: asyncpg.Connection) -> list[TrackedPair]:
-    """Every pair currently being collected, oldest decision first.
-
-    This is what a restart reads. There is no list in a file to disagree with it.
-    """
+    """Every pair currently being collected, oldest decision first. This is what a restart reads, and
+    there is no list in a file to disagree with it."""
     return [_pair(row) for row in await conn.fetch(_SELECT_TRACKED)]
 
 
@@ -286,13 +214,8 @@ async def is_tracked(conn: asyncpg.Connection, symbol: str, resolution: Resoluti
 async def read_collect_from(
     conn: asyncpg.Connection, symbol: str, resolution: Resolution
 ) -> datetime | None:
-    """The moment this pair's history is meant to reach back to, or `None` if it is not
-    currently tracked.
-
-    What the quiet gap-closing fill (`ingest/backfill.py`) reads before deciding how deep
-    to reach for a pair with nothing collected yet — it MUST NOT go further back than
-    this, and `None` here means there is nothing to fetch for, not "use the old default".
-    """
+    """The moment this pair's history is meant to reach back to, or `None` if it is not tracked. `None`
+    means there is nothing to fetch for, not "use the old default"."""
     return await conn.fetchval(_SELECT_COLLECT_FROM, symbol, resolution.value)
 
 
@@ -302,16 +225,8 @@ def collection_state(
     now: datetime,
     market_open: bool | None = None,
 ) -> CollectionState:
-    """How collection is going for one pair, from the age of its newest candle.
-
-    `market_open` is passed in rather than worked out here. Whether an instrument is
-    currently tradeable is the gateway's to answer — this module has no session calendar
-    and inventing one would produce a confident wrong answer twice a day.
-
-    The threshold is two periods *plus* the time a candle takes to arrive once its period
-    has closed. Both halves are load-bearing, and the second one was measured rather than
-    reasoned about — see `DELIVERY_GRACE`.
-    """
+    """How collection is going for one pair, from the age of its newest candle. `market_open` is passed
+    in: this module has no session calendar, and inventing one is a confident wrong answer twice a day."""
     if latest_candle is None:
         return CollectionState.NEVER_COLLECTED
 
@@ -328,12 +243,8 @@ async def read_status(
     market_open: dict[tuple[str, Resolution], bool] | None = None,
     now: datetime | None = None,
 ) -> list[TrackedPairStatus]:
-    """Every tracked pair with the time of its newest candle and how collection is going.
-
-    `market_open` maps a pair to whether its instrument is currently tradeable, as the
-    gateway reports it. Pairs it says nothing about come back `UNKNOWN` rather than being
-    guessed at.
-    """
+    """Every tracked pair with the time of its newest candle and how collection is going. Pairs the
+    gateway says nothing about come back `UNKNOWN` rather than being guessed at."""
     moment = now or datetime.now(UTC)
     lookup = market_open or {}
 
@@ -367,12 +278,8 @@ async def add_pair(
     collect_from: datetime | None = None,
     default_bars: int = 5000,
 ) -> TrackedPair:
-    """Validate a pair against the gateway, then start collecting it.
-
-    Validation first, and against the gateway rather than a list kept here: the archive
-    does not own the instrument catalogue and a pair the provider cannot serve is one that
-    would sit on the list forever collecting nothing.
-    """
+    """Validate a pair against the gateway, then start collecting it. Against the gateway rather than a
+    list kept here: a pair the provider cannot serve would sit on the list forever collecting nothing."""
     try:
         collectable = await instruments.is_collectable(symbol, resolution)
     except GatewayRefused as err:
@@ -380,9 +287,8 @@ async def add_pair(
             f"the gateway would not serve {symbol} at {resolution.value}: {err.detail}"
         ) from err
     except GatewayUnreachable:
-        # Deliberately not a TrackingRefused: the pair was not rejected, it was never
-        # asked about. Retrying makes sense here and does not for a refusal, so the two
-        # must not reach an operator as the same thing.
+        # Deliberately not a TrackingRefused: the pair was not rejected, it was never asked about.
+        # Retrying makes sense here and does not for a refusal.
         raise
 
     if not collectable:
@@ -400,18 +306,8 @@ async def decide_late_pairs(
     statuses: list[TrackedPairStatus],
     moment: datetime,
 ) -> list[tuple[TrackedPairStatus, CollectionState]]:
-    """Turn `UNKNOWN` into `STALLED` or `MARKET_CLOSED` where the gateway can say which.
-
-    **Only the late ones are asked about.** A pair whose newest candle is fresh reads
-    `COLLECTING` whatever the market is doing, so a request about it would spend the
-    gateway's shared allowance to learn nothing that changes an answer. On a healthy
-    archive that leaves nothing to ask, and this costs one round trip per late *symbol* —
-    not per pair, because the same instrument at two resolutions has one market.
-
-    A gateway that will not answer leaves the state `UNKNOWN`, which is what it already
-    was. The list is the archive's own and worth returning; not knowing why one pair is
-    late is not a reason to fail the whole read.
-    """
+    """Turn `UNKNOWN` into `STALLED` or `MARKET_CLOSED` where the gateway can say which. Only the late
+    ones are asked about, one round trip per late *symbol*; a gateway that will not answer leaves it."""
     late = sorted(
         {status.symbol for status in statuses if status.collection is CollectionState.UNKNOWN}
     )

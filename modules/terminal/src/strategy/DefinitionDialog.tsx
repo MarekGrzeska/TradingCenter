@@ -11,33 +11,12 @@ import { blankCondition, blankNumeric, blankRule } from "./rule/vocabulary";
 import type { Definition, Rule, RuleFact, RuleParam, StrategyApi } from "./strategyApi";
 
 /**
- * Writing a rule, or the next revision of one.
- *
- * **Every picker is the archive's.** Indicators, their lines and the range each parameter
- * accepts come from `GET /indicators`, and this screen holds no copy of any of it: a list
- * in here would be wrong the first time somebody adds an indicator, and a range in here
- * would be a second opinion about numbers this screen does not own
- * (`terminal-strategy-configurator`).
- *
- * Read through `useIndicatorCatalogue` rather than through a `useRead` of its own, and that
- * is not tidiness. The cache is shared and keyed by name: two readers of one key holding two
- * *shapes* is one poisoning the other, whichever answered last. This dialog did exactly that
- * once, and what broke was the chart grid — a screen it has nothing to do with.
- *
- * **The refusal is the module's, and it is shown where it happened.** Nothing is validated
- * here beyond what the shape needs to exist at all. A rule the module will not have comes
- * back naming the one thing to change, and `ConfirmDialog` keeps the dialog open with that
- * sentence under it — a refusal thrown at the screen underneath has lost the rule it is
- * about.
- *
- * **Saving a revision starts nothing.** A watch computes the revision it was pinned to, and
- * a rule saved here changes no running one until somebody moves it deliberately. The dialog
- * says so rather than leaving it to be discovered.
+ * **Every picker is the archive's**, read through `useIndicatorCatalogue`: the cache is keyed by name, and two readers
+ * holding two *shapes* poison each other. The refusal is the module's, and saving a revision starts nothing.
  */
 
-// The same height every control in this dialog has, including the ones inside the tree
-// (`rule/NodeEditor.tsx`). A form where a select is two pixels shorter than the input beside
-// it reads as broken before anybody has read a word of it.
+// The same height every control in this dialog has, including inside the tree (`rule/NodeEditor.tsx`): a select two
+// pixels shorter than the input beside it reads as broken before anybody has read a word.
 const FIELD = "h-8 w-full rounded border border-border bg-sunken px-2 text-ink";
 const SMALL = "h-7 rounded border border-border bg-sunken px-1 text-ink";
 const HINT = "text-ink-faint";
@@ -70,9 +49,8 @@ export function DefinitionDialog({
     () => new Map(catalogue.entries.map((entry) => [entry.id, entry])),
     [catalogue.entries],
   );
-  // Only the ones this vocabulary can read. An indicator answering zones or markers is a
-  // real entry of the archive and simply not something a comparison can point at yet —
-  // offering it would end in a refusal the operator could do nothing about.
+  // Only the ones this vocabulary can read. An indicator answering zones or markers is a real entry the comparison
+  // cannot point at yet — offering it would end in a refusal the operator could do nothing about.
   const readable = useMemo(
     () => catalogue.entries.filter((entry) => entry.output === "lines"),
     [catalogue.entries],

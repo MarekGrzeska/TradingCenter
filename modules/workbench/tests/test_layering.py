@@ -1,19 +1,5 @@
-"""The rule that replaced "no module imports another module" inside this process.
-
-Two things that were modules are packages now, so the old rule has nothing to be
-zero-or-one about. What stands in its place has to be exactly as mechanical, or it is not a
-rule but a preference — and a preference is what the first hurried afternoon spends.
-
-    agent/**        MUST NOT import teams or teams_tools
-    teams/**        MUST NOT import agent or teams_tools
-    teams_tools/**  MUST NOT import agent or teams
-    workbench/**    may import all three, and is the only place that may
-
-Read from the AST rather than from the top of the file, so an import tucked inside a
-function body counts too. `importlib` would slip past this, and that is accepted:
-`importlib` is not a mistake anybody makes by accident, and this rule is here for the
-mistakes that are.
-"""
+"""The rule that replaced "no module imports another module" inside this process: `agent`, `teams` and `teams_tools`
+import none of the others, and `workbench/` alone may import all three. Read from the AST, so an import in a function counts."""
 
 from __future__ import annotations
 

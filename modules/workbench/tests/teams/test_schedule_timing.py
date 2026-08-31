@@ -1,10 +1,5 @@
-"""What a cron expression means in time — `teams/scheduler/timing.py`, and the folding of
-missed slots that reads it (`scheduler/clock.py::_next_fire_and_skipped`).
-
-The expression is a wall clock in Poland; everything this module stores and publishes is
-UTC. These tests are the record of that pair, including the two nights a year where a wall
-clock is not a function.
-"""
+"""What a cron expression means in time, and the folding of missed slots that reads it. The expression is a
+wall clock in Poland and everything stored is UTC — including the two nights a year where it is not a function."""
 
 from __future__ import annotations
 
@@ -44,9 +39,8 @@ def test_the_clock_change_moves_utc_and_leaves_the_wall_clock_alone() -> None:
 
 
 def test_a_schedule_inside_the_spring_gap_still_fires_that_day() -> None:
-    """29 March 2026 has no 02:30 in Poland — the clocks jump 02:00 → 03:00. The schedule
-    MUST NOT be skipped for the day; what `croniter` picks is recorded here rather than
-    argued about."""
+    """29 March 2026 has no 02:30 in Poland. The schedule MUST NOT be skipped for the day; what `croniter`
+    picks is recorded here rather than argued about."""
     fires = fires_after("30 2 * * *", _utc("2026-03-28T12:00:00"))
     moments = [next(fires) for _ in range(2)]
 
@@ -75,11 +69,8 @@ def test_folding_rolls_a_daily_schedule_forward_in_polish_time() -> None:
 
 
 def test_an_hourly_expression_with_weekdays_steps_over_the_weekend() -> None:
-    """The rhythm the operator wanted: every hour at :35, Monday to Friday. Friday's last
-    fire is followed by Monday's first, with nothing in between.
-
-    2026-08-21 is a Friday; times are UTC, so 21:35 Polish summer time is 19:35 here.
-    """
+    """The rhythm the operator wanted: every hour at :35, Monday to Friday, with Friday's last fire followed
+    by Monday's first. Times are UTC, so 21:35 Polish summer time is 19:35 here."""
     friday_last = next_fire_after("35 * * * 1,2,3,4,5", _utc("2026-08-21T21:00:00"))
     assert friday_last == _utc("2026-08-21T21:35:00")
 

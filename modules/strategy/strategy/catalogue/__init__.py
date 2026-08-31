@@ -1,16 +1,5 @@
-"""The catalogue: every strategy this image carries, assembled in one place.
-
-The list below is the only file that changes when a strategy is added. Nothing in
-`runner/`, `routers/`, `tools/` or `archive.py` may import an entry module directly —
-`tests/test_layering.py` refuses it — so the runtime knows the catalogue and never a
-strategy, which is what "adding one changes no file of the runtime" means in practice.
-
-The entries are code in the image rather than rows in a table, and that is a decision with
-a cost: a new strategy is a deployment. What it buys is the property the whole platform
-stands on — `evaluate` is an ordinary reviewed function, unit-testable and identical in the
-loop and in the backtest. A strategy expressed as data would need an interpreter, and the
-interpreter would be code to deploy anyway (design.md, decision 1).
-"""
+"""Every strategy this image carries, and the only file that changes when one is added. Entries are code rather than
+rows, so a new strategy is a deployment — what that buys is an `evaluate` identical in the loop and in the backtest."""
 
 from __future__ import annotations
 
@@ -41,16 +30,8 @@ def all_entries() -> tuple[StrategySpec, ...]:
 
 
 def check_facts_are_announced(spec: StrategySpec, announced: Iterable[str]) -> None:
-    """Refuse a strategy whose facts name an indicator the archive does not announce.
-
-    Called when a strategy is registered into the running platform — when a watch is
-    created — rather than at import: what the archive announces is not knowable from here
-    without asking it, and asking it at import would make this module's start depend on
-    another module's health.
-
-    The refusal names the indicator, because that is the only part anybody can act on
-    (`strategy-runtime`, "Fakty pochodzą z archiwum, jedną drogą").
-    """
+    """Refuse a strategy whose facts name an indicator the archive does not announce. Called when a watch
+    is created rather than at import: asking at import would make this module's start depend on another's."""
     known = set(announced)
     for indicator in spec.indicators:
         if indicator not in known:

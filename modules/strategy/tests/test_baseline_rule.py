@@ -1,16 +1,5 @@
-"""The strategy of reference against its own twin, decision by decision.
-
-This is the measurement the whole vocabulary rests on. `baseline_ma_cross` is code somebody
-reviewed; `BASELINE_RULE` is the same rule written in the node vocabulary. If the two ever
-disagree, either the vocabulary cannot carry a real strategy or the interpreter does not
-compute what it appears to — and both are defects in this module, not nuances
-(`strategy-configurator`, "Strategia odniesienia pozostaje kodem i jest miarą interpretera").
-
-**One difference is intended.** The coded entry computes `extension_atr` only on the bar it
-enters; the interpreter computes features in one place for every rule, so the twin's
-refusals carry one feature more. The assertion below is written as "a superset with equal
-values" for exactly that, and for nothing else.
-"""
+"""The strategy of reference against its own twin, decision by decision, where a disagreement is a defect. One
+difference is intended: the interpreter computes features in one place, so the twin's refusals carry one more."""
 
 from __future__ import annotations
 
@@ -28,10 +17,8 @@ twin = spec_from_rule(
     rule=BASELINE_RULE,
 )
 
-# Every state the coded entry distinguishes. "unsettled and a zero range" is the sharp one:
-# both refusals apply at once, and the coded entry answers "not settled" because it checks
-# that first — which is why the twin states settlement as its own first guard rather than
-# leaving it to fall out of the arithmetic.
+# Every state the coded entry distinguishes. "unsettled and a zero range" is the sharp one: both refusals apply at
+# once and it answers "not settled", which is why the twin states settlement as its own first guard.
 CASES: dict[str, dict] = {
     "a crossing": {"fast": [1.0, 3.0], "slow": [2.0, 2.0], "atr": [1.0, 1.0]},
     "no crossing": {"fast": [1.0, 1.5], "slow": [2.0, 2.0], "atr": [1.0, 1.0]},

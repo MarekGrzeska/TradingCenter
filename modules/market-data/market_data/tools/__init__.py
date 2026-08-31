@@ -1,13 +1,5 @@
-"""The tool surface this module serves at `/mcp`.
-
-The reduction, the ceilings and the sentences about uncertainty — everything a model
-needs that a chart does not. A chart wants every candle; a model wants a summary, so the
-same archive read comes out reduced rather than whole.
-
-Registration order is the order a client sees the tools in, and it is the order a question
-travels: which pairs exist, then their candles, then the instrument behind a symbol, then
-what can be computed on top.
-"""
+"""The tool surface this module serves at `/mcp`. A chart wants every candle and a model wants a
+summary, so the same archive read comes out reduced; registration order is the order a question travels."""
 
 from __future__ import annotations
 

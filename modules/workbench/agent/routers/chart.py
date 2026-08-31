@@ -1,14 +1,5 @@
-"""`GET /chart` — what the agent set the operator's chart to.
-
-Global to the module, not scoped to an owner, for the same reason the prompt is: there is
-one chart, and `current_principal` is asked only to refuse an unauthenticated request.
-
-The consumer says what it has already applied and gets back either nothing or one command
-carrying everything newer, folded (`store.chart_state_after`). Nothing here writes: the
-cursor belongs to the consumer, so that two terminals, or one reopened, cannot take a
-command away from each other (specs/agent-chart-control, "Konsument czyta tylko to, czego
-jeszcze nie zastosował").
-"""
+"""`GET /chart` — what the agent set the operator's chart to, global to the module. Nothing here writes: the cursor
+belongs to the consumer, so two terminals cannot take a command away from each other."""
 
 from __future__ import annotations
 

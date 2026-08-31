@@ -1,41 +1,11 @@
 name: terraform-apply
 
-# Applying infrastructure from GitHub, deliberately started by a person.
+# Applying infrastructure from GitHub, started by a person: required-reviewer protection is not available for a
+# private repository on the free plan, so the gate is a `workflow_dispatch` with a confirmation typed into it.
+# The plan is still reviewed a step earlier, on the pull request terraform.yml comments on.
 #
-# ## Why this is not a review-and-approve button
-#
-# The obvious design is a job with `environment: infrastructure` and a required reviewer,
-# which pauses the run and shows "Review deployments" in the Actions tab. That is exactly
-# what was wanted here and it cannot be had: **required-reviewer protection rules are not
-# available for private repositories on the free plan.** Creating one answers
-#
-#     422 — Failed to create the environment protection rule. Please ensure the billing
-#     plan supports the required reviewers protection rule.
-#
-# and branch protection is unavailable for the same reason. So the gate is the thing the
-# free plan does support: a manual `workflow_dispatch` with a confirmation typed into it.
-# Actions → terraform-apply → Run workflow → type `apply`.
-#
-# The review still happens, one step earlier: terraform.yml posts the plan as a comment on
-# the pull request that changes `infra/`, and that comment is what there is to read. This
-# workflow re-plans and prints it again before applying, so a run is never applying
-# something nobody could see.
-#
-# ## Why it can still refuse
-#
-# The CI principal holds `Application.Read.All` on Microsoft Graph and deliberately not
-# `.ReadWrite.All` (infra/github-oidc.tf). Reading is enough to *plan* every Entra object
-# this root manages; changing one needs write, which nothing in the pipeline had a use for
-# until this workflow existed — and tenant-wide directory write, held by whatever can
-# trigger a workflow, is a larger privilege than a platform one person operates should
-# hand out for the convenience of not opening a terminal.
-#
-# So this workflow inspects its own plan and refuses up front when the plan touches an
-# `azuread_*` resource, naming the resources and telling the operator to apply locally.
-# That is a legible refusal in the first thirty seconds instead of a Graph 403 halfway
-# through an apply that has already changed half of Azure. Every azurerm change — App
-# Service settings, the database, monitoring, Key Vault, firewall rules — applies here
-# normally, and those are the ordinary case.
+# It refuses its own plan when one touches an `azuread_*` resource: the CI principal holds `Application.Read.All`
+# and not write, deliberately, so that would be a Graph 403 halfway through an apply that already changed Azure.
 
 on:
   workflow_dispatch:
@@ -71,9 +41,8 @@ env:
 jobs:
   apply:
     runs-on: ubuntu-latest
-    # `production` carries no protection rule on this plan either, but it scopes the
-    # federated credential the same way the three deploy workflows do — the subject the
-    # OIDC token presents is `environment:production`, and github-oidc.tf registered it.
+    # `production` carries no protection rule on this plan either, but it scopes the federated credential the
+    # same way the deploy workflows do — the OIDC subject is `environment:production`.
     environment: production
     defaults:
       run:
@@ -100,9 +69,8 @@ jobs:
       - name: Refuse a plan that changes Entra objects
         run: |
           set -euo pipefail
-          # `terraform show -json` rather than grepping the human output: a resource
-          # address never moves in the JSON, and "no changes" is an empty list rather than
-          # a sentence that could be reworded by a future Terraform.
+          # `terraform show -json` rather than grepping the human output: a resource address never moves in the
+          # JSON, and "no changes" is an empty list rather than a sentence a future Terraform could reword.
           entra=$(terraform show -json tfplan | jq -r '
             (.resource_changes // [])[]
             | select(.type | startswith("azuread_"))

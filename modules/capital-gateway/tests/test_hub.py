@@ -147,8 +147,7 @@ async def test_a_streamed_candle_carries_no_volume() -> None:
         {"kind": "sealed", "t": BASE_MS, "o": 95.0, "h": 110.0, "l": 94.0, "c": 99.0}
     )
 
-    # Neither provider event carries volume, so the field is null on this feed — forming
-    # and sealed alike. It exists so the shape matches the REST candle; pinning it here
+    # Neither provider event carries volume, so the field is null on this feed. Pinning it here
     # means a consumer reading a zero one day is a change somebody made, not a surprise.
     candles = [m for m in received if isinstance(m, CandleMessage)]
     assert len(candles) == 2
@@ -256,8 +255,6 @@ async def test_closing_the_hub_stops_every_connection() -> None:
     assert all(u.stopped == 1 for u in FakeUpstream.instances)
     assert hub.room_count() == 0
 
-
-# --- the boundary a session-bound resolution cannot compute ---
 
 
 def make_seeded_hub(
@@ -381,9 +378,8 @@ async def test_a_fixed_period_room_never_asks_about_a_boundary() -> None:
 
 
 async def test_a_provider_that_keeps_saying_no_is_not_asked_once_per_quote() -> None:
-    """A liquid instrument quotes hundreds of times a minute, and every one of those
-    would otherwise become a request through the same rate gate an operator's chart reads
-    through."""
+    """A liquid instrument quotes hundreds of times a minute, and every one would otherwise become
+    a request through the same rate gate an operator's chart reads through."""
     hub, asked = make_seeded_hub([None])
     subscriber, _ = collector()
 
@@ -418,12 +414,8 @@ async def test_a_reconnect_re_reads_the_boundary_it_may_have_missed() -> None:
 
 
 async def test_a_reconnect_inside_the_same_period_keeps_publishing() -> None:
-    """The ordinary drop, and the one that must not cost a day of chart.
-
-    A feed blip inside a daily period leaves the boundary unconfirmed but not moved, so
-    the provider hands the same period back. Read as "no progress" — the right reading
-    after a seal — the room fell silent for the rest of the period.
-    """
+    """The ordinary drop, and the one that must not cost a day of chart: a blip leaves the boundary
+    unconfirmed but not moved, and reading the same period as no progress silenced the room."""
     held = Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0)
     hub, asked = make_seeded_hub([held, held])
     subscriber, received = collector()
@@ -463,11 +455,8 @@ async def test_a_late_joiner_is_not_handed_a_finished_period_as_forming() -> Non
     assert candle.time == BASE_S
 
 
-# --- a boundary that does not wait for a quote -----------------------------------------
-#
-# The failure of 24 August 2026, which the tests above could not have caught: every one of
-# them reaches `place_boundary` through a quote, and the room that broke was the one no
-# quote ever reached again.
+# The failure of 24 August 2026, which the tests above could not have caught: they all reach
+# `place_boundary` through a quote, and the room that broke was the one no quote ever reached.
 
 
 async def test_a_daily_room_asks_about_its_boundary_without_a_single_quote(
@@ -552,9 +541,8 @@ async def test_the_last_leaver_stops_the_boundary_clock(
 
 
 def test_a_provider_that_keeps_saying_not_yet_is_asked_less_and_less() -> None:
-    """The answer does not change from one minute to the next, and over a weekend it does
-    not change for two days. Eight session-bound rooms asking every 30 seconds is 960
-    requests an hour out of ten per second shared by the whole account."""
+    """The answer does not change from one minute to the next, and over a weekend not for two days.
+    Eight rooms asking every 30 seconds is 960 requests an hour out of ten per second."""
     waits = [hub_module.BOUNDARY_RETRY_SECONDS]
     for _ in range(8):
         waits.append(hub_module.next_boundary_wait(waits[-1]))
@@ -588,9 +576,8 @@ async def test_the_growing_wait_is_wired_in_not_merely_written(
 
 
 async def test_a_joiner_is_handed_an_assembled_bar_as_forming_not_as_settled() -> None:
-    """A period can end without the provider sealing it, and then the only bar the room
-    has for it is its own assembly. A consumer stores what is marked settled, so handing
-    that one over as settled writes a candle nobody closed into an archive."""
+    """A period can end without the provider sealing it, and the only bar the room has is then its
+    own assembly. Handing that over as settled writes a candle nobody closed into an archive."""
     hub, _ = make_seeded_hub([Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0)])
     first, _ = collector()
     await hub.subscribe("US100", Resolution.DAY, first)

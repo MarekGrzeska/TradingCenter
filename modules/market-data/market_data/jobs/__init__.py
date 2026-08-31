@@ -1,11 +1,5 @@
-"""Collection jobs: a durable record of what backfill was asked for, and how it went.
-
-`models.py` is the vocabulary and the one place a job's status is worked out from its
-chunks. `store.py` is the only door to the two tables. `plan.py` turns "these pairs, from
-this moment" into chunks a job can be made of, and prices that plan without running it.
-`runner.py` works a job's chunks under the same fill budget as everything else this
-module fetches with.
-"""
+"""Collection jobs: a durable record of what backfill was asked for, and how it went. `store.py` is
+the only door to the two tables, `plan.py` makes chunks, `runner.py` works them under the fill budget."""
 
 from __future__ import annotations
 

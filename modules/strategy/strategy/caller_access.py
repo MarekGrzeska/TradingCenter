@@ -1,26 +1,5 @@
-"""Which caller may reach which surface of this application.
-
-The platform's own gate answers a narrower question than it looks like it does: Easy Auth
-authorizes an **application**, and once a caller is through that door every path in this
-process is behind it. This module serves two surfaces to two different callers — the
-workbench reads `pending_setups` at `/mcp`, the operator reads and writes the REST
-contract — so the record below is the thing Easy Auth cannot express: path by path, which
-identity has business there.
-
-**A path not in the record is refused, not passed.** The default matters more than any
-single entry: a REST route added next month would otherwise be reachable by the workbench
-on the day it is written, and nothing would say so.
-
-**The identity is the calling application, read from the token's own claims** — never the
-principal-id header, which for a delegated token names the person at the keyboard.
-market-data learned that in production on 19 August 2026 by deploying the opposite
-assumption and refusing every request the terminal made.
-
-This is market-data's file with this module's paths: raw ASGI rather than
-`BaseHTTPMiddleware`, which is load-bearing rather than stylistic — `BaseHTTPMiddleware`
-buffers a response body in some Starlette versions, and that would break the
-streamable-http transport `/mcp` is served over.
-"""
+"""Which caller may reach which surface, which Easy Auth cannot express: it authorizes an application, not a route.
+The identity is the calling application read from the token's claims, never the header that names the person."""
 
 from __future__ import annotations
 
@@ -40,9 +19,8 @@ PRINCIPAL_ID_HEADER = b"x-ms-client-principal-id"
 PRINCIPAL_NAME_HEADER = b"x-ms-client-principal-name"
 PRINCIPAL_HEADER = b"x-ms-client-principal"
 
-# The token claim naming the application the token was issued to. `azp` in a v2 token,
-# `appid` in a v1 one, and Easy Auth passes some claim types through as the long URI form.
-# Deliberately not `oid` or `sub`: those name the person, and this module admits programs.
+# The token claim naming the application the token was issued to: `azp` in v2, `appid` in v1, and Easy
+# Auth's long URI form. Deliberately not `oid` or `sub`: those name the person.
 APPLICATION_CLAIMS = (
     "azp",
     "appid",
@@ -53,11 +31,8 @@ UNAUTHENTICATED = "anonymous"
 
 
 def calling_application(headers: dict[bytes, bytes]) -> str | None:
-    """The application identifier this request was issued to, or `None` if it cannot be named.
-
-    `None` is a refusal, never a pass: a request whose calling application cannot be read is
-    exactly the request this record has nothing to say about.
-    """
+    """The application identifier this request was issued to, or `None`. `None` is a refusal, never a
+    pass: it is exactly the request this record has nothing to say about."""
     raw = headers.get(PRINCIPAL_HEADER)
     if not raw:
         return None
@@ -83,18 +58,14 @@ class Surface(str, Enum):
     OPEN = "open"
 
 
-# `/ping` answers a constant. It reads nothing, so its answer cannot vary with anything
-# this module holds — that is what makes it exemptible at all. The test on this set asserts
-# equality rather than membership, so **any** addition here fails CI.
+# `/ping` answers a constant. It reads nothing, so its answer cannot vary with anything this module
+# holds. The test on this set asserts equality, so any addition here fails CI.
 OPEN_PATHS = frozenset({"/ping"})
 
 TOOLS_PREFIX = "/mcp"
 
-# Every REST path this module publishes, as its route template. Written out rather than
-# read off `app.routes`: a record derived from the application can never disagree with it,
-# and disagreeing is the whole job. `tests/test_caller_access.py` holds this list against
-# the published document, so a new route fails a test until somebody decides which surface
-# it belongs to.
+# Every REST path this module publishes, written out rather than read off `app.routes`: a record derived
+# from the application can never disagree with it, and disagreeing is the whole job.
 REST_PATHS: tuple[str, ...] = (
     "/",
     "/health",
@@ -146,11 +117,8 @@ def surface_for(path: str) -> Surface | None:
 
 
 class CallerAccess:
-    """The record, applied in front of the whole application.
-
-    Holds `app.state` rather than a `Settings`: this is built while `create_app()` runs and
-    the settings are put on the state by the lifespan, long afterwards.
-    """
+    """The record, applied in front of the whole application. Holds `app.state` rather than a `Settings`:
+    this is built while `create_app()` runs, and the lifespan fills the state later."""
 
     def __init__(self, app: ASGIApp, state) -> None:
         self._app = app
@@ -175,9 +143,8 @@ class CallerAccess:
 
         settings = getattr(self._state, "settings", None)
         if settings is None:
-            # The lifespan puts them there before anything serves, so this is not a state a
-            # running process reaches. Refused rather than passed anyway: "the settings were
-            # missing" must never be the reading under which everything is allowed.
+            # The lifespan puts them there before anything serves, so a running process does not
+            # reach this. "The settings were missing" must never be the reading that allows all.
             log.error("request refused: settings are not on the application state yet")
             await self._refuse(scope, receive, send, 503, "the platform is still starting")
             return
@@ -193,9 +160,8 @@ class CallerAccess:
         )
 
         if not settings.require_authenticated_principal:
-            # Local work: nothing stands in front, so there is no identity to have and no
-            # list to be on. Logged as such rather than silently — a deployed instance
-            # printing this line is a misconfiguration somebody needs to see.
+            # Local work: nothing stands in front, so there is no identity to have. Logged rather
+            # than silent — a deployed instance printing this is a misconfiguration to see.
             log.info("request on %s from %s", path, application or principal or UNAUTHENTICATED)
             await self._app(scope, receive, send)
             return

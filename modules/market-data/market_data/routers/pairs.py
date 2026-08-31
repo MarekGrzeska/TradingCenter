@@ -91,10 +91,8 @@ async def track_pairs(body: TrackPairRequest, request: Request) -> TrackPairsRes
     state = request.app.state
     now = datetime.now(UTC)
 
-    # Refused here rather than left to `plan_chunks` below, which raises the same thing:
-    # by then the pairs would already be tracked and ingest already resynced, so the
-    # caller would get a refusal for a request that had nonetheless changed what the
-    # archive collects. A refusal has to cost nothing.
+    # Refused here rather than left to `plan_chunks`, which raises the same thing: by then the pairs
+    # would be tracked and ingest resynced, and a refusal has to cost nothing.
     if body.collect_from is not None and body.collect_from > now:
         raise FutureRequest(
             f"{body.collect_from.isoformat()} is in the future; there is no history there"
@@ -133,9 +131,8 @@ async def track_pairs(body: TrackPairRequest, request: Request) -> TrackPairsRes
         )
 
     if not accepted:
-        # Every pair was refused. A single-pair request — the shape every caller before
-        # this change used — surfaces exactly the error it always did, rather than a 201
-        # with the refusal buried in a list of one.
+        # Every pair was refused. A single-pair request surfaces exactly the error it always did,
+        # rather than a 201 with the refusal buried in a list of one.
         status, detail = first_refusal or (422, "no pairs given")
         raise HTTPException(status_code=status, detail=detail)
 
@@ -145,16 +142,8 @@ async def track_pairs(body: TrackPairRequest, request: Request) -> TrackPairsRes
     async with state.pool.acquire() as conn:
         plans = []
         for pair in accepted:
-            # A request reaching deeper than the boundary the archive holds *is* the
-            # instruction to measure it again, so the boundary goes first and the range is
-            # planned whole. Only here: pricing a job writes nothing, and reading coverage
-            # must not change what it reports (`market-data-store` spec, "Odczyt stanu
-            # pokrycia nie zmienia granicy").
-            #
-            # Read from what this caller asked for, not from `pair.collect_from`. That one
-            # is `LEAST(existing, new)` — the deepest moment this pair was *ever* asked to
-            # reach — so re-adding a pair with no date at all, which asks for nothing new,
-            # would look like a deeper request and drop a boundary nobody questioned.
+            # A request reaching deeper than the recorded boundary *is* the instruction to measure it
+            # again. Read from what this caller asked for: `pair.collect_from` is the deepest ever.
             requested_from = body.collect_from
             if requested_from is not None:
                 reachable = await earliest_reachable(conn, pair.symbol, pair.resolution)
@@ -202,10 +191,8 @@ async def delete_pair(
             status_code=404, detail=f"{symbol} {resolution.value} is not being collected"
         )
 
-    # Between the two writes: the decision is already closed (nothing new claims this
-    # pair's chunks, and `is_tracked` already reads false for it), so this is what
-    # actually stops a live subscription — not a database write, and the reason the two
-    # transactions in `close_for_deletion`/`delete_pair_data` cannot be one.
+    # Between the two writes: the decision is already closed, so this is what actually stops a live
+    # subscription — and the reason those two transactions cannot be one.
     await request.app.state.ingest.sync()
 
     async with pool.acquire() as conn:

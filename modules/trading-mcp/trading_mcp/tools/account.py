@@ -1,8 +1,5 @@
-"""Reading the account: positions, resting orders, balance. No price, candle or
-indicator tool lives here — that is market-mcp's archive, named explicitly in every
-description below rather than left for a model to guess
-(specs/trading-mcp-tools, "Zestaw obejmuje rachunek i wykonanie, a nie rynek").
-"""
+"""Reading the account: positions, resting orders, balance. No price, candle or indicator tool lives
+here — that is the archive's, named explicitly in every description rather than left to a guess."""
 
 from __future__ import annotations
 

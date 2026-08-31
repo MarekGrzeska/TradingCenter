@@ -1,9 +1,5 @@
-"""The published contract the terminal's generated types are built from.
-
-These are not tests of FastAPI. They pin what the generator depends on: the document
-carries every shape the terminal reads, and it describes the subscription's messages,
-which FastAPI by itself does not.
-"""
+"""The published contract the terminal's generated types are built from. Not tests of FastAPI: they pin
+what the generator depends on, including the subscription's messages FastAPI does not describe."""
 
 from __future__ import annotations
 
@@ -14,9 +10,8 @@ import pytest
 
 from market_data.openapi import document
 
-# Every shape the terminal reads off the wire. Named rather than counted: adding a model
-# is ordinary and must not fail this, while losing one of these silently breaks a
-# generated type and, a step later, a screen.
+# Every shape the terminal reads off the wire. Named rather than counted: adding a model is ordinary,
+# while losing one silently breaks a generated type and, a step later, a screen.
 CONSUMED_BY_THE_TERMINAL = {
     "CandleOut",
     "CandlesOut",
@@ -62,9 +57,8 @@ def test_the_subscription_messages_are_published_although_it_has_no_path() -> No
 
 
 def test_a_response_model_declares_every_field_it_always_sends() -> None:
-    """A field with a default is not `required` to Pydantic, but this module answers with
-    it regardless — `null` when there is none. A consumer generating types off the raw
-    reading gets `T | undefined` for a case that cannot happen."""
+    """A field with a default is not `required` to Pydantic, but this module answers with it regardless.
+    A consumer generating types off the raw reading gets `T | undefined` for a case that cannot happen."""
     schemas = document()["components"]["schemas"]
 
     tracked = schemas["TrackedPairOut"]
@@ -82,9 +76,8 @@ def test_a_request_model_keeps_its_optional_fields_optional() -> None:
 
 
 def test_a_model_reached_only_through_a_request_body_counts_as_a_request() -> None:
-    # `PairRequest` is nested inside `TrackPairRequest`, never returned on its own. The
-    # request side is found by reachability rather than by a list of names, so a model
-    # that moves sides cannot be left behind by a list nobody updated.
+    # `PairRequest` is nested inside `TrackPairRequest`, never returned alone. The request side is found
+    # by reachability rather than a list of names, so a model that moves sides is not left behind.
     schemas = document()["components"]["schemas"]
 
     nested = schemas["PairRequest"]
@@ -100,12 +93,8 @@ def test_augmenting_twice_changes_nothing() -> None:
     assert once == twice
 
 
-# --- 8.8: the schema describes the HTTP contract and nothing else ---------------------
-#
-# Served through the app rather than read from `document()`, because what these three
-# pin is what a consumer actually fetches. They arrived here from `test_app.py` and lost
-# their PostgreSQL container on the way: `/openapi.json` is built from the routes and
-# reads no state, so `api` — which brings a database with it — was never what they needed.
+# Served through the app rather than read from `document()`, because what these pin is what a consumer
+# actually fetches. `/openapi.json` reads no state, so they lost their PostgreSQL container on the way.
 
 
 @pytest.fixture
@@ -117,9 +106,8 @@ async def served(app, settings):
 
 
 async def test_the_websocket_path_is_absent_from_the_schema(served) -> None:
-    """OpenAPI has no vocabulary for WebSocket payloads, so a path that appeared there
-    would describe a contract it cannot actually state — and the README would become the
-    second description rather than the only one."""
+    """OpenAPI has no vocabulary for WebSocket payloads, so a path appearing there would describe a
+    contract it cannot state — and the README would become a second description."""
     schema = (await served.get("/openapi.json")).json()
 
     assert "/ws/candles" not in schema["paths"]

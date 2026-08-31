@@ -10,18 +10,8 @@ import type { TeamMemory, TeamMemoryEntry, TeamsApi } from "./teamsApi";
 const NOT_READ_YET: TeamMemory | null = null;
 
 /**
- * What a team learned in earlier runs — specs/terminal-teams, "Pamięć zespołu jest
- * widoczna przy zespole i to operator ją prostuje".
- *
- * This is the one thing in the module that changes how the *next* run goes and appears
- * neither in the revision nor in that run's trace. A team that remembered something untrue
- * repeats it at every start and is paid for every time, and an operator with nowhere to see
- * it goes looking through prompts. So: a list, and a way to take one entry out.
- *
- * There is nothing here that writes or edits. A note is an agent deciding to keep
- * something, and a correction is the next note (specs/teams-memory, "Wpis raz zapisany się
- * nie zmienia") — the operator's part is removal, which is why the only action on a row is
- * destructive and asks first.
+ * The one thing that changes how the *next* run goes without appearing in the revision or the trace, so it is
+ * shown and removable. Nothing here writes: a correction is the next note (specs/teams-memory).
  */
 export function MemoryPanel({
   api,

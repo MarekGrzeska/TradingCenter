@@ -96,9 +96,8 @@ async def test_a_4xx_is_a_refusal_naming_the_detail(client: GatewayClient) -> No
 async def test_a_validation_list_is_flattened_rather_than_dropped(
     client: GatewayClient,
 ) -> None:
-    """The gateway's other refusal shape. Handed over raw it reaches the model as the
-    repr of a list of dicts; flattened, it names the field the order got wrong — which is
-    the only form a caller can act on."""
+    """The gateway's other refusal shape. Handed over raw it reaches the model as the repr of a list of
+    dicts; flattened, it names the field the order got wrong."""
     respx.post(f"{BASE}/orders").mock(
         return_value=httpx.Response(
             422,
@@ -153,8 +152,6 @@ async def test_unreachable_gateway_is_a_gateway_unavailable(client: GatewayClien
         await client.get("/positions")
     await client.aclose()
 
-
-# --- the-gateway-door-authenticates: the credential's shape follows the place ---------
 
 
 class _FakeToken:
@@ -211,9 +208,8 @@ async def test_without_a_scope_no_token_is_asked_for(client: GatewayClient) -> N
 async def test_a_token_that_cannot_be_had_leaves_the_key_to_do_the_work(
     settings: Settings, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Not a refusal to start: until the gateway's door requires a token, the key is what
-    # gets in, and refusing here would be this module taking itself down over a credential
-    # nothing yet asks for.
+    # Not a refusal to start: until the gateway's door requires a token, the key is what gets in, and
+    # refusing here would take this module down over a credential nothing yet asks for.
     monkeypatch.setattr("trading_mcp.client.DefaultAzureCredential", lambda: _FakeCredential(None))
     scoped = settings.model_copy(update={"capital_gateway_scope": "api://gateway/.default"})
     client = GatewayClient(scoped)
@@ -231,9 +227,8 @@ async def test_a_token_that_cannot_be_had_leaves_the_key_to_do_the_work(
 async def test_a_gateway_that_refuses_the_demo_check_stops_the_port_opening(
     settings: Settings,
 ) -> None:
-    # Where "cannot present itself" is actually answered: by the gateway, on the check
-    # that runs before uvicorn listens. After the door is flipped, a module without a
-    # usable token lands here.
+    # Where "cannot present itself" is actually answered: by the gateway, on the check that runs
+    # before uvicorn listens.
     client = GatewayClient(settings)
     respx.get(f"{BASE}/capabilities").mock(return_value=httpx.Response(401))
 
@@ -244,17 +239,8 @@ async def test_a_gateway_that_refuses_the_demo_check_stops_the_port_opening(
 
 
 async def test_the_async_transport_is_installed() -> None:
-    """The real credential, not a double — which is the whole point of this test.
-
-    Every other test here monkeypatches `DefaultAzureCredential`, so none of them touches
-    the transport `azure.identity.aio` imports lazily on the first `get_token`. Shipping
-    without `aiohttp` is therefore an `ImportError` in production and a green suite here:
-    that is exactly what happened on 20 August 2026, when this container exited 1 five
-    seconds into start-up, because the demo check is the first thing that asks for a token.
-
-    Any `AzureError` is a pass — on a machine with no identity the answer is a refusal, and
-    a refusal proves the pipeline was built. `ImportError` is the failure being guarded.
-    """
+    """The real credential, not a double, which is the whole point: every other test patches it, so none
+    touches the transport `azure.identity.aio` imports lazily. That shipped as an ImportError on 20 Aug 2026."""
     credential = DefaultAzureCredential()
     try:
         await credential.get_token("api://tradingcenter-capital-gateway/.default")

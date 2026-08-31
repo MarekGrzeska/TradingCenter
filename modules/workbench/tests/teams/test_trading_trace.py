@@ -1,10 +1,5 @@
-"""Orders against a real database: what a run writes as it places them, what the count
-stops, and what a revision that never heard of trading limits still does.
-
-The guards themselves are `test_trading_limits.py`; this file is the half that needs
-rows — specs/teams-trading, "Każde wywołanie zapisujące zostawia własny wiersz śladu"
-and "Granica dobowa jest sprawdzana przed utworzeniem przebiegu".
-"""
+"""Orders against a real database: what a run writes as it places them, what the count stops, and what a
+revision that never heard of trading limits still does. The guards themselves are next door."""
 
 from __future__ import annotations
 
@@ -89,8 +84,6 @@ async def _trades(pool: asyncpg.Pool, run_id: int) -> list[dict]:
         return [dict(row) for row in await store.get_run_trades(conn, run_id=run_id)]
 
 
-# --- the row, and what it says ---
-
 
 async def test_a_placed_order_leaves_a_row_naming_the_agent_and_the_order(
     pool: asyncpg.Pool,
@@ -134,16 +127,8 @@ async def test_a_read_tool_leaves_no_trade_row(pool: asyncpg.Pool) -> None:
 async def test_a_tool_with_no_annotation_on_the_order_server_counts_as_an_order(
     pool: asyncpg.Pool,
 ) -> None:
-    """The gap an audit found on 18 August 2026: this module read a missing
-    `readOnlyHint` as "not a write", `agent` read the same absence as "a write", and the
-    two were deciding the same question about the same trading-mcp.
-
-    Read as teams read it, the first tool trading-mcp ever publishes unannotated travels
-    with no row in `trades` and no charge against `TradingLimits` — an order the operator
-    cannot see, and one the daily count never stopped. So: unannotated on a server that
-    can reach the account is an order. `agent`'s half is pinned by
-    `test_an_unannotated_tool_counts_as_moving_the_account`.
-    """
+    """The gap an audit found on 18 August 2026: this module read a missing `readOnlyHint` as "not a write" and `agent`
+    read it as "a write", about the same trading-mcp. On a server that can reach the account, unannotated is an order."""
 
     class Unannotated(WriteServer):
         async def list_tools(self) -> list[ToolDescriptor]:
@@ -170,9 +155,8 @@ async def test_a_tool_with_no_annotation_on_the_order_server_counts_as_an_order(
 async def test_a_tool_with_no_annotation_on_a_reading_server_is_still_not_an_order(
     pool: asyncpg.Pool,
 ) -> None:
-    """The other half of that reading, and the reason the conservatism is gated on the
-    server rather than applied everywhere: market-mcp cannot reach an account, so an
-    unannotated tool of its own is what it looks like."""
+    """The other half of that reading, and why the conservatism is gated on the server rather than applied everywhere:
+    market-mcp cannot reach an account, so an unannotated tool of its own is what it looks like."""
 
     class ReadingServer(WriteServer):
         def __init__(self) -> None:
@@ -222,9 +206,8 @@ async def test_an_unsettled_reply_is_recorded_as_unsettled_with_its_reference(
 async def test_an_access_failure_leaves_the_row_as_unknown_not_as_failed(
     pool: asyncpg.Pool,
 ) -> None:
-    """specs/teams-trading, "Wywołanie, którego skutek pozostał nieznany": the row exists
-    because it was written before the call, and it says the one true thing — this module
-    does not know whether the order reached the account."""
+    """specs/teams-trading, "Wywołanie, którego skutek pozostał nieznany": the row exists because it was written before
+    the call, and it says the one true thing — this module does not know whether the order reached the account."""
     definition = TeamDefinition(agents=[a_trader()])
 
     run_id = await _run(
@@ -257,8 +240,6 @@ async def test_a_refused_order_is_recorded_as_refused(pool: asyncpg.Pool) -> Non
 
     assert row["status"] == "refused"
 
-
-# --- the run count ---
 
 
 async def test_a_run_reaching_its_order_limit_stops_and_says_orders_not_cost(
@@ -332,9 +313,8 @@ async def test_a_team_with_no_trading_limits_places_every_order_it_asks_for(
 async def test_a_revision_saved_before_trading_limits_existed_still_runs(
     pool: asyncpg.Pool,
 ) -> None:
-    """specs/teams-catalogue, "Rewizja z fazy sprzed narzędzi handlowych". The JSONB of an
-    older revision carries no `trading` key at all; reading it back must not refuse it and
-    must not invent limits for it."""
+    """specs/teams-catalogue, "Rewizja z fazy sprzed narzędzi handlowych": the JSONB of an older revision carries no
+    `trading` key at all, and reading it back must neither refuse it nor invent limits for it."""
     async with pool.acquire() as conn:
         team, revision = await store.create_team(
             conn,
@@ -374,8 +354,6 @@ async def test_a_revision_saved_before_trading_limits_existed_still_runs(
     assert definition.trading.orders_per_run is None
     assert definition.trading.max_order_size is None
 
-
-# --- the daily count ---
 
 
 async def test_todays_orders_are_what_the_daily_ceiling_reads(pool: asyncpg.Pool) -> None:
@@ -453,13 +431,10 @@ async def test_an_unsettled_order_still_counts_against_the_day(pool: asyncpg.Poo
     assert placed == 1
 
 
-# --- the table itself, and what outlives a run (task 7.6) ---
-
 
 async def test_the_table_refuses_a_status_it_does_not_know(pool: asyncpg.Pool) -> None:
-    """The five statuses are a closed set in the schema, not a convention in the code —
-    a sixth spelling arriving from a future edit fails the insert rather than becoming a
-    value nothing knows how to read (`0004_trades.py`)."""
+    """The five statuses are a closed set in the schema rather than a convention in the code: a sixth spelling from a
+    future edit fails the insert rather than becoming a value nothing knows how to read."""
     definition = TeamDefinition(agents=[a_trader()])
     run_id = await _run(pool, definition, ScriptedProvider(default=places_orders(1)))
 

@@ -1,11 +1,5 @@
-"""The module's access to its tool servers — `market-mcp` and `polymarket-mcp` for
-reads, `trading-mcp` for writes — and who gets which tools.
-
-`client.py` is the only place the `mcp` package exists. Everything past this package
-speaks `ToolDescriptor`, `ToolOutcome` and `ToolPlan` — which is what keeps a run's own
-code from growing an opinion about a protocol it does not own, and lets a second server
-join the first without either speaking a word of MCP itself.
-"""
+"""The module's access to its tool servers, and who gets which tools. `client.py` is the only place the
+`mcp` package exists, which is what lets a second server join the first without a run learning a protocol."""
 
 from __future__ import annotations
 

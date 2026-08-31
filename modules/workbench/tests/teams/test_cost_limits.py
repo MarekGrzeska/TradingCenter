@@ -37,9 +37,8 @@ def test_a_guard_stops_the_call_that_would_go_past_the_limit() -> None:
 
 
 def test_a_call_with_no_reported_cost_adds_nothing() -> None:
-    """specs/teams-usage: unknown usage is not zero usage, and it is not free either — it
-    simply cannot be counted, and counting it as zero would be the same lie as writing it
-    as zero."""
+    """Unknown usage is not zero usage and it is not free either — it simply cannot be counted, and
+    counting it as zero would be the same lie as writing it as zero."""
     guard = CostGuard(Decimal(1))
 
     guard.add(None)

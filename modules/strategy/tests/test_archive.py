@@ -1,9 +1,5 @@
-"""The archive client, against its contract doubled at the transport.
-
-`respx` rather than a fake object, because what is under test here *is* the reading of the
-wire: which request goes out, and what the answer becomes. Above this layer the loop takes
-a `FakeArchive` instead, where the wire is no longer the question.
-"""
+"""The archive client, against its contract doubled at the transport. `respx` rather than a fake object,
+because what is under test here *is* the reading of the wire."""
 
 from __future__ import annotations
 
@@ -115,9 +111,8 @@ class TestReadingFacts:
                 SPEC, "US100", SPEC.resolve_params({"fast_period": 8}), as_of=BAR
             )
 
-        # Parsed rather than matched as a substring: what matters is the value asked for,
-        # not how json.dumps spaced it. `float` is the archive's own wire type for a
-        # parameter — it converts to what an entry needs on its side.
+        # Parsed rather than matched as a substring: what matters is the value asked for, not how json.dumps spaced
+        # it. `float` is the archive's own wire type for a parameter.
         sent = json.loads(route.calls[0].request.read())
         assert [spec["params"]["period"] for spec in sent["specs"]] == [8.0, 50.0, 14.0]
 
@@ -204,12 +199,8 @@ class TestWhenTheArchiveWillNotAnswer:
 class TestTheLastClosedBar:
     @respx.mock
     async def test_it_is_read_from_the_closed_candles_route(self) -> None:
-        """The whole of this module's rule about when a period ends.
-
-        `GET /candles` answers with closed bars only — the forming one has its own route,
-        `/candles/{symbol}/forming`, which nothing here calls. So the last row of a recent
-        window *is* the last closed bar, and a forming candle can never reach a strategy.
-        """
+        """The whole of this module's rule about when a period ends: `GET /candles` answers with closed
+        bars only, so the last row of a recent window *is* the last closed bar."""
         closed = respx.get(f"{BASE}/candles/US100").mock(
             return_value=httpx.Response(200, json=candles_body())
         )
@@ -253,9 +244,8 @@ class TestSplittingALongRead:
         assert len(_split("HOUR", BAR - timedelta(days=30), BAR)) == 1
 
     def test_a_range_over_the_ceiling_is_split_and_covered_exactly(self) -> None:
-        """The loop never reaches this; the backtest does, over years of minutes. The point
-        of it living in the client is that neither the strategy nor the caller has to know
-        the ceiling exists."""
+        """The loop never reaches this; the backtest does, over years of minutes. The point of it living in the
+        client is that neither the strategy nor the caller has to know the ceiling exists."""
         start, end = BAR - timedelta(days=400), BAR
         windows = _split("MINUTE", start, end)
 

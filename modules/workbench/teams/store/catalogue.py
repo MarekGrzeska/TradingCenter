@@ -1,10 +1,5 @@
-"""Teams and their revisions — the catalogue itself.
-
-`team_revisions` is only ever inserted into. There is no UPDATE statement against it in
-this file and there should never be one: a run points at a revision, and a revision edited
-underneath a finished run turns its trace into a claim about a team that no longer exists
-(specs/teams-catalogue, "Rewizja raz zapisana się nie zmienia").
-"""
+"""Teams and their revisions — the catalogue itself. `team_revisions` is only ever inserted into, and there
+should never be an UPDATE against it: a revision edited under a finished run turns its trace into a claim."""
 
 from __future__ import annotations
 
@@ -15,11 +10,8 @@ from tc_runtime.db import Conn, fetch_one
 
 from ..contract import TeamDefinition
 
-# `latest_revision` is derived rather than stored on `teams`. The correlated subquery
-# reads one row from `ix_team_revisions_team_version` per team — a catalogue is tens of
-# rows, not millions — and the alternative is a denormalized column that two writers
-# could disagree about. The listing still loads no definition, which is the property
-# specs/teams-catalogue actually asks for ("lista powstaje bez pobierania definicji").
+# `latest_revision` is derived rather than stored: the correlated subquery reads one row per team, and the
+# alternative is a denormalized column two writers could disagree about. The listing still loads no definition.
 _LATEST_REVISION = """
     (SELECT max(r.version) FROM team_revisions r WHERE r.team_id = t.id) AS latest_revision
 """
@@ -36,10 +28,8 @@ _INSERT_REVISION = """
     RETURNING id, team_id, version, definition, created_at
 """
 
-# `archived_at IS NULL` rides on every read of a team, here and below: a retired team is
-# gone from the catalogue an operator picks a run from, and answers a direct read the way
-# a deleted one would — while its revisions stay readable through the statements further
-# down (specs/teams-catalogue, "Zespół wycofany z katalogu nie zabiera ze sobą przebiegów").
+# `archived_at IS NULL` rides on every read of a team: a retired team is gone from the catalogue and answers
+# a direct read the way a deleted one would, while its revisions stay readable further down.
 _SELECT_TEAM = f"""
     SELECT t.id, t.name, t.description, t.created_at, t.updated_at, {_LATEST_REVISION}
       FROM teams t
@@ -53,9 +43,8 @@ _SELECT_TEAMS_FOR_OWNER = f"""
      ORDER BY t.updated_at DESC, t.id DESC
 """
 
-# `FOR UPDATE` on the team row, not on `team_revisions`: two saves arriving together
-# would otherwise both read the same `max(version)` and one would lose to the unique
-# constraint. The lock is held for the length of one insert on a single-operator table.
+# `FOR UPDATE` on the team row, not on `team_revisions`: two saves arriving together would otherwise both
+# read the same `max(version)` and one would lose to the unique constraint.
 _LOCK_TEAM_FOR_WRITE = """
     SELECT id FROM teams
      WHERE id = $1 AND owner_principal = $2 AND archived_at IS NULL
@@ -72,9 +61,8 @@ _TOUCH_TEAM = """
     UPDATE teams SET updated_at = now() WHERE id = $1
 """
 
-# Ownership through the join rather than through `archived_at`: a revision belongs to
-# whoever owns the team, and stays readable after that team is retired, because a run
-# points at it.
+# Ownership through the join rather than through `archived_at`: a revision belongs to whoever owns the team,
+# and stays readable after that team is retired, because a run points at it.
 _SELECT_REVISION = """
     SELECT r.id, r.team_id, r.version, r.definition, r.created_at
       FROM team_revisions r
@@ -82,10 +70,8 @@ _SELECT_REVISION = """
      WHERE r.team_id = $1 AND t.owner_principal = $2 AND r.version = $3
 """
 
-# By id rather than by team and version: this is what a *run* names (`runs.team_revision_id`),
-# and a viewer watching one has the run in hand and nothing else. Going through the version
-# would mean asking the run's team which version this is — a question whose only honest
-# answer is this row.
+# By id rather than by team and version: this is what a *run* names, and a viewer watching one has the run
+# in hand and nothing else.
 _SELECT_REVISION_BY_ID = """
     SELECT r.id, r.team_id, r.version, r.definition, r.created_at
       FROM team_revisions r
@@ -102,10 +88,8 @@ _SELECT_LATEST_REVISION = """
      LIMIT 1
 """
 
-# `archived_at IS NULL` in the WHERE, not only in the stamp: retiring twice returns no
-# row, so the route answers 404 the second time rather than quietly moving the timestamp.
-# An UPDATE, never a DELETE — the runs and revisions hanging off this team are the result
-# of the experiment this module exists to keep.
+# `archived_at IS NULL` in the WHERE, not only in the stamp: retiring twice returns no row, so the route
+# answers 404 the second time. An UPDATE, never a DELETE — the runs hanging off this team are the result.
 _ARCHIVE_TEAM = """
     UPDATE teams SET archived_at = now()
      WHERE id = $1 AND owner_principal = $2 AND archived_at IS NULL
@@ -114,9 +98,8 @@ _ARCHIVE_TEAM = """
 
 
 def _as_jsonb(definition: TeamDefinition) -> str:
-    """`by_alias=True` is load-bearing: `TeamEdge.from_` is written `from` on the wire and
-    MUST be written `from` in storage too, so that a revision read back parses through the
-    same alias rather than through the populate-by-name fallback."""
+    """`by_alias=True` is load-bearing: `TeamEdge.from_` is written `from` on the wire and MUST be written
+    `from` in storage too, so a revision read back parses through the same alias."""
     return json.dumps(definition.model_dump(mode="json", by_alias=True))
 
 
@@ -128,9 +111,8 @@ async def create_team(
     description: str,
     definition: TeamDefinition,
 ) -> tuple[asyncpg.Record, asyncpg.Record]:
-    """The team and its first revision, in one transaction. A team with no revision would
-    be a catalogue entry that cannot be opened or run, and `TeamOut.latest_revision` has
-    nowhere to get a value from — so the two rows are written together or not at all."""
+    """The team and its first revision, in one transaction. A team with no revision is a catalogue entry
+    that cannot be opened or run, so the two rows are written together or not at all."""
     async with conn.transaction():
         team = await fetch_one(conn, _INSERT_TEAM, owner_principal, name, description)
         revision = await fetch_one(conn, _INSERT_REVISION, team["id"], 1, _as_jsonb(definition))

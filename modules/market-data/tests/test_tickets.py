@@ -1,9 +1,5 @@
-"""The ticket store on its own — issuing, spending, and expiring.
-
-The route and the handshake are exercised in `test_app.py`, against a real app. What is
-here is the part that has no HTTP in it: that a ticket works exactly once, that time
-takes it away, and that neither happens by accident.
-"""
+"""The ticket store on its own — issuing, spending, and expiring. The route and the handshake are
+exercised against a real app; what is here is the part that has no HTTP in it."""
 
 from __future__ import annotations
 
@@ -68,9 +64,8 @@ def test_a_ticket_is_still_good_a_moment_before_it_expires() -> None:
 
 
 def test_expired_tickets_do_not_pile_up() -> None:
-    """The store is a dict in a process that stays up for weeks. Every subscription the
-    terminal opens mints one, and a reconnect loop against an archive that is refusing
-    mints one per attempt — so what is never spent has to go on its own."""
+    """The store is a dict in a process that stays up for weeks, and a reconnect loop against a refusing
+    archive mints one per attempt — so what is never spent has to go on its own."""
     clock = [NOW]
     tickets = store_at(clock)
     for _ in range(10):

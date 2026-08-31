@@ -4,15 +4,8 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 /**
- * A back end not running is a normal state here — the terminal has no offline
- * mode and both services are started separately. Vite's stock proxy error
- * handler prints a multi-line stack for every failed request, so a grid of six
- * charts retrying on a backoff buries the console in identical AggregateErrors
- * that say nothing the first one didn't.
- *
- * This replaces that handler with one throttled line, and answers the request
- * with a 502 carrying a readable `detail` so the app renders its own
- * "source unreachable" state rather than a transport failure.
+ * A back end not running is a normal state here, and Vite's stock proxy error handler prints a stack per failed
+ * request. This answers with a 502 carrying a readable `detail`, so the app renders its own unreachable state.
  */
 function quietProxyErrors(label: string, target: string): ProxyOptions["configure"] {
   let lastLoggedAt = 0;
@@ -50,20 +43,8 @@ function quietProxyErrors(label: string, target: string): ProxyOptions["configur
   };
 }
 
-// The dev-time stand-in for whatever sits in front of market-data in production (Front
-// Door, Application Gateway, ...). `ARCHIVE_PROXY_TARGET` is server-side and read only
-// here, distinct from `VITE_ARCHIVE_HTTP` / `VITE_ARCHIVE_WS`, which are client-side and
-// point at the prefix below in dev — see design.md.
-//
-// capital-gateway has an entry again, and it carries the caller key on the server side.
-// The gateway demands a credential from every caller, and a browser cannot hold a shared
-// secret — in production it presents a token instead, which the platform validates before
-// the request arrives. In dev there is no platform, so the dev server is what adds the
-// key: `GATEWAY_PROXY_KEY` is server-side and never reaches the bundle
-// (openspec/changes/archive/…-accounts-screen-opens-the-gateway/design.md, D5).
-//
-// The instrument catalogue still comes through market-data, unchanged — this entry is the
-// account, not a second road to the market (see gatewaySource.ts).
+  // The dev-time stand-in for whatever fronts market-data in production. `ARCHIVE_PROXY_TARGET` is server-side, unlike
+  // `VITE_ARCHIVE_HTTP`; the gateway's key is added here too, because a browser cannot hold a shared secret.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const archive = env.ARCHIVE_PROXY_TARGET || "http://localhost:8020";
@@ -77,17 +58,8 @@ export default defineConfig(({ mode }) => {
     plugins: [react(), tailwindcss()],
     server: {
       proxy: {
-        // One entry for both roads to the archive: `/archive-api/...` is its
-        // HTTP contract and `/archive-api/ws/candles` its subscription, and
-        // `ws: true` upgrades only the request that asks to be upgraded.
-        //
-        // `-api` is not decoration. The prefix was `/archive`, which back then
-        // was also a tab's route — so a proxy claiming that prefix shadowed the
-        // tab for anything that reaches the server: a reload, a bookmark, the
-        // link `scripts/dev.sh` prints. Clicking through still worked, because
-        // the router never asks, which is exactly why it survived the test
-        // suite. Whatever fronts market-data in production would shadow a tab
-        // the same way, so the fix is the prefix, not the dev server.
+        // One entry for both roads to the archive, `ws: true` upgrading only what asks. `-api` is not decoration: the
+        // prefix was `/archive`, which a tab route also claimed, so anything reaching the server shadowed the tab.
         "/archive-api": {
           target: archive,
           ws: true,
@@ -96,12 +68,8 @@ export default defineConfig(({ mode }) => {
           configure: quietProxyErrors("market-data", archive),
         },
 
-        // The workbench's own address, not a path under the archive's — it is an
-        // independent module on 8030. One entry where there were two: the conversation and
-        // the team catalogue are one process, so `/agent-api` and `/teams-api` became this.
-        //
-        // No `ws: true`: a turn and a run's progress both ride `fetch` + `ReadableStream`
-        // over plain HTTP, never a WebSocket upgrade.
+        // The workbench's own address, not a path under the archive's — one entry where there were two, since the
+        // conversation and the team catalogue are one process. No `ws: true`: both ride `fetch` over plain HTTP.
         "/workbench-api": {
           target: workbench,
           changeOrigin: true,
@@ -109,9 +77,8 @@ export default defineConfig(({ mode }) => {
           configure: quietProxyErrors("workbench", workbench),
         },
 
-        // The account. The key is attached here, in the dev server, so it stays out of
-        // anything the browser downloads — set `GATEWAY_PROXY_KEY` to the same value
-        // `capital-gateway`'s own `.env` holds as `GATEWAY_API_KEY`.
+        // The account. The key is attached here so it stays out of anything the browser downloads — set
+        // `GATEWAY_PROXY_KEY` to the same value `capital-gateway`'s `.env` holds as `GATEWAY_API_KEY`.
         "/gateway-api": {
           target: gateway,
           changeOrigin: true,
@@ -120,9 +87,8 @@ export default defineConfig(({ mode }) => {
           configure: quietProxyErrors("capital-gateway", gateway),
         },
 
-        // The prediction-market archive. No key and no header: it wants a token in
-        // production and nothing at all in dev, where `REQUIRE_AUTHENTICATED_PRINCIPAL`
-        // is off — so unlike the gateway above there is nothing for this proxy to add.
+        // The prediction-market archive. No key and no header: a token in production, nothing at all in dev where
+        // `REQUIRE_AUTHENTICATED_PRINCIPAL` is off, so there is nothing for this proxy to add.
         "/polymarket-api": {
           target: polymarket,
           changeOrigin: true,
@@ -130,10 +96,8 @@ export default defineConfig(({ mode }) => {
           configure: quietProxyErrors("polymarket-data", polymarket),
         },
 
-        // The strategy platform. Same shape as the archive above and for the same reason:
-        // a token in production, nothing locally. It is the module the terminal reaches
-        // that answers with refusals more often than with anything else, which is a fact
-        // about the screen rather than about this proxy.
+        // The strategy platform, same shape and same reason as the archive above: a token in production, nothing
+        // locally.
         "/strategy-api": {
           target: strategy,
           changeOrigin: true,

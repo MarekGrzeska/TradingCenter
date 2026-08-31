@@ -30,12 +30,8 @@ def upgrade() -> None:
         """
     )
 
-    # `tracking_ended_at` rather than a DELETE: ending an observation stops the sampling and
-    # keeps every sample already collected, so the row has to survive as the anchor its
-    # markets, outcomes and samples hang from. Tracking the same event again clears it, and
-    # the history is still there to be continued rather than restarted.
-    #
-    # `ON DELETE SET NULL` for the group: deleting a group must not delete observations.
+    # `tracking_ended_at` rather than a DELETE: ending an observation stops the sampling and keeps
+    # every sample, so the row survives as the anchor its markets, outcomes and samples hang from.
     op.execute(
         """
         CREATE TABLE tracked_events (
@@ -58,10 +54,8 @@ def upgrade() -> None:
         """
     )
 
-    # An event holds one market or a hundred and twenty-eight of them — measured on a
-    # single 2028 election event. `resolved_outcome` names which outcome won, and is what
-    # stops the sampling for this market; `closed` is the provider's own flag, kept beside
-    # it because the two do not always arrive together.
+    # An event holds one market or a hundred and twenty-eight of them, measured on one 2028 election
+    # event. `resolved_outcome` stops the sampling; `closed` is the provider's flag, and they differ.
     op.execute(
         """
         CREATE TABLE markets (
@@ -81,18 +75,8 @@ def upgrade() -> None:
     )
     op.execute("CREATE INDEX markets_event_idx ON markets (event_id)")
 
-    # The outcome is what has a price, and a market may have more than two of them. The
-    # source application stored a sample only where the outcomes were exactly Yes and No,
-    # and everything else vanished without a line in a log.
-    #
-    # `position` keeps the provider's own ordering, which is what pairs `outcomes[i]` with
-    # `clobTokenIds[i]` in its response — both arrive as JSON inside a string, and are
-    # parsed once here rather than at every use.
-    #
-    # `oldest_available_at` is the "the provider has nothing older" boundary. It is written
-    # at the oldest point a read actually returned, never at the edge of the window asked
-    # for: those two are separated by everything the provider did not have, and writing the
-    # second announces as checked something nobody checked.
+    # The outcome is what has a price, and a market may have more than two. `position` keeps the
+    # provider's ordering, which pairs `outcomes[i]` with `clobTokenIds[i]`; both arrive as JSON in a string.
     op.execute(
         """
         CREATE TABLE outcomes (
@@ -107,20 +91,8 @@ def upgrade() -> None:
         """
     )
 
-    # One row per (outcome, moment), whichever way the sample arrived — the sampler and the
-    # backfill meet in the same minute often, and two rows for one moment would leave a
-    # series with two prices at one instant and no way to say which is the archive's answer.
-    #
-    # Two valuations, two columns, at least one of them present. They answer different
-    # questions and on a thin market they differ by a lot: measured 22 August 2026 on one,
-    # last trade 0.003 against a 0.002/0.004 book. `source` records which provider surface
-    # the row came from, because the whole saving in the sampler rests on the metadata
-    # surface publishing the same midpoint the order book does — a fact that is measured and
-    # therefore has to stay checkable.
-    #
-    # `quoted_at` is the moment the valuation itself is *about*, when the provider says so.
-    # Without it a price from a trade nine hours ago is indistinguishable from one a minute
-    # old.
+    # One row per (outcome, moment), whichever way the sample arrived; two valuations, because on a thin market they
+    # differ by a lot. `quoted_at` is the moment the valuation is *about* — without it a stale trade reads as fresh.
     op.execute(
         """
         CREATE TABLE price_samples (
@@ -148,9 +120,8 @@ def upgrade() -> None:
         "CREATE INDEX price_samples_outcome_time_idx ON price_samples (outcome_id, observed_at)"
     )
 
-    # What has actually been collected, as opposed to what happens to have rows in it. No
-    # sample at 3 a.m. because nobody traded and no sample because the module was not
-    # running look identical in `price_samples`, and only this table tells them apart.
+    # What has actually been collected, as opposed to what happens to have rows. No sample because
+    # nobody traded and no sample because the module was down look identical without this table.
     op.execute(
         """
         CREATE TABLE collected_ranges (

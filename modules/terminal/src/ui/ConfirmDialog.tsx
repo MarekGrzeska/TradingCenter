@@ -4,19 +4,8 @@ import { ModalShell } from "./ModalShell";
 import { Button } from "./Button";
 
 /**
- * The one way the terminal asks for consent — the wizard, deleting a pair's data,
- * retrying a job. Never asked in place (`terminal-dialogs` spec, "Pytanie o zgodę jest
- * dialogiem, nie interfejsem w miejscu"): a question sitting next to one row reads as
- * being about that row, and position speaks louder than any caption.
- *
- * What the caller does not own: work in flight, the second click, the failure and the
- * keyboard. `onConfirm` is awaited with the dialog still up, and a rejection is named
- * inside it — a message thrown at the view the dialog just left has lost the decision it
- * explains.
- *
- * The ground, the focus trap and `Escape` live in `ModalShell`, which every modal in the
- * terminal is built on. What is left here is the question itself: the two actions, the work
- * between them, and the failure that has to stay beside the decision it explains.
+ * The one way the terminal asks for consent, never in place: a question next to one row reads as being about that row.
+ * `onConfirm` is awaited with the dialog up, because a failure thrown at the view behind has lost its decision.
  */
 export function ConfirmDialog({
   title,

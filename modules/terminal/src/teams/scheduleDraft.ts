@@ -70,11 +70,8 @@ export const WEEKDAYS: readonly { day: number; label: string }[] = [
 ];
 
 /**
- * A rhythm of this kind, keeping whatever the previous one already answered — switching
- * from "every day at 9:00" to "on chosen weekdays" keeps 9:00 rather than starting the
- * hour over. Only the fields the new kind uses are carried: the module refuses a rhythm
- * carrying anything else, and a form that can build a refused shape is a form that
- * refuses on save for a reason the operator cannot see.
+ * A rhythm of this kind keeping what the previous one answered, carrying only the fields the new kind uses: the
+ * module refuses anything else, and a form that can build a refused shape refuses on save for an unseen reason.
  */
 export function recurrenceOfKind(kind: RecurrenceKind, previous: Recurrence | null): Recurrence {
   const hour = previous?.hour ?? 9;
@@ -111,15 +108,8 @@ export function chosenWeekdays(recurrence: Recurrence): number[] {
 }
 
 /**
- * One day switched on or off, in the shape the module stores.
- *
- * Every day chosen is written as no days at all, exactly as the module normalises it — so
- * the form never holds two states for one trigger and the operator cannot wonder which of
- * them they saved. `weekly` is the exception: its days are required, so seven days stay
- * seven days there and remain their own expression.
- *
- * The last day cannot be taken away. A rhythm that fires on no day is one the module
- * refuses, and the refusal would arrive on save with the form already looking finished.
+ * Every day chosen is written as no days at all, exactly as the module normalises it, so the form never holds two
+ * states for one trigger. `weekly` is the exception, and the last day cannot be taken away — that rhythm is refused.
  */
 export function withWeekdayToggled(recurrence: Recurrence, day: number): Recurrence {
   const chosen = chosenWeekdays(recurrence);

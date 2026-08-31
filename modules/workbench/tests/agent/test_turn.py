@@ -30,9 +30,8 @@ class RecordingQueue:
 
 
 class FakeProvider:
-    """Yields a scripted list of chunks, optionally raising once they are exhausted —
-    a stand-in for a provider that broke partway through (`agent/graph.py`'s node
-    catches this and returns whatever text was already accumulated)."""
+    """Yields a scripted list of chunks, optionally raising once they are exhausted — a stand-in for a
+    provider that broke partway through."""
 
     def __init__(self, chunks: list, *, then_raise: bool = False) -> None:
         self._chunks = chunks
@@ -181,9 +180,7 @@ async def test_usage_never_reported_is_recorded_as_unknown_not_skipped(pool, db)
 
 
 async def test_a_reply_keeps_its_version_after_the_prompt_is_later_edited(pool, db) -> None:
-    # specs/agent-prompt-management, "Odpowiedź niesie wersję, pod jaką faktycznie
-    # padła" — editing the prompt between two turns of the same rozmowa must not
-    # reach back and relabel the first one.
+    # Editing the prompt between two turns of the same rozmowa must not reach back and relabel the first.
     session_id = await _new_session(db)
     provider = FakeProvider([TextDelta("first"), UsageReport(1, 1, None, None)])
     await run_turn(pool, session_id=session_id, model_entry=LUNA, provider=provider, queue=RecordingQueue())

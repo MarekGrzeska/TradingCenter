@@ -1,23 +1,5 @@
-"""The math, and nothing else.
-
-No FastAPI, no asyncpg, no pydantic — this module takes arrays of floats and returns
-arrays of floats. That is deliberate and load-bearing (design.md, "Obliczenia w
-`market-data`, nie w nowym module"): the day these need to move to a process of their
-own, moving this file is the whole migration, because it has nothing to disentangle
-from the web framework or the database driver.
-
-Every function is indexed by bar number, not by time — a caller lines the result up
-against its own timestamps. `np.nan` marks an index a finite-window function cannot
-answer yet (fewer than `period` samples behind it); a recursive one is never NaN, because
-it is defined from its first sample onward. How far into a recursive series to trust the
-answer is `warmup.py`'s question, not this module's — mixing the two would make a kernel
-function's output depend on how it happens to be called, which is the one thing this
-module exists to rule out.
-
-Every operation runs at `float64` and every reduction has one fixed order — never a
-parallel or tree reduction — because two orderings of the same sum can differ in the
-last bit, and an indicator that isn't the same twice isn't the product this module sells.
-"""
+"""The math, and nothing else: arrays of floats in, arrays of floats out. Every reduction has one
+fixed order — two orderings differ in the last bit, and an indicator that isn't the same twice isn't."""
 
 from __future__ import annotations
 
@@ -91,17 +73,8 @@ def rolling_min(values: FloatArray, period: int) -> np.ndarray:
 
 
 def _recursive_smoothing(values: FloatArray, alpha: float) -> np.ndarray:
-    """`out[0] = values[0]`, `out[i] = alpha * values[i] + (1 - alpha) * out[i - 1]`.
-
-    Seeded with the first sample rather than an early SMA on purpose: `warmup.py`'s
-    formula for how many bars a filter needs is the weight of exactly this seed decaying
-    below `1e-9`, and seeding any other way would make that formula describe a filter
-    this function does not implement.
-
-    A Python loop, not a vectorised one — there is no vectorised form of a first-order
-    recursive filter, and at the sizes this module reads (a few thousand bars) the loop
-    costs low single-digit milliseconds, measured by hand rather than watched by a test.
-    """
+    """Seeded with the first sample rather than an early SMA: `warmup.py`'s formula is the weight of
+    exactly this seed decaying, and a first-order recursive filter has no vectorised form."""
     arr = _as_float64(values)
     out = np.empty(arr.shape, dtype=np.float64)
     if len(arr) == 0:
@@ -125,10 +98,8 @@ def rma(values: FloatArray, period: int) -> np.ndarray:
 
 
 def rolling_argmax(values: FloatArray, period: int) -> np.ndarray:
-    """Bars ago the trailing window's maximum sits — 0 for "the current bar is the
-    high", `period - 1` for "the oldest bar in the window is". A tie favours the
-    older bar (`np.argmax` keeps the first occurrence), so the count only grows on a
-    tie, never shrinks."""
+    """Bars ago the trailing window's maximum sits. A tie favours the older bar (`np.argmax` keeps
+    the first occurrence), so the count only grows on a tie, never shrinks."""
     arr = _as_float64(values)
     out = np.full(arr.shape, np.nan, dtype=np.float64)
     if period < 1 or len(arr) < period:
@@ -150,15 +121,8 @@ def rolling_argmin(values: FloatArray, period: int) -> np.ndarray:
 
 
 def _rolling_ols(values: FloatArray, period: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Ordinary least squares of each trailing window against `x = 0 .. period - 1`
-    (`0` the oldest bar in the window, `period - 1` the current one). Shared by
-    `linreg`, `linreg_slope` and `r_squared` so the three never disagree about what
-    window they fit.
-
-    Returns `(slope, intercept, r_squared)`, each `np.nan` for the first
-    `period - 1` bars and wherever the window has zero variance (`r_squared` is
-    undefined for a flat window, not `0`).
-    """
+    """Ordinary least squares of each trailing window against `x = 0 .. period - 1`. Shared by three
+    entries so they never disagree about the window; `r_squared` is undefined for a flat one, not 0."""
     arr = _as_float64(values)
     n = len(arr)
     slope = np.full(n, np.nan, dtype=np.float64)
@@ -235,10 +199,8 @@ def shift(values: FloatArray, n: int) -> np.ndarray:
 
 
 def lead(values: FloatArray, n: int) -> np.ndarray:
-    """`values`, `n` bars ahead — `shift`'s mirror image. `np.nan` for the last `n`
-    bars, which have no such future bar yet. Swing-point confirmation (a bar higher
-    than `n` bars on *both* sides) is what this is for — every other primitive here
-    only ever looks backward."""
+    """`values`, `n` bars ahead — `shift`'s mirror image. Swing-point confirmation is what this is
+    for; every other primitive here only ever looks backward."""
     arr = _as_float64(values)
     out = np.full(arr.shape, np.nan, dtype=np.float64)
     if n < 1 or len(arr) <= n:
@@ -254,13 +216,8 @@ def diff(values: FloatArray, n: int = 1) -> np.ndarray:
 
 
 def cross(a: FloatArray, b: FloatArray) -> np.ndarray:
-    """`1.0` where `a` crosses above `b` this bar, `-1.0` where it crosses below,
-    `0.0` otherwise, `np.nan` for the first bar (no previous bar to cross from).
-
-    Not read by any catalogue entry yet — a foundation primitive for the marker-
-    shaped indicators later stages add (design.md's ~20-primitive list), added now so
-    later stages spend their budget on the indicator, not the primitive.
-    """
+    """`1.0` where `a` crosses above `b` this bar, `-1.0` below, `np.nan` for the first. Not read by
+    any catalogue entry yet — a foundation primitive, added now so later stages spend on the indicator."""
     arr_a, arr_b = _as_float64(a), _as_float64(b)
     n = len(arr_a)
     out = np.full(n, np.nan, dtype=np.float64)
@@ -276,11 +233,8 @@ def cross(a: FloatArray, b: FloatArray) -> np.ndarray:
 
 
 def alma(values: FloatArray, period: int, offset: float, sigma: float) -> np.ndarray:
-    """Arnaud Legoux moving average — `wma`'s sibling with a Gaussian weight over
-    the window instead of a linear ramp. `offset` in `[0, 1]` slides the bell's
-    peak from the window's oldest bar (`0`) to its current one (`1`); `sigma`
-    controls how wide the bell is. A finite window, same as `wma` — no recursion,
-    so no seed to warm up."""
+    """Arnaud Legoux moving average — `wma`'s sibling with a Gaussian weight instead of a linear ramp.
+    A finite window, so no seed to warm up."""
     arr = _as_float64(values)
     out = np.full(arr.shape, np.nan, dtype=np.float64)
     if period < 1 or len(arr) < period:
@@ -295,17 +249,8 @@ def alma(values: FloatArray, period: int, offset: float, sigma: float) -> np.nda
 
 
 def kama(values: FloatArray, period: int, fast: int, slow: int) -> np.ndarray:
-    """Kaufman's adaptive moving average — a recursive filter whose smoothing
-    constant tightens toward `fast` while the market trends efficiently and
-    relaxes toward `slow` while it chops, unlike `ema`/`rma`'s fixed one.
-
-    Seeded at bar `period - 1` with that bar's own value, once the efficiency
-    ratio has its first `period`-bar window to read. `warmup.kama_warmup_bars`
-    bounds the seed's influence using `slow` alone: every bar's actual constant
-    is at least as fast-decaying as the slow one, since `fast_sc >= slow_sc` by
-    construction, so treating the whole filter as if it always used the slowest
-    case only ever overestimates how long the seed lingers.
-    """
+    """Kaufman's adaptive moving average, whose smoothing constant tightens while the market trends.
+    `warmup.kama_warmup_bars` bounds the seed with `slow` alone, which only ever overestimates."""
     arr = _as_float64(values)
     n = len(arr)
     out = np.full(n, np.nan, dtype=np.float64)
@@ -330,12 +275,8 @@ def kama(values: FloatArray, period: int, fast: int, slow: int) -> np.ndarray:
 
 
 def true_range(high: FloatArray, low: FloatArray, close: FloatArray) -> np.ndarray:
-    """The greatest of today's range and today's move from yesterday's close.
-
-    The first bar has no previous close to gap from, so it falls back to the bar's own
-    range — the same thing every later bar would compute if yesterday's close happened
-    to equal today's open.
-    """
+    """The greatest of today's range and today's move from yesterday's close. The first bar has no
+    previous close to gap from, so it falls back to its own range."""
     high_arr, low_arr, close_arr = _as_float64(high), _as_float64(low), _as_float64(close)
     out = high_arr - low_arr
     if len(close_arr) > 1:

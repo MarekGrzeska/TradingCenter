@@ -96,10 +96,8 @@ class TestRefusalsAreToldApart:
 class TestTheHeaderTheProvidersEdgeReads:
     @respx.mock
     async def test_every_request_names_this_module(self, http) -> None:
-        """The provider's edge selects on User-Agent — measured 22 August 2026, where
-        `Python-urllib/3.12` draws `403 error code: 1010` on both surfaces and an absent
-        header does not. A library's default is a value somebody else decides; this module
-        sends its own so a dependency bump cannot change it."""
+        """The provider's edge selects on User-Agent — measured 22 August 2026. A library's default is a
+        value somebody else decides; this module sends its own so a dependency bump cannot change it."""
         route = respx.get(f"{GAMMA}/events/slug/x").mock(
             return_value=httpx.Response(200, json=_event())
         )

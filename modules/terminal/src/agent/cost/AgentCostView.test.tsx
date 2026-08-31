@@ -165,9 +165,8 @@ describe("AgentCostView", () => {
     await waitFor(() => expect(seen.length).toBeGreaterThan(0));
     const first = seen[0];
 
-    // A native date input's own multi-segment editor is not something `userEvent.type`
-    // models well; setting the whole value at once is how a picked date actually
-    // arrives at the `onChange` handler.
+    // A native date input's own multi-segment editor is not something `userEvent.type` models well;
+    // setting the whole value at once is how a picked date actually reaches the handler.
     fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-01-01" } });
 
     await waitFor(() => expect(seen.length).toBeGreaterThan(1));
@@ -233,11 +232,8 @@ describe("AgentCostView", () => {
   });
 
   it("does not strand the operator on a page the new range no longer has", async () => {
-    // The clock is pinned because the range this test narrows *to* has to be one the
-    // picker is not already showing: the default `from` is today-6, and typing today-6
-    // into it is not a change React can see, so nothing refetches and the row never
-    // arrives. Left to the real date this passed for 364 days a year and failed on the
-    // 365th — it failed on 18 August 2026, six days after the date written below.
+    // The clock is pinned because the range this narrows *to* has to be one the picker is not already
+    // showing. Left to the real date this passed for 364 days a year and failed on the 365th.
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-09-20T12:00:00Z"));
     let long = true;

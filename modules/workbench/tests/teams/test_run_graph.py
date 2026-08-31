@@ -51,12 +51,8 @@ async def test_an_agent_waits_for_every_predecessor() -> None:
 
 
 async def test_an_agent_with_predecessors_at_uneven_depths_runs_exactly_once() -> None:
-    """The failure this guards ran the collector twice: with each incoming edge added on
-    its own, LangGraph triggers the node once per predecessor *wave*, so `scout` finishing
-    a superstep before `analyst` started the collector early — with an empty briefing —
-    and again when `analyst` finished, tripping `run_steps_status_fields_match` on the
-    second `start_step` (run 22, 21 August 2026). Equal-depth fan-in cannot show this;
-    the uneven diamond is the shape that does."""
+    """The failure this guards ran the collector twice: with each incoming edge added on its own, LangGraph
+    triggers the node once per predecessor *wave*. Equal-depth fan-in cannot show this; the uneven diamond does."""
     definition = a_team(
         ["scout", "analyst", "kron"],
         [("scout", "analyst"), ("scout", "kron"), ("analyst", "kron")],
@@ -73,9 +69,8 @@ async def test_an_agent_with_predecessors_at_uneven_depths_runs_exactly_once() -
 
 
 async def test_agents_without_a_dependency_between_them_work_at_the_same_time() -> None:
-    """specs/teams-runs, "Dwie role bez zależności między sobą". Proven by making both
-    wait for the other to have started — a sequential runner deadlocks, and the test would
-    time out rather than pass quietly."""
+    """Proven by making both wait for the other to have started — a sequential runner deadlocks, and the
+    test times out rather than passing quietly."""
     definition = a_team(["left", "right", "judge"], [("left", "judge"), ("right", "judge")])
     both_started = asyncio.Barrier(2)
 

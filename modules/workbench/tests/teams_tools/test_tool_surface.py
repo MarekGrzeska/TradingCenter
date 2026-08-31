@@ -1,18 +1,12 @@
-"""specs/teams-mcp-tools: the announced shape of the set, and what announcing it costs.
-
-This module publishes the most tools of the three, so it pays for every character of
-scaffolding the most often — the ceiling below is what keeps that from growing quietly.
-"""
+"""specs/teams-mcp-tools: the announced shape of the set, and what announcing it costs. This module publishes the most
+tools of the three, so it pays for every character of scaffolding the most often — hence the ceiling below."""
 
 from __future__ import annotations
 
 import json
 
-# Characters of the serialized `list_tools()`, which is what an MCP client reads before
-# every turn. In characters rather than tokens so the test needs no tokenizer: the ratio
-# measured on this material with `cl100k_base` is a steady 4,2, so the ceiling below is
-# ~5 000 tokens. Raising it is a deliberate edit of this line, never a side effect of
-# adding a tool — that is the whole point of writing it down.
+# Characters of the serialized `list_tools()`, which is what an MCP client reads before every turn — in characters
+# so the test needs no tokenizer, at a measured 4.2 per token. Raising it is a deliberate edit of this line.
 SURFACE_CEILING_CHARS = 21100
 
 
@@ -31,9 +25,8 @@ async def test_the_surface_stays_under_its_ceiling(server) -> None:
     )
 
 
-# Maps of name -> schema, whose *keys* are field names and mean nothing here. An indicator
-# parameter really is called `default`, which is why this test walks the schema instead of
-# searching its text.
+# Maps of name -> schema, whose *keys* are field names and mean nothing here. An indicator parameter really is called
+# `default`, which is why this test walks the schema instead of searching its text.
 _NAME_MAPS = ("properties", "$defs", "patternProperties")
 
 

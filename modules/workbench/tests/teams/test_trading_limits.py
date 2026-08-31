@@ -1,10 +1,5 @@
-"""The trading ceilings themselves — `runner/trading.py` and the contract they read.
-
-What is proven here is the rule the whole group turns on: a limit is the operator's to
-set and the operator's to leave out, and leaving it out means no limit at all
-(specs/teams-trading, "Każda granica handlowa daje się wyłączyć, a moduł żadnej nie
-narzuca"). The database half — rows written, daily counts — is `test_trading_trace.py`.
-"""
+"""The trading ceilings themselves, and the contract they read. What is proven is the rule the whole group
+turns on: a limit is the operator's to set and to leave out, and leaving it out means no limit at all."""
 
 from __future__ import annotations
 
@@ -18,8 +13,6 @@ from teams.runner.trading import OrderTooLarge, RunOrderLimitReached, TradeGuard
 
 AN_ORDER = {"symbol": "GOLD", "direction": "BUY", "size": 1}
 
-
-# --- nothing set means nothing enforced ---
 
 
 def test_a_definition_with_no_trading_limits_is_valid() -> None:
@@ -40,9 +33,8 @@ def test_a_definition_with_no_trading_limits_is_valid() -> None:
 
 
 def test_a_guard_with_no_limits_never_stops_anything() -> None:
-    """The operator's own call, honoured: a team let loose on the whole account places
-    order after order and this module has nothing to say about it. What stops an
-    irreversible mistake is the demo account `trading-mcp` refuses to start without."""
+    """The operator's own call, honoured: a team let loose on the whole account places order after order.
+    What stops an irreversible mistake is the demo account `trading-mcp` refuses to start without."""
     guard = TradeGuard(TradingLimits())
 
     for _ in range(500):
@@ -58,8 +50,6 @@ def test_an_enormous_limit_is_taken_at_face_value() -> None:
     guard.check({"size": "99999998"})  # no raise
     assert guard.placed == 0
 
-
-# --- each limit works on its own ---
 
 
 def test_only_the_size_limit_set_leaves_the_counts_unbounded() -> None:
@@ -85,8 +75,6 @@ def test_only_the_run_count_set_leaves_the_size_unbounded() -> None:
     with pytest.raises(RunOrderLimitReached):
         guard.check({"size": "1"})
 
-
-# --- the two refusals are different facts ---
 
 
 def test_the_run_count_is_reached_at_the_limit_not_past_it() -> None:
@@ -127,13 +115,10 @@ def test_an_oversized_order_does_not_count_against_the_run() -> None:
     assert guard.placed == 0
 
 
-# --- arguments this module cannot read ---
-
 
 def test_a_size_that_is_not_a_number_is_left_to_the_tool_server() -> None:
-    """`trading-mcp` owns what a valid argument looks like. An unreadable size is not
-    treated as zero and not treated as enormous — the size limit simply has nothing to
-    compare, and the call goes where it will be refused properly."""
+    """`trading-mcp` owns what a valid argument looks like. An unreadable size is neither zero nor enormous:
+    the limit has nothing to compare, and the call goes where it will be refused properly."""
     guard = TradeGuard(TradingLimits(max_order_size="1"))
 
     guard.check({"size": "not a number"})  # no raise
@@ -151,8 +136,6 @@ def test_a_call_with_no_size_still_counts_against_the_run() -> None:
     with pytest.raises(RunOrderLimitReached):
         guard.check({"position_id": "p2"})
 
-
-# --- what the contract refuses ---
 
 
 def test_a_zero_count_is_refused_rather_than_read_as_none_allowed() -> None:

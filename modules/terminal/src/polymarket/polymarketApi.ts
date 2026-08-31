@@ -1,22 +1,6 @@
 /**
- * The prediction-market archive, read straight from `polymarket-data`.
- *
- * Its own client rather than a route under the archive's: a different App Service behind
- * a different gate, so it carries a token minted for **its** audience and nobody else's
- * (specs/terminal-identity). The wire types come from `contract.polymarket.generated.ts`,
- * which is generated from that module's own Pydantic models — this file maps them to what
- * the views want and is the only place the two shapes meet.
- *
- * **A probability is a number on 0..1, never a percentage**, at every layer including
- * this one. The module says so in every field description it publishes and the mistake it
- * guards against is silent: reading 0,62 as 62 is wrong by two orders of magnitude and
- * throws nothing on the way. Nothing here multiplies by a hundred; formatting for a human
- * is the view's business and it does it once.
- *
- * **Nothing here computes a change.** The seven windows come from the module, which
- * measures them against the base point it actually holds — the provider's spacing wobbles,
- * so the base point is rarely the window's edge, and two readings subtracted here would be
- * a different number with no way to say so.
+ * Its own client rather than a route under the archive's: a different App Service behind a different gate, so it
+ * carries a token for **its** audience. A probability is a number on 0..1 here and at every other layer.
  */
 
 import { noIdentity, type Identity } from "../auth/identity";
@@ -24,8 +8,6 @@ import type { components } from "../data/contract.polymarket.generated";
 import { jsonClient, statusMapper } from "../data/http";
 
 type Schemas = components["schemas"];
-
-// --- what the views work in -----------------------------------------------------------
 
 export interface Outcome {
   id: number;
@@ -81,11 +63,8 @@ export interface TrackedEvent {
  *  so a window added there is a compile error here and not a silently missing column. */
 export type WindowName = Schemas["WindowChange"]["window"];
 
-/** One window's movement, or the named reason there is none.
- *
- *  `change` and `unavailable` are exclusive and exhaustive on purpose: a window the
- *  collected history does not reach is a reason, never a zero. A zero would be a claim
- *  about the market where the truth is a claim about the archive. */
+/** One window's movement, or the named reason there is none: `change` and `unavailable` are exclusive and
+ *  exhaustive, because a window the collected history does not reach is a reason, never a zero. */
 export interface WindowChange {
   window: WindowName;
   change: number | null;
@@ -146,8 +125,6 @@ export interface TrackResult {
    *  was created — the view says so rather than pretending it did something. */
   alreadyTracked: boolean;
 }
-
-// --- wire → domain --------------------------------------------------------------------
 
 /** A moment, or `null`. Kept in one place because every shape here has at least one, and
  *  `new Date(null!)` is the epoch rather than an error — a wrong answer that renders. */
@@ -248,19 +225,9 @@ function mapGroup(raw: Schemas["GroupOut"]): Group {
   return { id: raw.id, name: raw.name, eventCount: raw.event_count };
 }
 
-// --- the client -----------------------------------------------------------------------
-
 /**
- * What each refusal means here.
- *
- * 403 is `refused` rather than a sign-in problem, and that is the distinction this module
- * makes and the platform cannot: a caller Easy Auth admitted may still have no business
- * on the REST contract, because the gate authorizes an application and not a route
- * (`polymarket_data/caller_access.py`). 401 is not in this table and cannot be —
- * `jsonClient` turns it into a lost session before a mapper is reached.
- *
- * 409 is the tracking ceiling: understood, declined, and unchanged on a retry. 502 is the
- * provider, not this module — the one status here worth retrying.
+ * 403 is `refused`, not a sign-in problem: the gate authorizes an application, not a route. 409 is the tracking
+ * ceiling, 502 the provider rather than this module — the one status here worth retrying.
  */
 const mapStatus = statusMapper({
   403: "refused",
@@ -284,14 +251,8 @@ export interface PolymarketApi {
     range?: { since?: Date; until?: Date },
   ): Promise<History>;
   trackEvent(reference: string, signal: AbortSignal, group?: string): Promise<TrackResult>;
-  /** The observation and everything collected for it, in one act — **the only way an event
-   *  leaves the list**, and the one call here that cannot be undone.
-   *
-   *  There is no counterpart that stops the sampling and keeps the samples: it produced an
-   *  observation that neither collected nor left, and the module no longer offers it. There
-   *  is also no call that deletes the history and keeps the observation; the module's
-   *  contract still has one, and this client deliberately does not — a method with no caller
-   *  is a road somebody takes later, not knowing it was left behind on purpose. */
+  /** The observation and everything collected for it, in one act — **the only way an event leaves the list**.
+   *  The module's contract still offers a history-only delete; this client does not, so nobody finds it later. */
   removeEvent(providerEventId: string, signal: AbortSignal): Promise<void>;
   listGroups(signal: AbortSignal): Promise<Group[]>;
   createGroup(name: string, signal: AbortSignal): Promise<Group>;
@@ -310,9 +271,8 @@ export function createPolymarketApi(
     async listEvents(signal, options) {
       const query = new URLSearchParams();
       if (options?.groupId !== undefined) query.set("group_id", String(options.groupId));
-      // Sent whenever it was asked for, not only when true: the module defaults it to
-      // `true`, so a falsy check made `includeEnded: false` unsendable — the one value a
-      // caller would bother passing.
+      // Sent whenever it was asked for, not only when true: the module defaults it to `true`, so a falsy
+      // check made `includeEnded: false` unsendable — the one value a caller would bother passing.
       if (options?.includeEnded !== undefined) {
         query.set("include_ended", String(options.includeEnded));
       }
@@ -390,9 +350,8 @@ export function createPolymarketApi(
       return mapGroup(raw);
     },
 
-    // `send`, not `json`: both answer 204 with no body at all, and `Response.json()` on
-    // an empty body throws a SyntaxError that would surface as a broken screen rather
-    // than as the success it is.
+    // `send`, not `json`: both answer 204 with no body, and `Response.json()` on an empty body throws a
+    // SyntaxError that would surface as a broken screen rather than as the success it is.
     async deleteGroup(groupId, signal) {
       await http.send(`${httpBase}/groups/${groupId}`, { signal, method: "DELETE" });
     },

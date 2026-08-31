@@ -1,14 +1,5 @@
-"""Smoke tests against the real capital.com demo API.
-
-Skipped unless ``--run-live`` is passed and credentials are configured. These are the
-only tests that can catch a provider changing its mind — the rest of the suite proves
-this module is consistent with what capital.com did in July 2026, which is not the same
-claim.
-
-Read-only. Nothing here places, amends or cancels an order — that lives in
-``test_live_trading.py`` behind its own flag, so this file stays safe to run against any
-demo account at any time.
-"""
+"""Smoke tests against the real capital.com demo API, skipped without ``--run-live``. Read-only:
+the writes live in ``test_live_trading.py``, so this stays safe against any demo account."""
 
 from __future__ import annotations
 
@@ -58,20 +49,8 @@ async def test_a_deep_read_pages_and_reports_its_cost(settings: Settings) -> Non
 
 
 async def test_the_gate_keeps_a_burst_under_the_providers_limit(settings: Settings) -> None:
-    """The unit test measures this module's own delay; this measures whether capital.com
-    agrees that the resulting stream of requests is acceptable.
-
-    The failure it exists to catch is a rate limit reached in production, where a 429 is
-    not an exception a caller sees but an empty candle series that looks like a data
-    problem.
-
-    The gate is per ``CapitalClient`` and the provider counts per account, so this waits
-    out the previous test's traffic first. It has to: a new client's window starts empty
-    and knows nothing of what the last one sent, and without the wait this test measured
-    the deep read's tail rather than its own burst. The app runs one client per process,
-    which is what makes the per-client gate a process-wide one — two clients in one
-    process would be two gates and twice the rate.
-    """
+    """Whether capital.com agrees the resulting stream of requests is acceptable — a rate limit in
+    production is not an exception but an empty candle series. Waits out the previous test's traffic."""
     burst = 25  # more than two windows at 10/s, so the gate has to hold the line twice
     client = CapitalClient(settings)
     try:
@@ -83,9 +62,8 @@ async def test_the_gate_keeps_a_burst_under_the_providers_limit(settings: Settin
         elapsed = time.monotonic() - started
 
         assert [r.status_code for r in responses if r.status_code != 200] == []
-        # 25 requests cannot clear a 10-per-second gate in under two seconds. Passing this
-        # faster would mean the gate let the burst through, and the assertion above would
-        # then be luck rather than evidence.
+        # 25 requests cannot clear a 10-per-second gate in under two seconds. Passing faster
+        # would mean the gate let the burst through, and the assertion above would be luck.
         assert elapsed >= 2.0
     finally:
         await client.aclose()
@@ -143,9 +121,8 @@ async def test_the_stream_delivers_quotes_and_a_forming_candle(settings: Setting
 
 
 async def test_the_stream_delivers_a_sealed_candle(settings: Settings) -> None:
-    """MINUTE rather than MINUTE_5, because a sealed candle only arrives when a period
-    ends and this test would otherwise sit for five minutes. Even at one minute it can
-    wait most of one, which is why it is opt-in and skips rather than fails."""
+    """MINUTE rather than MINUTE_5: a sealed candle only arrives when a period ends, and this would
+    otherwise sit for five minutes. It can still wait most of one, which is why it is opt-in."""
     received = await _watch(settings, Resolution.MINUTE, until="sealed", timeout=90)
 
     sealed = [m for m in received if isinstance(m, CandleMessage) and not m.forming]
@@ -157,11 +134,8 @@ async def test_the_stream_delivers_a_sealed_candle(settings: Settings) -> None:
     assert len({c.time for c in sealed}) == len(sealed)
 
 
-# --- what the provider's history actually contains, measured rather than assumed ---
-#
-# Three things this module now depends on, none of them documented by capital.com. They
-# are read-only and cheap; they exist so a provider changing its mind is a red test here
-# rather than a wrong candle in somebody's archive.
+# Three things this module depends on, none of them documented by capital.com. Read-only and cheap,
+# so a provider changing its mind is a red test here rather than a wrong candle in an archive.
 
 
 def _newest_period_start(history_ts: str) -> datetime:
@@ -173,17 +147,8 @@ def _newest_period_start(history_ts: str) -> datetime:
 async def test_a_history_read_reaching_now_includes_the_period_still_running(
     settings: Settings,
 ) -> None:
-    """The newest candle of a read that reaches the present belongs to a period that has
-    not finished yet.
-
-    `market-data` stored that candle as a settled fact until this was measured, on the
-    strength of a comment asserting the opposite ("the current period has not finished,
-    so the provider does not have it either"). Both readings cannot be right, and the
-    one that was written down was never checked.
-
-    MINUTE_5 because its boundary is arithmetic, so "is this the period we are in" has an
-    exact answer without asking the venue about its session.
-    """
+    """The newest candle of a read that reaches the present belongs to a period not yet finished.
+    `market-data` stored it as settled until this was measured, on a comment asserting the opposite."""
     adapter = CapitalAdapter(CapitalClient(settings))
     try:
         instruments = await adapter.search_instruments(EPIC)
@@ -204,13 +169,8 @@ async def test_a_history_read_reaching_now_includes_the_period_still_running(
 
 
 async def test_a_daily_read_reaching_now_includes_today(settings: Settings) -> None:
-    """The same claim for DAY, which is the one that cannot be checked by arithmetic.
-
-    No bucket comparison: a daily boundary follows the venue's session, and computing one
-    is exactly what this module refuses to do. The weaker check is the one that is
-    honest — today's candle is present while the market is open — and it is enough to
-    decide whether `tradeable` is a usable source of truth for "this period is running".
-    """
+    """The same claim for DAY, which arithmetic cannot check: a daily boundary follows the venue's
+    session. The weaker check is the honest one — today's candle is present while the market is open."""
     adapter = CapitalAdapter(CapitalClient(settings))
     try:
         instruments = await adapter.search_instruments(EPIC)
@@ -230,12 +190,8 @@ async def test_a_daily_read_reaching_now_includes_today(settings: Settings) -> N
 
 
 async def test_market_status_tracks_the_session(settings: Settings) -> None:
-    """`tradeable` is what decides whether a daily candle is still forming, so it has to
-    mean the session and not merely "this instrument exists".
-
-    Measured against the quotes, which are the other observable of the same fact: a
-    market the provider calls tradeable is one whose quotes move.
-    """
+    """`tradeable` decides whether a daily candle is still forming, so it has to mean the session
+    and not merely "this instrument exists". Measured against the quotes, the same fact observed."""
     adapter = CapitalAdapter(CapitalClient(settings))
     try:
         instruments = await adapter.search_instruments(EPIC)

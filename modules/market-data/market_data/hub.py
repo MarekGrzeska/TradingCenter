@@ -1,21 +1,5 @@
-"""Fan-out to subscribers, and the seam that used to live in the browser.
-
-A consumer that wants a chart needs two things that arrive by different roads: the series
-up to now, and every change after. Joining them is the awkward part, and until this module
-existed it was done in the terminal — read the history, subscribe, and hope nothing closed
-in between. Something always eventually does, which is where the terminal's "on resume you
-must close the gap" rule came from.
-
-It is done here instead, once, because here it can actually be made airtight. The snapshot
-is read while the room is held still and the subscriber is attached before it is released,
-so there is no moment at which a candle can be neither in the snapshot nor in the changes.
-The same hold covers the write: without it a candle could commit to the database after the
-snapshot query ran and be broadcast afterwards, arriving twice.
-
-The room is held by an asyncio lock rather than a database one. Everything that can attach
-a subscriber or publish to one runs in this process, on this loop, so the lock covers every
-path — and a database lock could not cover the in-memory subscriber set anyway.
-"""
+"""Fan-out to subscribers, and the seam that used to live in the browser. The snapshot is read while
+the room is held still and the subscriber attached before it is released, so nothing falls between."""
 
 from __future__ import annotations
 
@@ -37,12 +21,8 @@ Subscriber = Callable[["Outbound"], Awaitable[None]]
 
 
 class Snapshot(BaseModel):
-    """The first message on every subscription, and the only one that looks backwards.
-
-    Carries the settled series and, separately, whatever period is currently being built.
-    They are separate because they mean different things: one will never change again, the
-    other changes with every quote.
-    """
+    """The first message on every subscription, and the only one that looks backwards. The settled
+    series and the period being built are separate because one will never change again."""
 
     kind: Literal["snapshot"] = "snapshot"
     symbol: str
@@ -52,12 +32,8 @@ class Snapshot(BaseModel):
 
 
 class CandleChange(BaseModel):
-    """One candle, closed or still forming, said explicitly.
-
-    One message kind for both, marked rather than split, because a consumer upserts by
-    period start and two message types would only make it reconcile them itself. The mark
-    is what stops a chart treating a period still moving as settled.
-    """
+    """One candle, closed or still forming, said explicitly. One message kind for both, marked rather
+    than split, because a consumer upserts by period start."""
 
     kind: Literal["candle"] = "candle"
     symbol: str
@@ -74,9 +50,8 @@ class Room:
     def __init__(self) -> None:
         self.subscribers: set[Subscriber] = set()
         self.lock = asyncio.Lock()
-        # Held in memory and never stored. A forming candle changes with every quote and
-        # understates its own range until the period closes; a subscriber joining midway
-        # still wants it, or its chart is missing the bar the price is actually in.
+        # Held in memory and never stored: a forming candle understates its own range until the
+        # period closes, and a subscriber joining midway still wants it.
         self.forming: Candle | None = None
 
 
@@ -92,28 +67,14 @@ class Hub:
         return len(room.subscribers) if room else 0
 
     def forming(self, symbol: str, resolution: Resolution) -> Candle | None:
-        """The candle currently being built for one pair, or None.
-
-        `.get`, never `_room`: a read that created a room would leave one behind for every
-        symbol anybody ever asked about, and `unsubscribe` only ever collects rooms it
-        finds empty — a room nobody subscribed to would never be reached.
-
-        No lock. `publish` assigns `room.forming` between two awaits, so a reader can only
-        ever see the candle before or the candle after, never a half of either. Taking the
-        room's lock would instead make this read wait out a database write and a broadcast
-        to every subscriber, for a guarantee it already has.
-        """
+        """The candle currently being built for one pair, or None. `.get`, never `_room`: a read that
+        created a room would leave one behind forever. No lock — `publish` assigns between two awaits."""
         room = self._rooms.get((symbol, resolution))
         return room.forming if room else None
 
     def forming_resolutions(self, symbol: str) -> list[Resolution]:
-        """Which resolutions this symbol has a forming candle for, finest first.
-
-        A room exists because something published into it, so this is "what is arriving
-        right now" rather than "what the operator asked to track" — and those differ in
-        exactly the case worth answering: a pair tracked at MINUTE and HOUR whose minute
-        feed has stalled still has a price, on HOUR.
-        """
+        """Which resolutions this symbol has a forming candle for, finest first. What is arriving now
+        rather than what the operator asked to track — a stalled minute feed still has a price on HOUR."""
         live = [
             resolution
             for (candidate, resolution), room in self._rooms.items()
@@ -126,25 +87,16 @@ class Hub:
 
     @asynccontextmanager
     async def held(self, symbol: str, resolution: Resolution):
-        """Hold one room still.
-
-        Whatever happens inside is atomic with respect to subscribing: a producer wraps
-        its database write and its broadcast in this, so a subscriber's snapshot either
-        already contains the candle or is followed by the message carrying it — never
-        both, and never neither.
-        """
+        """Hold one room still. Whatever happens inside is atomic with respect to subscribing, so a
+        subscriber's snapshot either contains the candle or is followed by the message carrying it."""
         async with self._room(symbol, resolution).lock:
             yield
 
     async def publish(
         self, symbol: str, resolution: Resolution, candle: Candle, *, store=None
     ) -> None:
-        """Send a candle to everyone listening, optionally storing it first.
-
-        `store` runs inside the hold. That is the whole point: a write that commits
-        outside it can land between a subscriber's snapshot query and its attachment, and
-        the same period then arrives twice.
-        """
+        """Send a candle to everyone listening, optionally storing it first. `store` runs inside the
+        hold: a write committing outside it can land between a snapshot query and its attachment."""
         room = self._room(symbol, resolution)
         async with room.lock:
             if store is not None:
@@ -159,12 +111,8 @@ class Hub:
         subscriber: Subscriber,
         read_settled: Callable[[], Awaitable[list[Candle]]],
     ) -> None:
-        """Attach a subscriber, having first sent it the snapshot it needs.
-
-        The read and the attachment happen under the same hold, which is what makes the
-        seam airtight — and is the reason a consumer no longer has to close a gap after
-        reconnecting.
-        """
+        """Attach a subscriber, having first sent it the snapshot it needs. The read and the attachment
+        happen under one hold, which is why a consumer no longer closes a gap after reconnecting."""
         room = self._room(symbol, resolution)
         async with room.lock:
             settled = await read_settled()

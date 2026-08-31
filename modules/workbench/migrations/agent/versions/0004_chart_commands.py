@@ -1,14 +1,5 @@
-"""What the agent set the terminal's chart to.
-
-A command, not a state: the row says what was asked for at one moment, and the row's own
-id is the sequence number the terminal remembers having applied. Keeping this a log
-rather than a single mutable "chart state" row is what keeps the terminal the owner of
-what it draws — the operator's own picker changes never have to be written back here to
-stop the next read from undoing them (design.md, "Polecenie jest deklaratywne
-i numerowane, a terminal trzyma kursor").
-
-Nullable columns carry the "leave it as it is" half of that: a command that only sets the
-resolution says nothing about the symbol, and null is how it says nothing.
+"""What the agent set the terminal's chart to. A command, not a state: keeping it a log is what keeps the
+terminal the owner of what it draws, and null is how a command says nothing about a field.
 
 Revision ID: 0004
 Revises: 0003
@@ -31,9 +22,8 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     op.create_table(
         "chart_commands",
-        # The sequence the terminal remembers. `Identity` rises across the whole table
-        # and therefore across every conversation — the terminal has one chart, and one
-        # cursor for it, whatever rozmowa the command came from.
+        # The sequence the terminal remembers. `Identity` rises across the whole table and therefore
+        # across every conversation — the terminal has one chart, and one cursor for it.
         sa.Column("id", sa.BigInteger(), sa.Identity(), primary_key=True),
         sa.Column(
             "session_id",
@@ -43,9 +33,8 @@ def upgrade() -> None:
         ),
         sa.Column("symbol", sa.Text(), nullable=True),
         sa.Column("resolution", sa.Text(), nullable=True),
-        # JSONB for the same reason `tool_calls.arguments` is: this is a JSON array on
-        # the wire, and a reader asking which indicators were set should not parse a
-        # string to find out. Null and `[]` are different answers — see the check below.
+        # JSONB for the same reason `tool_calls.arguments` is: this is a JSON array on the wire. Null
+        # and `[]` are different answers — see the check below.
         sa.Column("indicators", postgresql.JSONB(), nullable=True),
         sa.Column(
             "created_at",

@@ -13,10 +13,8 @@ import { useTrackedPairs } from "./useTrackedPairs";
 import { Button } from "../ui/Button";
 
 /**
- * What the archive is collecting, one row per instrument — because the questions an
- * operator actually asks are *what are we archiving* and *is it keeping up*, and the two
- * tabs this replaced answered neither directly (proposal.md, Why). Resolutions are a
- * column, and expanding a row shows coverage and stops collection.
+ * One row per instrument, because the questions an operator asks are *what are we archiving* and *is it keeping up*,
+ * which the two tabs this replaced answered neither of directly (proposal.md, Why).
  */
 
 const COLLECTION_HINT: Record<CollectionState, string> = {
@@ -71,9 +69,8 @@ interface DeletionNotice {
 }
 
 /**
- * Deleting cuts the row it names, so the confirmation of what happened can't
- * live there — it lives here instead, above the list, until the operator
- * dismisses it or deletes something else.
+ * Deleting cuts the row it names, so the confirmation of what happened cannot live there — it lives above the list
+ * until the operator dismisses it or deletes something else.
  */
 function DeletionBanner({ notice, onDismiss }: { notice: DeletionNotice; onDismiss(): void }) {
   return (
@@ -100,13 +97,8 @@ function DeletionBanner({ notice, onDismiss }: { notice: DeletionNotice; onDismi
 }
 
 /**
- * The one confirmation both Delete buttons raise, on the terminal's shared dialog
- * — deleting is the same weight of decision as starting to collect, and the two
- * must not read differently (`terminal-dialogs` spec).
- *
- * It owns nothing but what the question says. `onConfirm` does the deleting and
- * *throws* what failed: staying open, naming the reason and offering another go
- * belong to the dialog, so neither call site writes that again.
+ * The one confirmation both Delete buttons raise, on the terminal's shared dialog: deleting is the same weight of
+ * decision as starting to collect. `onConfirm` *throws* what failed, so neither call site writes that again.
  */
 function DeleteDialog({
   symbol,
@@ -271,10 +263,8 @@ function InstrumentRow({
     }
 
     if (failedResolutions.length > 0) {
-      // What is left in `group.pairs` after `onChanged()` reloads is exactly
-      // what failed. Thrown rather than returned: the dialog stays open on a
-      // rejection and names it, which is what a partial success has to look
-      // like — never a dialog that closes over half a job.
+      // What is left in `group.pairs` after `onChanged()` reloads is exactly what failed. Thrown rather than
+      // returned: a partial success has to stay open and name it, never close over half a job.
       throw new Error(`could not delete ${failedResolutions.join(", ")}`);
     }
   }, [group.pairs, group.symbol, onChanged, onDeleted]);
@@ -353,11 +343,8 @@ function InstrumentRow({
 }
 
 /**
- * How much of this interval is actually archived: how many candles, roughly how much
- * storage they take, and since when — the question expanding a row exists to answer
- * (`terminal-data-manager` spec, "Rozwinięcie instrumentu podaje objętość zebranych
- * danych"). An interval that has collected nothing says so, rather than showing a zero
- * that could be mistaken for a measurement.
+ * How much of this interval is archived: how many candles, roughly how much storage, and since when. An interval that
+ * has collected nothing says so, rather than showing a zero that could be mistaken for a measurement.
  */
 function IntervalVolume({ pair }: { pair: TrackedPair }) {
   if (pair.candleCount === 0) {

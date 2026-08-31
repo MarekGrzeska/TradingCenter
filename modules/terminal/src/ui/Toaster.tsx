@@ -3,15 +3,8 @@ import { useSyncExternalStore } from "react";
 import { toastStore, type Toast } from "./toastStore";
 
 /**
- * Mounted once, in `Shell`. Everything that wants to say something calls `showToast`;
- * nothing else renders one (`toastsComeFromOnePlace.test.ts`).
- *
- * Deliberately not a dialog: it takes no focus, traps none, and blocks nothing. A toast
- * that stole focus from a chart the operator is reading would be worse than the silence
- * it replaced — and `ConfirmDialog` stays the only component in the terminal announcing
- * itself as one (`terminal-dialogs` spec, "Wszystkie dialogi wychodzą z jednego
- * miejsca"). That guard reads source text rather than rendered output, so naming the
- * attribute here — even to say this file does not use it — is what trips it.
+ * Mounted once in `Shell`; everything that wants to say something calls `showToast`. Deliberately not a dialog: it takes
+ * no focus and blocks nothing — one stealing focus from a chart would be worse than the silence it replaced.
  */
 export function Toaster() {
   const toasts = useSyncExternalStore(toastStore.subscribe, toastStore.getSnapshot);
@@ -19,9 +12,8 @@ export function Toaster() {
 
   return (
     <div
-      // `polite`, not `assertive`: none of this interrupts what the operator is doing,
-      // and an archive refusing one indicator is not worth cutting a screen reader off
-      // mid-sentence for.
+      // `polite`, not `assertive`: none of this interrupts what the operator is doing, and an archive refusing one
+      // indicator is not worth cutting a screen reader off mid-sentence for.
       aria-live="polite"
       aria-label="Notifications"
       className="pointer-events-none fixed bottom-4 right-4 z-50 flex w-80 flex-col gap-2"

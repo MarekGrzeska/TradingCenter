@@ -1,17 +1,5 @@
-"""The connection string, in the two shapes this module needs it.
-
-`DATABASE_URL` is written driver-neutral — `postgresql://user:pass@host/db` — because it
-is an operator-facing setting and an operator should not have to know which Python
-library reaches the database. Inside, two libraries do, and they disagree about the
-scheme:
-
-    asyncpg      wants a plain `postgresql://` and chokes on a `+driver` suffix
-    SQLAlchemy   wants `postgresql+asyncpg://`, or it reaches for a sync driver
-                 that is not installed
-
-Both translations live here so neither becomes a rule someone has to remember at every
-call site.
-"""
+"""The connection string, in the two shapes this module needs it: asyncpg wants a plain
+`postgresql://`, SQLAlchemy wants `postgresql+asyncpg://` or it reaches for a driver not installed."""
 
 from __future__ import annotations
 
@@ -23,34 +11,24 @@ from urllib.parse import urlparse
 import asyncpg
 from azure.identity.aio import ClientSecretCredential, DefaultAzureCredential
 
-# The lock protocol itself is one copy, in the package: it is the piece of this file that
-# was genuinely identical to agent's and teams'. What stays below is what is not — this
-# module's own `connect`, its own pool sizing, and the wait it allows, which is thirty
-# minutes rather than five because the candle table is the largest thing in the system and
-# an index rebuilt over it outlasts several ordinary starts
-# (packages-replace-the-hand-copies/design.md, D4).
+# The lock protocol is one copy in the package, being the piece genuinely identical to the others.
+# What stays is this module's own wait: thirty minutes, because an index over the candle table outlasts a start.
 from tc_runtime.db import LockNotAcquired, advisory_lock
 
 log = logging.getLogger(__name__)
 
 _SCHEME_SEPARATOR = "://"
 
-# Azure Database for PostgreSQL's own resource id — the audience every Entra token
-# presented to it must be issued for, whether the caller is a managed identity in Azure
-# or a service principal authenticating locally (design.md, "Do bazy — tożsamość").
+# Azure Database for PostgreSQL's own resource id — the audience every Entra token presented to it
+# must be issued for, managed identity or service principal alike.
 _AAD_SCOPE = "https://ossrdbms-aad.database.windows.net/.default"
 
-# The two shapes the database credential takes: a service principal locally, the App
-# Service's managed identity in Azure. Named once because three signatures hand the same
-# value along, and a narrower annotation on any one of them is a claim this module cannot
-# keep — which is exactly what it was before, and what a type checker noticed.
+# The two shapes the database credential takes: a service principal locally, the App Service's
+# managed identity in Azure. Named once because three signatures hand the same value along.
 Credential = ClientSecretCredential | DefaultAzureCredential
 
-# The advisory-lock key this module's migrations take. Advisory locks are scoped to one
-# database and this module has its own, so the value only has to be stable — it carries
-# the module's port so a log line naming it says which module took it. `agent/db.py`'s
-# twin carries 8030 for the same reason.
-# Re-exported so this module's own callers keep one import for its database plumbing.
+# The advisory-lock key this module's migrations take. Scoped to one database, so the value only has
+# to be stable; it carries the module's port so a log line naming it says which module took it.
 __all__ = ["MIGRATION_LOCK_KEY", "LockNotAcquired", "advisory_lock"]
 
 MIGRATION_LOCK_KEY = 8020
@@ -65,12 +43,8 @@ def asyncpg_dsn(database_url: str) -> str:
 
 
 def sqlalchemy_url(database_url: str) -> str:
-    """The URL as SQLAlchemy takes it — asyncpg named, because it is the only driver here.
-
-    Alembic runs through SQLAlchemy; without the suffix it defaults to psycopg2, which
-    this module does not install, and the failure reads like a missing database rather
-    than a missing driver.
-    """
+    """The URL as SQLAlchemy takes it — asyncpg named, because it is the only driver here. Without
+    the suffix Alembic defaults to psycopg2, and the failure reads like a missing database."""
     scheme, separator, rest = database_url.partition(_SCHEME_SEPARATOR)
     if not separator:
         raise ValueError(f"DATABASE_URL is not a usable connection string: {database_url!r}")
@@ -86,16 +60,8 @@ def _connection_target(database_url: str) -> str:
 def _credential(
     client_id: str | None, client_secret: str | None, tenant_id: str | None
 ) -> Credential:
-    """Which Entra credential this process authenticates to the database with.
-
-    All three present selects a service principal — local development's own identity
-    (`sp-tradingcenter-market-data-dev`, design.md, "Do bazy — tożsamość"), read from
-    `.env` since there is no ambient identity on a developer's machine to fall back on.
-    None of them present falls through to `DefaultAzureCredential`, which in Azure finds
-    the App Service's system-assigned managed identity with no configuration at all. A
-    partial set is a misconfiguration, not a mode to guess at — it is rejected rather
-    than silently treated as "no credential given".
-    """
+    """Which Entra credential this process authenticates to the database with. All three present
+    selects a service principal; none falls through to the managed identity. A partial set is refused."""
     values = (("client_id", client_id), ("client_secret", client_secret), ("tenant_id", tenant_id))
     given = [name for name, value in values if value]
     if given and len(given) < 3:
@@ -109,16 +75,8 @@ def _credential(
 
 
 class _TokenProvider:
-    """Fetches an Entra token on every call.
-
-    asyncpg invokes this once per physical connection it opens — for a `pool`, that
-    means every connection the pool opens over its lifetime, not once at startup. That
-    is the point: it is what makes a connection opened after the previous token expired
-    (specs/market-data-database-connection, "Wygasające poświadczenie jest odnawiane")
-    just work, with no separate refresh loop to get wrong. `DefaultAzureCredential`
-    caches internally and only reaches the identity endpoint again once the cached token
-    is close to expiring, so this is not one network round-trip per connection either.
-    """
+    """Fetches an Entra token on every call. asyncpg invokes this once per physical connection, which
+    is what renews an expiring credential with no refresh loop; the credential caches internally."""
 
     def __init__(self, credential: Credential) -> None:
         self._credential = credential
@@ -127,10 +85,8 @@ class _TokenProvider:
         try:
             token = await self._credential.get_token(_AAD_SCOPE)
         except Exception as err:
-            # Not retried and not papered over with a fallback password — one does not
-            # exist (specs/market-data-database-connection, "Moduł przedstawia się
-            # tożsamością, nie hasłem"). Whatever asyncpg does with this propagates up
-            # through `pool()`/`connect()` and fails startup.
+            # Not retried and not papered over with a fallback password — one does not exist.
+            # Whatever asyncpg does with this propagates up and fails startup.
             raise RuntimeError(f"could not obtain a database credential: {err}") from err
         return token.token
 
@@ -141,15 +97,8 @@ def identity_connect_args(
     client_secret: str | None,
     tenant_id: str | None,
 ) -> tuple[dict[str, object], Credential]:
-    """`connect_args` for a SQLAlchemy engine reaching this database with identity auth.
-
-    For `migrations/env.py`, which drives its own engine rather than going through
-    `pool()`/`connect()` — SQLAlchemy's asyncpg dialect forwards `connect_args` straight
-    to `asyncpg.connect()`, so the same `user`/token-callable shape works there
-    unchanged. The credential is returned alongside so the caller can close it once the
-    engine is done; this function does not own that lifecycle the way `pool()`'s context
-    manager does.
-    """
+    """`connect_args` for a SQLAlchemy engine reaching this database with identity auth, for
+    `migrations/env.py`. The credential is returned alongside so the caller can close it."""
     credential = _credential(client_id, client_secret, tenant_id)
     return {"user": user, "password": _TokenProvider(credential)}, credential
 
@@ -163,15 +112,8 @@ async def connect(
     client_secret: str | None = None,
     tenant_id: str | None = None,
 ) -> AsyncIterator[asyncpg.Connection]:
-    """One connection, closed on the way out.
-
-    `user` selects identity-based auth: an Entra token is fetched fresh at the moment
-    this connects and presented as the password, and `database_url` itself is expected
-    to carry no credential of its own. Omitted — as the test suite's throwaway
-    PostgreSQL needs — `database_url` is used exactly as given and the three `client_*`/
-    `tenant_id` arguments are ignored. See `_credential()` for what they select when
-    `user` is given.
-    """
+    """One connection, closed on the way out. `user` selects identity-based auth: a token is fetched
+    fresh and presented as the password, and `database_url` is expected to carry no credential."""
     if user is None:
         try:
             conn = await asyncpg.connect(asyncpg_dsn(database_url))
@@ -209,17 +151,8 @@ async def pool(
     min_size: int = 1,
     max_size: int = 10,
 ) -> AsyncIterator:
-    """A pool, for the parts of the module that run as many things at once.
-
-    Ingest needs one: a subscription per tracked pair, each writing as candles close, plus
-    whatever backfills are running beside them. A single shared connection would serialise
-    all of that behind whichever query got there first, and a connection per pair would
-    open twenty of them to write one row a minute each.
-
-    `user`/`client_*`/`tenant_id` — see `connect()`. `app.py`'s lifespan always passes
-    `user`; the test suite's own pool usage (if any) does not, for the same reason
-    `connect()` does not.
-    """
+    """A pool, for the parts of the module that run many things at once. A shared connection would
+    serialise ingest behind one query, and one per pair would open twenty to write a row a minute."""
     if user is None:
         try:
             created = await asyncpg.create_pool(
@@ -253,17 +186,8 @@ async def pool(
 
 
 async def fetch_one(conn: asyncpg.Connection, query: str, *args: object) -> asyncpg.Record:
-    """`fetchrow` for a statement that cannot answer with nothing.
-
-    An `INSERT … RETURNING` and an aggregate `SELECT` each produce exactly one row, but
-    asyncpg types every `fetchrow` as optional because most statements can miss. Indexing
-    the result straight away is therefore right and unprovable at the same time, and the
-    proof lives in the query three lines above — until someone moves one of the two.
-
-    Named here instead of assumed at six call sites. A statement that does come back empty
-    is a broken invariant, and reading it as such beats a `TypeError` further down about a
-    `None` whose origin is no longer visible.
-    """
+    """`fetchrow` for a statement that cannot answer with nothing. asyncpg types every `fetchrow` as
+    optional, so indexing straight away is right and unprovable at once; a broken invariant reads as one."""
     row = await conn.fetchrow(query, *args)
     if row is None:
         raise RuntimeError(f"no row from a statement that always returns one: {query.strip()}")

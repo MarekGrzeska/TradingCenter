@@ -81,9 +81,8 @@ async def test_the_request_asks_for_what_it_was_told_to(reader: GatewayHistory) 
 
 @respx.mock
 async def test_a_deep_read_is_one_request_not_a_page_walk(reader: GatewayHistory) -> None:
-    # The gateway pages past the provider's thousand-candle ceiling itself, anchoring on
-    # data rather than on the clock. A second implementation here would drift from it —
-    # and it is the gateway that owns the rate gate.
+    # The gateway pages past the provider's ceiling itself, anchoring on data rather than the clock.
+    # A second implementation here would drift from it — and the gateway owns the rate gate.
     route = respx.get(HISTORY_URL).mock(
         return_value=httpx.Response(200, json=gateway_history([], requested=50_000, requests=63))
     )
@@ -131,9 +130,8 @@ async def test_candles_come_back_oldest_first(reader: GatewayHistory) -> None:
 async def test_a_page_mixing_zoned_and_unzoned_timestamps_is_still_in_time_order(
     reader: GatewayHistory,
 ) -> None:
-    # The gateway sorts on the string, which is chronological only while every timestamp
-    # carries the same zone marker — and a candle the provider gave no `snapshotTimeUTC`
-    # for carries none. Sorting on the instant here is what keeps the two consistent.
+    # The gateway sorts on the string, which is chronological only while every timestamp carries the
+    # same zone marker, and some carry none. Sorting on the instant keeps the two consistent.
     respx.get(HISTORY_URL).mock(
         return_value=httpx.Response(
             200,
@@ -194,8 +192,6 @@ async def test_no_before_moment_omits_the_anchor(reader: GatewayHistory) -> None
     assert "before" not in route.calls.last.request.url.params
 
 
-# --- when it goes wrong -------------------------------------------------------------
-
 
 @respx.mock
 async def test_a_refusal_carries_the_reason_the_gateway_gave(reader: GatewayHistory) -> None:
@@ -247,8 +243,6 @@ async def test_a_candle_with_no_timestamp_is_not_silently_stored(reader: Gateway
         await reader.history("US100", Resolution.MINUTE, 1000)
 
 
-# --- specs/market-data-upstream-access: every REST call carries the caller key ------
-
 
 @respx.mock
 async def test_the_shared_client_carries_the_caller_key_on_every_request() -> None:
@@ -266,9 +260,8 @@ async def test_the_shared_client_carries_the_caller_key_on_every_request() -> No
 async def test_a_401_from_the_gateway_is_a_refusal_not_an_empty_history(
     reader: GatewayHistory,
 ) -> None:
-    # capital-gateway answers a missing or wrong caller key with 401 before it ever asks
-    # the provider. That must surface as GatewayRefused, distinguishable from "the
-    # provider has nothing here" — never as an empty, successfully-read page.
+    # capital-gateway answers a missing or wrong caller key with 401 before it asks the provider.
+    # That must surface as GatewayRefused, never as an empty, successfully-read page.
     respx.get(HISTORY_URL).mock(
         return_value=httpx.Response(401, json={"detail": "missing or invalid caller key"})
     )
@@ -278,8 +271,6 @@ async def test_a_401_from_the_gateway_is_a_refusal_not_an_empty_history(
 
     assert err.value.status_code == 401
 
-
-# --- specs/the-gateway-door-authenticates: the credential's shape follows the place ----
 
 
 class _FakeToken:
@@ -340,10 +331,8 @@ async def test_without_a_scope_the_key_is_the_whole_credential() -> None:
 
 @respx.mock
 async def test_a_token_that_cannot_be_had_leaves_the_key_to_do_the_work(monkeypatch) -> None:
-    # Between the deploy and the flip, the key is still what opens the gateway's door.
-    # Refusing here would stop the archive filling over a credential nothing yet asks for;
-    # once the door does ask, the gateway answers 401 and that is a refusal this module
-    # already reports as one.
+    # Between the deploy and the flip, the key is still what opens the gateway's door. Refusing here
+    # would stop the archive filling over a credential nothing yet asks for.
     monkeypatch.setattr(
         "market_data.gateway._http.DefaultAzureCredential", lambda: _FakeCredential(None)
     )

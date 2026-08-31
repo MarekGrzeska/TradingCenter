@@ -22,14 +22,8 @@ export interface TrackedPairsState {
 }
 
 /**
- * What the archive is collecting, kept current. `status` separates "nothing is being
- * archived" from "nobody could be asked" — both are an empty array, and only one means
- * the operator has nothing set up (terminal-data-manager spec, "Panel mówi, gdy archiwum
- * nie odpowiada").
- *
- * A failed poll does not blank rows already on screen; the failure is reported beside
- * them. Slightly stale rows beat an error where real data was. Both properties are
- * `useRead`'s now, shared with every other read in the terminal.
+ * What the archive is collecting, kept current. `status` separates "nothing is being archived" from "nobody could be
+ * asked" — both are an empty array. A failed poll reports beside the rows rather than blanking them.
  */
 export function useTrackedPairs(admin: ArchiveAdmin): TrackedPairsState {
   const read = useRead<TrackedPair[]>({

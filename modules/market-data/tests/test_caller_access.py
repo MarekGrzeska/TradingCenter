@@ -1,10 +1,5 @@
-"""The record that says which caller may reach which surface, and every way it refuses.
-
-The tests matter more here than the code does: this layer is the only thing standing
-between a caller admitted for eleven read-only tools and `DELETE /pairs/{symbol}`. Before
-the tools moved in, `agent` and `teams` had neither an address for this module nor a
-credential for it, and the prohibition held by construction. It holds by this file now.
-"""
+"""The record that says which caller may reach which surface, and every way it refuses. Before the
+tools moved in the prohibition held by construction; it holds by this file now."""
 
 from __future__ import annotations
 
@@ -44,11 +39,8 @@ def _settings(require: bool = True) -> Settings:
 
 
 def _wrap(require: bool = True):
-    """The layer around a sentinel that records having been reached.
-
-    A sentinel rather than the real application: what is under test is the decision, and
-    a real route would need a database to prove it was allowed to run.
-    """
+    """The layer around a sentinel that records having been reached. A sentinel rather than the real
+    application: what is under test is the decision, not a route that would need a database."""
     reached: list[str] = []
 
     async def sentinel(scope, receive, send):
@@ -74,13 +66,8 @@ def _client(app) -> httpx.AsyncClient:
 
 
 def _as(application: str | None, person: str = "a-person-object-id") -> dict[str, str]:
-    """The headers Easy Auth puts on a request it let through.
-
-    Both of them, and the pair is the whole lesson of 19 August 2026: the claims blob names
-    the **application** the token was issued to, while `X-MS-CLIENT-PRINCIPAL-ID` names the
-    person for a delegated token. The record is written in applications, so a test that
-    only set the id header was testing a header this module must not decide on.
-    """
+    """The headers Easy Auth puts on a request it let through — both, and that pair is the lesson of
+    19 August 2026: the claims blob names the application, the id header names the person."""
     if application is None:
         return {}
     return {
@@ -105,8 +92,6 @@ def _principal_blob(application: str, claim: str = "azp") -> str:
     return base64.b64encode(json.dumps(blob).encode("utf-8")).decode("ascii")
 
 
-# --- 4.2: the record's two lists, read from settings ---
-
 
 def test_the_caller_lists_are_parsed_from_one_setting_each() -> None:
     settings = _settings()
@@ -126,8 +111,6 @@ def test_blank_and_absent_lists_are_empty_rather_than_a_caller_named_nothing() -
     assert settings.rest_caller_ids == frozenset()
 
 
-# --- 4.4: every "identity — surface it has no right to" pair ---
-
 
 TOOL_CALLER_MUST_NOT_REACH = [
     ("POST", "/pairs"),
@@ -146,9 +129,8 @@ TOOL_CALLER_MUST_NOT_REACH = [
 async def test_a_tool_caller_is_refused_every_rest_route(
     method: str, path: str, caller: str
 ) -> None:
-    """The two writing routes are the reason this layer exists, and the reading ones are
-    here too: the rule is "this caller has no business on REST", not "not on the
-    dangerous half of REST"."""
+    """The two writing routes are the reason this layer exists, and the reading ones are here too: the
+    rule is "this caller has no business on REST", not "not on the dangerous half of REST"."""
     layer, reached = _wrap()
 
     async with _client(layer) as client:
@@ -216,9 +198,8 @@ async def test_no_identity_at_all_is_refused_where_the_requirement_is_on() -> No
 
 
 async def test_local_work_needs_no_identity_and_no_list() -> None:
-    """Nothing stands in front of a local process, so there is no identity to have. The
-    lists are read only where the requirement is on, which is why they are empty in a
-    developer's `.env` rather than filled with placeholders."""
+    """Nothing stands in front of a local process, so there is no identity to have — which is why the
+    lists are empty in a developer's `.env` rather than filled with placeholders."""
     layer, reached = _wrap(require=False)
 
     async with _client(layer) as client:
@@ -229,8 +210,6 @@ async def test_local_work_needs_no_identity_and_no_list() -> None:
     assert rest.status_code == 200
     assert reached == ["/mcp", "/pairs"]
 
-
-# --- 4.5: a path the record does not name ---
 
 
 @pytest.mark.parametrize("path", ["/admin", "/candles/US100/forming/extra", "/pairs/US100/rows"])
@@ -248,9 +227,8 @@ async def test_a_path_outside_the_record_is_refused_not_passed(path: str, caller
 
 
 def test_every_published_route_is_in_the_record() -> None:
-    """The other half of refusing by default: a route nobody classified would be
-    unreachable, which is a failure this test names at the moment it is added rather than
-    at the moment somebody notices the terminal cannot read it."""
+    """The other half of refusing by default: a route nobody classified would be unreachable, named
+    here at the moment it is added rather than when somebody notices the terminal cannot read it."""
     from market_data.app import create_app
 
     published = set(create_app().openapi()["paths"])
@@ -258,14 +236,10 @@ def test_every_published_route_is_in_the_record() -> None:
     assert unclassified == set()
 
 
-# --- 4.3 and 4.6: the paths open with no identity, and the assertion that freezes them ---
-
 
 def test_the_open_paths_are_exactly_these_two() -> None:
-    """Equality, not membership, and that is the whole test: any path added here fails
-    CI, so a data-carrying route cannot be exempted from identity quietly. `/ping` answers
-    a constant and `/ws/candles` cannot carry a header — each has its reason written
-    beside it in `caller_access.py`, and a third entry needs one too."""
+    """Equality, not membership, and that is the whole test: any path added here fails CI, so a
+    data-carrying route cannot be exempted from identity quietly."""
     assert OPEN_PATHS == {"/ping", "/ws/candles"}
 
 
@@ -326,9 +300,8 @@ def test_the_rest_record_does_not_reach_into_the_tool_surface() -> None:
 
 
 async def test_missing_settings_refuse_rather_than_allow() -> None:
-    """A process whose lifespan has not filled the state is not yet serving, so this is
-    not a state a running instance reaches. Refused anyway: "the settings were not there"
-    must never be the reading under which every route is open."""
+    """A process whose lifespan has not filled the state is not yet serving. Refused anyway: "the
+    settings were not there" must never be the reading under which every route is open."""
     reached: list[str] = []
 
     async def sentinel(scope, receive, send):  # pragma: no cover - must not be reached
@@ -344,9 +317,8 @@ async def test_missing_settings_refuse_rather_than_allow() -> None:
 
 
 async def test_an_open_path_answers_before_the_settings_exist() -> None:
-    """Which is why `/ping` is checked before them: the platform's probe reaches a
-    container whose lifespan is still applying a migration, and a 503 there reads as a
-    dead process (`deploy_probe.py`)."""
+    """Which is why `/ping` is checked before them: the platform's probe reaches a container whose
+    lifespan is still applying a migration, and a 503 there reads as a dead process."""
     reached: list[str] = []
 
     async def sentinel(scope, receive, send):
@@ -363,19 +335,10 @@ async def test_an_open_path_answers_before_the_settings_exist() -> None:
     assert reached == ["/ping"]
 
 
-# --- the identity itself: which fact the record is written in --------------------------
-
 
 async def test_a_person_in_the_id_header_is_not_the_caller() -> None:
-    """The production failure of 19 August 2026, as a test.
-
-    The terminal presents a **delegated** token, and Easy Auth fills
-    `X-MS-CLIENT-PRINCIPAL-ID` with the signed-in person's object id — not the terminal
-    application's. A record of application identifiers can never match that, so every REST
-    request was refused until the image was rolled back. What must not happen again is this
-    module deciding on that header at all: without a claims blob there is no calling
-    application to name, and no identifier here is one either.
-    """
+    """The production failure of 19 August 2026, as a test: Easy Auth fills the id header with the
+    signed-in person's object id, which no record of application identifiers can ever match."""
     layer, reached = _wrap()
 
     async with _client(layer) as client:

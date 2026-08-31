@@ -186,11 +186,8 @@ describe("archive subscription messages", () => {
     expect(settled[0]).toMatchObject({ kind: "bar", bar: { forming: false } });
   });
 
-  // The archive's timestamps arrive as ISO on both roads, but the range read
-  // spells the field `time` and the subscription `period_start`. A bar that
-  // landed on a different axis point depending on which road it came by would
-  // draw the same period twice — terminal-market-data spec, "Znaczniki czasu są
-  // sprowadzone do jednej postaci".
+  // The range read spells the field `time` and the subscription `period_start`. A bar landing on a different
+  // axis point by road would draw the same period twice (terminal-market-data spec, "Znaczniki czasu…").
   it("puts a candle at the same instant whichever road it arrived by", async () => {
     server.use(
       http.get(`${HTTP_BASE}/candles/US100`, () =>
@@ -357,10 +354,8 @@ describe("archive pair management", () => {
     await source().trackPairs([{ symbol: "US100", resolution: "MINUTE" }], null, signal());
   });
 
-  // The ceiling is the reason the panel exists to be refused: the gateway holds
-  // one provider connection per pair and the provider limits sessions. A
-  // refusal that arrived as a generic failure would leave the operator with
-  // nothing to act on.
+  // The gateway holds one provider connection per pair and the provider limits sessions, so the ceiling is
+  // what the panel exists to be refused by. A generic failure would leave the operator nothing to act on.
   it("keeps the reason a top-level refusal gives, and marks it as a refusal rather than a fault", async () => {
     server.use(
       http.post(`${HTTP_BASE}/pairs`, () =>
@@ -385,9 +380,8 @@ describe("archive pair management", () => {
       ),
     );
 
-    // 504: the archive answered — it is the thing behind it that did not, and
-    // retrying is worth doing. Compare `unreachable`, where the archive itself
-    // never answered at all.
+    // 504: the archive answered — it is the thing behind it that did not, and retrying is worth doing.
+    // Compare `unreachable`, where the archive itself never answered at all.
     const call = source().trackPairs([{ symbol: "US100", resolution: "MINUTE" }], null, signal());
     await expect(call).rejects.toMatchObject({ kind: "upstream" });
   });
@@ -531,9 +525,8 @@ describe("archive: reading a subscription's refusal off the tracked list", () =>
     estimatedBytes: 0,
   });
 
-  // The archive refuses before the handshake, so the browser never learns why:
-  // the tracked list is the second place to ask. A pair missing from it is the
-  // one answer that means retrying cannot help.
+  // The archive refuses before the handshake, so the browser never learns why: the tracked list is the
+  // second place to ask, and a pair missing from it is the one answer that means retrying cannot help.
   it("names the pair and where to fix it, when nobody is collecting it", () => {
     const reason = readRefusalFromPairs([pair("GOLD", "HOUR")], "US100", "MINUTE_5");
     expect(reason).toContain("US100 MINUTE_5");
@@ -813,13 +806,8 @@ describe("archive: collection jobs", () => {
 });
 
 /**
- * Opening the stream, which costs a ticket.
- *
- * A browser cannot put a header on a WebSocket handshake, so the operator's
- * token cannot travel with one. The archive answers that with a ticket good
- * once — asked for over HTTP, where headers work, and spent on the address.
- * These check the two properties the arrangement rests on: the token never
- * reaches the address, and no ticket is ever used twice.
+ * A browser cannot put a header on a WebSocket handshake, so the archive answers with a ticket good once.
+ * These check the two properties that rests on: the token never reaches the address, no ticket is used twice.
  */
 describe("archive.subscribe (the ticket the handshake costs)", () => {
   /** Constructible on purpose: the hub reaches the socket through `new
@@ -847,14 +835,8 @@ describe("archive.subscribe (the ticket the handshake costs)", () => {
     close: () => void;
   }
 
-  /** `createArchiveSource` builds its own hub, so the socket is reached the
-   *  only way a test can reach it: through the global the browser would use.
-   *
-   *  Installed for the whole test rather than around the `subscribe` call. The
-   *  hub asks for a ticket before it dials, so the socket is constructed a
-   *  microtask *after* `subscribe` returns — restoring the global on the way
-   *  out of a synchronous block would put the real one back first, and the
-   *  spy would see nothing. */
+  /** The hub asks for a ticket before it dials, so the socket is constructed a microtask *after* `subscribe`
+   *  returns — restoring the global inside a synchronous block would put the real one back first. */
   let restoreWebSocket: (() => void) | null = null;
 
   function installFakeWebSocket(factory: typeof WebSocket): void {

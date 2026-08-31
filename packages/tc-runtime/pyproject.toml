@@ -12,17 +12,12 @@ dependencies = [
     # The database credential, and only that: a managed identity in Azure, a service
     # principal locally — never a stored password.
     "azure-identity>=1.19",
-    # Not optional, and the reason is an incident rather than a preference:
-    # `azure.identity.aio` builds its transport lazily and raises `ImportError` from the
-    # credential's *constructor* when no async HTTP transport is installed. market-mcp
-    # found this on 13 August 2026 as a container that would not start — the trap only
-    # springs where a credential is actually constructed, so a module that never reaches
-    # Azure locally looks fine until it is deployed. The package carries it so no
-    # consumer has to remember.
+    # Not optional, and the reason is an incident: `azure.identity.aio` raises `ImportError` from the credential's
+    # *constructor* with no async transport installed, which market-mcp found as a container that would not start.
+    # The trap springs only where a credential is constructed, so the package carries it and no consumer remembers.
     "aiohttp>=3.10",
-    # `auth` and `routers` are FastAPI-shaped. A module that only wants `db` still
-    # installs it; splitting the package to avoid that would be two packages for a
-    # dependency every consumer already has.
+    # `auth` and `routers` are FastAPI-shaped. A module that only wants `db` still installs it; splitting the package
+    # would be two packages for a dependency every consumer already has.
     "fastapi>=0.110",
 ]
 
@@ -33,9 +28,8 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["tc_runtime"]
 
-# Tool versions pinned to the same values every module pins, so a rule that passes here
-# passes there. A package linted by a different ruff than its consumers is a package that
-# reports green and reddens somebody else's job.
+# Tool versions pinned to the same values every module pins, so a rule that passes here passes there: a package
+# linted by a different ruff than its consumers reports green and reddens somebody else's job.
 [tool.ruff]
 line-length = 100
 

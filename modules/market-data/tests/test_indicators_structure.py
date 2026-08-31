@@ -1,9 +1,5 @@
-"""`market-data-indicators` spec, "Punkt zwrotny potwierdza się z opóźnieniem i już
-się nie zmienia" and "Poziomy z wyższego interwału pochodzą z zamkniętego okresu" —
-the W1 layer (`docs/wskazniki-plan-wdrozenia.html`), tested the way `test_indicators_
-kernel.py` tests the primitives underneath it: small, hand-computed series, not the
-synthetic one `test_indicators_catalogue.py` uses for golden snapshots.
-"""
+"""`market-data-indicators`, "Punkt zwrotny potwierdza się z opóźnieniem" and "Poziomy z wyższego
+interwału pochodzą z zamkniętego okresu" — small, hand-computed series, not the golden synthetic one."""
 
 from __future__ import annotations
 
@@ -54,9 +50,8 @@ class TestSwingPoints:
         assert fn_of(entry, Markers)(series, {"n": 2}) == []
 
     def test_stays_the_same_on_a_longer_read(self):
-        """Task 3.10: a turning point neither disappears nor moves when the same
-        stretch is read again inside a longer series — the guarantee that lets a
-        consumer trust a swing point it already drew."""
+        """Task 3.10: a turning point neither disappears nor moves when the same stretch is read again
+        inside a longer series — the guarantee that lets a consumer trust a swing point it drew."""
         entry = get("swing_points")
         short_series = _structure_series(9)  # just enough to confirm bar 2, not bar 7
         long_series = _structure_series(10)

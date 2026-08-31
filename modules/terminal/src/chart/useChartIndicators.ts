@@ -62,14 +62,8 @@ export interface ChartIndicators {
 }
 
 /**
- * The operator's chosen indicators, from the picker to the numbers a line is drawn from:
- * which ones the catalogue still offers, over which window they are computed, what colour
- * each instance carries, and what to say when one of them cannot be had.
- *
- * Split out of `Chart.tsx` because it is the half of that file with a boundary of its own:
- * the chart's lifecycle writes candles into a canvas, and this reads what the canvas is
- * showing and asks the archive about it. The two meet at four places and no more — the two
- * refs handed in, the window sync the chart's handlers call, and the state the layers draw.
+ * The half of `Chart.tsx` with a boundary of its own: the chart's lifecycle writes candles into a canvas,
+ * this reads what is on it and asks the archive. They meet at four places — two refs, the sync, the state.
  */
 export function useChartIndicators({
   indicatorSource,
@@ -92,24 +86,16 @@ export function useChartIndicators({
     setIndicatorSelectionsState(next);
     onIndicatorSelectionsChangeRef.current?.(next);
   }, []);
-  // The lazy `useState` initializer above only ever runs once, at mount — a later change
-  // to the prop is otherwise invisible until the component remounts (a page reload,
-  // previously the only way an agent-set indicator ever appeared). Re-adopted here
-  // whenever the prop is a *different* array than the one already in state: the
-  // operator's own edit above already set that state before its callback reaches the
-  // grid store, so the round-tripped prop is the same reference and this is a no-op for
-  // it; a write from elsewhere — `chartControl.ts`'s `syncAgentChart`, so far the one
-  // other writer of a slot's indicators — hands back a new one and belongs on screen
-  // without the operator refreshing to see it.
+  // The lazy `useState` initializer runs once at mount, so a later prop change stayed invisible until a
+  // remount. Re-adopted when the prop is a *different* array — the operator's own edit round-trips the same one.
   useEffect(() => {
     if (initialIndicatorSelections === undefined) return;
     setIndicatorSelectionsState((current) =>
       current === initialIndicatorSelections ? current : initialIndicatorSelections,
     );
   }, [initialIndicatorSelections]);
-  // The range indicators are computed over — set from what `redraw` actually drew, not
-  // from every live tick, so an indicator does not refetch on each forming-candle update
-  // (design.md's "na żywo" is a later stage; see `useIndicators`).
+  // Set from what `redraw` actually drew, not from every live tick, so an indicator does not refetch on
+  // each forming-candle update (design.md's "na żywo" is a later stage; see `useIndicators`).
   const [barsRange, setBarsRange] = useState<BarsRange | null>(null);
   // What was last asked for, so a pan inside it costs nothing. State cannot answer this:
   // the range handler runs on every frame the library reports, long before a render.
@@ -125,10 +111,8 @@ export function useChartIndicators({
       const visible = chartRef.current?.timeScale().getVisibleLogicalRange() ?? null;
       const held = heldIndicatorWindowRef.current;
       if (!force && held !== null && windowStillCovers(held, series, visible)) return;
-      // A forced sync always hands over a fresh object, even for an unchanged window, and
-      // that is load-bearing rather than sloppy: `useIndicators` watches `range` by
-      // reference, and a candle closing has to be recomputed over exactly the window that
-      // was already asked for. Equal values, different answer.
+  // A fresh object even for an unchanged window is load-bearing: `useIndicators` watches `range` by
+  // reference, and a candle closing must be recomputed over exactly the window already asked for.
       const next = indicatorWindow(series, visible, resolution);
       heldIndicatorWindowRef.current = next;
       setBarsRange(next);
@@ -143,18 +127,8 @@ export function useChartIndicators({
     () => new Map(catalogue.entries.map((entry) => [entry.id, entry] as const)),
     [catalogue.entries],
   );
-  // A selection restored from a saved slot may name an indicator the catalogue no
-  // longer offers (a removed entry, or storage from a build that had a
-  // different one). Dropped from what actually computes and draws — surfaced
-  // in the header instead — but never rewritten in the caller's storage on its
-  // own: only an explicit change through the picker does that (terminal-grid
-  // spec, "wpis nieznany katalogowi pomijany z komunikatem").
-  //
-  // The two not-ready states are not the same state. Still loading: nothing is asked
-  // for yet, because a compute for an id the catalogue no longer offers is a read the
-  // archive refuses, and the answer that would have filtered it is one tick away.
-  // Failed: the selections pass through unfiltered, so a flaky read never reads as
-  // "the archive removed everything".
+  // A restored selection may name an indicator the catalogue no longer offers: dropped from what computes,
+  // never rewritten in the caller's storage. Still-loading filters nothing yet, so a flaky read never reads as "removed".
   const { knownIndicatorSelections, unknownIndicatorIds } = useMemo(() => {
     if (catalogue.status === "loading") {
       return { knownIndicatorSelections: NO_SELECTIONS, unknownIndicatorIds: [] as string[] };
@@ -179,36 +153,23 @@ export function useChartIndicators({
     barsRange,
   );
 
-  // The colours as they stand *now*, not as they stood when the archive last answered.
-  // Picking a swatch must repaint the line it names immediately; waiting for the next
-  // recompute would make choosing a colour feel like a read of the archive, which it
-  // is not (design.md, "Kolor rozwiązywany przy rysowaniu z bieżących selekcji").
+  // The colours as they stand now, not as when the archive last answered: picking a swatch has to repaint
+  // at once, or choosing one would feel like a read (design.md, "Kolor rozwiązywany przy rysowaniu").
   const instanceColors = useMemo(
     () => new Map(indicatorSelections.map((selection) => [selection.key, selection.color])),
     [indicatorSelections],
   );
 
-  // The same assignment the sync effect makes, from the same input, kept out of the
-  // readout below: `shown` moves on every crosshair pixel and neither `drawnInstances`
-  // nor `assignLineColors` needs to redo its work that often.
+  // The same assignment the sync effect makes, kept out of the readout below: `shown` moves on every
+  // crosshair pixel and neither `drawnInstances` nor `assignLineColors` needs redoing that often.
   const readoutAssignment = useMemo(() => {
     const drawn = drawnInstances(indicatorsState.selections, indicatorsState.results, catalogueById);
     const colors = colorsRef.current ?? readChartColors();
     return { drawn, lineColors: assignLineColors(drawn, colors, instanceColors) };
   }, [indicatorsState.selections, indicatorsState.results, catalogueById, instanceColors, colorsRef]);
 
-  // The header badge says *that* indicators are unavailable; it has nowhere to put *why*
-  // except a `title` nobody hovers. The reason is the useful part and is often actionable
-  // on the spot — "no MINUTE_5 series collected" is a thing the operator can go and fix —
-  // so it is raised where it will be read. Keyed per slot, so a chart requerying on every
-  // candle close refreshes one toast instead of stacking one per close, and two slots
-  // failing for different reasons still say so separately.
-  //
-  // Two ways this goes wrong and they read differently. The whole read can fail — the
-  // archive is unreachable, or refused the request — and then nothing was computed. Or
-  // the archive answered and some indicators came back carrying a reason instead of an
-  // answer, which is the archive not holding a series they need; the rest drew fine and
-  // the toast has to say which ones did not.
+  // The badge has nowhere to put *why*, and the reason is often actionable, so it is raised as a toast keyed
+  // per slot. A failed read and an answered read carrying refusals are different states and say so separately.
   const indicatorError = indicatorsState.status === "error" ? indicatorsState.error : null;
   const failedIndicators = indicatorsState.results.filter((result) => result.error !== null);
   // A string, not the array: the array is rebuilt every render and would refire the

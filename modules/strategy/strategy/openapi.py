@@ -1,18 +1,5 @@
-"""The module's OpenAPI document, printed without starting anything.
-
-The terminal generates its view of this contract from here rather than copying it by hand,
-as it already does for `market-data`, the workbench's teams surface and `polymarket-data`.
-What makes that possible is that FastAPI builds the document from the Pydantic models in
-`contract.py` — a property of the code, not of a running process — so nothing here opens a
-pool, reaches the archive or reads a setting. `Settings()` is built inside `lifespan`,
-which this never enters.
-
-    uv run python -m strategy.openapi > schema.json
-
-Regenerating against a *running* server would mean regenerating needs a database and a
-network, which means it would not be run — which is exactly how two copies of a contract
-drift apart.
-"""
+"""The module's OpenAPI document, printed without starting anything, so regenerating needs no database
+and no network — which is exactly how two copies of a contract stay together."""
 
 from __future__ import annotations
 
@@ -35,25 +22,8 @@ def _referenced(node: Any, into: set[str]) -> None:
 
 
 def require_response_fields(schema: dict[str, Any]) -> dict[str, Any]:
-    """Mark every property of a response model as required, in place.
-
-    The third copy of this function in this repository, and copied rather than shared for
-    the reason no module imports another. The reason it exists is identical every time, so
-    it is worth stating again rather than pointing at: Pydantic leaves a field with a
-    default out of `required`, which is right for something a caller *sends* — omitting it
-    means "use the default" — and simply untrue for something a module *answers with*.
-    FastAPI serialises a response model whole.
-
-    This contract is mostly such fields. A refusal carries `reason` and no levels; a trade
-    carries levels and often no `reason`; `reason_kind` is null on a trade. Generated as
-    `T | undefined` they would make a consumer either handle a case that cannot happen or
-    assert it away and lose the checking it generated types to get — and here the values in
-    question are a stop and a target, where "absent" and "null" reading the same would be a
-    consumer that cannot tell a missing price from one that was never set.
-
-    Request bodies keep Pydantic's reading, so the two are told apart by reachability
-    rather than by a hand-kept list — a list would rot the first time a model moved sides.
-    """
+    """Mark every property of a response model as required, in place: pydantic's reading is right for what a caller
+    sends and untrue for what this module answers with, which here is a stop and a target that may be null."""
     components = schema.get("components", {}).get("schemas", {})
     from_requests: set[str] = set()
     for path in schema.get("paths", {}).values():
@@ -85,9 +55,8 @@ def document() -> dict[str, Any]:
 
 
 def main() -> None:
-    # Sorted keys so the same code always prints the same bytes: the generated TypeScript is
-    # committed and compared, and a diff caused by dictionary ordering would be noise nobody
-    # can act on.
+    # Sorted keys so the same code always prints the same bytes: the generated TypeScript is committed and compared,
+    # and a diff caused by dictionary ordering would be noise nobody can act on.
     json.dump(document(), sys.stdout, indent=2, sort_keys=True, ensure_ascii=False)
     sys.stdout.write("\n")
 

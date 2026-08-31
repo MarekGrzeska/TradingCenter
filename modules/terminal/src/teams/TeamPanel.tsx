@@ -1,24 +1,8 @@
 import type { TeamTradingLimits } from "./teamsApi";
 
 /**
- * The team itself, edited beside the agents that make it up — the whole of the right-hand
- * column, always (specs/terminal-teams, "Granice handlowe ustawia się w tym samym widoku co
- * resztę zespołu").
- *
- * It used to share that column with whichever agent was selected, which meant the three
- * numbers below were reachable only through a button that deselected one. Agents have their
- * own dialog now, so nothing takes this panel's place and nothing has to be dismissed to
- * find a ceiling.
- *
- * Every field here may be left empty, and an empty one is not an omission to be corrected:
- * it is "no limit", the module saves it, and a team the operator deliberately lets trade
- * with everything it has is an experiment they are entitled to run (specs/teams-trading,
- * "Każda granica handlowa daje się wyłączyć, a moduł żadnej nie narzuca"). This panel
- * therefore nags about nothing and refuses nothing — what it does is make the three
- * numbers visible, because a ceiling nobody can find is a ceiling nobody sets.
- *
- * What is *not* the operator's to move is a module away: `trading-mcp` refuses to start
- * against anything but the demo account, and no field on this screen turns that off.
+ * The team itself, always the whole right-hand column, because a ceiling nobody can find is one nobody sets.
+ * An empty field is "no limit", not an omission — the module saves it and nags about nothing (specs/teams-trading).
  */
 export function TeamPanel({
   trading,
@@ -46,9 +30,8 @@ export function TeamPanel({
             id="trading-max-size"
             inputMode="decimal"
             placeholder="no limit"
-            // The string as typed, never a parsed number: it is compared against the size
-            // an agent asks for and never recomputed, and a round trip through a float is
-            // where a size stops being the one that was written down.
+            // The string as typed, never a parsed number: it is compared against the size an agent asks
+            // for, and a round trip through a float is where a size stops being the one written down.
             value={trading.maxOrderSize ?? ""}
             onChange={(event) =>
               onChange(

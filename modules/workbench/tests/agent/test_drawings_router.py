@@ -1,8 +1,4 @@
-"""`/drawings` — the operator's own hand on what the agent drew.
-
-specs/agent-chart-drawings, "Operator cofa rysunek ręką"; specs/terminal-chart,
-"Operator zarządza naniesionymi obiektami z listy".
-"""
+"""`/drawings` — the operator's own hand on what the agent drew."""
 
 from __future__ import annotations
 
@@ -209,9 +205,8 @@ async def test_a_drawing_is_published_as_lit_until_it_is_hidden(db) -> None:
 
 
 async def test_the_operator_hides_a_drawing_and_shows_it_again(db) -> None:
-    """specs/terminal-chart, "Operator gasi poziom z listy" — hiding travels the same
-    route a price correction does, because it is a correction of the drawing like any
-    other (design.md, "Operator gasi przez `PATCH /drawings/{id}`")."""
+    """Hiding travels the same route a price correction does, because it is a correction of the drawing
+    like any other."""
     written = await _draw(db)
 
     with TestClient(app) as client:

@@ -42,11 +42,8 @@ async def test_series_far_above_ceiling_is_refused_with_guidance(tool_server, ar
 async def test_a_years_daily_window_stays_within_a_character_budget(
     tool_server, archive
 ) -> None:
-    """DAY candles over roughly a year (~365 raw, above the 200 target but nowhere
-    near the refusal ceiling) — aggregation must keep the reply well under a budget
-    small enough that a model reading it is reading a summary, not a re-serialized
-    archive (specs/market-data-answers, "nic nie znika po cichu" without the answer
-    itself defeating the ceiling that names it)."""
+    """DAY candles over roughly a year — aggregation must keep the reply well under a budget small
+    enough that a model reading it is reading a summary, not a re-serialized archive."""
     archive.with_series(series(365, start=datetime(2025, 1, 1, tzinfo=UTC)))
 
     _content, structured = await tool_server.call_tool(
@@ -106,12 +103,8 @@ async def test_derived_series_is_named_in_the_reply(tool_server, archive) -> Non
 async def test_a_backwards_window_is_refused_rather_than_answered_empty(
     tool_server, archive
 ) -> None:
-    """The refusal that used to arrive as the archive's own 422 across the wire.
-
-    Reading in-process there is nothing to refuse it — the query matches nothing — so a
-    backwards range would come back as "no candles", which is the one confident wrong
-    answer this module exists to prevent. The check moved into the tool with the read.
-    """
+    """The refusal that used to arrive as the archive's own 422. Reading in-process nothing refuses it —
+    the query matches nothing — so a backwards range would come back as "no candles"."""
     archive.with_series([])
 
     with pytest.raises(ToolError, match="is before"):
@@ -128,9 +121,8 @@ async def test_a_backwards_window_is_refused_rather_than_answered_empty(
 async def test_an_unknown_resolution_is_refused_naming_the_known_ones(
     tool_server, archive
 ) -> None:
-    """The other refusal that used to be the archive's: FastAPI rejected a resolution
-    outside the enum before the handler ran. In-process the string reaches the tool, so
-    the tool is what names the ones that exist."""
+    """The other refusal that used to be the archive's: FastAPI rejected a resolution outside the enum
+    before the handler ran. In-process the string reaches the tool, so the tool names the ones that exist."""
     with pytest.raises(ToolError) as err:
         await tool_server.call_tool("get_candles", {"symbol": "US100", "resolution": "FORTNIGHT"})
 

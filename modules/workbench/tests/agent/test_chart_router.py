@@ -1,7 +1,4 @@
-"""`GET /chart` — the terminal's half of the chart-control loop.
-
-specs/agent-chart-control, "Konsument czyta tylko to, czego jeszcze nie zastosował".
-"""
+"""`GET /chart` — the terminal's half of the chart-control loop."""
 
 from __future__ import annotations
 

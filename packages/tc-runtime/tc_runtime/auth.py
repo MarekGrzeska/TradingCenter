@@ -1,15 +1,5 @@
-"""Who is calling, as a platform authenticator says it.
-
-One copy of what `agent/auth.py` and `teams/auth.py` each carried — measured 86.4%
-identical on 18 August 2026, and the difference was prose in every line of it. The same
-two headers are read a third time in `market_data/routers/stream.py`, inline; that one is
-not moved here, because it is four lines inside a WebSocket route rather than a file.
-
-The setting that decides whether a missing principal is refused belongs to the module, so
-it arrives as an argument rather than being read from `app.state` here: a package that
-reached into a caller's settings object by attribute name would be coupling with no
-contract, which is the thing this package exists to avoid rather than to spread.
-"""
+"""Who is calling, as a platform authenticator says it. The setting that decides whether a missing
+principal is refused arrives as an argument, not by reaching into a caller's settings object."""
 
 from __future__ import annotations
 
@@ -30,11 +20,8 @@ UNAUTHENTICATED = "anonymous"
 
 
 def principal_from(request: Request, *, required: bool) -> str:
-    """The caller's identity, or `UNAUTHENTICATED` when none is demanded.
-
-    Refusing here refuses a request before it ever reaches a route body, which is what
-    lets a module turn its authentication requirement on without auditing its routes.
-    """
+    """The caller's identity, or `UNAUTHENTICATED` when none is demanded. Refusing here refuses a request
+    before it reaches a route body, which lets a module turn the requirement on without an audit."""
     identity = (
         request.headers.get(PRINCIPAL_ID_HEADER) or request.headers.get(PRINCIPAL_NAME_HEADER) or ""
     ).strip()

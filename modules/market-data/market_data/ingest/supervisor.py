@@ -1,15 +1,5 @@
-"""Ingest for every tracked pair, and the one budget they all spend from.
-
-The budget is the reason this is a single object rather than a task per pair started
-wherever a pair is added. Every fill goes through the gateway's shared rate gate, which
-is the provider's ten requests a second counted against the account — so the limit has to
-be held in one place that all of them queue behind. Two deep fills running together are
-enough to starve the chart an operator is looking at right now, and that operator's reads
-cross the same gate.
-
-Adding or removing a pair takes effect without a restart: `sync` reconciles the running
-tasks against what the operator has decided.
-"""
+"""Ingest for every tracked pair, and the one budget they all spend from. One object rather than a
+task per pair, because the provider's ten requests a second are counted against the account."""
 
 from __future__ import annotations
 
@@ -27,9 +17,8 @@ log = logging.getLogger(__name__)
 Pair = tuple[str, Resolution]
 
 
-# How long a pair waits before being started again after its task died. Longer than a
-# feed reconnect on purpose: this path is for a failure that got past `run()`'s own
-# guard, which is rarer and less likely to have cleared a second later.
+# How long a pair waits before being started again after its task died. Longer than a feed
+# reconnect: this path is for a failure that got past `run()`'s own guard.
 REVIVE_DELAY_SECONDS = 30.0
 
 
@@ -52,15 +41,8 @@ class Ingest:
         self._history = history
         self._stream_url = stream_url
         self._default_bars = default_bars
-        # One semaphore for the whole process, not one per pair. A per-pair budget is no
-        # budget at all: twenty pairs would each politely run one fill and together spend
-        # twenty times the allowance.
-        #
-        # `limiter` lets a caller hand in a semaphore built elsewhere, so this budget can
-        # be the *same* object a collection job runner draws from — one gate for every
-        # gateway request this process makes on its own initiative, not two gates that
-        # happen to share a number (design.md, "Zlecenia dzielą budżet ruchu z resztą
-        # modułu").
+        # One semaphore for the whole process. A per-pair budget is no budget: twenty pairs would
+        # each politely run one fill and together spend twenty times the allowance.
         self._limiter = limiter if limiter is not None else asyncio.Semaphore(backfill_concurrency)
         self._backoff = backoff
         self._pair_options = pair_options
@@ -75,23 +57,16 @@ class Ingest:
         return set(self._tasks)
 
     async def start(self) -> None:
-        """Begin collecting every pair the operator has decided on.
-
-        Each pair closes its own gap before it subscribes, which is what makes a restart
-        after an outage catch up rather than resume with a hole in the middle.
-        """
-        # Public because "how long has ingest been up" is the first thing asked of a feed
-        # that looks stale, and the answer distinguishes a process that just restarted
-        # from one that has been quietly failing for hours.
+        """Begin collecting every pair the operator has decided on. Each pair closes its own gap
+        before it subscribes, which is what makes a restart catch up rather than resume with a hole."""
+        # Public because "how long has ingest been up" is the first thing asked of a stale feed,
+        # and it tells a process that just restarted from one failing quietly for hours.
         self.started_at = datetime.now(UTC)
         await self.sync()
 
     async def sync(self) -> None:
-        """Match the running tasks to the tracked pairs.
-
-        Called at start and whenever the operator changes the list, so adding a pair
-        starts collecting it without a restart and removing one stops within a period.
-        """
+        """Match the running tasks to the tracked pairs, at start and whenever the operator changes
+        the list — so adding a pair starts collecting it without a restart."""
         async with self._pool.acquire() as conn:
             wanted = {(pair.symbol, pair.resolution) for pair in await read_tracked(conn)}
 
@@ -139,20 +114,8 @@ class Ingest:
         self._tasks[(symbol, resolution)] = task
 
     def _pair_ended(self, symbol: str, resolution: Resolution, task: asyncio.Task) -> None:
-        """Say that a pair stopped collecting, and start it again.
-
-        Without this the end is the quietest thing that happens here. `run()` returning
-        or raising leaves the task in `_tasks` looking exactly like one that is working:
-        `/pairs` still lists the pair, `running` still counts it, and the only symptom is
-        an archive that quietly stops gaining candles. `sync()` clears the corpse, but
-        `sync()` runs at start and when the operator edits the list — so on 10 August a
-        process kept its pairs "collecting" for forty minutes after every one of them had
-        died, and it took reading the database to notice.
-
-        The same reasoning as `JobRunner._report_worker_death`, and the same conclusion:
-        an end nobody planned for must not be silent. This one goes further and revives
-        the pair, because unlike a job's worker there is nothing else to pick the work up.
-        """
+        """Say that a pair stopped collecting, and start it again. Without this the end is the quietest
+        thing here: on 10 August a process kept its pairs "collecting" for forty minutes after all died."""
         if task.cancelled() or self._tasks.get((symbol, resolution)) is not task:
             return  # `_stop_pair`, or already replaced — the ordinary way this ends.
 
@@ -166,9 +129,8 @@ class Ingest:
                 exc_info=error,
             )
         else:
-            # `run()` returns when the pair stops being tracked, which `_stop_pair` would
-            # have cancelled — so reaching here means it read "untracked" itself. Nothing
-            # to revive, and nothing wrong.
+            # `run()` returns when the pair stops being tracked, which `_stop_pair` would have
+            # cancelled — so reaching here means it read "untracked" itself. Nothing wrong.
             log.info("ingest for %s %s stopped: no longer tracked", symbol, resolution.value)
             self._tasks.pop((symbol, resolution), None)
             return
@@ -181,14 +143,8 @@ class Ingest:
         )
 
     async def _revive(self, symbol: str, resolution: Resolution) -> None:
-        """Start a died pair again, after a pause.
-
-        The pause is what keeps a failure that recurs immediately — a database that is
-        down, a bug on the first line — from becoming a spin that fills the log and the
-        rate budget. It is deliberately longer than a feed reconnect: this path is for
-        something that got past `run()`'s own guard, which is rarer and less likely to
-        clear in a second.
-        """
+        """Start a died pair again, after a pause. The pause keeps an immediately recurring failure
+        from becoming a spin, and is longer than a feed reconnect for the same reason as above."""
         try:
             await asyncio.sleep(REVIVE_DELAY_SECONDS)
             async with self._pool.acquire() as conn:

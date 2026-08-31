@@ -1,12 +1,5 @@
-"""The doubles every suite over the app shares, and the clock they agree on.
-
-Here rather than in `conftest.py` because these are imported by name, not injected:
-`candle(...)` takes arguments at ninety-odd call sites and a fixture wrapping it would
-buy nothing. `conftest.py` next door holds the things pytest hands out instead.
-
-The two things that reach outward — the gateway's instruments and the ingest supervisor —
-are faked because what the suites test is the contract, not the upstream.
-"""
+"""The doubles every suite over the app shares, and the clock they agree on. Here rather than in
+`conftest.py` because these are imported by name, not injected."""
 
 from __future__ import annotations
 
@@ -17,13 +10,8 @@ from market_data.models import Candle, CandleSource, Resolution
 NOW = datetime(2026, 8, 7, 12, 0, tzinfo=UTC)
 LIMIT = 20
 
-# Every read of a range says which range, and this is why.
-#
-# `/candles` defaults to the last day *of the real clock*, so a test that writes candles
-# around a fixed `NOW` and then omits the window is only asserting anything while the wall
-# clock happens to be within a day of that constant. Two tests did, and they began failing
-# at noon on 2026-08-08 — a day after `NOW`, having passed every run before it, for no
-# reason connected to the code.
+# Every read of a range says which range: `/candles` defaults to the last day of the real clock, so
+# omitting the window asserts nothing once the wall clock drifts a day from `NOW`. Two tests did.
 WINDOW = {
     "from": (NOW - timedelta(hours=1)).isoformat(),
     "to": (NOW + timedelta(minutes=1)).isoformat(),
@@ -74,8 +62,6 @@ class FakeInstruments:
             raise self.error
         return self.market_open
 
-    # --- specs/market-data-api: the catalogue proxy ------------------------------
-
     async def catalogue(self, max_nodes: int | None, asset_class: str | None) -> dict:
         if self.error is not None:
             raise self.error
@@ -90,9 +76,8 @@ class FakeInstruments:
     async def search(self, q: str) -> list:
         if self.error is not None:
             raise self.error
-        # One hit derived from the query unless a test says otherwise. `search_results`
-        # exists for the tool surface, whose whole question about this call is what it does
-        # with more matches than it will show.
+        # One hit derived from the query unless a test says otherwise. `search_results` exists for
+        # the tool surface, whose whole question is what it does with more matches than it shows.
         if self.search_results is not None:
             return self.search_results
         return [{"symbol": q.upper(), "name": q, "asset_class": "CRYPTO", "tradeable": True}]
@@ -141,9 +126,6 @@ class FakeJobRunner:
 
 
 def at(stamp: str) -> datetime:
-    """The instant a timestamp names, however it was spelled.
-
-    JSON renders UTC with a `Z`; comparing strings would be testing pydantic's choice of
-    suffix rather than whether the archive answered with the right moment.
-    """
+    """The instant a timestamp names, however it was spelled. Comparing strings would test pydantic's
+    choice of suffix rather than whether the archive answered with the right moment."""
     return datetime.fromisoformat(stamp)

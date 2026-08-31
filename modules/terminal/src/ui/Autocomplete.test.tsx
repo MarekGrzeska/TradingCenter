@@ -99,10 +99,8 @@ describe("Autocomplete: keyboard", () => {
   });
 });
 
-// The debounce and the stale-answer guard used to live in `useInstrumentSearch` and had
-// their own tests; the logic moved into `useAsyncOptions` and these follow it, because a
-// picker that fires per keystroke or lets a slow earlier answer win is the same bug
-// wherever it lives (terminal-instruments spec, "Pisanie w polu wyszukiwania").
+// The debounce and the stale-answer guard moved out of `useInstrumentSearch` into `useAsyncOptions`, and these follow:
+// a picker that fires per keystroke or lets a slow earlier answer win is the same bug wherever it lives.
 describe("Autocomplete: typing", () => {
   it("does not issue a request per keystroke", async () => {
     const user = userEvent.setup();
@@ -215,10 +213,8 @@ describe("Autocomplete: made choice", () => {
   });
 });
 
-// The three real sources the terminal builds this component with. Same
-// keyboard path through all three proves the promise in design.md, "Terminal:
-// jeden `Autocomplete`, trzy źródła" — the component does not know which one
-// it was given.
+// The three real sources the terminal builds this component with. The same keyboard path through all three is the
+// promise in design.md, "Terminal: jeden `Autocomplete`, trzy źródła" — it does not know which one it was given.
 describe("Autocomplete: identical keyboard behavior across all three real sources", () => {
   it("asset classes", async () => {
     const gateway = fakeInstrumentSource({

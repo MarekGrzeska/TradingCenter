@@ -19,19 +19,8 @@ import {
 } from "./runs";
 
 /**
- * The teams module's client, over types generated from its own OpenAPI document rather
- * than hand-written the way `agentApi.ts` is. The two modules differ in exactly the way
- * design.md says they do: the agent's wire is a handful of narrow DTOs, this one is
- * graphs, revisions and runs — wide enough that a renamed field would arrive as
- * `undefined` and show up as a blank node rather than as a compile error.
- *
- * Regenerate with `pnpm contract:generate`; `pnpm contract:check` fails on a stale file.
- *
- * The module's own spelling (snake_case, `from` on an edge) stays inside this file and in
- * `runs.ts`, which holds the same rule for the run half — a progress frame carries the
- * same facts as the JSON read beside it, so both go through one set of mappers. Every
- * other file in `src/teams/` speaks the camelCase shapes below — same rule as
- * `archive.ts` and `agentApi.ts`, and the reason a wire change lands in one place.
+ * Over types generated from the module's OpenAPI rather than hand-written like `agentApi.ts`: this wire is
+ * graphs, revisions and runs, wide enough that a renamed field would arrive as a blank node, not an error.
  */
 
 type Wire = components["schemas"];
@@ -93,11 +82,8 @@ export interface TeamLimits {
   dailyLimit: string | null;
 }
 
-/** What a revision lets its agents do to the account. **Every one is optional and an empty
- *  one means no limit at all** — the module substitutes nothing and refuses nothing for a
- *  missing one, so neither does this side (specs/teams-trading, "Każda granica handlowa
- *  daje się wyłączyć, a moduł żadnej nie narzuca"). `maxOrderSize` is a string for the
- *  same reason a cost is: compared, never recomputed. */
+  /** **Every one is optional and an empty one means no limit at all** — the module substitutes nothing and
+   *  refuses nothing, so neither does this side. `maxOrderSize` is a string: compared, never recomputed. */
 export interface TeamTradingLimits {
   maxOrderSize: string | null;
   ordersPerRun: number | null;
@@ -151,12 +137,8 @@ export type TriggerComparison = "gt" | "gte" | "lt" | "lte" | "eq";
 
 export type RecurrenceKind = "every_minutes" | "hourly" | "daily" | "weekly" | "monthly";
 
-/** A schedule's rhythm, in the shape the module publishes it — `kind` decides which of
- *  the others carry a value. `weekdays` are ISO days: 1 is Monday, 7 is Sunday.
- *
- *  Nothing here is translated into a cron expression on this side: the module owns that
- *  translation both ways (`terminal-teams-schedules`, "Terminal nie liczy czasu
- *  wyzwolenia sam"). */
+  /** `kind` decides which of the others carry a value; `weekdays` are ISO days, 1 Monday. Nothing is turned
+   *  into a cron expression here — the module owns that translation both ways (`terminal-teams-schedules`). */
 export interface Recurrence {
   kind: RecurrenceKind;
   minutes: number | null;
@@ -202,12 +184,8 @@ export interface ScheduleDraft extends ScheduleTiming {
   pinnedRevisionId: number | null;
 }
 
-/** A market condition, expressed as a call to a tool this module already reads through —
- *  never a locally computed indicator (specs/teams-triggers, "Warunek jest czytany
- *  narzędziami serwera narzędzi"). `lastResult` is `null` until the first check, and
- *  `null` again whenever the tool server could not be asked — a third value, not a
- *  `false` (specs/teams-triggers, "Niedostępność serwera narzędzi to nie jest
- *  niespełniony warunek"). */
+  /** A market condition as a call to a tool this module already reads through, never a locally computed
+   *  indicator. `lastResult` is `null` until the first check and whenever the server could not be asked. */
 export interface Trigger {
   id: number;
   teamId: number;
@@ -272,11 +250,8 @@ export interface TeamsModel {
 export interface TeamsTool {
   name: string;
   description: string;
-  /** Whether the tool leaves the account alone, read off the server's own annotation and
-   *  never decided here. `null` is a third value and not a `true`: a tool carrying no
-   *  annotation is one nobody said anything about, and the picker says exactly that
-   *  (specs/trading-mcp-tools, "Narzędzie zapisujące jest oznaczone jako zmieniające
-   *  stan"). */
+  /** Read off the server's own annotation and never decided here. `null` is a third value, not a `true`: a
+   *  tool carrying no annotation is one nobody said anything about (specs/trading-mcp-tools). */
   readOnly: boolean | null;
 }
 
@@ -421,9 +396,8 @@ function mapDefinition(raw: RawDefinition): TeamDefinition {
       runLimit: raw.limits?.run_limit ?? null,
       dailyLimit: raw.limits?.daily_limit ?? null,
     },
-    // A revision saved before this field existed carries no `trading` at all, and reads
-    // back here as three empty limits — which is what it always meant and what the module
-    // reads it as too (specs/teams-catalogue, "Rewizja z fazy sprzed narzędzi handlowych").
+    // A revision saved before this field existed carries no `trading` at all and reads back as three empty
+    // limits — which is what it always meant and what the module reads it as too (specs/teams-catalogue).
     trading: {
       maxOrderSize: raw.trading?.max_order_size ?? null,
       ordersPerRun: raw.trading?.orders_per_run ?? null,
@@ -582,9 +556,8 @@ function mapFire(raw: RawFire): ScheduleFire {
   };
 }
 
-// 422: the module understood the definition and declined it — a cycle, an agent wired to
-// nothing, a model outside its catalogue, a tool it does not announce. The message is the
-// operator's whole lead, so it travels intact.
+// 422: the module understood the definition and declined it — a cycle, an agent wired to nothing, a model
+// outside its catalogue. The message is the operator's whole lead, so it travels intact.
 const mapStatus = statusMapper({ 404: "not-found", 422: "refused" });
 
 export function createTeamsApi(httpBase: string, identity: Identity = noIdentity): TeamsApi {
@@ -604,22 +577,13 @@ export function createTeamsApi(httpBase: string, identity: Identity = noIdentity
         return raw.map((tool) => ({
           name: tool.name,
           description: tool.description,
-          // `undefined` from a module that announces no such property is the same
-          // statement as `null` from one that does: nobody said. It is not turned into
-          // "reads only" here — that would be this side holding an opinion about somebody
-          // else's tool.
+          // `undefined` from a module that announces no such property is the same statement as `null` from
+          // one that does: nobody said. Turning it into "reads only" would be an opinion about somebody else's tool.
           readOnly: tool.read_only ?? null,
         }));
       } catch (cause) {
-        // A module deployed before this route existed answers 404 here, and that reads
-        // as "nothing announced" rather than as a failure: the panel still edits the
-        // rest of an agent, and an already-assigned tool keeps its name (specs/
-        // teams-tool-access — the module's announcement is the only source there is,
-        // and inventing one here is exactly what it forbids).
-        //
-        // A tool server that is configured and unreachable is *not* folded in here: the
-        // module answers 503, that reaches the panel as "the tool list could not be
-        // read", and it is a different sentence because it is a different fact.
+        // A module deployed before this route existed answers 404, which reads as "nothing announced" rather
+        // than a failure. A configured but unreachable tool server answers 503 — a different fact, said differently.
         if (cause instanceof MarketDataError && cause.kind === "not-found") return [];
         throw cause;
       }

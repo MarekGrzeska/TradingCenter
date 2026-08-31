@@ -1,6 +1,5 @@
-"""The connection string, the credential and the pool — moved here with the code they
-test, from `modules/agent/tests/test_db.py`, where they had been asserting nothing about
-agent in particular."""
+"""The connection string, the credential and the pool — moved here with the code they test, where they
+had been asserting nothing about agent in particular."""
 
 from __future__ import annotations
 
@@ -44,8 +43,6 @@ def test_connection_target_names_host_port_and_database_never_a_credential() -> 
     assert target == "db.internal:5432/agent"
     assert "secret" not in target
 
-
-# --- identity: specs/agent-database-connection/spec.md ---
 
 
 class _FakeToken:

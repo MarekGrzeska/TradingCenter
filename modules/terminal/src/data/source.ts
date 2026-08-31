@@ -27,12 +27,8 @@ export interface HistoryRequest {
   to: number;
 }
 
-/** One independently reachable back end behind the terminal's single source.
- *  There are two, and either can be down without the other: the archive keeps
- *  the candles, the gateway owns the instrument catalogue. Saying which is
- *  which is the whole reason this exists — "no data" and "no search" have
- *  different causes and different answers (design.md, Risks: "Archiwum staje
- *  się na ścieżce krytycznej wykresu"). */
+/** One independently reachable back end behind the terminal's single source: the archive keeps the candles,
+ *  the gateway owns the catalogue. "No data" and "no search" have different causes and different answers. */
 export interface SourcePart {
   readonly id: string;
   /** What to call it where an operator can read it. */
@@ -41,27 +37,18 @@ export interface SourcePart {
    *  adapter says its own: "unreachable" alone leaves the reader to guess
    *  whether the screen is empty or merely frozen. */
   readonly whenUnreachable: string;
-  /** Resolves if the part answers, rejects with a `MarketDataError` otherwise.
-   *  Carries no data of its own — it exists for the shell's connection
-   *  indicator (terminal-shell spec, "Stan źródła danych jest widoczny
-   *  globalnie"), polled independently of whatever charts happen to be
-   *  subscribed at the time. */
+  /** Resolves if the part answers, rejects with a `MarketDataError` otherwise. Carries no data — it exists for
+   *  the shell's connection indicator, polled independently of whatever charts are subscribed. */
   ping(signal: AbortSignal): Promise<void>;
 }
 
-/** Candles: a range read and a live subscription. Implemented by the archive.
- *
- *  `history` is the range read; it is not how a chart gets its series. That
- *  comes from `subscribe`, whose first message carries the snapshot — see
- *  `StreamEvent`. */
+/** Candles: a range read and a live subscription. `history` is the range read and is not how a chart gets its
+ *  series — that comes from `subscribe`, whose first message carries the snapshot. */
 export interface CandleSource extends SourcePart {
   history(request: HistoryRequest, signal: AbortSignal): Promise<Bar[]>;
 
-  /** Subscribe to one (symbol, resolution) pair. `sink` receives every event —
-   *  the opening snapshot, bars, status, error — for that pair until the
-   *  returned cleanup function is called. Multiple subscribers to the same pair
-   *  MUST share one underlying connection (terminal-market-data spec) — that
-   *  sharing lives in the source implementation, not in callers. */
+  /** Subscribe to one (symbol, resolution) pair. Multiple subscribers to the same pair MUST share one
+   *  connection (terminal-market-data spec) — that sharing lives in the implementation, not in callers. */
   subscribe(
     symbol: string,
     resolution: Resolution,
@@ -91,13 +78,8 @@ export interface InstrumentSource extends SourcePart {
 }
 
 /**
- * What every view reads through: one interface, one instance, whatever sits
- * behind it. Behind it today are two back ends — candles from the archive,
- * instruments from the gateway — and no view knows that or may find out
- * (terminal-market-data spec, "Świece i instrumenty idą z różnych miejsc").
- *
- * The composition lives in `marketData.ts`; views take the instance it exports
- * and never a constructor.
+ * What every view reads through: one interface, whatever sits behind it. Behind it today are two back ends,
+ * and no view knows that. The composition lives in `marketData.ts`; views take the instance, never a constructor.
  */
 export interface MarketDataSource
   extends Pick<CandleSource, "history" | "subscribe">,
@@ -113,11 +95,8 @@ export interface MarketDataSource
 export interface ArchiveAdmin {
   listPairs(signal: AbortSignal): Promise<TrackedPair[]>;
 
-  /** Starts collection for one or more pairs as a single decision. Each pair
-   *  is refused independently — never silently ignored — when the ceiling is
-   *  full or the gateway will not serve it; a refusal for one never withholds
-   *  the pairs that were fine. `collectFrom` null means the configured
-   *  default depth. */
+  /** Starts collection for one or more pairs as a single decision. Each pair is refused independently, never
+   *  silently ignored, so a refusal for one never withholds the pairs that were fine. */
   trackPairs(
     pairs: PairRequest[],
     collectFrom: number | null,
@@ -161,11 +140,8 @@ export interface ArchiveAdmin {
    *  there is nothing to retry. */
   retryJob(jobId: number, signal: AbortSignal): Promise<Job>;
 
-  /** Removes a job from the collection history, with every chunk it covers.
-   *  Deletes no candle — the data the job collected stays archived, which is
-   *  what separates this from `deletePair`. Rejects with a `MarketDataError`
-   *  of kind `"refused"` while any of its chunks is still pending or
-   *  running. */
+  /** Removes a job and its chunks from the collection history, deleting no candle — that is what separates it
+   *  from `deletePair`. Refuses while any of its chunks is still pending or running. */
   deleteJob(jobId: number, signal: AbortSignal): Promise<void>;
 }
 

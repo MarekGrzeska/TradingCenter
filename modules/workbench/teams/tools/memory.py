@@ -1,23 +1,5 @@
-"""The two tools a team uses to remember something, served by this process.
-
-A source rather than a server: no address, no identity, no session to lose (specs/
-teams-tool-access, "Narzędzie w tym samym procesie jest źródłem, ale nie serwerem"). What
-it shares with `ToolServer` is everything the registry and the plan touch — a label, a
-tool list, a call that never raises into the run — and nothing else.
-
-**Announcing does not touch the database.** The two descriptors are module constants, so a
-source built with no pool still answers `list_tools()`. That is what lets the two save-time
-paths — `announced_snapshot` and `announced_tools_by_server`, both of which rebuild a
-registry from settings alone — publish these names without a connection, and it is why
-`from_settings` can construct this itself instead of every caller threading a pool through
-(design.md, "Rejestr buduje źródło pamięci sam").
-
-**Calling does.** A call needs to know which team is remembering, on whose behalf, and in
-which run, and none of that exists until a run does — so the run binds a scope onto this
-source and the plan dispatches through the bound object. An unbound call is answered as
-unavailable rather than raised, the same way an unreachable server is: a tool that cannot
-work costs an agent its answer, never the run its trace.
-"""
+"""The two tools a team uses to remember something, served by this process as a source rather than a server: no address,
+no session to lose. Announcing touches no database, so the save-time paths publish these names with no connection."""
 
 from __future__ import annotations
 
@@ -38,9 +20,8 @@ LABEL = "team-memory"
 READ_TOOL = "memory_read"
 WRITE_TOOL = "memory_write"
 
-# The descriptions are the only thing a model ever learns about these tools, so both of
-# them state what the tool will refuse and why — a ceiling left unsaid turns a refusal
-# into a surprise the model explains to the operator by guessing.
+# The descriptions are the only thing a model ever learns about these tools, so both state what the tool
+# will refuse and why — a ceiling left unsaid turns a refusal into a surprise the model explains by guessing.
 MEMORY_TOOLS: tuple[ToolDescriptor, ...] = (
     ToolDescriptor(
         name=READ_TOOL,
@@ -80,13 +61,8 @@ MEMORY_TOOL_NAMES: frozenset[str] = frozenset(tool.name for tool in MEMORY_TOOLS
 
 @dataclass(frozen=True)
 class MemoryScope:
-    """Which team is remembering, on whose behalf, and in which run.
-
-    Carried from the run start rather than read off the definition: the same definition can
-    stand under two names for two operators, and a source that guessed would hand one
-    operator another's memory (specs/teams-runs, "Przebieg niesie zespół i właściciela, a
-    nie samą rewizję").
-    """
+    """Which team is remembering, on whose behalf, and in which run. Carried from the run start rather than
+    read off the definition: the same definition can stand under two names for two operators."""
 
     team_id: int
     owner_principal: str
@@ -104,11 +80,8 @@ class MemoryToolSource:
 
     @property
     def configured(self) -> bool:
-        """Always. There is no setting whose absence turns memory off — a team that was
-        assigned no memory tool does not see it, and that is the whole of the switch. A
-        setting would be a second state in which a saved revision stops being runnable
-        after a restart (design.md, "Ustawienie mówiące, że pamięci nie ma — nie istnieje").
-        """
+        """Always. There is no setting whose absence turns memory off — a team assigned no memory tool does
+        not see it, and that is the whole of the switch."""
         return True
 
     async def list_tools(self) -> list[ToolDescriptor]:
@@ -200,9 +173,8 @@ class BoundMemoryTools:
 
         scope = self._scope
         async with self._pool.acquire() as conn:  # type: ignore[union-attr]
-            # Counted in the database rather than in this object: agents in one run work
-            # concurrently and each holds its own bound instance, so a counter here would
-            # let two of them pass the ceiling together.
+            # Counted in the database rather than in this object: agents in one run work concurrently and
+            # each holds its own bound instance, so a counter here would let two pass the ceiling together.
             written = await store.count_memories_for_run(conn, run_id=scope.run_id)
             if written >= MEMORY_WRITES_PER_RUN:
                 return ToolOutcome(

@@ -38,13 +38,8 @@ export interface ChartFocus {
 }
 
 /**
- * A one-off "show this fragment" arriving from outside, and the paging it needs to become
- * showable.
- *
- * Its own file because it is a machine with one entry and one exit — a request comes in,
- * and exactly one settlement goes back out however it ends — wound through parts of the
- * chart that have nothing else to do with it. Keeping it whole is what makes "every
- * request is settled exactly once" readable in one place instead of five.
+ * A one-off "show this fragment" arriving from outside, and the paging it needs to become showable. Its own
+ * file because it is a machine with one entry and one exit, wound through parts of the chart that ignore it.
  */
 export function useChartFocus({
   symbol,
@@ -56,10 +51,8 @@ export function useChartFocus({
   requestOlderRef,
   reachBackRef,
 }: ChartFocusInput): ChartFocus {
-  // What is currently being pursued — set the moment a request cannot be shown yet,
-  // cleared the moment it settles one way or the other. Read by `needsMore` below, which
-  // is how a single `requestOlder()` call ends up paging until this is satisfied or the
-  // pager gives up on its own (design.md, "Dociąganie pod kadr przez istniejący pager").
+  // Set the moment a request cannot be shown yet, cleared the moment it settles. `needsMore` reads it,
+  // which is how one `requestOlder()` pages until satisfied (design.md, "Dociąganie pod kadr przez istniejący pager").
   const pendingFocusRef = useRef<ChartFocusRequest | null>(null);
   const onFocusRequestSettledRef = useRef(onFocusRequestSettled);
   onFocusRequestSettledRef.current = onFocusRequestSettled;
@@ -87,12 +80,8 @@ export function useChartFocus({
     return true;
   }, [chartRef, barsRef]);
 
-  /** The one place a pursuit ends, however it ends: applies `focus` against whatever is
-   *  now drawn (which may be all of it, some of it, or — if nothing overlaps — none),
-   *  clears it as the pending one, and always tells the caller it is done. An application
-   *  that touched nothing is reported the way an unreadable indicator already is
-   *  (`terminal-chart` spec, "say it, do not hide it" — the same rule this file already
-   *  follows for indicators it could not compute). */
+  /** The one place a pursuit ends, however it ends. An application that touched nothing is still
+   *  reported, the way an unreadable indicator is (`terminal-chart` spec, "say it, do not hide it"). */
   const settlePendingFocus = useCallback(
     (focus: ChartFocusRequest) => {
       pendingFocusRef.current = null;
@@ -110,18 +99,8 @@ export function useChartFocus({
     [applyFocusToView, symbol, resolution],
   );
 
-  /** Applies `focus` now if the series already reaches back far enough; otherwise asks
-   *  the archive for what is missing and waits.
-   *
-   *  A focus that names a moment is fetched in one read of exactly the window between
-   *  that moment and the oldest drawn bar (`reachBack`) — not walked to by the pager,
-   *  which moves about a day of calendar per page on MINUTE_5 and stops after twenty of
-   *  them. Walking is right for a drag to the left edge, where the destination is "a bit
-   *  more"; it is wrong for "the middle of March", where the destination is known before
-   *  the first request and five months away.
-   *
-   *  `lastBars` names no moment and keeps the walk: it wants more of the newest end, which
-   *  is what the pager's own margin is already for. */
+  /** A focus naming a moment is read in one window back to it rather than walked to: the pager moves
+   *  about a day per page on MINUTE_5 and gives up after twenty. `lastBars` names none and keeps the walk. */
   const pursueFocus = useCallback(
     (focus: ChartFocusRequest) => {
       if (reachesBack(barsRef.current, focus)) {

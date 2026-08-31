@@ -1,15 +1,6 @@
 /**
- * The node vocabulary, as the screen offers it.
- *
- * **The list of kinds is the module's, spelled here in Polish.** What a node *is* comes from
- * `contract.strategy.generated.ts` and is never restated — this file only says what each
- * kind is called on screen and what a freshly added one starts out as. A kind the module
- * grows and this file does not name simply does not appear in the picker, which is the safe
- * direction: the editor can lag the vocabulary, never lead it.
- *
- * Blanks are deliberately valid on their own. A half-built tree the module would refuse is
- * the ordinary state of an editor mid-thought, but a blank that could not even be
- * *serialized* would make the whole rule unreadable the moment somebody added a row.
+ * What each node kind is called on screen and what a fresh one starts as; what a node *is* comes from the generated
+ * contract. A kind this file does not name simply never appears — the editor may lag the vocabulary, never lead it.
  */
 
 import type { ConditionNode, NumericNode } from "../strategyApi";

@@ -5,9 +5,8 @@ import tseslint from "typescript-eslint";
 import { globalIgnores } from "eslint/config";
 
 export default tseslint.config(
-  // `contract.generated.ts` is machine-written from market-data's OpenAPI document and
-  // read by `tsc`, not by people. Linting it would only ever produce findings nobody may
-  // act on — the fix for anything in it is to change the server's model.
+  // `contract.generated.ts` is machine-written and read by `tsc`, not by people: a finding in it could only be
+  // acted on by changing the server's model.
   globalIgnores(["dist", "coverage", "src/data/contract.generated.ts"]),
   {
     files: ["**/*.{ts,tsx}"],

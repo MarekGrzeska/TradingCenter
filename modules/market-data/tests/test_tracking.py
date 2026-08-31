@@ -33,13 +33,8 @@ LIMIT = 20
 
 
 async def all_pairs(db: asyncpg.Connection) -> list[asyncpg.Record]:
-    """Every row of `tracked_pairs`, the stopped ones included.
-
-    Read from the table rather than through the module, because nothing in the module
-    reads it this way: collection asks `read_tracked`, which is the live pairs only. A
-    reader that exists solely to be asserted on is a reader free to drift away from what
-    the code actually does.
-    """
+    """Every row of `tracked_pairs`, the stopped ones included. Read from the table rather than through
+    the module, because a reader existing solely to be asserted on is free to drift."""
     return await db.fetch("SELECT state FROM tracked_pairs ORDER BY added_at, symbol")
 
 
@@ -59,8 +54,6 @@ def candle(symbol: str = "US100", resolution: Resolution = Resolution.MINUTE, **
     )
 
 
-# --- 6.4: the rule, on its own ------------------------------------------------------
-
 
 def test_a_pair_that_has_collected_nothing_says_so() -> None:
     assert (
@@ -74,9 +67,8 @@ def test_a_fresh_series_is_collecting() -> None:
 
 
 def test_one_period_behind_is_not_yet_a_fault() -> None:
-    # A candle is only written once its period closes, so the newest one is legitimately
-    # up to a period old at any moment. A threshold of one period would call every
-    # healthy pair broken, every period.
+    # A candle is only written once its period closes, so the newest is legitimately up to a period
+    # old. A threshold of one period would call every healthy pair broken, every period.
     latest = MOMENT - timedelta(minutes=1, seconds=30)
     assert collection_state(Resolution.MINUTE, latest, MOMENT, True) is CollectionState.COLLECTING
 
@@ -94,13 +86,8 @@ def test_more_than_two_periods_behind_with_the_market_open_has_stalled() -> None
 
 
 def test_a_candle_still_on_its_way_is_not_a_stall() -> None:
-    """Measured on the live feed, and the reason `DELIVERY_GRACE` exists.
-
-    A closed minute candle took 52 to 169 seconds to arrive, so a perfectly healthy pair
-    sits well past two periods behind for part of every minute. Without the grace the
-    state flipped between COLLECTING and STALLED from one read to the next, which teaches
-    an operator to ignore the one indicator that is supposed to matter.
-    """
+    """Measured on the live feed, and the reason `DELIVERY_GRACE` exists: a closed minute candle took 52
+    to 169 seconds, so the state flipped between COLLECTING and STALLED from one read to the next."""
     for lag in (timedelta(seconds=112), timedelta(seconds=229)):
         assert (
             collection_state(Resolution.MINUTE, MOMENT - lag, MOMENT, True)
@@ -109,9 +96,8 @@ def test_a_candle_still_on_its_way_is_not_a_stall() -> None:
 
 
 def test_the_grace_does_not_scale_with_the_period() -> None:
-    """A fixed span, not a third period. At HOUR a third period would be another hour of
-    a dead feed going unreported; the delivery itself takes the same few seconds at every
-    resolution."""
+    """A fixed span, not a third period. At HOUR a third period would be another hour of a dead feed
+    going unreported; the delivery itself takes the same few seconds at every resolution."""
     assert (
         collection_state(Resolution.HOUR, MOMENT - timedelta(hours=2, minutes=10), MOMENT, True)
         is CollectionState.STALLED
@@ -138,8 +124,6 @@ def test_lateness_is_measured_in_the_pair_s_own_periods() -> None:
     assert collection_state(Resolution.MINUTE, latest, MOMENT, True) is CollectionState.STALLED
     assert collection_state(Resolution.HOUR, latest, MOMENT, True) is CollectionState.COLLECTING
 
-
-# --- 6.1 and 6.6: taking a pair on ---------------------------------------------------
 
 
 @pytest.mark.db
@@ -174,9 +158,8 @@ async def test_a_symbol_at_two_resolutions_is_two_pairs(db: asyncpg.Connection) 
 async def test_going_over_the_ceiling_is_refused_with_the_reason(
     db: asyncpg.Connection,
 ) -> None:
-    """6.6. The ceiling is real — the gateway holds one provider connection per pair and
-    the provider limits sessions — so the refusal has to name it rather than silently
-    accepting a pair nothing will collect."""
+    """The ceiling is real — the gateway holds one provider connection per pair — so the refusal has to
+    name it rather than silently accepting a pair nothing will collect."""
     for n in range(3):
         await track(db, f"SYM{n}", Resolution.MINUTE, limit=3)
 
@@ -228,15 +211,8 @@ async def test_an_untracked_pair_frees_a_place(db: asyncpg.Connection) -> None:
 async def test_additions_racing_each_other_cannot_overrun_the_ceiling(
     db: asyncpg.Connection, migrated_url: str
 ) -> None:
-    """Counting and inserting have to be one atomic thing.
-
-    Without the lock they are not: several additions read the same count, all decide
-    there is room, and the archive ends up over a ceiling the provider itself enforces.
-
-    Eight at once rather than two. Two interleave only sometimes — the version of this
-    test that used a pair passed against a deliberately unlocked implementation, which
-    makes it worse than no test at all. Eight fails every time.
-    """
+    """Counting and inserting have to be one atomic thing. Eight at once rather than two: the two-pair
+    version passed against a deliberately unlocked implementation, which is worse than no test."""
     conns = [await asyncpg.connect(asyncpg_dsn(migrated_url)) for _ in range(8)]
     try:
         outcomes = await asyncio.gather(
@@ -250,8 +226,6 @@ async def test_additions_racing_each_other_cannot_overrun_the_ceiling(
     assert sum(isinstance(o, LimitReached) for o in outcomes) == 6
     assert len(await read_tracked(db)) == 2
 
-
-# --- 6.2: letting a pair go ----------------------------------------------------------
 
 
 @pytest.mark.db
@@ -316,8 +290,6 @@ async def test_tracking_a_stopped_pair_again_resumes_the_same_decision(
     assert len(await all_pairs(db)) == 1
 
 
-# --- 6.5: the configuration outliving the process ------------------------------------
-
 
 @pytest.mark.db
 async def test_the_configuration_survives_a_restart(
@@ -344,8 +316,6 @@ async def test_the_configuration_survives_a_restart(
     }
 
 
-# --- 6.3: the list, with how each pair is doing ---------------------------------------
-
 
 @pytest.mark.db
 async def test_the_status_carries_the_newest_candle(db: asyncpg.Connection) -> None:
@@ -363,11 +333,8 @@ async def test_the_status_carries_the_newest_candle(db: asyncpg.Connection) -> N
 
 @pytest.mark.db
 async def test_the_status_carries_the_oldest_candle(db: asyncpg.Connection) -> None:
-    """How far back the data reaches, which is not how far back it was asked to reach.
-
-    The panel answers "since when is there data for this instrument", and `collect_from`
-    would answer it wrongly for every pair whose job has not finished yet.
-    """
+    """How far back the data reaches, which is not how far back it was asked to reach. `collect_from`
+    would answer the panel wrongly for every pair whose job has not finished."""
     await track(db, "US100", Resolution.MINUTE, LIMIT)
     await write_candles(
         db,
@@ -474,8 +441,6 @@ async def test_candles_at_another_resolution_do_not_count_as_freshness(
     assert status.collection is CollectionState.NEVER_COLLECTED
 
 
-# --- 6.1: validation against the gateway ---------------------------------------------
-
 
 @pytest.fixture
 async def instruments():
@@ -557,8 +522,6 @@ async def test_validation_happens_before_the_ceiling_is_spent(
 
     assert len(await read_tracked(db)) == 1
 
-
-# --- collect_from: where history is meant to reach back to ---------------------------
 
 
 def test_default_collect_from_is_default_bars_back() -> None:

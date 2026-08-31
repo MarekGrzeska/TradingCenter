@@ -12,20 +12,13 @@ import type { JobHistoryState } from "./useJobHistory";
 import { Button } from "../ui/Button";
 
 /**
- * Every pull the archive has run, per instrument and per interval — the
- * question `market-data-jobs` exists to answer without a log: what got
- * backfilled, how far a running one has got, and where to retry what
- * failed without touching the pair's archived status at all.
+ * Every pull the archive has run, per instrument and per interval — what `market-data-jobs` answers without a log:
+ * what got backfilled, how far a running one has got, and where to retry what failed.
  */
 
 /**
- * How long a running pull may show no sign of life before the tab says so.
- *
- * One chunk is one gateway request under the shared limiter, so five minutes is
- * comfortably above anything healthy and far below the forty minutes it took to
- * notice a job had stopped (proposal.md, Why). This is a display threshold, not
- * a judgement the archive makes: the fact is `lastActivityAt`, and calling it
- * worrying belongs to the view that already re-reads every ten seconds.
+ * One chunk is one gateway request under the shared limiter, so five minutes is above anything healthy and far below
+ * the forty it took to notice a stopped job. A display threshold, not a judgement the archive makes.
  */
 const STALL_AFTER_SECONDS = 5 * 60;
 
@@ -68,13 +61,8 @@ function chunkRange(chunks: Chunk[]): { start: number; end: number } | null {
   };
 }
 
-/** How far back the work actually got, which is not always how far it was planned to.
- *
- *  A chunk is skipped when the provider turns out to have nothing below it, so a job
- *  asked for 2024 against an instrument whose history starts in 2026 plans the whole
- *  span and collects the top of it. Without this the row said "2024 → today, 0 candles",
- *  which reads as a failure and was a correct answer nobody could see. Derived from the
- *  chunks the row already carries — no field on the wire holds it. */
+/** How far back the work actually got, which is not always how far it was planned to: a chunk is skipped when the
+ *  provider has nothing below it, and the row otherwise said "2024 → today, 0 candles" for a correct answer. */
 function collectedRange(chunks: Chunk[]): { start: number; end: number } | null {
   return chunkRange(chunks.filter((c) => c.state === "done"));
 }
@@ -90,22 +78,15 @@ function failureReasons(chunks: Chunk[]): string[] {
   return [...reasons];
 }
 
-/** One line of the combined timeline — a pull or a skasowanie, never
- *  confused for the other, since a job that succeeded and a deletion that
- *  undid it read very differently and MUST NOT share a row shape
- *  (terminal-collection-history spec, "Skasowanie odróżnia się od
- *  dociągnięcia"). */
+/** A pull or a skasowanie, never confused for the other: a job that succeeded and a deletion that undid it read very
+ *  differently and MUST NOT share a row shape (terminal-collection-history spec). */
 type HistoryEntry =
   | { kind: "job"; at: number; symbol: string; resolution: Resolution; job: JobPairView }
   | { kind: "deletion"; at: number; symbol: string; resolution: Resolution; deletion: PairDeletion };
 
 /**
- * Jobs and deletions, one instrument's story told in one order.
- *
- * A pull and the deletion that later undid it are two events about the same
- * pair, and splitting them into two lists would lose the "why does this
- * pair's range look shallower now" a reader is after — the deletion has to
- * sit right next to the pull it follows, not in a table of its own.
+ * Jobs and deletions in one order: a pull and the deletion that undid it are two events about the same pair, and two
+ * lists would lose the "why does this pair's range look shallower now" a reader is after.
  */
 function combinedEntries(rows: JobPairView[], deletions: PairDeletion[]): HistoryEntry[] {
   const entries: HistoryEntry[] = [
@@ -128,15 +109,8 @@ function combinedEntries(rows: JobPairView[], deletions: PairDeletion[]): Histor
       }),
     ),
   ];
-  // Newest first, whatever the instrument: this tab is asked "what just happened" before
-  // anything else (terminal-collection-history spec, "Historia jest ułożona od
-  // najnowszego zdarzenia"). The cost, taken deliberately, is that a deletion no longer
-  // sits beside the pull it undid — that story can still be followed down the symbol
-  // column, while "what just happened" had no workaround at all (design.md).
-  //
-  // Symbol and interval are the tiebreak because seconds collide — a wizard submission
-  // stamps every pair with the same `at` — and the two lists come from independent
-  // polls, so input order is no help even though the sort is stable.
+  // Newest first, whatever the instrument: this tab is asked "what just happened" first, and that had no workaround
+  // while the deletion-beside-its-pull story can still be followed down the symbol column. Symbol breaks tied seconds.
   return entries.sort((a, b) => {
     if (a.at !== b.at) return b.at - a.at;
     if (a.symbol !== b.symbol) return a.symbol.localeCompare(b.symbol);
@@ -150,9 +124,8 @@ export function CollectionHistoryView() {
     () => combinedEntries(history.rows, history.deletions),
     [history.rows, history.deletions],
   );
-  // Which job is open, not a copy of it: the dialog is built from the rows
-  // below on every render, so the ten-second poll refreshes what it shows
-  // instead of leaving a snapshot ageing on screen.
+  // Which job is open, not a copy of it: the dialog is built from the rows below on every render, so the ten-second
+  // poll refreshes what it shows instead of leaving a snapshot ageing on screen.
   const [openJobId, setOpenJobId] = useState<number | null>(null);
   const openRows = useMemo(
     () => (openJobId === null ? [] : history.rows.filter((r) => r.jobId === openJobId)),
@@ -258,11 +231,8 @@ function HistoryRow({ row, onOpenJob }: { row: JobPairView; onOpenJob(jobId: num
   const reasons = failureReasons(row.chunks);
   const range = chunkRange(row.chunks);
   const collected = collectedRange(row.chunks);
-  // Only for a job that finished cleanly. A range still filling in is not a shortfall,
-  // and a chunk that *failed* says nothing about what the provider holds — reading its
-  // absence as "the history stops here" turns an outage into a claim about the
-  // instrument. `succeeded` is exactly the case where every unfinished chunk was
-  // skipped, which is the provider having answered.
+  // Only for a job that finished cleanly. A failed chunk says nothing about what the provider holds, and reading its
+  // absence as "the history stops here" turns an outage into a claim about the instrument.
   const whole = row.status === "succeeded" && range !== null;
   const shallow = whole && collected !== null && collected.start > range.start;
   const nothingReached = whole && collected === null;
@@ -318,12 +288,8 @@ function HistoryRow({ row, onOpenJob }: { row: JobPairView; onOpenJob(jobId: num
           )}
         </td>
         <td className="px-4 py-1.5 text-right">
-          {/* Where Retry used to sit. It retried the whole job from beside one
-              pair, which is a promise the position contradicted; the job — every
-              pair of it — is what the dialog behind this shows and retries
-              (terminal-collection-history spec, "Ponowienie stoi przy całości,
-              nie przy parze"). Keyboard-reachable in its own right, so opening a
-              job never needs a pointer. */}
+          {/* Where Retry used to sit. It retried the whole job from beside one pair, a promise the position
+              contradicted — the job is what the dialog behind this shows and retries. */}
           <Button
             tone="muted"
             size="xs"
@@ -351,16 +317,8 @@ function HistoryRow({ row, onOpenJob }: { row: JobPairView; onOpenJob(jobId: num
 }
 
 /**
- * One collection job, whole — the only place it is visible as one thing. The tab stays a
- * flat timeline because grouping by job would file the newest event wherever its job
- * happened to start, so the job is assembled here out of rows already on screen: no
- * second request, no second freshness clock, and it moves with the ten-second poll.
- *
- * Retry lives here because this is where its scope is visible — it re-runs every failed
- * chunk of every pair the job touched, which is what the per-row button used to do while
- * looking like it did less. Removing the job from the history is here for the same
- * reason, and the two share nothing else: one re-runs work, the other forgets it ever
- * happened without touching a candle.
+ * One collection job, whole — assembled from rows already on screen, so no second request and no second freshness
+ * clock. Retry lives here because this is where its scope is visible: every failed chunk of every pair.
  */
 function JobDialog({
   jobId,
@@ -373,10 +331,8 @@ function JobDialog({
   onChanged(): void;
   onClose(): void;
 }) {
-  // The second question is a second dialog, not a second button beside "Retry job".
-  // `ConfirmDialog` asks one thing and answers it once; two irreversible buttons on one
-  // panel is how the wrong one gets pressed (`terminal-dialogs` spec, "Pytanie o zgodę
-  // jest dialogiem").
+  // The second question is a second dialog, not a second button beside "Retry job": two irreversible buttons on one
+  // panel is how the wrong one gets pressed (`terminal-dialogs` spec, "Pytanie o zgodę jest dialogiem").
   const [removing, setRemoving] = useState(false);
   const chunks = rows.flatMap((row) => row.chunks);
   const retryable = chunks.filter(
@@ -537,11 +493,8 @@ function JobDialog({
 }
 
 /**
- * A skasowanie, in the same table a pull's row lives in — deliberately not
- * styled like one. It is neither a success nor a failure, so it MUST NOT
- * borrow `text-good` (reserved for a job that succeeded) or `text-critical`
- * (a job that failed): reading it at a glance has to say "something was
- * removed", not "something went wrong" or "something finished".
+ * A skasowanie in the same table, deliberately not styled like a pull: neither success nor failure, so it MUST NOT
+ * borrow `text-good` or `text-critical` — at a glance it says "removed", not "went wrong".
  */
 function DeletionRow({ deletion }: { deletion: PairDeletion }) {
   const { removedFrom, removedTo } = deletion;

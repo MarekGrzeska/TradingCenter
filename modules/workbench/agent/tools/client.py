@@ -1,20 +1,5 @@
-"""The session with `market-mcp`, and the one place the `mcp` package is imported.
-
-Three things this file is responsible for, and they are easy to conflate:
-
-- **What tools exist.** Asked once per session with the server and kept in the process,
-  not asked per turn — the same choice market-mcp made for its own indicator catalogue.
-  Nothing is committed and nothing is checked before start: MCP describes itself, so the
-  contract travels in the session that uses it (specs/agent-tool-access, "Moduł nie
-  trzyma kopii tego, co ogłasza serwer narzędzi").
-- **Three outcomes, not two.** A tool that answered "not like that" and a server that
-  did not answer at all are different facts, and the model can act on the first
-  (specs/agent-tool-access, "Przekroczenie czasu MUST być odróżnialne od odmowy
-  narzędzia").
-- **Never raising into the turn.** Every failure here comes back as a `ToolOutcome`.
-  A turn that dies because the archive is busy is a worse answer than a turn that says
-  so.
-"""
+"""The session with `market-mcp`, and the one place the `mcp` package is imported. Three responsibilities easy to
+conflate: what tools exist, asked once per session; three outcomes rather than two; and never raising into the turn."""
 
 from __future__ import annotations
 
@@ -39,17 +24,8 @@ from ..config import Settings
 
 log = logging.getLogger(__name__)
 
-# What the SDK turns a `404` on `POST /mcp` into. The status never reaches this file:
-# `streamable_http.py` sees it, synthesizes this JSON-RPC error into the response stream,
-# and `ClientSession` raises it as an `McpError` — so the string is the only handle there
-# is. Matching a string from somebody else's library is brittle on purpose rather than by
-# accident: `test_session_gone.py` drives a real client against a real server that has
-# forgotten the session, so an SDK upgrade that reworded this fails a test instead of
-# quietly turning the retry off. Kept identical to `teams/tools/client.py`, which found
-# this first — a fix here belongs there too.
-# The two tails every unanswered call ends with, and the difference between them is the
-# whole of `moves_the_account`. Written once because four call sites used to spell them
-# out, and a reworded half is a different instruction to the model, not a typo.
+# What the SDK turns a `404` on `POST /mcp` into. The status never reaches this file, so the string is the
+# only handle there is — brittle on purpose: a real client drives a real forgetful server in the tests.
 _MAY_HAVE_LANDED = (
     "The call may have gone through — do not send it again. Tell the operator the "
     "outcome is unknown and that they should check the account."
@@ -63,25 +39,20 @@ _SESSION_GONE_MESSAGE = "Session terminated"
 # `streamable_http_app()` and wraps it without touching the route).
 MCP_PATH = "/mcp"
 
-# No header for an operator's own credential any more, and its absence is the whole of
-# what this file lost with `teams-mcp`: every server reached from here is reached on this
-# module's own identity. The one tool source that acts for a person is not on a network at
-# all (`workbench/team_tools.py`).
+# No header for an operator's own credential any more: every server reached from here is reached on this
+# module's own identity. The one tool source that acts for a person is not on a network at all.
 
 
 @dataclass(frozen=True)
 class ToolDescriptor:
-    """One tool as the server announced it. `input_schema` is JSON Schema and is handed
-    to the provider unread — this module does not validate arguments the server already
-    describes, and a second opinion here would only be a second thing to keep in step."""
+    """One tool as the server announced it. `input_schema` is JSON Schema and is handed to the provider
+    unread: a second opinion here would only be a second thing to keep in step."""
 
     name: str
     description: str
     input_schema: dict[str, Any]
-    # From the server's own `readOnlyHint`. `None` means the tool carried no annotation
-    # at all, which is not the same as "reads" — see `ToolServer.moves_the_account`,
-    # where the difference decides whether a call that never answered is recorded as
-    # unknown or as unavailable.
+    # From the server's own `readOnlyHint`. `None` means the tool carried no annotation at all, which is
+    # not the same as "reads" — the difference decides how a call that never answered is recorded.
     read_only: bool | None = None
 
 
@@ -93,12 +64,8 @@ class ToolOutcomeKind(StrEnum):
     # The server did not answer at all — unreachable, timed out, refused the identity.
     # Nothing was asked, so nothing about the archive is known either way.
     UNAVAILABLE = "unavailable"
-    # The server did not answer *and* the call may have landed anyway. Only ever produced
-    # for a call that can change the account, where "nothing was asked" is a claim this
-    # module cannot make: a `place_order` that timed out is either no position or one
-    # nobody knows about (specs/agent-trading, "Wywołanie ruszające rachunek zostawia
-    # ślad przed wysłaniem"). Kept apart from UNAVAILABLE because the two carry opposite
-    # advice — retry the read, never the order.
+    # The server did not answer *and* the call may have landed anyway. Only ever produced for a call that
+    # can change the account. Kept apart from UNAVAILABLE: retry the read, never the order.
     UNKNOWN = "unknown"
 
 
@@ -114,15 +81,8 @@ class ToolOutcome:
 
 
 class _ManagedIdentityAuth(httpx.Auth):
-    """A bearer token per request rather than per connection.
-
-    The streamable-http transport fixes its headers when the connection opens, and a
-    session outliving its token would start failing mid-conversation for a reason that
-    reads like nothing at all. `DefaultAzureCredential` caches internally and only
-    reaches the identity endpoint again near expiry, so this is not a round trip per
-    call — the same reasoning market-mcp's own client documents on its side of this
-    seam.
-    """
+    """A bearer token per request rather than per connection: the streamable-http transport fixes its
+    headers when the connection opens, and a session outliving its token fails for no readable reason."""
 
     def __init__(self, credential: DefaultAzureCredential, scope: str) -> None:
         self._credential = credential
@@ -135,26 +95,8 @@ class _ManagedIdentityAuth(httpx.Auth):
 
 
 class ToolServer:
-    """One MCP session over one server, named by which triplet of `Settings` fields it
-    reads.
-
-    `prefix` selects the field group — `"market_mcp"` reads `market_mcp_url` and its
-    two neighbours, `"teams_mcp"` the same shape one catalogue over. The default carries
-    the whole of this module's history: every call site that predates the second server
-    keeps constructing a bare `ToolServer(settings)` and gets exactly the market-mcp
-    instance it always did.
-
-    `can_move_the_account` marks the one server whose calls could leave the account
-    changed even when nothing comes back. It used to have a sibling — a flag for the one
-    server that acted **for a person** rather
-    than merely on this module's behalf. Its tools create teams and spend money in an
-    operator's name, so a call to it carries their credential; market-mcp reads a shared
-    archive and has no use for one (design.md, D2).
-
-    `can_move_the_account` marks the one server whose writes land somewhere this module
-    cannot look afterwards. It decides nothing about how a call is made and everything
-    about how a call that did not answer is recorded.
-    """
+    """One MCP session over one server, named by which triplet of `Settings` fields it reads. `can_move_the_account`
+    decides nothing about how a call is made and everything about how one that did not answer is recorded."""
 
     def __init__(
         self,
@@ -198,16 +140,8 @@ class ToolServer:
             await self._credential.close()
 
     async def list_tools(self, operator_principal: str | None = None) -> list[ToolDescriptor]:
-        """What the model may call this turn. An empty list is the answer whenever the
-        server is not configured or not reachable — the caller's job is to run the turn
-        without tools, not to fail it (specs/agent-tool-access, "Brak serwera narzędzi
-        nie odbiera agentowi mowy").
-
-        `operator_principal` is accepted and ignored, so that every tool source in the
-        registry has one signature. A server on a network is reached on *this* module's
-        identity and its session is shared across turns; the source that acts for a person
-        is not on a network (`workbench/team_tools.py`).
-        """
+        """What the model may call this turn. An empty list is the answer whenever the server is not configured or not
+        reachable, so the caller runs the turn without tools; `operator_principal` is accepted and ignored for one signature."""
         if self._url is None:
             return []
         if self._tools is not None:
@@ -237,14 +171,8 @@ class ToolServer:
         return self._tools
 
     def moves_the_account(self, name: str) -> bool:
-        """Whether a call to `name` could leave the account changed even if nothing comes
-        back. Asked *before* the call, because the answer decides that the trace is
-        written first.
-
-        A tool this server announced but we hold no descriptor for counts as moving the
-        account: the list is dropped whenever a session breaks, so the honest reading of
-        "we cannot tell" is the one that writes a row too many rather than none.
-        """
+        """Whether a call to `name` could leave the account changed even if nothing comes back. Asked before
+        the call. A tool we hold no descriptor for counts as moving it: a row too many beats none."""
         if not self.can_move_the_account:
             return False
         for tool in self._tools or ():
@@ -255,23 +183,8 @@ class ToolServer:
     async def call(
         self, name: str, arguments: dict[str, Any], operator_principal: str | None = None
     ) -> ToolOutcome:
-        """One logical call, and at most two requests. `operator_principal` is accepted
-        and ignored — see `list_tools`.
-
-        The second request happens only when the server rejected the first as belonging
-        to a session it does not know — which it answers **before** looking at which tool
-        was asked for, so it proves the call was not handled. That is the whole of the
-        licence: a timeout leaves the effect unknown and is never repeated, and the
-        distinction is drawn on the server's answer rather than on the tool's name,
-        because the gate that produced the answer had not read the name either.
-
-        A restart on the other side is the ordinary way this happens, and it happened in
-        production on 17 August 2026: `trading-mcp` was redeployed, and the first call
-        after it — an order — died against a session that no longer existed. Without the
-        retry this module answers that with `UNKNOWN` and sends the operator to check an
-        account nothing was ever sent to. `teams/tools/client.py` carries the same
-        retry, and got it first.
-        """
+        """One logical call, and at most two requests: the second only when the server rejected the first as belonging
+        to a session it does not know. Without the retry an order reads as `UNKNOWN` and sends the operator to check nothing."""
         started = time.monotonic()
 
         def elapsed() -> int:
@@ -317,21 +230,11 @@ class ToolServer:
                 return ToolOutcome(*self._unreachable(second, may_have_landed), elapsed())
 
         if result.isError:
-            # market-mcp's refusals are written for a reader who can act on them, so its
-            # own words travel rather than a summary of them (specs/agent-tools, "Odmowa
-            # narzędzia jest wynikiem, nie awarią tury"). A refusal has no structured
-            # output — the SDK reports it as unstructured prose only.
+            # market-mcp's refusals are written for a reader who can act on them, so its own words travel
+            # rather than a summary. A refusal has no structured output — the SDK reports prose only.
             return ToolOutcome(ToolOutcomeKind.REFUSED, _text_of(result.content), elapsed())
-        # A tool whose return type is a bare list — `list_tracked_pairs`, e.g. — is not
-        # one text block but one *per item*, because `_convert_to_content` recurses into
-        # a list rather than serializing it whole. Joining those with `_text_of` below
-        # would hand a reader expecting one JSON document N of them back to back — valid
-        # for nothing (`json.loads` sees "Extra data" past the first), and silently wrong
-        # for exactly one (a single object, not the one-item array it should be).
-        # `structuredContent` is the SDK's own well-formed answer to that, built from the
-        # same return value before it gets split apart for `content` — read it when the
-        # server declared one instead of reassembling it by hand from prose blocks meant
-        # for a model to read, not a parser.
+        # A tool whose return type is a bare list is not one text block but one per item, because the SDK
+        # recurses into a list. `structuredContent` is its own well-formed answer to that.
         text = (
             json.dumps(result.structuredContent)
             if result.structuredContent is not None
@@ -361,15 +264,8 @@ class ToolServer:
 
     @asynccontextmanager
     async def _session_for(self) -> AsyncIterator[ClientSession]:
-        """One session for the life of the process — the credential this module presents
-        never varies, so a connection is paid for once.
-
-        There used to be a second way through here, for the one server that acted in a
-        *person's* name: its credential arrived per call, the streamable-http transport
-        fixes its headers when the connection opens, and a shared session would have
-        carried whichever operator happened to open it. That server is a layer in this
-        process now, so the branch and its per-call connection are gone with it.
-        """
+        """One session for the life of the process — the credential this module presents never varies, so a
+        connection is paid for once. The branch for a per-person credential went with the server that needed it."""
         yield await self._connected_session()
 
     async def _connected_session(self) -> ClientSession:
@@ -395,11 +291,8 @@ class ToolServer:
             if self._credential is not None and self._scope is not None
             else None
         )
-        # `create_mcp_http_client` rather than a bare `httpx.AsyncClient`: the transport
-        # relies on defaults it sets (redirects, in particular), and a client built by
-        # hand here would be a second place to keep them. `read` is left long — the
-        # connection carries the session's own event stream; per-call time is bounded by
-        # `asyncio.wait_for` at the call sites instead.
+            # `create_mcp_http_client` rather than a bare `httpx.AsyncClient`: the transport relies on
+            # defaults it sets. `read` is left long; per-call time is bounded at the call sites instead.
         http_client = await stack.enter_async_context(
             create_mcp_http_client(
                 timeout=httpx.Timeout(self._timeout, read=None), auth=auth
@@ -413,9 +306,8 @@ class ToolServer:
         return session
 
     async def _disconnect(self) -> None:
-        """Drops the session so the next call opens a fresh one. The tool list goes with
-        it: a server that restarted may be publishing a different set, and holding the
-        old one would be this module keeping exactly the copy it is not supposed to."""
+        """Drops the session so the next call opens a fresh one. The tool list goes with it: a server that
+        restarted may publish a different set, and holding the old one would be keeping a copy."""
         stack, self._stack = self._stack, None
         self._session = None
         self._tools = None
@@ -428,14 +320,8 @@ class ToolServer:
 
 
 def _describe(err: BaseException) -> str:
-    """The cause, not the wrapper.
-
-    Both the streamable-http transport and the MCP session run their halves in an anyio
-    task group, so a refused connection surfaces as `unhandled errors in a TaskGroup
-    (1 sub-exception)` — a sentence that names nothing. It reached a live run before it
-    reached this function, and the model would have been handed it verbatim. Groups
-    nest, so this recurses.
-    """
+    """The cause, not the wrapper. Both halves run in an anyio task group, so a refused connection surfaces
+    as "unhandled errors in a TaskGroup" — a sentence that names nothing. Groups nest, so this recurses."""
     if isinstance(err, BaseExceptionGroup):
         inner = [_describe(sub) for sub in err.exceptions]
         # Deduplicated: a group of five identical connection refusals is one fact.
@@ -447,13 +333,8 @@ def _describe(err: BaseException) -> str:
 
 
 def _session_is_gone(err: BaseException) -> bool:
-    """Whether the server refused this request as belonging to a session it does not know.
-
-    Recurses into groups for `_describe`'s reason: the transport runs its halves in anyio
-    task groups, so what reaches a caller is often the error wrapped in one. Byte for byte
-    the same as `teams/tools/client.py`'s — deliberately, so a correction travels by
-    copying rather than by rewriting.
-    """
+    """Whether the server refused this request as belonging to a session it does not know. Byte for byte the
+    same as `teams/tools/client.py`'s, so a correction travels by copying rather than by rewriting."""
     if isinstance(err, BaseExceptionGroup):
         return any(_session_is_gone(sub) for sub in err.exceptions)
     return (
@@ -464,9 +345,8 @@ def _session_is_gone(err: BaseException) -> bool:
 
 
 def _text_of(content: list[Any]) -> str:
-    """Text blocks only, joined. market-mcp answers in prose by design — its ceilings,
-    its aggregation notes and its refusals are all sentences — so a non-text block is
-    something new on that side, named here rather than dropped silently."""
+    """Text blocks only, joined. market-mcp answers in prose by design, so a non-text block is something new
+    on that side, named here rather than dropped silently."""
     parts: list[str] = []
     for block in content:
         text = getattr(block, "text", None)

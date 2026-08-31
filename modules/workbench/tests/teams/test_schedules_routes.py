@@ -1,14 +1,5 @@
-"""Schedules and triggers over HTTP — the wire shapes, the refusals, and who sees what.
-
-Through `TestClient` and the real lifespan, like `test_catalogue_routes.py`: the routes
-read the pool and the settings the lifespan puts on `app.state`, so a test that assembled
-its own app would be testing a second arrangement rather than the one deployed.
-
-Fire history is written directly through `store` in these tests rather than through a
-route — starting the clock that claims a due fire and writes the history row is group 3's
-job (`scheduler/`), not these routes'. What is proven here is that the row, once it
-exists, is exactly what an operator sees.
-"""
+"""Schedules and triggers over HTTP — the wire shapes, the refusals, and who sees what, through `TestClient` and the
+real lifespan. Fire history is written through `store` here, because claiming a due fire is the clock's job."""
 
 from __future__ import annotations
 
@@ -58,9 +49,8 @@ def client(db: asyncpg.Connection) -> Iterator[TestClient]:
 
 
 def _record_fire(migrated_url: str, **kwargs) -> asyncpg.Record:
-    """A row written the way group 3's clock will write it, without needing the clock —
-    a fresh connection outside the app's own pool, closed before the assertion reads it
-    back through the route."""
+    """A row written the way the clock will write it, without needing the clock — a fresh connection outside
+    the app's own pool, closed before the assertion reads it back through the route."""
 
     async def _write() -> asyncpg.Record:
         conn = await asyncpg.connect(asyncpg_dsn(migrated_url))
@@ -114,8 +104,6 @@ def _trigger_body(revision_id: int, *, tool_name: str = "read_indicators") -> di
         "threshold": "70",
     }
 
-
-# --- schedules ------------------------------------------------------------------------
 
 
 def test_a_schedule_is_created_with_a_next_fire_computed_from_the_cron_expression(
@@ -283,9 +271,8 @@ def test_a_daily_rhythm_with_weekdays_is_refused(client: TestClient) -> None:
 
 
 def test_a_rhythm_with_weekdays_can_be_previewed_before_it_is_saved(client: TestClient) -> None:
-    """That the days survive the draft route. The weekend itself is proven where the
-    arithmetic lives (`test_schedule_timing.py`) — this preview caps at 20 fires, which for
-    an hourly rhythm need not reach a Saturday at all."""
+    """That the days survive the draft route. The weekend itself is proven where the arithmetic lives; this
+    preview caps at 20 fires, which for an hourly rhythm need not reach a Saturday."""
     preview = client.post(
         "/schedules/next-fires",
         json={
@@ -396,8 +383,6 @@ def test_a_fire_that_started_nothing_shows_up_in_the_schedules_history(
     assert rows[0]["run_id"] is None
     assert rows[0]["reason"] == "the previous run is still working"
 
-
-# --- triggers -----------------------------------------------------------------------
 
 
 def test_a_trigger_with_no_tool_server_configured_is_refused(client: TestClient) -> None:
@@ -513,12 +498,8 @@ def test_a_fire_that_started_nothing_shows_up_in_the_triggers_history(
     assert rows[0]["run_id"] is None
 
 
-# --- what the removed acknowledgement left behind -------------------------------------
-#
-# Four tests stood here, holding a schedule over an order-placing revision to a consent
-# field. The requirement is withdrawn (`manage-schedules-and-drop-the-acknowledgement`),
-# so what is held now is the opposite: the same save goes through, against a server that
-# really announces a write tool rather than against a stub that pretends to.
+# Four tests stood here, holding a schedule over an order-placing revision to a consent field. The
+# requirement is withdrawn, so what is held now is the opposite: the same save goes through.
 
 
 def test_a_schedule_over_order_placing_tools_is_written_without_any_consent(
@@ -557,10 +538,8 @@ def test_a_trigger_over_order_placing_tools_is_written_too(
 def test_an_acknowledgement_field_from_an_older_terminal_is_ignored(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The window between deploying this module and deploying the terminal. A terminal
-    built before this change still sends `unattended_ack`; the module must drop it on the
-    floor rather than refuse the save, or that window is one where no schedule can be
-    written at all."""
+    """The window between deploying this module and deploying the terminal. A terminal built before this
+    change still sends `unattended_ack`, and the module must drop it rather than refuse the save."""
     with serving_sync(tools=("place_order",)) as url:
         monkeypatch.setenv("TRADING_MCP_URL", url)
         with TestClient(app) as started:
@@ -574,8 +553,6 @@ def test_an_acknowledgement_field_from_an_older_terminal_is_ignored(
     assert response.status_code == 201, response.text
     assert "unattended_ack" not in response.json()
 
-
-# --- deleting, and what it takes with it ---------------------------------------------
 
 
 def test_a_deleted_schedule_is_gone_from_the_catalogue(client: TestClient) -> None:

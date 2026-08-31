@@ -25,12 +25,8 @@ class ParamOutOfRange(StrategyError, ValueError):
 
 
 class UnknownFactIndicator(StrategyError):
-    """A strategy declared a fact the archive's catalogue does not announce.
-
-    Refused at registration, naming the indicator — `strategy-runtime`, "Fakty pochodzą
-    z archiwum, jedną drogą". The alternative is a strategy that runs and silently decides
-    on one fact fewer than it was written against.
-    """
+    """A strategy declared a fact the archive's catalogue does not announce, refused at registration and
+    naming the indicator. The alternative is a strategy that silently decides on one fact fewer."""
 
     def __init__(self, strategy_id: str, indicator: str) -> None:
         self.strategy_id = strategy_id
@@ -52,14 +48,8 @@ class ArchiveRefused(StrategyError):
 
 
 class DefinitionRefused(StrategyError, ValueError):
-    """A rule that will not be saved, and the one thing about it that has to change.
-
-    Refused at the moment it is written rather than at the first candle, the way a team
-    definition is (`teams/validation.py`): a rule that cannot run is something the operator
-    can still see on the screen they wrote it on, and an hour later it is a strategy that
-    silently records nothing (`strategy-configurator`, "Definicja jest odrzucana w chwili
-    zapisu").
-    """
+    """A rule that will not be saved, and the one thing about it that has to change. Refused when it is
+    written rather than at the first candle: an hour later it is a strategy that silently records nothing."""
 
 
 class UnknownDefinition(StrategyError):
@@ -76,13 +66,8 @@ class UnknownRevision(StrategyError):
 
 
 class RevisionMismatch(StrategyError):
-    """A parameter set written for one revision, offered to another.
-
-    Named rather than tolerated: a value inside its range under revision 3 may be outside
-    it — or have no declaration at all — under revision 4, so silently reusing the set
-    would run a strategy on numbers nothing vouches for (`strategy-configurator`,
-    "Rewizja jest niezmienna, a obserwacja ją przypina").
-    """
+    """A parameter set written for one revision, offered to another. Named rather than tolerated: a value
+    inside its range under revision 3 may be outside it under revision 4."""
 
     def __init__(self, parameter_set_id: int, belongs_to: int | None, offered_to: int | None) -> None:
         self.parameter_set_id = parameter_set_id

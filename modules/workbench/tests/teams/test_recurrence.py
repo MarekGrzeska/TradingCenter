@@ -1,8 +1,5 @@
-"""The rhythm ↔ cron pair, both ways — `teams/recurrence.py`.
-
-No database and no clock: this is a translation, and the one property worth holding it to
-is that the two directions agree.
-"""
+"""The rhythm ↔ cron pair, both ways. No database and no clock: this is a translation, and the one property
+worth holding it to is that the two directions agree."""
 
 from __future__ import annotations
 

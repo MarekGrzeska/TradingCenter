@@ -4,14 +4,12 @@ version = "0.1.0"
 description = "The caller-identity middleware and upstream-refusal helper shared by the three MCP modules"
 requires-python = ">=3.12"
 dependencies = [
-    # `network_identity` is raw ASGI and needs Starlette's own types rather than
-    # FastAPI's wrapper of them; `detail` reads an upstream's refusal off an `httpx`
-    # response. Nothing else — no database driver, no Azure credential, no FastAPI.
+    # `network_identity` is raw ASGI and needs Starlette's own types; `detail` reads an upstream's refusal off an
+    # `httpx` response. Nothing else — no database driver, no Azure credential, no FastAPI.
     "httpx>=0.27",
     "starlette>=0.37",
-    # `tool_schemas` reaches into a built server's tool registry, which is FastMCP's.
-    # Not a widening of what this package is for: all three consumers are MCP servers by
-    # definition, and all three already pin `mcp==1.27.0` themselves.
+    # `tool_schemas` reaches into a built server's tool registry, which is FastMCP's. Not a widening: all three
+    # consumers are MCP servers by definition, and all three already pin `mcp==1.27.0` themselves.
     "mcp>=1.27,<2",
 ]
 

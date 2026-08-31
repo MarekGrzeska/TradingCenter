@@ -1,9 +1,5 @@
-"""Where this module keeps its migrations.
-
-Its advisory-lock key stays in `db.py` with the rest of this module's database plumbing —
-unlike agent and teams, this module kept that file, because it is not a copy of theirs
-(`packages-replace-the-hand-copies/design.md`, D4).
-"""
+"""Where this module keeps its migrations. Its advisory-lock key stays in `db.py`, which unlike
+agent's and teams' this module kept, because it is not a copy of theirs."""
 
 from __future__ import annotations
 

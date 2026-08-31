@@ -25,15 +25,8 @@ export const NO_HISTORY: EditHistory = [];
 const DEPTH = 50;
 
 /**
- * The state *before* an action, kept so the action can be taken back.
- *
- * Text edits coalesce: `edit` runs on every keystroke, so a prompt typed into character by
- * character would otherwise fill the whole history and undo one letter at a time. A run of
- * edits carrying the same `text:` kind keeps the state from before the run — the first
- * keystroke's — and the operator gets back what they had before they started typing, which
- * is what they mean by "undo that". Every other kind always pushes: two agents removed one
- * after the other are two actions, and collapsing them would make one undo do the work of
- * two.
+ * The state *before* an action, so it can be taken back. Text edits coalesce — `edit` runs on every keystroke —
+ * so undo gives back what the operator had before they started typing; every other kind always pushes.
  */
 export function remember(history: EditHistory, before: TeamState, kind: string): EditHistory {
   const top = history[history.length - 1];

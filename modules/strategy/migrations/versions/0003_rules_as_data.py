@@ -1,8 +1,5 @@
-"""Definitions and their revisions — the half of a strategy that used to be only code.
-
-Additive throughout. Nothing here rewrites an existing row, because every existing row was
-produced by an entry that lives in the image and has no revision to point at: `NULL` in the
-four new columns means exactly what it says, and is not missing data.
+"""Definitions and their revisions — the half of a strategy that used to be only code. Additive
+throughout: `NULL` in the four new columns means exactly what it says, and is not missing data.
 
 Revision ID: 0003
 Revises: 0002
@@ -23,11 +20,8 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # The name and the identity of a clicked strategy. `strategy_id` is a plain text id
-    # from the same namespace the coded entries use, so `watches`, `decisions`,
-    # `parameter_sets` and the whole tool surface keep working on one kind of key
-    # (design.md, decision 5). A definition claiming a coded entry's id is refused above
-    # this table, where the catalogue can be consulted.
+    # The name and identity of a clicked strategy. `strategy_id` is a plain text id from the same
+    # namespace the coded entries use, so everything downstream keeps working on one kind of key.
     op.create_table(
         "strategy_definitions",
         sa.Column("id", sa.BigInteger, sa.Identity(always=True), primary_key=True),
@@ -38,10 +32,8 @@ def upgrade() -> None:
                   server_default=sa.text("now()")),
     )
 
-    # Append-only, exactly like `parameter_sets` and for the same reason one layer up: a
-    # decision names the revision it was computed under, and answering "what decided this"
-    # a month later requires that revision to still read the way it read then. A change of
-    # mind is the next revision (`strategy-configurator`, "Rewizja jest niezmienna").
+    # Append-only, exactly like `parameter_sets`: a decision names the revision it was computed under,
+    # and answering "what decided this" a month later requires that revision to read as it read then.
     op.create_table(
         "strategy_revisions",
         sa.Column("id", sa.BigInteger, sa.Identity(always=True), primary_key=True),
@@ -52,19 +44,16 @@ def upgrade() -> None:
             nullable=False,
         ),
         sa.Column("version", sa.Integer, nullable=False),
-        # The whole rule as one blob. Not shredded into node rows: a tree in tables is a
-        # tree nobody can read in a query, and what makes a revision worth keeping is that
-        # it can still be read exactly as it was written.
+        # The whole rule as one blob. Not shredded into node rows: a tree in tables is a tree nobody
+        # can read in a query, and a kept revision has to be readable exactly as written.
         sa.Column("definition", postgresql.JSONB(), nullable=False),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False,
                   server_default=sa.text("now()")),
         sa.UniqueConstraint("definition_id", "version", name="strategy_revisions_version"),
     )
 
-    # A parameter set belongs to a revision, not to a strategy: a value inside its range
-    # under one revision may be outside it — or undeclared — under the next (design.md,
-    # decision 6). Nullable, because a coded entry has no revision and its sets are still
-    # its own.
+    # A parameter set belongs to a revision, not to a strategy: a value inside its range under one
+    # revision may be outside it under the next. Nullable, because a coded entry has no revision.
     op.add_column(
         "parameter_sets",
         sa.Column(
@@ -75,9 +64,8 @@ def upgrade() -> None:
         ),
     )
 
-    # The watch pins its revision. Saving a newer one MUST NOT change what a running watch
-    # computes — a rule swapped underfoot produces decisions from before and after that
-    # look comparable and are not (design.md, decision 7).
+    # The watch pins its revision. Saving a newer one MUST NOT change what a running watch computes —
+    # a rule swapped underfoot produces decisions that look comparable and are not.
     op.add_column(
         "watches",
         sa.Column(

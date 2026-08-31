@@ -39,8 +39,6 @@ def candle(offset: int, **overrides) -> Candle:
     )
 
 
-# --- the result model itself: the one combination that must not be buildable ---------
-
 
 class TestResultShapeOrError:
     """`market-data-indicators` spec, "Wynik ma jeden z czterech kształtów" — enforced on
@@ -69,8 +67,6 @@ class TestResultShapeOrError:
         with pytest.raises(ValidationError, match="exactly one of"):
             IndicatorResultOut(id="ema", params={}, settled=True, lines={"ema": []}, zones=[])
 
-
-# --- catalogue: no database, no app.state — the route touches neither -----------------
 
 
 @pytest.fixture
@@ -105,14 +101,11 @@ async def test_catalogue_carries_no_volume_entry(catalogue_client) -> None:
         assert "volume" not in entry["name"].lower() or "obv" not in entry["id"]
 
 
-# --- compute: needs the real archive -----------------------------------------------------
-
 pytestmark = pytest.mark.db
 
 
-# `pool` comes from conftest. This `api` deliberately does not: the suite computes over
-# the archive and touches nothing that reaches outward, so it wires the two pieces the
-# router actually reads rather than the full set the contract suites need.
+# `pool` comes from conftest; this `api` deliberately does not. The suite computes over the archive and
+# touches nothing outward, so it wires the two pieces the router reads rather than the full set.
 @pytest.fixture
 async def api(app, pool, settings):
     app.state.pool = pool
@@ -150,10 +143,8 @@ async def test_computes_a_line_indicator_over_the_requested_range(api, pool) -> 
 
 
 class TestResultOrder:
-    """`market-data-indicators` spec, "Kolejność wyników" — position is the only thing
-    that binds a result back to the spec that asked for it. Id and params do not: two
-    identical specs are indistinguishable by either, and a consumer drawing the same
-    average twice in two colours needs to know which row is which."""
+    """"Kolejność wyników" — position is the only thing binding a result back to the spec that asked for
+    it: two identical specs are indistinguishable by id or params."""
 
     async def test_results_come_back_in_the_order_they_were_asked_for(self, api, pool) -> None:
         async with pool.acquire() as conn:
@@ -355,8 +346,6 @@ async def test_the_response_names_its_side_and_algorithm_version(api) -> None:
     assert body["algorithm_version"] >= 1
 
 
-# --- W1, points and levels: markers, cluster levels, cross-resolution levels ----------
-
 
 async def test_swing_points_are_returned_as_markers(api, pool) -> None:
     # A clean up-down-up wiggle so bar 5 (offset 25) is an unambiguous swing high
@@ -517,8 +506,6 @@ async def test_htf_levels_names_the_missing_day_series_in_its_own_result(api, po
     assert results["htf_levels_day"]["levels"] is None
 
 
-# --- E3, zones: zones on the wire, and task 4.3's coverage-driven session gap ---
-
 
 _TODAY = NOW.replace(hour=0, minute=0, second=0, microsecond=0)
 
@@ -573,10 +560,8 @@ async def test_range_gap_is_returned_with_direction_and_bounds(api, pool) -> Non
 
 
 async def test_friday_to_sunday_gap_is_not_reported_as_a_price_gap(api, pool) -> None:
-    """Task 4.8: a weekend close is a session boundary the archive has
-    verified, not an imbalance — `skip_session_gaps` (on by default) must
-    suppress it, and the same data must show the module *would* have
-    reported it otherwise, proving the suppression is doing something."""
+    """Task 4.8: a weekend close is a session boundary the archive verified, not an imbalance. The same
+    data must show the module *would* have reported it otherwise."""
     from market_data.coverage import record_coverage
 
     thursday = datetime(2026, 8, 6, tzinfo=UTC)  # real calendar dates —
@@ -592,9 +577,8 @@ async def test_friday_to_sunday_gap_is_not_reported_as_a_price_gap(api, pool) ->
                 _day_candle(monday, high=104.0, low=103.0),
             ],
         )
-        # The whole window verified, weekend included — the archive looked
-        # and found nothing there, `Absence.MARKET_CLOSED`, not a hole ingest
-        # left behind.
+        # The whole window verified, weekend included — the archive looked and found nothing there,
+        # `Absence.MARKET_CLOSED`, not a hole ingest left behind.
         await record_coverage(conn, "US100", Resolution.DAY, thursday, monday + timedelta(days=1))
 
     request_body = {
@@ -659,8 +643,6 @@ async def test_session_range_reads_the_minute_series_regardless_of_requested_res
     assert zone["bottom"] == pytest.approx(104.0)
 
 
-# --- E4, time profile: task 5.3's refusal, and the minute-series ceiling ---
-
 
 async def test_time_profile_names_the_missing_minute_series_in_its_own_result(api, pool) -> None:
     async with pool.acquire() as conn:
@@ -677,9 +659,8 @@ async def test_time_profile_names_the_missing_minute_series_in_its_own_result(ap
             "specs": [{"id": "time_profile"}],
         },
     )
-    # Every requested indicator failing is still an answer, not a refusal: the caller
-    # asked a well-formed question and the archive answered what it had, which is
-    # nothing (spec, "Wszystkie zamówione wskaźniki bez serii").
+    # Every requested indicator failing is still an answer, not a refusal: the caller asked a
+    # well-formed question and the archive answered what it had, which is nothing.
     assert response.status_code == 200
 
     [result] = response.json()["results"]
@@ -716,9 +697,8 @@ async def test_time_profile_computes_from_the_minute_series_at_day_resolution(ap
 
 
 async def test_a_wide_request_hiding_a_bigger_minute_read_is_refused(api, pool) -> None:
-    """The fine-resolution series `time_profile` needs behind a DAY-resolution
-    request is invisible to the ceiling's own `candles×indicators` count —
-    this is the check that keeps it from silently bypassing that ceiling."""
+    """The fine-resolution series `time_profile` needs behind a DAY request is invisible to the
+    ceiling's own `candles×indicators` count — this keeps it from silently bypassing that ceiling."""
     from market_data.indicators.service import REQUEST_CEILING
 
     # `FINE_RESOLUTION` is MINUTE_5 (288/day), not MINUTE (1440/day) — the
@@ -736,8 +716,6 @@ async def test_a_wide_request_hiding_a_bigger_minute_read_is_refused(api, pool) 
     assert response.status_code == 422
     assert "ceiling" in response.json()["detail"]
 
-
-# --- partial answers: whose problem it is decides the granularity of the refusal ------
 
 
 class TestPartialAnswer:

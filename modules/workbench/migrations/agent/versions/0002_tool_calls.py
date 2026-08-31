@@ -1,10 +1,5 @@
-"""What the agent asked market-mcp for, and what came back.
-
-Deliberately not a row in `messages`. That table is the transcript, and the transcript
-is what the terminal reads; a tool call is how the agent got to its answer, not part of
-the conversation. Keeping the two apart is what lets this change land with no terminal
-work at all — and gives the change that shows these calls something already written to
-read (specs/agent-tools, "Wywołanie narzędzia zostawia ślad").
+"""What the agent asked market-mcp for, and what came back. Deliberately not a row in `messages`: that
+table is the transcript, and a tool call is how the agent got to its answer.
 
 Revision ID: 0002
 Revises: 0001
@@ -23,9 +18,8 @@ down_revision: str | None = "0001"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-# The three answers a call can end in, and they are not interchangeable: `refused` means
-# market-mcp answered and named what to change, `unavailable` means it never answered at
-# all and nothing about the archive is known either way.
+# The three answers a call can end in, and they are not interchangeable: `refused` means the server
+# answered and named what to change, `unavailable` that it never answered at all.
 OUTCOMES = ("ok", "refused", "unavailable")
 
 
@@ -43,18 +37,16 @@ def upgrade() -> None:
             sa.ForeignKey("sessions.id", name="tool_calls_session_id_fkey"),
             nullable=False,
         ),
-        # The agent's reply this call was made in service of. Written after that reply
-        # exists, for the same reason usage rows are: the id does not exist until the
-        # turn ends.
+        # The agent's reply this call was made in service of, written after that reply exists — for the
+        # same reason usage rows are: the id does not exist until the turn ends.
         sa.Column(
             "message_id",
             sa.BigInteger(),
             sa.ForeignKey("messages.id", name="tool_calls_message_id_fkey"),
             nullable=False,
         ),
-        # Which round of the turn asked for it, and the position within that round.
-        # Together with `id` they make the order recoverable without trusting a
-        # timestamp: several calls in one round are dispatched in the same millisecond.
+        # Which round of the turn asked for it, and the position within that round. Together with `id`
+        # they make the order recoverable without trusting a timestamp.
         sa.Column("round_index", sa.Integer(), nullable=False),
         sa.Column("position", sa.Integer(), nullable=False),
         sa.Column("tool_name", sa.Text(), nullable=False),

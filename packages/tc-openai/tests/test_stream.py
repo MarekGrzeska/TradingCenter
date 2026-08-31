@@ -1,17 +1,5 @@
-"""`stream()` — the only method either module calls, and until now the only one nothing
-ran.
-
-`test_provider_shape.py` next door asserts what the client *is*; these assert what the
-call *does*, which is where the incident that package was written after actually lived: a
-turn with tools answered `400`, and the panel showed "incomplete — broke off" with no
-reason recorded anywhere. Two of the four below are that failure written down — the reason
-must reach the caller, and the text already streamed must not be swallowed with it.
-
-The seam is `ChatOpenAI` itself rather than `OpenAIProvider._client`, so everything between
-`stream()` and the wire still runs: message building, `bind_tools`, chunk accumulation and
-the usage read. What the fake cannot say anything about is whether langchain honours the
-constructor arguments it is handed, which is exactly what the shape tests are for.
-"""
+"""`stream()` — the only method either module calls, and until now the only one nothing ran. The seam is
+`ChatOpenAI` itself, so message building, `bind_tools`, accumulation and the usage read all still run."""
 
 from __future__ import annotations
 
@@ -98,14 +86,8 @@ async def _drain(provider: OpenAIProvider, **kwargs: Any) -> list[Any]:
 
 
 async def test_a_turn_with_tools_assembles_one_call_from_its_pieces(upstream: _Upstream) -> None:
-    """The arguments arrive as partial JSON split across chunks — `{"sym` here and
-    `bol": "GOLD"}` there — and langchain's accumulation is what puts them back together.
-    Read chunk by chunk instead, the tool is called with nothing, which is a turn that
-    fails on an argument the model did send.
-
-    Text is yielded as it arrives rather than at the end, because the operator is watching
-    a panel; the tool call can only be yielded once the last chunk has landed.
-    """
+    """The arguments arrive as partial JSON split across chunks, and langchain's accumulation puts them
+    back together. Read chunk by chunk the tool is called with nothing, on an argument the model did send."""
     upstream.chunks = [
         AIMessageChunk(content=[{"type": "text", "text": "checking", "index": 0}]),
         AIMessageChunk(
@@ -149,9 +131,8 @@ async def test_a_turn_with_tools_assembles_one_call_from_its_pieces(upstream: _U
 async def test_an_upstream_failure_reaches_the_caller_carrying_its_reason(
     upstream: _Upstream,
 ) -> None:
-    """The incident itself. A reason that stops here is a panel saying "incomplete" about
-    a turn whose cause was written down by the provider and then dropped — and the caller
-    has nothing left to record or to act on."""
+    """The incident itself. A reason that stops here is a panel saying "incomplete" about a turn whose
+    cause the provider wrote down and this dropped."""
     upstream.chunks = [AIMessageChunk(content=[{"type": "text", "text": "checking", "index": 0}])]
     upstream.raises = RuntimeError(
         "Error code: 400 - Function tools with reasoning_effort are not supported"
@@ -174,9 +155,8 @@ async def test_an_upstream_failure_reaches_the_caller_carrying_its_reason(
 async def test_a_round_is_replayed_so_the_model_sees_what_it_already_asked(
     upstream: _Upstream,
 ) -> None:
-    """A result sent back without the call that produced it reads as an answer to nothing,
-    and `tool_call_id` is what pairs the two — an answer under the wrong id is an answer to
-    a question the model did not ask."""
+    """A result sent back without the call that produced it reads as an answer to nothing, and
+    `tool_call_id` is what pairs the two."""
     upstream.chunks = [AIMessageChunk(content=[{"type": "text", "text": "2400", "index": 0}])]
 
     await _drain(
@@ -215,9 +195,8 @@ async def test_a_round_is_replayed_so_the_model_sees_what_it_already_asked(
 async def test_usage_the_provider_never_reported_is_none_and_never_zero(
     upstream: _Upstream,
 ) -> None:
-    """specs/agent-usage, "Zużycia, którego dostawca nie podał, MUST NOT być zgadywane" —
-    and zero is a guess that reads as a measurement. A turn always ends in a report, so the
-    caller has one shape to store rather than two."""
+    """"Zużycia, którego dostawca nie podał, MUST NOT być zgadywane" — and zero is a guess that reads
+    as a measurement. A turn always ends in a report, so the caller has one shape to store."""
     upstream.chunks = [AIMessageChunk(content=[{"type": "text", "text": "2400", "index": 0}])]
 
     seen = await _drain(

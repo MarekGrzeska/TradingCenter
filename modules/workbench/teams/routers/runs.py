@@ -1,15 +1,5 @@
-"""Runs: starting one, reading its trace, watching it work, and interrupting it.
-
-Every route takes `current_principal` and hands it to the store, which puts the owner into
-the statement itself — a run belonging to somebody else answers 404, exactly as one that
-never existed (specs/teams-browser-access).
-
-A run is started on a **revision**, never on "the team as it is now": the route resolves
-the revision once, and everything after that — the graph, the trace, the comparison a
-month later — points at that row. An operator saving a new revision while a run works
-changes nothing about the run (specs/teams-runs, "Przebieg odbywa się na rewizji, nie na
-zespole").
-"""
+"""Runs: starting one, reading its trace, watching it work, and interrupting it, with every route handing
+`current_principal` to the store. A run is started on a *revision*, so a save while it works changes nothing about it."""
 
 from __future__ import annotations
 
@@ -41,16 +31,11 @@ _KEEPALIVE_SECONDS = 15
 async def start_run(
     team_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> RunOut:
-    """Starts a run of the team's latest revision and answers immediately.
+    """Starts a run of the team's latest revision and answers immediately. 201 with the run, not its
+    result: a team takes minutes, and a request held open for that fails whenever the network does.
 
-    201 with the run, not the run's result: a team takes minutes, and a request held open
-    for it would be a request that fails whenever the network does. What the operator
-    watches afterwards is `/runs/{id}/events`, and what survives either way is the trace.
-
-    The checks and the start itself are `runner.start_run_on_revision` — the same
-    function the schedule/trigger clock calls once it has resolved its own revision
-    (design.md, "Uruchomienie przebiegu tą samą drogą co router").
-    """
+    The checks and the start itself are `runner.start_run_on_revision` — the same function the clock calls
+    once it has resolved its own revision."""
     pool = request.app.state.teams.pool
     async with pool.acquire() as conn:
         revision = await store.get_latest_revision(conn, team_id=team_id, owner_principal=owner)
@@ -58,10 +43,8 @@ async def start_run(
         raise HTTPException(404, detail="no such team")
 
     try:
-        # Every check and the start itself live in `start_run_on_revision`: the model
-        # catalogue, the team's daily cost ceiling and — since phase 2 — its daily order
-        # ceiling. A schedule firing at 3am takes exactly the same ones, which is the whole
-        # reason that function exists rather than this body.
+        # Every check and the start itself live in `start_run_on_revision`: the model catalogue, the daily
+        # cost ceiling and the daily order ceiling. A schedule firing at 3am takes exactly the same ones.
         run, _task = await start_run_on_revision(
             pool,
             revision=dict(revision),
@@ -75,9 +58,8 @@ async def start_run(
     except DefinitionRefused as err:
         raise HTTPException(422, detail=str(err)) from err
     except (DailyCostLimitReached, DailyOrderLimitReached) as err:
-        # Both are 422 and both name their own number — after "why did nothing start" the
-        # operator's next question is "how much of what" (specs/teams-usage,
-        # specs/teams-trading).
+        # Both are 422 and both name their own number — after "why did nothing start" the operator's next
+        # question is "how much of what".
         raise HTTPException(422, detail=str(err)) from err
     return RunOut.from_row(dict(run))
 
@@ -109,9 +91,8 @@ async def get_run(run_id: int, request: Request, owner: str = Depends(current_pr
 async def get_run_steps(
     run_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> list[RunStepOut]:
-    """Who is waiting, who is working, who has finished and what they handed over — the
-    same picture the progress stream carries, for a viewer that arrived late or came back
-    (specs/teams-runs, "po ponownym otwarciu widać jego bieżący stan")."""
+    """Who is waiting, who is working, who has finished and what they handed over — the same picture the
+    progress stream carries, for a viewer that arrived late or came back."""
     async with request.app.state.teams.pool.acquire() as conn:
         run = await store.get_run(conn, run_id=run_id, owner_principal=owner)
         if run is None:
@@ -136,14 +117,8 @@ async def get_run_tool_calls(
 async def get_run_trades(
     run_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> list[TradeOut]:
-    """What this run did to the account, in the order it did it.
-
-    Beside `/tool-calls` rather than folded into it: that route answers "what did the
-    agents ask for", this one answers "what happened to the money", and an operator who
-    just watched a team trade is asking the second (specs/teams-trading). The owner
-    filter is the same one every other run route uses — a stranger's run is 404, the
-    same answer as one that never existed (specs/teams-browser-access).
-    """
+    """What this run did to the account, in the order it did it. Beside `/tool-calls` rather than folded
+    into it: that route answers what the agents asked for, this one what happened to the money."""
     async with request.app.state.teams.pool.acquire() as conn:
         run = await store.get_run(conn, run_id=run_id, owner_principal=owner)
         if run is None:
@@ -156,9 +131,8 @@ async def get_run_trades(
 async def cancel_run(
     run_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> RunOut:
-    """Asks a run to stop. 202, not 200: the status is written by the run itself as it
-    unwinds, so what comes back here is the run as it was when the interruption was
-    accepted — the operator's own view catches up through the stream or a reload."""
+    """Asks a run to stop. 202, not 200: the status is written by the run itself as it unwinds, so what
+    comes back is the run as it was when the interruption was accepted."""
     async with request.app.state.teams.pool.acquire() as conn:
         row = await store.get_run(conn, run_id=run_id, owner_principal=owner)
     if row is None:
@@ -166,9 +140,8 @@ async def cancel_run(
     if row["status"] not in ("pending", "running"):
         raise HTTPException(409, detail=f"the run is already {row['status']}")
     if not request.app.state.teams.runs.cancel(run_id):
-        # In the database as running, but nothing in this process is running it — the
-        # state `store.fail_unfinished_runs` closes at start-up. Answering 409 rather than
-        # pretending to interrupt something that is not there.
+        # In the database as running, but nothing in this process is running it — the state
+        # `store.fail_unfinished_runs` closes at start-up. 409 rather than pretending to interrupt.
         raise HTTPException(409, detail="the run is not being worked on by this instance")
     return RunOut.from_row(dict(row))
 
@@ -181,30 +154,12 @@ def _sse(event: str, data: dict) -> str:
 async def run_events(
     run_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> StreamingResponse:
-    """Progress as it happens, starting with where the run is now.
-
-    The snapshot first, then live events: a viewer that opens halfway through has to see
-    the agents that already finished, and one that reconnects must not have to guess what
-    it missed. Dropping the connection unsubscribes a queue and nothing else — the run
-    holds no reference to any of this (specs/teams-runs, "Zerwanie połączenia odbierającego
-    postęp MUST NOT przerwać przebiegu").
-    """
+    """Progress as it happens, starting with where the run is now. A viewer that opens halfway through has
+    to see the agents that already finished, and dropping the connection unsubscribes a queue and nothing else."""
     pool = request.app.state.teams.pool
     registry = request.app.state.teams.runs
-    # Subscribed before the snapshot is **read**, not merely before it is sent. Reading it
-    # first left a window nothing covered: releasing the connection is a suspension point,
-    # so a step finishing right there landed in neither place — too late for the snapshot,
-    # too early for a queue that did not exist. The same window swallowed the end of a run
-    # outright, and `finished` read from that same stale row left the stream open for ever
-    # over a run that was already closed.
-    #
-    # The cost of this order is a queue held over a request that may turn out to be a 404,
-    # which is what the `except` below is for. Nothing is disclosed by it: the subscription
-    # is a queue nobody reads, and the ownership check still happens before a single frame
-    # is written. The other cost is an event that is both in the snapshot and in the queue,
-    # repeated to a watcher that has already seen it — deliberately the direction to fail
-    # in: a step told twice that it finished still reads as finished, and a step whose
-    # finish was dropped reads as working for ever.
+    # Subscribed before the snapshot is *read*, not merely before it is sent: releasing the connection is a suspension
+    # point, so a step finishing there landed in neither place. A repeated event is the direction to fail in.
     queue = registry.subscribe(run_id)
     try:
         async with pool.acquire() as conn:

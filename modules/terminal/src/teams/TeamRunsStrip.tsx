@@ -9,16 +9,8 @@ import type { TeamsApi } from "./teamsApi";
 const SHOWN = 6;
 
 /**
- * The team's last few runs, on one line in the editor.
- *
- * Editing and reading a run are the same loop — change a prompt, run it, read what came
- * out, change it again — and until now that loop went through the catalogue every time it
- * turned. This is the short way round: the runs are visible while the team is open, and one
- * click opens any of them on the run view.
- *
- * It is a strip and not a panel on purpose. The editor's screen belongs to the graph and the
- * agent that is being changed; what a run needs here is enough to recognise it — its number,
- * how it ended, when — and a way in.
+ * The team's last few runs on one line, because editing and reading a run are one loop that used to turn
+ * through the catalogue. A strip, not a panel: enough to recognise a run — number, ending, time — and a way in.
  */
 export function TeamRunsStrip({
   api,

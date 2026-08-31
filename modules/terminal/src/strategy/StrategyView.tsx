@@ -17,25 +17,8 @@ import {
 } from "./strategyApi";
 
 /**
- * What the strategies decided, and — far more often — why they decided nothing.
- *
- * **This screen is mostly refusals, on purpose.** A strategy worth running says no to the
- * large majority of the bars it sees, so a tab built around setups would be empty most of
- * the time and empty precisely when somebody asks the question people actually ask these
- * systems: why has nothing happened. The refusals are the answer, so they are the list,
- * and the kind of refusal is a badge rather than a detail — coverage, the strategy itself
- * and a platform limit have three different remedies (specs/terminal-strategy).
- *
- * **Nothing here reaches an account.** The module behind this screen has no route that
- * places, amends or cancels an order and will not grow one; a button suggesting otherwise
- * would be the only place in this terminal promising execution where there is none.
- *
- * **The catalogue now has two kinds in it**, and the difference is one an operator can act
- * on. An entry that is code in the deployed image has no revisions and is not editable from
- * here — its rule is in the repository under that id. A rule somebody wrote is a row, and
- * writing the next revision of it is what the panel below is for. Neither kind can move an
- * account, and no revision saved here changes what a running watch computes: a watch is
- * pinned to the revision it was started with (specs/terminal-strategy-configurator).
+ * Mostly refusals, on purpose: they are the answer to the question people actually ask. **Nothing here reaches an
+ * account**, no entry that is code in the image is editable, and no revision saved here moves a running watch.
  */
 
 /** How often the decisions are re-asked. The platform decides on closed bars — hourly for
@@ -48,9 +31,8 @@ const NO_DECISIONS: Decision[] = [];
 
 export function StrategyView({
   api,
-  // The archive, for one thing only: which instruments it collects, which is what the
-  // dialog below offers instead of a text field. This screen reads nothing else from it —
-  // the decisions and their facts come from the platform, which did the reading itself.
+  // The archive, for one thing only: which instruments it collects, which is what the dialog offers instead of a
+  // text field. The decisions and their facts come from the platform, which did the reading itself.
   admin = archive,
 }: { api?: StrategyApi; admin?: ArchiveAdmin } = {}) {
   const client = useMemo(

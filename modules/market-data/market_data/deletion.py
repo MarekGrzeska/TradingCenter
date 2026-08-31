@@ -1,30 +1,5 @@
-"""Skasowanie — the operator's explicit, irreversible decision to remove a pair's data.
-
-Untracking a pair was never enough to answer "get rid of what this collected": it only
-flips `tracked_pairs` and leaves candles and coverage in place, on purpose — that is
-still what `tracking.untrack` does, and it is still correct for the fixed threshold of
-"nothing kasuje itself". What was missing was a way to *ask* for the data to go, and
-without one an operator who re-tracked a pair with a shorter range kept seeing the old
-range back, because the old data was still there and its coverage told planning the
-range was already fetched.
-
-Deletion is that missing door, and it is deliberately two steps rather than one:
-
-1. `close_for_deletion` stops anything new from starting on this pair — flips it
-   untracked and skips its queued chunks — as one transaction. The caller then syncs
-   ingest, which is how the live subscription actually stops; that is not a database
-   operation and cannot live inside this module's transaction.
-2. `delete_pair_data` removes the candles, the coverage, and (when the deleted series is
-   the minute one) the rollups built from it, and records that it happened. One
-   transaction, because a pair left with candles gone but coverage intact would look to
-   planning like a pair already fully collected, and never be fetched again
-   (`market-data-store` spec, "Skasowanie danych pary zdejmuje też jej pokrycie").
-
-Nothing here calls the other from inside a transaction of its own — a chunk still in
-flight when step 1 commits can finish afterwards, and `jobs.runner.execute_chunk` is
-what refuses to write for a pair that is no longer tracked, closing that race rather than
-this module trying to.
-"""
+"""Skasowanie — the operator's explicit, irreversible decision to remove a pair's data. Two steps:
+`close_for_deletion` stops new work, then `delete_pair_data` removes candles and coverage together."""
 
 from __future__ import annotations
 
@@ -72,14 +47,8 @@ _SELECT_DELETIONS = """
 async def close_for_deletion(
     conn: asyncpg.Connection, symbol: str, resolution: Resolution
 ) -> TrackedPair | None:
-    """Stop new work for a pair about to be deleted, as one transaction.
-
-    Flips the pair untracked and settles its still-pending chunks as skipped, so nothing
-    claims fresh work for a pair whose data is about to disappear. Returns `None` if the
-    pair was not being tracked — meaning there is nothing to delete, which the caller
-    reads as a refusal (`market-data-api` spec, "Skasowanie pary, która nie jest
-    śledzona").
-    """
+    """Stop new work for a pair about to be deleted, as one transaction. Returns `None` if the pair
+    was not tracked, which the caller reads as a refusal."""
     async with conn.transaction():
         stopped = await untrack(conn, symbol, resolution)
         if stopped is not None:
@@ -90,13 +59,8 @@ async def close_for_deletion(
 async def delete_pair_data(
     conn: asyncpg.Connection, symbol: str, resolution: Resolution
 ) -> PairDeletion:
-    """Remove a pair's candles and coverage, and record that it happened — one
-    transaction, so there is no moment where one exists without the other.
-
-    Must run after `close_for_deletion` has already stopped new work for this pair and
-    the caller has synced ingest; neither is checked here, because both are the caller's
-    to sequence (`app.py`'s `DELETE /pairs/{symbol}`).
-    """
+    """Remove a pair's candles and coverage, and record it — one transaction, so there is no moment
+    where one exists without the other. Must run after `close_for_deletion` and an ingest sync."""
     async with conn.transaction():
         removed, earliest, latest = await delete_all_candles(conn, symbol, resolution)
         await delete_all_coverage(conn, symbol, resolution)
@@ -121,9 +85,8 @@ async def read_deletions(
     symbol: str | None = None,
     resolution: Resolution | None = None,
 ) -> list[PairDeletion]:
-    """Every recorded skasowanie, newest first — optionally narrowed to one pair, the
-    same shape `jobs.list_jobs` is narrowed by, since the terminal reads both to build
-    one instrument's history."""
+    """Every recorded skasowanie, newest first, optionally narrowed to one pair — the same shape
+    `jobs.list_jobs` takes, since the terminal reads both to build one instrument's history."""
     rows = await conn.fetch(_SELECT_DELETIONS, symbol, resolution.value if resolution else None)
     return [
         PairDeletion(

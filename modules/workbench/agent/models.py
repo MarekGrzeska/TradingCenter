@@ -36,9 +36,8 @@ class Message(BaseModel):
     model_id: str | None
     prompt_version: str | None
     incomplete: bool
-    # Why it is incomplete, when it is: the operator said stop. A reply that broke is
-    # something to try again, and one that was stopped is something somebody meant
-    # (specs/agent-chat, "Zatrzymana odróżnia się od urwanej błędem").
+    # Why it is incomplete, when it is: the operator said stop. A reply that broke is something to try
+    # again, and one that was stopped is something somebody meant.
     stopped: bool
     created_at: datetime
 
@@ -48,9 +47,7 @@ class Usage(BaseModel):
     session_id: int
     message_id: int
     model_id: str
-    # `None`, not zero, when the provider reported nothing for this call
-    # (specs/agent-usage, "Zużycia, którego dostawca nie podał, MUST NOT być
-    # zgadywane").
+    # `None`, not zero, when the provider reported nothing for this call.
     input_tokens: int | None
     output_tokens: int | None
     cached_tokens: int | None
@@ -62,9 +59,8 @@ class Usage(BaseModel):
 
 
 class RecordedCall(BaseModel):
-    """A tool call that happened, before it has a row. Built by the graph — the only
-    place that knows which round it belonged to and what it cost in time — and handed to
-    `store.record_tool_calls` once the agent message it belongs to exists."""
+    """A tool call that happened, before it has a row. Built by the graph — the only place that knows which
+    round it belonged to — and handed to the store once the agent message it belongs to exists."""
 
     round_index: int
     name: str
@@ -72,25 +68,14 @@ class RecordedCall(BaseModel):
     outcome: str
     text: str
     duration_ms: int
-    # Set only for a call that could change the account: its row was written before the
-    # call was sent, so this one already exists and is not to be inserted again — only
-    # joined to the reply (specs/agent-trading). `None` is every other call, and the
-    # sentence above it describes those.
+    # Set only for a call that could change the account: its row was written before the call was sent, so
+    # this one already exists and is only joined to the reply.
     row_id: int | None = None
 
 
 class ToolCall(BaseModel):
-    """One call the agent made while producing an agent message.
-
-    Not a `Message`, on purpose: the transcript is the conversation, and this is how the
-    agent got to its half of it (specs/agent-tools, "Wywołanie narzędzia zostawia ślad").
-
-    `outcome` distinguishes four answers that must never be collapsed into fewer — see
-    `ToolOutcomeKind` in `tools/client.py`, which is where they are decided.
-
-    `message_id` is `None` for a call that outlived its turn: it was written before being
-    sent, and the reply it would have hung off never came (specs/agent-trading).
-    """
+    """One call the agent made while producing an agent message — not a `Message`, on purpose: the transcript is the
+    conversation. `message_id` is `None` for a call that outlived its turn, written before being sent and never answered."""
 
     id: int
     session_id: int
@@ -106,9 +91,8 @@ class ToolCall(BaseModel):
 
 
 class ChartIndicator(BaseModel):
-    """One indicator instance as the agent asked for it — the terminal's own selection
-    shape minus the instance key, which the terminal hands out itself when it applies
-    this. `params` empty means "whatever the catalogue defaults to"."""
+    """One indicator instance as the agent asked for it — the terminal's own selection shape minus the
+    instance key. `params` empty means "whatever the catalogue defaults to"."""
 
     id: str
     params: dict[str, float] = {}
@@ -116,16 +100,14 @@ class ChartIndicator(BaseModel):
 
 
 class ChartSnapshot(BaseModel):
-    """What the consumer says it is drawing at the moment it asks a question. Not stored
-    and not a message: it describes the instant the question was asked, not a state this
-    module keeps (specs/agent-chat, "Tura wie, co terminal właśnie rysuje")."""
+    """What the consumer says it is drawing at the moment it asks a question. Not stored and not a message:
+    it describes the instant the question was asked, not a state this module keeps."""
 
     symbol: str | None = None
     resolution: str | None = None
     indicators: list[ChartIndicator] = []
-    # The visible span, each half optional on its own: a consumer that draws but cannot
-    # say what is on screen still sends the rest (specs/agent-chat, "Tura wie, co terminal
-    # właśnie rysuje").
+    # The visible span, each half optional on its own: a consumer that draws but cannot say what is on
+    # screen still sends the rest.
     visible_from: datetime | None = None
     visible_to: datetime | None = None
 
@@ -158,21 +140,11 @@ class ChartSnapshot(BaseModel):
 
 
 class ChartFocus(BaseModel):
-    """Which fragment of the time axis the chart should show. Exactly one of the three
-    shapes this carries MUST be filled: `from_`/`to` (a range), `around`/`bars` (a point
-    and a span around it), or `last_bars` (the newest N candles) — checked by the tool
-    that builds this, not here (specs/agent-chart-control, "Narzędzie ustawia zawartość
-    aktywnego slotu").
+    """Which fragment of the time axis the chart should show — exactly one of its three shapes filled. Absolute time on
+    the wire, so a command sitting in the log for an hour still means what it meant; `last_bars` is the one exception."""
 
-    Absolute time on the wire, not relative to the moment the command is read: a command
-    sitting in the log for an hour must mean the same thing it meant when it was issued.
-    `last_bars` is the one named exception — it means "the end of the series", whatever
-    that is at the moment it is applied.
-    """
-
-    # No wire alias here — this shape is only ever read back by this module's own store,
-    # never by another module. The "from" alias a caller actually sends and sees lives on
-    # `ChartFocusOut` and the tool's own parsing, where the wire is what matters.
+    # No wire alias here — this shape is only ever read back by this module's own store. The "from" alias
+    # a caller sends and sees lives on `ChartFocusOut`, where the wire is what matters.
     from_: datetime | None = None
     to: datetime | None = None
     around: datetime | None = None
@@ -181,16 +153,8 @@ class ChartFocus(BaseModel):
 
 
 class ChartCommand(BaseModel):
-    """What the agent set the chart to, once. Declarative: `None` on a field means "leave
-    that as it is", never "clear it" — a model asked to add an average must not be able
-    to blank the symbol by omission (specs/agent-chart-control, "Narzędzie ustawia
-    zawartość aktywnego slotu"). An empty `indicators` list is the one way to say "draw
-    none", and it is a list, not a None. A missing `focus` means "leave the operator
-    looking where they are".
-
-    `sequence` is the row's own id: rising across the whole module, not per session, so a
-    consumer holding one number knows what it has already applied.
-    """
+    """What the agent set the chart to, once, declaratively: `None` means "leave that as it is", never "clear it", and an
+    empty `indicators` list is the one way to say "draw none". `sequence` rises across the module, not per session."""
 
     sequence: int
     session_id: int
@@ -201,12 +165,8 @@ class ChartCommand(BaseModel):
     created_at: datetime
 
     def merged_with(self, later: ChartCommand) -> ChartCommand:
-        """This command, then a newer one on top — the later value wins per field, and a
-        field the later one left alone keeps this one's.
-
-        What makes it safe for a consumer to skip the commands it missed while it was
-        away: one merged answer says what the chart should look like now, where replaying
-        only the newest would silently drop an earlier command's indicators."""
+        """This command, then a newer one on top — the later value wins per field, and a field the later
+        one left alone keeps this one's. What makes it safe for a consumer to skip what it missed."""
         return ChartCommand(
             sequence=later.sequence,
             session_id=later.session_id,
@@ -219,12 +179,8 @@ class ChartCommand(BaseModel):
 
 
 class ChartLevel(BaseModel):
-    """A single price, optionally in effect only from a moment on — support, resistance,
-    a level the operator or the agent wants to keep looking at. `kind` is what the
-    store's four-column geometry (`design.md`, "Zapis: cztery kolumny geometrii i CHECK
-    per kształt") discriminates on; `at` fills `time_a`, `price` fills `price_a`, and
-    `time_b`/`price_b` stay null — the shape the database's own `chart_drawings_level_
-    shape` check enforces independently of this class ever agreeing."""
+    """A single price, optionally in effect only from a moment on. `kind` is what the store's four-column
+    geometry discriminates on; `at` fills `time_a`, `price` fills `price_a`, and the rest stay null."""
 
     kind: Literal["level"] = "level"
     price: float
@@ -234,9 +190,8 @@ class ChartLevel(BaseModel):
 
 
 class ChartZone(BaseModel):
-    """A price band, optionally bounded in time. `bottom` fills `price_a`, `top` fills
-    `price_b` and must exceed it — checked here for an early refusal, and by
-    `chart_drawings_zone_shape` regardless."""
+    """A price band, optionally bounded in time. `bottom` fills `price_a`, `top` fills `price_b` and must
+    exceed it — checked here for an early refusal, and by the database regardless."""
 
     kind: Literal["zone"] = "zone"
     top: float
@@ -253,9 +208,8 @@ class ChartTrendlinePoint(BaseModel):
 
 
 class ChartTrendline(BaseModel):
-    """Two points, `a` and `b` — never `from`/`to`, which `ChartZone` already uses for a
-    pair of moments alone; a trend line's pair is a moment *and* a price each. `a.time`
-    fills `time_a`, `b.time` fills `time_b` and must be later."""
+    """Two points, `a` and `b` — never `from`/`to`, which `ChartZone` already uses for a pair of moments
+    alone; a trend line's pair is a moment *and* a price each."""
 
     kind: Literal["trendline"] = "trendline"
     a: ChartTrendlinePoint
@@ -270,47 +224,36 @@ ChartDrawingGeometry = ChartLevel | ChartZone | ChartTrendline
 
 
 class ChartDrawing(BaseModel):
-    """One drawing as stored: `geometry`'s own `kind` says which of the three shapes it
-    is, and carries that shape's fields plus the label and colour every shape takes the
-    same way (specs/agent-chart-drawings, "Rysunek należy do instrumentu, nie do
-    widoku"). `session_id` is nullable — a drawing outlives the session that made it."""
+    """One drawing as stored: `geometry`'s own `kind` says which of the three shapes it is. `session_id`
+    is nullable — a drawing outlives the session that made it."""
 
     id: int
     symbol: str
     session_id: int | None
     geometry: ChartDrawingGeometry
-    # Whether the chart draws it. Beside `created_at` rather than inside `geometry` on
-    # purpose: `label` and `color` say how the drawing looks, this says whether it is
-    # drawn at all, and at a change of shape it would have nowhere to go
-    # (specs/agent-chart-drawings, "Rysunki są trwałe i mają własną tożsamość").
+    # Whether the chart draws it. Beside `created_at` rather than inside `geometry`: `label` and `color`
+    # say how the drawing looks, this says whether it is drawn at all.
     hidden: bool
     created_at: datetime
     updated_at: datetime
 
 
 class PromptRevision(BaseModel):
-    """One saved system prompt, both variants together — "two texts, one version",
-    the same shape `PROMPT_VERSION` always was, now a row instead of a constant
-    (specs/agent-prompt-management, "Zapis tworzy nową wersję, nigdy nie nadpisuje
-    istniejącej"). Never updated after insert; the current one is whichever has the
-    highest `id`."""
+    """One saved system prompt, both variants together — "two texts, one version", a row instead of a
+    constant. Never updated after insert; the current one is whichever has the highest `id`."""
 
     version: str
     with_tools_body: str
     without_tools_body: str
     created_at: datetime
-    # Where the row came from: a deployment's migration, or a person. Not on the wire —
-    # it exists so the module can refuse to let a seed cover an operator's save
-    # (specs/agent-prompt-management, "Zasiew z wdrożenia nie przykrywa tego, co
-    # zapisał operator"), not so anybody reads it.
+    # Where the row came from: a deployment's migration, or a person. Not on the wire — it exists so the
+    # module can refuse to let a seed cover an operator's save.
     source: Literal["seed", "operator"] = "operator"
 
 
 class UsageAggregate(BaseModel):
-    """One row of a `GROUP BY` over `usage` — by model, by session, or by day,
-    depending which query built it. Sums ignore the rows they cannot price;
-    `unknown_count` is how many of those a caller silently dropping them would hide
-    (specs/agent-usage, "Zużycie da się odczytać zbiorczo")."""
+    """One row of a `GROUP BY` over `usage`. Sums ignore the rows they cannot price, and `unknown_count`
+    is how many of those a caller silently dropping them would hide."""
 
     key: str
     input_tokens: int

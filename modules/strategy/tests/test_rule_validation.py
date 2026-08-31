@@ -1,10 +1,5 @@
-"""The half of a rule's validation that can only be had by asking the archive.
-
-Nothing here repeats what `rule.py` decides on its own. What is under test is the pairing
-between a written rule and the catalogue the archive publishes — and every refusal naming
-the one thing that has to change, because "invalid definition" sends somebody to read the
-whole tree.
-"""
+"""The half of a rule's validation that can only be had by asking the archive. Every refusal names the one
+thing that has to change, because "invalid definition" sends somebody to read the whole tree."""
 
 from __future__ import annotations
 
@@ -109,9 +104,8 @@ def test_a_value_outside_the_archives_range_is_refused_with_the_range() -> None:
 
 
 def test_a_tunable_ranging_further_than_the_indicator_is_refused_with_both_ranges() -> None:
-    """The check whose absence surfaces as a refusal from the archive in the middle of the
-    night: everything looks right until somebody tunes the period to the top of the range
-    this rule declared, and the archive says no to a value it never accepted."""
+    """The check whose absence surfaces as a refusal from the archive in the middle of the night: everything looks
+    right until somebody tunes the period to the top of the range this rule declared."""
     with pytest.raises(DefinitionRefused) as refused:
         check(
             rule(

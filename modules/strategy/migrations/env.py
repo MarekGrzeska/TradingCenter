@@ -1,13 +1,5 @@
-"""How alembic reaches this module's database.
-
-Async, because asyncpg is the only driver this module installs. The URL comes from the
-module's own settings, so `DATABASE_URL` names the database for the service and for its
-migrations alike; a test overrides it with `set_main_option("sqlalchemy.url", ...)`.
-
-One chain, so this is one file rather than the shared helper the workbench needs for its
-two — but the mechanism is the same one, and the `sslmode` correction below is the same
-correction, for the same reason.
-"""
+"""How alembic reaches this module's database, async because asyncpg is the only driver installed. One
+chain, so this is one file rather than the shared helper the workbench needs for its two."""
 
 from __future__ import annotations
 
@@ -23,15 +15,12 @@ from tc_runtime.db import sqlalchemy_url
 config = context.config
 
 if config.config_file_name is not None:
-    # `disable_existing_loggers=False`, against `fileConfig`'s default. Alembic runs
-    # in-process during tests, and the default switches off every logger that already
-    # exists — which is every `strategy.*` logger, since importing the module created
-    # them. A test asserting on what is logged then passes for the wrong reason.
+    # `disable_existing_loggers=False`, against `fileConfig`'s default: alembic runs in-process during
+    # tests, and the default kills every `strategy.*` logger, so a logging test passes for nothing.
     fileConfig(config.config_file_name, disable_existing_loggers=False)
 
-# No metadata to compare against, and none wanted: the tables are handwritten SQL and the
-# runtime queries them through asyncpg, so there is no model layer for `--autogenerate` to
-# diff. A migration here is read as the statement it will actually run.
+# No metadata to compare against, and none wanted: the tables are handwritten SQL queried through
+# asyncpg, so there is no model layer for `--autogenerate` to diff.
 target_metadata = None
 
 
@@ -47,11 +36,8 @@ def _database_url() -> str:
 
 
 def _identity_connect_args():
-    """Identity auth for the engine this migration run drives — the same mechanism the
-    application itself uses, so a migration proves the role it runs as can do exactly what
-    the running module will later need (`strategy-database-connection`). Empty when a test
-    has already pointed `sqlalchemy.url` at its own throwaway database, and empty in local
-    mode, where the URL carries its own credential."""
+    """Identity auth for the engine this migration run drives — the same mechanism the application uses,
+    so a migration proves the role can do what the module will need. Empty for a test or local mode."""
     if config.get_main_option("sqlalchemy.url", None):
         return {}, None
     from tc_runtime.db import identity_connect_args
@@ -91,11 +77,8 @@ async def run_migrations_online() -> None:
     database_url = _database_url()
     connect_args, credential = _identity_connect_args()
     if credential is not None:
-        # SQLAlchemy's asyncpg dialect forwards a URL's query string as literal keyword
-        # arguments to `asyncpg.connect()` — `?sslmode=require` becomes an `sslmode=`
-        # kwarg, which asyncpg does not accept (it wants `ssl=`). Carried into
-        # connect_args as `ssl` instead, and the query string dropped so SQLAlchemy
-        # cannot pass it along a second time.
+        # SQLAlchemy's asyncpg dialect forwards a URL's query string as literal kwargs, and asyncpg
+        # wants `ssl=`, not `sslmode=`. Carried into connect_args instead, and dropped from the URL.
         parsed = urlparse(database_url)
         sslmode = parse_qs(parsed.query).get("sslmode", [None])[0]
         if sslmode:

@@ -1,12 +1,5 @@
-"""The schedule tools: creating, listing, pausing, editing and deleting.
-
-`unattended_ack` used to be the point of this file — a parameter deliberately absent, so
-that a model could not fill in a safeguard the moment a refusal was in its way. The
-safeguard is gone (`manage-schedules-and-drop-the-acknowledgement`), so what is held here
-now is the other half of the same worry: that a model reaching for the destructive tool
-gets a different tool from the reversible one, and that editing does not go through
-delete-and-recreate.
-"""
+"""The schedule tools: creating, listing, pausing, editing and deleting. `unattended_ack` used to be the point of this
+file; what is held now is the other half — that a model reaching for the destructive tool gets a different one."""
 
 from __future__ import annotations
 
@@ -197,8 +190,6 @@ async def test_list_schedules_shows_fires_that_started_nothing_and_why(server) -
     await teams.aclose()
 
 
-# --- managing what is already there ---------------------------------------------------
-
 
 async def test_the_published_set_covers_the_whole_life_of_a_schedule(server) -> None:
     """Creating without managing is the shape this change was opened over: the operator
@@ -297,14 +288,8 @@ async def test_editing_a_trigger_changes_only_what_was_named(server) -> None:
 
 @respx.mock
 async def test_a_zero_cooldown_travels_instead_of_being_swallowed(server) -> None:
-    """`cooldown_seconds=0` is falsy, and `or` read that as "not given" — so the tool kept
-    the old value and answered with a success naming it. The operator asked for something
-    and was told it had been done.
-
-    Whether zero is *allowed* is teams' question, not this module's: it refuses a
-    non-positive cooldown with a sentence (`contract.py`, `_positive`). Forwarding the
-    value is what lets that refusal reach whoever asked, instead of a silent no-op.
-    """
+    """`cooldown_seconds=0` is falsy, and `or` read that as "not given" — so the tool kept the old value and
+    answered with a success naming it. Whether zero is allowed is teams' question, not this module's."""
     mcp, teams = server
     respx.get(f"{BASE}/triggers/21").mock(return_value=httpx.Response(200, json=_trigger()))
     saved = respx.put(f"{BASE}/triggers/21").mock(

@@ -1,20 +1,5 @@
-"""The two tools that put objects on the operator's chart and read them back.
-
-The second and third tools this module owns rather than borrows — `chart.py` was the
-first, and everything its docstring says about checking before writing, refusing in a
-sentence the model can act on, and never touching the terminal holds here unchanged.
-
-What is different, and it is the one place this module deliberately contradicts
-`set_chart`, is that `draw_on_chart` is **incremental**: `add` adds, `remove` removes,
-and a drawing left out of both stays exactly where it was. `set_chart` is declarative
-because forgetting an indicator costs one line the operator restores with a click; a
-declarative `draw_on_chart` would let one forgetful call wipe supports collected over
-weeks (specs/agent-chart-drawings, "Agent stawia i kasuje rysunki narzędziem").
-
-Reading is a separate tool from writing on purpose: a read is safe to repeat and a write
-is not, and one tool whose description mixes the two gets called for a read by a model
-that then writes (design.md, "Dwa narzędzia: jedno pisze, drugie czyta").
-"""
+"""The two tools that put objects on the operator's chart and read them back, under everything `chart.py` says about
+checking first. `draw_on_chart` is *incremental*: a declarative one would let a forgetful call wipe weeks of supports."""
 
 from __future__ import annotations
 
@@ -45,10 +30,8 @@ from .client import ToolDescriptor, ToolOutcome, ToolOutcomeKind, ToolServer
 DRAW_TOOL_NAME = "draw_on_chart"
 LIST_DRAWINGS_TOOL_NAME = "list_chart_drawings"
 
-# The drawing palette, not the indicator one: a drawing is not an indicator and has no
-# reason to wear its colour. Objects already standing in the record with an indicator
-# token keep drawing in it — the terminal still resolves those — but nothing new is
-# offered one (design.md, "Paleta rysunków dokłada tokeny, nie odbiera starych").
+# The drawing palette, not the indicator one: a drawing has no reason to wear an indicator's colour.
+# Objects already standing with an indicator token keep drawing in it, but nothing new is offered one.
 _COLOR_SCHEMA = {
     "type": "string",
     "description": "one of " + ", ".join(DRAWING_COLORS) + "; omit to let the chart choose",
@@ -59,10 +42,8 @@ _LABEL_SCHEMA = {
     "description": "short caption drawn next to the object, e.g. 'weekly high'",
 }
 
-# Three shapes, discriminated by `kind`, each with its own field names. A model handed
-# `price_a`/`price_b` confuses them; one handed `top`/`bottom` cannot (design.md, "Zapis:
-# cztery kolumny geometrii i CHECK per kształt" — the four columns are storage's
-# business, and this is the other side of that translation).
+# Three shapes, discriminated by `kind`, each with its own field names. A model handed `price_a`/`price_b`
+# confuses them; one handed `top`/`bottom` cannot.
 _LEVEL_SCHEMA = {
     "type": "object",
     "description": "a single price: a support, a resistance, a level worth watching",
@@ -273,11 +254,8 @@ def _as_point(raw: Any, field: str) -> ChartTrendlinePoint:
 
 
 def _as_geometry(item: Any, index: int) -> ChartDrawingGeometry:
-    """One entry of `add`, as the model wrote it. Every invariant the database also holds
-    is checked here first — not because the `CHECK` would miss it, but because a refusal
-    is only useful if it reaches the model as a sentence in the same turn, and a
-    constraint violation reaches it as a failed turn (specs/agent-chart-drawings, "Odmowa
-    rysowania nazywa, co poprawić")."""
+    """One entry of `add`, as the model wrote it. Every invariant the database also holds is checked here
+    first: a refusal is only useful if it reaches the model as a sentence in the same turn."""
     where = f"`add[{index}]`"
     if not isinstance(item, dict):
         raise ChartRefusal(f"{where} must be an object with a `kind`.")
@@ -302,10 +280,8 @@ def _as_geometry(item: Any, index: int) -> ChartDrawingGeometry:
             )
         start = _optional_time(item, "from", f"{where}.from")
         end = _optional_time(item, "to", f"{where}.to")
-        # A band that ends before it starts is not a band. Refused here and nowhere else:
-        # unlike a trend line's two moments, a zone's are both optional, so there is no
-        # `CHECK` pinning their order — and the terminal draws such a zone as a rectangle
-        # of zero width, which is a drawing that silently is not there.
+        # A band that ends before it starts is not a band. Refused here and nowhere else: a zone's two
+        # moments are both optional, so there is no `CHECK` pinning their order.
         if start is not None and end is not None and start >= end:
             raise ChartRefusal(
                 f"{where} ends before it starts: `to` ({end.isoformat()}) is not after "
@@ -358,9 +334,8 @@ def _as_ids(raw: Any, field: str) -> list[int]:
                 f"`{field}` takes ids as whole numbers; {item!r} is not one. "
                 "Call list_chart_drawings for the ids."
             )
-        # Bounded here, not left to the driver: an id past `bigint` makes asyncpg raise,
-        # and a raised exception is a dead turn where this is a sentence the model can act
-        # on (specs/agent-tools, "Odmowa narzędzia jest wynikiem, nie awarią tury").
+        # Bounded here, not left to the driver: an id past `bigint` makes asyncpg raise, and a raised
+        # exception is a dead turn where this is a sentence the model can act on.
         if not 0 < item <= MAX_DRAWING_ID:
             raise ChartRefusal(
                 f"there is no drawing with id {item}. Call list_chart_drawings for the "
@@ -396,9 +371,8 @@ def _geometry_text(geometry: ChartDrawingGeometry) -> str:
 
 
 async def _switch(conn: Conn, symbol: str, ids: list[int], *, hidden: bool) -> list[int]:
-    """Hide or show, refusing the whole call over an id that is not on this instrument —
-    the same contract `remove` has, and deliberately so: a model told "two of the three
-    were hidden" has to work out which, where a refusal names it."""
+    """Hide or show, refusing the whole call over an id that is not on this instrument — the same contract
+    `remove` has: a model told "two of the three were hidden" has to work out which."""
     if not ids:
         return []
     switched = await store.set_drawings_hidden(conn, symbol=symbol, ids=ids, hidden=hidden)
@@ -441,9 +415,8 @@ def _confirmation(
 
 
 def _drawing_as_json(drawing: ChartDrawing) -> dict[str, Any]:
-    """The stored drawing in the same field names `add` takes, so an id read here can be
-    handed straight back to `remove` and a shape read here can be redrawn without
-    translation."""
+    """The stored drawing in the same field names `add` takes, so an id read here can be handed straight
+    back to `remove` and a shape read here can be redrawn without translation."""
     geometry = drawing.geometry
     body: dict[str, Any]
     if isinstance(geometry, ChartLevel):
@@ -467,9 +440,8 @@ def _drawing_as_json(drawing: ChartDrawing) -> dict[str, Any]:
         **body,
         "label": geometry.label,
         "color": geometry.color,
-        # Without this the model hides what is already hidden, and cannot answer what the
-        # operator is actually looking at (specs/agent-chart-drawings, "Odczyt mówi, który
-        # rysunek jest zgaszony").
+        # Without this the model hides what is already hidden, and cannot answer what the operator is
+        # actually looking at.
         "hidden": drawing.hidden,
         "created_at": drawing.created_at.isoformat(),
     }
@@ -483,9 +455,8 @@ def _clock() -> Callable[[], int]:
 
 
 class DrawOnChartTool:
-    """`draw_on_chart` as the turn sees it. Holds the pool for the same reason `ChartTool`
-    does: a tool call happens long after the request that started the turn let go of its
-    connection."""
+    """`draw_on_chart` as the turn sees it. Holds the pool for the same reason `ChartTool` does: a tool
+    call happens long after the request that started the turn let go of its connection."""
 
     name = DRAW_TOOL_NAME
     descriptor = DRAW_TOOL
@@ -515,12 +486,8 @@ class DrawOnChartTool:
                 "delete, `hide` or `show` with ids to take off the chart or put back."
             )
 
-        # Two orders about one drawing have no outcome the model could have predicted,
-        # and picking a winner would be a rule it cannot read off the schema (design.md,
-        # "Sprzeczne polecenie jest odmową, nie rozstrzygnięciem"). Every pair of the
-        # three lists, not just hide-against-show: `remove` beside `hide` would otherwise
-        # run the removal first and refuse the hiding as "no drawing with that id", which
-        # sends the model hunting a wrong id instead of looking at the two lists it wrote.
+        # Two orders about one drawing have no outcome the model could have predicted. Every pair of the
+        # three lists: `remove` beside `hide` would refuse the hiding as "no drawing with that id".
         named_in = {"remove": removals, "hide": to_hide, "show": to_show}
         for first, second in combinations(named_in, 2):
             shared = sorted(set(named_in[first]) & set(named_in[second]))
@@ -542,14 +509,8 @@ class DrawOnChartTool:
         except ChartRefusal as err:
             return refuse(str(err))
 
-        # One transaction around the whole call: three drawings of which one does not fit
-        # under the ceiling means none of them is written, and a removal whose id turns
-        # out not to exist takes its own deletion back with it (specs/agent-chart-
-        # drawings, "Jedno wywołanie MUST zostać wykonane w całości albo wcale").
-        #
-        # Removals run first so that a call at the ceiling which swaps one drawing for
-        # another — the shape "move this level" takes — fits where two separate calls
-        # would have had to be ordered by hand.
+        # One transaction around the whole call, so three drawings of which one does not fit means none is
+        # written. Removals run first, so a call at the ceiling that swaps one drawing for another fits.
         try:
             async with self._pool.acquire() as conn, conn.transaction():
                 removed = (
@@ -567,9 +528,8 @@ class DrawOnChartTool:
                         "Call list_chart_drawings to see what is there now; nothing was "
                         "changed."
                     )
-                # Hiding and showing after removals and before the ceiling: neither one
-                # changes how many drawings the instrument carries, so neither belongs in
-                # that count (specs/agent-chart-drawings, "Zgaszone liczą się do sufitu").
+                # Hiding and showing after removals and before the ceiling: neither changes how many
+                # drawings the instrument carries, so neither belongs in that count.
                 hidden = await _switch(conn, symbol, to_hide, hidden=True)
                 shown = await _switch(conn, symbol, to_show, hidden=False)
                 standing = await store.count_drawings(conn, symbol=symbol)
@@ -598,10 +558,8 @@ class DrawOnChartTool:
 
 
 class ListChartDrawingsTool:
-    """`list_chart_drawings`. No tool server: this reads this module's own table, which
-    is why it still answers when the archive does not — and why it never checks the
-    symbol, since a symbol with no drawings and a symbol the archive dropped both
-    honestly answer "nothing drawn here"."""
+    """`list_chart_drawings`. No tool server: this reads this module's own table, which is why it answers
+    when the archive does not — and why it never checks the symbol."""
 
     name = LIST_DRAWINGS_TOOL_NAME
     descriptor = LIST_DRAWINGS_TOOL
@@ -619,9 +577,8 @@ class ListChartDrawingsTool:
         async with self._pool.acquire() as conn:
             drawings = await store.list_drawings(conn, symbol=symbol)
 
-        # JSON, like every market-mcp answer the model already reads: the ids have to
-        # survive being read back into a `remove`, and prose is where ids get rounded,
-        # reordered or dropped.
+        # JSON, like every market-mcp answer the model already reads: the ids have to survive being read
+        # back into a `remove`, and prose is where ids get rounded, reordered or dropped.
         payload = {
             "symbol": symbol,
             "drawings": [_drawing_as_json(drawing) for drawing in drawings],

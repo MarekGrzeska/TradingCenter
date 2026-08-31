@@ -1,22 +1,5 @@
-"""One evaluation, and the loop that keeps asking for one.
-
-The order inside an evaluation is deliberate and is the whole of what the runtime does:
-
-    the last closed bar  ->  already decided?  ->  read the facts  ->  evaluate
-                                                ->  the platform's gates  ->  record
-
-**Only closed bars.** The archive's `/candles` answers with closed bars only, so asking it
-what the last one is *is* the rule — this module needs no opinion of its own about when a
-period ends, and a forming candle can never reach a strategy.
-
-**A failure to see is recorded, not swallowed.** An archive that will not answer produces a
-decision that says so, with its own reason kind, rather than a gap in the record. The
-operator's question three weeks later is "why did nothing happen", and silence is the one
-answer that cannot be given.
-
-**Nothing here reaches an account.** There is no client for one in this module at all
-(`strategy-runtime`, "Platforma nie ma drogi do konta").
-"""
+"""One evaluation, and the loop that keeps asking for one. Only closed bars, because the archive answers with those
+alone; a failure to see is recorded rather than swallowed, and nothing here has a client for an account at all."""
 
 from __future__ import annotations
 
@@ -41,9 +24,8 @@ from ..store import (
 
 log = logging.getLogger(__name__)
 
-# The platform's floor for reward over risk. A strategy may want more of itself; none may
-# want less. Here rather than in settings because it is a property of what this platform
-# will call a setup, not a knob for an environment to differ on.
+# The platform's floor for reward over risk: a strategy may want more of itself, none may want less. Here rather than
+# in settings because it is a property of what this platform calls a setup, not a knob to differ on.
 MINIMUM_REWARD_OVER_RISK = 1.5
 
 
@@ -62,20 +44,14 @@ class Evaluated:
 
 
 async def evaluate_once(pool, archive: Archive, watch: Watch) -> Evaluated:
-    """One watch, one bar, one decision — or the reason there was not one.
-
-    **The watch's own revision, never the newest.** A definition may have moved on three
-    times since this watch was started; none of that changes what it decides until somebody
-    points it at a newer one (`strategy-configurator`, "Rewizja jest niezmienna, a
-    obserwacja ją przypina").
-    """
+    """One watch, one bar, one decision — or the reason there was not one. The watch's own revision, never
+    the newest: a definition may have moved on three times without changing what this watch decides."""
     async with pool.acquire() as conn:
         try:
             found = await resolver.resolve_watch(conn, watch)
         except StrategyError as err:
-            # A watch for a strategy this image no longer carries, or a revision it cannot
-            # read. Skipped rather than raised: the other watches are unaffected, and the
-            # operator's remedy is a row, not a restart.
+            # A watch for a strategy this image no longer carries, or a revision it cannot read. Skipped rather than
+            # raised: the other watches are unaffected, and the operator's remedy is a row, not a restart.
             return Evaluated(watch=watch, as_of=None, decision=None, skipped=str(err))
         parameters = await read_parameter_set(conn, watch.parameter_set_id)
     spec = found.spec
@@ -156,13 +132,8 @@ async def _write(
 
 
 async def evaluate_all(pool, archive: Archive) -> list[Evaluated]:
-    """Every active watch, one after another.
-
-    Sequential on purpose. The archive counts its budget against the whole system, and a
-    platform that fanned out over twenty watches at once would be competing with the chart
-    the operator is looking at right now. Bars close on the scale of minutes; there is
-    nothing to be won by hurrying.
-    """
+    """Every active watch, one after another. Sequential on purpose: the archive counts its budget against
+    the whole system, and bars close on the scale of minutes."""
     async with pool.acquire() as conn:
         watches = await list_watches(conn, active_only=True)
 
@@ -171,9 +142,8 @@ async def evaluate_all(pool, archive: Archive) -> list[Evaluated]:
         try:
             results.append(await evaluate_once(pool, archive, watch))
         except Exception:
-            # One watch's unexpected failure must not stop the others: they are independent
-            # by construction, and a platform that stops watching everything because one
-            # strategy raised is a platform that fails in the least useful way.
+            # One watch's unexpected failure must not stop the others: a platform that stops watching everything
+            # because one strategy raised fails in the least useful way.
             log.exception(
                 "evaluating %s on %s failed unexpectedly", watch.strategy_id, watch.symbol
             )
@@ -181,12 +151,8 @@ async def evaluate_all(pool, archive: Archive) -> list[Evaluated]:
 
 
 class EvaluationLoop:
-    """The clock. Wakes, evaluates every active watch, sleeps.
-
-    In the module's own process rather than a scheduler outside it, for the reason the
-    teams' clock gives: a rhythm that lives outside the thing it drives is a second place
-    to deploy and a second place to be wrong about what is running.
-    """
+    """The clock. Wakes, evaluates every active watch, sleeps. In the module's own process rather than a
+    scheduler outside it: a rhythm that lives outside the thing it drives is a second place to be wrong."""
 
     def __init__(self, pool, archive: Archive, *, interval_seconds: int) -> None:
         self._pool = pool
@@ -221,8 +187,7 @@ class EvaluationLoop:
             except asyncio.CancelledError:
                 raise
             except Exception:
-                # The loop outlives any one failure. Everything below it already handles
-                # its own; this is the backstop that keeps a surprise from ending the
-                # process's whole reason for running.
+                # The loop outlives any one failure: everything below it already handles its own, and this is the
+                # backstop that keeps a surprise from ending the process's whole reason for running.
                 log.exception("an evaluation pass failed")
             await asyncio.sleep(self._interval)

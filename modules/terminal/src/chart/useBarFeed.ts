@@ -19,14 +19,8 @@ export interface BarFeed {
 }
 
 /**
- * Owns one (symbol, resolution) feed: subscribe, and draw what arrives. Nothing is
- * spliced — the subscription's first message *is* the history, taken while the archive
- * holds its room still, and a reconnect brings a fresh one rather than a gap to chase
- * (design.md, "Archiwum jest dla terminala jedynym źródłem świec i strumienia").
- *
- * Bars go to `sink` imperatively and never into React state: six slots at roughly five
- * quotes a second would re-render the tree ~30 times a second (design.md, "Wykres pisze
- * do canvasu, nie do stanu Reacta"). Only what changes rarely lives in state here.
+ * Owns one (symbol, resolution) feed: nothing is spliced, the subscription's first message *is* the history.
+ * Bars go to `sink` imperatively — six slots at five quotes a second would re-render the tree thirty times.
  */
 export function useBarFeed(
   source: MarketDataSource,
@@ -47,11 +41,8 @@ export function useBarFeed(
   const retry = useCallback(() => setAttempt((n) => n + 1), []);
 
   useEffect(() => {
-    // Each effect run owns this flag and its cleanup sets it. A resolution
-    // switched three times in quick succession therefore draws the last one,
-    // not whichever snapshot happens to land last. It also makes StrictMode's
-    // mount/unmount/mount safe: the first run's late message is dead the
-    // moment its cleanup ran.
+    // Each effect run owns this flag and its cleanup sets it, so a resolution switched three times draws
+    // the last one — and StrictMode's mount/unmount/mount is safe for the same reason.
     let cancelled = false;
 
     setStatus("loading");
@@ -64,15 +55,13 @@ export function useBarFeed(
         case "snapshot":
           sinkRef.current.onHistory(event.bars);
           if (event.forming) {
-            // Separate from the settled series because it means something
-            // different: the period still moving, which the next message will
-            // move again. The sink merges it by timestamp like any other bar.
+            // Separate from the settled series because it means something different: the period still
+            // moving, which the next message will move again.
             sinkRef.current.onBar(event.forming);
           }
           setStatus(event.bars.length === 0 && !event.forming ? "empty" : "ready");
-          // A snapshot that arrives after a refusal-then-retry supersedes the
-          // refusal; leaving the old message up would contradict the candles
-          // now on screen.
+          // A snapshot that arrives after a refusal-then-retry supersedes the refusal; leaving the old
+          // message up would contradict the candles now on screen.
           setError(null);
           break;
         case "bar":
@@ -82,10 +71,8 @@ export function useBarFeed(
           setStreamState(event.state);
           break;
         case "error":
-          // Named by the source — an unknown symbol, a pair nobody chose to
-          // collect, the archive being unreachable. A subscription that fails
-          // before its snapshot has nothing to draw, so this is the whole
-          // answer rather than a footnote under a chart.
+          // Named by the source — an unknown symbol, a pair nobody collects, the archive unreachable. A
+          // subscription that fails before its snapshot has nothing to draw, so this is the whole answer.
           setError(event.message);
           setStatus((current) => (current === "loading" ? "error" : current));
           break;

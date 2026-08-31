@@ -23,23 +23,14 @@ export interface AutocompleteProps<T> {
    *  reason for an empty list (e.g. nothing archived yet) says its own
    *  sentence instead of the generic one. */
   noResultsMessage?: string;
-  /** How many came back, said out loud under a list that was *not* cut short
-   *  — for a list an operator picks from to commit real collection work, the
-   *  count is what tells them they are looking at all of it
-   *  (terminal-instruments spec, "Katalog kompletny"). Omitted where a count
-   *  would be noise, as with a handful of asset classes. */
+  /** How many came back, said out loud under a list that was *not* cut short: for a list an operator commits real
+   *  collection work from, the count is what says they are looking at all of it. Omitted where it would be noise. */
   countLabel?(count: number): string;
 }
 
 /**
- * One reusable picker for the whole terminal — asset class, instrument in a class,
- * instrument already archived — behaving identically everywhere: arrows and Enter to
- * choose, Escape to close without disturbing the current choice, explicit empty and
- * failure states (terminal-instruments spec, "Podpowiadanie zachowuje się wszędzie tak
- * samo").
- *
- * A value and an open query are mutually exclusive: once something is chosen the field
- * shows it rather than an input, and clearing it is what returns to picking.
+ * One reusable picker for the whole terminal, behaving identically everywhere: arrows and Enter, Escape without
+ * disturbing the choice, explicit empty and failure states. A value and an open query are mutually exclusive.
  */
 export function Autocomplete<T>({
   value,

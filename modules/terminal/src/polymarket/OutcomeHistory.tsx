@@ -6,13 +6,8 @@ import type { History, PolymarketApi, TrackedEvent } from "./polymarketApi";
 import { RANGES, rangeStart, reachesBeforeCoverage, type RangeChoice } from "./series";
 
 /**
- * The series for one outcome of one event, with a range to choose and the boundary of what
- * was actually collected said in words beside the line that draws it.
- *
- * Said as well as drawn, deliberately: the line is where an operator sees the boundary
- * while reading the chart, and the sentence is where they see it when the requested range
- * reaches back past everything the archive holds — the case where there is barely a line
- * to look at (specs/terminal-polymarket).
+ * One outcome's series, with the boundary of what was collected said in words as well as drawn: the sentence is
+ * where an operator sees it when the range reaches back past the archive and there is barely a line to look at.
  */
 
 const EMPTY: History = { outcomeId: 0, points: [], collectedFrom: null, collectedTo: null };

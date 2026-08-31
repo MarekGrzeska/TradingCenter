@@ -1,28 +1,16 @@
-# There used to be a `sp-tradingcenter-market-data-dev` registration here — the identity
-# the local market-data process authenticated to `market_data_dev` with, separate from
-# the human operator because the server's AD Administrator bypasses every GRANT. Local
-# work moved to a container the same day (openspec/changes/local-dev-database-in-docker),
-# which retired both the identity and its yearly secret rotation. Local processes now
-# carry no cloud identity at all — and config.py holds them to loopback because of it.
+# There used to be a `sp-tradingcenter-market-data-dev` registration here, for the local process. Local work moved to a
+# container the same day, retiring the identity and its yearly rotation — and config.py holds local runs to loopback.
 
 # --- the terminal, as a caller of market-data ---------------------------------------
 
-# The browser half of the pair whose other half is `module.market_data_easy_auth`
-# (app-service.tf). This registration holds no secret and cannot: a single-page
-# application runs where every byte it carries is readable, so it authenticates the
-# *operator* and never itself. What it gets back is a token for market-data, which it
-# sends in an `Authorization` header — the thing an Easy Auth cookie cannot do across two
-# hostnames (openspec/changes/authenticate-terminal-to-market-data, design.md).
+# The browser half of the pair whose other half is `module.market_data_easy_auth`. It holds no secret and cannot: a
+# single-page application authenticates the *operator*, and what it gets back travels in an `Authorization` header.
 resource "azuread_application" "terminal" {
   display_name = "app-tradingcenter-terminal"
 
   single_page_application {
-    # The trailing slash is not optional — the provider refuses a redirect URI without
-    # one when there is no path segment ("URI must have a trailing slash when there is no
-    # path segment"). Azure then matches it exactly, and MSAL's own default is
-    # `window.location.origin`, which has **no** trailing slash. So the terminal sets its
-    # `redirectUri` explicitly rather than taking the default; the two spellings must
-    # agree, and this is the one that can be registered.
+    # The trailing slash is not optional — the provider refuses a redirect URI without one when there is no path
+    # segment — and MSAL's default `window.location.origin` has none, so the terminal sets `redirectUri` explicitly.
     redirect_uris = ["${local.terminal_origin}/"]
   }
 
@@ -35,13 +23,8 @@ resource "azuread_application" "terminal" {
     }
   }
 
-  # Ready for whenever the terminal is changed to ask for a token scoped to the workbench
-  # by name, rather than reusing its market-data token against it (see the comment on
-  # `module.workbench_easy_auth` below) — `required_resource_access` takes one block per
-  # resource, so this sits alongside the one above rather than replacing it.
-  #
-  # There used to be a third block here, for teams. Its module and the workbench's are one
-  # process, so there is one registration to stand ready and one scope to ask for.
+  # Ready for whenever the terminal asks for a token scoped to the workbench by name rather than reusing market-data's.
+  # There used to be a third block, for teams: one process, one registration, one scope to ask for.
   required_resource_access {
     resource_app_id = module.workbench_easy_auth.client_id
 
@@ -51,10 +34,8 @@ resource "azuread_application" "terminal" {
     }
   }
 
-  # The gateway, since the Accounts screen. The terminal reads the demo account from it
-  # directly — the shared key the modules use cannot travel to a browser, so a token for
-  # this API is what the screen presents instead
-  # (openspec/changes/archive/…-accounts-screen-opens-the-gateway).
+  # The gateway, since the Accounts screen: the shared key the modules use cannot travel to a browser, so a token for
+  # this API is what the screen presents instead.
   required_resource_access {
     resource_app_id = module.capital_gateway_easy_auth.client_id
 
@@ -64,36 +45,24 @@ resource "azuread_application" "terminal" {
     }
   }
 
-  # **No block for the strategy platform, and that is the pattern rather than an
-  # omission.** `polymarket-data` has none either. A `resource_access.id` must be a
-  # concrete value at plan time, and a scope being created by this same apply is not one —
-  # the plan fails with "the argument … is required, but no definition was found", which
-  # is what it did on the first attempt at this change. The three above only work because
-  # their scopes have been in state for months.
-  #
-  # `azuread_application_pre_authorized` below is what actually matters: it is why the
-  # operator never sees a second consent screen. Nothing is lost by leaving this list at
-  # three.
+  # **No block for the strategy platform, and that is the pattern rather than an omission** — `polymarket-data` has none
+  # either. A `resource_access.id` must be concrete at plan time, and a scope this same apply creates is not.
 }
 
 resource "azuread_service_principal" "terminal" {
   client_id = azuread_application.terminal.client_id
 }
 
-# Consent, decided here instead of on a screen. Without this the operator is asked, at
-# first sign-in and again after any scope change, whether they agree to give their own
-# terminal access to their own archive — a question with one sensible answer, asked of
-# the only person who could have configured either side.
+# Consent, decided here instead of on a screen: without this the operator is asked whether they agree to give their own
+# terminal access to their own archive — a question with one sensible answer, asked of the person who configured both.
 resource "azuread_application_pre_authorized" "terminal" {
   application_id       = module.market_data_easy_auth.application_id
   authorized_client_id = azuread_application.terminal.client_id
   permission_ids       = [module.market_data_easy_auth.scope_id]
 }
 
-# The same, for the gateway's own API. Standing ready rather than in use today: the
-# terminal still presents its market-data token, which that app accepts as a third
-# audience (app-service.tf). This is what makes asking for the gateway by name a change to
-# the terminal alone, with no second consent prompt on the day it happens.
+# The same for the gateway's own API, standing ready rather than in use: it is what makes asking for the gateway by name
+# a change to the terminal alone, with no second consent prompt on the day it happens.
 resource "azuread_application_pre_authorized" "terminal_gateway" {
   application_id       = module.capital_gateway_easy_auth.application_id
   authorized_client_id = azuread_application.terminal.client_id
@@ -102,21 +71,9 @@ resource "azuread_application_pre_authorized" "terminal_gateway" {
 
 # --- the workbench, as an API of its own ---------------------------------------------
 #
-# Its own registration rather than reuse of `module.market_data_easy_auth` — each backend
-# module is its own API here the same way each is its own deployable, and a module that
-# borrowed another's registration could never be removed without touching the one it
-# borrowed from ("Moduł ma dać się usunąć przez skasowanie katalogu i zasobów").
-#
-# The terminal's identity layer (`src/auth/`) acquires one token today, scoped to
-# market-data, and reuses it everywhere. So `allowed_audiences` on this app's App Service
-# (app-service.tf) accepts *both* this audience and market-data's: the terminal's existing
-# token works against it unmodified, and the scope below stands ready, pre-authorized, for
-# whenever the terminal is changed to ask for it by name instead.
-#
-# **There used to be two of these**, one for the chat and one for teams. One process, one
-# registration — and the display name keeps the `-agent` spelling for the same reason the
-# App Service does (`local.workbench_app_name`): renaming an Entra application means a new
-# client id, and the client id is what the terminal's build and three allow-lists hold.
+# Its own registration rather than reuse of market-data's: a module that borrowed another's could never be removed
+# without touching it. **There used to be two of these** — one process, one registration, and the `-agent` spelling
+# stays because a rename means a new client id, which the terminal's build and three allow-lists hold.
 module "workbench_easy_auth" {
   source = "./modules/easy-auth-app"
 
@@ -141,32 +98,24 @@ resource "azuread_application_pre_authorized" "workbench_terminal" {
   permission_ids       = [module.workbench_easy_auth.scope_id]
 }
 
-# The fourth, and the first that is in use on the day it is written. The three above stood
-# ready and unused from August until `polymarket-screen-opens-the-archive`, because the
-# terminal asked for one scope — market-data's — and presented that token to every back end;
-# the gateway had been configured to accept it as a third audience rather than the terminal
-# being taught to ask by name. It asks by name for all four now, which is what makes these
-# resources the reason a second consent screen never appears.
+# The fourth, and the first in use on the day it is written: the three above stood ready from August, because the
+# terminal asked for market-data's scope and presented that token everywhere. It asks by name for all four now.
 resource "azuread_application_pre_authorized" "polymarket_data_terminal" {
   application_id       = module.polymarket_data_easy_auth.application_id
   authorized_client_id = azuread_application.terminal.client_id
   permission_ids       = [module.polymarket_data_easy_auth.scope_id]
 }
 
-# The fifth, and the second written on the day it is used. The strategy platform shipped
-# for machine callers, so its registration announced no delegated scope at all — the
-# terminal was already on its caller list and still met a 401, because there was nothing
-# for a browser to ask for. This and the scope beside it are what that 401 actually was.
+# The fifth. The strategy platform shipped for machine callers, so its registration announced no delegated scope at all
+# — the terminal was on its caller list and still met a 401, because there was nothing for a browser to ask for.
 resource "azuread_application_pre_authorized" "strategy_terminal" {
   application_id       = module.strategy_easy_auth.application_id
   authorized_client_id = azuread_application.terminal.client_id
   permission_ids       = [module.strategy_easy_auth.scope_id]
 }
 
-# The three values the terminal's build needs (deploy-terminal.yml). All three are public
-# by nature — a client id and a scope name travel in every authorization request the
-# browser makes, and are visible to anyone with the developer tools open. They go through
-# `vars`, never `secrets`; nothing here adds a stored secret.
+# The three values the terminal's build needs. All three are public by nature — a client id and a scope name travel in
+# every authorization request the browser makes — so they go through `vars`, never `secrets`.
 output "terminal_entra_client_id" {
   value = azuread_application.terminal.client_id
 }

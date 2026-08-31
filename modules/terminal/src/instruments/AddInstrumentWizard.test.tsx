@@ -14,12 +14,8 @@ import type {
 } from "../data/types";
 
 /**
- * The wizard talks to two back ends: the gateway's catalogue (asset classes,
- * instruments) through `instruments`, and the archive's job machinery
- * (estimate, trackPairs) through `archive`. Both are driven by hand here —
- * the acceptance dialog's whole point is showing exactly what a real
- * `estimateJob` would return, so a mock that always answers the same thing
- * would assert nothing about it.
+ * Two back ends: the gateway's catalogue and the archive's job machinery, both driven by hand here — the acceptance
+ * dialog's whole point is showing what a real `estimateJob` returns, which a fixed mock asserts nothing about.
  */
 class FakeGateway {
   classes: AssetClass[] = [];
@@ -148,11 +144,8 @@ describe("AddInstrumentWizard — steps (terminal-data-manager spec)", () => {
     expect(submit).toBeEnabled();
   });
 
-  // The date field is the operator's own calendar, not UTC's — picking "2026-08-01" MUST
-  // mean the start of that day in Warsaw (`terminal-shell` spec, "Czas jest pokazywany w
-  // polskiej strefie czasowej", scenario "Data podana przez operatora"). And it starts at
-  // the beginning of the current year rather than at everything the provider has: an
-  // arbitrarily early default would commit every operator to hundreds of requests.
+  // The date field is the operator's own calendar, not UTC's (`terminal-shell` spec, "Czas jest pokazywany w polskiej
+  // strefie"), and it starts at this year rather than all history: an early default commits hundreds of requests.
   it("defaults to this Warsaw year and reads the picked date as Warsaw midnight, not UTC", async () => {
     const user = userEvent.setup();
     fakeArchive.estimateAnswer = {
@@ -189,9 +182,8 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
   }
 
   it("prices every pair, says the numbers are estimates, and asks once for both resolutions", async () => {
-    // The operator decides on cost from these numbers, so their being calendar-period
-    // overestimates is part of what the dialog has to say (market-data-jobs spec,
-    // "Szacunek jest opisany jako szacunek").
+    // The operator decides on cost from these numbers, so their being calendar-period overestimates is part of what
+    // the dialog has to say (market-data-jobs spec, "Szacunek jest opisany jako szacunek").
     const user = userEvent.setup();
     fakeArchive.estimateAnswer = {
       pairs: [pairEstimate("BTCUSD", "MINUTE"), pairEstimate("BTCUSD", "HOUR")],

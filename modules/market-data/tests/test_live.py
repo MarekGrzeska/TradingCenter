@@ -1,30 +1,5 @@
-"""The one thing in this module that could not be settled by reasoning (5.1).
-
-Derived resolutions are computed from the minute series, and that is only sound if the
-period boundary this module floors to is the boundary the provider uses. `HOUR_4` is the
-one where a guess is plausible and wrong in a way nothing would catch: the arithmetic
-anchors on the epoch, which is UTC midnight, and a provider anchoring on a venue's open
-instead would hand back candles that are the right length, the right shape and offset by
-hours. Every one of them would look correct on a chart.
-
-So it is measured. These tests read through a running `capital-gateway` against the demo
-API, take the provider's own `HOUR_4` candles and the minute series underneath them, and
-compare a derivation against the observation for the same periods.
-
-Skipped unless `--run-live` is passed and a gateway is listening. Read-only, and shallow:
-a day of minutes for one pair, which is what the change's own constraint on the apply
-phase allows.
-
-**`INDEX_CFD` wants a trading day; `CRYPTO_CFD` does not.** capital.com runs its index,
-forex and commodity CFDs 23/5, so at the weekend `US100` hands back Friday's series and
-nothing newer — and the density check further down measures candles against a wall clock
-that now has two idle days in it, so it fails while telling the truth about a series that
-is perfectly fine. `BTCUSD` keeps trading, and the whole file can be run against it alone
-at the weekend with `-k crypto` if that is all that is wanted.
-
-    GATEWAY_API_KEY=k uv run uvicorn capital_gateway.app:app --port 8010  # in modules/capital-gateway
-    MARKET_DATA_GATEWAY_API_KEY=k uv run pytest -m live --run-live       # same k both places
-"""
+"""Whether the `HOUR_4` boundary this module floors to is the one the provider uses — the one thing here reasoning
+could not settle, and wrong in a way nothing catches. Skipped unless `--run-live` with a gateway on 8010."""
 
 from __future__ import annotations
 
@@ -48,21 +23,8 @@ GATEWAY_URL = os.environ.get("MARKET_DATA_GATEWAY_URL", "http://localhost:8010")
 # module docstring for how to run one locally.
 GATEWAY_API_KEY = os.environ.get("MARKET_DATA_GATEWAY_API_KEY", "")
 
-# Two instruments whose sessions are as unlike as capital.com offers, because the thing
-# being tested is whether the four-hour anchor follows the clock or a venue's open: if it
-# followed the open, two instruments opening at different times would disagree.
-#
-# Their schedules were measured rather than reasoned about, twice, because the first
-# answer was wrong. On Saturday 2026-08-08 at 15:11 UTC the provider reported BTCUSD and
-# ETHUSD `marketStatus: TRADEABLE` with a minute candle for the minute then in progress,
-# while US100, GOLD and EURUSD were `CLOSED` with nothing since Friday 21:00 UTC. So the
-# index is 23/5 and the crypto CFD trades the weekend too — it is a CFD, but the venue
-# behind it does not shut on Saturday.
-#
-# What is *not* a schedule: BTCUSD served nothing between 04:59 and at least 06:04 UTC
-# that same morning, with a quote that did not move for 90 s. An hour-plus outage on a
-# weekend, mistaken at the time for the instrument being shut. If a series here looks
-# frozen, check `marketStatus` before concluding anything about the calendar.
+# Two instruments whose sessions are as unlike as capital.com offers: an anchor following a venue's open rather
+# than the clock would have them disagree. Measured 2026-08-08, and a frozen series is an outage, not a calendar.
 CRYPTO_CFD = "BTCUSD"
 INDEX_CFD = "US100"
 
@@ -106,11 +68,8 @@ async def test_the_provider_anchors_four_hour_candles_on_utc_midnight(
 async def test_a_derived_four_hour_candle_matches_the_provider_s_own(
     gateway: GatewayHistory, db: asyncpg.Connection, symbol: str
 ) -> None:
-    """The claim in full: build `HOUR_4` from minutes and compare it to the observation.
-
-    Only complete periods are compared. A period the minute series covers in part would
-    differ for a reason that says nothing about the boundary, which is what is under test.
-    """
+    """The claim in full: build `HOUR_4` from minutes and compare it to the observation. Only complete
+    periods are compared — a partly covered one would differ for a reason that is not the boundary."""
     minutes = await gateway.history(symbol, Resolution.MINUTE, MINUTES)
     observed = await gateway.history(symbol, Resolution.HOUR_4, FOUR_HOUR_BARS)
     assert minutes.candles, f"the demo API returned no minute candles for {symbol}"
@@ -146,9 +105,8 @@ async def test_a_derived_four_hour_candle_matches_the_provider_s_own(
 async def test_a_derived_hour_matches_the_provider_s_own(
     gateway: GatewayHistory, db: asyncpg.Connection
 ) -> None:
-    """`HOUR` alongside it. Its anchor is far less doubtful, which is the point: if the
-    four-hour comparison fails while this one passes, the boundary is the suspect rather
-    than the aggregation."""
+    """`HOUR` alongside it, whose anchor is far less doubtful: if the four-hour comparison fails while
+    this one passes, the boundary is the suspect rather than the aggregation."""
     minutes = await gateway.history(CRYPTO_CFD, Resolution.MINUTE, 600)
     observed = await gateway.history(CRYPTO_CFD, Resolution.HOUR, 10)
 
@@ -180,25 +138,8 @@ async def test_a_derived_hour_matches_the_provider_s_own(
 async def test_the_minute_series_is_dense_enough_to_derive_from(
     gateway: GatewayHistory, symbol: str
 ) -> None:
-    """Whether `complete` means anything in practice.
-
-    A period is marked complete when it holds every minute it could, and that mark is
-    only a signal if a whole period is the ordinary case. Measured over three trading
-    days in August 2026, on both instruments:
-
-        every interior four-hour period   240/240, except
-        the period starting 20:00 UTC     233-235/240, every day, both instruments
-
-    The provider pauses for a few minutes around 21:00 UTC daily — the daily break of a
-    23/5 schedule, not a quirk. So one period in six is legitimately short, for every
-    instrument, forever, which is the reason `complete` must never be read as "data is
-    missing". Coverage answers that; this does not.
-
-    **Run this on a trading day.** The density assertion below measures candles against
-    the wall clock between the first and the last of them, and a weekend inside that span
-    is hours of legitimately absent minutes — the assertion would fail, and it would be
-    telling the truth about a series that is perfectly fine.
-    """
+    """Whether `complete` means anything in practice. Measured over three trading days: every interior four-hour
+    period is full except 20:00 UTC, the daily break — so `complete` must never be read as "data is missing"."""
     page = await gateway.history(symbol, Resolution.MINUTE, MINUTES)
     starts = [candle.period_start for candle in page.candles]
     assert len(starts) == len(set(starts))

@@ -1,17 +1,5 @@
-"""An observation is collected or it is gone — the third state leaves the schema.
-
-`tracking_ended_at` was the only thing that could produce an event which neither collects
-nor leaves the list. Nothing sets it any more: the route that did is gone and so is the tool.
-A column nothing writes, backing a state the contract still announces, is a promise with no
-producer — so it goes too, rather than sitting there waiting for somebody to reach for it.
-
-**The two steps are in the only order that works.** After the column is dropped there is no
-way to tell which rows were the stopped ones, so they are deleted first. Their markets,
-outcomes, samples and collected ranges go with them through the cascades already declared in
-0001 and 0002 — the atomicity is the schema's, not this file's.
-
-This deletes data the provider will not give back. It is the cost of two states instead of
-three and it was taken deliberately (`openspec/changes/an-observation-is-collected-or-gone`).
+"""An observation is collected or it is gone: a column nothing writes, backing a state the contract announces, is a
+promise with no producer. The rows go before the column, since afterwards there is no telling which they were.
 
 Revision ID: 0003
 Revises: 0002
@@ -34,9 +22,8 @@ log = logging.getLogger("alembic.runtime.migration")
 
 
 def upgrade() -> None:
-    # Counted before the delete and logged at warning, the way `store.delete_history` logs
-    # its own: a migration that quietly removed collected history would be the one thing
-    # nobody could reconstruct afterwards, not even in principle.
+    # Counted before the delete and logged at warning, the way `store.delete_history` logs its own: a
+    # migration that quietly removed collected history is the one thing nobody could reconstruct.
     gone = op.get_bind().scalar(
         sa.text("SELECT count(*) FROM tracked_events WHERE tracking_ended_at IS NOT NULL")
     )
@@ -54,12 +41,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """The column comes back empty, and that is all a downgrade can honestly do.
-
-    Every row it distinguished was deleted on the way up; there is nowhere to read them back
-    from. A downgrade that silently produced an empty column while claiming to restore the
-    state is the failure mode worth naming here rather than discovering.
-    """
+    """The column comes back empty, and that is all a downgrade can honestly do: every row it
+    distinguished was deleted on the way up, and there is nowhere to read them back from."""
     op.execute("DROP INDEX IF EXISTS tracked_events_active_idx")
     op.execute("ALTER TABLE tracked_events ADD COLUMN tracking_ended_at timestamptz")
     op.execute(

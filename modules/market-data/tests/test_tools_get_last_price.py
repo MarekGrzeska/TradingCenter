@@ -1,9 +1,5 @@
-"""What a pair costs now, and the four different reasons it might not be sayable.
-
-The tool reads the forming period first and falls back to the newest settled candle only
-when that answers with none. Every test here sets both roads, because the interesting
-cases are the ones where the two disagree.
-"""
+"""What a pair costs now, and the four different reasons it might not be sayable. Every test sets both
+roads, because the interesting cases are the ones where the forming period and the settled candle disagree."""
 
 from __future__ import annotations
 
@@ -115,9 +111,8 @@ async def test_an_open_market_with_no_quotes_is_named_as_stalled_collection(
 
 
 async def test_a_silent_gateway_is_not_reported_as_an_open_market(tool_server, archive) -> None:
-    """`no_quotes` covers one more case than its name says: the archive could not find out
-    whether the market is open. Saying "the market is open" there would state as fact the
-    one thing nobody established."""
+    """`no_quotes` covers one more case than its name says: the archive could not find out whether the
+    market is open, and saying it is would state as fact the one thing nobody established."""
     moment = datetime.now(UTC) - timedelta(hours=2)
     archive.forming = forming(FormingState.NO_QUOTES, market_open=None)
     archive.pairs = [tracked(resolution=Resolution.MINUTE, latest_candle=moment)]

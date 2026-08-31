@@ -1,7 +1,4 @@
-"""Levels, zones and trend lines left on an instrument — objects, not a log.
-
-specs/agent-chart-drawings, "Rysunki są trwałe i mają własną tożsamość".
-"""
+"""Levels, zones and trend lines left on an instrument — objects, not a log."""
 
 from __future__ import annotations
 
@@ -24,16 +21,12 @@ from ..models import (
 # ceiling sits where usefulness already ends rather than at some larger, arbitrary number.
 MAX_DRAWINGS_PER_SYMBOL = 100
 
-# The largest value `chart_drawings.id` can hold — PostgreSQL's `bigint`. Checked before a
-# query rather than left to the driver: asyncpg refuses an out-of-range integer by raising,
-# which for a tool call means a turn that died instead of a refusal the model could act on.
-# Python's ints have no such ceiling, so a model inventing a long number reaches this.
+# The largest value `chart_drawings.id` can hold. Checked before a query rather than left to the driver:
+# asyncpg raises on an out-of-range integer, which for a tool call is a turn that died, not a refusal.
 MAX_DRAWING_ID = 2**63 - 1
 
-# A state of the instrument, not a log: unlike chart_commands, there is no cursor and no
-# "since sequence" read here — a consumer reads every drawing for a symbol and replaces
-# what it shows with all of it (design.md of agent-chart-drawings, "Rysunek jest stanem,
-# nie logiem").
+# A state of the instrument, not a log: there is no cursor and no "since sequence" read here — a consumer
+# reads every drawing for a symbol and replaces what it shows with all of it.
 
 _SELECT_DRAWING_COLUMNS = (
     "id, symbol, session_id, kind, time_a, price_a, time_b, price_b, label, color, "
@@ -82,10 +75,8 @@ _UPDATE_DRAWING = f"""
     RETURNING {_SELECT_DRAWING_COLUMNS}
 """
 
-# Scoped to the symbol for the same reason `_DELETE_DRAWINGS` is: an id belonging to
-# another instrument comes back as untouched rather than quietly acted on. Returns only
-# the rows that actually moved, so the caller can tell the model which ids it could not
-# act on.
+# Scoped to the symbol, so an id belonging to another instrument comes back as untouched rather than
+# quietly acted on. Returns only the rows that moved, so the caller can name the ids it could not act on.
 _SET_DRAWINGS_HIDDEN = """
     UPDATE chart_drawings
        SET hidden = $3, updated_at = now()
@@ -97,9 +88,8 @@ _SET_DRAWINGS_HIDDEN = """
 def _geometry_to_columns(
     geometry: ChartDrawingGeometry,
 ) -> tuple[str, datetime | None, float, datetime | None, float | None]:
-    """The domain shape, flattened to the four columns the database actually has — the
-    mirror of `_geometry_from_row` below. `kind` says which fields the other three mean
-    (`design.md`, "Zapis: cztery kolumny geometrii i CHECK per kształt")."""
+    """The domain shape, flattened to the four columns the database actually has — the mirror of
+    `_geometry_from_row` below. `kind` says which fields the other three mean."""
     if isinstance(geometry, ChartLevel):
         return "level", geometry.at, geometry.price, None, None
     if isinstance(geometry, ChartZone):
@@ -139,9 +129,8 @@ async def count_drawings(conn: Conn, *, symbol: str) -> int:
 
 
 async def list_drawings(conn: Conn, *, symbol: str) -> list[ChartDrawing]:
-    """Every drawing on `symbol`, oldest first. Unbounded, deliberately: this table's own
-    ceiling (`MAX_DRAWINGS_PER_SYMBOL`) already keeps one symbol's rows small, so a
-    second limit here would only hide a violation of the first."""
+    """Every drawing on `symbol`, oldest first. Unbounded, deliberately: this table's own ceiling already
+    keeps one symbol's rows small, and a second limit would hide a violation of the first."""
     rows = await conn.fetch(_SELECT_DRAWINGS_BY_SYMBOL, symbol)
     return [_drawing_from_row(row) for row in rows]
 
@@ -153,14 +142,8 @@ async def add_drawings(
     symbol: str,
     geometries: Sequence[ChartDrawingGeometry],
 ) -> list[ChartDrawing]:
-    """Inserted one at a time rather than in bulk: `add` lists are short (bounded by the
-    same ceiling this writes under), and a loop of plain `INSERT ... RETURNING` needs no
-    array-binding gymnastics for four differently-typed columns.
-
-    The ceiling is not checked here — the caller (`tools/drawings.py`) checks it against
-    `count_drawings` before this ever runs, inside the same transaction, so that a call
-    naming three drawings when only two fit refuses all three rather than writing two
-    (specs/agent-chart-drawings, "Agent stawia i kasuje rysunki narzędziem")."""
+    """Inserted one at a time rather than in bulk: `add` lists are short, and a loop of plain `INSERT ...
+    RETURNING` needs no array-binding gymnastics. The ceiling is the caller's, inside the same transaction."""
     written: list[ChartDrawing] = []
     for geometry in geometries:
         kind, time_a, price_a, time_b, price_b = _geometry_to_columns(geometry)
@@ -182,31 +165,22 @@ async def add_drawings(
 
 
 async def remove_drawings(conn: Conn, *, symbol: str, ids: Sequence[int]) -> list[int]:
-    """The ids actually removed — scoped to `symbol`, so an id that exists but belongs to
-    a different instrument comes back as *not* removed, the same as one that never
-    existed at all. The caller compares this against what it asked for to tell the model
-    which ids it could not act on."""
+    """The ids actually removed — scoped to `symbol`, so one belonging to a different instrument comes back
+    as not removed, the same as one that never existed."""
     rows = await conn.fetch(_DELETE_DRAWINGS, symbol, list(ids))
     return [row["id"] for row in rows]
 
 
 async def lock_drawing(conn: Conn, *, drawing_id: int) -> ChartDrawing | None:
-    """One drawing, held until the surrounding transaction ends.
-
-    `FOR UPDATE` because the only caller reads it to decide what a partial correction
-    means — a zone patched with a new `top` alone is checked against the `bottom` it
-    already has, and that bottom must not change between the check and the write
-    (`routers/drawings.py`). `None` means no row with this id, which is a 404 rather
-    than a broken invariant."""
+    """One drawing, held until the surrounding transaction ends. `FOR UPDATE` because the only caller reads
+    it to decide what a partial correction means, and that reading must not change under it."""
     row = await conn.fetchrow(_SELECT_DRAWING, drawing_id)
     return None if row is None else _drawing_from_row(row)
 
 
 async def delete_drawing(conn: Conn, *, drawing_id: int) -> bool:
-    """Whether a row was there to delete — the operator's own removal, which unlike the
-    tool's knows the id but not the symbol it belongs to. `False` becomes a 404: a
-    delete that quietly succeeded on nothing reads to the operator exactly like one that
-    worked (specs/agent-chart-drawings, "Operator cofa rysunek ręką")."""
+    """Whether a row was there to delete — the operator's own removal, which knows the id but not the
+    symbol. `False` becomes a 404: a delete that quietly succeeded on nothing reads like one that worked."""
     return await conn.fetchval(_DELETE_DRAWING, drawing_id) is not None
 
 
@@ -219,12 +193,8 @@ async def update_drawing(
     label: str | None,
     hidden: bool | None = None,
 ) -> ChartDrawing | None:
-    """`None` on any field leaves it as it is — the same convention `PatchSessionIn`
-    already uses, so this is not a new rule to learn. `None` return means no row with
-    this id; the router turns that into 404.
-
-    `conn.fetchrow`, not `fetch_one`: an id nobody has is an expected outcome here, not
-    the broken invariant `fetch_one` exists to catch."""
+    """`None` on any field leaves it as it is — the same convention `PatchSessionIn` uses. `conn.fetchrow`,
+    not `fetch_one`: an id nobody has is an expected outcome here, not a broken invariant."""
     row = await conn.fetchrow(_UPDATE_DRAWING, drawing_id, price_a, price_b, label, hidden)
     return None if row is None else _drawing_from_row(row)
 
@@ -232,12 +202,7 @@ async def update_drawing(
 async def set_drawings_hidden(
     conn: Conn, *, symbol: str, ids: Sequence[int], hidden: bool
 ) -> list[int]:
-    """The ids actually switched — same contract as `remove_drawings`, and for the same
-    reason: an id belonging to another instrument, or to nothing at all, comes back as
-    untouched, and the caller compares that against what it asked for.
-
-    Hiding is not removing, and nothing else about the row moves: the drawing keeps its
-    id, its moment and its geometry, so showing it again gives back exactly what was there
-    (specs/agent-chart-drawings, "Zapalony rysunek jest tym samym rysunkiem")."""
+    """The ids actually switched — same contract as `remove_drawings`. Hiding is not removing: the drawing
+    keeps its id, its moment and its geometry, so showing it again gives back exactly what was there."""
     rows = await conn.fetch(_SET_DRAWINGS_HIDDEN, symbol, list(ids), hidden)
     return [row["id"] for row in rows]

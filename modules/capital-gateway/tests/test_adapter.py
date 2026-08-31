@@ -69,8 +69,6 @@ def mock_navigation() -> None:
     )
 
 
-# --- reads ---
-
 
 @respx.mock
 async def test_searching_returns_matching_instruments(adapter: CapitalAdapter) -> None:
@@ -155,12 +153,8 @@ async def test_a_cut_short_traversal_says_so(adapter: CapitalAdapter) -> None:
 
 
 def mock_mixed_navigation() -> None:
-    """A tree with two asset classes in it.
-
-    Kept apart from `mock_navigation` rather than folded into it: the traversal tests
-    below assert on exact catalogue contents, and a sieve tested against a tree of one
-    class would pass while letting everything through.
-    """
+    """A tree with two asset classes in it. Kept apart from `mock_navigation`: a sieve tested
+    against a tree of one class would pass while letting everything through."""
     respx.get(f"{API}/marketnavigation").mock(
         return_value=httpx.Response(
             200,
@@ -199,11 +193,8 @@ async def test_one_asset_class_comes_back_without_the_others(adapter: CapitalAda
 
 @respx.mock
 async def test_filtering_by_class_still_walks_the_whole_tree(adapter: CapitalAdapter) -> None:
-    """The sieve is on markets, not on branches.
-
-    A walk that guessed a branch's class from its name would be cheaper and would drop
-    instruments filed somewhere the name did not suggest.
-    """
+    """The sieve is on markets, not on branches. A walk guessing a branch's class from its name
+    would be cheaper and would drop instruments filed somewhere the name did not suggest."""
     mock_session()
     mock_mixed_navigation()
 
@@ -280,8 +271,6 @@ async def test_a_rate_limited_read_raises_instead_of_reaching_a_mapper(
 
     assert "429" in err.value.message
 
-
-# --- trading ---
 
 
 @respx.mock
@@ -473,15 +462,11 @@ async def test_closing_a_position_settles_as_closed(adapter: CapitalAdapter) -> 
     assert order.status is OrderStatus.CLOSED
 
 
-# --- the account's request budget: one question, one request -------------------------
-
 
 @respx.mock
 async def test_two_daily_reads_ask_the_venue_once(adapter: CapitalAdapter) -> None:
-    """`GET /markets/{epic}` is what decides whether today's DAY candle is still forming,
-    and one operator question reaches it more than once — a chart read and the period
-    boundary behind it. capital.com counts its 10 requests/second against the account, so
-    the second one is taken from the archive's own collection."""
+    """One operator question reaches `GET /markets/{epic}` more than once — a chart read and the
+    boundary behind it — and capital.com counts its 10 requests/second against the account."""
     today = datetime.now(UTC).strftime("%Y-%m-%dT00:00:00")
     respx.post(f"{API}/session").mock(
         return_value=httpx.Response(200, headers={"CST": "c", "X-SECURITY-TOKEN": "t"}, json={})
@@ -572,8 +557,6 @@ async def test_an_unknown_instrument_is_not_remembered(adapter: CapitalAdapter) 
 
     assert market.call_count == 2
 
-
-# --- a write that came back as something other than JSON -----------------------------
 
 
 @respx.mock

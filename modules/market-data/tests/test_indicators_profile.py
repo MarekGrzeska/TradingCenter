@@ -1,8 +1,5 @@
-"""`market-data-indicators` spec, "Profil czasowy liczy udział czasu, nie wolumenu" —
-the W3 layer (`docs/wskazniki-plan-wdrozenia.html`), on the minute series
-`time_profile` reads regardless of the resolution charted. Task 5.5's own words:
-the point of control has to match a hand recount on a small sample.
-"""
+"""`market-data-indicators`, "Profil czasowy liczy udział czasu, nie wolumenu" — on the minute series
+`time_profile` reads whatever the resolution charted. The point of control has to match a hand recount."""
 
 from __future__ import annotations
 
@@ -16,14 +13,8 @@ from market_data.indicators.catalogue import Series, TimeProfile, get
 
 
 def _minute_series(mid: list[float]) -> tuple[Series, list[datetime]]:
-    """Each bar's true range held to exactly 2.0 by construction (`high = mid +
-    1`, `low = mid - 1`, `close = mid`, and consecutive `mid` values never more
-    than 1.0 apart) — the "gap from yesterday's close" component of
-    `true_range` never exceeds the bar's own 2.0 range, so its ATR settles on
-    a constant 2.0 from the very first bar, not a decaying approximation of
-    one. `typical = (H+L+C)/3` then collapses to exactly `mid`, which is what
-    makes this series a hand-checkable bucket assignment rather than one that
-    needs the kernel's own arithmetic trusted to build the fixture."""
+    """Each bar's true range held to exactly 2.0 by construction, so ATR settles on a constant 2.0 from
+    the first bar and `typical` collapses to `mid` — a hand-checkable bucket assignment."""
     base = datetime(2026, 6, 1, tzinfo=UTC)
     times = [base + timedelta(minutes=i) for i in range(len(mid))]
     high = [m + 1.0 for m in mid]
@@ -45,9 +36,8 @@ _PARAMS = {"atr_period": 3, "bucket_atr": 0.5, "value_area_pct": 70.0}
 
 class TestTimeProfile:
     def test_point_of_control_matches_a_hand_recount(self):
-        # bucket 1 (mid=100): bars 0,1,2 → count 3
-        # bucket 2 (mid=101): bars 3,4,5,6,9 → count 5 — the busiest
-        # bucket 3 (mid=102): bars 7,8 → count 2
+        # bucket 1 (mid=100): bars 0,1,2 → 3; bucket 2 (mid=101): bars 3,4,5,6,9 → 5, the busiest;
+        # bucket 3 (mid=102): bars 7,8 → 2.
         series, times = _minute_series(_MID)
         entry = get("time_profile")
         levels = fn_of(entry, TimeProfile)(series, times, _PARAMS)
@@ -72,9 +62,8 @@ class TestTimeProfile:
         assert sum(count for _price, count in buckets if count is not None) == len(_MID)
 
     def test_value_area_expands_from_the_poc_by_weight(self):
-        # Target is 70% of 10 bars = 7; the POC alone (5) falls short, so the
-        # heavier neighbour (bucket 1, weight 3) is pulled in over the
-        # lighter one (bucket 3, weight 2) — 5 + 3 = 8 clears the target.
+        # Target is 70% of 10 bars = 7; the POC alone (5) falls short, so the heavier neighbour
+        # (weight 3) is pulled in over the lighter one (weight 2) — 5 + 3 clears the target.
         series, times = _minute_series(_MID)
         entry = get("time_profile")
         levels = fn_of(entry, TimeProfile)(series, times, _PARAMS)
@@ -87,9 +76,8 @@ class TestTimeProfile:
         assert val.count is None
 
     def test_a_wider_value_area_pct_pulls_in_the_last_bucket_too(self):
-        # 100% covers every bar, so the value area is now the whole populated
-        # range: bucket 3 (the last one left out at 70%) joins bucket 1,
-        # which was already in — the edges become the full range's own.
+        # 100% covers every bar, so the value area is the whole populated range: bucket 3 joins
+        # bucket 1, which was already in.
         series, times = _minute_series(_MID)
         entry = get("time_profile")
         params = {**_PARAMS, "value_area_pct": 100.0}
@@ -101,10 +89,8 @@ class TestTimeProfile:
         assert val.price == pytest.approx(100.0)  # bottom of bucket 1 — unchanged from 70%
 
     def test_a_flat_series_has_no_bucket_width_to_measure_and_answers_empty(self):
-        # `high == low == close` throughout: true range, and so ATR, is
-        # exactly zero — `_minute_series`' fixed ±1 spread does not apply
-        # here on purpose, since that spread is itself what gives every other
-        # test in this file a nonzero bucket width to bucket into.
+        # `high == low == close` throughout, so true range and ATR are exactly zero — the fixed
+        # ±1 spread does not apply here, and that spread is what gives every other test a width.
         flat = np.full(5, 100.0)
         series = Series(open=flat, high=flat, low=flat, close=flat)
         base = datetime(2026, 6, 1, tzinfo=UTC)

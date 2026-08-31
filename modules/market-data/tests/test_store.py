@@ -28,8 +28,6 @@ def candle(**overrides) -> Candle:
     )
 
 
-# --- the model's own guards (no database needed) ------------------------------------
-
 
 def test_a_candle_is_closed_unless_it_says_otherwise() -> None:
     assert candle().forming is False
@@ -52,8 +50,6 @@ def test_a_period_start_in_another_zone_becomes_the_same_instant_in_utc() -> Non
         2026, 8, 7, 14, 0, tzinfo=UTC
     )
 
-
-# --- 2.4: the same triple written twice ---------------------------------------------
 
 
 @pytest.mark.db
@@ -94,8 +90,6 @@ async def test_the_same_period_from_the_other_source_is_still_one_candle(
     assert len(stored) == 1
     assert stored[0].source is CandleSource.HISTORY
 
-
-# --- 4.2: which of the two roads is believed ----------------------------------------
 
 
 @pytest.mark.db
@@ -217,8 +211,6 @@ async def test_a_range_read_excludes_its_end_so_two_reads_join_cleanly(
     assert joined == sorted(set(joined))
     assert len(joined) == 4
 
-
-# --- 2.5: the candle that has not closed --------------------------------------------
 
 
 @pytest.mark.db

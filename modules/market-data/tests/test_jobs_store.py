@@ -1,9 +1,5 @@
-"""jobs/store.py and the status derivation in jobs/models.py.
-
-Group 2 of rework-instrument-collection: a job's status is never stored, only derived
-from its chunks — so most of what is worth testing here is that the derivation reads
-the same regardless of which write put the chunks in that shape.
-"""
+"""jobs/store.py and the status derivation in jobs/models.py. A job's status is never stored, only
+derived, so what is worth testing is that the derivation reads the same whichever write shaped it."""
 
 from __future__ import annotations
 
@@ -67,8 +63,6 @@ async def _tracked(db: asyncpg.Connection, symbol: str = "US100", resolution: Re
     await track(db, symbol, resolution, LIMIT)
 
 
-# --- status derivation (pure) --------------------------------------------------------
-
 
 def test_a_job_with_no_chunks_succeeded_trivially() -> None:
     # Every pair in the decision was already fully covered — there was nothing to
@@ -100,8 +94,6 @@ def test_all_failed_with_nothing_settled_is_failed() -> None:
 def test_all_interrupted_with_nothing_settled_is_interrupted() -> None:
     assert derive_status([ChunkState.INTERRUPTED, ChunkState.INTERRUPTED]) is JobStatus.INTERRUPTED
 
-
-# --- creating and reading a job -------------------------------------------------------
 
 
 @pytest.mark.db
@@ -139,8 +131,6 @@ async def test_a_chunk_for_an_untracked_pair_is_refused(db: asyncpg.Connection) 
 async def test_reading_an_unknown_job_is_none(db: asyncpg.Connection) -> None:
     assert await read_job(db, 999_999) is None
 
-
-# --- claiming and finishing chunks -----------------------------------------------------
 
 
 @pytest.mark.db
@@ -231,8 +221,6 @@ async def test_a_partial_job_names_the_pair_still_running(db: asyncpg.Connection
     assert reread.running_pair == (running.symbol, running.resolution)
 
 
-# --- restart: orphaned chunks ---------------------------------------------------------
-
 
 @pytest.mark.db
 async def test_startup_interrupts_a_running_chunk(db: asyncpg.Connection) -> None:
@@ -250,9 +238,8 @@ async def test_startup_interrupts_a_running_chunk(db: asyncpg.Connection) -> Non
 
 @pytest.mark.db
 async def test_startup_interrupts_chunks_still_queued(db: asyncpg.Connection) -> None:
-    """A chunk that never got as far as running is exactly as orphaned as one that did
-    — no runner survived to work either of them (design.md, "Historia zleceń i
-    kawałków przeżywa restart")."""
+    """A chunk that never got as far as running is exactly as orphaned as one that did — no runner
+    survived to work either of them."""
     await _tracked(db)
     job = await create_job(db, MOMENT, [plan()])
     # Left pending, deliberately not claimed — the runner that would have picked it up
@@ -277,8 +264,6 @@ async def test_settled_chunks_are_untouched_by_a_restart(db: asyncpg.Connection)
     reread = await read_job(db, job.id)
     assert reread.chunks[0].state is ChunkState.DONE
 
-
-# --- retrying ---------------------------------------------------------------------------
 
 
 @pytest.mark.db
@@ -332,8 +317,6 @@ async def test_retrying_an_unknown_job_is_refused(db: asyncpg.Connection) -> Non
         await retry_job(db, 999_999)
 
 
-# --- bulk-skipping chunks past a discovered boundary -----------------------------------
-
 
 @pytest.mark.db
 async def test_skipping_only_touches_pending_chunks_at_or_before_the_boundary(
@@ -375,8 +358,6 @@ async def test_skipping_does_not_touch_a_chunk_already_running(db: asyncpg.Conne
     assert reread.chunks[0].id == claimed.id
     assert reread.chunks[0].state is ChunkState.RUNNING
 
-
-# --- listing, narrowed to a pair -------------------------------------------------------
 
 
 @pytest.mark.db
@@ -439,8 +420,6 @@ async def test_a_job_spanning_two_pairs_reads_whole_through_read_job(
 
     assert len(whole.chunks) == 2
 
-
-# --- when something last happened ------------------------------------------------------
 
 
 @pytest.mark.db
@@ -509,8 +488,6 @@ async def test_a_stalled_job_reports_the_same_moment_on_every_read(
 
     assert first == second
 
-
-# --- removing a job from the history ---------------------------------------------------
 
 
 @pytest.mark.db

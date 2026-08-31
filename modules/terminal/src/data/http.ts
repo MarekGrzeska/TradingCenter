@@ -2,23 +2,8 @@ import { noIdentity, SignedOut, SIGNED_OUT_MESSAGE, type Identity } from "../aut
 import { MarketDataError, type MarketDataErrorKind } from "./types";
 
 /**
- * The one place an HTTP failure becomes something an operator can read.
- *
- * Both back ends the terminal talks to are FastAPI, so both spell a refusal the
- * same two ways — a `detail` string, or the framework's own list of validation
- * objects — and neither is worth parsing twice. What they do *not* share is
- * what a status means: 422 is an unsupported resolution to the gateway and a
- * pair the archive will not take on. That judgement stays with each adapter,
- * which is what `mapStatus` is.
- *
- * This is already as much as the adapters have in common, and that was measured rather
- * than assumed: `agentApi.ts` (649 lines) and `teamsApi.ts` (840) look like twins from
- * the outside, and on 20 August 2026 they were compared the way the Python modules are
- * before anything is shared — `difflib.SequenceMatcher` over lines, `autojunk` off.
- * 14.8% of lines in common, 7.9% ignoring blanks and comments, against the 70% the
- * sharing rule asks for and the 79.4% that moved the OpenAI provider into `tc-openai`.
- * The longest identical run is eight lines, and it is the model-catalogue row both
- * surfaces publish. A second wrapper beneath this one would have nothing to hold.
+ * Where an HTTP failure becomes something an operator can read. What a status *means* stays with each adapter,
+ * which is what `mapStatus` is: 422 is an unsupported resolution to the gateway, a refused pair to the archive.
  */
 
 export interface JsonRequest {
@@ -30,16 +15,8 @@ export interface JsonRequest {
 export type StatusMapper = (status: number, detail: string) => MarketDataError;
 
 /**
- * A back end's refusals, as a table.
- *
- * Every adapter here answered the same question with the same four lines of `if` — which
- * status means what — and the differences between them are the whole content: the
- * archive calls a 409 a refusal and a 502 an upstream failure, the gateway calls a 422 an
- * unsupported resolution, the two module APIs call it a refusal. A status nobody listed
- * is `unknown`, which is what each of them ended on anyway.
- *
- * 401 is not listed by anyone and cannot be: it means the same thing whichever back end
- * answered it, and `jsonClient` handles it before this is reached.
+ * A back end's refusals, as a table: every adapter answered the same question with the same four `if`s, and the
+ * differences are the content. 401 is nobody's to list — `jsonClient` handles it before this is reached.
  */
 export function statusMapper(kinds: Partial<Record<number, MarketDataErrorKind>>): StatusMapper {
   return (status, detail) => new MarketDataError(kinds[status] ?? "unknown", detail);
@@ -71,13 +48,8 @@ async function parseErrorDetail(response: Response): Promise<string> {
 const UNAUTHENTICATED = 401;
 
 /**
- * An HTTP client for one back end: `label` names it in the one message it composes
- * itself, and `mapStatus` decides what its refusals mean.
- *
- * Attaching the credential is this function's job rather than each call site's, and that
- * is load-bearing: a route added to `archive.ts` or `gatewaySource.ts` later carries a
- * token because it cannot not carry one. Neither file mentions a token anywhere. Left
- * out, `identity` is the one with none — local mode, requests go out bare.
+ * An HTTP client for one back end. Attaching the credential here rather than at each call site is load-bearing:
+ * a route added later carries a token because it cannot not carry one. No `identity` means local mode, bare.
  */
 export function jsonClient(label: string, mapStatus: StatusMapper, identity: Identity = noIdentity) {
   async function attempt(url: string, request: JsonRequest, token: string | null) {
@@ -111,11 +83,8 @@ export function jsonClient(label: string, mapStatus: StatusMapper, identity: Ide
 
     let response = await attempt(url, request, token);
 
-    // One retry, and exactly one. A token can expire between being read from
-    // the cache and reaching the archive, and renewing it silently is better
-    // than showing the operator a failure they can do nothing about. Bounding
-    // it at a single attempt is what keeps "refused → renew → refused" from
-    // becoming a loop that hammers both the archive and the token endpoint.
+    // One retry, and exactly one: a token can expire between the cache and the archive, and bounding it at a
+    // single attempt keeps "refused → renew → refused" from hammering both the archive and the token endpoint.
     if (response.status === UNAUTHENTICATED && token !== null) {
       try {
         token = await identity.refresh();
@@ -126,9 +95,8 @@ export function jsonClient(label: string, mapStatus: StatusMapper, identity: Ide
     }
 
     if (response.status === UNAUTHENTICATED) {
-      // Survived the renewal, so it is the session and not the token. The
-      // detail from the server is dropped on purpose: it describes an audience
-      // or an issuer, and the operator's move is the same either way.
+      // Survived the renewal, so it is the session and not the token. The server's detail is dropped: it
+      // describes an audience or an issuer, and the operator's move is the same either way.
       throw new MarketDataError("unauthenticated", SIGNED_OUT_MESSAGE);
     }
     if (!response.ok) {
@@ -145,11 +113,8 @@ export function jsonClient(label: string, mapStatus: StatusMapper, identity: Ide
   };
 }
 
-/** `SignedOut` from the identity layer, said in the data layer's own vocabulary
- *  so no caller has to know both. Anything else — the token endpoint being
- *  briefly unreachable — is not a signed-out session and passes through
- *  untouched, because retrying is the right answer to it and is not the right
- *  answer to the other. */
+/** `SignedOut` said in the data layer's own vocabulary, so no caller has to know both. Anything else — the token
+ *  endpoint briefly unreachable — passes through untouched, because retrying is the right answer to that one. */
 function asUnauthenticated(cause: unknown): unknown {
   return cause instanceof SignedOut
     ? new MarketDataError("unauthenticated", cause.message)

@@ -1,16 +1,5 @@
-"""The three paths both surfaces published, and where they went.
-
-`/health` was identical and is one route. `GET /models` and `GET /usage` answered different
-shapes, so the teams surface's moved under `/teams/` and the conversation's stayed.
-
-The second test is the one worth having, and it asserts behaviour rather than a list of
-routes. `/teams/models` also matches `/teams/{team_id}`: a path parameter compiles to a
-segment matcher that runs *before* FastAPI tries to read the segment as an `int`, so the
-literal wins only by being registered first — measured on FastAPI 0.141.1, where reversing
-the two lines answers `422 int_parsing` instead of the catalogue. That is two lines of
-`teams/surface.py` in the right order, which is exactly the kind of correctness that
-survives until somebody tidies the imports.
-"""
+"""The three paths both surfaces published, and where they went. The second test asserts behaviour, because a path
+parameter compiles to a matcher that runs before FastAPI reads it as an `int`: reversing two lines answers 422."""
 
 from __future__ import annotations
 
@@ -34,16 +23,8 @@ class _Catalogue:
 
 @pytest.fixture
 def surfaces() -> TestClient:
-    """Both surfaces on one application, assembled the way `workbench/app.py` assembles
-    them — and with no lifespan, so this says nothing about a database.
-
-    State is stubbed rather than built: the routes under test here are the two that read a
-    catalogue, and what the rest of them read is other tests' subject.
-
-    `raise_server_exceptions=False` for exactly that reason — a route reached with nothing
-    behind it raises, and a raised exception is not the answer this file is asking about.
-    Turned into a 500, it says what these tests want to know: the request got past routing.
-    """
+    """Both surfaces on one application, assembled the way `workbench/app.py` assembles them — and with no
+    lifespan, so this says nothing about a database. State is stubbed rather than built."""
     app = FastAPI()
     agent.surface.include(app)
     teams.surface.include(app)
@@ -70,15 +51,13 @@ def test_the_literal_beats_the_team_id_it_looks_like(surfaces: TestClient) -> No
 
 
 def test_a_real_team_id_still_reaches_the_catalogue_route(surfaces: TestClient) -> None:
-    """The other half: putting the literals first must not shadow the parameterised route.
-    It answers here by failing on its own state rather than on routing, which is enough —
-    a `404` from the router would mean the route was never reached."""
+    """The other half: putting the literals first must not shadow the parameterised route. It answers by failing on its
+    own state rather than on routing, which is enough — a `404` from the router would mean it was never reached."""
     assert surfaces.get("/teams/7").status_code != 404
 
 
 def test_nothing_else_moved(surfaces: TestClient) -> None:
-    """A sample from each surface, at the path it had before the merge. The point is not
-    coverage of every route — `contract:check` in the terminal is that — but that the prefix
-    applied to two routers and not to a whole surface."""
+    """A sample from each surface, at the path it had before the merge. The point is not coverage of every route —
+    `contract:check` is that — but that the prefix applied to two routers and not to a whole surface."""
     for path in ("/sessions", "/prompt", "/chart", "/drawings", "/usage", "/teams", "/tools"):
         assert surfaces.get(path).status_code != 404, path

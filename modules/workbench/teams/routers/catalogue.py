@@ -1,10 +1,5 @@
-"""The catalogue: teams, their revisions, and retiring one.
-
-Every route here takes `current_principal` and hands it to the store, which puts the
-owner into the statement itself. A team belonging to somebody else answers 404, the same
-as one that never existed — the difference between those two answers is what tells a
-stranger how many teams there are (specs/teams-browser-access).
-"""
+"""The catalogue: teams, their revisions, and retiring one. Every route hands `current_principal` to the
+store, which puts the owner into the statement — a stranger's team answers 404, like one that never existed."""
 
 from __future__ import annotations
 
@@ -32,20 +27,8 @@ router = APIRouter()
 
 
 async def _check(request: Request, definition: TeamDefinition) -> None:
-    """The surroundings half of the save-time check — see `validation.py`. 422 rather
-    than 400, so a refusal over an unknown model reads to the terminal exactly like a
-    refusal over a cycle, which FastAPI raises for itself from the same body.
-
-    The tool names are asked of every configured server here rather than read from a
-    list kept anywhere: a server that reworded, added or dropped a tool since this
-    process started is answered correctly and without a restart, and there is no second
-    copy of its catalogue to drift (specs/teams-tool-access). `announced_snapshot`
-    answers `None` when nothing is configured at all, which `validation.py` turns into
-    its own sentence — a different refusal from "that tool is gone" and from "two
-    servers both claim it". The models are the other way round on purpose: that
-    catalogue is this module's own configuration, checked once at start-up, so it is
-    read from `app.state` rather than asked for again.
-    """
+    """The surroundings half of the save-time check, answering 422 so an unknown model reads exactly like a cycle. Tool
+    names are asked of every configured server rather than read from a list; the models are this module's own configuration."""
     try:
         check_definition(
             definition,
@@ -144,11 +127,8 @@ async def get_revision(
 async def get_revision_by_id(
     revision_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> TeamRevisionOut:
-    """The definition a run is working on, reached the way a run names it — by the id on
-    `runs.team_revision_id` rather than by a version the watcher would first have to look
-    up. Drawing a run against the team's *latest* revision instead would show the operator
-    a graph the run is not running (specs/teams-runs, "Przebieg odbywa się na rewizji, nie
-    na zespole")."""
+    """The definition a run is working on, reached the way a run names it — by id rather than by a version
+    the watcher would first have to look up. The team's latest would show a graph the run is not running."""
     async with request.app.state.teams.pool.acquire() as conn:
         row = await store.get_revision_by_id(
             conn, revision_id=revision_id, owner_principal=owner
@@ -162,9 +142,8 @@ async def get_revision_by_id(
 async def get_layout(
     team_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> TeamLayoutOut:
-    """Where the operator left each agent. A team with nothing saved answers with an empty
-    layout rather than a 404 — never having been arranged is the ordinary state, and the
-    canvas computes places from the dependencies for every agent this does not name."""
+    """Where the operator left each agent. A team with nothing saved answers with an empty layout rather
+    than a 404: never having been arranged is the ordinary state."""
     async with request.app.state.teams.pool.acquire() as conn:
         team = await store.get_team(conn, team_id=team_id, owner_principal=owner)
         if team is None:
@@ -180,14 +159,8 @@ async def save_layout(
     request: Request,
     owner: str = Depends(current_principal),
 ) -> TeamLayoutOut:
-    """Replaces the layout. Not a revision and not a change to one: this route never
-    touches `team_revisions`, which is the whole reason the table it writes exists
-    (specs/terminal-teams, "Przesunięcie nie jest zmianą definicji").
-
-    Agent keys are not checked against any revision on purpose. The canvas sends what it
-    drew, an unsaved draft can carry an agent no revision knows yet, and a key that never
-    becomes one is a row nobody reads.
-    """
+    """Replaces the layout. Not a revision and not a change to one, which is the whole reason the table it
+    writes exists. Agent keys are not checked against any revision: the canvas sends what it drew."""
     async with request.app.state.teams.pool.acquire() as conn:
         saved = await store.save_layout(
             conn,

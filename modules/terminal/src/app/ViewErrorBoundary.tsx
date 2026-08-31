@@ -11,10 +11,8 @@ interface State {
 }
 
 /**
- * Catches a render error from one view and keeps the rest of the terminal
- * alive — terminal-shell spec, "Awaria pojedynczego widoku". "Retry" remounts
- * the subtree fresh via the `key` rather than merely clearing the error flag,
- * so state that caused the crash doesn't survive the retry.
+ * Catches a render error from one view and keeps the rest of the terminal alive. "Retry" remounts the subtree through
+ * the `key` rather than clearing the flag, so the state that caused the crash does not survive the retry.
  */
 export class ViewErrorBoundary extends Component<Props, State> {
   state: State = { error: null, resetCount: 0 };

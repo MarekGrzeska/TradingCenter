@@ -1,10 +1,5 @@
-"""Regions rather than lines: three-bar imbalances and fixed clock windows.
-
-No market calendar backs any of this. `session_range` and `opening_range` take the hours
-they cover as parameters and read the archive's own fine series to place them; a gap is
-suppressed across a *verified* market closure, which coverage knows and a calendar would
-have to be taught (docs/wskazniki-plan-wdrozenia.html, "W2 — strefy"; task 4.3).
-"""
+"""Regions rather than lines: three-bar imbalances and fixed clock windows. No market calendar backs
+any of it — a gap is suppressed across a *verified* closure, which coverage knows."""
 
 from __future__ import annotations
 
@@ -27,8 +22,6 @@ from .spec import (
     Zones,
 )
 
-# ("market_status wie tylko, czy rynek jest otwarty teraz"). ---
-
 
 def _three_bar_gaps(
     hi: np.ndarray,
@@ -36,22 +29,8 @@ def _three_bar_gaps(
     session_close_before: np.ndarray,
     skip_session_gaps: bool,
 ) -> list[Zone]:
-    """A void between bar `i - 1` and bar `i + 1` that bar `i` itself never
-    reaches into, in whichever direction `i`'s impulse moved — the "fair value
-    gap" a three-bar pattern is, on whichever pair of edges the caller hands in
-    (`hi`/`lo` are the full wick range for `range_gap`, the body's own edges for
-    `body_gap`; the pattern itself does not care which).
-
-    Touched and filled are different claims: touched is price merely reaching
-    the near edge again, filled is a later bar crossing all the way to the far
-    one. Only the second means the imbalance is gone, so only the second closes
-    the zone (`end_bar`) — `IndicatorZoneOut.to` stays null on a merely-touched
-    gap, same as one nothing has come back to at all.
-
-    A candidate spanning a confirmed market closure (`session_close_before`) is
-    skipped when `skip_session_gaps` is set — a weekend is not an imbalance,
-    task 4.3's whole point.
-    """
+    """A void between bar `i - 1` and bar `i + 1` that bar `i` never reaches into. Touched and filled
+    are different claims, and only filled — a later bar crossing to the far edge — closes the zone."""
     n = len(hi)
     zones: list[Zone] = []
     for i in range(1, n - 1):
@@ -67,10 +46,8 @@ def _three_bar_gaps(
 
         touched_at: int | None = None
         filled_at: int | None = None
-        # `i + 2`, not `i + 1`: bar `i + 1` is one of the three bars that forms
-        # the gap in the first place (its own edge *is* `top`, by construction
-        # above), so starting the scan there would count the gap as touching
-        # itself the instant it exists.
+        # `i + 2`, not `i + 1`: bar `i + 1` is one of the three bars forming the gap, so a scan
+        # starting there would count the gap as touching itself the instant it exists.
         for j in range(i + 2, n):
             if direction == "bullish":
                 if touched_at is None and lo[j] <= top:
@@ -136,18 +113,8 @@ _BODY_GAP = IndicatorSpec(
 def _fixed_window_zones(
     s: Series, days: Sequence[object], in_window: Callable[[int], bool]
 ) -> list[Zone]:
-    """Groups consecutive in-window minute bars into one zone apiece — shared
-    by `_session_window_zones` (a window per local calendar day) and
-    `_opening_range_zones` (a window per UTC calendar day), which differ only
-    in how `in_window` decides a bar belongs to today's window, and in which
-    calendar `days` names.
-
-    A day boundary always closes whatever window was open first, even if
-    `in_window` would call the new day's own first bar "inside" too — a
-    window defined in its own zone's local hours never legitimately reaches
-    midnight, so two different days' windows must never merge into one zone
-    just because nothing out-of-window separated them.
-    """
+    """Groups consecutive in-window minute bars into one zone apiece. A day boundary always closes
+    the open window first, so two days' windows never merge because nothing out-of-window separated them."""
     zones: list[Zone] = []
     window_bars: list[int] = []
 
@@ -180,12 +147,8 @@ def _fixed_window_zones(
 
 
 def _session_window_zones(zone_info: ZoneInfo) -> MinuteZoneFn:
-    """One zone per local calendar day in `zone_info`, spanning the bars whose
-    local clock time falls in `[from_hour, to_hour)` — a fixed window, not a
-    market-hours lookup (see this module's docstring). `zoneinfo`
-    resolves the UTC offset per calendar day rather than once for the whole
-    read, so the same local hours line up across a DST change instead of
-    sliding by the transition's hour (task 4.9)."""
+    """One zone per local calendar day, spanning the bars whose local clock falls in the window — not
+    a market-hours lookup. `zoneinfo` resolves the offset per day, so DST does not slide the hours."""
 
     def compute(s: Series, times: Sequence[datetime], p: Mapping[str, float]) -> list[Zone]:
         from_hour = float(p["from_hour"])
@@ -204,12 +167,8 @@ def _session_window_zones(zone_info: ZoneInfo) -> MinuteZoneFn:
 
 
 def _opening_range_zones(s: Series, times: Sequence[datetime], p: Mapping[str, float]) -> list[Zone]:
-    """The high-low range of the first `window_minutes` of each UTC calendar
-    day — `htf_levels_day` anchors to the same boundary for the same reason:
-    it is the only "day" this module can name without a session calendar
-    (design.md, Ichimoku/Alligator decision). Kept to the most recent `n` —
-    unlike a gap or a session window, nothing bounds how many opening ranges a
-    wide daily-chart request would otherwise produce."""
+    """The high-low range of the first `window_minutes` of each UTC day — the only "day" this module
+    can name without a session calendar. Kept to the most recent `n`: nothing else bounds the count."""
     window = timedelta(minutes=int(p["window_minutes"]))
     n = int(p["n"])
     days = [t.date() for t in times]

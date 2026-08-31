@@ -19,16 +19,13 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # Append-only, and the append-only-ness is the point: a decision names the version it
-    # was computed under, and that version has to still read the way it read then
-    # (`strategy-catalogue`, "Decyzja zawsze niesie powód i pochodzenie"). Nothing updates
-    # a row here; a change of mind is the next version.
+    # Append-only, and that is the point: a decision names the version it was computed under, and that
+    # version has to still read the way it read then. A change of mind is the next version.
     op.create_table(
         "parameter_sets",
         sa.Column("id", sa.BigInteger, sa.Identity(always=True), primary_key=True),
-        # The catalogue entry's id — text rather than a foreign key, because the
-        # catalogue is code in the image, not a table. A row whose strategy has since
-        # left the image is still readable, which is what a decision from that era needs.
+        # The catalogue entry's id — text rather than a foreign key, because the catalogue is code in
+        # the image. A row whose strategy has since left the image is still readable.
         sa.Column("strategy_id", sa.Text, nullable=False),
         sa.Column("version", sa.Integer, nullable=False),
         sa.Column("params", postgresql.JSONB(), nullable=False),
@@ -37,9 +34,8 @@ def upgrade() -> None:
         sa.UniqueConstraint("strategy_id", "version", name="parameter_sets_strategy_version"),
     )
 
-    # One row per (strategy, symbol) the platform is watching. `active` is the whole of
-    # the off switch: deactivating one MUST NOT touch the others
-    # (`strategy-runtime`, "Platforma bez strategii jest stanem wspieranym").
+    # One row per (strategy, symbol) the platform is watching. `active` is the whole of the off switch:
+    # deactivating one MUST NOT touch the others.
     op.create_table(
         "watches",
         sa.Column("id", sa.BigInteger, sa.Identity(always=True), primary_key=True),
@@ -68,16 +64,13 @@ def upgrade() -> None:
             sa.ForeignKey("parameter_sets.id", ondelete="RESTRICT"),
             nullable=False,
         ),
-        # The closing time of the bar this decision was made on. Never the wall clock:
-        # a decision belongs to a bar, and the same bar replayed must land on the same row
-        # (`strategy-runtime`, "Każda ocena zostaje zapisana i daje się odtworzyć").
+        # The closing time of the bar this decision was made on, never the wall clock: a decision
+        # belongs to a bar, and the same bar replayed must land on the same row.
         sa.Column("as_of", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("action", sa.Text, nullable=False),
         sa.Column("reason", sa.Text, nullable=True),
-        # Which layer refused. A refusal for want of data is answered by fetching history;
-        # a refusal by the strategy is answered by reading the strategy — telling them
-        # apart in the row is what keeps the two answers apart
-        # (`strategy-runtime`, "Dziura w danych nie jest odpowiedzią").
+        # Which layer refused. A refusal for want of data is answered by fetching history; one by the
+        # strategy is answered by reading the strategy, and the row is what keeps the two apart.
         sa.Column("reason_kind", sa.Text, nullable=True),
         sa.Column("direction", sa.Text, nullable=True),
         sa.Column("entry", sa.Double, nullable=True),
@@ -87,9 +80,8 @@ def upgrade() -> None:
         sa.Column("score", sa.Double, nullable=True),
         sa.Column("features", postgresql.JSONB(), nullable=False,
                   server_default=sa.text("'{}'::jsonb")),
-        # The facts the decision stood on, in full. Not a pointer at the archive: replay
-        # has to survive the archive's retention and any later correction to it
-        # (design.md, decision 4).
+        # The facts the decision stood on, in full. Not a pointer at the archive: replay has to
+        # survive the archive's retention and any later correction to it.
         sa.Column("facts", postgresql.JSONB(), nullable=False),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False,
                   server_default=sa.text("now()")),

@@ -27,14 +27,12 @@ def upgrade() -> None:
         sa.Column("resolution", sa.Text, nullable=False),
         sa.Column("range_from", sa.TIMESTAMP(timezone=True), nullable=False),
         sa.Column("range_to", sa.TIMESTAMP(timezone=True), nullable=False),
-        # The three things a report has to name about itself, as columns rather than only
-        # inside the blob, because they are what two runs must share before their numbers
-        # may be read together (`strategy-backtest`).
+        # The three things a report has to name about itself, as columns rather than only inside the
+        # blob, because they are what two runs must share before their numbers may be read together.
         sa.Column("params", postgresql.JSONB(), nullable=False),
         sa.Column("costs", postgresql.JSONB(), nullable=False),
-        # The whole report as it was produced. Kept entire rather than shredded into
-        # columns: a metric added next month must not make last month's runs unreadable,
-        # and what makes a run worth keeping is that it can still be read as it was.
+        # The whole report as it was produced, kept entire rather than shredded into columns: a metric
+        # added next month must not make last month's runs unreadable.
         sa.Column("report", postgresql.JSONB(), nullable=False),
         sa.Column("ran_at", sa.TIMESTAMP(timezone=True), nullable=False,
                   server_default=sa.text("now()")),

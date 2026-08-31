@@ -1,9 +1,5 @@
-"""The teams surface's own database fixtures.
-
-A PostgreSQL of its own rather than a second schema in the conversation's: the two chains
-own `alembic_version` separately, which is the whole reason there are two databases in
-production as well. Everything not about this database is one copy in `tests/conftest.py`.
-"""
+"""The teams surface's own database fixtures. A PostgreSQL of its own rather than a second schema in the
+conversation's: the two chains own `alembic_version` separately, which is why production has two databases."""
 
 from __future__ import annotations
 
@@ -13,12 +9,8 @@ import asyncpg
 import pytest
 from tc_runtime.db import asyncpg_dsn
 
-# Children before parents: `usage` and `tool_calls` both reference `run_steps`,
-# `run_steps` references `runs`, `runs` references `team_revisions`, `team_revisions`
-# references `teams` — the same convention agent's own TABLES follows. `schedule_fires`
-# references `schedules`, `triggers` and `runs`; `schedules` and `triggers` each
-# reference `team_revisions`. `team_layouts` references `teams` directly, not a revision.
-# `team_memories` references both `teams` and `runs`, so it goes before either.
+# Children before parents, the same convention agent's own TABLES follows. `team_memories` references both
+# `teams` and `runs`, so it goes before either.
 TABLES: tuple[str, ...] = (
     "trades",
     "usage",

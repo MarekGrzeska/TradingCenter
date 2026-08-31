@@ -14,11 +14,8 @@ function draftOf(prompt: AgentPrompt): Draft {
 }
 
 /**
- * View and edit the system prompt the agent actually runs, from the terminal instead
- * of a commit and a deploy (`terminal-agent-prompt-management` spec). `current` is
- * only ever set from a response the module sent — never from what the operator is
- * mid-typing, so a refused save leaves the last confirmed version on screen rather
- * than something that looks saved but is not.
+ * The system prompt the agent actually runs, edited from the terminal instead of a commit and a deploy. `current` is
+ * only ever set from a response, so a refused save leaves the last confirmed version rather than a fake one.
  */
 export function PromptManagementView({ api = agentApi }: { api?: AgentApi } = {}) {
   const state = usePrompt(api);

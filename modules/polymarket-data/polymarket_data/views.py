@@ -1,9 +1,5 @@
-"""Assembling what a read answers with, in one place both surfaces use.
-
-The REST contract and the tool surface answer the same questions in different shapes, and
-the part that is genuinely the same — which events, with which prices, and whether collection
-is actually running — is here rather than twice.
-"""
+"""Assembling what a read answers with, in one place both surfaces use — which events, with which prices,
+and whether collection is actually running."""
 
 from __future__ import annotations
 
@@ -15,9 +11,8 @@ from . import store
 from .contract import CollectionOut, SnapshotEntry, SnapshotOut, TrackedEventOut
 from .models import Event, Sample
 
-# How many missed ticks before collection is called stalled rather than merely quiet. Three,
-# so one slow round or one provider hiccup does not raise an alarm — but silence in the data
-# still stops looking like silence in the market.
+# How many missed ticks before collection is called stalled rather than merely quiet. Three, so one slow
+# round does not raise an alarm — but silence in the data still stops looking like silence in the market.
 STALLED_AFTER_TICKS = 3
 
 
@@ -28,11 +23,8 @@ def collection_state(
     interval_seconds: int,
     now: datetime | None = None,
 ) -> CollectionOut:
-    """Whether prices are actually arriving for this event.
-
-    Being on the list does not prove they are, and that is the whole reason this exists:
-    an observation nobody is collecting looks exactly like a market nobody is trading.
-    """
+    """Whether prices are actually arriving for this event. Being on the list does not prove they are:
+    an observation nobody is collecting looks exactly like a market nobody is trading."""
     moment = now or datetime.now(UTC)
     last = (state or {}).get("last_success_at")
 
@@ -80,11 +72,8 @@ async def tracked_events(
 
 
 async def snapshot(conn: Conn) -> SnapshotOut:
-    """Every tracked outcome's newest price, in one read.
-
-    The view the terminal opens on. A request per event would be a request per row, and one
-    measured event holds 128 markets.
-    """
+    """Every tracked outcome's newest price, in one read — the view the terminal opens on. A request per
+    event would be a request per row."""
     events = await store.load_events(conn)
     samples: dict[int, Sample] = await store.latest_samples(conn)
     entries: list[SnapshotEntry] = []

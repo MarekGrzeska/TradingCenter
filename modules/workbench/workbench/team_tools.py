@@ -1,31 +1,5 @@
-"""The team tools as the conversation's registry sees them — the adapter between them.
-
-It lives here rather than in either package because it is the one thing that knows both:
-`agent`'s tool-source protocol and `teams_tools`' FastMCP registry. `teams_tools` imports
-neither of the other two — its client takes an application object, not a package — and
-`agent` does not know these tools are local. The assembly is the only layer allowed to
-know both, and `tests/test_layering.py` is what keeps it that way.
-
-
-A drop-in for a `ToolServer` (`agent/tools/client.py`): same `configured`, `label`,
-`list_tools`, `moves_the_account`, `call`, `aclose` — so nothing above the registry had to
-learn that one of its sources is not on a network. That is the whole of what this file is
-for; the tools themselves are unchanged, and so are their descriptions, their schemas and
-the wording of every refusal.
-
-Three differences from a `ToolServer`, all of them subtractions:
-
-* **`configured` is always true.** There is no address to leave unset, so there is no state
-  in which the conversation has no team tools. The two network sources keep theirs.
-* **Nothing is retried and no session can be gone.** A `ToolServer` reopens a session the
-  server has forgotten; there is no session here, and a failure is the tool's own.
-* **`moves_the_account` is always false.** Nothing here reaches the account — that is
-  trading-mcp's, one source over.
-
-What a tool raises becomes an outcome rather than an exception, exactly as it does over the
-network: a turn that dies because a catalogue refused is a worse answer than a turn that
-says so.
-"""
+"""The team tools as the conversation's registry sees them, and the one thing that knows both `agent`'s tool-source
+protocol and `teams_tools`' registry: a drop-in `ToolServer`, always configured, never retried, raising nothing."""
 
 from __future__ import annotations
 
@@ -61,13 +35,8 @@ class LocalTeamsTools:
         await self._client.aclose()
 
     async def list_tools(self, operator_principal: str | None = None) -> list[ToolDescriptor]:
-        """What the model may call this turn.
-
-        Read from the registry rather than from a session, so it cannot fail and cannot be
-        empty for a reason worth reporting — and it does not depend on who is asking, which
-        is why the argument is accepted and ignored: the registry hands every source the
-        same one.
-        """
+        """What the model may call this turn. Read from the registry rather than from a session, so it
+        cannot fail — and it does not depend on who is asking, which is why the argument is ignored."""
         if self._tools is None:
             self._tools = [
                 ToolDescriptor(
@@ -87,13 +56,8 @@ class LocalTeamsTools:
     async def call(
         self, name: str, arguments: dict[str, Any], operator_principal: str | None = None
     ) -> ToolOutcome:
-        """One tool call, in the operator's name and inside this process.
-
-        The identity is set for the duration of the call and reset after it, including when
-        the tool raises (`operator.carrying`). It is the only way it reaches the tool: a
-        model that writes a principal into an argument is writing into a field nothing
-        reads.
-        """
+        """One tool call, in the operator's name and inside this process. The identity is set for the
+        duration and reset after, and it is the only way it reaches the tool."""
         started = time.monotonic()
 
         def elapsed() -> int:
@@ -103,10 +67,8 @@ class LocalTeamsTools:
             with carrying(operator_principal):
                 result = await self._mcp.call_tool(name, arguments)
         except ToolError as err:
-            # Everything a tool raises arrives wrapped in this, including the refusals the
-            # tools write deliberately — so the text a `ToolServer` would have received
-            # from the far side as `isError` is the text of this exception. The tools'
-            # own words travel rather than a summary of them.
+            # Everything a tool raises arrives wrapped in this, including the refusals the tools write deliberately,
+            # so the tools' own words travel where a `ToolServer` would have received `isError` text.
             return ToolOutcome(ToolOutcomeKind.REFUSED, str(err), elapsed())
         except Exception as err:  # noqa: BLE001 - a broken tool is not a broken turn
             log.warning("tool call %s failed: %s", name, err)
@@ -120,15 +82,8 @@ class LocalTeamsTools:
 
 
 def _text_of(result: Any) -> str:
-    """What the model reads.
-
-    `call_tool` answers a `(content, structured)` pair for a tool with a declared output
-    schema — which is every tool here, since each returns a pydantic model — and bare
-    content blocks otherwise. The structured half is the one to read, for the reason
-    `agent/tools/client.py` gives about a list-returning tool: content blocks are one per
-    item, and joining them hands a reader expecting one JSON document several of them back
-    to back.
-    """
+    """What the model reads: `call_tool` answers a `(content, structured)` pair for a tool with an output schema, and the
+    structured half is the one to read — content blocks are one per item, and joining them hands back several documents."""
     if isinstance(result, tuple) and len(result) == 2:
         return json.dumps(result[1])
     if isinstance(result, dict):

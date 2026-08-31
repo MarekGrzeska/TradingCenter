@@ -1,13 +1,5 @@
-"""Two ways into Polymarket's public database: by phrase, and by category.
-
-Both read the provider live and neither writes anything. They exist as two tools rather than
-one because they answer questions a model asks differently: "is there a market about X" has a
-phrase in it, and "what is there about tariffs at all" does not — it has a subject, and
-guessing phrases at a subject is how a model misses the market it was asked for.
-
-Both answers are aggressively projected. A listing of a hundred events measured 10 MiB on the
-provider and there is no parameter to ask for less, so the reduction is this module's job.
-"""
+"""Two ways into Polymarket's public database, by phrase and by category: "is there a market about X" has a phrase
+in it and "what is there about tariffs" does not, and guessing phrases is how a model misses what it was asked for."""
 
 from __future__ import annotations
 

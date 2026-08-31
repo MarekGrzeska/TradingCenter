@@ -1,10 +1,4 @@
-"""What a collection job is, and the one rule for working out how it is going.
-
-A job's status is never stored — it is derived from its chunks, every time. Two sources
-of truth for the same fact drift apart exactly when a process dies between writing one
-and the other, and a job's status is read most often right after the kind of restart
-that could cause that.
-"""
+"""The vocabulary of a job, and the one place a job's status is worked out from its chunks."""
 
 from __future__ import annotations
 
@@ -17,9 +11,8 @@ from ..models import Resolution
 
 
 class ChunkState(str, Enum):
-    """One chunk's life. `interrupted` is reached only from `pending` or `running`, and
-    only by this module's own startup — no runner survives a restart, so anything not
-    yet settled at that moment was orphaned, not merely delayed."""
+    """One chunk's life. `interrupted` is reached only from `pending` or `running`, and only by this
+    module's own startup: no runner survives a restart."""
 
     PENDING = "pending"
     RUNNING = "running"
@@ -51,13 +44,8 @@ class JobStatus(str, Enum):
 
 
 def derive_status(states: list[ChunkState]) -> JobStatus:
-    """A job's status, from its chunks' states alone.
-
-    Any chunk still open means the job is running — including one merely queued,
-    because a runner is what makes `pending` mean "about to happen" rather than "stuck".
-    Once nothing is open, the job is done in some shape: fully, partially — some
-    settled, some not — or not at all.
-    """
+    """A job's status, from its chunks' states alone. Any chunk still open means running — including
+    a queued one, because a runner is what makes `pending` mean "about to happen"."""
     if not states:
         return JobStatus.SUCCEEDED
     if any(state in OPEN_CHUNK_STATES for state in states):
@@ -119,20 +107,8 @@ def _progress(chunks: list[Chunk]) -> tuple[int, int]:
 
 
 def _last_activity(chunks: list[Chunk], created_at: datetime) -> datetime:
-    """When something last happened here — a chunk starting counts, not only one settling.
-
-    A chunk that has been running for forty minutes *is* the last thing that happened,
-    and counting only `finished_at` would date the job from the chunk before it: a job
-    that is working would then look stalled, which is the mistake this answers in the
-    opposite direction. Progress and candle counts cannot tell the two apart at all —
-    a chunk working for forty minutes and a chunk stuck for forty minutes report exactly
-    the same numbers, and only this moment separates them (`market-data-jobs` spec,
-    "Zlecenie podaje moment swojej ostatniej aktywności").
-
-    Falls back to the job's own creation so the question "since when has nothing
-    happened" always has an answer, including for a job whose first chunk has yet to be
-    claimed.
-    """
+    """When something last happened here — a chunk starting counts, not only one settling. A chunk
+    working for forty minutes and one stuck for forty report the same numbers; only this separates them."""
     moments = [
         moment
         for chunk in chunks
@@ -192,13 +168,8 @@ class Job(BaseModel):
 
 
 class JobPairView(BaseModel):
-    """One job, narrowed to one pair — what `terminal-collection-history` actually reads.
-
-    A job created for four pairs is four of these once narrowed, one per pair, each with
-    only that pair's chunks and a status derived from just them. `Job` itself is never
-    narrowed this way; it stays the whole record for `GET /jobs/{id}` and for retry,
-    which has to see every pair a job touched to know what it is retrying.
-    """
+    """One job, narrowed to one pair. `Job` itself is never narrowed: it stays the whole record for
+    `GET /jobs/{id}` and for retry, which has to see every pair the job touched."""
 
     job_id: int
     symbol: str

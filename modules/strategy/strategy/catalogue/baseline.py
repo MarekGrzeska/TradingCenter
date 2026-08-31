@@ -1,21 +1,5 @@
-"""The strategy of reference: two moving averages crossing, with a stop sized by range.
-
-**Deliberately ordinary, and first on purpose.** It does three jobs no clever strategy could
-do as well:
-
-* it tests the contract's honesty — a strategy this simple needing a change in the runtime
-  would mean the contract is drawn wrong, and better to learn that here than three
-  strategies later;
-* it takes the whole pipe for a walk before any new indicator exists — decisions, the
-  refusals, the trace, the replay and the backtest all work against it using indicators the
-  archive has carried for months;
-* it leaves a number. "The strategy works" means nothing until it means "it beats this,
-  after costs, on the same data" — which is what makes it the entry every later one is
-  measured against rather than an embarrassment to delete.
-
-Nothing here is novel and nothing here is meant to be. A crossing of averages is the oldest
-published rule in the business, which is precisely what makes it a fair floor.
-"""
+"""The strategy of reference: two moving averages crossing, with a stop sized by range. Deliberately ordinary and
+first, because "the strategy works" means nothing until it means "it beats this, after costs, on the same data"."""
 
 from __future__ import annotations
 
@@ -31,20 +15,15 @@ RANGE = "range"
 
 
 def _evaluate(facts: Facts, params: Mapping[str, float]) -> Decision:
-    """Long when the fast average has just crossed above the slow one, and only then.
-
-    Every refusal below says which condition failed, because a strategy that answers "no"
-    for three weeks has to be readable rather than guessable. The order is deliberate: the
-    cheapest and most common refusal first, so the usual answer is also the shortest path.
-    """
+    """Long when the fast average has just crossed above the slow one, and only then. Every refusal says
+    which condition failed, cheapest and commonest first, so the usual answer is the shortest path."""
     fast = facts.get(FAST)
     slow = facts.get(SLOW)
     atr = facts.get(RANGE)
     if fast is None or slow is None or atr is None:
         return Decision.no_trade("a fact this strategy declared was not read")
-    # An error on one fact is the archive saying it cannot compute that one — never that
-    # the answer was nothing. Refusing here keeps a missing average from reading as a
-    # crossing that did not happen.
+    # An error on one fact is the archive saying it cannot compute that one — never that the answer
+    # was nothing. Refusing keeps a missing average from reading as a crossing that did not happen.
     for value in (fast, slow, atr):
         if value.error is not None:
             return Decision.no_trade(f"the archive could not compute {value.key}: {value.error}")
@@ -104,9 +83,8 @@ moving_average_cross = StrategySpec(
     resolution="HOUR",
     evaluate=_evaluate,
     facts=(
-        # `period` points at this strategy's own parameter, so tuning the entry tunes what
-        # is read — the declaration stays a declaration and the archive still answers one
-        # named indicator per fact.
+        # `period` points at this strategy's own parameter, so tuning the entry tunes what is read —
+        # the declaration stays a declaration and the archive still answers one named indicator per fact.
         Fact(indicator="ema", resolution="HOUR", params={"period": "fast_period"}, key=FAST),
         Fact(indicator="ema", resolution="HOUR", params={"period": "slow_period"}, key=SLOW),
         Fact(indicator="atr", resolution="HOUR", params={"period": "atr_period"}, key=RANGE),

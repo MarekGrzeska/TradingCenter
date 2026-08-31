@@ -1,15 +1,5 @@
-"""Asking the gateway whether a pair is worth collecting.
-
-The archive does not own the instrument catalogue and should not keep a copy of it: the
-gateway does, the provider changes it, and a second list here would be wrong within a
-week. So a pair offered by an operator is checked against the thing that would actually
-have to serve it.
-
-The check is "can one candle be had for this symbol at this resolution", not "does this
-symbol appear in a search". A search matches on names and would happily accept an
-instrument the provider has no price series for at that resolution — which is a pair that
-sits on the tracked list forever, holding a provider connection and archiving nothing.
-"""
+"""Asking the gateway whether a pair is worth collecting. The check is "can one candle be had", not
+"does this appear in a search": a search matches names and would accept a pair with no series."""
 
 from __future__ import annotations
 
@@ -26,13 +16,8 @@ class GatewayInstruments:
         self._client = client
 
     async def is_collectable(self, symbol: str, resolution: Resolution) -> bool:
-        """Whether the gateway can produce candles for this pair right now.
-
-        One candle is asked for, which is one provider request — the cheapest question
-        that has the right answer. `False` means the pair exists as far as the request
-        went but has no series; a symbol the provider does not know at all comes back as
-        `GatewayRefused`, and the caller can tell an operator which of the two it was.
-        """
+        """Whether the gateway can produce candles for this pair right now. One candle is the cheapest
+        question with the right answer; a symbol the provider does not know comes back refused instead."""
         candles = await get_json(
             self._client,
             f"{self._base_url}/instruments/{symbol}/candles",
@@ -42,18 +27,8 @@ class GatewayInstruments:
         return isinstance(candles, list) and len(candles) > 0
 
     async def is_market_open(self, symbol: str) -> bool | None:
-        """Whether the provider currently calls this instrument tradeable.
-
-        The archive has no session calendar and will not grow one — inventing a market's
-        opening hours produces a confident wrong answer twice a day. This asks the module
-        that already knows, and `None` — no exact match in the catalogue — stays distinct
-        from `False`, because "could not find out" and "the market is shut" send an
-        operator to two different places.
-
-        Read off the search route because the gateway publishes none for a single
-        instrument, and matched on the symbol **exactly**: search matches names as well as
-        symbols, so its first hit for `GOLD` is not guaranteed to be `GOLD`.
-        """
+        """Whether the provider currently calls this instrument tradeable. The archive has no session
+        calendar and will not grow one; `None` stays distinct from `False`. Matched on the symbol exactly."""
         hits = await get_json(
             self._client,
             f"{self._base_url}/instruments/search",
@@ -69,12 +44,8 @@ class GatewayInstruments:
                 return tradeable if isinstance(tradeable, bool) else None
         return None
 
-    # --- specs/market-data-api: the catalogue itself, proxied for the terminal --------
-    #
-    # capital-gateway is not public — the terminal cannot reach it directly (design.md,
-    # "Terminal osiąga katalog instrumentów przez market-data"). These three forward the
-    # gateway's own JSON unread: no model, no reshaping, so a field the gateway adds is
-    # visible here the same day rather than on the next release of this module.
+    # capital-gateway is not public, so the terminal reaches the catalogue through here. These three
+    # forward the gateway's own JSON unread: a field it adds is visible the same day.
 
     async def catalogue(self, max_nodes: int | None, asset_class: str | None) -> dict:
         params: dict[str, int | str] = {}

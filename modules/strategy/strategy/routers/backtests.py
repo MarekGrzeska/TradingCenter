@@ -1,10 +1,5 @@
-"""Backtest runs that were kept — read only.
-
-There is no route that *starts* one. A run over years of bars is minutes of work and would
-hold a request open for all of it, so the backtest is a command (`python -m
-strategy.backtest`) and this is where its reports are read back. That split is also what
-keeps a long run from being something a caller can set off by accident.
-"""
+"""Backtest runs that were kept — read only. There is no route that starts one: a run over years is
+minutes of work, so the backtest is a command, which also keeps it from being set off by accident."""
 
 from __future__ import annotations
 

@@ -1,7 +1,5 @@
-"""place_order, close_position, amend_stops, cancel_working_order — every write, and
-specs/trading-mcp-execution's three outcomes: settled, unsettled, and never sent at
-all.
-"""
+"""place_order, close_position, amend_stops, cancel_working_order — every write, and the three
+outcomes: settled, unsettled, and never sent at all."""
 
 from __future__ import annotations
 
@@ -27,8 +25,6 @@ def _receipt(**fields: object) -> dict[str, object]:
         "reason": None,
     } | fields
 
-
-# --- place_order ---
 
 
 @respx.mock
@@ -152,9 +148,8 @@ async def test_a_timeout_is_an_access_failure_with_unknown_effect(server) -> Non
 
 @respx.mock
 async def test_a_5xx_write_is_an_access_failure_not_a_refusal(server) -> None:
-    """Unlike a 4xx, a 5xx can happen after the provider already saw the request —
-    grouped with access failures, not with a clean refusal (specs/
-    trading-mcp-execution, "Moduł nie ponawia zlecenia po własnej awarii")."""
+    """Unlike a 4xx, a 5xx can happen after the provider already saw the request — grouped with access
+    failures, not with a clean refusal."""
     mcp = server
     respx.post(f"{BASE}/orders").mock(
         return_value=httpx.Response(503, json={"detail": "upstream trouble"})
@@ -188,8 +183,6 @@ async def test_a_4xx_validation_error_from_the_gateway_is_a_refusal(server) -> N
         await mcp.call_tool("place_order", {"symbol": "GOLD", "direction": "BUY", "size": 0.1})
 
 
-# --- close_position / cancel_working_order ---
-
 
 @respx.mock
 async def test_close_position_calls_the_right_id(server) -> None:
@@ -216,8 +209,6 @@ async def test_cancel_working_order_calls_the_right_id(server) -> None:
     assert structured["outcome"] == "settled"
     assert route.called
 
-
-# --- amend_stops: the tri-state contract ---
 
 
 @respx.mock
@@ -283,18 +274,12 @@ async def test_setting_both_stops_sends_both(server) -> None:
     assert sent == {"stop_loss": 2300.0, "take_profit": 2600.0}
 
 
-# --- the demo guard is re-checked before every write ---
-
-
-# --- the boundary between "your request was wrong" and "I could not ask" ---
 
 
 @respx.mock
 async def test_a_rejected_caller_key_is_an_access_failure_not_a_refusal(server) -> None:
-    """A 401 is this module's own credential being turned away — nobody looked at the
-    order. Reported as a refusal it would send an agent off re-editing an order that was
-    never the problem (specs/trading-mcp-tools, "Odmowa narzędzia jest odróżnialna od
-    awarii dostępu")."""
+    """A 401 is this module's own credential being turned away; nobody looked at the order. Reported as
+    a refusal it would send an agent re-editing an order that was never the problem."""
     mcp = server
     respx.post(f"{BASE}/orders").mock(
         return_value=httpx.Response(401, json={"detail": "missing or invalid caller key"})
@@ -332,14 +317,11 @@ async def test_a_404_on_a_position_stays_a_refusal(server) -> None:
     assert "access failure" not in str(excinfo.value)
 
 
-# --- arguments a MARKET order cannot carry ---
-
 
 @respx.mock
 async def test_a_market_order_with_a_level_is_refused_before_any_request(server) -> None:
-    """capital-gateway drops `level` and `good_till` from a MARKET order without a word,
-    and the `level` that comes back is the fill price — so an agent that meant "buy, but
-    not above this" would be filled anywhere and read nothing about it."""
+    """capital-gateway drops `level` and `good_till` from a MARKET order without a word, so an agent
+    that meant "buy, but not above this" would be filled anywhere and read nothing about it."""
     mcp = server
     order_route = respx.post(f"{BASE}/orders")
 
@@ -372,16 +354,11 @@ async def test_a_market_order_with_good_till_is_refused_and_names_it(server) -> 
     assert order_route.calls.call_count == 0
 
 
-# --- the demo check's own failures are this module's, and nothing was sent ---
-
 
 @respx.mock
 async def test_a_write_costs_one_round_trip(server) -> None:
-    """The demo check ran in front of every write until 18 August 2026, behind a cache
-    any error invalidated — so one 503 made every later write cost two rounds for the
-    life of the process. It runs once now, before the port opens
-    (specs/trading-mcp-upstream-access, "Moduł pracuje wyłącznie na rachunku
-    demonstracyjnym")."""
+    """The demo check ran in front of every write until 18 August 2026, behind a cache any error
+    invalidated — so one 503 made every later write cost two rounds. It runs once now."""
     mcp = server
     capabilities = respx.get(f"{BASE}/capabilities")
     respx.post(f"{BASE}/orders").mock(return_value=httpx.Response(200, json=_receipt()))

@@ -150,12 +150,8 @@ class TestDecisions:
 
 class TestReplay:
     async def test_a_recorded_decision_decides_the_same_way_again(self, db) -> None:
-        """A recorded decision is evidence only if it can be re-decided.
-
-        The snapshot goes back into the very same `evaluate`, with no archive involved —
-        which is what makes it survive the archive's retention and any later correction
-        to it.
-        """
+        """A recorded decision is evidence only if it can be re-decided. The snapshot goes back into the
+        very same `evaluate`, with no archive involved."""
         spec = get("baseline_ma_cross")
         resolved = spec.resolve_params()
         facts = crossing_facts(fast=[99.0, 101.0], slow=[100.0, 100.0], atr=[2.0, 2.0])

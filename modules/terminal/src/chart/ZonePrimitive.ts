@@ -18,10 +18,8 @@ import { MarkPrimitive } from "./MarkPrimitive";
 import { timeToX } from "./timeCoordinates";
 
 /**
- * One `zones`-shaped region: a rectangle from the moment it took effect to
- * the moment it closed, open to the right edge while `to` is null — the same
- * null `IndicatorZoneOut.to` already carries (`terminal-chart` spec, "Strefy
- * i poziomy rysują się jako obszary, nie jako linie serii"; task 4.6).
+ * One `zones`-shaped region: a rectangle from the moment it took effect to the moment it closed, open to
+ * the right edge while `to` is null.
  */
 export interface DrawnZone {
   from: Time;
@@ -42,11 +40,9 @@ export interface ZoneColors {
 
 interface ZoneRenderItem {
   xStart: number | null;
-  /** Open to the right: the rectangle reaches the pane's own right edge, never
-   *  the whole chart width. Kept apart from a null `xEnd`, which means the end
-   *  moment resolved to no coordinate at all — the two used to be the same
-   *  `null` here, so a zone whose end the time scale could not place silently
-   *  became an open one running off the screen. */
+  /** Open to the right: the rectangle reaches the pane's own right edge, never the whole chart width.
+   *  Kept apart from a null `xEnd`, which means the end moment resolved to no coordinate — the two used
+   *  to be one `null`, so an unplaceable end silently became an open zone. */
   open: boolean;
   xEnd: number | null;
   yTop: number | null;
@@ -91,9 +87,8 @@ class ZonePaneRenderer implements IPrimitivePaneRenderer {
         ctx.fillRect(xStart, yTop, Math.max(xEnd - xStart, 0), Math.max(yBottom - yTop, 1));
         ctx.restore();
 
-        // A band the operator drew gets its edges outlined at the drawing's own weight;
-        // a computed one stays the bare wash it always was. The fill alone carries no
-        // weight to tell the two apart with.
+        // A band the operator drew gets its edges outlined at the drawing's own weight; a computed one
+        // stays the bare wash it always was.
         if (this.weight === "drawing") {
           ctx.save();
           ctx.strokeStyle = item.color;
@@ -143,18 +138,8 @@ function colorFor(direction: DrawnZone["direction"], colors: ZoneColors): string
 }
 
 /**
- * A series primitive drawing every `Zone` a `zones`-output indicator answered
- * with — `range_gap`, `body_gap`, `session_range_*`, `opening_range` (task
- * 4.7) — and, at the `drawing` weight, an operator's own band. Its zones are
- * replaced wholesale on every recompute, the same convention
- * `RayPrimitive.setLevels` already uses for `levels`.
- *
- * Only zones overlapping the time scale's current visible range are turned
- * into screen coordinates at all — with a few hundred zones open on a wide
- * chart (task 4.10's ~300), mapping every one of them on every repaint (pan,
- * zoom, a live tick) is the cost `renderItems()`'s own filter exists to
- * avoid, before a single `timeToCoordinate` call is spent on one that is not
- * on screen.
+ * Every `Zone` a `zones` entry answered with, and an operator's own band at the `drawing` weight. Only zones
+ * overlapping the visible range are mapped to screen coordinates: a few hundred open would cost that per repaint.
  */
 export class ZonePrimitive extends MarkPrimitive<ZoneRenderItem> {
   private zones: readonly DrawnZone[] = [];

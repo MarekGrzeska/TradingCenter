@@ -45,10 +45,8 @@ class TestStructure:
 
     @pytest.mark.db
     async def test_a_refresh_keeps_the_outcome_ids_its_history_hangs_from(self, db) -> None:
-        """Replacing markets on refresh would take every outcome id with it, and
-        `price_samples` cascades from those ids — a refresh would delete the history it was
-        refreshing. The provider adding a market to a running event is measured, so this
-        path runs often."""
+        """Replacing markets on refresh would take every outcome id with it, and `price_samples` cascades
+        from those ids — a refresh would delete the history it was refreshing."""
         first = builders.binary_market("Will it?", provider_market_id="m-1")
         original = builders.event(markets=(first,), provider_event_id="e-1")
         event_id = await store.upsert_event(db, original)
@@ -96,12 +94,8 @@ class TestStructure:
 
 
 class TestRemovingAnObservation:
-    """The only way an event leaves the list, and it takes everything with it.
-
-    What used to be here was three tests about an ending that stuck — a state produced by a
-    route and a tool that both existed to produce it. Neither exists now, so neither does
-    the state (`openspec/changes/an-observation-is-collected-or-gone`).
-    """
+    """The only way an event leaves the list, and it takes everything with it. What used to be here was
+    three tests about an ending that stuck — a state neither the route nor the tool produces any more."""
 
     @pytest.mark.db
     async def test_removal_takes_the_markets_outcomes_samples_and_ranges(self, db) -> None:
@@ -149,9 +143,8 @@ class TestRemovingAnObservation:
 class TestSamples:
     @pytest.mark.db
     async def test_the_same_moment_from_two_directions_stays_one_row(self, db) -> None:
-        """The sampler and a backfill meet in the same minute regularly. Two rows for one
-        moment leave a series with two prices at one instant and no way to say which is the
-        archive's answer."""
+        """The sampler and a backfill meet in the same minute regularly. Two rows for one moment leave a
+        series with two prices at one instant and no way to say which is the archive's answer."""
         event_id = await store.upsert_event(db, builders.event())
         [yes_id, _] = await outcome_ids(db, event_id)
 
@@ -192,9 +185,8 @@ class TestSamples:
 
     @pytest.mark.db
     async def test_a_sample_with_no_price_at_all_is_not_a_sample(self, db) -> None:
-        """A failed read writes nothing. A placeholder — or the last known price repeated —
-        makes a series that reads like a market standing still rather than collection that
-        failed."""
+        """A failed read writes nothing. A placeholder — or the last known price repeated — makes a series
+        that reads like a market standing still rather than collection that failed."""
         with pytest.raises(ValueError, match="not a price"):
             Sample(outcome_id=1, observed_at=NOON, source=Surface.GAMMA)
 

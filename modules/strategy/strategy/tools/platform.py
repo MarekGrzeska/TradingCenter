@@ -1,16 +1,5 @@
-"""The four read-only tools this module announces.
-
-`pending_setups` is the one that shapes the rest. A workbench trigger is a threshold on one
-numeric field of one tool's answer, so a count of the setups a strategy is standing on is
-exactly the shape a trigger can watch — and the deterministic core finding a candidate is
-then what wakes a team. That is the intended seam between this module and the agents: the
-core decides, the team reads the same decision and argues with it.
-
-The number is counted from the recorded decisions rather than kept as a running total, so
-what a trigger compares against a threshold is the very fact the woken team will read. A
-trigger reacting to one value while the team it starts reads another is worse than no
-trigger at all (`teams-triggers` learned that on the archive's side first).
-"""
+"""The four read-only tools this module announces. `pending_setups` shapes the rest, and its number is counted from
+the recorded decisions, so a trigger compares against the very fact the woken team will read."""
 
 from __future__ import annotations
 

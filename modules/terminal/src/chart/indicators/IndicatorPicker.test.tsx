@@ -1,10 +1,6 @@
 /**
- * The picker on its own, driven by props — the catalogue is long enough that finding an
- * entry is its own problem, separate from what happens once one is chosen (`Chart.test.tsx`
- * covers that half).
- *
- * `market-data-indicators` spec, "Wyszukiwanie po nazwie potocznej"; `terminal-chart` spec,
- * "Operator wybiera wskaźniki z tego, co oferuje źródło".
+ * The picker on its own, driven by props — the catalogue is long enough that finding an entry is its own
+ * problem, separate from what happens once one is chosen.
  */
 
 import { render, screen, within } from "@testing-library/react";

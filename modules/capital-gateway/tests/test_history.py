@@ -31,8 +31,6 @@ def candles(newest: datetime, count: int) -> list[Candle]:
     ]
 
 
-# --- window arithmetic ---
-
 
 def test_a_window_is_one_period_short_of_the_count() -> None:
     # Measured: 999 steps pass, 1000 answer error.invalid.max.daterange, because the
@@ -51,8 +49,6 @@ def test_a_stored_timestamp_round_trips() -> None:
         2026, 7, 23, 14, 19, tzinfo=UTC
     )
 
-
-# --- the paging loop ---
 
 
 async def test_a_multi_page_read_returns_one_ordered_series() -> None:
@@ -113,15 +109,8 @@ async def test_running_past_the_bottom_keeps_what_was_collected() -> None:
 
 
 async def test_an_empty_first_window_is_not_the_end_of_history() -> None:
-    """`not-found` before a single candle has been collected says nothing about the
-    bottom of the instrument.
-
-    The window is where the caller's anchor put it, not where data put it, and the
-    provider answers `not-found` to more questions than "there is nothing older". Read as
-    an ending it cost US100 its whole history below January 2026: a permanent boundary
-    was recorded there, and every later request to reach 2024 planned nothing and
-    reported success.
-    """
+    """`not-found` before a single candle has been collected says nothing about the bottom of the
+    instrument. Read as an ending it cost US100 its whole history below January 2026."""
 
     async def fetch(date_from, date_to, limit):
         return None  # error.prices.not-found, on the very first window
@@ -241,13 +230,10 @@ async def test_a_satisfied_request_does_not_claim_history_ended() -> None:
     assert result.history_ended is False
 
 
-# --- the floor: a lower bound in time, which `bars` cannot express -------------------
-
 
 async def test_a_floor_drops_candles_older_than_it() -> None:
-    # The whole point: `bars` counts candles, so an instrument shut half the week hands
-    # back candles reaching much further into the past than the caller wanted. Nothing
-    # older than the floor may come out, however it arrived.
+    # `bars` counts candles, so an instrument shut half the week hands back candles reaching
+    # much further into the past than the caller wanted. Nothing older than the floor may come out.
     newest = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
     floor = newest - STEP * 2
     page = candles(newest, 6)  # reaches back well past the floor
@@ -281,21 +267,8 @@ async def test_a_window_never_reaches_past_the_floor() -> None:
     assert seen[0] == (history.iso_utc(floor), history.iso_utc(anchor))
 
 
-# Four ways a floored read can look like it ran out, and none of them is the provider's
-# bottom. `history_ended` is recorded downstream as a permanent boundary, so claiming it
-# because the *caller* asked for less stops the next, deeper read being made. Two of these
-# cost real candles:
-#
-#   - "not-found for a clamped window": Capital answers `error.prices.not-found` for a
-#     window holding nothing, and the last window of a floored read is narrow and often
-#     lands in a shut market. Read as an ending, it became a stored boundary and every
-#     older chunk still queued was skipped behind it.
-#   - "no progress at a clamped window": having paged down to its oldest candle, the read
-#     asks once more about the sliver left between that candle and the floor, and the
-#     provider answers with the candle it already sent. No progress, but equally no
-#     statement about its own bottom. Measured on 5-minute US100 floored at
-#     2026-02-16 07:01:23 — paging stopped on the 07:05 candle, and reading the sliver as
-#     an ending skipped every chunk queued back to 1 January.
+# Four ways a floored read can look like it ran out, none of them the provider's bottom.
+# `history_ended` is stored as a permanent boundary, so claiming it stops the next, deeper read.
 ANCHOR = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
 
 
@@ -345,9 +318,8 @@ async def test_a_floored_read_never_claims_the_provider_ran_out(
 
 
 async def test_running_out_of_provider_data_above_the_floor_still_ends_history() -> None:
-    # The floor must not mask a genuine ending. `floor` is far enough back that no window
-    # is ever clamped to it, so running out is unambiguously the provider's own bottom
-    # rather than the caller's bound being reached.
+    # The floor must not mask a genuine ending: it is far enough back that no window is clamped
+    # to it, so running out is unambiguously the provider's bottom rather than the caller's bound.
     anchor = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
     floor = anchor - STEP * 100_000
     pages = [candles(anchor, 3)]
@@ -393,8 +365,6 @@ async def test_paging_stops_when_the_caller_is_gone() -> None:
     assert result.count == 6
 
 
-# --- through the adapter ---
-
 
 @pytest.fixture
 def adapter() -> CapitalAdapter:
@@ -430,8 +400,6 @@ async def test_the_adapter_treats_not_found_as_an_ending(adapter: CapitalAdapter
     assert result.history_ended is True
     await adapter.aclose()
 
-
-# --- which candle is still forming ---
 
 
 async def _open() -> bool:

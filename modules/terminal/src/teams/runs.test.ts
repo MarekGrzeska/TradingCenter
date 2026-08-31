@@ -10,9 +10,8 @@ import {
 } from "./runs";
 
 /**
- * The pure half of `runs.ts`. A frame arriving split across two network reads, and a
- * recorded call that names a step rather than an agent, are both plain-value problems —
- * no stream and no component required to state them.
+ * The pure half of `runs.ts`: a frame split across two network reads, and a recorded call naming a step rather
+ * than an agent, are plain-value problems — no stream and no component required to state them.
  */
 
 function step(id: number, agentKey: string): TeamRunStep {
@@ -144,9 +143,8 @@ describe("what came of an order", () => {
   });
 
   it("reads a row still saying `sent` by whether the run is over", () => {
-    // While the run works it is an order on its way; once the run is over it is an order
-    // the module never learned the fate of, which is what its own contract says of the
-    // row (`0004_trades.py`).
+    // While the run works it is an order on its way; once it is over it is an order the module never learned
+    // the fate of, which is what its own contract says of the row (`0004_trades.py`).
     expect(outcomeOf(trade("sent"), false)).toEqual({ text: "sent", known: true });
     expect(outcomeOf(trade("sent"), true)).toEqual({ text: "outcome unknown", known: false });
   });
@@ -154,9 +152,8 @@ describe("what came of an order", () => {
 
 describe("stopCause", () => {
   it("tells the order limit from the cost limit", () => {
-    // The two sentences the module writes (`runner/trading.py`, `runner/cost.py`). Only
-    // the heading above the reason is picked here — the sentence itself always travels
-    // intact, which is why a reworded one costs a heading and nothing else.
+    // The two sentences the module writes (`runner/trading.py`, `runner/cost.py`). Only the heading is picked
+    // here — the sentence travels intact, so a reworded one costs a heading and nothing else.
     expect(stopCause("the run's order limit was reached: 2 of 2 allowed placed.")).toBe("orders");
     expect(stopCause("the run's cost limit was reached: 2.01 spent of 2.00 allowed.")).toBe("cost");
     expect(stopCause("the operator interrupted the run")).toBe("other");
@@ -173,9 +170,8 @@ describe("attachAgentKeys", () => {
 
   it("names the agent whose step made the call, and keeps what it was given and answered", () => {
     expect(attachAgentKeys(calls, [step(1, "scout")])).toEqual([
-      // The call under a step nobody handed in is dropped rather than shown under an
-      // invented name — the two reads crossed a step being created, and the next
-      // snapshot carries both.
+      // A call under a step nobody handed in is dropped rather than shown under an invented name: the two
+      // reads crossed a step being created, and the next snapshot carries both.
       {
         agentKey: "scout",
         roundIndex: 0,

@@ -1,22 +1,5 @@
-"""The module's own clock: waking on its own, claiming a due schedule or trigger exactly
-once, and starting the run each fire calls for — the same sequence `POST
-/teams/{id}/runs` runs, minus the click (design.md, "Zegar w procesie modułu, nie w
-Azure").
-
-Two independent concerns share one wake rather than two tasks: a schedule fires on time,
-a trigger fires on a market condition's edge, and both end the same way — a call to
-`runner.start_run_on_revision` and a row in `schedule_fires`. `_fire_schedule` and
-`_check_trigger` stay separate functions because what decides "is this due" differs (a
-cron expression against the clock, a tool call against the market), not because the two
-need separate clocks, separate polling loops, or separate safety rails — both share the
-same overlap check, the same daily-limit and unattended-tool refusal, and the same
-failure-streak tracking.
-
-Every step here reads a row already claimed by this process (`store.claim_due_schedule`,
-`store.claim_trigger_for_check`) — the conditional `UPDATE` is the entire exactly-once
-guarantee (design.md, "Wyzwolenie przejmowane w bazie, nie posiadane przez proces"), so
-nothing below needs a lock of its own.
-"""
+"""The module's own clock: waking, claiming a due schedule or trigger exactly once, and starting the run each fire calls
+for. Two concerns share one wake because both end in `start_run_on_revision` and a row in `schedule_fires`."""
 
 from __future__ import annotations
 
@@ -59,13 +42,8 @@ _COMPARISONS: dict[str, Callable[[float, float], bool]] = {
 
 @dataclass(frozen=True)
 class _Deps:
-    """Everything a fire needs that is not the row itself.
-
-    None of the five is read by the clock — they are what `start_run_on_revision` wants,
-    carried four call levels down to it. Bundled because they travelled as five separate
-    keyword arguments through every signature on the way, so adding a sixth meant editing
-    each of them and the two handlers had to keep agreeing about all of it.
-    """
+    """Everything a fire needs that is not the row itself. None of the five is read by the clock — they are
+    what `start_run_on_revision` wants, and they travelled as five keyword arguments through every signature."""
 
     catalogue: ModelCatalogue
     provider: ModelProvider
@@ -100,9 +78,8 @@ class Clock:
         self._task: asyncio.Task[None] | None = None
 
     def start(self) -> None:
-        # The lever specs/teams-schedules calls for: cleared and restarted, every
-        # schedule and trigger is exactly where it was, and a run started by hand still
-        # works — this is the one thing that does not happen.
+        # The lever the spec calls for: cleared and restarted, every schedule and trigger is exactly where
+        # it was, and a run started by hand still works — this is the one thing that does not happen.
         if not self._settings.scheduler_enabled:
             log.info(
                 "the clock is disabled (SCHEDULER_ENABLED=false) — no schedule or "
@@ -127,15 +104,8 @@ class Clock:
             await asyncio.sleep(self._settings.scheduler_poll_interval_seconds)
 
     async def tick(self) -> list[asyncio.Task[None]]:
-        """One wake: every due schedule, then every due trigger. Public so a test can
-        drive it without waiting on `scheduler_poll_interval_seconds`.
-
-        Returns the failure-streak tracking task for every fire that actually started a
-        run, so a test can `asyncio.gather(*tasks)` and know every write this wake will
-        ever make has happened before it moves on — `_run_forever` discards the list and
-        lets them run detached, which is the right shape in production: nothing is
-        waiting on a wake to finish.
-        """
+        """One wake: every due schedule, then every due trigger. Public so a test can drive it without
+        waiting on the poll interval, and it returns the tracking tasks so a test can wait for every write."""
         tasks: list[asyncio.Task[None]] = []
         async with self._pool.acquire() as conn:
             due_schedules = await store.list_due_schedules(conn)
@@ -163,14 +133,8 @@ class Clock:
         *,
         what: str,
     ) -> asyncio.Task[None] | None:
-        """One row's turn, with its own failure contained to itself.
-
-        The wake works every operator's schedules, so an exception escaping one of them
-        would silence all the ones after it in the same list — and silently, since the
-        row that failed never reaches `record_fire` either. `_run_forever` still catches
-        whatever gets past this; that outer net is for the wake itself (the two `SELECT`s
-        above), not for one row.
-        """
+        """One row's turn, with its own failure contained to itself. The wake works every operator's
+        schedules, so an exception escaping one would silence all the ones after it, and silently."""
         try:
             return await handler(self._pool, row, self._deps)
         except Exception:
@@ -178,13 +142,9 @@ class Clock:
             return None
 
 
-# --- shared by both -------------------------------------------------------------------
-
 
 async def _resolve_revision(conn: asyncpg.pool.PoolConnectionProxy, *, row: Mapping[str, Any]):
-    """The revision a schedule or trigger would run — both carry the same
-    `revision_mode`/`pinned_revision_id`/`team_id`/`owner_principal` shape
-    (`store.recurring.SCHEDULE_COLUMNS`, `store.recurring.TRIGGER_COLUMNS`)."""
+    """The revision a schedule or trigger would run — both carry the same revision-selection shape."""
     if row["revision_mode"] == "pinned":
         return await store.get_revision_by_id(
             conn, revision_id=row["pinned_revision_id"], owner_principal=row["owner_principal"]
@@ -197,9 +157,8 @@ async def _resolve_revision(conn: asyncpg.pool.PoolConnectionProxy, *, row: Mapp
 async def _start_from(
     pool: asyncpg.Pool, *, row: Mapping[str, Any], deps: _Deps
 ) -> tuple[asyncpg.Record, asyncio.Task[None]] | str:
-    """Resolves the revision and starts a run on it, or returns the refusal reason as a
-    string instead of raising — every caller here writes that string into a
-    `schedule_fires` row rather than handling an exception."""
+    """Resolves the revision and starts a run on it, or returns the refusal reason as a string instead of
+    raising — every caller writes that string into a `schedule_fires` row."""
     async with pool.acquire() as conn:
         revision_row = await _resolve_revision(conn, row=row)
     if revision_row is None:
@@ -217,32 +176,15 @@ async def _start_from(
             settings=deps.settings,
             registry=deps.registry,
         )
-    # The ceilings are caught by their *base* classes, not by the two daily ones
-    # `routers/runs.py` names. A route may enumerate: an uncaught ceiling there is one
-    # 500 for one operator who is watching. Here it would leave the fire with no row at
-    # all and take the rest of the wake down with it — which is how `DailyOrderLimitReached`,
-    # added by phase 2 to the very function this calls, went unhandled for a whole phase.
-    # A ceiling added later is caught by this on the day it is written.
+    # The ceilings are caught by their *base* classes, not the two daily ones a route names. A route may
+    # enumerate; here an uncaught ceiling leaves the fire with no row and takes the rest of the wake down.
     except (DefinitionRefused, CostLimitReached, TradeLimitReached) as err:
         return str(err)
 
 
 class _ScheduleSource:
-    """A claimed row as the shared tail sees it: what to call it, and the four `store`
-    calls that name it. `_TriggerSource` is the same five methods against the other
-    table, and `_Source` is the two of them.
-
-    `store` keeps its schedule and trigger functions apart, and `schedule_id=` and
-    `trigger_id=` are different keyword arguments on purpose — a caller cannot hand one
-    an id belonging to the other. That is why the tail below could not simply take an
-    integer: binding the kind here is what lets one sequence serve both.
-
-    No shared base, deliberately — it would be five `raise NotImplementedError` bodies
-    standing in for what the union below already says, and pyright checks the two agree
-    at every call site in the tail. Everything that actually differs between a schedule
-    and a trigger — a cron slot against the clock, a tool call against the market —
-    happens before the tail starts.
-    """
+    """A claimed row as the shared tail sees it: what to call it, and the four `store` calls that name it. No shared base,
+    deliberately — it would be five `raise NotImplementedError` bodies standing in for what the union already says."""
 
     kind = "schedule"
 
@@ -328,15 +270,8 @@ async def _start_and_track(
     deps: _Deps,
     skipped_count: int = 0,
 ) -> asyncio.Task[None] | None:
-    """Everything after a row has been claimed and its own kind of "is it due" answered:
-    the overlap check, the run, the `schedule_fires` row either way, and the failure
-    streak that decides whether this row keeps working unattended.
-
-    Written once because every line of it was true twice. The overlap check and the
-    streak wiring are the two the pair could least afford to drift on — a schedule that
-    overlaps itself doubles a team's cost, and a streak that only one half tracked would
-    leave that half firing forever after it stopped working.
-    """
+    """Everything after a row has been claimed and its own kind of "is it due" answered. Written once
+    because every line of it was true twice — a schedule that overlaps itself doubles a team's cost."""
     async with pool.acquire() as conn:
         previous_status = await source.latest_run_status(conn)
     if previous_status in _RUN_IN_PROGRESS:
@@ -373,16 +308,12 @@ async def _start_and_track(
     )
 
 
-# --- schedules --------------------------------------------------------------------
-
 
 def _next_fire_and_skipped(
     cron_expression: str, due_at: datetime, now: datetime
 ) -> tuple[datetime, int]:
-    """The schedule's new `next_fire_at` — the first cron slot strictly after `now` —
-    and how many slots between `due_at` (the row's own value at claim time, itself
-    already due) and `now` were folded into this one fire
-    (specs/teams-schedules, "Pominięte wyzwolenia zwijają się do jednego")."""
+    """The schedule's new `next_fire_at` — the first cron slot strictly after `now` — and how many slots
+    between the claimed value and now were folded into this one fire."""
     skipped = 0
     for candidate in fires_after(cron_expression, due_at):
         if candidate <= now:
@@ -395,10 +326,8 @@ def _next_fire_and_skipped(
 async def _fire_schedule(
     pool: asyncpg.Pool, schedule: Mapping[str, Any], deps: _Deps
 ) -> asyncio.Task[None] | None:
-    """Returns the failure-streak tracking task when a run actually started, so a caller
-    that cares when the bookkeeping is done (a test; nothing in production does) can
-    await it instead of guessing with a sleep. `Clock.tick()` lets it run detached, the
-    same as any other run this module starts."""
+    """Returns the failure-streak tracking task when a run actually started, so a caller that cares can
+    await it instead of guessing with a sleep. `Clock.tick()` lets it run detached."""
     now = datetime.now(UTC)
     next_fire_at, skipped = _next_fire_and_skipped(
         schedule["cron_expression"], schedule["next_fire_at"], now
@@ -409,9 +338,8 @@ async def _fire_schedule(
             conn, schedule_id=schedule["id"], next_fire_at=next_fire_at
         )
     if claimed_row is None:
-        # Another process already claimed this fire, or it was disabled between being
-        # listed as due and this call (specs/teams-schedules, "Dwa procesy przy jednym
-        # wyzwoleniu") — either way, nothing further belongs to this attempt.
+        # Another process already claimed this fire, or it was disabled between being listed as due and
+        # this call — either way, nothing further belongs to this attempt.
         return
     # asyncpg's Record forwards mapping access at runtime but is not a `Mapping` to a
     # type checker (contract.py's own `from_row` callers hit the same thing).
@@ -425,16 +353,10 @@ async def _fire_schedule(
     )
 
 
-# --- triggers -----------------------------------------------------------------------
-
 
 def _walk(payload: Any, field_path: str) -> Any:
-    """Dotted-path access into whatever a tool call answered with — a plain dict/list
-    walk, list segments read as an index. `None` for any step that does not resolve,
-    which the caller treats the same as a server that could not be asked
-    (specs/teams-triggers, "Niedostępność serwera narzędzi to nie jest niespełniony
-    warunek" — a field this trigger's `field_path` cannot find is the same kind of "the
-    condition could not be read" as the call itself failing)."""
+    """Dotted-path access into whatever a tool call answered with. `None` for any step that does not
+    resolve, which the caller treats the same as a server that could not be asked."""
     current = payload
     for segment in field_path.split("."):
         if isinstance(current, list):
@@ -452,10 +374,8 @@ def _walk(payload: Any, field_path: str) -> Any:
 async def _server_announcing(
     servers: list[ToolServer], tool_name: str
 ) -> ToolServer | None:
-    """The first configured server that publishes this name, or `None` — which covers
-    both "nobody announces it" and "nobody could be asked". A trigger treats those the
-    same way it treats a refused call: it did not learn what the market is doing, so it
-    MUST NOT fire (specs/teams-triggers)."""
+    """The first configured server that publishes this name, or `None` — covering both "nobody announces
+    it" and "nobody could be asked". A trigger treats those the way it treats a refused call."""
     for server in servers:
         try:
             tools = await server.list_tools()
@@ -469,11 +389,8 @@ async def _server_announcing(
 async def _evaluate_condition(
     trigger: Mapping[str, Any], *, tool_registry: ToolServerRegistry
 ) -> tuple[bool | None, str | None]:
-    """`(result, unavailable_reason)` — `result` is `None` exactly when
-    `unavailable_reason` is set. A server that could not be asked, one that refused the
-    call, and an answer with no such field are all the same fact from a trigger's own
-    seat: it did not learn what the market is doing, so it MUST NOT fire either way. The
-    reason text is what tells the two apart on the way to `schedule_fires`."""
+    """`(result, unavailable_reason)` — `result` is `None` exactly when the reason is set. All three
+    silences are one fact from a trigger's seat: it did not learn what the market is doing."""
     configured = tool_registry.configured()
     if not configured:
         return None, (
@@ -485,10 +402,8 @@ async def _evaluate_condition(
     if isinstance(arguments, str):
         arguments = json.loads(arguments)
 
-    # Which server owns the name is asked here rather than assumed: since phase 2 there
-    # are two, and a trigger names one tool without saying whose. The list is read once
-    # per session and cached in the client, so this costs a round trip on the first tick
-    # after a restart and nothing afterwards.
+    # Which server owns the name is asked here rather than assumed: since phase 2 there are two, and a
+    # trigger names one tool without saying whose. The list is cached, so this costs one round trip.
     server = await _server_announcing(configured, trigger["tool_name"])
     if server is None:
         return None, (
@@ -532,9 +447,8 @@ async def _check_trigger(
     trigger_id = claimed["id"]
     source = _TriggerSource(trigger_id)
 
-    # Evaluating the condition never calls a model — one tool call, nothing charged to
-    # this team's usage (specs/teams-triggers, "Obserwowanie rynku nie kosztuje tokenów
-    # modelu") — so a trigger checked every few seconds costs nothing until it fires.
+    # Evaluating the condition never calls a model — one tool call, nothing charged to this team's usage —
+    # so a trigger checked every few seconds costs nothing until it fires.
     result, unavailable_reason = await _evaluate_condition(
         claimed, tool_registry=deps.tool_registry
     )
@@ -546,18 +460,16 @@ async def _check_trigger(
             )
         return None
 
-    # A fire is the `false -> true` transition, not the state itself — reading it stays
-    # true for the next ten checks fires nothing ten more times
-    # (specs/teams-triggers, "Wyzwalacz reaguje na zbocze, nie na stan").
+    # A fire is the `false -> true` transition, not the state itself: a reading that stays true for the
+    # next ten checks fires nothing ten more times.
     edge = bool(result) and not bool(claimed["last_result"])
     last_fired_at = claimed["last_fired_at"]
     cooldown_seconds = claimed["cooldown_seconds"]
     cooldown_active = (
         last_fired_at is not None and (now - last_fired_at).total_seconds() < cooldown_seconds
     )
-    # `fired` (and so `last_fired_at`) only advances past the cooldown gate — an edge
-    # suppressed by cooldown MUST NOT itself reset the cooldown window, or a condition
-    # flickering faster than the cooldown would never actually clear it.
+    # `fired` only advances past the cooldown gate — an edge suppressed by cooldown MUST NOT reset the
+    # window, or a condition flickering faster than the cooldown would never clear it.
     proceeding = edge and not cooldown_active
 
     async with pool.acquire() as conn:
@@ -577,8 +489,6 @@ async def _check_trigger(
     return await _start_and_track(pool, source, claimed, deps=deps)
 
 
-# --- the failure streak, common to both --------------------------------------------
-
 
 async def _track_run(
     pool: asyncpg.Pool,
@@ -588,12 +498,8 @@ async def _track_run(
     source: _Source,
     failure_threshold: int,
 ) -> None:
-    """Waits for a run this clock started to finish, then moves the failure streak that
-    decides whether its schedule or trigger keeps working unattended
-    (specs/teams-schedules, "Harmonogram po serii nieudanych przebiegów wyłącza się
-    sam"). `cancelled` — an operator's own interruption — moves neither way: it is a
-    supervised choice, not a signal about whether the schedule itself is healthy.
-    """
+    """Waits for a run this clock started to finish, then moves the failure streak that decides whether its
+    schedule keeps working unattended. `cancelled` moves neither way: it is a supervised choice."""
     try:
         await task
         async with pool.acquire() as conn:

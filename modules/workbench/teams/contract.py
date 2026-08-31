@@ -1,24 +1,5 @@
-"""The shapes this module answers with — snake_case on the wire, same convention as
-`market_data/contract.py` and `agent/contract.py`.
-
-No separate domain-model layer the way `agent/models.py` is one: agent's contract diverges
-from storage (a computed `source` field, geometry unions), which is what a dataclass in
-between is for. This module's simple tables map onto their wire shape almost one to one, so
-each `*Out` reads an `asyncpg.Record` directly through its own `from_row` — a parallel
-dataclass with the same fields and no behaviour of its own would be duplication, not
-architecture.
-
-`TeamDefinition` is the one exception and the one shape that matters most: it is both what
-gets stored in `team_revisions.definition` (JSONB) and what the wire carries, unchanged
-either way, because there is nothing about a definition that storage needs and a caller
-should not see. What is validated here is the *pure* shape — unique agent keys, edges naming
-real agents, no isolated agent, no dependency cycle — because none of it needs anything
-outside this JSON. Whether a `model_id` is in the module's configured catalogue or a tool
-name is one market-mcp still announces needs a database and a live session neither Pydantic
-nor this file has, so those two checks are the store's job at the moment a revision is
-actually saved (specs/teams-catalogue, "Definicja, której nie da się wykonać, jest
-odrzucana przy zapisie").
-"""
+"""The shapes this module answers with, snake_case and with no separate domain layer, its tables mapping onto the wire
+almost one to one. `TeamDefinition` is the exception: the *pure* shape is checked here, the rest at save time."""
 
 from __future__ import annotations
 
@@ -41,32 +22,22 @@ def _parse_jsonb(value: object) -> Any:
     return json.loads(value) if isinstance(value, str) else value
 
 
-# What a team may remember, in three numbers. Constants beside `ROUND_CEILING` rather
-# than settings, and the split is the one `docs/architecture.md` states: a number the
-# operator has a right to set is their budget and lives in the revision — the daily cost
-# ceiling and the trading limits are theirs. These three are not about their money. They
-# bound the shape in which this module hands anything to a model at all, which is why an
-# environment variable must not be able to move them.
-#
-# `MEMORY_ENTRY_MAX_CHARS` is repeated as a CHECK in migration 0008 — the only one of the
-# three whose breach would land on disk — and `test_contract.py` fails if the two drift.
+# What a team may remember, in three numbers — constants rather than settings, on `docs/architecture.md`'s split: these
+# bound the shape in which this module hands anything to a model, so an env var must not move them.
 MEMORY_ENTRY_MAX_CHARS = 2000
 MEMORY_READ_LIMIT = 20
 MEMORY_WRITES_PER_RUN = 10
 
 
 class ModelOut(BaseModel):
-    """One entry of the model catalogue — everything a picker needs and nothing else
-    (specs/teams-models, "Katalog modeli wystarcza do zbudowania wybieraka"). The
-    terminal MUST NOT carry a model id of its own, so a model added to this module's
-    configuration reaches the picker with no terminal change at all."""
+    """One entry of the model catalogue — everything a picker needs and nothing else. The terminal MUST NOT
+    carry a model id of its own, so a model added to configuration reaches the picker with no change there."""
 
     id: str
     display_name: str
     cost_rank: int
-    # Per 1,000,000 tokens, the unit providers quote — published in the unit it is
-    # configured in, so the terminal renders what arrives and never rescales it. Strings
-    # for the same reason every cost on this wire is one (see `CostLimits`).
+    # Per 1,000,000 tokens, the unit providers quote, published in the unit it is configured in. Strings
+    # for the same reason every cost on this wire is one.
     input_rate_per_1m: str
     output_rate_per_1m: str
 
@@ -82,20 +53,8 @@ class ModelOut(BaseModel):
 
 
 class ToolOut(BaseModel):
-    """One tool as the tool server announces it right now (specs/teams-tool-access,
-    "Moduł nie trzyma kopii tego, co ogłasza serwer narzędzi").
-
-    Name and description, and deliberately not the input schema: a definition points at a
-    tool by name and carries nothing else about it, so the picker needs a label and a line
-    of prose. Publishing the schema would put a copy of somebody else's contract on this
-    module's wire, where it would be stale from the first argument market-mcp renames.
-
-    `read_only` is the one property that does travel — read straight off the server's own
-    `readOnlyHint`, not decided here, so an operator picking tools for an agent sees which
-    ones move the account before assigning one (specs/trading-mcp-tools, "Narzędzie
-    zapisujące jest oznaczone jako zmieniające stan"). `None` when a tool carries no
-    annotation at all — unknown, not assumed read-only.
-    """
+    """One tool as the server announces it right now — name and description, deliberately not the input schema, which
+    would put a copy of somebody else's contract on this wire. `read_only` travels; `None` means unknown, not read-only."""
 
     name: str
     description: str
@@ -139,9 +98,8 @@ class TeamEdge(BaseModel):
     """One dependency: `to` waits for `from_` and receives its output — specs/teams-runs,
     'Agent widzi wypowiedzi poprzedników, a nie całą historię przebiegu'."""
 
-    # Two one-way aliases for one wire name — see market_data's `Uncovered.from_` for
-    # why: `from` is a Python keyword, and building this model with a type checker
-    # rejects `TeamEdge(from_=...)` if `alias=` were used instead of the pair below.
+    # Two one-way aliases for one wire name: `from` is a Python keyword, and a type checker rejects
+    # `TeamEdge(from_=...)` if `alias=` were used instead of the pair below.
     from_: str = Field(validation_alias="from", serialization_alias="from")
     to: str
 
@@ -149,10 +107,8 @@ class TeamEdge(BaseModel):
 
 
 class CostLimits(BaseModel):
-    """Budgets a revision may carry — specs/teams-usage, 'Przekroczenie granicy kosztu
-    zatrzymuje przebieg'. Strings, like every other cost on this contract's wire: nothing
-    here computes with these, only compares them against a running total, and a string
-    round-trips exactly where a float would invite rescaling it should never do."""
+    """Budgets a revision may carry. Strings, like every other cost on this wire: nothing here computes
+    with these, only compares them, and a string round-trips exactly where a float invites rescaling."""
 
     run_limit: str | None = Field(default=None, description="max cost for one run")
     daily_limit: str | None = Field(default=None, description="max cost per day for this team")
@@ -172,23 +128,8 @@ class CostLimits(BaseModel):
 
 
 class TradingLimits(BaseModel):
-    """What a revision allows its agents to do to the account — specs/teams-trading.
-
-    **Every one of the three is optional, and an omitted one means no limit at all.** The
-    module substitutes nothing and holds no ceiling of its own in code: a team the
-    operator deliberately lets trade with everything it has is an experiment they are
-    entitled to run, and a module refusing to save it would be making that call for them
-    (specs/teams-trading, "Każda granica handlowa daje się wyłączyć, a moduł żadnej nie
-    narzuca").
-
-    What is *not* negotiable lives a module away: `trading-mcp` refuses to start against
-    anything but the demo account, and no setting here or there turns that off
-    (specs/trading-mcp-upstream-access). That is the split — the irreversible thing is
-    fixed, the operator's own budget is theirs.
-
-    `max_order_size` is a string for the same reason every cost on this wire is: it is
-    compared, never recomputed, and a string round-trips exactly.
-    """
+    """What a revision allows its agents to do to the account: all three optional, an omitted one meaning no limit at
+    all. What is not negotiable lives a module away, in a `trading-mcp` that starts only against the demo account."""
 
     max_order_size: str | None = Field(
         default=None, description="largest size one order may carry; null means no limit"
@@ -217,25 +158,16 @@ class TradingLimits(BaseModel):
     @field_validator("orders_per_run", "orders_per_day")
     @classmethod
     def _positive_count(cls, value: int | None, info: ValidationInfo) -> int | None:
-        # Zero is refused rather than read as "none allowed": a team that may place no
-        # orders is one whose agents should carry no write tools, and the two are
-        # different statements. There is no upper bound — see the class docstring.
+        # Zero is refused rather than read as "none allowed": a team that may place no orders is one
+        # whose agents should carry no write tools, and the two are different statements.
         if value is not None and value <= 0:
             raise ValueError(f"{info.field_name} must be positive, got {value}")
         return value
 
 
 class TeamDefinition(BaseModel):
-    """The whole of what a team revision carries — every agent, every dependency between
-    them, and the cost and trading limits a run against this revision must respect. One
-    immutable blob per revision (specs/teams-catalogue, "Rewizja raz zapisana się nie
-    zmienia").
-
-    `trading` defaults to an empty `TradingLimits`, which is what every revision saved
-    before this field existed reads back as — and it means the same thing there as it
-    does for a new one: no limit. Nothing about an old revision changes by being read
-    (specs/teams-catalogue, "Rewizja z fazy sprzed narzędzi handlowych").
-    """
+    """The whole of what a team revision carries, as one immutable blob. `trading` defaults to an empty `TradingLimits`,
+    which is what every revision saved before that field existed reads back as, and it means the same thing: no limit."""
 
     agents: list[AgentDefinition]
     edges: list[TeamEdge] = Field(default_factory=list)
@@ -245,13 +177,8 @@ class TeamDefinition(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _every_agent_names_a_model(cls, data: Any) -> Any:
-        """Before the agents parse, so the refusal can name the agent by its own `key`.
-
-        `model_id` is a required field, so Pydantic would refuse this on its own — but as
-        `agents.2.model_id`, which leaves the operator counting rows in a canvas to find
-        out which role it means (specs/teams-models, "Agent bez wskazanego modelu": the
-        refusal names *that agent*).
-        """
+        """Before the agents parse, so the refusal can name the agent by its own `key`. Pydantic would
+        refuse this on its own — as `agents.2.model_id`, which leaves the operator counting rows."""
         if not isinstance(data, dict):
             return data
         agents = data.get("agents")
@@ -299,10 +226,8 @@ class TeamDefinition(BaseModel):
 
     @model_validator(mode="after")
     def _no_isolated_agent_among_connected_ones(self) -> TeamDefinition:
-        # specs/teams-catalogue, "Agent, do którego nic nie prowadzi i który do niczego
-        # nie prowadzi": a team with no edges at all is fine — every agent works
-        # independently, by choice. An agent touching none while others ARE wired
-        # together is not a choice; it is the edge someone forgot to draw.
+        # A team with no edges at all is fine: every agent works independently, by choice. An agent
+        # touching none while others are wired together is not a choice, it is a forgotten edge.
         if not self.edges:
             return self
         touched = {edge.from_ for edge in self.edges} | {edge.to for edge in self.edges}
@@ -356,13 +281,8 @@ class SaveRevisionIn(BaseModel):
 
 
 class AgentPlace(BaseModel):
-    """One agent's place on the canvas — the definition's own key and two coordinates.
-
-    Its own shape rather than a field on `AgentDefinition`, and that is the decision
-    rather than an accident: a definition is immutable once saved and is what a run points
-    at, so a coordinate inside it would mint a revision every time a node was dragged
-    (design.md, "Rozmieszczenie agentów obok rewizji, nie w niej").
-    """
+    """One agent's place on the canvas. Its own shape rather than a field on `AgentDefinition`: a
+    coordinate inside an immutable definition would mint a revision every time a node was dragged."""
 
     agent_key: str
     x: float
@@ -370,9 +290,8 @@ class AgentPlace(BaseModel):
 
 
 class TeamLayoutOut(BaseModel):
-    """Where the operator left each agent. Absent keys are not an error and not a zero:
-    the canvas computes a place from the dependencies for anything this does not name
-    (specs/terminal-teams, "Agent bez zapamiętanego miejsca")."""
+    """Where the operator left each agent. Absent keys are not an error and not a zero: the canvas computes
+    a place from the dependencies for anything this does not name."""
 
     places: list[AgentPlace]
 
@@ -401,10 +320,8 @@ class SaveLayoutIn(BaseModel):
 
 
 class TeamOut(BaseModel):
-    """A row in the catalogue — specs/teams-catalogue, "Katalog wystarcza, żeby wybrać
-    zespół bez otwierania go". No `owner_principal` on the wire: ownership gates which
-    rows a query returns at all (specs/teams-browser-access), the same way agent's own
-    `SessionOut` never carries one either."""
+    """A row in the catalogue. No `owner_principal` on the wire: ownership gates which rows a query returns
+    at all, the same way agent's own `SessionOut` never carries one."""
 
     id: int
     name: str
@@ -446,9 +363,8 @@ class TeamRevisionOut(BaseModel):
 class RunOut(BaseModel):
     id: int
     team_revision_id: int
-    # pending, running, completed, failed, or cancelled — `runs.status` in the schema;
-    # kept as a plain string here the way agent's own `ToolCallOut.outcome` is, with the
-    # CHECK constraint as the actual enforcement.
+    # pending, running, completed, failed, or cancelled — kept as a plain string the way agent's own
+    # `ToolCallOut.outcome` is, with the CHECK constraint as the actual enforcement.
     status: str
     stopped_reason: str | None
     started_at: datetime | None
@@ -523,12 +439,8 @@ class ToolCallOut(BaseModel):
 
 
 class MemoryEntryOut(BaseModel):
-    """One thing a team decided to keep — specs/teams-memory.
-
-    `author_agent_key` and `run_id` are legibility, not permission: nothing decides who
-    may read an entry from either. `run_id` is optional because an entry outlives the run
-    that wrote it, and the column leaves room for one the operator writes by hand.
-    """
+    """One thing a team decided to keep. `author_agent_key` and `run_id` are legibility, not permission,
+    and `run_id` is optional because an entry outlives the run that wrote it."""
 
     id: int
     author_agent_key: str
@@ -548,14 +460,8 @@ class MemoryEntryOut(BaseModel):
 
 
 class TeamMemoryOut(BaseModel):
-    """What a team remembers, newest first — and how much of it there is.
-
-    `total` rides beside the entries rather than being left for the reader to count,
-    because the read is cut at a ceiling and a cut nobody can see is a memory the reader
-    believes is complete (specs/teams-memory, "Odczyt oddaje najnowsze wpisy, a nie całą
-    pamięć"). The same field answers the model through the tool and the operator through
-    the route.
-    """
+    """What a team remembers, newest first — and how much of it there is. `total` rides beside the entries
+    because the read is cut at a ceiling, and a cut nobody can see is a memory the reader believes complete."""
 
     entries: list[MemoryEntryOut]
     total: int
@@ -566,26 +472,8 @@ class TeamMemoryOut(BaseModel):
 
 
 class TradeOut(BaseModel):
-    """One call a run made that could change the account — specs/teams-trading, "Każde
-    wywołanie zapisujące zostawia własny wiersz śladu".
-
-    The same event is also a `ToolCallOut`, with the arguments and the reply verbatim.
-    This is that event read as a *trade*: the fields an operator asks about after the
-    fact — what, which way, how much, and what came of it — as columns rather than as
-    JSON somebody has to read.
-
-    `status` is this module's own reading of the outcome and is one of `sent`, `settled`,
-    `unsettled`, `refused`, `unknown`. `result_status` beside it is the provider's word
-    — FILLED, WORKING, PENDING, REJECTED — kept separate because a row can carry the
-    first without the second ever arriving.
-
-    A row still saying `sent` after its run has finished is an order this module does not
-    know the fate of. That is not a gap in the trace; it is the trace saying the one
-    thing it must be able to say (`0004_trades.py`).
-
-    `size` and `level` are strings, like every other number on this wire that is compared
-    rather than recomputed.
-    """
+    """One call a run made that could change the account, read as a *trade*, as columns rather than JSON. A row still
+    saying `sent` after its run finished is an order whose fate this module does not know."""
 
     id: int
     run_id: int
@@ -666,29 +554,20 @@ class UsageAggregateOut(BaseModel):
 
 
 class UsageSummaryOut(BaseModel):
-    """specs/teams-usage, "Odczyt zużycia w rozbiciu na role" — `by_agent` is the read
-    that requirement is for; `by_model` is agent's own `UsageSummaryOut` precedent,
-    kept because a run can genuinely mix cheap and expensive models across agents."""
+    """`by_agent` is the read the requirement is for; `by_model` is agent's own precedent, kept because a
+    run can genuinely mix cheap and expensive models across agents."""
 
     total_cost: str
     by_agent: list[UsageAggregateOut]
     by_model: list[UsageAggregateOut]
 
 
-# --- schedules, triggers, and the fires either one produces ---------------------------
-#
-# Phase 3 — a team running without an operator at the keyboard. `ScheduleIn`/`TriggerIn`
-# carry the same revision-selection shape (`revision_mode`/`pinned_revision_id`) and are
-# validated the same way (`_revision_selection_is_coherent`) rather than sharing a base
-# class: everything else about the two diverges (a cron expression against a market
-# condition), and a base class for two fields would cost more to read than it saves to
-# write.
+# Phase 3 — a team running without an operator at the keyboard. `ScheduleIn` and `TriggerIn` carry the same
+# revision-selection shape and are validated the same way rather than sharing a base class for two fields.
 
 
 def _revision_selection_is_coherent(revision_mode: str, pinned_revision_id: int | None) -> None:
-    """specs/teams-schedules, "Harmonogram uruchamia rewizję przypiętą, a tryb «najnowsza»
-    jest jawnym wyborem" — `pinned` names a revision, `latest` names none, and nothing
-    else is well-formed."""
+    """`pinned` names a revision, `latest` names none, and nothing else is well-formed."""
     if revision_mode == "pinned" and pinned_revision_id is None:
         raise ValueError("revision_mode 'pinned' needs pinned_revision_id")
     if revision_mode == "latest" and pinned_revision_id is not None:
@@ -696,15 +575,8 @@ def _revision_selection_is_coherent(revision_mode: str, pinned_revision_id: int 
 
 
 class ScheduleTiming(BaseModel):
-    """When a schedule fires, said either way: as a rhythm, or as the cron expression the
-    clock runs (specs/teams-schedules, "Harmonogram da się opisać rytmem"). Exactly one of
-    the two — a body carrying both would leave the module choosing which one the operator
-    meant, and one carrying neither says nothing at all.
-
-    Shared by `ScheduleIn` and `NextFiresIn` so that a preview and the save that follows it
-    are refused by the same validator, rather than a draft previewing happily and then
-    failing on save.
-    """
+    """When a schedule fires, said either way — as a rhythm, or as the cron expression the clock runs. Exactly one of
+    the two, shared by the save and the preview, so a draft cannot preview happily and then fail on save."""
 
     cron_expression: str | None = None
     recurrence: Recurrence | None = None
@@ -747,9 +619,7 @@ class ScheduleIn(ScheduleTiming):
 
 
 class NextFiresIn(ScheduleTiming):
-    """A timing the operator has not saved — what the preview asks about
-    (specs/teams-schedules, "Moduł liczy najbliższe wyzwolenia także dla opisu, którego
-    nie zapisano")."""
+    """A timing the operator has not saved — what the preview asks about."""
 
     count: int = 5
 
@@ -760,14 +630,11 @@ class ScheduleOut(BaseModel):
     revision_mode: str
     pinned_revision_id: int | None
     cron_expression: str
-    # The same expression as a rhythm, or `None` when it is not one of them — read back
-    # here rather than stored, so the row keeps one description of itself and an operator
-    # who wrote their own expression gets it back unchanged (design.md, "Rytm jest na
-    # drucie, wyrażenie czasowe zostaje zapisem wykonawczym").
+    # The same expression as a rhythm, or `None` when it is not one of them — read back here rather than
+    # stored, so an operator who wrote their own expression gets it back unchanged.
     recurrence: Recurrence | None
-    # Set at creation and after every claim — never read by a caller to decide anything,
-    # only shown; the module is the one clock (specs/teams-schedules, "Moduł ma jeden
-    # zegar i sam publikuje najbliższe wyzwolenia").
+    # Set at creation and after every claim — never read by a caller to decide anything, only shown; the
+    # module is the one clock.
     next_fire_at: datetime
     enabled: bool
     disabled_reason: str | None
@@ -794,21 +661,15 @@ class ScheduleOut(BaseModel):
 
 
 class NextFiresOut(BaseModel):
-    """specs/terminal-teams-schedules, "Terminal nie liczy czasu wyzwolenia sam" — the
-    module's own answer to "when does this schedule fire next", computed fresh from
-    `cron_expression` rather than read off the row's own `next_fire_at` — which reflects
-    the last *claim*, not a live forecast, and goes stale the moment a schedule is
-    disabled."""
+    """The module's own answer to "when does this schedule fire next", computed fresh from the expression
+    rather than read off `next_fire_at` — which reflects the last claim and goes stale once disabled."""
 
     times: list[datetime]
 
 
 class TriggerIn(BaseModel):
-    """A market condition, expressed as a call to a tool this module already has a
-    session for (specs/teams-triggers, "Warunek jest czytany narzędziami serwera
-    narzędzi") — never a locally computed indicator. `field_path` names the value inside
-    that call's result to compare; `threshold` is a string for the same reason every
-    other number on this contract that a caller must not rescale is (see `CostLimits`)."""
+    """A market condition, expressed as a call to a tool this module already has a session for — never a
+    locally computed indicator. `threshold` is a string for the reason every unrescalable number here is."""
 
     revision_mode: Literal["pinned", "latest"] = "pinned"
     pinned_revision_id: int | None = None
@@ -862,9 +723,8 @@ class TriggerOut(BaseModel):
     cooldown_seconds: int
     poll_interval_seconds: int
     next_check_at: datetime
-    # `None` until the first check ever runs, and `None` again whenever the tool server
-    # could not be asked — a third value, not a `false` (specs/teams-triggers,
-    # "Niedostępność serwera narzędzi to nie jest niespełniony warunek").
+    # `None` until the first check ever runs, and `None` again whenever the tool server could not be asked
+    # — a third value, not a `false`.
     last_result: bool | None
     last_checked_at: datetime | None
     last_fired_at: datetime | None
@@ -901,9 +761,8 @@ class TriggerOut(BaseModel):
 
 
 class ScheduleFireOut(BaseModel):
-    """One fire attempt from either source, including one that started nothing
-    (specs/teams-schedules, "Wyzwolenie bez przebiegu zostawia zapisany powód"). Exactly
-    one of `schedule_id`/`trigger_id` is set, mirroring the row's own CHECK constraint."""
+    """One fire attempt from either source, including one that started nothing. Exactly one of
+    `schedule_id`/`trigger_id` is set, mirroring the row's own CHECK constraint."""
 
     id: int
     schedule_id: int | None

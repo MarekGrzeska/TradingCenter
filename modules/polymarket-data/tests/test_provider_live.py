@@ -1,13 +1,5 @@
-"""The measurements this module's design rests on, run against the real provider.
-
-`live`, so `--run-live` is needed and CI never runs them: they read a third party over the
-network, which is that party's availability rather than this repository's correctness.
-
-They exist because the design took four measured facts and built on them. A fact that is
-built on and never measured again is an assumption with a date on it — and the first of these
-is load-bearing enough that if it ever changed, the archive would keep filling with a number
-that no longer means what the column says.
-"""
+"""The measurements this module's design rests on, run against the real provider. `live`, so CI never
+runs them — and they exist because a fact that is built on and never measured again has a date on it."""
 
 from __future__ import annotations
 
@@ -43,17 +35,8 @@ async def a_liquid_event(client: provider.PolymarketClient) -> dict:
 
 
 async def test_the_metadata_surface_publishes_the_order_books_midpoint(client) -> None:
-    """The measurement the sampler rests on, and the one worth re-running.
-
-    `outcomePrices` from the metadata surface was the order book's midpoint to the digit on
-    22 August 2026, for every outcome of every market of an event. That is what lets one
-    request price a 128-market event where the source application spent 256.
-
-    A tolerance rather than equality: the two surfaces are read a moment apart and a liquid
-    market moves. A drift beyond one tick is the surfaces having parted company, which is
-    the thing this test exists to catch — silently, the archive would keep filling with a
-    number that no longer means what the column says.
-    """
+    """The measurement the sampler rests on, and the one worth re-running: `outcomePrices` was the order
+    book's midpoint to the digit. A tolerance rather than equality, since the two are read a moment apart."""
     payload = await a_liquid_event(client)
     prices = parsing.prices_from(payload)
     assert prices, "the event carried no prices at all"
@@ -74,9 +57,8 @@ async def test_the_metadata_surface_publishes_the_order_books_midpoint(client) -
 
 
 async def test_the_history_window_is_still_fifteen_days(client) -> None:
-    """Measured 22 August 2026: 15 days accepted, 16 refused, and the cap is on the interval
-    rather than the point count. `history_window_days` defaults to that number, so a
-    provider that moved it would leave every backfill refused with nothing saying why."""
+    """Measured 22 August 2026: 15 days accepted, 16 refused, and the cap is on the interval. A provider
+    that moved it would leave every backfill refused with nothing saying why."""
     payload = await a_liquid_event(client)
     token = next(iter(parsing.prices_from(payload)))
     now = datetime.now(UTC)
@@ -110,15 +92,8 @@ async def test_the_answer_runs_past_the_window_that_was_asked_for(client) -> Non
 
 
 async def test_the_edge_still_selects_on_the_user_agent(client) -> None:
-    """Why `PROVIDER_USER_AGENT` exists, stated exactly.
-
-    The first version of this measurement said "a request without a User-Agent is refused",
-    and that was wrong — what drew the `403 error code: 1010` was `urllib`'s own default.
-    Checked apart: `Python-urllib/3.12` is refused, an absent header is served. So the fact
-    is that the edge **selects on this header**, which makes a library's default a value
-    somebody else decides — and one that a dependency bump could turn into an access refusal
-    with no change in this module.
-    """
+    """Why `PROVIDER_USER_AGENT` exists, stated exactly. The first version of this measurement was wrong:
+    what drew the 403 was `urllib`'s own default, not an absent header — the edge *selects* on it."""
     async with httpx.AsyncClient(timeout=30.0) as bare:
         url = "https://gamma-api.polymarket.com/events"
         refused = await bare.get(

@@ -1,17 +1,5 @@
-"""The system prompt's trusted storage, replacing the hard-coded constants
-`agent/prompt.py` used to be its only source of truth for
-(`agent-prompt-management` spec, "Zapis tworzy nową wersję, nigdy nie nadpisuje
-istniejącej").
-
-Append-only: a row is never updated, only added — the same shape as `tool_calls`,
-kept for the same reason (`CLAUDE.md`, "rows in `tool_calls` still recording what
-happened").
-
-Seeds one row, `"v4"`, with the exact text `SYSTEM_PROMPT_WITH_TOOLS` and
-`SYSTEM_PROMPT_WITHOUT_TOOLS` held at the moment this migration was written —
-copied here as literals, not imported, so this migration keeps seeding the same
-history regardless of what `agent/prompt.py` becomes later. Transcripts already
-stamped `"v4"` have something in the database to agree with.
+"""The system prompt's trusted storage, append-only, replacing the constants `agent/prompt.py` held. Seeds `"v4"` as
+literals rather than by import, so it keeps seeding the same history whatever `agent/prompt.py` becomes later.
 
 Revision ID: 0003
 Revises: 0002

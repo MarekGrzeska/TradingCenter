@@ -1,19 +1,5 @@
-"""What the archive has verified, as opposed to what it merely lacks.
-
-Absence of a candle is ambiguous in the data itself. There is no candle for 3am on
-Saturday because the market was shut, and no candle for last Tuesday afternoon because
-ingest was down, and in a table of candles those two look exactly alike. A consumer
-cannot tell a complete series from a holed one, and the module cannot tell which weekend
-it has already asked the provider about — so it asks again, forever.
-
-Coverage is the second record that resolves it: the stretches of time the archive has
-actually looked at. Inside one, an empty period is an answer. Outside every one, it is a
-question nobody has asked yet.
-
-Ranges are stored merged. A fill writes a range per run, and left unmerged the table
-grows a row per run until "is this moment covered" is a scan of thousands; merged, a
-pair that has been collected continuously has one row.
-"""
+"""What the archive has verified, as opposed to what it merely lacks. An empty period inside a
+covered range is an answer; outside every range it is a question nobody has asked yet."""
 
 from __future__ import annotations
 
@@ -26,20 +12,15 @@ from .models import CoverageRange, Resolution
 
 
 class Absence(str, Enum):
-    """Why there is no candle for a period.
-
-    The distinction is the point of this module. `MARKET_CLOSED` is a complete answer —
-    the archive looked and there was nothing to collect. `NOT_COLLECTED` is an admission,
-    and the only one of the two worth sending anyone back to the provider for.
-    """
+    """Why there is no candle for a period. `MARKET_CLOSED` is a complete answer; `NOT_COLLECTED`
+    is an admission, and the only one worth sending anyone back to the provider for."""
 
     MARKET_CLOSED = "market_closed"
     NOT_COLLECTED = "not_collected"
 
 
-# Serialises coverage writes for one pair. `hashtextextended` gives the bigint the
-# advisory lock functions take, and the two-argument form keeps the symbol and the
-# resolution from colliding through concatenation.
+# Serialises coverage writes for one pair. `hashtextextended` gives the bigint the advisory lock
+# functions take, and the two-argument form keeps symbol and resolution from colliding.
 _LOCK_PAIR = "SELECT pg_advisory_xact_lock(hashtextextended($1 || ':' || $2, 0))"
 
 # Overlapping *or* touching, so that two fills meeting end to end become one range rather
@@ -107,27 +88,14 @@ async def record_coverage(
     history_ends_at: datetime | None = None,
 ) -> CoverageRange:
     """Record that a stretch of time has been verified, merged into what is already known.
-
-    Returns the range as it now stands, which may be wider than the one passed in.
-
-    `history_ended` says the provider has nothing older than `history_ends_at`, which is
-    where the read that found it actually ran out — the oldest candle it brought back,
-    never the edge it asked about. The two are a whole window apart, and the boundary is
-    kept and acted on long after the window is forgotten.
-
-    It carries its own point rather than borrowing `range_start` because ranges merge: a
-    range meeting an older one end to end becomes one row starting at the older edge, and
-    a boundary read off that start slides to wherever the pair's oldest coverage happens
-    to begin. The flag survives a merge, and so does the earliest point any member named.
-    """
+    `history_ends_at` carries its own point rather than borrowing `range_start`, because ranges merge."""
     if history_ended and history_ends_at is None:
         raise ValueError(
             "a history boundary must say where it lies: pass the oldest candle the read "
             "returned, not the edge it asked about"
         )
-    # Through the model first, so a naive datetime is refused here rather than stored as
-    # whatever wall clock the writer happened to have — and so the ordering check below
-    # compares two instants rather than an instant and a wall clock.
+    # Through the model first, so a naive datetime is refused here rather than stored as whatever
+    # wall clock the writer had — and so the check below compares two instants.
     offered = CoverageRange(
         symbol=symbol,
         resolution=resolution,
@@ -142,12 +110,8 @@ async def record_coverage(
             f"{offered.range_start.isoformat()} to {offered.range_end.isoformat()}"
         )
 
-    # One transaction, and a lock on the pair inside it. Reading the neighbours and
-    # replacing them with their union is read-then-write: two fills recording adjacent
-    # ranges at the same moment would otherwise leave two rows that should have been one,
-    # or collide on the "at most one history_ended per pair" index. Row locks cannot help
-    # — the second fill's rows do not exist yet — so the lock is on the pair itself, and
-    # it is released with the transaction.
+    # One transaction, and a lock on the pair inside it. Reading the neighbours and replacing them
+    # with their union is read-then-write, and row locks cannot help: the second fill's rows do not exist.
     async with conn.transaction():
         await conn.execute(_LOCK_PAIR, symbol, resolution.value)
         neighbours = await conn.fetch(
@@ -159,9 +123,8 @@ async def record_coverage(
         merged_history_ended = offered.history_ended or any(
             row["history_ended"] for row in neighbours
         )
-        # The deepest boundary any member named. Two of them can only disagree by one
-        # having been measured when the provider held less, and the earlier one is the
-        # one that was demonstrated.
+        # The deepest boundary any member named. Two can only disagree by one having been measured
+        # when the provider held less, and the earlier one is the one that was demonstrated.
         boundaries = [
             point
             for point in (offered.history_ends_at, *(r["history_ends_at"] for r in neighbours))
@@ -225,13 +188,8 @@ async def is_covered(
 async def absence_at(
     conn: asyncpg.Connection, symbol: str, resolution: Resolution, moment: datetime
 ) -> Absence:
-    """Why there is no candle at `moment` — assuming the caller has established there
-    isn't one.
-
-    Takes no position on whether a candle exists, because the caller reading a range
-    already knows which periods came back empty and asking the candle table again per
-    empty period would be a query per hole.
-    """
+    """Why there is no candle at `moment`, assuming the caller established there isn't one. Takes no
+    position on whether one exists: asking the candle table per empty period is a query per hole."""
     if await is_covered(conn, symbol, resolution, moment):
         return Absence.MARKET_CLOSED
     return Absence.NOT_COLLECTED
@@ -240,55 +198,26 @@ async def absence_at(
 async def delete_all_coverage(
     conn: asyncpg.Connection, symbol: str, resolution: Resolution
 ) -> None:
-    """Remove every verified range for one pair.
-
-    Coverage and candles must disappear together — a range that outlives its candles
-    tells planning a period is already fetched when nothing is there
-    (`market-data-store` spec, "Skasowanie danych pary zdejmuje też jej pokrycie"). The
-    caller is the one holding both deletions in a single transaction; this function only
-    ever does its own half.
-    """
+    """Remove every verified range for one pair. Coverage and candles must disappear together — a
+    range that outlives its candles tells planning a period is already fetched."""
     await conn.execute(_DELETE_ALL, symbol, resolution.value)
 
 
 async def earliest_reachable(
     conn: asyncpg.Connection, symbol: str, resolution: Resolution
 ) -> datetime | None:
-    """Where the provider's history was last found to end, or `None` if nobody has
-    reached it.
-
-    Reported, not enforced. Planning stopped clipping against this: the clip only ever
-    bit a request reaching deeper than the boundary, which is the one request that means
-    "measure it again", and it bit silently — a pair whose boundary was recorded once
-    could never be deepened afterwards. What still uses the boundary is the job that
-    finds it, to settle in bulk the chunks queued behind it.
-
-    `None` means the module has not yet reached the end of the provider's history — not
-    that there is no limit.
-    """
+    """Where the provider's history was last found to end, or `None` if nobody has reached it.
+    Reported, not enforced: the clip only ever bit the request that meant "measure it again"."""
     return await conn.fetchval(_SELECT_HISTORY_END, symbol, resolution.value)
 
 
 async def clear_history_boundary(
     conn: asyncpg.Connection, symbol: str, resolution: Resolution
 ) -> datetime | None:
-    """Forget that the provider's history was ever found to end, keeping every candle and
-    every verified range. Returns the boundary that was dropped, or `None` if there was
-    none.
-
-    The boundary exists to stop work nobody would return to, which is worth having and is
-    also why it must be droppable. It is recorded from one answer on one day; capital.com
-    deepens its own history over time, and an answer that was right in August is not an
-    answer about today. Nothing else in this module clears it — deleting the pair used to
-    be the only way, which is a price out of all proportion to re-asking a question.
-
-    Called only by the path that actually orders collection. Reading coverage and pricing
-    a job leave it alone (`market-data-store` spec, "Odczyt stanu pokrycia nie zmienia
-    granicy"), so an operator can look without changing what they are looking at.
-    """
-    # Read before writing rather than RETURNING: the returning clause reports the row as
-    # it now stands, which after this update is the null we just put there. One
-    # transaction, because a boundary reported as dropped had better be dropped.
+    """Forget that the provider's history was ever found to end, keeping every candle and range. It
+    is recorded from one answer on one day, and capital.com deepens its own history over time."""
+    # Read before writing rather than RETURNING: the returning clause reports the row as it now
+    # stands, which after this update is the null we just put there.
     async with conn.transaction():
         dropped = await conn.fetchval(_SELECT_HISTORY_END, symbol, resolution.value)
         await conn.execute(_CLEAR_HISTORY_END, symbol, resolution.value)
@@ -302,16 +231,8 @@ async def uncovered_within(
     start: datetime,
     end: datetime,
 ) -> list[tuple[datetime, datetime]]:
-    """The stretches of `[start, end]` the archive has never looked at, oldest first.
-
-    The complement of coverage, clipped to what was asked for. A consumer reading a range
-    needs this beside the candles: a series with nothing in it on Saturday and a series
-    with nothing in it because ingest was down are the same list of candles, and only one
-    of them is complete.
-
-    Empty means the whole requested range was verified — which is not the same as the
-    range being full of candles.
-    """
+    """The stretches of `[start, end]` the archive has never looked at, oldest first. Empty means the
+    whole range was verified — which is not the same as the range being full of candles."""
     if end < start:
         raise ValueError(
             f"a range cannot end before it starts: {start.isoformat()} to {end.isoformat()}"

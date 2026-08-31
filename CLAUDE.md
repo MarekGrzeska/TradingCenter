@@ -238,9 +238,13 @@ and RFC 2119 keywords stay literal English because the CLI parses them; Polish "
 satisfy the validator. Everything else — code, comments, identifiers, commit messages, READMEs,
 this file — stays **English**.
 
-**Comments carry the reason, not the narration.** One retelling the line beneath it is parsed
-twice; one naming a measurement, a constraint or an approach that failed is the only record of it.
-Trim when a file is touched, not in bulk.
+**Comments carry the reason, not the narration.** One saying what the name and the body already
+say is deleted; an unreadable fragment is fixed with a name, a split into functions or a simpler
+construction, never with a paragraph beside it. A comment stays only for what the code cannot be
+read for: **why this and not the obvious alternative**, a **library or platform trap**, or a
+**design decision** in one sentence. Two lines is the ceiling — three paragraphs is a document
+that landed in the wrong file, and belongs in `docs/` or in the commit message. Swept across the
+repository on 26 August 2026, so a long comment is a regression now, not a leftover.
 
 ## CI
 

@@ -6,29 +6,15 @@ import { createGatewaySource } from "./gatewaySource";
 import type { ArchiveAdmin, IndicatorSource, MarketDataSource } from "./source";
 
 /**
- * The one market-data source the app runs on, and the two back ends behind it.
- *
- * Candles and the live stream come from the archive; the instrument catalogue is
- * `capital-gateway`'s, which owns it. No view knows that (terminal-market-data spec,
- * "Świece i instrumenty idą z różnych miejsc"), and keeping the seam here is what makes
- * the archive a rollback rather than a rewrite if it ever has to come back out.
- *
- * Both reach the same host: `capital-gateway` is not public, so `gatewaySource` calls
- * `market-data`, which proxies the three catalogue routes to it unread. Whose data and
- * whose rules is unchanged — only the wire hop, which is what this seam absorbs.
- *
- * A single module-level instance, so six charts on one pair share one socket rather
- * than opening six.
+ * Candles from the archive, the instrument catalogue from `capital-gateway`, which owns it and is not public, so
+ * the calls go through market-data unread. Keeping the seam here makes the archive a rollback, not a rewrite.
  */
 const { archiveHttp, archiveWs } = resolveEndpoints();
 
 
 /**
- * The operator's identity, or the absence of one. A wiring decision, made here for the
- * same reason the back ends are composed here: a view that consumed it directly would be
- * a view that had to know about Entra. `null` configuration is a working mode — local
- * development, nothing in front of the archive — and answers "no credential" rather than
- * failing.
+ * The operator's identity, or the absence of one, wired here for the reason the back ends are: a view consuming
+ * it directly would be a view that knew about Entra. `null` is a working mode, not a failure.
  */
 const entraConfig = resolveEntra();
 const identities = entraConfig === null ? null : createEntraIdentities(entraConfig);
@@ -45,14 +31,8 @@ function scopeFor(pick: (s: NonNullable<typeof entraConfig>["scopes"]) => string
 }
 
 /**
- * The shared sign-in state, and the credential for the archive.
- *
- * One per module rather than one for the terminal: each back end accepts a token minted
- * for its own audience, so a token taken for one is not sent to another
- * (terminal-identity, "Każde wywołanie archiwum niesie poświadczenie"). They share the
- * account and the state — `TopBar` subscribing to this one sees every change — and differ
- * only in what they ask Entra for. A module whose scope is unset gets `noIdentity`: its
- * calls go out bare and its own gate refuses them, which is a refusal a tab can name.
+ * One identity per module rather than one for the terminal: each back end accepts a token minted for its own
+ * audience. A module whose scope is unset gets `noIdentity` — bare calls, refused by its own gate, nameably.
  */
 export const identity: Identity = identities?.shared ?? noIdentity;
 
@@ -94,10 +74,8 @@ export const marketData: MarketDataSource = {
 export const instruments = gateway;
 
 /**
- * The same archive, seen as the thing the operator administers rather than the
- * thing a chart reads. Narrowed to `ArchiveAdmin` on purpose: the panel manages
- * what is collected, and reading candles through it would go around the one
- * interface every view is supposed to use.
+ * The same archive, seen as the thing the operator administers. Narrowed to `ArchiveAdmin` on purpose: reading
+ * candles through it would go around the one interface every view is supposed to use.
  */
 export const archive: ArchiveAdmin = archiveSource;
 

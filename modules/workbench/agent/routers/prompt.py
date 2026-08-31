@@ -1,10 +1,5 @@
-"""`GET`/`PUT /prompt` — the system prompt's own trusted storage, read and rewritten
-here instead of a constant in `agent/prompt.py` (specs/agent-prompt-management).
-
-Global to the module, not scoped to an owner: one prompt, not one per operator, so
-`current_principal` is asked only to refuse an unauthenticated request — its value is
-never read.
-"""
+"""`GET`/`PUT /prompt` — the system prompt's own trusted storage. Global to the module, so
+`current_principal` is asked only to refuse an unauthenticated request; its value is never read."""
 
 from __future__ import annotations
 

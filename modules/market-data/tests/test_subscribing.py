@@ -1,10 +1,5 @@
-"""Who may subscribe, and how a browser gets in.
-
-`market-data-api` 8.9 and `market-data-browser-access`. `/ws/candles` is the one path
-outside Easy Auth, so the ticket is the whole of what stands between the internet and the
-stream — which is why the refusals here are checked as carefully as the acceptances, and
-why one test reads the log to prove the ticket value never reaches it.
-"""
+"""Who may subscribe, and how a browser gets in. `/ws/candles` is the one path outside Easy Auth, so
+the ticket is the whole of what stands between the internet and the stream."""
 
 from __future__ import annotations
 
@@ -26,15 +21,10 @@ from market_data.tracking import track
 pytestmark = pytest.mark.db
 
 
-# --- 8.9: subscribing to something nobody chose to collect -----------------------------
-
 
 class FakeWebSocket:
-    """Enough of a WebSocket to drive the handler's decisions.
-
-    The handler is exercised directly rather than through a test client, because a client
-    runs the app on its own event loop and the database pool belongs to this one.
-    """
+    """Enough of a WebSocket to drive the handler's decisions. The handler is exercised directly rather
+    than through a test client, because a client runs the app on its own event loop."""
 
     def __init__(self, app, **params):
         self.query_params = params
@@ -59,11 +49,8 @@ class FakeWebSocket:
 
 
 def a_ticket(app) -> str:
-    """A live ticket, from the store the app is actually running with.
-
-    Spelled out at every call site rather than defaulted inside `FakeWebSocket`, because
-    a default would mean no test could tell whether the guard was there at all.
-    """
+    """A live ticket, from the store the app is actually running with. Spelled out at every call site,
+    because a default would mean no test could tell whether the guard was there at all."""
     return app.state.tickets.issue("test-principal").value
 
 
@@ -99,11 +86,8 @@ async def test_subscribing_to_a_collected_pair_is_accepted(app, api, pool) -> No
 
 
 async def test_a_subscription_is_accepted_through_the_router_too(app, api, pool) -> None:
-    """The tests around this one call the handler themselves, which is how the handshake
-    stayed broken while they all passed: the `hub` dependency asked for a `Request`, and a
-    WebSocket connection is not one, so FastAPI had nothing to pass and every subscription
-    failed with a 500 before the handler ran. Only the router can get that wrong, so only
-    a connection made through it can notice."""
+    """The tests around this one call the handler themselves, which is how the handshake stayed broken
+    while they all passed: the `hub` dependency asked for a `Request`, which a WebSocket is not."""
     async with pool.acquire() as conn:
         await track(conn, "US100", Resolution.MINUTE, LIMIT)
         await write_candles(conn, [candle(0)])
@@ -136,8 +120,6 @@ async def test_a_subscription_with_an_unknown_resolution_is_refused(app, api) ->
     assert "unknown resolution" in socket.closed[1]
 
 
-# --- specs/market-data-browser-access: how a browser gets in -------------------------
-
 
 async def test_a_ticket_is_issued_with_the_time_it_stays_good_for(api) -> None:
     response = await api.post("/stream-tickets")
@@ -156,9 +138,8 @@ async def test_a_ticket_records_the_principal_the_platform_identified(app, api) 
 
 
 async def test_a_ticket_is_refused_when_the_platform_identified_nobody(app, api) -> None:
-    """The module does not take it on trust that the layer in front is doing its job.
-    Configured to stand behind one, a request arriving with no identity means that layer
-    is not there — and the answer is to stop minting keys, not to mint one anyway."""
+    """The module does not take it on trust that the layer in front is doing its job: configured to stand
+    behind one, a request with no identity means that layer is not there."""
     app.state.settings = app.state.settings.model_copy(
         update={"require_authenticated_principal": True}
     )
@@ -180,9 +161,8 @@ async def test_a_ticket_is_issued_without_a_principal_when_nothing_stands_in_fro
 
 
 async def test_the_ticket_route_is_not_under_the_path_exempted_from_easy_auth(api) -> None:
-    """`infra/app-service.tf` exempts `/ws/candles` from Easy Auth because a browser
-    cannot authenticate a handshake. A ticket factory sharing that prefix would be one
-    careless match away from being exempt too — which is an open stream."""
+    """`infra/app-service.tf` exempts `/ws/candles` from Easy Auth because a browser cannot authenticate
+    a handshake. A ticket factory sharing that prefix would be one careless match from being exempt."""
     schema = (await api.get("/openapi.json")).json()
 
     assert "/stream-tickets" in schema["paths"]
@@ -298,11 +278,8 @@ async def test_no_ticket_value_reaches_the_logs(app, api, pool, caplog) -> None:
 
 
 async def _handshake(app, query: str) -> list[dict]:
-    """Connect to /ws/candles through the app itself, and answer with what it sent back.
-
-    httpx's ASGI transport speaks HTTP only, so the connection is made at the ASGI level:
-    a connect, then a disconnect, which is enough to see how the handshake ended.
-    """
+    """Connect to /ws/candles through the app itself, and answer with what it sent back. httpx's ASGI
+    transport speaks HTTP only, so the connection is made at the ASGI level."""
     scope = {
         "type": "websocket",
         "asgi": {"version": "3.0", "spec_version": "2.3"},

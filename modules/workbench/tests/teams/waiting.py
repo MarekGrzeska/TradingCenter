@@ -1,20 +1,5 @@
-"""Waiting for a run that is working in the background, from a synchronous test.
-
-`TestClient` drives the application from a portal thread while a run's task lives on the
-event loop, so a test has to hand that loop time rather than ask again as fast as it can.
-Both helpers here used to be a bare `for _ in range(60)` with no pause — one in
-`test_runs_routes.py`, one in `test_usage_route.py`, the same loop written twice.
-
-That loop is bounded by *round trips*, not by time, and it is a race the test can lose:
-sixty requests can be served and answered before the run's task is scheduled at all. It
-survived every local run and failed once on CI, on the pull request that added two more
-suites of database tests beside it — the extra load did not break it, it made the existing
-race visible.
-
-Bounded by a deadline and paused between attempts instead. `time.sleep` releases the GIL,
-which is the part the busy loop never did: it is what lets the loop thread actually move
-the run along.
-"""
+"""Waiting for a run working in the background, from a synchronous test: `TestClient` drives the app from a portal
+thread while the run lives on the event loop. `time.sleep` releases the GIL, which is what lets that loop move the run."""
 
 from __future__ import annotations
 

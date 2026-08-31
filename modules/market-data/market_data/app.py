@@ -1,17 +1,5 @@
-"""The published surface: FastAPI over the archive, plus the subscription.
-
-Only assembly lives here — the lifespan, the error handling every route shares, and the
-routers themselves. The routes are in `routers/`, split by the area they serve rather than
-by verb, because that is how the specs are organised and how changes actually arrive: a
-change to jobs touches four routes that are all in one file and none of the others.
-
-The one thing worth reading twice is `/ws/candles`, in `routers/stream.py`. Its first
-message is a snapshot and every message after it is a change, and the two are joined there
-rather than by whoever is consuming them. That is the whole reason the seam stopped being
-the terminal's problem: the snapshot is read while the room is held still and the
-subscriber attaches before it is released, so no candle can fall between them and none can
-arrive twice.
-"""
+"""The published surface: FastAPI over the archive, plus the subscription. Only assembly lives
+here; the routes are in `routers/`, split by the area they serve rather than by verb."""
 
 from __future__ import annotations
 
@@ -25,14 +13,8 @@ from tc_runtime import migrate, schema_version
 
 from . import telemetry
 
-# Must run before `from fastapi import FastAPI` below, not merely before `FastAPI(...)` is
-# called. OpenTelemetry's FastAPI auto-instrumentation (enabled by `configure_azure_monitor`
-# inside `configure()`) patches the `fastapi.FastAPI` *class attribute* — but `from fastapi
-# import FastAPI` binds this module's own `FastAPI` name to whatever the attribute holds at
-# the moment that statement runs. Called after the import (as it was inside `lifespan`,
-# which only runs at ASGI startup — long after every import in this file has resolved), the
-# patch lands on an attribute this module never looks at again, and `AppRequests` never
-# receives a point regardless of where `FastAPI(...)` itself is called.
+# Must run before `from fastapi import FastAPI` below, not merely before `FastAPI(...)` is called:
+# the auto-instrumentation patches the class attribute, and the import binds this module's name.
 telemetry.configure()
 
 from fastapi import FastAPI, Request
@@ -60,17 +42,8 @@ log = logging.getLogger(__name__)
 
 
 def candle_sink(pool, hub: Hub):
-    """Where ingest sends every candle it sees, forming or closed.
-
-    The storing happens inside the hub's hold rather than before it. That is the one thing
-    that makes a snapshot airtight: a write committing outside the hold can land between a
-    subscriber's snapshot query and its attachment, and the same period then arrives twice
-    — once in the snapshot and once as a change.
-
-    A forming candle is published and not stored. It changes with every quote and
-    understates its own range until the period closes, but a chart that never saw it would
-    be missing the bar the price is actually in.
-    """
+    """Where ingest sends every candle it sees. The storing happens inside the hub's hold: a write
+    committing outside it lands between a subscriber's snapshot and its attachment, and arrives twice."""
 
     async def sink(candle: Candle) -> None:
         if candle.forming:
@@ -99,32 +72,21 @@ async def lifespan(app: FastAPI):
         ) as pool,
         http_client(settings.gateway_api_key, settings.gateway_scope) as client,
     ):
-        # The database is brought to this image's revision here, before anything is
-        # built on top of it, before a request is served and — the one that leaves a
-        # mark — before a single candle is written
-        # (`market-data-database-connection`, "Moduł sam doprowadza bazę do rewizji,
-        # dla której powstał"). `ingest.start()` is far below, which is what makes that
-        # ordering hold.
-        #
-        # One connection held for the whole of it: the advisory lock is session scoped,
-        # so it has to be released on the connection that took it, and handing that
-        # connection back to the pool in between would release it early.
+        # The database is brought to this image's revision before anything is built on it and
+        # before a candle is written. One connection throughout: the advisory lock is session scoped.
         async with pool.acquire() as conn:
             async with advisory_lock(
                 conn, MIGRATION_LOCK_KEY, wait=settings.migration_lock_wait_seconds
             ):
                 await migrate.run(MIGRATIONS)
-            # Still checked, and now for a narrower pair of accidents than before: a
-            # migration that reported success without arriving, and an image older than
-            # the schema it found (`schema_version.py`).
+            # Still checked, for a narrower pair of accidents: a migration that reported success
+            # without arriving, and an image older than the schema it found.
             await schema_version.verify(conn, MIGRATIONS)
 
         history = GatewayHistory(settings.gateway_base_url, client)
         hub = Hub()
-        # Shared with the job runner below, not one semaphore each — two gates that
-        # happen to share a number would still let a deep job starve an interactive
-        # read the way a single gate cannot (design.md, "Zlecenia dzielą budżet ruchu
-        # z resztą modułu").
+        # Shared with the job runner below, not one semaphore each: two gates sharing a number
+        # would still let a deep job starve an interactive read the way a single gate cannot.
         fill_limiter = asyncio.Semaphore(settings.backfill_concurrency)
         ingest = Ingest(
             pool,
@@ -143,9 +105,8 @@ async def lifespan(app: FastAPI):
         app.state.settings = settings
         app.state.pool = pool
         app.state.hub = hub
-        # Lives as long as the process and no longer. A restart voids the tickets in
-        # flight, which costs at most one failed handshake — the consumer's answer to
-        # that is the same as to any other refusal: ask for another and try again.
+        # Lives as long as the process. A restart voids the tickets in flight, which costs at
+        # most one failed handshake — the consumer asks for another and tries again.
         app.state.tickets = TicketStore(timedelta(seconds=settings.stream_ticket_ttl_seconds))
         app.state.history = history
         app.state.instruments = GatewayInstruments(settings.gateway_base_url, client)
@@ -154,18 +115,16 @@ async def lifespan(app: FastAPI):
         # Memory only: the gateway it asks is resolved per request from the line
         # above, so a caller swapping that out is answered by the new one.
         app.state.market_status = MarketStatus()
-        # A recursive filter's loop holds the GIL, so this is a plain gate on how many
-        # `POST /indicators/*` requests compute at once — not a pool, since a thread would
-        # not free the event loop the way it does for I/O (indicators/service.py).
+        # A recursive filter's loop holds the GIL, so this is a plain gate on how many requests
+        # compute at once — a thread would not free the event loop the way it does for I/O.
         app.state.indicator_limiter = asyncio.Semaphore(settings.indicator_concurrency)
 
         candle_age = telemetry.CandleAgeGauge()
         candle_age_periods = telemetry.CandlePeriodsLateGauge()
         telemetry.register(candle_age, candle_age_periods)
 
-        # Before anything else touches the job tables: no runner survives a restart, so
-        # any chunk left `pending` or `running` from before this start was orphaned, not
-        # merely delayed (jobs/store.py, `interrupt_orphaned_chunks`).
+        # Before anything else touches the job tables: no runner survives a restart, so a chunk
+        # left `pending` or `running` from before this start was orphaned, not merely delayed.
         async with pool.acquire() as conn:
             interrupted = await interrupt_orphaned_chunks(conn)
         if interrupted:
@@ -204,11 +163,8 @@ async def _tracking_refused(request: Request, exc: TrackingRefused) -> JSONRespo
 
 
 async def _future_request(request: Request, exc: FutureRequest) -> JSONResponse:
-    # 422 and the reason in full: a start date after now is a request the module will
-    # never be able to honour, and the caller's next move is to pick a different date —
-    # which it can only do if told that is the problem (`market-data-jobs` spec, "Data w
-    # przyszłości"). Without this it fell to the catch-all below and read as a 500, which
-    # says "the archive broke" about a request that was simply wrong.
+    # 422 and the reason in full: a start date after now is a request the module can never honour,
+    # and the caller's next move is a different date — which it can only pick if told that is it.
     return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 
@@ -220,9 +176,8 @@ async def _gateway_error(request: Request, exc: GatewayError) -> JSONResponse:
 
 
 async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
-    # Nothing raw reaches a consumer. A database error names tables and columns, which is
-    # more than a caller can use and more than a log should carry; the detail goes to the
-    # log and the caller gets something it can act on.
+    # Nothing raw reaches a consumer: a database error names tables and columns, which is more
+    # than a caller can use and more than a log should carry.
     log.exception("unhandled error serving %s", request.url.path)
     return JSONResponse(
         status_code=500,
@@ -231,18 +186,8 @@ async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
 
 
 def create_app() -> FastAPI:
-    """One assembled application, owning nothing that outlives it.
-
-    A factory rather than a module-level object because `app.state` is where every
-    dependency is held, and a single shared instance makes that state a global one test
-    hands to the next: twenty tests reassigned `app.state.*` mid-test and every one of
-    those assignments survived into whatever ran after it. The three MCP modules already
-    build theirs this way (`build_http_app`); this is the same seam, arriving late.
-
-    `telemetry.configure()` is deliberately *not* here — it must run before this module's
-    `from fastapi import FastAPI`, which the comment at the top of the file explains, and
-    calling it per application would register the meters more than once.
-    """
+    """One assembled application, owning nothing that outlives it. A module-level object makes
+    `app.state` a global one test hands to the next, which twenty of them did."""
     app = FastAPI(
         title="TradingCenter · market-data",
         description=(
@@ -257,24 +202,11 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # No CORS middleware here, and adding one would break the browser rather than help it.
-    #
-    # The terminal calls this module across origins, so every request carrying an
-    # `Authorization` header is preceded by an `OPTIONS` preflight — which by definition
-    # carries no credential of any kind. Easy Auth, set to `Return401`, would answer that
-    # preflight with a 401 before the application ever saw it, so CORS has to be answered by
-    # something standing in front of Easy Auth: App Service's own, configured in
-    # `infra/app-service.tf`. Two layers both appending `Access-Control-Allow-Origin` produce
-    # a doubled header, and a browser rejects a response carrying two.
-    #
-    # Locally the question does not arise: Vite proxies this module under the page's own
-    # origin, so nothing is cross-origin to begin with.
+    # No CORS middleware here: Easy Auth would answer the credential-free preflight with a 401
+    # first, so App Service answers CORS in front of it, and two layers would double the header.
 
     # The subscription's message shapes, hung on the document FastAPI builds from the routes.
-    # Wrapping rather than replacing keeps FastAPI's own construction untouched, and mutating
-    # the dict it caches means the served `/openapi.json` and the dumped one are the same
-    # bytes — a generator reading one and a human reading the other must never see two
-    # different contracts (`openapi.py`).
+    # Mutating the cached dict means the served `/openapi.json` and the dumped one are one contract.
     routes_openapi = app.openapi
 
     def openapi_with_stream() -> dict:
@@ -287,37 +219,23 @@ def create_app() -> FastAPI:
     app.add_exception_handler(GatewayError, _gateway_error)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, _unhandled)  # type: ignore[arg-type]
 
-    # Order matches the single module these came out of, so the published document lists its
-    # paths exactly where it always did. `instruments` and `indicators` are newer than the
-    # rest and go last, after everything this module owned before them.
+    # Order matches the single module these came out of, so the published document lists its paths
+    # exactly where it always did. `instruments` and `indicators` are newer and go last.
     for area in (meta, candles, pairs, jobs, stream, instruments, indicators):
         app.include_router(area.router)
 
-    # The tool surface, as a mounted ASGI application rather than a router: what the MCP
-    # library builds is a Starlette app, not an `APIRouter`, and it owns its own session
-    # handling underneath. `build_mcp_app` is handed the application rather than its state
-    # because the state does not exist yet — the lifespan fills it, long after this line.
-    #
-    # `mcp_app` is imported here, inside the factory, and that is not style: it pulls in
-    # Starlette, and the module-level import block must stay below `telemetry.configure()`
-    # (see the top of this file). An import at call time cannot climb above it by accident.
+    # A mounted ASGI application rather than a router: what the MCP library builds is a Starlette
+    # app. Imported inside the factory so it cannot climb above `telemetry.configure()`.
     from .mcp_app import ToolSurfaceAddress, build_mcp_app
 
     mcp_server, mcp_asgi = build_mcp_app(app)
-    # Kept on the application so the lifespan can start its session manager: the mounted
-    # app's own lifespan never runs, and without that task group every tool call answers
-    # `RuntimeError: Task group is not initialized` (`mcp_app.py`).
+    # Kept on the application so the lifespan can start its session manager: the mounted app's
+    # own lifespan never runs, and without that task group every tool call fails.
     app.state.mcp_server = mcp_server
     app.mount("/mcp", mcp_asgi)
 
-    # In front of both surfaces, and it has to be one layer rather than a dependency per
-    # router: `/mcp` is a mounted ASGI application, not a router, so a `dependencies=`
-    # check could not reach it and the rule would exist in two mechanisms that drift in
-    # one direction. `app.state` rather than the settings themselves — the lifespan puts
-    # those there long after this line runs (`caller_access.py`).
-    # Added first, so it ends up *inside* the caller-access layer: that layer decides on
-    # `/mcp` as written, and this one turns it into the path the router can match
-    # (`mcp_app.ToolSurfaceAddress`).
+    # One layer rather than a dependency per router: `/mcp` is a mounted app, so `dependencies=`
+    # could not reach it. Added first, so it ends up inside the caller-access layer.
     app.add_middleware(ToolSurfaceAddress)
     app.add_middleware(CallerAccess, state=app.state)
 

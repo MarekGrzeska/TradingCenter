@@ -9,12 +9,8 @@ import { todayInWarsaw } from "../../ui/formatTime";
 import { Button } from "../../ui/Button";
 
 /**
- * Where the operator checks what conversations with the agent have cost, before the
- * Azure invoice does (`terminal-agent-cost` spec's Purpose). Every number here is the
- * module's own — `GET /usage`'s aggregates, read and shown, never summed or converted
- * on this side (spec, "Terminal MUST NOT liczyć kosztu z tokenów i cennika po swojej
- * stronie"): `cost`/`*RatePer1M` stay strings the whole way from `agent/contract.py`
- * to the `$` prefix below, so there is no arithmetic here to get wrong.
+ * What conversations have cost, before the Azure invoice says so. Every number is the module's own — the strings
+ * stay strings the whole way to the `$` prefix, so there is no arithmetic here to get wrong.
  */
 export function AgentCostView({
   api = agentApi,
@@ -29,11 +25,8 @@ export function AgentCostView({
   const usage = useUsage(api, range);
 
   function openConversation(sessionId: number): void {
-    // `GET /usage` publishes only the three aggregates — a session's own cost, not a
-    // per-call breakdown of it (no route on the module carries one). Opening the
-    // conversation is what actually answers "koszt rozbity na wywołania": each agent
-    // reply in the transcript is one call, and this row's own total sits right above
-    // it in the by-conversation table `chatStore` never has to duplicate.
+    // `GET /usage` publishes only the three aggregates, not a per-call breakdown. Opening the conversation
+    // is what answers that: each agent reply in the transcript is one call.
     chatStore.openSession(sessionId);
     chatStore.setExpanded(true);
   }
@@ -43,10 +36,8 @@ export function AgentCostView({
       <div className="flex flex-wrap items-center gap-3 border-b border-border pb-3">
         <DateRangeControls inputs={inputs} onChange={setInputs} />
         {usage.status === "ready" && usage.summary && (
-          // The one place the range's total lives — `terminal-agent-cost` spec,
-          // "Zakładka MUST pokazywać sumę kosztu dla wybranego zakresu w jednym
-          // miejscu"; a sum scattered across three tables is not an answer to the
-          // question this section exists for.
+          // The one place the range's total lives: a sum scattered across three tables is not an answer
+          // to the question this section exists for.
           <span className="ml-auto text-sm">
             <span className="text-ink-muted">Total cost </span>
             <span className="font-semibold text-ink">${usage.summary.totalCost}</span>
@@ -170,11 +161,9 @@ function AggregateTable({
   return (
     <section>
       <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-secondary">{title}</h2>
-      {/* `table-fixed` with the same colgroup in all three tables, and every table
-          carrying the action column whether or not it has an action. Three separate
-          `table-auto` tables each size their own columns from their own content, so the
-          numbers in one do not land under the numbers in the next — which is what the
-          missing fifth column made obvious rather than caused. */}
+      {/* `table-fixed` with the same colgroup in all three, and every table carrying the action column
+          whether or not it has an action: three `table-auto` tables size their own columns from their own
+          content, so the numbers in one do not land under the numbers in the next. */}
       <table className="w-full table-fixed text-sm">
         <colgroup>
           <col />

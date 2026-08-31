@@ -10,11 +10,8 @@ import type {
 } from "lightweight-charts";
 
 /**
- * One price bucket of a `time_profile` result — the `count`-carrying rows of
- * its `levels` (`market-data-indicators` spec; `IndicatorLevel.count`'s own
- * doc, "how many extrema support this level"). `VAH`/`VAL` (`count: null`)
- * are summary edges, not buckets, and never reach this primitive — task 5.4
- * asks for the histogram itself, not its boundary annotations.
+ * One price bucket of a `time_profile` result. `VAH`/`VAL` are summary edges, not buckets, and never
+ * reach this primitive — what is asked for is the histogram itself, not its boundary annotations.
  */
 export interface ProfileBar {
   price: number;
@@ -78,14 +75,8 @@ class ProfilePaneView implements IPrimitivePaneView {
 }
 
 /**
- * A series primitive drawing `time_profile`'s buckets as a horizontal
- * histogram against the pane's right edge (task 5.4) — every bar's own
- * length set by its count against the busiest bucket in the same read, so
- * the point of control always reaches the full `MAX_BAR_WIDTH_FRACTION`
- * regardless of how many bars trade there in absolute terms.
- *
- * Bars are replaced wholesale on every recompute, the same convention
- * `RayPrimitive.setLevels` and `ZonePrimitive.setZones` already use.
+ * `time_profile`'s buckets as a horizontal histogram against the pane's right edge, each bar's length set by
+ * its count against the busiest bucket in the same read, so the point of control always reaches full width.
  */
 export class TimeProfilePrimitive implements ISeriesPrimitive<Time> {
   private bars: readonly ProfileBar[] = [];

@@ -1,10 +1,5 @@
-"""Easy Auth's headers, read the same way by both surfaces.
-
-`agent/auth.py` and `teams/auth.py` were two modules' files and are byte-identical apart
-from the namespace they read their settings out of (`app.state.agent` against
-`app.state.teams`). Two copies of these tests meant a rule fixed on one surface could rot
-on the other with nothing to say so; one parameterised file cannot.
-"""
+"""Easy Auth's headers, read the same way by both surfaces. Two copies of these tests meant a rule fixed on
+one surface could rot on the other with nothing to say so; one parameterised file cannot."""
 
 from __future__ import annotations
 

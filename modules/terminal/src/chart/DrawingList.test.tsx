@@ -234,9 +234,8 @@ describe("DrawingList — hiding without removing", () => {
   });
 
   it("keeps a hidden object on the list, marked out and offering to bring it back", async () => {
-    // The list is the only way back to a hidden object, so one that dropped off it would
-    // be hidden for good (`terminal-chart` spec, "Operator zarządza naniesionymi obiektami
-    // z listy"), and an instrument with everything hidden must not read as an empty one.
+    // The list is the only way back to a hidden object, so one that dropped off it would be hidden for
+    // good — and an instrument with everything hidden must not read as an empty one.
     const patch = vi.fn(async () => null);
     await open(props({ items: [HIDDEN], patch }));
 
@@ -272,9 +271,8 @@ describe("DrawingCard — the same object, beside the chart", () => {
   });
 
   it("closes on the operator's own say-so, and stays open when they only hide the object", async () => {
-    // The card is where the operator hid it, so the nearest way back is there too
-    // (`terminal-chart-objects` spec, "Zgaszenie z opisu"). What takes the card away is the
-    // object leaving the instrument, which hiding does not do.
+    // The card is where the operator hid it, so the nearest way back is there too. What takes the card
+    // away is the object leaving the instrument, which hiding does not do.
     const patch = vi.fn(async () => null);
     const { onClose } = show(A_LEVEL, props({ patch }));
 

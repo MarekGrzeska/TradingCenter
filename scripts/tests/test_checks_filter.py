@@ -1,14 +1,5 @@
-"""The `changes` filter in `checks.yml`, run rather than read.
-
-Every other job in that workflow depends on this one step, so a mistake in it is not one
-red job — it is a repository where no pull request runs any test. Iteration 1 found exactly
-that: a pattern referring to a variable one line before it was assigned, which under
-`set -u` would have brought the whole `changes` job down. It was found by *running* the step
-on a synthetic diff, not by reading it, and this is that run kept.
-
-The real shell is executed: only the GitHub context and the `git diff` are replaced, so
-`matches`, the pattern table and the loop are the ones that will run in CI.
-"""
+"""The `changes` filter in `checks.yml`, run rather than read: every other job depends on it, so a mistake is a
+repository where no pull request runs anything. Iteration 1's unassigned variable was found by running it."""
 
 from __future__ import annotations
 
@@ -27,12 +18,8 @@ BASH = shutil.which("bash")
 
 
 def _bash_has_associative_arrays() -> bool:
-    """The step's own shell needs `declare -A`, which arrived in bash 4.
-
-    macOS still ships 3.2.57, so gating on "is there a bash" passed here and then
-    failed every test in the file — a defence that had never once run on this
-    project's own machine. Ask the shell what it can do, not whether it exists.
-    """
+    """The step's own shell needs `declare -A`, which arrived in bash 4. macOS ships 3.2.57, so gating on
+    "is there a bash" passed here and failed every test in the file. Ask the shell what it can do."""
     if BASH is None:
         return False
     probe = subprocess.run(
@@ -48,11 +35,8 @@ pytestmark = pytest.mark.skipif(
 
 
 def filter_script() -> str:
-    """The step's `run:` block, from the line after the `git diff` onwards.
-
-    Everything before it is the base-commit dance, which needs a GitHub event. Everything
-    after is the decision, which needs only a list of file names.
-    """
+    """The step's `run:` block from the line after the `git diff`: everything before it is the base-commit
+    dance, which needs a GitHub event, and everything after needs only a list of file names."""
     workflow = yaml.safe_load(CHECKS.read_text(encoding="utf-8"))
     steps = workflow["jobs"]["changes"]["steps"]
     step = next(s for s in steps if s.get("id") == "filter")
@@ -62,12 +46,8 @@ def filter_script() -> str:
 
 
 def run_step(changed: list[str], cwd: Path) -> tuple[subprocess.CompletedProcess[str], str]:
-    """The step's own shell on a synthetic diff, and whatever it wrote to `GITHUB_OUTPUT`.
-
-    `cwd` matters: the step reads `packages/` to decide which packages the matrix runs, so
-    a run that cannot see that directory answers a question CI never asks. Only
-    `GITHUB_OUTPUT` and the diff are replaced.
-    """
+    """The step's own shell on a synthetic diff. `cwd` matters: the step reads `packages/` to decide the
+    matrix, so a run that cannot see that directory answers a question CI never asks."""
     assert BASH is not None
     with tempfile.TemporaryDirectory() as directory:
         output = Path(directory) / "github_output"
@@ -103,11 +83,8 @@ def outputs(changed: list[str]) -> dict[str, str]:
 
 
 def decide(changed: list[str]) -> dict[str, bool]:
-    """The job decisions alone.
-
-    The step writes one more output than there are jobs — `package-list`, the matrix — and
-    it is not a decision, so only `true`/`false` is read here.
-    """
+    """The job decisions alone. The step writes one more output than there are jobs — `package-list`, the
+    matrix — and it is not a decision."""
     return {
         name: value == "true"
         for name, value in outputs(changed).items()
@@ -157,10 +134,8 @@ class TestOneFileAtATime:
         assert not decisions["market-data"]
 
     def test_market_datas_contract_reaches_the_terminal(self) -> None:
-        """The terminal keeps generated types built from that schema, and `contract:check`
-        only runs if its job does. There used to be a second copy — market-mcp's committed
-        snapshot — and the module that held it is now a route inside market-data, so the
-        second consumer of this file is the one that could never go stale."""
+        """The terminal keeps generated types built from that schema, and `contract:check` only runs if its
+        job does. The second copy — market-mcp's snapshot — is gone with the module that held it."""
         decisions = decide(["modules/market-data/market_data/contract.py"])
         assert decisions["market-data"]
         assert decisions["terminal"]
@@ -172,22 +147,15 @@ class TestOneFileAtATime:
         assert decisions["trading-mcp"]
 
     def test_the_teams_surface_reaches_the_terminal(self) -> None:
-        """The terminal generates its types from that surface's schema, and
-        `weekdays-on-the-shorter-rhythms` measured why the filter is the whole module: it
-        touched only `recurrence.py`, whose docstring *is* a description in the schema.
-
-        It used to reach a third job as well — teams-mcp, which kept a committed snapshot of
-        the same document. There is no snapshot and no module: those tools read the routes in
-        the same process now."""
+        """`weekdays-on-the-shorter-rhythms` measured why the filter is the whole module: it touched only
+        `recurrence.py`, whose docstring *is* a description in the schema."""
         decisions = decide(["modules/workbench/teams/recurrence.py"])
         assert decisions["workbench"]
         assert decisions["terminal"]
 
     def test_polymarket_datas_contract_reaches_the_terminal(self) -> None:
-        """The third generated source. Its `contract.py` and `openapi.py` rather than the
-        whole module — unlike the teams surface above, whose descriptions live all over it —
-        because the second of those two files is what marks every response field required,
-        so it moves the generated types with no edit to the first."""
+        """Its `contract.py` and `openapi.py` rather than the whole module: the second marks every response
+        field required, so it moves the generated types with no edit to the first."""
         decisions = decide(["modules/polymarket-data/polymarket_data/contract.py"])
         assert decisions["polymarket-data"]
         assert decisions["terminal"]
@@ -209,18 +177,16 @@ class TestOneFileAtATime:
         assert decisions["market-data"]
 
     def test_tc_openai_reaches_only_its_consumer(self) -> None:
-        """Two consumers became one when they became one module — and the property this
-        test is for is the other half: a package's edit must not run a module that does not
-        take it."""
+        """Two consumers became one when they became one module; the property this holds is the other half,
+        that a package's edit must not run a module which does not take it."""
         decisions = decide(["packages/tc-openai/tc_openai/provider.py"])
         assert decisions["workbench"]
         assert not decisions["market-data"]
         assert not decisions["trading-mcp"]
 
     def test_tc_mcp_kit_reaches_everything_that_speaks_mcp(self) -> None:
-        """The archive, trading-mcp and the workbench — the last two of those hold a
-        database, which is why `CLAUDE.md`'s old reason for this package existing apart from
-        `tc-runtime` (that only database-less modules took it) had to be rewritten twice."""
+        """The archive, trading-mcp and the workbench — the last two hold a database, which is why the old
+        reason for this package existing apart from `tc-runtime` had to be rewritten twice."""
         decisions = decide(["packages/tc-mcp-kit/tc_mcp_kit/network_identity.py"])
         assert decisions["market-data"]
         assert decisions["trading-mcp"]
@@ -229,12 +195,8 @@ class TestOneFileAtATime:
 
 
 class TestTheMatrixTheJobRuns:
-    """`package-list`, which is the diff intersected with `packages/`.
-
-    Neither half alone is right: the directory alone runs all three packages for a
-    one-package edit, and the diff alone hands the matrix a package the pull request
-    deletes, whose `working-directory` no longer exists.
-    """
+    """`package-list` is the diff intersected with `packages/`. Neither half alone is right: the directory
+    runs all three for a one-package edit, the diff hands the matrix a package the pull request deletes."""
 
     def test_one_package_edit_runs_that_package_alone(self) -> None:
         assert matrix(["packages/tc-openai/tc_openai/provider.py"]) == ["tc-openai"]
@@ -266,9 +228,8 @@ class TestTheMatrixTheJobRuns:
         assert sorted(matrix([".github/workflows/checks.yml"])) == on_disk
 
     def test_a_name_that_would_break_the_matrix_stops_the_step(self, tmp_path: Path) -> None:
-        """The guard's own failure mode, which is why the loops read line by line: a
-        directory name with a space survives to be refused instead of being split into
-        two names that both look fine."""
+        """The guard's own failure mode, and why the loops read line by line: a directory name with a space
+        survives to be refused instead of being split into two names that both look fine."""
         (tmp_path / "packages" / "tc-fine").mkdir(parents=True)
         (tmp_path / "packages" / "tc broken").mkdir()
         done, _ = run_step([".github/workflows/checks.yml"], tmp_path)

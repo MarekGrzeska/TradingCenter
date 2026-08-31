@@ -1,8 +1,5 @@
-"""list_teams, read_team, create_team, revise_team — the catalogue half of the surface.
-
-specs/teams-mcp-tools: one call per thing the operator asked for, and a correction that
-names only what changes.
-"""
+"""list_teams, read_team, create_team, revise_team — the catalogue half of the surface: one call per thing the operator
+asked for, and a correction that names only what changes (specs/teams-mcp-tools)."""
 
 from __future__ import annotations
 
@@ -288,9 +285,8 @@ async def test_somebody_elses_team_reads_as_one_that_does_not_exist(server) -> N
 async def test_a_created_team_is_reported_as_created_even_if_reading_it_back_fails(
     server,
 ) -> None:
-    """The team exists the moment teams answers the POST. If the follow-up read fails and
-    this tool reports a failure, the model creates the team again — the exact duplicate
-    the no-retry rule exists to prevent, committed by the tool rather than the client."""
+    """The team exists the moment teams answers the POST. If the follow-up read fails and this tool reports a failure,
+    the model creates the team again — the exact duplicate the no-retry rule exists to prevent."""
     mcp, teams = server
     created = respx.post(f"{BASE}/teams").mock(
         return_value=httpx.Response(

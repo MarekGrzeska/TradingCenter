@@ -1,16 +1,5 @@
-"""What a trade costs, stated rather than assumed.
-
-The archive holds the **bid** side, so the spread is invisible in the data: every candle
-this module reads is one side of a market that has two. A strategy with a wide reward over
-risk looks robust to costs right up until the costs are put in, which is why a report that
-does not name its cost model is not a result (`strategy-backtest`, "Wynik nazywa swoje
-koszty i swoje parametry").
-
-Stated as an explicit parameter per instrument rather than measured, for now. The better
-source is the gateway's quote stream — bid and ask, a few hundred a minute — and swapping
-a measurement in later changes nothing here, because the report names whatever model it
-was given either way.
-"""
+"""What a trade costs, stated rather than assumed: the archive holds the bid side, so the spread is invisible, and a
+report that does not name its cost model is not a result. Swapping a measurement in later changes nothing here."""
 
 from __future__ import annotations
 
@@ -20,20 +9,14 @@ from typing import Any
 
 @dataclass(frozen=True)
 class CostModel:
-    """Costs in the instrument's own price units, except `commission`, which is in R-free
-    money and is therefore expressed as a fraction of the risk.
-
-    `spread` is the full distance between bid and ask. A position pays half of it entering
-    and half leaving, which is the same thing as paying it once — written as the full
-    spread because that is the number an operator can look up.
-    """
+    """Costs in the instrument's own price units, except `commission`, which is a fraction of the risk.
+    `spread` is the full distance between bid and ask, because that is the number an operator looks up."""
 
     spread: float = 0.0
     # Per side, on top of the spread: what moving through a thin book actually costs.
     slippage: float = 0.0
-    # A round turn, as a fraction of the trade's risk. Zero for the CFD accounts this
-    # system trades, where the cost is in the spread; kept because it is not zero
-    # everywhere and a report that could not express it would be quietly wrong there.
+    # A round turn, as a fraction of the trade's risk. Zero for the CFD accounts this system trades,
+    # where the cost is in the spread; kept because it is not zero everywhere.
     commission_r: float = 0.0
 
     def __post_init__(self) -> None:
@@ -68,7 +51,6 @@ class CostModel:
         )
 
 
-# Deliberately not a default anywhere a report can be produced from it. A zero-cost run is
-# a legitimate thing to ask for — "what is the ceiling" — and an illegitimate thing to
-# arrive at by omission, so it has a name and has to be chosen.
+# Deliberately not a default anywhere a report can be produced from it. A zero-cost run is a legitimate
+# thing to ask for and an illegitimate thing to arrive at by omission.
 FREE = CostModel()

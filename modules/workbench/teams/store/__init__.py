@@ -1,34 +1,5 @@
-"""Reading and writing everything `teams` owns — asyncpg directly, no ORM in the runtime
-path, the same shape as `agent/store.py` and `market_data/store.py`. Unlike those two it is
-a package: one file per aggregate, because as one file it had reached 1 227 lines and every
-change to any part of `teams` pulled all of them into the reader's context.
-
-    catalogue.py   teams, team_revisions — the definitions and their history
-    layout.py      team_layouts — where the operator dragged each node
-    memory.py      team_memories — what a team keeps from one run to the next
-    runs.py        runs, run_steps, tool_calls, and the start-up recovery
-    usage.py       usage — the cost written once, and the sums read from it
-    trades.py      trades — orders a run placed, and what came back
-    recurring.py   the machine a schedule and a trigger both are
-    schedules.py   schedules — only what a trigger has no version of
-    triggers.py    triggers — the same, the other way round
-    fires.py       schedule_fires — rows either source produces
-
-One property rides on every statement in every one of them rather than on the routes that
-call them, so that no route can forget it: **the owner filter is part of the statement.** A
-row belonging to somebody else and a row that was never created answer identically — `None`,
-no row, nothing to tell them apart by (specs/teams-browser-access, "Odmowa dostępu do cudzego
-zespołu MUST być nieodróżnialna od odpowiedzi o zespole nieistniejącym"). The two exceptions
-are named where they stand: the clock reaching across every owner, and reads a caller already
-resolved an id for.
-
-Rows come back as `asyncpg.Record` and go to `contract.py`'s `from_row` unchanged — see that
-file's docstring for why there is no domain layer in between.
-
-Callers import the package, not its parts (`from .. import store`, then `store.get_team(...)`),
-which is why the surface below is re-exported here: it is the same list of names it was when
-this was one file, and a caller cannot tell that it moved.
-"""
+"""Reading and writing everything `teams` owns, through asyncpg and no ORM, as a package since it reached 1,227 lines.
+The owner filter is part of every statement rather than of the routes, so a stranger's row answers as a missing one."""
 
 from __future__ import annotations
 

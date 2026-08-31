@@ -1,12 +1,5 @@
-"""The two in-process memory tools: what they announce, what they refuse, and what one
-run leaves for the next.
-
-Against a real database, because everything worth proving here is a property of the
-statements and of the ceilings — what a bound source hands back, and what it declines to
-write. The MCP servers are absent throughout on purpose: a team reaching only for memory
-must run with no tool server configured at all (specs/teams-tool-access, "Zespół sięgający
-wyłącznie po narzędzia z procesu").
-"""
+"""The two in-process memory tools: what they announce, what they refuse, and what one run leaves for the next. The MCP
+servers are absent throughout on purpose — a team reaching only for memory must run with no tool server configured."""
 
 from __future__ import annotations
 
@@ -91,8 +84,6 @@ async def _run(
     return run["id"]
 
 
-# --- announcing ----------------------------------------------------------------------
-
 
 async def test_the_source_announces_both_tools_without_a_database() -> None:
     """Announcing touches no pool — which is what lets the save-time paths build a
@@ -129,8 +120,6 @@ async def test_a_call_outside_a_run_is_unavailable_rather_than_an_error() -> Non
     assert "inside a team run" in outcome.text
 
 
-# --- planning ------------------------------------------------------------------------
-
 
 async def test_a_team_reaching_only_for_memory_plans_with_no_server_configured(
     pool: asyncpg.Pool,
@@ -149,8 +138,6 @@ async def test_a_team_reaching_only_for_memory_plans_with_no_server_configured(
 
     assert [tool.name for tool in plan.for_agent("scout")] == ["memory_read"]
 
-
-# --- reading and writing -------------------------------------------------------------
 
 
 async def test_what_one_run_writes_the_next_run_reads(pool: asyncpg.Pool) -> None:
@@ -231,8 +218,6 @@ async def test_a_team_that_has_written_nothing_reads_an_empty_memory(
     assert calls[0]["outcome"] == str(ToolOutcomeKind.OK)
     assert "not written any notes yet" in calls[0]["result_text"]
 
-
-# --- the ceilings --------------------------------------------------------------------
 
 
 async def test_the_read_says_when_it_did_not_hand_over_everything(
@@ -364,12 +349,9 @@ async def test_memory_does_not_reach_another_operators_team(pool: asyncpg.Pool) 
     assert total == 0
 
 
-# --- the assignment, at call time ----------------------------------------------------
-
 
 async def test_an_agent_that_may_only_read_cannot_write(pool: asyncpg.Pool) -> None:
-    """specs/teams-tool-access, "Model woła nazwę, której nie dostał". The reader is
-    offered `memory_read` and asks for `memory_write` anyway — which is what a model does
+    """The reader is offered `memory_read` and asks for `memory_write` anyway — which is what a model does
     when it has seen the name in another agent's tool list."""
     definition = TeamDefinition(
         agents=[
@@ -562,9 +544,8 @@ async def test_a_name_the_model_invented_is_answered_not_dispatched(
 async def test_a_server_announcing_a_memory_name_refuses_the_run(
     pool: asyncpg.Pool,
 ) -> None:
-    """specs/teams-tool-access, "Nazwa z procesu zderza się z nazwą z serwera". The
-    definition carries only the name, so there is nothing in it that could say which
-    source was meant."""
+    """The definition carries only the name, so there is nothing in it that could say which source was
+    meant."""
 
     def shadowing(mcp) -> None:
         @mcp.tool(name="memory_read", description="claims the same name")

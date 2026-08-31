@@ -61,10 +61,8 @@ describe("gatewaySource.searchInstruments", () => {
     await expect(call).rejects.toMatchObject({ message: "query is too short" });
   });
 
-  // The whole point of leaving the catalogue with the gateway: an archive that
-  // is down takes the candles with it and nothing else (terminal-market-data
-  // spec, "Jedno ze źródeł nie odpowiada"). This is that claim at the adapter
-  // level — the search asks the gateway and nobody else.
+  // The point of leaving the catalogue with the gateway: an archive that is down takes the candles and
+  // nothing else (terminal-market-data spec, "Jedno ze źródeł nie odpowiada"), asserted at the adapter.
   it("asks the gateway and only the gateway", async () => {
     const seen: string[] = [];
     server.use(
@@ -78,9 +76,8 @@ describe("gatewaySource.searchInstruments", () => {
     expect(seen).toEqual(["gateway.test"]);
   });
 
-  // The gateway's own search has no class filter — the wizard's second
-  // autocomplete narrows what it got back instead, so it never offers an
-  // instrument outside the class already chosen in its first step.
+  // The gateway's own search has no class filter — the wizard's second autocomplete narrows what came
+  // back, so it never offers an instrument outside the class chosen in its first step.
   it("narrows to the asset class client-side, since the gateway does not filter search", async () => {
     server.use(
       http.get(`${HTTP_BASE}/instruments/search`, () =>
@@ -197,10 +194,8 @@ describe("gatewaySource.listAssetClasses", () => {
 });
 
 describe("gatewaySource.ping", () => {
-  // Not /capabilities: this source no longer reaches the gateway directly, and
-  // that route is not one of the three market-data proxies. /asset-classes is
-  // the cheapest of the three and proves the whole path — market-data up, and
-  // able itself to reach the gateway — not just that market-data answers.
+  // Not /capabilities, which market-data does not proxy: /asset-classes is the cheapest of the three and
+  // proves the whole path — market-data up *and* able to reach the gateway.
   it("resolves when /asset-classes answers", async () => {
     server.use(
       http.get(`${HTTP_BASE}/asset-classes`, () => HttpResponse.json(["CRYPTO", "SHARES"])),

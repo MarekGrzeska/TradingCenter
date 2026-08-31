@@ -48,8 +48,6 @@ QUOTE_FRAME = {
 }
 
 
-# --- the subscription is the URL ----------------------------------------------------
-
 
 def test_the_subscription_is_the_query_string() -> None:
     url = stream_url("ws://gateway.test:8010/ws/stream", "US100", Resolution.MINUTE_5)
@@ -60,8 +58,6 @@ def test_a_trailing_slash_does_not_make_a_second_path() -> None:
     url = stream_url("ws://gateway.test:8010/ws/stream/", "GOLD", Resolution.HOUR)
     assert url.startswith("ws://gateway.test:8010/ws/stream?")
 
-
-# --- the four kinds (3.2) -----------------------------------------------------------
 
 
 def test_a_candle_frame_becomes_a_candle() -> None:
@@ -95,9 +91,8 @@ def test_a_streamed_candle_has_no_volume() -> None:
 
 
 def test_a_quote_frame_is_not_read_at_all() -> None:
-    """The busiest kind on the feed — about five a second per pair — and nothing here
-    consumes one. Reading it built an object a listener with no branch for it dropped
-    on the spot."""
+    """The busiest kind on the feed — about five a second per pair — and nothing here consumes one.
+    Reading it built an object a listener with no branch for it dropped on the spot."""
     assert read_message(json.dumps(QUOTE_FRAME)) is None
 
 
@@ -126,8 +121,6 @@ def test_an_error_frame_is_read_not_raised() -> None:
     assert isinstance(message, FeedFailure)
     assert message.message == "upstream dropped"
 
-
-# --- what it refuses to guess at ----------------------------------------------------
 
 
 def test_a_kind_this_module_does_not_consume_is_ignored() -> None:
@@ -159,8 +152,6 @@ def test_a_status_frame_with_an_unknown_state_is_drift() -> None:
     with pytest.raises(UnreadablePayload, match="status"):
         read_message(json.dumps({"kind": "status", "state": "havoc"}))
 
-
-# --- against a real socket ----------------------------------------------------------
 
 
 @pytest.fixture
@@ -229,9 +220,8 @@ async def test_the_socket_closes_when_the_caller_is_done(
 async def test_a_subscription_that_goes_quiet_ends_instead_of_waiting_forever(
     idle_feed: tuple[str, asyncio.Event], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Measured 24 August 2026: one pair's ingest ran forty hours without a single break
-    while receiving nothing for the last fourteen of them. A subscription nobody ends is a
-    subscription nobody reopens — and reopening is what closes the gap."""
+    """Measured 24 August 2026: one pair's ingest ran forty hours while receiving nothing for the last
+    fourteen. A subscription nobody ends is one nobody reopens, and reopening closes the gap."""
     monkeypatch.setattr(stream_module, "SILENCE_TOLERANCE_SECONDS", 0.05)
     url, _hung_up = idle_feed
 
@@ -243,10 +233,8 @@ async def test_a_subscription_that_goes_quiet_ends_instead_of_waiting_forever(
 
 
 def test_the_second_line_of_defence_fires_after_the_first() -> None:
-    """The gateway tears down a provider connection that stops carrying data and rebuilds
-    it, widening its own tolerance up to ten minutes. Firing sooner than that would have
-    the wrong module recovering: a subscription ended here costs a gap fill and a fresh
-    room, where the gateway's answer costs one reconnect."""
+    """The gateway tears down a connection that stops carrying data, widening its own tolerance to ten
+    minutes. Firing sooner would have the wrong module recovering."""
     assert stream_module.SILENCE_TOLERANCE_SECONDS >= 2 * 10 * 60
 
 
@@ -256,21 +244,16 @@ async def test_a_gateway_that_is_not_listening_is_named_as_unreachable() -> None
             pass
 
 
-# --- specs/market-data-upstream-access: the handshake carries the caller key --------
-
 
 @pytest.fixture
 async def header_capturing_feed() -> AsyncIterator[tuple[str, list]]:  # list[Headers]
-    """A stand-in gateway that records the headers each handshake arrived with, so a
-    test can assert on what `subscribe` actually sent rather than trusting the argument
-    it was called with."""
+    """A stand-in gateway recording the headers each handshake arrived with, so a test can assert on
+    what `subscribe` actually sent rather than on the argument it was called with."""
     seen: list = []
 
     async def handler(connection) -> None:
-        # `Headers`, not `dict(...)`: HTTP header names are case-insensitive and the
-        # library normalises on read, but a plain dict conversion keeps whatever case
-        # the wire happened to use — asserting against that would be asserting on an
-        # accident, not on the guarantee.
+        # `Headers`, not `dict(...)`: header names are case-insensitive and the library normalises on
+        # read, but a dict conversion keeps whatever case the wire used.
         seen.append(connection.request.headers)
         await connection.close()
 

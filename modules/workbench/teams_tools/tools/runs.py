@@ -1,10 +1,5 @@
-"""Running a team, and reading what it did.
-
-`read_run` is the tool this whole module is for. Composing a team from a sentence is the
-easy half; the expensive half is looking at what came out and changing one prompt because
-of it, and that only works if the trace arrives in a shape a model can reason about
-(specs/teams-mcp-tools, "Zestaw odpowiada na pytania o to, co się wydarzyło").
-"""
+"""Running a team, and reading what it did. `read_run` is the tool this module is for: composing a team from
+a sentence is the easy half, and the expensive half only works if the trace arrives in a readable shape."""
 
 from __future__ import annotations
 

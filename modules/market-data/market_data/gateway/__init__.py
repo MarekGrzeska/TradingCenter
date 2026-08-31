@@ -1,9 +1,5 @@
-"""`capital-gateway`, as this module consumes it — and the only place that talks to it.
-
-Two roads carry candles here: `/instruments/{symbol}/history` for depth and `/ws/stream`
-for what is happening now. They spell a period start differently, so both go through
-`market_data.periods` and arrive as the same instant.
-"""
+"""`capital-gateway`, as this module consumes it — and the only place that talks to it. Both roads
+that carry candles go through `market_data.periods` and arrive as the same instant."""
 
 from ._http import DEFAULT_TIMEOUT, GATEWAY_KEY_HEADER, http_client
 from .history import GatewayHistory, HistoryPage

@@ -1,11 +1,5 @@
-"""Running a saved revision: the graph it compiles to, one agent's own loop, and the
-engine that writes the trace while both happen.
-
-The split is by what each part is allowed to know. `graph.py` knows the shape of a team
-and nothing about models or databases; `loop.py` knows one agent's model-and-tools
-exchange and nothing about the team around it; `engine.py` is where the database, the
-statuses, the time limit and whoever is watching all meet.
-"""
+"""Running a saved revision: the graph it compiles to, one agent's own loop, and the engine that writes the
+trace while both happen. The split is by what each part is allowed to know."""
 
 from __future__ import annotations
 

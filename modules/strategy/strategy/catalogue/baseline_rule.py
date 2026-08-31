@@ -1,26 +1,5 @@
-"""`baseline_ma_cross`, written a second time — as data, in the node vocabulary.
-
-**Not a second catalogue entry.** It is deliberately absent from `CATALOGUE`: an operator
-reading a list with two identical baselines on it would have to work out which is which,
-and neither answer would be useful. This is the measuring stick, kept beside the thing it
-measures.
-
-**Why it exists.** Expressing a known, reviewed rule in the node vocabulary and comparing
-the two decision by decision is the only honest test of two things at once: whether the
-vocabulary is expressive enough to carry a real strategy, and whether the interpreter
-computes what it appears to. `tests/test_baseline_rule.py` is that comparison, and a
-difference between the twins is a defect in this module, never a nuance.
-
-**One difference is intended, and the test names it.** The coded entry computes
-`extension_atr` only on the bar it enters; this one computes both features whenever the
-guards have passed, so its refusals carry one feature more. That is the direction "more
-information", not a divergence of logic — the interpreter has one place where features are
-computed and it is the same place for every rule.
-
-The arithmetic is nested exactly the way the coded entry nests it — `reward_multiple ·
-(stop_atr · atr)` and not `(reward_multiple · stop_atr) · atr` — because floating-point
-multiplication does not associate, and "identical" here means identical.
-"""
+"""`baseline_ma_cross` written a second time as data, absent from `CATALOGUE` because it is the measuring stick kept
+beside the thing it measures. Its arithmetic nests exactly as the coded entry's does, since multiplication does not."""
 
 from __future__ import annotations
 
@@ -87,9 +66,8 @@ BASELINE_RULE = RuleDefinition(
         RuleParam(name="reward_multiple", type="float", default=3.0, min=1.0, max=10.0),
     ],
     guards=[
-        # First, and this is the ordering the coded entry has too: everything below reads a
-        # settled series, and a crossing computed off one that has not filled yet is the
-        # defect this whole vocabulary is arranged to make unavailable.
+        # First, and this is the ordering the coded entry has too: everything below reads a settled
+        # series, and a crossing computed off one that has not filled is the defect this rules out.
         Guard(
             when=Logic(
                 op="not",

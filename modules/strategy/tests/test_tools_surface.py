@@ -1,8 +1,5 @@
-"""The tool surface: what it announces, and what it answers.
-
-Driven against the real store, because every tool here is a read of it and doubling that
-would leave the queries untested while looking like coverage.
-"""
+"""The tool surface: what it announces, and what it answers. Driven against the real store, because every tool here
+is a read of it and doubling that would leave the queries untested while looking like coverage."""
 
 from __future__ import annotations
 
@@ -71,18 +68,16 @@ async def call(server, name: str, **arguments):
 
 class TestTheSurfaceOnlyReads:
     async def test_every_announced_tool_says_so_structurally(self, tool_server) -> None:
-        """An annotation is a claim an MCP client can act on, not a convention this module
-        follows. Asserted of the announced list rather than of the source, so a tool added
-        without it fails here."""
+        """An annotation is a claim an MCP client can act on, not a convention this module follows. Asserted of the
+        announced list rather than of the source, so a tool added without it fails here."""
         for tool in await tool_server.list_tools():
             assert tool.annotations is not None, tool.name
             assert tool.annotations.readOnlyHint is True, tool.name
             assert tool.annotations.destructiveHint is False, tool.name
 
     async def test_there_is_no_tool_that_changes_anything(self, tool_server) -> None:
-        """Activating a strategy, writing a parameter set and running a backtest are the
-        operator's, over REST. A model asking for one of them should find nothing to call —
-        and the answer is the module's scope, not a momentary refusal."""
+        """Activating a strategy, writing a parameter set and running a backtest are the operator's, over REST. A
+        model asking for one should find nothing to call — the module's scope, not a momentary refusal."""
         announced = {tool.name for tool in await tool_server.list_tools()}
 
         assert announced == {

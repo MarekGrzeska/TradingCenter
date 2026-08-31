@@ -42,10 +42,8 @@ function matches(entry: IndicatorCatalogueEntry, needle: string): boolean {
 }
 
 /**
- * The alias a search hit, when the visible label does not already explain the hit —
- * typing "fair value gap" must not return a row that only says `RANGE_GAP` and leaves
- * the operator to guess why (`market-data-indicators` spec, "Wyszukiwanie po nazwie
- * potocznej"). Null when the id or the name carries the match itself.
+ * The alias a search hit, when the visible label does not already explain the hit — typing "fair value
+ * gap" must not return a row that only says `RANGE_GAP`. Null when the id or the name carries the match.
  */
 function matchedAlias(entry: IndicatorCatalogueEntry, needle: string): string | null {
   if (!needle) return null;
@@ -56,16 +54,8 @@ function matchedAlias(entry: IndicatorCatalogueEntry, needle: string): string | 
 }
 
 /**
- * Built entirely from the catalogue it is given — no indicator is named in this file.
- * Adding one to `market_data/indicators/catalogue/` makes it appear here without a
- * change on this side, as long as its output shape and render style are ones `canDraw`
- * already accepts (`market-data-indicators` spec, "Katalog wystarcza do zbudowania
- * wybieraka"; `terminal-chart` spec, "Operator wybiera wskaźniki z tego, co oferuje
- * źródło").
- *
- * A catalogue entry may be chosen more than once. The checkbox is the entry's on/off —
- * it adds the first instance and removes every one of them — while each instance below
- * it carries its own params, its own colour and its own removal.
+ * Built entirely from the catalogue it is given, so a new archive entry appears here untouched. An entry may
+ * be chosen more than once: the checkbox is its on/off, each instance below carries its own params and colour.
  */
 export function IndicatorPicker({ entries, selections, onChange, canDraw }: IndicatorPickerProps) {
   const [open, setOpen] = useState(false);
@@ -73,9 +63,8 @@ export function IndicatorPicker({ entries, selections, onChange, canDraw }: Indi
   const [paramErrors, setParamErrors] = useState<Record<string, string>>({});
 
   const needle = query.trim().toLowerCase();
-  // Filtering hides, it does not deselect: `selections` is the state, this list is only a
-  // view of the catalogue. A selected entry filtered out of view stays computed and drawn,
-  // and the button's own count keeps saying so.
+  // Filtering hides, it does not deselect: `selections` is the state and this list is only a view of the
+  // catalogue. A selected entry filtered out of view stays computed and drawn.
   const shown = needle ? entries.filter((entry) => matches(entry, needle)) : entries;
 
   function close() {
@@ -147,18 +136,16 @@ export function IndicatorPicker({ entries, selections, onChange, canDraw }: Indi
         onClick={() => (open ? close() : setOpen(true))}
         aria-expanded={open}
         aria-label="Indicators"
-        // `h-6`, matching the resolution select beside it in `Chart.tsx` — a native
-        // `<select>`'s own sizing runs taller than a `<button>`'s given the same
-        // padding, so the height is pinned explicitly rather than left to it.
+        // `h-6`, matching the resolution select beside it: a native `<select>`'s own sizing runs taller
+        // than a `<button>`'s given the same padding.
         className="h-6 rounded border border-border px-1.5 text-xs text-ink hover:bg-panel-strong"
       >
         Indicators{selections.length > 0 ? ` (${selections.length})` : ""}
       </button>
 
       {open && (
-        // Left-anchored: the button sits near the left edge of the header, beside the
-        // symbol and resolution controls. A right-anchored panel would pin its right
-        // edge to the button's and grow leftward, running off the header entirely.
+        // Left-anchored: the button sits near the left edge of the header. A right-anchored panel would
+        // pin its right edge to the button's and grow leftward, running off the header entirely.
         <div className="absolute left-0 top-full z-20 mt-1 flex max-h-80 w-72 flex-col rounded border border-border-strong bg-raised shadow-lg">
           {/* Outside the listbox, not inside it: a text field is not one of the options,
               and the catalogue is long enough that this is the first thing an operator

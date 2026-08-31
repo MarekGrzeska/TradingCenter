@@ -1,10 +1,5 @@
-"""What the archive holds, as this module's own shapes.
-
-Deliberately not the provider's shapes. Polymarket sends `outcomes`, `outcomePrices` and
-`clobTokenIds` as JSON *inside a string*, positionally aligned with each other, and a field
-it renames is a change this module absorbs rather than one the terminal or the workbench
-reads about.
-"""
+"""What the archive holds, as this module's own shapes — deliberately not the provider's, which sends
+three fields as JSON inside a string, positionally aligned."""
 
 from __future__ import annotations
 
@@ -15,12 +10,8 @@ from enum import Enum
 
 
 class Surface(str, Enum):
-    """Which of the provider's two surfaces a value came from.
-
-    Recorded on every sample because the sampler's whole saving rests on a measured
-    equivalence — the metadata surface publishes the same midpoint the order book does — and
-    a measured fact has to stay checkable.
-    """
+    """Which of the provider's two surfaces a value came from. Recorded on every sample because the
+    sampler's saving rests on a measured equivalence, and a measured fact has to stay checkable."""
 
     GAMMA = "gamma"
     CLOB = "clob"
@@ -28,11 +19,8 @@ class Surface(str, Enum):
 
 @dataclass(frozen=True, slots=True)
 class Outcome:
-    """One thing that can happen, and the only level at which there is a price.
-
-    `position` is the provider's own ordering, which is what pairs an outcome name with its
-    token; `token_id` is what the order-book surface is queried by.
-    """
+    """One thing that can happen, and the only level at which there is a price. `position` is the
+    provider's ordering, which pairs an outcome with its token; `token_id` is what the book is queried by."""
 
     position: int
     name: str
@@ -43,13 +31,8 @@ class Outcome:
 
 @dataclass(frozen=True, slots=True)
 class Market:
-    """One question with a definite answer. Two outcomes is the common case, not the rule.
-
-    `resolved_outcome` is what stops the sampling: a resolved market's price will not move
-    again. `neg_risk` says this market is one of a set bound by a mutual-exclusion rule —
-    the "who wins" shape, where the Yes prices across the set need not sum to one. Measured
-    on a three-market event: 1,005.
-    """
+    """One question with a definite answer; two outcomes is the common case, not the rule.
+    `resolved_outcome` stops the sampling, and `neg_risk` says the Yes prices need not sum to one."""
 
     provider_market_id: str
     question: str
@@ -90,16 +73,8 @@ class Event:
 
 @dataclass(frozen=True, slots=True)
 class Sample:
-    """One outcome's price at one moment, however it arrived.
-
-    Two valuations rather than one, because they answer different questions and on a thin
-    market they differ by a lot. At least one of them is present; which, is what `midpoint`
-    and `last_trade` being null or not says.
-
-    `observed_at` is when this module looked. `quoted_at` is what the valuation is *about*,
-    where the provider says so — without it a price from a trade nine hours ago reads
-    exactly like one a minute old.
-    """
+    """One outcome's price at one moment, however it arrived. Two valuations, at least one present.
+    `quoted_at` is what the valuation is *about* — without it a nine-hour-old trade reads as fresh."""
 
     outcome_id: int
     observed_at: datetime
@@ -118,11 +93,8 @@ class Sample:
 
 @dataclass(frozen=True, slots=True)
 class CollectedRange:
-    """A window this module has actually read from the provider.
-
-    The whole reason it exists: no sample because nobody traded and no sample because the
-    module was not running are the same absence in the samples table.
-    """
+    """A window this module has actually read from the provider. No sample because nobody traded and no
+    sample because the module was not running are the same absence in the samples table."""
 
     starts_at: datetime
     ends_at: datetime

@@ -4,11 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { MarketDataError } from "../data/types";
 import { PolymarketView } from "./PolymarketView";
 
-// The real library draws to a canvas jsdom cannot render — it reaches into a null 2d
-// context inside a `requestAnimationFrame` callback, which surfaces after the test that
-// triggered it has already finished. What this file tests is what the panel *says* and
-// what it asks the module for; the series' own rule (where a line breaks) is a pure
-// function with its own tests in `series.test.ts`.
+// The real library draws to a canvas jsdom cannot render, reaching into a null 2d context inside a
+// `requestAnimationFrame` that surfaces after the test that triggered it has finished.
 vi.mock("./ProbabilityChart", () => ({
   ProbabilityChart: () => null,
 }));
@@ -22,9 +19,8 @@ import type {
 } from "./polymarketApi";
 
 /**
- * The tab, from the operator's seat. What is asserted here is what the screen *claims* —
- * that a market is not a coin, that a price carries its age, that an uncovered window says
- * so instead of showing a zero, and that a refusal reads differently from an outage.
+ * The tab from the operator's seat: that a market is not a coin, that a price carries its age, that an uncovered
+ * window says so instead of showing a zero, and that a refusal reads differently from an outage.
  */
 
 function outcome(id: number, name: string, price: number | null = 0.5) {
@@ -251,9 +247,8 @@ describe("PolymarketView", () => {
   it("starts collapsed, carrying what identifies the observation and no price", async () => {
     render(<PolymarketView api={fakeApi()} />);
 
-    // A summary quoting one outcome per market is a market reduced to a single "for"
-    // price, which the unfolded view is forbidden to do. Folding is not an exception to
-    // that rule, only the easiest place to slip past it.
+    // A summary quoting one outcome per market is a market reduced to a single "for" price, which the
+    // unfolded view is forbidden to do. Folding is only the easiest place to slip past that rule.
     expect(await screen.findByText("Fed cuts in March")).toBeInTheDocument();
     expect(screen.getByText("collecting")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
@@ -313,9 +308,8 @@ describe("PolymarketView", () => {
     await unfold();
 
     expect(await screen.findByText("March")).toBeInTheDocument();
-    // Exact match: the chart's outcome picker still offers "August 6 · Yes", and it should —
-    // a resolved market's history is the part the provider will not give back, so it stays
-    // reachable. What folds away is its row.
+    // Exact match: the picker still offers "August 6 · Yes", and it should — a resolved market's history is
+    // the part the provider will not give back, so it stays reachable. What folds away is its row.
     expect(screen.queryByText("August 6")).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "1 resolved market" }));

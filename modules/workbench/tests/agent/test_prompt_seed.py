@@ -1,13 +1,5 @@
-"""The rule that a deployment's seed yields to a person, and the bug it was written from.
-
-specs/agent-prompt-management, "Zasiew z wdrożenia nie przykrywa tego, co zapisał operator".
-
-The failure this exists for is not hypothetical and is reproduced below: migrations seed
-`v4`…`v11`, each one higher by one, and `_next_prompt_version` does the same `+1`, so the
-version an operator gets by saving once is always exactly the one the next seeding
-migration will use. Both rows used to go in, and the seed — inserted later, so higher `id`
-— won the read.
-"""
+"""The rule that a deployment's seed yields to a person, and the bug it was written from: migrations seed each version
+one higher and `_next_prompt_version` does the same `+1`, so the seed used to win the read after one save."""
 
 from __future__ import annotations
 
@@ -22,15 +14,8 @@ pytestmark = pytest.mark.db
 
 
 async def _seed(db: asyncpg.Connection, version: str, text: str = "seeded") -> None:
-    """Run the migrations' own seed statement, against the connection the fixture gives.
-
-    Derived from `_SEED` rather than retyped: a copy here would let the rule under test
-    drift away from the rule the migrations run, which is the whole failure this file
-    exists to prevent, one level up.
-
-    Only the parameter style is translated — alembic hands `seed_prompt` a SQLAlchemy
-    connection that speaks `:name`, and this fixture speaks asyncpg's `$n`.
-    """
+    """Run the migrations' own seed statement, against the connection the fixture gives. Derived from
+    `_SEED` rather than retyped: a copy would let the rule under test drift from the rule the migrations run."""
     sql = str(_SEED)
     for n, name in enumerate(("version", "with_tools", "without_tools"), start=1):
         sql = sql.replace(f":{name}", f"${n}")
@@ -73,12 +58,8 @@ class TestTheSeedYields:
     async def test_one_operator_write_does_not_block_the_deployment_forever(
         self, db: asyncpg.Connection
     ) -> None:
-        """A seed refused once must not mean the table is closed to seeds for good.
-
-        It reopens the moment the newest row is a seed again — which today only happens
-        by an operator being overwritten, so this is really a statement about the rule
-        having no hidden latch in it.
-        """
+        """A seed refused once must not mean the table is closed to seeds for good. It reopens the moment
+        the newest row is a seed again, so this is really a statement about the rule having no latch."""
         await store.create_prompt_revision(db, with_tools_body="mine", without_tools_body="mine")
         await _seed(db, "v99")
         assert (await store.latest_prompt_revision(db)).source == "operator"
@@ -119,12 +100,8 @@ class TestVersionsAreUnique:
 async def test_the_operators_next_version_is_the_one_the_next_seed_would_use(
     db: asyncpg.Connection,
 ) -> None:
-    """The arithmetic behind the whole bug, kept as a statement rather than a memory.
-
-    Both sides do `+1` from the latest, so they land on the same string. This is not a
-    defect to fix in `_next_prompt_version` — it is why the guard above cannot be replaced
-    by "seed a version nobody has taken".
-    """
+    """The arithmetic behind the whole bug, kept as a statement rather than a memory. Not a defect to fix in
+    `_next_prompt_version` — it is why the guard cannot be replaced by "seed a version nobody has taken"."""
     at_head = await store.latest_prompt_revision(db)
     number = int(at_head.version.removeprefix("v"))
 
@@ -160,11 +137,8 @@ def test_seed_prompt_is_not_reachable_from_the_runtime_path() -> None:
 
 
 def test_the_migration_that_added_source_states_the_versions_it_backfills() -> None:
-    """D2: the seeded versions are literals in `0013`, not read from those migrations.
-
-    A backfill that reads today's constants answers a different question every time it is
-    replayed, and this is the assertion that keeps it from being 'simplified' into one.
-    """
+    """The seeded versions are literals in `0013`, not read from those migrations: a backfill that reads
+    today's constants answers a different question every time it is replayed."""
     import pathlib
 
     migration = (
