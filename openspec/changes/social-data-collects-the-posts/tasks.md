@@ -41,11 +41,11 @@
 
 ## 6. Narzędzia i dostęp
 
-- [ ] 6.1 `mcp_app.py` i cztery narzędzia: ostatnie posty, okno, jeden post, stan archiwum
-- [ ] 6.2 Skrót treści na listach, pełna treść wyłącznie przez odczyt jednego posta, tłumaczenie tylko na żądanie
-- [ ] 6.3 Test odmawiający zestawowi narzędzia zmieniającego stan oraz test budżetu opisów
-- [ ] 6.4 `caller_access.py` — zapis trasa po trasie, odmowa dla ścieżki spoza zapisu, identyfikator aplikacji z tokena, pusty zapis odmawia wszystkim
-- [ ] 6.5 Testy dostępu: wołający narzędzi nie wchodzi na REST, brak tożsamości odmawiany, `/health` bez tożsamości
+- [x] 6.1 `mcp_app.py` i cztery narzędzia: ostatnie posty, okno, jeden post, stan archiwum
+- [x] 6.2 Skrót treści na listach, pełna treść wyłącznie przez odczyt jednego posta, tłumaczenie tylko na żądanie
+- [x] 6.3 Test odmawiający zestawowi narzędzia zmieniającego stan oraz test budżetu opisów
+- [x] 6.4 `caller_access.py` — zapis trasa po trasie, odmowa dla ścieżki spoza zapisu, identyfikator aplikacji z tokena, pusty zapis odmawia wszystkim
+- [x] 6.5 Testy dostępu: wołający narzędzi nie wchodzi na REST, brak tożsamości odmawiany, `/health` bez tożsamości
 
 ## 7. Workbench
 

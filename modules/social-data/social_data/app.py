@@ -14,7 +14,8 @@ from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
-from . import enrichment
+from . import enrichment, mcp_app
+from .caller_access import CallerAccess
 from .config import Settings
 from .ingest import Ingest
 from .providers.truth_social import TruthSocialFeed
@@ -87,11 +88,14 @@ async def lifespan(app: FastAPI):
         app.state.ingest = ingest
         await ingest.start()
 
-        log.info("social-data is serving")
-        try:
-            yield
-        finally:
-            await ingest.stop()
+        # The tool surface's session manager: a mounted application's lifespan is never run, so the
+        # task group has to be started here or every tool call fails.
+        async with mcp_app.tool_surface_session(app):
+            log.info("social-data is serving")
+            try:
+                yield
+            finally:
+                await ingest.stop()
 
 
 def create_app() -> FastAPI:
@@ -103,6 +107,15 @@ def create_app() -> FastAPI:
     )
     app.include_router(meta.router)
     app.include_router(posts.router)
+
+    server, tool_app = mcp_app.build_mcp_app(app)
+    app.state.mcp_server = server
+    app.mount(mcp_app.MOUNT_PATH, tool_app)
+
+    # In front of the whole application, and in this order: the address fix runs before routing, and
+    # the caller record before that, so nothing decides who may call after routing has begun.
+    app.add_middleware(mcp_app.ToolSurfaceAddress)
+    app.add_middleware(CallerAccess, state=app.state)
     return app
 
 

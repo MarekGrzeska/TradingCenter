@@ -153,6 +153,15 @@ async def api(app, pool, settings):
 
 
 @pytest.fixture
+async def tool_server(app, pool, settings):
+    """The FastMCP server this module publishes, wired to a real database and built from the same
+    application `create_app()` builds — a server assembled here would be a ceiling on nothing."""
+    app.state.pool = pool
+    app.state.settings = settings
+    return app.state.mcp_server
+
+
+@pytest.fixture
 def app():
     """A fresh application per test. A fixture rather than an import: while the module-level `app` was in
     scope, a test that forgot to ask for this one still found something to mutate."""
