@@ -71,11 +71,11 @@
 
 ## 10. Stack lokalny, CI, dokumentacja
 
-- [ ] 10.1 Rola i baza `social` w `compose.yaml` i w tworzeniu baz przez skrypty dev
-- [ ] 10.2 Wiersz usługi w `scripts/dev.py` (port 8090, `/health`, powód i miejsce w kolejności startu)
-- [ ] 10.3 `checks.yml` — job modułu; zmiana `social_data/contract.py` odpala joby terminala i pocketa
-- [ ] 10.4 `CLAUDE.md` — wiersz w tabeli modułów, zdanie o portach, czwarty `*_MCP_URL`
-- [ ] 10.5 `docs/architecture.md` — moduł na rysunku i w tekście
+- [x] 10.1 Rola i baza `social` w `compose.yaml` i w tworzeniu baz przez skrypty dev
+- [x] 10.2 Wiersz usługi w `scripts/dev.py` (port 8090, `/health`, powód i miejsce w kolejności startu)
+- [x] 10.3 `checks.yml` — job modułu; zmiana `social_data/contract.py` odpala joby terminala i pocketa
+- [x] 10.4 `CLAUDE.md` — wiersz w tabeli modułów, zdanie o portach, czwarty `*_MCP_URL`
+- [x] 10.5 `docs/architecture.md` — moduł na rysunku i w tekście
 
 ## 11. Infrastruktura i wdrożenie
 

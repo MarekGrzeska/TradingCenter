@@ -31,10 +31,13 @@ GOOD_ENV: dict[str, str] = {
         "MARKET_MCP_URL=http://127.0.0.1:8020\n"
         "TRADING_MCP_URL=http://127.0.0.1:8060\n"
         "POLYMARKET_MCP_URL=http://127.0.0.1:8070\n"
+        "SOCIAL_MCP_URL=http://127.0.0.1:8090\n"
     ),
     "trading-mcp": "CAPITAL_GATEWAY_API_KEY=shared-secret\n",
     # No credential to carry: both of Polymarket's surfaces are public.
     "polymarket-data": "DATABASE_URL=postgresql://polymarket:pw@127.0.0.1:55432/polymarket\n",
+    # Nor here: the model key is optional, and without it the module collects and reads nothing.
+    "social-data": "DATABASE_URL=postgresql://social:pw@127.0.0.1:55432/social\n",
     "strategy": "DATABASE_URL=postgresql://strategy:pw@127.0.0.1:55432/strategy\n",
 }
 
@@ -152,6 +155,7 @@ class TestRefusals:
             "workbench",
             "trading-mcp",
             "polymarket-data",
+            "social-data",
             # Listed for market-data's reason rather than trading-mcp's: no secret of its
             # own, but `DATABASE_URL` has no default, so the process exits at start.
             "strategy",
@@ -238,6 +242,7 @@ class TestStartOrder:
             "market-data",
             "trading-mcp",
             "polymarket-data",
+            "social-data",
             "strategy",
             "workbench",
             "terminal",
@@ -251,6 +256,7 @@ class TestStartOrder:
             "workbench": 8030,
             "trading-mcp": 8060,
             "polymarket-data": 8070,
+            "social-data": 8090,
             "strategy": 8080,
             "terminal": 5173,
             "pocket": 5174,

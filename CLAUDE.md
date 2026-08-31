@@ -26,6 +26,7 @@ package cannot give it, the change is wrong, not the rule.
 | `modules/workbench` | the operator's conversation with a model **and** the teams they compose — one process, two surfaces, two schemas (`agent`, `teams`), two OpenAI keys, two model catalogues. |
 | `modules/trading-mcp` | MCP tools over the gateway's demo account. Network transport only, one named caller (the workbench). Demo checked against the gateway, not against a setting. |
 | `modules/polymarket-data` | the prediction-market archive. Owns its PostgreSQL, the only door to Polymarket. Two surfaces like market-data — but two of its tools **write**, and both only *add* to the list of observations; an observation is collected or removed with all its history, and removing is REST-only. |
+| `modules/social-data` | the post archive: what was said, when, and what a model made of it. Owns its PostgreSQL, the door to Truth Social. Two surfaces, and **nothing on either writes** — the reading is stamped with its model and overwritten, never versioned, and there is no backfill. |
 | `modules/strategy` | the strategy platform. A strategy is a catalogue entry — declared facts, parameters, one pure `evaluate` — and the entry is code in the image **or** an immutable revision the operator wrote. Owns its PostgreSQL, reads market-data's REST, and **never touches an account**: it decides, teams execute. |
 | `modules/terminal` | React+TS · the operator's screen. Consumes the others, publishes nothing — a consumer, not a peer. Call it the **terminal**, never a "console" or "dashboard". |
 | `modules/pocket` | React+TS · the archive on a phone, and a chat with the workbench beside it — mobile-first, two audiences, no MCP of its own. A second consumer, sharing the terminal's generated contract and none of its code. |
@@ -56,6 +57,7 @@ module runs `uv run pytest` · `ruff check .` · `pyright`, the terminal and `po
 | `workbench` | two chains — `uv run alembic -c alembic-agent.ini upgrade head` **and** `-c alembic-teams.ini` (the process runs both itself) — then `uv run uvicorn workbench.app:app --reload --port 8030` |
 | `trading-mcp` | `uv run python -m trading_mcp` (8060) · plus `uv run python scripts/contract.py check`, its snapshot of the gateway's OpenAPI |
 | `polymarket-data` | `uv run alembic upgrade head`, then `uv run uvicorn polymarket_data.app:app --reload --port 8070` |
+| `social-data` | `uv run alembic upgrade head`, then `uv run uvicorn social_data.app:app --reload --port 8090` |
 | `strategy` | `uv run alembic upgrade head`, then `uv run uvicorn strategy.app:app --reload --port 8080` |
 | `terminal` | `pnpm dev` (5173) |
 | `pocket` | `pnpm dev` (5174) · the dev scripts start it too; `--host` is what a phone on the same Wi-Fi needs |
@@ -71,7 +73,7 @@ sits where it does are one table at the top of that file — `uv run python scri
 --explain` prints it, so it is not repeated here.
 
 **Ports are fixed: 8010 gateway, 8020 market-data (REST *and* `/mcp`), 8030 workbench, 8060
-trading-mcp, 8070 polymarket-data (REST *and* `/mcp`), 8080 strategy (REST *and* `/mcp`),
+trading-mcp, 8070 polymarket-data, 8080 strategy, 8090 social-data (all three REST *and* `/mcp`),
 5173 terminal, 5174 pocket. 8040 and 8050 are nobody's** — a `.env` still pointing at
 either is a tool server that reads as down. 8070 was on that list until `polymarket-data-joins-the-stack`
 claimed it.
@@ -110,7 +112,8 @@ refuses to run rather than answer without them. `TRADING_MCP_URL` is the same sh
 account, checked independently — and it is the one that reads least like a setting, because the
 operator asks about their positions and the agent says it cannot see them. `POLYMARKET_MCP_URL`
 is the third of the shape, and the only one whose tools can *write*: three of its nine change the
-list of observations, and none of the nine deletes anything.
+list of observations, and none of the nine deletes anything. `SOCIAL_MCP_URL` is the fourth, and
+its four tools only read.
 
 **`trading-mcp` will not start on a wish.** `CAPITAL_GATEWAY_API_KEY` must be the gateway's own
 `GATEWAY_API_KEY` — the gateway checks that header on every caller, loopback included — and it
