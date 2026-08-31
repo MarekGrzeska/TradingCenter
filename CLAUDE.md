@@ -74,8 +74,8 @@ sits where it does are one table at the top of that file — `uv run python scri
 --explain` prints it, so it is not repeated here.
 
 **Ports are fixed: 8010 gateway, 8020 market-data (REST *and* `/mcp`), 8030 workbench, 8060
-trading-mcp, 8070 polymarket-data, 8080 strategy, 8090 social-data (all three REST *and* `/mcp`),
-5173 terminal, 5174 pocket. 8040 and 8050 are nobody's** — a `.env` still pointing at
+trading-mcp, 8070 polymarket-data, 8080 strategy, 8090 social-data, 8100 telegram-gateway (all four
+REST *and* `/mcp`), 5173 terminal, 5174 pocket. 8040 and 8050 are nobody's** — a `.env` still pointing at
 either is a tool server that reads as down. 8070 was on that list until `polymarket-data-joins-the-stack`
 claimed it.
 

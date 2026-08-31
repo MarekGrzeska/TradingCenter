@@ -59,9 +59,9 @@
 
 ## 9. Stos deweloperski i CI
 
-- [ ] 9.1 Wiersz usługi w `scripts/dev.py` (port 8100), rola i baza `telegram` w `LOGICAL_DATABASES`
+- [x] 9.1 Wiersz usługi w `scripts/dev.py` (port 8100), rola i baza `telegram` w `LOGICAL_DATABASES`
 - [x] 9.2 Job modułu w `.github/workflows/checks.yml`
-- [ ] 9.3 `Dockerfile` **i** `.github/workflows/deploy-telegram-gateway.yml` z sondą wdrożenia — razem, bo test trzyma je parą
+- [x] 9.3 `Dockerfile` **i** `.github/workflows/deploy-telegram-gateway.yml` z sondą wdrożenia — razem, bo test trzyma je parą
 
 ## 10. Infrastruktura
 
