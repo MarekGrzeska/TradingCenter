@@ -52,6 +52,7 @@ export default defineConfig(({ mode }) => {
   const gateway = env.GATEWAY_PROXY_TARGET || "http://localhost:8010";
   const polymarket = env.POLYMARKET_PROXY_TARGET || "http://localhost:8070";
   const strategy = env.STRATEGY_PROXY_TARGET || "http://localhost:8080";
+  const social = env.SOCIAL_PROXY_TARGET || "http://localhost:8090";
   const gatewayKey = env.GATEWAY_PROXY_KEY || env.GATEWAY_API_KEY || "";
 
   return {
@@ -94,6 +95,14 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/polymarket-api/, ""),
           configure: quietProxyErrors("polymarket-data", polymarket),
+        },
+
+        // The post archive, same shape and same reason as the two above.
+        "/social-api": {
+          target: social,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/social-api/, ""),
+          configure: quietProxyErrors("social-data", social),
         },
 
         // The strategy platform, same shape and same reason as the archive above: a token in production, nothing

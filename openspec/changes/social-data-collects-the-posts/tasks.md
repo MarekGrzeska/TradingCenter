@@ -54,12 +54,12 @@
 
 ## 8. Terminal
 
-- [ ] 8.1 Nowe źródło w `scripts/contract.mjs` → `src/data/contract.social.generated.ts`, `pnpm contract:generate`
-- [ ] 8.2 `src/data/config.ts` — baza adresu modułu, wpięcie w stan źródeł
-- [ ] 8.3 `src/social/api.ts` i `impact.ts` (podział po progu, porządek) z testami jednostkowymi
-- [ ] 8.4 `src/social/SocialView.tsx` i karta posta: okno i licznik, wysoki wpływ na wierzchu, reszta pod rozwinięciem z liczbą
-- [ ] 8.5 Stany ekranu: pusto, archiwum nieświeże, model nieskonfigurowany, nieudane odświeżenie nie kasuje listy
-- [ ] 8.6 Wpis w rejestrze zakładek; testy widoku (szczęśliwa ścieżka, jeden błąd, jedna odmowa)
+- [x] 8.1 Nowe źródło w `scripts/contract.mjs` → `src/data/contract.social.generated.ts`, `pnpm contract:generate`
+- [x] 8.2 `src/data/config.ts` — baza adresu modułu, wpięcie w stan źródeł
+- [x] 8.3 `src/social/api.ts` i `impact.ts` (podział po progu, porządek) z testami jednostkowymi
+- [x] 8.4 `src/social/SocialView.tsx` i karta posta: okno i licznik, wysoki wpływ na wierzchu, reszta pod rozwinięciem z liczbą
+- [x] 8.5 Stany ekranu: pusto, archiwum nieświeże, model nieskonfigurowany, nieudane odświeżenie nie kasuje listy
+- [x] 8.6 Wpis w rejestrze zakładek; testy widoku (szczęśliwa ścieżka, jeden błąd, jedna odmowa)
 
 ## 9. Pocket
 

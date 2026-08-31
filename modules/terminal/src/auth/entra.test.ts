@@ -41,6 +41,7 @@ const config: EntraConfig = {
     gateway: "api://gateway/access_as_user",
     polymarket: "api://polymarket/access_as_user",
     strategy: "api://strategy/access_as_user",
+    social: "api://social/access_as_user",
   },
 };
 

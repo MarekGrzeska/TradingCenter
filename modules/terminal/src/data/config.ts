@@ -49,6 +49,9 @@ export interface Endpoints {
    *  were kept. Its own address and its own scope for the same reason as the two above —
    *  a different App Service behind a different gate. */
   strategyHttp: string;
+  /** `social-data`, for the posts: the archive of what was said and what a model made of it.
+   *  Its own address and its own scope, for the reason the two above have theirs. */
+  socialHttp: string;
   /** `capital-gateway`, for the account. It used to have no address here at all; what changed is that the
    *  gateway recognises an authenticated browser. In dev this is a prefix the dev server proxies. */
   gatewayHttp: string;
@@ -62,6 +65,7 @@ const DEFAULT_WORKBENCH_HTTP = "/workbench-api";
 const DEFAULT_GATEWAY_HTTP = "/gateway-api";
 const DEFAULT_POLYMARKET_HTTP = "/polymarket-api";
 const DEFAULT_STRATEGY_HTTP = "/strategy-api";
+const DEFAULT_SOCIAL_HTTP = "/social-api";
 
 export interface EnvVars {
   VITE_ARCHIVE_HTTP?: string;
@@ -70,6 +74,7 @@ export interface EnvVars {
   VITE_GATEWAY_HTTP?: string;
   VITE_POLYMARKET_HTTP?: string;
   VITE_STRATEGY_HTTP?: string;
+  VITE_SOCIAL_HTTP?: string;
   VITE_ENTRA_CLIENT_ID?: string;
   VITE_ENTRA_TENANT_ID?: string;
   VITE_ENTRA_SCOPE?: string;
@@ -77,6 +82,7 @@ export interface EnvVars {
   VITE_ENTRA_SCOPE_GATEWAY?: string;
   VITE_ENTRA_SCOPE_POLYMARKET?: string;
   VITE_ENTRA_SCOPE_STRATEGY?: string;
+  VITE_ENTRA_SCOPE_SOCIAL?: string;
 }
 
 /** One scope per module, because each accepts a token minted for its **own** audience. `archive` keeps
@@ -87,6 +93,7 @@ export interface ModuleScopes {
   gateway: string | null;
   polymarket: string | null;
   strategy: string | null;
+  social: string | null;
 }
 
 /** Which Entra registration the terminal signs the operator in against, and what it asks
@@ -124,6 +131,7 @@ export function resolveEntra(env: EnvVars = import.meta.env): EntraConfig | null
       gateway: env.VITE_ENTRA_SCOPE_GATEWAY?.trim() || null,
       polymarket: env.VITE_ENTRA_SCOPE_POLYMARKET?.trim() || null,
       strategy: env.VITE_ENTRA_SCOPE_STRATEGY?.trim() || null,
+      social: env.VITE_ENTRA_SCOPE_SOCIAL?.trim() || null,
     },
   };
 }
@@ -139,5 +147,6 @@ export function resolveEndpoints(
     gatewayHttp: resolveHttpBase(env.VITE_GATEWAY_HTTP || DEFAULT_GATEWAY_HTTP),
     polymarketHttp: resolveHttpBase(env.VITE_POLYMARKET_HTTP || DEFAULT_POLYMARKET_HTTP),
     strategyHttp: resolveHttpBase(env.VITE_STRATEGY_HTTP || DEFAULT_STRATEGY_HTTP),
+    socialHttp: resolveHttpBase(env.VITE_SOCIAL_HTTP || DEFAULT_SOCIAL_HTTP),
   };
 }
