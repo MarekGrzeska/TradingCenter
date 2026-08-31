@@ -91,9 +91,9 @@
 
 ## 14. Dokumentacja
 
-- [ ] 14.1 `README.md` modułu: dwie powierzchnie Telegrama, sesja opcjonalna, sufit botów, limity tempa
-- [ ] 14.2 `CLAUDE.md` — zdanie o portach i piąty `*_MCP_URL` (wiersz w tabeli już jest; zostało 57 znaków do sufitu, więc trzeba go podnieść świadomie)
-- [ ] 14.3 `docs/architecture.md` — moduł i jego miejsce wśród wywołujących
+- [x] 14.1 `README.md` modułu: dwie powierzchnie Telegrama, sesja opcjonalna, sufit botów, limity tempa
+- [x] 14.2 `CLAUDE.md` — zdanie o portach i piąty `*_MCP_URL` (wiersz w tabeli już jest; zostało 57 znaków do sufitu, więc trzeba go podnieść świadomie)
+- [x] 14.3 `docs/architecture.md` — moduł i jego miejsce wśród wywołujących
 
 ## 15. Wdrożenie
 

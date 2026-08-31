@@ -227,6 +227,59 @@ not a route.
 backfill was available and was not taken: `collecting_since` is written once, and an archive
 that begins at a known moment is worth more than one beginning wherever the first pass reached.
 
+## The door out
+
+`telegram-gateway` arrived on 31 August 2026 and is the first module here whose effect is
+**outside** this system. Everything before it collects, decides or shows; this one makes a phone
+buzz. Its shape is the familiar one — one module, its own database, a REST contract and MCP tools
+at `/mcp` — and what is unfamiliar is who calls it and how.
+
+```
+   workbench            social-data          strategy
+   (the fifth tool       (a post over          (a decision
+    server, /mcp)         its threshold)        that changed)
+        │                     │                    │
+        │  a model sends      │  REST, managed identity
+        ▼                     ▼                    ▼
+        ┌──────────────────────────────────────────────┐
+        │  telegram-gateway                            │
+        │  send · destinations · bots                  │
+        │  REST  ·  two MCP tools at /mcp              │
+        └───────┬──────────────────────────┬───────────┘
+       bot API  │                          │  MTProto, only for
+       (sending)│                          │  the creator bot
+                ▼                          ▼
+             Telegram                  @BotFather
+```
+
+**It remembers nothing it sent**, and that is the decision the module turns on. There is no queue,
+no retry and no message table: a caller gets Telegram's own answer and decides what to do with it.
+The price is real and is paid in the callers — `social-data` and `strategy` each keep an *already
+told* marker of their own, written **after** a success, so a failed send leaves no marker and the
+next pass tries again. That absence is the whole retry mechanism this system has. The alternative,
+an idempotency key with a lifetime, is a message history under a worse name.
+
+**Two surfaces of Telegram, and only one of them can create a bot.** The bot API is stateless and
+authorised by a token; creating a bot means talking to @BotFather, which is an ordinary bot on a
+chat, and only a *user account* may talk to a bot. So half this module needs a personal Telegram
+session — and the absence of that session is a working configuration, in the shape
+`MARKET_MCP_URL` set: without it the module sends and refuses to create, naming what is missing.
+Sending never travels the account session even where one is configured: a notification sent as the
+operator is indistinguishable from one the operator wrote, and it spends a private account's
+budget.
+
+**A model may send and may not create or bind.** The tool surface publishes two tools; creating a
+bot, deleting one and binding a destination are REST-only. It is the line `polymarket-data` drew
+around deleting history, one step further out: a message can be taken back by saying the next
+thing, and a bot created outlives the conversation that asked for it — and still counts against
+the account's ceiling of twenty.
+
+**A destination is a name, not a chat id.** The caller writes to `operator-primary`. Taking a
+`chat_id` per caller would be simpler by one table and would put the same number in three `.env`
+files, all invalidated the day the bot is replaced. The name survives that; the number does not.
+A bot cannot open a conversation, so the name becomes an address only when a person taps
+`t.me/<bot>?start=<nonce>` — one tap, and it cannot be reduced to zero.
+
 ## The order path
 
 The workbench's teams surface has one more edge than the diagram above draws, and it is

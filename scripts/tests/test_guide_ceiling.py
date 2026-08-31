@@ -12,10 +12,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 GUIDE = REPO_ROOT / "CLAUDE.md"
 
 # Characters rather than tokens so the test needs no tokenizer: the measured ratio here is 4,2,
-# so this is ~5 200 tokens. Raised from 21 000 on 26 August 2026 to fit the comment rule.
-GUIDE_CEILING_CHARS = 22_000
+# so this is ~5 500 tokens. Raised from 21 000 on 26 August 2026 to fit the comment rule, and from
+# 22 000 on 31 August 2026 for the eighth module: a door out of the system that three callers reach
+# two different ways does not fit in a table row.
+GUIDE_CEILING_CHARS = 23_000
 
-# 21 361 characters on 26 August 2026; the headroom is deliberate, and is enough for a new trap
+# 22 438 characters on 31 August 2026; the headroom is deliberate, and is enough for a new trap
 # but not for the essays to come back.
 
 
