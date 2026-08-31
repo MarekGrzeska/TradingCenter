@@ -13,6 +13,7 @@ from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
+from . import redaction
 from .config import Settings
 from .routers import meta
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
@@ -28,6 +29,9 @@ def configure_logging() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         stream=sys.stdout,
     )
+    # After the handlers exist, and on the handlers rather than on a logger: `httpx` logs every
+    # request it makes at INFO, and a Telegram URL carries the token in its path.
+    redaction.install()
 
 
 @asynccontextmanager

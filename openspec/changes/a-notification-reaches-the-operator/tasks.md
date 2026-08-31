@@ -13,11 +13,11 @@
 
 ## 3. Wysyłka
 
-- [ ] 3.1 Klient Bot API za protokołem, z fake'iem do testów
-- [ ] 3.2 Wysłanie adresowane nazwą, z odmową dla nazwy nieznanej
-- [ ] 3.3 Odwzorowanie odmów Telegrama: limit tempa z czasem oczekiwania, blokada bota, pozostałe
-- [ ] 3.4 Odmowa dla treści przekraczającej sufit Telegrama, bez skracania
-- [ ] 3.5 Test: adres żądania do Telegrama nie trafia do logu w żadnej ścieżce błędu
+- [x] 3.1 Klient Bot API za protokołem, z fake'iem do testów
+- [x] 3.2 Wysłanie adresowane nazwą, z odmową dla nazwy nieznanej
+- [x] 3.3 Odwzorowanie odmów Telegrama: limit tempa z czasem oczekiwania, blokada bota, pozostałe
+- [x] 3.4 Odmowa dla treści przekraczającej sufit Telegrama, bez skracania
+- [x] 3.5 Test: adres żądania do Telegrama nie trafia do logu w żadnej ścieżce błędu
 
 ## 4. Adresaci i wiązanie
 
