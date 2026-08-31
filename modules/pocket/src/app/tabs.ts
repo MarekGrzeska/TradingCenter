@@ -1,4 +1,4 @@
-export const TABS = ["markets", "agent"] as const;
+export const TABS = ["markets", "social", "agent"] as const;
 
 export type Tab = (typeof TABS)[number];
 

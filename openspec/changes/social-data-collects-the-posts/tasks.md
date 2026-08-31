@@ -63,11 +63,11 @@
 
 ## 9. Pocket
 
-- [ ] 9.1 Nowe źródło w `scripts/contract.mjs` i `pnpm contract:generate`
-- [ ] 9.2 Adres modułu w `src/data/config.ts`, proxy w `vite.config.ts`, zakres Entra dla trzeciej tożsamości
-- [ ] 9.3 `src/social/PostsScreen.tsx` — lista zwinięta, ocena jako `Pill`, odświeżanie gestem przez istniejące `pull.ts`
-- [ ] 9.4 Trzecia zakładka w rejestrze i w `App.tsx`; odpytywanie wstrzymane, gdy ekran jest niewidoczny
-- [ ] 9.5 Testy ekranu i zapamiętanej zakładki
+- [x] 9.1 Nowe źródło w `scripts/contract.mjs` i `pnpm contract:generate`
+- [x] 9.2 Adres modułu w `src/data/config.ts`, proxy w `vite.config.ts`, zakres Entra dla trzeciej tożsamości
+- [x] 9.3 `src/social/PostsScreen.tsx` — lista zwinięta, ocena jako `Pill`, odświeżanie gestem przez istniejące `pull.ts`
+- [x] 9.4 Trzecia zakładka w rejestrze i w `App.tsx`; odpytywanie wstrzymane, gdy ekran jest niewidoczny
+- [x] 9.5 Testy ekranu i zapamiętanej zakładki
 
 ## 10. Stack lokalny, CI, dokumentacja
 

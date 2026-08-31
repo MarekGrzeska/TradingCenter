@@ -18,6 +18,14 @@ export function workbenchBase(
   return base(raw, "/workbench-api");
 }
 
+/** `social-data`, the post archive. Its own address for the reason the workbench has one, and its own
+ *  audience: a token minted for one module is never sent to another. */
+export function postsBase(
+  raw: string | undefined = import.meta.env.VITE_SOCIAL_HTTP as string | undefined,
+): string {
+  return base(raw, "/social-api");
+}
+
 export interface EntraConfig {
   clientId: string;
   tenantId: string;
@@ -28,6 +36,8 @@ export interface EntraConfig {
      *  module is never sent to another, so the agent goes without rather than borrowing the
      *  archive's. The screen says so instead of meeting a 401 it cannot explain. */
     workbench: string | null;
+    /** The post archive's own audience, `null` on the same terms as the workbench's. */
+    posts: string | null;
   };
 }
 
@@ -43,6 +53,11 @@ export function entraConfig(env: ImportMetaEnv = import.meta.env): EntraConfig |
   const tenantId = (env.VITE_ENTRA_TENANT_ID as string | undefined)?.trim();
   const archive = (env.VITE_ENTRA_SCOPE_POLYMARKET as string | undefined)?.trim();
   const workbench = (env.VITE_ENTRA_SCOPE_WORKBENCH as string | undefined)?.trim();
+  const posts = (env.VITE_ENTRA_SCOPE_SOCIAL as string | undefined)?.trim();
   if (!clientId || !tenantId || !archive) return null;
-  return { clientId, tenantId, scopes: { archive, workbench: workbench || null } };
+  return {
+    clientId,
+    tenantId,
+    scopes: { archive, workbench: workbench || null, posts: posts || null },
+  };
 }

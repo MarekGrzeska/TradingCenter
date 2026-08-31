@@ -1,0 +1,84 @@
+.card {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--card-bg);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  width: 100%;
+  /* A whole card is the target, not a chevron: a thumb is wider than an icon. */
+  min-height: var(--tap);
+  padding: 0.6rem 0.75rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.when {
+  color: var(--text-soft);
+  font-size: 0.72rem;
+}
+
+.repost {
+  padding: 0 0.3rem;
+  border-radius: 0.35rem;
+  background: var(--pill-muted-bg);
+  color: var(--pill-muted-fg);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.headline {
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.35;
+}
+
+.body {
+  border-top: 1px solid var(--border);
+  padding: 0.6rem 0.75rem 0.75rem;
+}
+
+.topics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-bottom: 0.5rem;
+}
+
+.topic {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--pill-muted-bg);
+  color: var(--pill-muted-fg);
+  font-size: 0.7rem;
+}
+
+.text {
+  margin: 0;
+  color: var(--text);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.link {
+  display: inline-block;
+  margin-top: 0.6rem;
+  min-height: 1.75rem;
+  color: var(--accent);
+  font-size: 0.8rem;
+}

@@ -14,6 +14,19 @@ const app = resolve(here, "..");
 
 const SOURCES = [
   {
+    name: "social-data",
+    moduleDir: resolve(app, "..", "social-data"),
+    pythonModule: "social_data.openapi",
+    output: join(app, "src", "data", "contract.social.generated.ts"),
+    banner: `/**
+ * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
+ *
+ * Printed from social-data's models by \`python -m social_data.openapi\`. A reading field is present and null
+ * where no model has read the post; this file is the only place this app learns that.
+ */
+`,
+  },
+  {
     name: "polymarket-data",
     moduleDir: resolve(app, "..", "polymarket-data"),
     pythonModule: "polymarket_data.openapi",

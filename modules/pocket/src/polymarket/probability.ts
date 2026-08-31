@@ -39,18 +39,9 @@ export function isStale(priceAt: Date | null, now: Date = new Date()): boolean {
   return now.getTime() - priceAt.getTime() > STALE_AFTER_MS;
 }
 
-/** `"4 min ago"`, for the moment beside a price. Coarse on purpose: the tick is a minute, so seconds
- *  would be noise that changes on every render. */
-export function formatAge(priceAt: Date | null, now: Date = new Date()): string {
-  if (priceAt === null) return "never";
-  const seconds = Math.max(0, Math.round((now.getTime() - priceAt.getTime()) / 1000));
-  if (seconds < 90) return "just now";
-  const minutes = Math.round(seconds / 60);
-  if (minutes < 60) return `${minutes} min ago`;
-  const hours = Math.round(minutes / 60);
-  if (hours < 48) return `${hours} h ago`;
-  return `${Math.round(hours / 24)} d ago`;
-}
+/** Re-exported, not redefined: the posts screen shows the same "how long ago" and one of the two would
+ *  have drifted. The implementation is in `ui/age.ts`. */
+export { formatAge } from "../ui/age";
 
 /** The five bands a probability's colour comes from, repeating what the bar's length says because a
  *  column of bars is scanned rather than read. */
