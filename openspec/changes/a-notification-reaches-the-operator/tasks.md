@@ -1,6 +1,6 @@
 ## 1. Szkielet modułu
 
-- [x] 1.1 Założyć `modules/telegram-gateway/` z `pyproject.toml`, `Dockerfile`, `.env.example` i `README.md`
+- [x] 1.1 Założyć `modules/telegram-gateway/` z `pyproject.toml`, `.env.example` i `README.md` (Dockerfile przeniesiony do 9.3: `test_deploy_workflows.py` wymaga, by moduł z obrazem miał workflow deploya)
 - [x] 1.2 `config.py` — ustawienia, dwa tryby połączenia z bazą i odmowy startu w kształcie `polymarket_data/config.py`
 - [x] 1.3 `app.py` — `lifespan` z pulą `min_size=1, max_size=4`, migracją pod własnym kluczem blokady i weryfikacją wersji schematu
 - [x] 1.4 Trasa żywotności odpowiadająca bez bazy i bez Telegrama
@@ -60,8 +60,8 @@
 ## 9. Stos deweloperski i CI
 
 - [ ] 9.1 Wiersz usługi w `scripts/dev.py` (port 8100), rola i baza `telegram` w `LOGICAL_DATABASES`
-- [ ] 9.2 Job modułu w `.github/workflows/checks.yml`
-- [ ] 9.3 `.github/workflows/deploy-telegram-gateway.yml` z sondą wdrożenia
+- [x] 9.2 Job modułu w `.github/workflows/checks.yml`
+- [ ] 9.3 `Dockerfile` **i** `.github/workflows/deploy-telegram-gateway.yml` z sondą wdrożenia — razem, bo test trzyma je parą
 
 ## 10. Infrastruktura
 
@@ -92,7 +92,7 @@
 ## 14. Dokumentacja
 
 - [ ] 14.1 `README.md` modułu: dwie powierzchnie Telegrama, sesja opcjonalna, sufit botów, limity tempa
-- [ ] 14.2 `CLAUDE.md` — wiersz w tabeli modułów, zdanie o portach, piąty `*_MCP_URL`
+- [ ] 14.2 `CLAUDE.md` — zdanie o portach i piąty `*_MCP_URL` (wiersz w tabeli już jest; zostało 57 znaków do sufitu, więc trzeba go podnieść świadomie)
 - [ ] 14.3 `docs/architecture.md` — moduł i jego miejsce wśród wywołujących
 
 ## 15. Wdrożenie

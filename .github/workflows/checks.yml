@@ -34,6 +34,7 @@ jobs:
       pocket: ${{ steps.filter.outputs.pocket }}
       openspec: ${{ steps.filter.outputs.openspec }}
       packages: ${{ steps.filter.outputs.packages }}
+      telegram-gateway: ${{ steps.filter.outputs.telegram-gateway }}
       scripts: ${{ steps.filter.outputs.scripts }}
       infra: ${{ steps.filter.outputs.infra }}
       # The diff's package names intersected with the directory: the diff alone lists a package this PR deletes,
@@ -98,6 +99,9 @@ jobs:
           # The same two packages, for the same two reasons. Its upstream is a public feed rather than a module
           # here, so there is no second directory in this pattern.
           PATTERNS[social-data]="^modules/social-data/|$tc_runtime|$tc_mcp_kit"
+          # Only `tc-runtime`: this module has no tool surface yet, so it does not take `tc-mcp-kit`, and its
+          # upstream is Telegram rather than a module here.
+          PATTERNS[telegram-gateway]="^modules/telegram-gateway/|$tc_runtime"
           # No third pairing here, deliberately: this module reads market-data over its published REST contract at
           # runtime and keeps no snapshot of it, so there is nothing to go stale.
           PATTERNS[strategy]="^modules/strategy/|$tc_runtime|$tc_mcp_kit"
@@ -252,6 +256,27 @@ jobs:
       - run: uv run pyright
       # Same split as the archive above: the `db` tests run here, the `live` ones stay behind --run-live
       # because they read a public feed nobody in this repository operates.
+      - run: uv run pytest -q
+
+  # The door to Telegram. `tc-runtime` alone in its filter above, and no `contract:check` pairing: nothing
+  # generates types from it, because it has no screen — the notification is its screen.
+  telegram-gateway:
+    name: telegram-gateway
+    needs: changes
+    if: needs.changes.outputs.telegram-gateway == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/telegram-gateway
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv run ruff check .
+      - run: uv run pyright
+      # The `db` tests run here; the `live` ones stay behind --run-live, because they would talk to the
+      # real Telegram as the operator's own account.
       - run: uv run pytest -q
 
   strategy:
