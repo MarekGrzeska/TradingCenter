@@ -43,6 +43,7 @@ function quietProxyErrors(label: string, target: string): ProxyOptions["configur
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const polymarket = env.POLYMARKET_PROXY_TARGET || "http://localhost:8070";
+  const workbench = env.WORKBENCH_PROXY_TARGET || "http://localhost:8030";
 
   return {
     plugins: [react()],
@@ -60,6 +61,15 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/polymarket-api/, ""),
           configure: quietProxyErrors("polymarket-data", polymarket),
+        },
+
+        // The conversation. Its own address rather than a path under the archive's — a different
+        // App Service behind a different gate. No `ws: true`: the turn rides SSE over plain HTTP.
+        "/workbench-api": {
+          target: workbench,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/workbench-api/, ""),
+          configure: quietProxyErrors("workbench", workbench),
         },
       },
     },

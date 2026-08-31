@@ -365,7 +365,7 @@ resource "azurerm_linux_web_app" "workbench" {
     # Same reasoning as market-data's own CORS block: the preflight carries no credential and Easy Auth would refuse
     # it before the container saw it. The workbench MUST NOT add one of its own — two layers double the header.
     cors {
-      allowed_origins     = [local.terminal_origin]
+      allowed_origins     = [local.terminal_origin, local.pocket_origin]
       support_credentials = false
     }
 
@@ -406,7 +406,13 @@ resource "azurerm_linux_web_app" "workbench" {
 
       # One caller: the terminal, holding the operator's own delegated token. The second — teams-mcp forwarding that
       # token between processes — went away with the process, and the identity now travels inside this one.
-      allowed_applications = [azuread_application.terminal.client_id]
+      # Two browsers, and the phone screen is here for one reason: the conversation is how it reaches
+      # polymarket-data's tools. It never speaks MCP itself — the workbench holds the model key and the
+      # tool servers' addresses, and those servers admit this app's managed identity, not a browser.
+      allowed_applications = [
+        azuread_application.terminal.client_id,
+        azuread_application.pocket.client_id,
+      ]
     }
 
     login {

@@ -1,28 +1,28 @@
 .screen {
-  /* One column, and a max-width only so a desktop browser does not stretch a phone layout across
-     a monitor. The phone case needs no breakpoint — it is the default. */
+  /* Header and chips stay put, the list scrolls under them: on a phone the filters are what the
+     operator reaches for while reading, and a header that scrolls away is a scroll back up. */
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
   width: 100%;
   max-width: 40rem;
   margin: 0 auto;
-  padding: 0 calc(0.75rem + var(--safe-left)) calc(1.5rem + var(--safe-bottom))
-    calc(0.75rem + var(--safe-right));
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
 }
 
 .header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: calc(0.6rem + var(--safe-top)) 0.75rem 0.5rem;
+  background: var(--bg);
+}
+
+.headerTop {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
-  padding: calc(0.6rem + var(--safe-top)) 0 0.6rem;
-  background: var(--bg);
-  /* The list scrolls under it, so the edge has to be drawn or the two blend where they meet. */
-  border-bottom: 1px solid var(--border);
 }
 
 .heading {
@@ -32,9 +32,17 @@
   color: var(--text-h);
 }
 
-.headerActions {
-  display: flex;
-  gap: 0.5rem;
+/* Information first, control second — but it is a real control, so it is a real target. */
+.freshness {
+  align-self: flex-start;
+  min-height: 1.75rem;
+  padding: 0 0.15rem;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
 .chips {
@@ -44,7 +52,7 @@
      chips are a strip, and the events are what the screen is for. */
   overflow-x: auto;
   scrollbar-width: none;
-  padding-bottom: 0.15rem;
+  padding: 0 0.75rem 0.5rem;
 }
 
 .chips::-webkit-scrollbar {
@@ -74,10 +82,38 @@
   background: var(--surface);
 }
 
+.scroller {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  /* The browser's own bounce would run underneath the pull gesture and both would move at once. */
+  overscroll-behavior-y: contain;
+}
+
+.pull {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  font-size: 0.72rem;
+  font-weight: 600;
+  transition: height 0.15s ease-out;
+}
+
+.pullPending {
+  color: var(--text-soft);
+}
+
+.pullReady {
+  color: var(--accent);
+}
+
 .list {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+  padding: 0 0.75rem 1rem;
 }
 
 .section {
