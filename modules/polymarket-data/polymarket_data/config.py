@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     # this multiplied by the tracked-event ceiling is the whole steady-state traffic.
     sample_interval_seconds: int = 60
 
+    # Collection's share of the connection pool, which holds ten. A tick gathers every event at once, so
+    # without a ceiling the sampler took every connection and a read queued behind it with no deadline.
+    sampler_db_concurrency: int = 3
+
     # The provider caps one price-history request at 15 days, measured — and on the interval rather
     # than the point count, so a coarser fidelity buys no width. A setting because the provider may move it.
     history_window_days: int = 15
@@ -145,6 +149,7 @@ class Settings(BaseSettings):
 
     @field_validator(
         "provider_concurrency",
+        "sampler_db_concurrency",
         "sample_interval_seconds",
         "history_window_days",
         "default_backfill_days",

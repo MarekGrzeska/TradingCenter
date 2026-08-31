@@ -3,6 +3,7 @@ writes nothing."""
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -23,6 +24,7 @@ def ingest(pool, fake, **kwargs) -> Ingest:
         interval_seconds=kwargs.pop("interval_seconds", 60),
         window_days=kwargs.pop("window_days", 15),
         default_backfill_days=kwargs.pop("default_backfill_days", 90),
+        db_concurrency=kwargs.pop("db_concurrency", 3),
     )
 
 
@@ -327,3 +329,44 @@ def _sample(outcome_id: int, moment: datetime) -> Sample:
         midpoint=Decimal("0.5"),
         source=Surface.GAMMA,
     )
+
+
+class CountingPool:
+    """A pool that says how many connections were held at once. Wrapping the real one rather than
+    faking it: what is under test is when `Ingest` takes and releases, not what it then runs."""
+
+    def __init__(self, pool) -> None:
+        self._pool = pool
+        self.held = 0
+        self.peak = 0
+
+    @asynccontextmanager
+    async def acquire(self, **kwargs):
+        self.held += 1
+        self.peak = max(self.peak, self.held)
+        try:
+            async with self._pool.acquire(**kwargs) as conn:
+                yield conn
+        finally:
+            self.held -= 1
+
+
+class TestCollectionsShareOfThePool:
+    async def test_a_tick_leaves_connections_for_the_screens(self, pool) -> None:
+        """`tick` gathers every tracked event at once, and each writes for as long as its markets take.
+        Uncapped, collection held every connection there was and a read waited on an acquire with no
+        deadline — the Polymarket tab that spun and never arrived."""
+        payloads = {
+            f"e-{n}": fakes.event_payload(
+                f"e-{n}", slug=f"event-{n}", markets=(fakes.market_payload(f"m-{n}"),)
+            )
+            for n in range(1, 7)
+        }
+        for payload in payloads.values():
+            await track(pool, payload)
+        counting = CountingPool(pool)
+
+        written = await ingest(counting, fakes.FakeProvider(payloads), db_concurrency=2).tick()
+
+        assert written == 12, "every event was still sampled"
+        assert counting.peak <= 2

@@ -76,6 +76,7 @@ async def lifespan(app: FastAPI):
             interval_seconds=settings.sample_interval_seconds,
             window_days=settings.history_window_days,
             default_backfill_days=settings.default_backfill_days,
+            db_concurrency=settings.sampler_db_concurrency,
         )
         app.state.ingest = ingest
         await ingest.start()

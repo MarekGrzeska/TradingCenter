@@ -9,6 +9,7 @@ from fastapi import APIRouter, HTTPException, Request, status
 
 from .. import provider, store, tracking, views
 from ..contract import DeletionResult, Problem, TrackedEventOut, TrackRequest, TrackResult
+from . import deps
 
 log = logging.getLogger(__name__)
 
@@ -25,7 +26,7 @@ async def list_events(
 ) -> list[TrackedEventOut]:
     """Every observation. There is no filter for stopped ones, because there are none:
     an observation is collected or it is gone."""
-    async with request.app.state.pool.acquire() as conn:
+    async with deps.connection(request.app.state.pool) as conn:
         return await views.tracked_events(
             conn,
             interval_seconds=_settings(request).sample_interval_seconds,
@@ -39,7 +40,7 @@ async def list_events(
     responses={404: {"model": Problem}},
 )
 async def read_event(request: Request, provider_event_id: str) -> TrackedEventOut:
-    async with request.app.state.pool.acquire() as conn:
+    async with deps.connection(request.app.state.pool) as conn:
         found = await views.tracked_events(
             conn,
             interval_seconds=_settings(request).sample_interval_seconds,
@@ -86,7 +87,7 @@ async def track_event(request: Request, body: TrackRequest) -> TrackResult:
             status.HTTP_502_BAD_GATEWAY, detail=f"the provider refused: {err}"
         ) from err
 
-    async with request.app.state.pool.acquire() as conn:
+    async with deps.connection(request.app.state.pool) as conn:
         group_id = None
         if body.group:
             group_id = (await store.create_group(conn, body.group)).id
@@ -132,7 +133,7 @@ async def remove_event(request: Request, provider_event_id: str) -> None:
     `204` rather than the removed event: what is returned about a thing that no longer exists
     is a shape somebody will be tempted to read.
     """
-    async with request.app.state.pool.acquire() as conn:
+    async with deps.connection(request.app.state.pool) as conn:
         if not await store.remove_event(conn, provider_event_id):
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND,
@@ -154,7 +155,7 @@ async def delete_history(request: Request, provider_event_id: str) -> DeletionRe
     binding on planning, so the window would read as already collected and nothing would
     come back to it.
     """
-    async with request.app.state.pool.acquire() as conn:
+    async with deps.connection(request.app.state.pool) as conn:
         events = await store.load_events(conn, provider_event_id=provider_event_id)
         if not events:
             raise HTTPException(

@@ -99,6 +99,28 @@ Two smaller ones, both traps: a price-history request is capped at **15 days** b
 nothing — and `endTs` is ignored, the response running to the present moment regardless.
 Both edges are therefore checked when a sample is written, not merely asked for.
 
+## What made the screens slow, measured 31 August 2026
+
+Both surfaces were reported loading slowly or not at all, and three things were behind it. Each is
+worth knowing because each looks harmless in the code that has it.
+
+**The newest price of every outcome cost a sort of the whole archive.** `DISTINCT ON (outcome_id)
+... ORDER BY outcome_id, observed_at DESC` wants its two columns in opposite directions, which no
+index this schema can hold provides, so every read sorted every sample ever collected. At 3,2M rows
+it measured **3520 ms**; driven from `outcomes` with a `LATERAL`, **3,4 ms** — and flat in the
+archive's depth rather than linear in it. The terminal asks for this every 30 s, `pocket` every 60.
+
+**A tick held every connection in the pool.** `tick` gathers all tracked events, and each held its
+connection through a round trip per market, per outcome and per collected range — 644 of them for a
+measured 128-market event, once a minute. With the pool at ten and ten events tracked, a read waited
+on `pool.acquire()`, which has no deadline. Three statements now cover an event whatever its size,
+`SAMPLER_DB_CONCURRENCY` caps collection's share of the pool, and a read that still finds nothing
+free is refused with a 503 after five seconds rather than left to the platform's 230 s idle cut.
+
+**The database is one burstable core.** `B_Standard_B1ms`, shared by every module's database. The
+two fixes above matter more here than they would on a larger server: sustained CPU exhausts the
+burst credits, and what is then slow is every module at once, not this one.
+
 ## Configuration
 
 `.env.example` is the list. `DATABASE_USER` unset selects local mode and narrows the
