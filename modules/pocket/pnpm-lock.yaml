@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@azure/msal-browser':
+        specifier: ^5.20.0
+        version: 5.20.0
       react:
         specifier: ^19.1.0
         version: 19.2.8
@@ -74,6 +77,14 @@ packages:
 
   '@asamuzakjp/css-color@3.2.0':
     resolution: {integrity: sha512-K1A6z8tS3XsmCMM86xoWdn7Fkdn9m6RSVtocUrJYIwZnFVkng/PvkEoWtOWmP+Scc6saYWHWZYbndEEXxl24jw==}
+
+  '@azure/msal-browser@5.20.0':
+    resolution: {integrity: sha512-mtOKr708E/E/+qhI50QufmhR8GS5C84IeFGEaH/guMOaPXT9B/obEt8TVzX5U8j5OEUgukn0PrRmwVKaigr2wA==}
+    engines: {node: '>=0.8.0'}
+
+  '@azure/msal-common@16.14.0':
+    resolution: {integrity: sha512-A4rb55hI86Q9tBl/+jBj7TMz7iX2RFgQs/nExFzcAtoI/BFRVdaH5SL/MivrYD7qvweMpN8AgVvVMHV8UBYxew==}
+    engines: {node: '>=0.8.0'}
 
   '@babel/code-frame@7.29.7':
     resolution: {integrity: sha512-Aup7aUOfpbAUg2ROOJN6Iw5f9DMBlzu0mIkm/malLQFN/YQgO48wCj0Kxa3sEHJvPVFg7siR+qRInwXd2qhQKw==}
@@ -1689,6 +1700,12 @@ snapshots:
       '@csstools/css-parser-algorithms': 3.0.5(@csstools/css-tokenizer@3.0.4)
       '@csstools/css-tokenizer': 3.0.4
       lru-cache: 10.4.3
+
+  '@azure/msal-browser@5.20.0':
+    dependencies:
+      '@azure/msal-common': 16.14.0
+
+  '@azure/msal-common@16.14.0': {}
 
   '@babel/code-frame@7.29.7':
     dependencies:

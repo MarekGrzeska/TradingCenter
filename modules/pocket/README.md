@@ -78,7 +78,26 @@ first read has nothing to fall back on, and that one renders the failure instead
 archive answers (a relative path goes through the dev proxy), `POLYMARKET_PROXY_TARGET` is what that
 proxy forwards to and never reaches the browser.
 
-**There is no sign-in here yet.** Locally `polymarket-data` requires no principal, so this works
-against the dev stack as it stands. A deployed copy would need what the terminal does — an Entra
-token for the archive's audience, and the app's identity in that module's `allowed_applications` —
-and that is a change to `infra/`, not to this module alone.
+**Sign-in is all three Entra values or none.** `VITE_ENTRA_CLIENT_ID`, `VITE_ENTRA_TENANT_ID` and
+`VITE_ENTRA_SCOPE_POLYMARKET` are set by the deploy and unset locally, where `polymarket-data`
+requires no principal and every request goes out bare. Two of the three is refused by
+`data/config.ts` rather than half-configured: it would send the operator to a sign-in that cannot
+finish, and Entra reports that as an unknown resource rather than as the missing setting it is.
+
+## Deployment
+
+A Static Web App of its own — `swa-tradingcenter-pocket`, Free tier, `infra/static-web-app.tf` —
+deployed by `.github/workflows/deploy-pocket.yml` on any push to `main` under `modules/pocket/`. A
+pull request gets a preview environment, and closing it takes that environment down: the Free SKU
+allows three.
+
+It carries **its own Entra registration**, `app-tradingcenter-pocket`, rather than a second redirect
+URI on the terminal's: one registration for two origins means consent granted for one is granted for
+the other, and the two screens are meant to be revocable apart. It asks for one API — the archive's
+`access_as_user` — and `polymarket-data` names it twice, in Easy Auth's `allowed_applications` and
+in its own `REST_CALLER_APPLICATION_IDS`, because the platform authorizes an application and the
+module authorizes a surface.
+
+**The infrastructure has to land before the image that needs it**, the way it does for every module
+here: the registration, the CORS origin and the caller lists are one `terraform apply`, and the
+operator runs it — this root manages Entra objects, which CI may read and not write.

@@ -4,6 +4,7 @@
  */
 
 import type { components } from "../data/contract.polymarket.generated";
+import { noIdentity, type Identity } from "../auth/identity";
 import { archiveBase } from "../data/config";
 import { jsonClient } from "../data/http";
 
@@ -135,8 +136,11 @@ export interface PolymarketApi {
   removeEvent(providerEventId: string, signal: AbortSignal): Promise<void>;
 }
 
-export function createPolymarketApi(base: string = archiveBase()): PolymarketApi {
-  const http = jsonClient("polymarket-data", STATUS_KINDS);
+export function createPolymarketApi(
+  base: string = archiveBase(),
+  identity: Identity = noIdentity,
+): PolymarketApi {
+  const http = jsonClient("polymarket-data", STATUS_KINDS, identity);
 
   return {
     async listEvents(signal) {

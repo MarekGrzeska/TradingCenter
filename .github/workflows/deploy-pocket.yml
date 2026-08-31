@@ -1,0 +1,113 @@
+name: deploy-pocket
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "modules/pocket/**"
+      - ".github/workflows/deploy-pocket.yml"
+  pull_request:
+    branches: [main]
+    # `closed` is not decoration: a merged PR's preview environment outlives it
+    # otherwise, and the Free SKU allows three. See the `close_preview` job.
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - "modules/pocket/**"
+      - ".github/workflows/deploy-pocket.yml"
+  workflow_dispatch: {}
+
+# Static Web Apps' GitHub deployment path has no OIDC option — the action takes a deployment token only. That
+# token is the same narrow, flagged exception to design.md's "no stored Azure secret" the terminal's is.
+permissions:
+  contents: read
+  pull-requests: write # Azure/static-web-apps-deploy comments preview URLs on PRs
+
+concurrency:
+  # Keyed by event, not by `github.ref` alone: merging a PR fires two runs in the same second, and under a
+  # ref-only key `cancel-in-progress` kills the production deploy one second in.
+  group: deploy-pocket-${{ github.event_name }}-${{ github.event.number || github.ref }}
+  # A superseded PR build is worth cancelling; a deploy to the real site is not.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/pocket
+    # PRs get a preview environment; only `main` is the real site. Skipped for PRs from forks, which never have
+    # the deployment token, and for a PR being closed, which is `close_preview`'s job.
+    if: >-
+      github.event.action != 'closed' &&
+      (github.event_name != 'pull_request' ||
+       github.event.pull_request.head.repo.full_name == github.repository)
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: modules/pocket/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: modules/pocket/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+
+      # Cross-origin, full-URL mode: Static Web Apps proxies nothing here, and the archive is a different host
+      # behind its own Easy Auth. All four values are **public** — a hostname, a client id, a tenant id and a
+      # scope name travel in every request the browser makes — so they go through `vars`, never `secrets`.
+      #
+      # **All three Entra values or none**: `data/config.ts` refuses two of the three and runs without a sign-in
+      # instead, which against a deployed archive is a screen that 401s on every read.
+      - run: pnpm build
+        env:
+          VITE_POLYMARKET_HTTP: https://app-tradingcenter-polymarket-data.azurewebsites.net
+          VITE_ENTRA_CLIENT_ID: ${{ vars.POCKET_ENTRA_CLIENT_ID }}
+          # The directory, not the terminal's copy of it: one tenant, one variable, already set for the
+          # terraform workflows.
+          VITE_ENTRA_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          # A literal, like the terminal's four: the same kind of public fact as the hostname beside it, and a
+          # scope left unset is no credential rather than another module's.
+          VITE_ENTRA_SCOPE_POLYMARKET: api://tradingcenter-polymarket-data/access_as_user
+
+      - uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_POCKET }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "modules/pocket/dist"
+          output_location: ""
+          skip_app_build: true
+
+      # Only for the real site, since a preview lives on a hostname this does not know. Two assertions, because
+      # the terminal has already been wrong about one: a single-page app whose host does not rewrite unknown
+      # paths serves `/` and 404s everything else, and the sign-in redirect comes back to `/`.
+      - name: Smoke-check the deployed screen
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          base="https://ashy-island-05d1d8e0f.6.azurestaticapps.net"
+          for attempt in $(seq 1 10); do
+            root=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$base/" || echo 000)
+            asset=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$base/manifest.webmanifest" || echo 000)
+            echo "attempt $attempt: / -> $root, /manifest.webmanifest -> $asset"
+            if [ "$root" = "200" ] && [ "$asset" = "200" ]; then
+              echo "pocket is serving, and it is installable"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::pocket did not serve both / ($root) and /manifest.webmanifest ($asset)"
+          exit 1
+
+  # Take the preview environment down with the PR that created it: the Free SKU allows three, so the fourth PR
+  # gets a hard `BadRequest` on a branch whose own build is fine. No checkout and no build.
+  close_preview:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request' && github.event.action == 'closed'
+    steps:
+      - uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_POCKET }}
+          action: "close"

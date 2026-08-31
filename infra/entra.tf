@@ -128,3 +128,51 @@ output "terminal_entra_scope" {
   description = "The scope the terminal asks for when it wants a token for market-data."
   value       = "${local.market_data_api_uri}/${local.market_data_api_scope}"
 }
+
+# --- pocket, as a caller of polymarket-data ------------------------------------------
+#
+# Its own registration rather than a second redirect URI on the terminal's: one registration for two origins means a
+# consent granted for one is granted for the other, and the two screens are meant to be revocable apart. It asks for
+# **one** API, which is the whole difference from the terminal's three blocks.
+resource "azuread_application" "pocket" {
+  display_name = "app-tradingcenter-pocket"
+
+  single_page_application {
+    # The trailing slash is not optional — the provider refuses a redirect URI without one when there is no path
+    # segment — and MSAL's default `window.location.origin` has none, so `auth/entra.ts` sets `redirectUri` itself.
+    redirect_uris = ["${local.pocket_origin}/"]
+  }
+
+  required_resource_access {
+    resource_app_id = module.polymarket_data_easy_auth.client_id
+
+    resource_access {
+      id   = module.polymarket_data_easy_auth.scope_id
+      type = "Scope"
+    }
+  }
+}
+
+resource "azuread_service_principal" "pocket" {
+  client_id = azuread_application.pocket.client_id
+}
+
+# Consent decided here rather than on a screen, for the terminal's reason: otherwise the operator is asked whether they
+# agree to give their own phone screen access to their own archive — a question with one sensible answer.
+resource "azuread_application_pre_authorized" "polymarket_data_pocket" {
+  application_id       = module.polymarket_data_easy_auth.application_id
+  authorized_client_id = azuread_application.pocket.client_id
+  permission_ids       = [module.polymarket_data_easy_auth.scope_id]
+}
+
+# The two values pocket's build needs that the terminal's does not already publish. Public by nature, like the
+# terminal's three: a client id travels in every authorization request the browser makes. The scope it asks for is
+# `terminal_entra_scope_polymarket`, which is the same string for both screens and stays output once.
+output "pocket_entra_client_id" {
+  value = azuread_application.pocket.client_id
+}
+
+output "pocket_origin" {
+  description = "Where the phone screen is served — the redirect URI above, the origin polymarket-data's CORS allows, and what deploy-pocket.yml smoke-checks."
+  value       = local.pocket_origin
+}

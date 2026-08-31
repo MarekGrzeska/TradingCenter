@@ -19,6 +19,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
+    "@azure/msal-browser": "^5.20.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0"
   },
