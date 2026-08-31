@@ -39,6 +39,9 @@ GOOD_ENV: dict[str, str] = {
     # Nor here: the model key is optional, and without it the module collects and reads nothing.
     "social-data": "DATABASE_URL=postgresql://social:pw@127.0.0.1:55432/social\n",
     "strategy": "DATABASE_URL=postgresql://strategy:pw@127.0.0.1:55432/strategy\n",
+    # Nor here, and deliberately: the account session that creates bots is three lines meant
+    # to stay empty, and without them the module sends and refuses to create.
+    "telegram-gateway": "DATABASE_URL=postgresql://telegram:pw@127.0.0.1:55432/telegram\n",
 }
 
 ON_PATH = {"uv", "docker", "pnpm", "npm"}
@@ -159,6 +162,7 @@ class TestRefusals:
             # Listed for market-data's reason rather than trading-mcp's: no secret of its
             # own, but `DATABASE_URL` has no default, so the process exits at start.
             "strategy",
+            "telegram-gateway",
         }
 
     def test_the_front_end_checks_are_skipped_when_neither_is_started(self) -> None:
@@ -244,6 +248,7 @@ class TestStartOrder:
             "polymarket-data",
             "social-data",
             "strategy",
+            "telegram-gateway",
             "workbench",
             "terminal",
             "pocket",
@@ -258,6 +263,7 @@ class TestStartOrder:
             "polymarket-data": 8070,
             "social-data": 8090,
             "strategy": 8080,
+            "telegram-gateway": 8100,
             "terminal": 5173,
             "pocket": 5174,
         }

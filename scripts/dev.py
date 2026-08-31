@@ -97,6 +97,9 @@ BRIGHT_MAGENTA = "\033[95m"
 # And bright cyan to the post archive: every other colour here is taken, and two services sharing
 # one is the thing this field exists to prevent.
 BRIGHT_CYAN = "\033[96m"
+# And bright yellow to the door to Telegram. Red is the failure colour and dim is the quiet one,
+# so this is the last ordinary colour left — a tenth back end would need a scheme, not a constant.
+BRIGHT_YELLOW = "\033[93m"
 
 SERVICES: tuple[Service, ...] = (
     Service(
@@ -195,6 +198,24 @@ SERVICES: tuple[Service, ...] = (
         ),
     ),
     Service(
+        name="telegram-gateway",
+        module="telegram-gateway",
+        port=8100,
+        command=(
+            "uv", "run", "uvicorn", "telegram_gateway.app:app", "--reload", "--port", "8100"
+        ),
+        log_prefix="telegram",
+        colour=BRIGHT_YELLOW,
+        health_path="/health",
+        why=(
+            "Independent of everything above it — its upstream is Telegram, and it sends "
+            "only when somebody asks. Before the workbench for the reason every tool server "
+            "is: the tool list is read on the first turn that wants one. Its other two "
+            "callers, social-data and strategy, do not wait on it at all — without a "
+            "gateway to reach they collect and decide as usual, and simply say nothing."
+        ),
+    ),
+    Service(
         name="workbench",
         module="workbench",
         port=8030,
@@ -256,11 +277,12 @@ MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
     ("polymarket-data", None),
     ("social-data", None),
     ("strategy", None),
+    ("telegram-gateway", None),
 )
 
 # Created here if missing rather than through docker-entrypoint-initdb.d, which only runs against
 # an empty volume and would never fire for a container from before these modules existed.
-LOGICAL_DATABASES = ("agent", "teams", "polymarket", "social", "strategy")
+LOGICAL_DATABASES = ("agent", "teams", "polymarket", "social", "strategy", "telegram")
 
 
 
@@ -313,6 +335,12 @@ REQUIRED_ENV: tuple[tuple[str, str], ...] = (
     # collects posts and leaves every reading empty, which /state says out loud.
     ("social-data", "copy .env.example; the defaults match compose.yaml, and the model key is optional"),
     ("strategy", "copy .env.example; the defaults match compose.yaml"),
+    # The three account-session lines are meant to stay empty: without them the module sends and
+    # refuses to create bots, which is a configuration it supports rather than a missing step.
+    (
+        "telegram-gateway",
+        "copy .env.example; the defaults match compose.yaml, and the account session is optional",
+    ),
 )
 
 
@@ -902,7 +930,8 @@ def ready_lines(*, start_front_ends: bool) -> list[str]:
         f"  Workbench docs      http://{LOOPBACK}:8030/docs",
         f"  Polymarket docs     http://{LOOPBACK}:8070/docs",
         (
-            "  Database            market_data, agent, teams, polymarket, social @ localhost:55432 "
+            "  Database            market_data, agent, teams, polymarket, social, strategy, "
+            "telegram @ localhost:55432 "
             "(compose.yaml; 'docker compose down' keeps the data)"
         ),
     ]

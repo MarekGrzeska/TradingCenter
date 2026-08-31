@@ -16,13 +16,14 @@ locals {
   # Every App Service app, once. Everything that carried a hand-typed numeral counts this instead: on 18 August
   # 2026 the memory alert the SKU decision stands on still said "all four apps" at seven.
   web_app_names = {
-    "capital-gateway" = local.capital_gateway_app_name
-    "market-data"     = local.market_data_app_name
-    "workbench"       = local.workbench_app_name
-    "trading-mcp"     = local.trading_mcp_app_name
-    "polymarket-data" = local.polymarket_data_app_name
-    "social-data"     = local.social_data_app_name
-    "strategy"        = local.strategy_app_name
+    "capital-gateway"  = local.capital_gateway_app_name
+    "market-data"      = local.market_data_app_name
+    "workbench"        = local.workbench_app_name
+    "trading-mcp"      = local.trading_mcp_app_name
+    "polymarket-data"  = local.polymarket_data_app_name
+    "social-data"      = local.social_data_app_name
+    "strategy"         = local.strategy_app_name
+    "telegram-gateway" = local.telegram_gateway_app_name
   }
 
   capital_gateway_app_name = "app-tradingcenter-gateway"
@@ -33,19 +34,21 @@ locals {
   trading_mcp_app_name = "app-tradingcenter-trading-mcp"
   # Named after the module from the first day, which is the one thing `workbench_app_name` above cannot be — a
   # rename later is a new identity, a new Postgres role and an edit in every module that names the old one.
-  polymarket_data_app_name = "app-tradingcenter-polymarket-data"
-  social_data_app_name     = "app-tradingcenter-social-data"
-  strategy_app_name        = "app-tradingcenter-strategy"
+  polymarket_data_app_name  = "app-tradingcenter-polymarket-data"
+  social_data_app_name      = "app-tradingcenter-social-data"
+  strategy_app_name         = "app-tradingcenter-strategy"
+  telegram_gateway_app_name = "app-tradingcenter-telegram-gateway"
 
   # Deterministic App Service hostnames, used ahead of `terraform apply` instead of waiting on the computed
   # `default_hostname`: Azure names of this form are `<name>.azurewebsites.net` with no surprises.
-  capital_gateway_hostname = "${local.capital_gateway_app_name}.azurewebsites.net"
-  market_data_hostname     = "${local.market_data_app_name}.azurewebsites.net"
-  workbench_hostname       = "${local.workbench_app_name}.azurewebsites.net"
-  trading_mcp_hostname     = "${local.trading_mcp_app_name}.azurewebsites.net"
-  polymarket_data_hostname = "${local.polymarket_data_app_name}.azurewebsites.net"
-  social_data_hostname     = "${local.social_data_app_name}.azurewebsites.net"
-  strategy_hostname        = "${local.strategy_app_name}.azurewebsites.net"
+  capital_gateway_hostname  = "${local.capital_gateway_app_name}.azurewebsites.net"
+  market_data_hostname      = "${local.market_data_app_name}.azurewebsites.net"
+  workbench_hostname        = "${local.workbench_app_name}.azurewebsites.net"
+  trading_mcp_hostname      = "${local.trading_mcp_app_name}.azurewebsites.net"
+  polymarket_data_hostname  = "${local.polymarket_data_app_name}.azurewebsites.net"
+  social_data_hostname      = "${local.social_data_app_name}.azurewebsites.net"
+  strategy_hostname         = "${local.strategy_app_name}.azurewebsites.net"
+  telegram_gateway_hostname = "${local.telegram_gateway_app_name}.azurewebsites.net"
 
   # What `market-data` is called when it is the *resource* a token is asked for: the terminal asks Entra for
   # `<uri>/<scope>`, and Easy Auth accepts a token whose audience is this.
@@ -73,6 +76,10 @@ locals {
   # callers are backend services presenting client credentials.
   strategy_api_uri   = "api://tradingcenter-strategy"
   strategy_api_scope = "access_as_user"
+
+  # The gateway's own audience, and without a delegated scope for trading-mcp's reason taken one step further: no
+  # browser reaches this module at all. It has no screen — the notification is the screen.
+  telegram_gateway_api_uri = "api://tradingcenter-telegram-gateway"
 
   # There used to be a third of this shape, for the tool server the agent built teams through. Those tools are a
   # layer in the workbench now — no address, no audience, nothing for a caller to present.
@@ -509,17 +516,18 @@ resource "azurerm_linux_web_app" "workbench" {
 # `local.web_app_names`, so a new module appears in the grant and in every count below, or in neither.
 locals {
   web_app_principal_ids = {
-    "capital-gateway" = azurerm_linux_web_app.capital_gateway.identity[0].principal_id
-    "market-data"     = azurerm_linux_web_app.market_data.identity[0].principal_id
-    "workbench"       = azurerm_linux_web_app.workbench.identity[0].principal_id
-    "trading-mcp"     = azurerm_linux_web_app.trading_mcp.identity[0].principal_id
-    "polymarket-data" = azurerm_linux_web_app.polymarket_data.identity[0].principal_id
-    "social-data"     = azurerm_linux_web_app.social_data.identity[0].principal_id
-    "strategy"        = azurerm_linux_web_app.strategy.identity[0].principal_id
+    "capital-gateway"  = azurerm_linux_web_app.capital_gateway.identity[0].principal_id
+    "market-data"      = azurerm_linux_web_app.market_data.identity[0].principal_id
+    "workbench"        = azurerm_linux_web_app.workbench.identity[0].principal_id
+    "trading-mcp"      = azurerm_linux_web_app.trading_mcp.identity[0].principal_id
+    "polymarket-data"  = azurerm_linux_web_app.polymarket_data.identity[0].principal_id
+    "social-data"      = azurerm_linux_web_app.social_data.identity[0].principal_id
+    "strategy"         = azurerm_linux_web_app.strategy.identity[0].principal_id
+    "telegram-gateway" = azurerm_linux_web_app.telegram_gateway.identity[0].principal_id
   }
 }
 
-# One grant, seven apps by `for_each` rather than seven copies: market-mcp reached production without one, and an
+# One grant, every app by `for_each` rather than a copy each: market-mcp reached production without one, and an
 # unresolved Key Vault reference does not fail loudly — the pull reports `unauthorized`, which reads as GHCR's fault.
 resource "azurerm_key_vault_access_policy" "apps" {
   for_each = local.web_app_principal_ids
@@ -1103,4 +1111,146 @@ output "strategy_hostname" {
 output "strategy_managed_identity_principal_id" {
   description = "The operator's one-off Postgres role creation in the `strategy` database needs this object id — and `scripts/grant-schema-ownership.sql` has to be run there too, before the first deploy tries to migrate."
   value       = azurerm_linux_web_app.strategy.identity[0].principal_id
+}
+
+# --- the door to Telegram --------------------------------------------------------------
+#
+# The eighth app, and the third whose callers are all programs — but the first with no browser among them at all: this
+# module has no screen, because the notification is the screen. **The eighth tenant on one B3 plan** is the thing to
+# watch; `plan_memory` alerts at 92%, and a module here weighs 150-310 MB.
+data "azuread_service_principal" "social_data_managed_identity" {
+  object_id = azurerm_linux_web_app.social_data.identity[0].principal_id
+}
+
+module "telegram_gateway_easy_auth" {
+  source = "./modules/easy-auth-app"
+
+  display_name   = "app-tradingcenter-telegram-gateway-easyauth"
+  identifier_uri = local.telegram_gateway_api_uri
+  redirect_uri   = "https://${local.telegram_gateway_hostname}/.auth/login/aad/callback"
+
+  # No scope: all three callers present client credentials, so there is nobody to consent on whose behalf.
+}
+
+resource "azurerm_linux_web_app" "telegram_gateway" {
+  name                = local.telegram_gateway_app_name
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  service_plan_id     = azurerm_service_plan.main.id
+  https_only          = true
+
+  # The database through an Entra token fetched at connection time, and the Key Vault references below. Telegram
+  # itself takes neither: a bot token is a row in this module's own database, and the account session is a secret.
+  identity {
+    type = "SystemAssigned"
+  }
+
+  site_config {
+    always_on = true
+
+    # No `cors` block, unlike the four modules above: no browser calls this app. Adding one later would mean a
+    # screen exists, and there is none.
+
+    application_stack {
+      # Placeholder — `deploy-telegram-gateway.yml` pushes the real GHCR image; the
+      # lifecycle block below is what stops Terraform reverting it.
+      docker_image_name = "mcr.microsoft.com/appsvc/staticsite:latest"
+
+      docker_registry_url      = local.ghcr_registry_url
+      docker_registry_username = local.ghcr_registry_username
+      docker_registry_password = local.ghcr_registry_password
+    }
+  }
+
+  auth_settings_v2 {
+    auth_enabled           = true
+    require_authentication = true
+    unauthenticated_action = "Return401"
+    default_provider       = "azureactivedirectory"
+
+    # One path, and it is one `telegram_gateway/caller_access.py` also opens — two gates stand in front of every
+    # request, and exempting a path from one is not exempting it. It names the module and nothing it holds.
+    excluded_paths = ["/"]
+
+    active_directory_v2 {
+      client_id                  = module.telegram_gateway_easy_auth.client_id
+      tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
+      client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
+
+      # Both spellings of this app's audience, for the reason market-data's taught on 21 August 2026: a list holding
+      # only the scope-name form looks like a working configuration until something asks the other way.
+      allowed_audiences = [
+        local.telegram_gateway_api_uri,
+        module.telegram_gateway_easy_auth.client_id,
+      ]
+
+      # Three callers, and the split between them is not reading from writing — all three send. It is that creating
+      # a bot and binding a destination are REST alone, which the two settings below are what actually say.
+      allowed_applications = [
+        data.azuread_service_principal.workbench_managed_identity.client_id,
+        data.azuread_service_principal.social_data_managed_identity.client_id,
+        data.azuread_service_principal.strategy_managed_identity.client_id,
+      ]
+    }
+
+    login {
+      token_store_enabled = true
+    }
+  }
+
+  # Merged rather than written once, because the account session is the setting whose *absence* is a working
+  # configuration: without it this module sends normally and refuses to create bots, naming what is missing.
+  app_settings = merge(
+    {
+      # No credential in the URL and no AZURE_* triple — config.py refuses one when DATABASE_USER is set, and the
+      # identity is ambient. That user is the role `scripts/grant-schema-ownership.sql` creates for this app.
+      DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.telegram.name}?sslmode=require"
+      DATABASE_USER = local.telegram_gateway_app_name
+
+      # Telegram's bot surface, set here rather than left to the module's default for the reason every other
+      # upstream address is: a default that moved under a dependency bump would move with nothing to say so.
+      BOT_API_BASE_URL = "https://api.telegram.org"
+
+      MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.telegram_gateway_easy_auth.password
+
+      # The module checks the caller's identity itself rather than trusting the block above is switched on.
+      REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
+
+      # Which caller reaches which surface, by the `azp`/`appid` claim naming the application — never the
+      # principal-id header, which for a delegated token names the signed-in person.
+      TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
+      REST_CALLER_APPLICATION_IDS = join(",", [
+        data.azuread_service_principal.social_data_managed_identity.client_id,
+        data.azuread_service_principal.strategy_managed_identity.client_id,
+      ])
+
+      APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
+    },
+    # All three or none, and never a reference to a secret with no value: an unresolved Key Vault reference is left
+    # in place as its own literal text, which `TELEGRAM_API_ID` would refuse to parse — a module that will not start
+    # over a capability it is supposed to work without.
+    var.telegram_account_session_configured ? {
+      TELEGRAM_API_ID   = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.telegram_api_id})"
+      TELEGRAM_API_HASH = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.telegram_api_hash})"
+      TELEGRAM_SESSION  = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.telegram_session})"
+    } : {}
+  )
+
+  lifecycle {
+    ignore_changes = [site_config[0].application_stack[0].docker_image_name]
+  }
+}
+
+output "telegram_gateway_hostname" {
+  value = azurerm_linux_web_app.telegram_gateway.default_hostname
+}
+
+output "telegram_gateway_scope" {
+  description = "What a caller asks Entra for when it wants a token for the gateway. Carried as a literal by social-data's and strategy's settings, like every other scope here."
+  value       = "${local.telegram_gateway_api_uri}/.default"
+}
+
+output "telegram_gateway_managed_identity_principal_id" {
+  description = "The operator's one-off Postgres role creation in the `telegram` database needs this object id — and `scripts/grant-schema-ownership.sql` has to be run there too, before the first deploy tries to migrate."
+  value       = azurerm_linux_web_app.telegram_gateway.identity[0].principal_id
 }

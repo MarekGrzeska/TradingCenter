@@ -165,3 +165,21 @@ variable "operator_object_id" {
   EOT
   type        = string
 }
+
+variable "telegram_account_session_configured" {
+  description = <<-EOT
+    Whether the three Telegram account secrets hold values, and so whether `telegram-gateway`
+    is given the settings that let it create bots.
+
+    False is a working configuration and the default: without the session the module sends
+    normally and refuses to create bots, naming what is missing. It is a variable rather than
+    a permanent setting because an app setting pointing at an empty Key Vault secret does not
+    fail — App Service leaves the reference in place as its own literal text, and the module
+    then refuses to start over a capability it is meant to work without.
+
+    Set the three secrets first (`az keyvault secret set --name telegram-api-id ...`), then
+    flip this and apply. Clearing it back to false is the rollback and costs one restart.
+  EOT
+  type        = bool
+  default     = false
+}

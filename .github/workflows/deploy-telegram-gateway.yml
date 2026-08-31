@@ -1,0 +1,38 @@
+name: deploy-telegram-gateway
+
+# Only a push to `main` deploys — the pull_request federated credential (github-oidc.tf)
+# cannot even authenticate to Azure, so this cannot run from a fork's PR by construction.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "modules/telegram-gateway/**"
+      # Path dependencies are baked into this image, so a merged package fix that never redeploys its
+      # consumers never reaches production. Exactly the packages this module's pyproject.toml names.
+      - "packages/tc-runtime/**"
+      - "packages/tc-mcp-kit/**"
+      - ".github/workflows/deploy-telegram-gateway.yml"
+      - ".github/workflows/_deploy-app-service.yml"
+      - "scripts/deploy_probe.py"
+  workflow_dispatch: {}
+
+# Declared on the caller, and nowhere else will do: a reusable workflow can only *narrow* the caller's token,
+# and `id-token` is never granted by default — without this every deploy fails at `azure/login`.
+permissions:
+  contents: read
+  id-token: write # azure/login's OIDC exchange
+  packages: write # docker push to GHCR
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-app-service.yml
+    with:
+      module: telegram-gateway
+      app_name: app-tradingcenter-telegram-gateway
+      # `/` is excluded from Easy Auth and answers a constant naming the service, which only the running module
+      # can produce — and the name matters because eight applications share one plan. It carries the schema too:
+      # the module refuses to start against a database at a revision its image was not built for.
+      probe_path: /
+      expected_status: 200
+      body_contains: '"telegram-gateway"'
+      attempts: 12

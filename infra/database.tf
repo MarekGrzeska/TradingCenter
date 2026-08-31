@@ -101,6 +101,16 @@ resource "azurerm_postgresql_flexible_server_database" "strategy" {
   charset   = "UTF8"
 }
 
+# A seventh, and the reasoning has still not changed. It holds bots, destinations and a long-poll cursor — never a
+# message. Same one-off grant before the first deploy migrates, or the module starts and refuses on a table it
+# cannot alter.
+resource "azurerm_postgresql_flexible_server_database" "telegram" {
+  name      = "telegram"
+  server_id = azurerm_postgresql_flexible_server.main.id
+  collation = "en_US.utf8"
+  charset   = "UTF8"
+}
+
 # `market_data_dev` used to sit beside it, for the one morning that arrangement lasted. Applying its removal DROPS it:
 # dev data is disposable, but the operator should know that is what the plan's `destroy` means.
 
@@ -163,6 +173,17 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "strategy_outbound" 
   for_each = toset(azurerm_linux_web_app.strategy.possible_outbound_ip_address_list)
 
   name             = "AllowStrategyOutbound-${replace(each.value, ".", "-")}"
+  server_id        = azurerm_postgresql_flexible_server.main.id
+  start_ip_address = each.value
+  end_ip_address   = each.value
+}
+
+# The sixth, same shape and same first convergence: `terraform apply
+# -target=azurerm_linux_web_app.telegram_gateway` once, then the normal unrestricted apply.
+resource "azurerm_postgresql_flexible_server_firewall_rule" "telegram_gateway_outbound" {
+  for_each = toset(azurerm_linux_web_app.telegram_gateway.possible_outbound_ip_address_list)
+
+  name             = "AllowTelegramGatewayOutbound-${replace(each.value, ".", "-")}"
   server_id        = azurerm_postgresql_flexible_server.main.id
   start_ip_address = each.value
   end_ip_address   = each.value

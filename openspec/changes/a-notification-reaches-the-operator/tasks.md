@@ -38,36 +38,36 @@
 
 ## 6. Powierzchnia REST
 
-- [ ] 6.1 `contract.py` — modele odpowiedzi, żadna nie niesie tokenu
-- [ ] 6.2 Trasy wysyłki
-- [ ] 6.3 Trasy zarządzania botami i adresatami
-- [ ] 6.4 Trasa stanu: sesja konta, liczba botów, liczba adresatów
-- [ ] 6.5 `openapi.py` — wydanie dokumentu, jak w pozostałych modułach
+- [x] 6.1 `contract.py` — modele odpowiedzi, żadna nie niesie tokenu
+- [x] 6.2 Trasy wysyłki
+- [x] 6.3 Trasy zarządzania botami i adresatami
+- [x] 6.4 Trasa stanu: sesja konta, liczba botów, liczba adresatów
+- [x] 6.5 `openapi.py` — wydanie dokumentu, jak w pozostałych modułach
 
 ## 7. Powierzchnia MCP
 
-- [ ] 7.1 `mcp_app.py` — montaż `/mcp` i sesja narzędziowa w `lifespan`
-- [ ] 7.2 Narzędzie wysyłające i narzędzie wyliczające adresatów
-- [ ] 7.3 Odmowa narzędzia, gdy brama nie zna żadnego adresata
-- [ ] 7.4 Test: powierzchnia narzędziowa nie zawiera zakładania, kasowania ani wiązania
+- [x] 7.1 `mcp_app.py` — montaż `/mcp` i sesja narzędziowa w `lifespan`
+- [x] 7.2 Narzędzie wysyłające i narzędzie wyliczające adresatów
+- [x] 7.3 Odmowa narzędzia, gdy brama nie zna żadnego adresata
+- [x] 7.4 Test: powierzchnia narzędziowa nie zawiera zakładania, kasowania ani wiązania
 
 ## 8. Dostęp wywołujących
 
-- [ ] 8.1 `caller_access.py` — middleware przed routingiem, tożsamość z roszczenia aplikacji
-- [ ] 8.2 Rozłączne listy dla powierzchni narzędziowej i kontraktu REST
-- [ ] 8.3 Test: trasa dodana bez osobnej obsługi też odmawia nieznanemu wywołującemu
+- [x] 8.1 `caller_access.py` — middleware przed routingiem, tożsamość z roszczenia aplikacji
+- [x] 8.2 Rozłączne listy dla powierzchni narzędziowej i kontraktu REST
+- [x] 8.3 Test: trasa dodana bez osobnej obsługi też odmawia nieznanemu wywołującemu
 
 ## 9. Stos deweloperski i CI
 
-- [ ] 9.1 Wiersz usługi w `scripts/dev.py` (port 8100), rola i baza `telegram` w `LOGICAL_DATABASES`
+- [x] 9.1 Wiersz usługi w `scripts/dev.py` (port 8100), rola i baza `telegram` w `LOGICAL_DATABASES`
 - [x] 9.2 Job modułu w `.github/workflows/checks.yml`
-- [ ] 9.3 `Dockerfile` **i** `.github/workflows/deploy-telegram-gateway.yml` z sondą wdrożenia — razem, bo test trzyma je parą
+- [x] 9.3 `Dockerfile` **i** `.github/workflows/deploy-telegram-gateway.yml` z sondą wdrożenia — razem, bo test trzyma je parą
 
 ## 10. Infrastruktura
 
-- [ ] 10.1 App Service, baza `telegram`, rejestracja Entra i Easy Auth w `infra/app-service.tf`
-- [ ] 10.2 `TOOL_CALLER_APPLICATION_IDS` (workbench) i `REST_CALLER_APPLICATION_IDS` (social-data, strategy) plus `allowed_applications`
-- [ ] 10.3 Sekrety w Key Vault: `api_id`, `api_hash`, string sesji
+- [x] 10.1 App Service, baza `telegram`, rejestracja Entra i Easy Auth w `infra/app-service.tf`
+- [x] 10.2 `TOOL_CALLER_APPLICATION_IDS` (workbench) i `REST_CALLER_APPLICATION_IDS` (social-data, strategy) plus `allowed_applications`
+- [x] 10.3 Sekrety w Key Vault: `api_id`, `api_hash`, string sesji
 
 ## 11. Wywołujący: workbench
 

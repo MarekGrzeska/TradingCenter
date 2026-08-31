@@ -84,6 +84,13 @@ async def bot_by_username(conn: Conn, username: str) -> Bot | None:
     return _bot(row) if row is not None else None
 
 
+async def bot_by_id(conn: Conn, bot_id: int) -> Bot | None:
+    """The bot behind a destination. Its @name is what a response publishes — the row id is this
+    module's own bookkeeping and means nothing to a caller."""
+    row = await conn.fetchrow(f"SELECT {_BOT_COLUMNS} FROM bots WHERE id = $1", bot_id)
+    return _bot(row) if row is not None else None
+
+
 async def count_bots(conn: Conn) -> int:
     """How many this module holds. Read before speaking to the creator bot, because a refusal after
     the fact still costs an attempt counted against the operator's account."""
@@ -139,8 +146,17 @@ async def destination_by_name(conn: Conn, name: str) -> Destination | None:
     return _destination(row) if row is not None else None
 
 
-async def count_destinations(conn: Conn) -> int:
-    return await conn.fetchval("SELECT count(*) FROM destinations") or 0
+async def count_destinations(conn: Conn, *, receiving: bool = False) -> int:
+    """How many there are, or how many can actually receive. The two differ by every destination
+    whose link nobody has tapped yet, which is the difference a state route exists to report."""
+    if not receiving:
+        return await conn.fetchval("SELECT count(*) FROM destinations") or 0
+    return (
+        await conn.fetchval(
+            "SELECT count(*) FROM destinations WHERE state = 'ready' AND chat_id IS NOT NULL"
+        )
+        or 0
+    )
 
 
 async def remove_destination(conn: Conn, name: str) -> bool:
