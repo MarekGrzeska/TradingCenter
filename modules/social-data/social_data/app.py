@@ -14,6 +14,7 @@ from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
+from . import enrichment
 from .config import Settings
 from .ingest import Ingest
 from .providers.truth_social import TruthSocialFeed
@@ -69,6 +70,11 @@ async def lifespan(app: FastAPI):
 
         app.state.pool = pool
 
+        # `None` without a key, and the module runs anyway: collecting without reading is a
+        # supported state, which `/state` names rather than leaving the screen to guess at.
+        enricher = enrichment.build(pool, settings)
+        app.state.enrichment = enricher
+
         # After the migration and not before it: a pass started earlier would write into a schema
         # it does not know, and a bad write is not undone by a later error response.
         ingest = Ingest(
@@ -76,6 +82,7 @@ async def lifespan(app: FastAPI):
             [TruthSocialFeed(http, feed_url=settings.truth_social_feed_url)],
             interval_seconds=settings.collect_interval_seconds,
             window_hours=settings.collect_window_hours,
+            enrich=None if enricher is None else enricher.run,
         )
         app.state.ingest = ingest
         await ingest.start()

@@ -23,12 +23,12 @@
 
 ## 4. Wzbogacenie
 
-- [ ] 4.1 `enrichment.py` — jedno wywołanie modelu ze sztywnym schematem odpowiedzi, osobno tłumaczenie
-- [ ] 4.2 Zapis odczytu ze stemplem modelu i czasu, nadpisywanie poprzedniego, zapis zużycia obok
-- [ ] 4.3 Odrzucenie odpowiedzi spoza zakresu 1–10 i nieodczytywalnej — post zostaje niewzbogacony
-- [ ] 4.4 Wpięcie w pętlę zbioru: błąd jednego posta nie przerywa serii ani zbioru, post wraca w kolejnym przebiegu
-- [ ] 4.5 Praca bez skonfigurowanego modelu jako stan wspierany, widoczny w stanie modułu
-- [ ] 4.6 Testy na atrapie modelu: stempel, nadpisanie, odmowa modelu, brak konfiguracji, ograniczenie do okna
+- [x] 4.1 `enrichment.py` — jedno wywołanie modelu ze sztywnym schematem odpowiedzi, osobno tłumaczenie
+- [x] 4.2 Zapis odczytu ze stemplem modelu i czasu, nadpisywanie poprzedniego, zapis zużycia obok
+- [x] 4.3 Odrzucenie odpowiedzi spoza zakresu 1–10 i nieodczytywalnej — post zostaje niewzbogacony
+- [x] 4.4 Wpięcie w pętlę zbioru: błąd jednego posta nie przerywa serii ani zbioru, post wraca w kolejnym przebiegu
+- [x] 4.5 Praca bez skonfigurowanego modelu jako stan wspierany, widoczny w stanie modułu
+- [x] 4.6 Testy na atrapie modelu: stempel, nadpisanie, odmowa modelu, brak konfiguracji, ograniczenie do okna
 
 ## 5. Kontrakt REST
 
