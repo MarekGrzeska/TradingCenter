@@ -75,6 +75,7 @@ def test_from_settings_builds_the_servers_that_are_on_a_network() -> None:
         "market-mcp",
         "trading-mcp",
         "polymarket-mcp",
+        "social-mcp",
     ]
 
 
@@ -84,7 +85,7 @@ def test_a_local_source_is_appended_to_the_servers_rather_than_replacing_one() -
     registry = ToolServerRegistry.from_settings(_settings(), local_sources=[team_tools])
 
     labels = [server.label for server in registry._servers]
-    assert labels == ["market-mcp", "trading-mcp", "polymarket-mcp", "team tools"]
+    assert labels == ["market-mcp", "trading-mcp", "polymarket-mcp", "social-mcp", "team tools"]
 
 
 async def test_the_local_source_answers_while_neither_server_is_configured() -> None:

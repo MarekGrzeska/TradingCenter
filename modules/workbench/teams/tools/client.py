@@ -342,6 +342,7 @@ class ToolServerRegistry:
                 # Reads only. Its three writing tools change a watch list, not an
                 # account, so nothing it publishes may read as account-moving here.
                 "polymarket-mcp": ToolServer(settings, prefix="polymarket_mcp"),
+                "social-mcp": ToolServer(settings, prefix="social_mcp"),
             },
             {MEMORY_LABEL: MemoryToolSource(pool)},
         )

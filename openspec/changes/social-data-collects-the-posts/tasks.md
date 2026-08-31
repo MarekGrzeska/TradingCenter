@@ -49,8 +49,8 @@
 
 ## 7. Workbench
 
-- [ ] 7.1 `SOCIAL_MCP_URL` i `SOCIAL_MCP_SCOPE` w `workbench/config.py` i `.env.example` — oba albo żaden, nieobecność wspierana
-- [ ] 7.2 Rejestracja czwartego serwera narzędzi; test, że brak ustawienia nie odbiera rozmowie mowy
+- [x] 7.1 `SOCIAL_MCP_URL` i `SOCIAL_MCP_SCOPE` w `workbench/config.py` i `.env.example` — oba albo żaden, nieobecność wspierana
+- [x] 7.2 Rejestracja czwartego serwera narzędzi; test, że brak ustawienia nie odbiera rozmowie mowy
 
 ## 8. Terminal
 
