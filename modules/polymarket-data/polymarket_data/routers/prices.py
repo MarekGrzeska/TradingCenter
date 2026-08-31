@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query, Request, status
 
 from .. import changes, store, views
 from ..contract import ChangesOut, HistoryOut, PricePoint, Problem, SnapshotOut
+from . import deps
 
 router = APIRouter(tags=["prices"])
 
@@ -23,7 +24,7 @@ async def snapshot(request: Request) -> SnapshotOut:
     One request rather than one per event: the screen this fills has a row per outcome, and a
     single measured event holds 128 markets.
     """
-    async with request.app.state.pool.acquire() as conn:
+    async with deps.connection(request.app.state.pool) as conn:
         return await views.snapshot(conn)
 
 
@@ -47,7 +48,7 @@ async def history(
     end = until or datetime.now(UTC)
     start = since or end - DEFAULT_HISTORY_SPAN
 
-    async with request.app.state.pool.acquire() as conn:
+    async with deps.connection(request.app.state.pool) as conn:
         exists = await conn.fetchval("SELECT 1 FROM outcomes WHERE id = $1", outcome_id)
         if not exists:
             raise HTTPException(
@@ -84,7 +85,7 @@ async def event_changes(request: Request, provider_event_id: str) -> ChangesOut:
     the collected history does not reach is a null with its reason, never a zero — a zero
     would be a claim about the market rather than about the archive.
     """
-    async with request.app.state.pool.acquire() as conn:
+    async with deps.connection(request.app.state.pool) as conn:
         events = await store.load_events(conn, provider_event_id=provider_event_id)
         if not events:
             raise HTTPException(

@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 
 from . import parsing, provider, store
@@ -36,17 +38,29 @@ class Ingest:
         interval_seconds: int,
         window_days: int,
         default_backfill_days: int,
+        db_concurrency: int,
     ) -> None:
         self._pool = pool
         self._client = client
         self._interval = interval_seconds
         self._window = timedelta(days=window_days)
         self._default_depth = timedelta(days=default_backfill_days)
+        self._connections = asyncio.Semaphore(db_concurrency)
         self._task: asyncio.Task | None = None
         # Backfills started by tracking, held so they are cancelled with the module rather
         # than left writing into a closing pool.
         self._backfills: set[asyncio.Task] = set()
         self.started_at: datetime | None = None
+
+    @asynccontextmanager
+    async def _connection(self) -> AsyncIterator:
+        """A pooled connection, and never more of them at once than collection's share of the pool.
+
+        `tick` gathers every event, so without this the sampler held every connection there was and a
+        read waited on `pool.acquire()`, which has no deadline — the screen that never finished loading.
+        """
+        async with self._connections, self._pool.acquire() as conn:
+            yield conn
 
     async def start(self) -> None:
         self.started_at = _now()
@@ -112,7 +126,7 @@ class Ingest:
 
     async def tick(self) -> int:
         """One pass over every event still worth asking about. Returns samples written."""
-        async with self._pool.acquire() as conn:
+        async with self._connection() as conn:
             events = await store.sampleable_events(conn)
         if not events:
             return 0
@@ -137,7 +151,7 @@ class Ingest:
         observed_at = _now()
         prices = parsing.prices_from(payload)
 
-        async with self._pool.acquire() as conn:
+        async with self._connection() as conn:
             # The structure first: the same payload says whether a market has been added or answered,
             # so refreshing before writing lands a new market's prices on an outcome that exists.
             try:
@@ -162,22 +176,21 @@ class Ingest:
             # A tick is also a collected window — the interval it stands for, not the instant it
             # happened at. Recorded as a point, two ticks never touched and nothing ever merged.
             covered_from = observed_at - timedelta(seconds=self._interval)
-            for sample in samples:
-                await store.record_collected(
-                    conn, sample.outcome_id, covered_from, observed_at
-                )
+            await store.record_collected_many(
+                conn, [sample.outcome_id for sample in samples], covered_from, observed_at
+            )
             await store.note_sampled(conn, event_id)
         return written
 
     async def _note_failure(self, event_id: int, reason: str) -> None:
         log.warning("sampling event %s failed: %s", event_id, reason)
-        async with self._pool.acquire() as conn:
+        async with self._connection() as conn:
             await store.note_sampling_failed(conn, event_id, reason)
 
     async def backfill_event(self, event_id: int, *, since: datetime | None = None) -> int:
         """Fills an event's past, window by window. Each window succeeds, fails and is retried on its
         own: a failed window is not recorded as collected, or its gap would read as "nothing traded"."""
-        async with self._pool.acquire() as conn:
+        async with self._connection() as conn:
             outcomes = await store.outcomes_of_event(conn, event_id)
         if not outcomes:
             return 0
@@ -253,7 +266,7 @@ class Ingest:
         ]
 
         oldest_returned = datetime.fromtimestamp(points[0][0], UTC)
-        async with self._pool.acquire() as conn:
+        async with self._connection() as conn:
             written = await store.record_samples(conn, samples)
             await store.record_collected(conn, outcome_id, window_start, window_end)
             if oldest_returned - window_start > NOTHING_OLDER_SLACK:
@@ -265,17 +278,14 @@ class Ingest:
     async def close_gaps(self) -> int:
         """Fills the period between each outcome's newest sample and now. Every stop leaves one, and on
         this provider it does not stay fillable — history for a resolved market is often simply gone."""
-        async with self._pool.acquire() as conn:
+        async with self._connection() as conn:
             events = await store.sampleable_events(conn)
 
         filled = 0
         for event_id, _ in events:
-            async with self._pool.acquire() as conn:
+            async with self._connection() as conn:
                 outcomes = await store.outcomes_of_event(conn, event_id)
-                newest = {
-                    outcome_id: await store.newest_sample_at(conn, outcome_id)
-                    for outcome_id, _, _ in outcomes
-                }
+                newest = await store.newest_sample_at(conn, event_id)
             now = _now()
             for outcome_id, token_id, oldest in outcomes:
                 last = newest.get(outcome_id)

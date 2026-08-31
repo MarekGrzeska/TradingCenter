@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
+from . import deps
+
 router = APIRouter()
 
 
@@ -16,7 +18,7 @@ async def root() -> dict:
 @router.get("/health", tags=["meta"])
 async def health(request: Request) -> dict:
     """Whether the archive can answer at all, which means whether its database can."""
-    async with request.app.state.pool.acquire() as conn:
+    async with deps.connection(request.app.state.pool) as conn:
         await conn.fetchval("SELECT 1")
     return {"database": "reachable"}
 

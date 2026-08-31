@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from .. import store
 from ..contract import GroupOut, Problem
+from . import deps
 
 router = APIRouter(tags=["groups"])
 
@@ -24,7 +25,7 @@ class AssignRequest(BaseModel):
 
 @router.get("/groups", response_model=list[GroupOut])
 async def list_groups(request: Request) -> list[GroupOut]:
-    async with request.app.state.pool.acquire() as conn:
+    async with deps.connection(request.app.state.pool) as conn:
         groups = await store.list_groups(conn)
     return [
         GroupOut(id=group.id or 0, name=group.name, event_count=len(group.event_ids))
@@ -35,7 +36,7 @@ async def list_groups(request: Request) -> list[GroupOut]:
 @router.post("/groups", response_model=GroupOut, status_code=status.HTTP_201_CREATED)
 async def create_group(request: Request, body: GroupRequest) -> GroupOut:
     """Idempotent on the name: asking twice for the same category is not an error."""
-    async with request.app.state.pool.acquire() as conn:
+    async with deps.connection(request.app.state.pool) as conn:
         group = await store.create_group(conn, body.name.strip())
         groups = {existing.id: existing for existing in await store.list_groups(conn)}
     found = groups.get(group.id)
@@ -52,7 +53,7 @@ async def create_group(request: Request, body: GroupRequest) -> GroupOut:
 )
 async def delete_group(request: Request, group_id: int) -> None:
     """The events keep their observation and every sample — they come back ungrouped."""
-    async with request.app.state.pool.acquire() as conn:
+    async with deps.connection(request.app.state.pool) as conn:
         if not await store.delete_group(conn, group_id):
             raise HTTPException(status.HTTP_404_NOT_FOUND, detail=f"no group {group_id}")
 
@@ -63,7 +64,7 @@ async def delete_group(request: Request, group_id: int) -> None:
     responses={404: {"model": Problem}},
 )
 async def assign_group(request: Request, event_id: int, body: AssignRequest) -> None:
-    async with request.app.state.pool.acquire() as conn:
+    async with deps.connection(request.app.state.pool) as conn:
         if not await store.assign_group(conn, event_id, body.group_id):
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND, detail=f"no observed event with id {event_id}"

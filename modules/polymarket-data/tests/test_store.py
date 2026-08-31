@@ -93,6 +93,21 @@ class TestStructure:
         assert loaded.resolved
 
 
+    @pytest.mark.db
+    async def test_a_market_the_payload_names_twice_is_written_once(self, db) -> None:
+        """The whole event is upserted in one statement now, and two rows with one conflict target in a
+        single statement is an error rather than a last-write-wins. The provider is not promised to be tidy."""
+        market = builders.binary_market("Will it?", provider_market_id="m-twice")
+        repeated = builders.event(markets=(market, market))
+
+        event_id = await store.upsert_event(db, repeated)
+
+        [loaded] = await store.load_events(db)
+        assert loaded.id == event_id
+        assert len(loaded.markets) == 1
+        assert len(loaded.markets[0].outcomes) == 2
+
+
 class TestRemovingAnObservation:
     """The only way an event leaves the list, and it takes everything with it. What used to be here was
     three tests about an ending that stuck — a state neither the route nor the tool produces any more."""
@@ -241,6 +256,47 @@ class TestSamples:
         assert await store.history(db, yes_id, since=NOON, until=NOON) == []
 
 
+    @pytest.mark.db
+    async def test_where_a_catch_up_starts_is_read_for_the_whole_event_at_once(self, db) -> None:
+        """A restart asks this of every event it tracks, and a measured event holds 256 outcomes. An
+        outcome with nothing collected is absent rather than `None` — there is no moment to start from."""
+        event_id = await store.upsert_event(
+            db, builders.event(markets=(builders.multi_outcome_market("B?", ("X", "Y", "Z")),))
+        )
+        [x_id, y_id, z_id] = await outcome_ids(db, event_id)
+        await store.record_samples(
+            db,
+            [
+                Sample(outcome_id=x_id, observed_at=NOON - timedelta(hours=1),
+                       midpoint=Decimal("0.1"), source=Surface.GAMMA),
+                Sample(outcome_id=x_id, observed_at=NOON, midpoint=Decimal("0.2"),
+                       source=Surface.GAMMA),
+                Sample(outcome_id=y_id, observed_at=NOON - timedelta(hours=2),
+                       midpoint=Decimal("0.3"), source=Surface.GAMMA),
+            ],
+        )
+
+        newest = await store.newest_sample_at(db, event_id)
+
+        assert newest == {x_id: NOON, y_id: NOON - timedelta(hours=2)}
+        assert z_id not in newest
+
+    @pytest.mark.db
+    async def test_a_resolved_market_is_not_caught_up_on(self, db) -> None:
+        """Sampling stopped for it, so there is no gap to close — asking would spend the provider
+        budget on history that will not move again."""
+        answered = builders.binary_market("Did it?", resolved_outcome="Yes")
+        event_id = await store.upsert_event(db, builders.event(markets=(answered,)))
+        [yes_id, _] = await outcome_ids(db, event_id)
+        await store.record_samples(
+            db,
+            [Sample(outcome_id=yes_id, observed_at=NOON, midpoint=Decimal("0.9"),
+                    source=Surface.GAMMA)],
+        )
+
+        assert await store.newest_sample_at(db, event_id) == {}
+
+
 class TestWhatWasActuallyCollected:
     @pytest.mark.db
     async def test_touching_windows_merge_into_one(self, db) -> None:
@@ -295,6 +351,44 @@ class TestWhatWasActuallyCollected:
         assert await db.fetchval(
             "SELECT oldest_available_at FROM outcomes WHERE id = $1", yes_id
         ) is None
+
+
+    @pytest.mark.db
+    async def test_one_window_over_many_outcomes_merges_each_on_its_own(self, db) -> None:
+        """What a tick records: every outcome of an event covered by the one interval, in one statement.
+        Each outcome merges with what it already had, and with nothing another outcome had."""
+        event_id = await store.upsert_event(
+            db,
+            builders.event(
+                markets=(
+                    builders.binary_market("A?"),
+                    builders.multi_outcome_market("B?", ("X", "Y")),
+                )
+            ),
+        )
+        ids = await outcome_ids(db, event_id)
+        # One of the four already has a range the new window touches; the rest have nothing.
+        await store.record_collected(db, ids[0], NOON - timedelta(hours=1), NOON)
+
+        await store.record_collected_many(db, ids, NOON, NOON + timedelta(hours=1))
+
+        [merged] = await store.collected_ranges(db, ids[0])
+        assert merged.starts_at == NOON - timedelta(hours=1)
+        assert merged.ends_at == NOON + timedelta(hours=1)
+        for other in ids[1:]:
+            [only] = await store.collected_ranges(db, other)
+            assert (only.starts_at, only.ends_at) == (NOON, NOON + timedelta(hours=1))
+
+    @pytest.mark.db
+    async def test_a_window_over_no_outcomes_writes_nothing(self, db) -> None:
+        """A tick whose every price was unreadable records no collection: an empty range list would
+        otherwise become a claim that the interval was looked at."""
+        event_id = await store.upsert_event(db, builders.event())
+        [yes_id, _] = await outcome_ids(db, event_id)
+
+        await store.record_collected_many(db, [], NOON, NOON + timedelta(hours=1))
+
+        assert await store.collected_ranges(db, yes_id) == []
 
 
 class TestDeletion:

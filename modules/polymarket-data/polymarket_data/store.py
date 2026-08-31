@@ -3,6 +3,7 @@ handwritten SQL and so are the queries, so a read is the statement it will actua
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 
 from tc_runtime.db import Conn, fetch_one
@@ -60,7 +61,11 @@ async def upsert_event(
     conn: Conn, event: Event, *, group_id: int | None = None
 ) -> int:
     """The event with its whole structure, in one transaction — all of it or none. Markets and outcomes
-    are upserted rather than replaced: replacing them would cascade away the history being refreshed."""
+    are upserted rather than replaced: replacing them would cascade away the history being refreshed.
+
+    Three statements whatever the event's size, not one per row. A measured event of 128 markets took 385
+    round trips a minute here, each holding the pooled connection a read was queued behind.
+    """
     async with conn.transaction():
         row = await fetch_one(
             conn,
@@ -80,53 +85,69 @@ async def upsert_event(
             group_id,
         )
         event_id = row["id"]
+        if not event.markets:
+            return event_id
 
-        for market in event.markets:
-            market_row = await fetch_one(
-                conn,
-                """
-                INSERT INTO markets (
-                    event_id, provider_market_id, condition_id, question,
-                    group_item_title, neg_risk, closed, resolved_outcome, updated_at
-                )
-                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now())
-                ON CONFLICT (provider_market_id) DO UPDATE SET
-                    event_id = EXCLUDED.event_id,
-                    condition_id = EXCLUDED.condition_id,
-                    question = EXCLUDED.question,
-                    group_item_title = EXCLUDED.group_item_title,
-                    neg_risk = EXCLUDED.neg_risk,
-                    closed = EXCLUDED.closed,
-                    resolved_outcome = EXCLUDED.resolved_outcome,
-                    updated_at = now()
-                RETURNING id
-                """,
-                event_id,
-                market.provider_market_id,
-                market.condition_id,
-                market.question,
-                market.group_item_title,
-                market.neg_risk,
-                market.closed,
-                market.resolved_outcome,
+        # Last of each duplicate wins, and the order the provider sent them is kept. Two rows with one
+        # conflict target in a single statement is an error, not a last-write-wins, so this is required.
+        markets = list({market.provider_market_id: market for market in event.markets}.values())
+        market_rows = await conn.fetch(
+            """
+            INSERT INTO markets (
+                event_id, provider_market_id, condition_id, question,
+                group_item_title, neg_risk, closed, resolved_outcome, updated_at
             )
-            market_id = market_row["id"]
+            SELECT $1, m.provider_market_id, m.condition_id, m.question,
+                   m.group_item_title, m.neg_risk, m.closed, m.resolved_outcome, now()
+            FROM unnest(
+                $2::text[], $3::text[], $4::text[], $5::text[], $6::bool[], $7::bool[], $8::text[]
+            ) AS m(
+                provider_market_id, condition_id, question,
+                group_item_title, neg_risk, closed, resolved_outcome
+            )
+            ON CONFLICT (provider_market_id) DO UPDATE SET
+                event_id = EXCLUDED.event_id,
+                condition_id = EXCLUDED.condition_id,
+                question = EXCLUDED.question,
+                group_item_title = EXCLUDED.group_item_title,
+                neg_risk = EXCLUDED.neg_risk,
+                closed = EXCLUDED.closed,
+                resolved_outcome = EXCLUDED.resolved_outcome,
+                updated_at = now()
+            RETURNING id, provider_market_id
+            """,
+            event_id,
+            [market.provider_market_id for market in markets],
+            [market.condition_id for market in markets],
+            [market.question for market in markets],
+            [market.group_item_title for market in markets],
+            [market.neg_risk for market in markets],
+            [market.closed for market in markets],
+            [market.resolved_outcome for market in markets],
+        )
+        market_ids = {row["provider_market_id"]: row["id"] for row in market_rows}
 
-            for outcome in market.outcomes:
-                await conn.execute(
-                    """
-                    INSERT INTO outcomes (market_id, position, name, token_id)
-                    VALUES ($1, $2, $3, $4)
-                    ON CONFLICT (token_id) DO UPDATE SET
-                        market_id = EXCLUDED.market_id,
-                        position = EXCLUDED.position,
-                        name = EXCLUDED.name
-                    """,
-                    market_id,
-                    outcome.position,
-                    outcome.name,
-                    outcome.token_id,
-                )
+        outcomes = {
+            outcome.token_id: (market_ids[market.provider_market_id], outcome)
+            for market in markets
+            for outcome in market.outcomes
+        }
+        if not outcomes:
+            return event_id
+        await conn.execute(
+            """
+            INSERT INTO outcomes (market_id, position, name, token_id)
+            SELECT * FROM unnest($1::bigint[], $2::int[], $3::text[], $4::text[])
+            ON CONFLICT (token_id) DO UPDATE SET
+                market_id = EXCLUDED.market_id,
+                position = EXCLUDED.position,
+                name = EXCLUDED.name
+            """,
+            [market_id for market_id, _ in outcomes.values()],
+            [outcome.position for _, outcome in outcomes.values()],
+            [outcome.name for _, outcome in outcomes.values()],
+            list(outcomes),
+        )
     return event_id
 
 
@@ -327,15 +348,25 @@ async def history(
 
 async def latest_samples(conn: Conn) -> dict[int, Sample]:
     """The newest sample of every tracked outcome, in one query — the snapshot the terminal opens on.
-    A request per event would be a request per row of the screen."""
+    A request per event would be a request per row of the screen.
+
+    Driven from `outcomes` with a LATERAL rather than `DISTINCT ON` over the samples, so the cost follows
+    the number of outcomes and not the depth of the archive. `DISTINCT ON (outcome_id) ORDER BY
+    outcome_id, observed_at DESC` matches no index this schema can hold — the two columns are wanted in
+    opposite directions — so it sorted every sample ever collected: 3,5 s at 3,2M rows, measured
+    31 August 2026, on a read the two screens make every 30 s.
+    """
     rows = await conn.fetch(
         """
-        SELECT DISTINCT ON (s.outcome_id)
-               s.outcome_id, s.observed_at, s.midpoint, s.last_trade, s.quoted_at, s.source
-        FROM price_samples s
-        JOIN outcomes o ON o.id = s.outcome_id
-        JOIN markets m ON m.id = o.market_id
-        ORDER BY s.outcome_id, s.observed_at DESC
+        SELECT s.outcome_id, s.observed_at, s.midpoint, s.last_trade, s.quoted_at, s.source
+        FROM outcomes o
+        JOIN LATERAL (
+            SELECT p.outcome_id, p.observed_at, p.midpoint, p.last_trade, p.quoted_at, p.source
+            FROM price_samples p
+            WHERE p.outcome_id = o.id
+            ORDER BY p.observed_at DESC
+            LIMIT 1
+        ) s ON true
         """
     )
     return {
@@ -381,22 +412,38 @@ async def sample_at_or_before(conn: Conn, outcome_id: int, moment: datetime) -> 
 async def record_collected(
     conn: Conn, outcome_id: int, starts_at: datetime, ends_at: datetime
 ) -> None:
-    """Adds a window and merges it with everything it touches, in one statement. Two adjacent ranges left
-    separate answer "not collected" for the instant between them, which is a gap nothing ever fills."""
+    """Adds a window and merges it with everything it touches. Two adjacent ranges left separate answer
+    "not collected" for the instant between them, which is a gap nothing ever fills."""
+    await record_collected_many(conn, [outcome_id], starts_at, ends_at)
+
+
+async def record_collected_many(
+    conn: Conn, outcome_ids: Sequence[int], starts_at: datetime, ends_at: datetime
+) -> None:
+    """The same window against many outcomes, in one statement — what a tick records, since every outcome
+    of an event is covered by the one interval. One statement each was a round trip per outcome per minute."""
+    if not outcome_ids:
+        return
     await conn.execute(
         """
-        WITH touching AS (
-            DELETE FROM collected_ranges
-            WHERE outcome_id = $1 AND starts_at <= $3 AND ends_at >= $2
-            RETURNING starts_at, ends_at
+        WITH incoming AS (
+            SELECT DISTINCT unnest($1::bigint[]) AS outcome_id
+        ),
+        touching AS (
+            DELETE FROM collected_ranges c
+            USING incoming i
+            WHERE c.outcome_id = i.outcome_id AND c.starts_at <= $3 AND c.ends_at >= $2
+            RETURNING c.outcome_id, c.starts_at, c.ends_at
         )
         INSERT INTO collected_ranges (outcome_id, starts_at, ends_at)
-        SELECT $1,
-               LEAST($2, COALESCE(min(starts_at), $2)),
-               GREATEST($3, COALESCE(max(ends_at), $3))
-        FROM touching
+        SELECT i.outcome_id,
+               LEAST($2, COALESCE(min(t.starts_at), $2)),
+               GREATEST($3, COALESCE(max(t.ends_at), $3))
+        FROM incoming i
+        LEFT JOIN touching t ON t.outcome_id = i.outcome_id
+        GROUP BY i.outcome_id
         """,
-        outcome_id,
+        list(outcome_ids),
         starts_at,
         ends_at,
     )
@@ -580,8 +627,25 @@ async def outcomes_of_event(conn: Conn, event_id: int) -> list[tuple[int, str, d
     return [(row["id"], row["token_id"], row["oldest_available_at"]) for row in rows]
 
 
-async def newest_sample_at(conn: Conn, outcome_id: int) -> datetime | None:
-    """Where a gap-closing read has to start from."""
-    return await conn.fetchval(
-        "SELECT max(observed_at) FROM price_samples WHERE outcome_id = $1", outcome_id
+async def newest_sample_at(conn: Conn, event_id: int) -> dict[int, datetime]:
+    """Where a gap-closing read has to start from, for every unresolved outcome of one event.
+
+    One statement rather than one per outcome: a restart asks this of every event it tracks, and a
+    measured event holds 256 outcomes. An outcome with nothing collected is absent, not `None`.
+    """
+    rows = await conn.fetch(
+        """
+        SELECT o.id, s.observed_at
+        FROM outcomes o
+        JOIN markets m ON m.id = o.market_id
+        JOIN LATERAL (
+            SELECT p.observed_at FROM price_samples p
+            WHERE p.outcome_id = o.id
+            ORDER BY p.observed_at DESC
+            LIMIT 1
+        ) s ON true
+        WHERE m.event_id = $1 AND m.resolved_outcome IS NULL
+        """,
+        event_id,
     )
+    return {row["id"]: row["observed_at"] for row in rows}
