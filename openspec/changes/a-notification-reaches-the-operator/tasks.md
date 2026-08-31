@@ -53,9 +53,9 @@
 
 ## 8. Dostęp wywołujących
 
-- [ ] 8.1 `caller_access.py` — middleware przed routingiem, tożsamość z roszczenia aplikacji
-- [ ] 8.2 Rozłączne listy dla powierzchni narzędziowej i kontraktu REST
-- [ ] 8.3 Test: trasa dodana bez osobnej obsługi też odmawia nieznanemu wywołującemu
+- [x] 8.1 `caller_access.py` — middleware przed routingiem, tożsamość z roszczenia aplikacji
+- [x] 8.2 Rozłączne listy dla powierzchni narzędziowej i kontraktu REST
+- [x] 8.3 Test: trasa dodana bez osobnej obsługi też odmawia nieznanemu wywołującemu
 
 ## 9. Stos deweloperski i CI
 

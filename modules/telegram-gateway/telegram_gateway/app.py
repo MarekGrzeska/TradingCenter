@@ -16,6 +16,7 @@ from tc_runtime.db import pool as make_pool
 from . import mcp_app, redaction
 from .binding import Watcher
 from .bot_api import bot_api
+from .caller_access import CallerAccess
 from .config import Settings
 from .routers import bots, destinations, messages, meta, state
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
@@ -103,9 +104,10 @@ def create_app() -> FastAPI:
     app.state.mcp_server = server
     app.mount(mcp_app.MOUNT_PATH, tool_app)
 
-    # In front of the whole application: the address fix runs before routing, so `/mcp` and `/mcp/`
-    # are one address rather than a redirect an MCP client will not follow on a POST.
+    # In front of the whole application, and in this order: the address fix runs before routing, and
+    # the caller record before that, so nothing decides who may call after routing has begun.
     app.add_middleware(mcp_app.ToolSurfaceAddress)
+    app.add_middleware(CallerAccess, state=app.state)
     return app
 
 
