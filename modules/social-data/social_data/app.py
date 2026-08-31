@@ -8,12 +8,15 @@ import os
 import sys
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
 from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
 from .config import Settings
+from .ingest import Ingest
+from .providers.truth_social import TruthSocialFeed
 from .routers import meta
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
@@ -36,13 +39,23 @@ async def lifespan(app: FastAPI):
     settings = Settings()  # type: ignore[call-arg]
     app.state.settings = settings
 
-    async with make_pool(
-        settings.database_url,
-        user=settings.database_user,
-        client_id=settings.azure_client_id,
-        client_secret=settings.azure_client_secret,
-        tenant_id=settings.azure_tenant_id,
-    ) as pool:
+    async with (
+        make_pool(
+            settings.database_url,
+            user=settings.database_user,
+            client_id=settings.azure_client_id,
+            client_secret=settings.azure_client_secret,
+            tenant_id=settings.azure_tenant_id,
+        ) as pool,
+        httpx.AsyncClient(
+            timeout=httpx.Timeout(settings.provider_timeout_seconds, connect=10.0),
+            headers={
+                "User-Agent": settings.provider_user_agent,
+                "Accept": "application/rss+xml, application/xml;q=0.9",
+            },
+            follow_redirects=True,
+        ) as http,
+    ):
         # One connection held for the whole of it: the advisory lock is session scoped, so handing
         # the connection back to the pool in between would release it early.
         async with pool.acquire() as conn:
@@ -56,8 +69,22 @@ async def lifespan(app: FastAPI):
 
         app.state.pool = pool
 
+        # After the migration and not before it: a pass started earlier would write into a schema
+        # it does not know, and a bad write is not undone by a later error response.
+        ingest = Ingest(
+            pool,
+            [TruthSocialFeed(http, feed_url=settings.truth_social_feed_url)],
+            interval_seconds=settings.collect_interval_seconds,
+            window_hours=settings.collect_window_hours,
+        )
+        app.state.ingest = ingest
+        await ingest.start()
+
         log.info("social-data is serving")
-        yield
+        try:
+            yield
+        finally:
+            await ingest.stop()
 
 
 def create_app() -> FastAPI:

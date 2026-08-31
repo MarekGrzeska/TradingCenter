@@ -14,12 +14,12 @@
 
 ## 3. Zbiór
 
-- [ ] 3.1 `providers/__init__.py` — protokół źródła i rejestr
-- [ ] 3.2 `providers/truth_social.py` — pobranie feedu po dacie, parser dokumentu, czysta treść z rozwiniętymi encjami, rozpoznanie podania dalej
-- [ ] 3.3 Testy parsera na zapisanym dokumencie: encje, znaczniki, podanie dalej, wpis bez identyfikatora, dokument nieparsowalny
-- [ ] 3.4 `ingest.py` — pętla w `lifespan`, okno przez każdą dotkniętą datę UTC, filtr do okna, moment ostatniego udanego zbioru
-- [ ] 3.5 Zapis momentu początku zbioru przy pierwszym uruchomieniu; brak dociągania przeszłości
-- [ ] 3.6 Testy: okno przez północ, cichy feed nie rusza archiwum ani momentu zbioru, pusty dzień go aktualizuje
+- [x] 3.1 `providers/__init__.py` — protokół źródła i rejestr
+- [x] 3.2 `providers/truth_social.py` — pobranie feedu po dacie, parser dokumentu, czysta treść z rozwiniętymi encjami, rozpoznanie podania dalej
+- [x] 3.3 Testy parsera na zapisanym dokumencie: encje, znaczniki, podanie dalej, wpis bez identyfikatora, dokument nieparsowalny
+- [x] 3.4 `ingest.py` — pętla w `lifespan`, okno przez każdą dotkniętą datę UTC, filtr do okna, moment ostatniego udanego zbioru
+- [x] 3.5 Zapis momentu początku zbioru przy pierwszym uruchomieniu; brak dociągania przeszłości
+- [x] 3.6 Testy: okno przez północ, cichy feed nie rusza archiwum ani momentu zbioru, pusty dzień go aktualizuje
 
 ## 4. Wzbogacenie
 
