@@ -14,6 +14,8 @@ from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
 from . import redaction
+from .binding import Watcher
+from .bot_api import bot_api
 from .config import Settings
 from .routers import meta
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
@@ -40,14 +42,17 @@ async def lifespan(app: FastAPI):
     settings = Settings()  # type: ignore[call-arg]
     app.state.settings = settings
 
-    async with make_pool(
-        settings.database_url,
-        user=settings.database_user,
-        client_id=settings.azure_client_id,
-        client_secret=settings.azure_client_secret,
-        tenant_id=settings.azure_tenant_id,
-        max_size=settings.database_pool_size,
-    ) as pool:
+    async with (
+        bot_api(settings.bot_api_base_url) as telegram,
+        make_pool(
+            settings.database_url,
+            user=settings.database_user,
+            client_id=settings.azure_client_id,
+            client_secret=settings.azure_client_secret,
+            tenant_id=settings.azure_tenant_id,
+            max_size=settings.database_pool_size,
+        ) as pool,
+    ):
         # One connection held for the whole of it: the advisory lock is session scoped, so handing
         # the connection back to the pool in between would release it early.
         async with pool.acquire() as conn:
@@ -60,11 +65,22 @@ async def lifespan(app: FastAPI):
             await schema_version.verify(conn, MIGRATIONS)
 
         app.state.pool = pool
+        app.state.telegram = telegram
+
+        # After the migration and not before it: a bound destination is a write, and a write to a
+        # schema this process does not know is not undone by a later error response.
+        watcher = Watcher(pool, telegram)
+        app.state.watcher = watcher
+        await watcher.start()
+
         log.info(
             "telegram-gateway is serving; creating bots is %s",
             "available" if settings.can_create_bots else "unavailable (no account session)",
         )
-        yield
+        try:
+            yield
+        finally:
+            await watcher.stop()
 
 
 def create_app() -> FastAPI:

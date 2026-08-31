@@ -21,11 +21,11 @@
 
 ## 4. Adresaci i wiązanie
 
-- [ ] 4.1 Wydanie odnośnika startowego z jednorazowym sekretem i terminem ważności
-- [ ] 4.2 Pętla `getUpdates` w tle, per bot, z przesunięciem trzymanym w bazie
-- [ ] 4.3 Związanie adresata z komendy startowej niosącej sekret; zużycie sekretu
-- [ ] 4.4 Oznaczenie adresata zablokowanego i odmowa dalszych wysyłek do niego
-- [ ] 4.5 Usunięcie adresata bez ruszania bota
+- [x] 4.1 Wydanie odnośnika startowego z jednorazowym sekretem i terminem ważności
+- [x] 4.2 Pętla `getUpdates` w tle, per bot, z przesunięciem trzymanym w bazie
+- [x] 4.3 Związanie adresata z komendy startowej niosącej sekret; zużycie sekretu
+- [x] 4.4 Oznaczenie adresata zablokowanego i odmowa dalszych wysyłek do niego
+- [x] 4.5 Usunięcie adresata bez ruszania bota
 
 ## 5. Zakładanie botów
 
