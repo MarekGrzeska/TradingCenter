@@ -58,7 +58,7 @@ module runs `uv run pytest` · `ruff check .` · `pyright`, the terminal and `po
 | `polymarket-data` | `uv run alembic upgrade head`, then `uv run uvicorn polymarket_data.app:app --reload --port 8070` |
 | `strategy` | `uv run alembic upgrade head`, then `uv run uvicorn strategy.app:app --reload --port 8080` |
 | `terminal` | `pnpm dev` (5173) |
-| `pocket` | `pnpm dev` (5174) · `--host` to reach it from a phone; `scripts/dev.py` does not start it |
+| `pocket` | `pnpm dev` (5174) · the dev scripts start it too; `--host` is what a phone on the same Wi-Fi needs |
 
 - `uv run pytest` alone runs unit tests; anything needing a database **skips** without Docker.
 - `-m db` — integration against a throwaway PostgreSQL (testcontainers, random port). CI runs these.

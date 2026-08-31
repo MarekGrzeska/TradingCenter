@@ -14,7 +14,8 @@ pnpm contract:generate   # after polymarket_data/contract.py moves; CI's contrac
 ```
 
 Port **5174**. The terminal holds 5173 and both read the same archive; nothing here waits on the
-other, so either may run alone.
+other, so either may run alone — and `scripts/dev.py` starts both, dropping both under
+`--no-terminal`, because neither is a back end.
 
 ## Why a second front end rather than a tab in the terminal
 

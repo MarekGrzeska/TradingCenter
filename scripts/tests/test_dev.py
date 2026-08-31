@@ -11,13 +11,13 @@ from dev import (
     SERVICES,
     Environment,
     advisories,
+    command_for,
     database_host,
     env_value,
     is_loopback,
     parse_args,
     preflight,
     services_to_start,
-    terminal_command,
 )
 
 GOOD_ENV: dict[str, str] = {
@@ -58,12 +58,12 @@ def environment(
         port_in_use=lambda port: port in taken,
         port_owner=lambda port: f" by uvicorn (pid {1000 + port})",
         docker_daemon_answers=lambda: docker_answers,
-        node_modules_present=lambda: node_modules,
+        node_modules_present=lambda _module: node_modules,
     )
 
 
 def test_a_complete_setup_has_nothing_to_refuse() -> None:
-    assert preflight(environment(), start_terminal=True) == []
+    assert preflight(environment(), start_front_ends=True) == []
 
 
 class TestRefusals:
@@ -72,7 +72,7 @@ class TestRefusals:
         files = dict(GOOD_ENV)
         files["trading-mcp"] = "CAPITAL_GATEWAY_API_KEY=something-else\n"
 
-        problems = preflight(environment(files=files), start_terminal=True)
+        problems = preflight(environment(files=files), start_front_ends=True)
 
         assert len(problems) == 1
         assert "does not match" in problems[0]
@@ -83,7 +83,7 @@ class TestRefusals:
         files = dict(GOOD_ENV)
         files["trading-mcp"] = "SOMETHING_ELSE=1\n"
 
-        problems = preflight(environment(files=files), start_terminal=True)
+        problems = preflight(environment(files=files), start_front_ends=True)
 
         assert any("has no CAPITAL_GATEWAY_API_KEY" in p for p in problems)
 
@@ -104,7 +104,7 @@ class TestRefusals:
             f"{key}=postgresql://", f"{key}=postgresql://user:pw@{remote}:5432/x?ignored="
         )
 
-        problems = preflight(environment(files=files), start_terminal=True)
+        problems = preflight(environment(files=files), start_front_ends=True)
 
         assert any(f"modules/{module}/.env's {key} points at '{remote}'" in p for p in problems)
         assert any("never a remote database" in p for p in problems)
@@ -112,21 +112,21 @@ class TestRefusals:
     def test_a_missing_docker_is_refused(self) -> None:
         problems = preflight(
             environment(on_path=ON_PATH - {"docker"}),
-            start_terminal=True,
+            start_front_ends=True,
         )
         assert any("docker is not on PATH" in p for p in problems)
 
     def test_docker_installed_but_not_answering_is_a_different_message(self) -> None:
-        problems = preflight(environment(docker_answers=False), start_terminal=True)
+        problems = preflight(environment(docker_answers=False), start_front_ends=True)
         assert any("the daemon is not answering" in p for p in problems)
 
     def test_a_missing_uv_is_refused(self) -> None:
-        problems = preflight(environment(on_path=ON_PATH - {"uv"}), start_terminal=True)
+        problems = preflight(environment(on_path=ON_PATH - {"uv"}), start_front_ends=True)
         assert any("uv is not on PATH" in p for p in problems)
 
     def test_a_taken_port_is_refused_and_names_the_service(self) -> None:
         """The commonest reason a run appears to hang: the wait watches somebody else."""
-        problems = preflight(environment(busy_ports={8060}), start_terminal=True)
+        problems = preflight(environment(busy_ports={8060}), start_front_ends=True)
 
         assert len(problems) == 1
         assert "port 8060 is already in use" in problems[0]
@@ -139,7 +139,7 @@ class TestRefusals:
     ) -> None:
         files = {name: text for name, text in GOOD_ENV.items() if name != module}
 
-        problems = preflight(environment(files=files), start_terminal=True)
+        problems = preflight(environment(files=files), start_front_ends=True)
 
         assert any(f"modules/{module}/.env is missing" in p for p in problems)
 
@@ -157,16 +157,17 @@ class TestRefusals:
             "strategy",
         }
 
-    def test_the_terminal_checks_are_skipped_when_it_is_not_started(self) -> None:
+    def test_the_front_end_checks_are_skipped_when_neither_is_started(self) -> None:
         problems = preflight(
             environment(on_path={"uv", "docker"}, node_modules=False),
-            start_terminal=False,
+            start_front_ends=False,
         )
         assert problems == []
 
-    def test_a_missing_node_modules_is_refused_when_the_terminal_is_started(self) -> None:
-        problems = preflight(environment(node_modules=False), start_terminal=True)
-        assert any("node_modules is missing" in p for p in problems)
+    def test_a_missing_node_modules_is_refused_for_each_front_end_by_name(self) -> None:
+        problems = preflight(environment(node_modules=False), start_front_ends=True)
+        assert any("modules/terminal/node_modules is missing" in p for p in problems)
+        assert any("modules/pocket/node_modules is missing" in p for p in problems)
 
     def test_every_problem_is_reported_together(self) -> None:
         """Finding out about the second one after two services are running means killing them."""
@@ -174,7 +175,7 @@ class TestRefusals:
 
         problems = preflight(
             environment(files=files, on_path=set(), busy_ports={8010}),
-            start_terminal=True,
+            start_front_ends=True,
         )
 
         assert len(problems) > 4
@@ -193,7 +194,7 @@ class TestAdvisoriesAreNotRefusals:
         )
         env = environment(files=files)
 
-        assert preflight(env, start_terminal=True) == [], "an absent tool URL is not a refusal"
+        assert preflight(env, start_front_ends=True) == [], "an absent tool URL is not a refusal"
         assert any(f"has no {key}" in line for line in advisories(env))
 
     def test_a_complete_env_says_nothing(self) -> None:
@@ -240,6 +241,7 @@ class TestStartOrder:
             "strategy",
             "workbench",
             "terminal",
+            "pocket",
         ]
 
     def test_ports_are_the_fixed_ones(self) -> None:
@@ -251,6 +253,7 @@ class TestStartOrder:
             "polymarket-data": 8070,
             "strategy": 8080,
             "terminal": 5173,
+            "pocket": 5174,
         }
 
     def test_the_ports_that_stopped_being_anybodys_are_not_listened_on(self) -> None:
@@ -262,7 +265,7 @@ class TestStartOrder:
     def test_every_back_end_is_waited_for(self) -> None:
         """A service started and not waited for is what `dev.ps1` once did to teams-mcp."""
         for service in SERVICES:
-            if service.name == "terminal":
+            if service.front_end:
                 continue
             assert service.health_path, f"{service.name} has no health path to wait on"
 
@@ -270,11 +273,16 @@ class TestStartOrder:
         for service in SERVICES:
             assert len(service.why) > 30, f"{service.name}'s position has no reason with it"
 
-    def test_no_terminal_drops_exactly_one_service(self) -> None:
-        full = services_to_start(start_terminal=True)
-        backend = services_to_start(start_terminal=False)
-        assert len(full) - len(backend) == 1
-        assert "terminal" not in {service.name for service in backend}
+    def test_no_terminal_drops_both_screens_and_nothing_else(self) -> None:
+        """The flag kept its name when the second front end arrived, and what it drops is the kind
+        rather than the name: a back end run is a run with no screen at all."""
+        full = services_to_start(start_front_ends=True)
+        backend = services_to_start(start_front_ends=False)
+        assert {service.name for service in full} - {service.name for service in backend} == {
+            "terminal",
+            "pocket",
+        }
+        assert not any(service.front_end for service in backend)
 
     def test_every_service_directory_exists(self) -> None:
         for service in SERVICES:
@@ -290,24 +298,35 @@ class TestArgumentParsing:
     def test_both_spellings_of_the_one_flag_agree(self) -> None:
         """`dev.ps1` documents -NoTerminal and `dev.sh` --no-terminal. The wrappers pass their arguments through,
         so this is the last place a difference between the two platforms could appear."""
-        assert parse_args(["--no-terminal"]).start_terminal is False
-        assert parse_args(["-NoTerminal"]).start_terminal is False
+        assert parse_args(["--no-terminal"]).start_front_ends is False
+        assert parse_args(["-NoTerminal"]).start_front_ends is False
 
     def test_the_default_starts_everything(self) -> None:
-        assert parse_args([]).start_terminal is True
+        assert parse_args([]).start_front_ends is True
 
     def test_an_unknown_flag_is_refused(self) -> None:
         with pytest.raises(SystemExit):
             parse_args(["--no-database"])
 
 
-class TestTerminalCommand:
-    def test_pnpm_is_preferred(self) -> None:
-        assert terminal_command(environment())[0] == "pnpm"
+class TestTheCommandEachServiceIsStartedWith:
+    def test_pnpm_is_preferred_for_a_front_end(self) -> None:
+        for service in SERVICES:
+            if service.front_end:
+                assert command_for(service, environment())[0] == "pnpm"
 
     def test_npm_alone_is_enough(self) -> None:
         """Refusing over the choice of package manager helps nobody."""
-        assert terminal_command(environment(on_path={"uv", "docker", "npm"}))[0] == "npx"
+        without_pnpm = environment(on_path={"uv", "docker", "npm"})
+        for service in SERVICES:
+            if service.front_end:
+                assert command_for(service, without_pnpm)[0] == "npx"
+
+    def test_a_back_end_has_no_fallback_to_fall_back_to(self) -> None:
+        """The property that keeps this one function safe for every row: only a front end carries a
+        second command, so a missing pnpm cannot rewrite how uvicorn is started."""
+        gateway = next(service for service in SERVICES if service.name == "capital-gateway")
+        assert command_for(gateway, environment(on_path={"uv", "docker", "npm"})) == gateway.command
 
 
 class TestEnvReading:
@@ -393,13 +412,13 @@ class TestCommandResolution:
 
     def test_every_service_command_resolves_on_this_machine(self) -> None:
         """The real check: the first word of each row is something this machine can launch. `uv` covers seven of
-        the eight, and which of `pnpm`/`npx` is available is what `terminal_command` decides."""
+        the eight, and which of `pnpm`/`npx` is available is what `command_for` decides."""
         import shutil
 
         import dev
 
         for service in dev.SERVICES:
-            if service.name == "terminal":
+            if service.front_end:
                 continue
             assert shutil.which(service.command[0]), f"{service.name}: {service.command[0]}"
 
