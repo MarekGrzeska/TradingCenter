@@ -29,7 +29,24 @@ Uruchomione na tej gałęzi, nie deklarowane:
 | `openspec validate social-data-collects-the-posts --strict` | valid |
 
 Testy `live` nie były uruchamiane — czytają cudzy feed przez sieć i zostają za `--run-live`.
-`terraform plan` nie był uruchamiany: wymaga poświadczeń Azure, a apply jest operatora.
+
+**`terraform.yml` → `plan` na PR jest czerwony i to jest stan przewidziany, nie regresja.** Plan
+kończy się na `Plan: 9 to add, 16 to change, 0 to destroy` i dopiero potem odmawia:
+
+```
+Error: Invalid for_each argument
+azurerm_linux_web_app.social_data.possible_outbound_ip_address_list is a list of string,
+known only after apply
+```
+
+Reguła firewalla per aplikacja robi `for_each` po adresach wychodzących App Service, których przed
+`apply` nie ma — dokładnie to, co komentarz przy tej regule zapowiada („first convergence needs two
+applies"). Każdy poprzedni nowy moduł przeszedł przez to samo: `add-trading-tools`,
+`a-strategy-is-a-catalogue-entry`. Droga wyjścia jest ta z `database.tf`:
+`terraform apply -target=azurerm_linux_web_app.social_data` raz, potem normalny apply — i od tego
+momentu plan liczy się do końca. Nie ma tu nic do naprawienia w kodzie; jedyną alternatywą byłoby
+skasowanie reguły nazwanej po aplikacji, a jej adresy pokrywają się z istniejącymi i cała jej
+wartość to ślad, że taka aplikacja tu jest.
 
 ## Findings
 
