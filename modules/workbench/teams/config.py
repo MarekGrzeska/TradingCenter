@@ -96,6 +96,13 @@ class Settings(BaseSettings):
     social_mcp_scope: str | None = None
     social_mcp_request_timeout_seconds: float = 15.0
 
+    # The fifth, and the only one whose tool acts outside this system. Its ceiling is trading-mcp's number
+    # for trading-mcp's reason: a timeout on this side of a message already delivered is a notification
+    # sent twice, or one reported as failed after it arrived.
+    telegram_mcp_url: str | None = None
+    telegram_mcp_scope: str | None = None
+    telegram_mcp_request_timeout_seconds: float = 35.0
+
     # A ceiling on the whole run, not on one agent: the thing an operator waits on is the run. A setting
     # rather than a constant, unlike the per-agent round ceiling, which is a safety property.
     run_timeout_seconds: float = 900.0
@@ -131,6 +138,8 @@ class Settings(BaseSettings):
         "polymarket_mcp_scope",
         "social_mcp_url",
         "social_mcp_scope",
+        "telegram_mcp_url",
+        "telegram_mcp_scope",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -189,6 +198,9 @@ class Settings(BaseSettings):
         )
         self.social_mcp_url = self._coherent_tool_server_url(
             url=self.social_mcp_url, scope=self.social_mcp_scope, env_prefix="SOCIAL_MCP"
+        )
+        self.telegram_mcp_url = self._coherent_tool_server_url(
+            url=self.telegram_mcp_url, scope=self.telegram_mcp_scope, env_prefix="TELEGRAM_MCP"
         )
         return self
 

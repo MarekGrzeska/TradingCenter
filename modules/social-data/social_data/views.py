@@ -81,4 +81,6 @@ async def state(conn: Conn, settings, *, now: datetime | None = None) -> StateOu
         window_hours=settings.collect_window_hours,
         collect_interval_seconds=settings.collect_interval_seconds,
         model_configured=settings.model_configured,
+        alerts_configured=settings.alerts_configured,
+        alert_min_impact_score=settings.alert_min_impact_score,
     )

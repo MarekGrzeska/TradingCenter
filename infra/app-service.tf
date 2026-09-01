@@ -77,9 +77,15 @@ locals {
   strategy_api_uri   = "api://tradingcenter-strategy"
   strategy_api_scope = "access_as_user"
 
-  # The gateway's own audience, and without a delegated scope for trading-mcp's reason taken one step further: no
-  # browser reaches this module at all. It has no screen — the notification is the screen.
-  telegram_gateway_api_uri = "api://tradingcenter-telegram-gateway"
+  # The gateway's own audience. It has no screen — the notification is the screen — so the delegated scope below is
+  # not a browser's: it is the operator's `az`, bootstrapping the first bot and the first destination by hand.
+  telegram_gateway_api_uri   = "api://tradingcenter-telegram-gateway"
+  telegram_gateway_api_scope = "access_as_user"
+
+  # Microsoft's own well-known registration for the Azure CLI, and the only client the operator has for a
+  # module with no screen. Bootstrapping the gateway is `curl` with a token from `az`, so this is what the
+  # scope below is pre-authorized for.
+  azure_cli_client_id = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"
 
   # There used to be a third of this shape, for the tool server the agent built teams through. Those tools are a
   # layer in the workbench now — no address, no audience, nothing for a caller to present.
@@ -496,6 +502,11 @@ resource "azurerm_linux_web_app" "workbench" {
     SOCIAL_MCP_URL   = "https://${local.social_data_hostname}"
     SOCIAL_MCP_SCOPE = "${local.social_data_api_uri}/.default"
 
+    # The fifth, and the one whose tool acts outside this system: it sends a Telegram message. Same both-or-neither
+    # rule and the same rollback — clear the pair and restart, and the conversation notifies nobody.
+    TELEGRAM_MCP_URL   = "https://${local.telegram_gateway_hostname}"
+    TELEGRAM_MCP_SCOPE = "${local.telegram_gateway_api_uri}/.default"
+
     # The teams surface's own clock, in this app's `lifespan` rather than a timer calling in, which would need its own
     # registration. **The one setting here whose value is a decision**: config.py defaults it on, this states it.
     SCHEDULER_ENABLED = "true"
@@ -906,40 +917,51 @@ resource "azurerm_linux_web_app" "social_data" {
     }
   }
 
-  app_settings = {
-    # No credential in the URL and no AZURE_* triple — config.py refuses one when DATABASE_USER is set, and the
-    # identity is ambient. That user is the role `scripts/grant-schema-ownership.sql` creates, named after this app.
-    DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.social.name}?sslmode=require"
-    DATABASE_USER = local.social_data_app_name
+  # Merged, because the gateway is the setting whose *absence* is a working configuration: without it this
+  # module collects and reads exactly as before and tells nobody, which `/state` reports.
+  app_settings = merge(
+    {
+      # No credential in the URL and no AZURE_* triple — config.py refuses one when DATABASE_USER is set, and the
+      # identity is ambient. That user is the role `scripts/grant-schema-ownership.sql` creates, named after this app.
+      DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.social.name}?sslmode=require"
+      DATABASE_USER = local.social_data_app_name
 
-    # The feed, set here rather than left to the module's default for the reason every other upstream address is:
-    # it is somebody's side project, and the day it moves is a deployment.
-    TRUTH_SOCIAL_FEED_URL = "https://www.trumpstruth.org/feed"
-    PROVIDER_USER_AGENT   = "tradingcenter-social-data/0.1 (+https://github.com/MarekGrzeska)"
+      # The feed, set here rather than left to the module's default for the reason every other upstream address is:
+      # it is somebody's side project, and the day it moves is a deployment.
+      TRUTH_SOCIAL_FEED_URL = "https://www.trumpstruth.org/feed"
+      PROVIDER_USER_AGENT   = "tradingcenter-social-data/0.1 (+https://github.com/MarekGrzeska)"
 
-    # The conversation's key, read from Key Vault like the workbench reads its two — a reference, never a value in
-    # this file. **Shared rather than a third secret**, so the readings arrive on the same line of the bill as the
-    # chat; splitting them is one more `key_vault_secret_names` entry and one edit here, the day that matters.
-    OPENAI_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.openai_api_key})"
+      # The conversation's key, read from Key Vault like the workbench reads its two — a reference, never a value in
+      # this file. **Shared rather than a third secret**, so the readings arrive on the same line of the bill as the
+      # chat; splitting them is one more `key_vault_secret_names` entry and one edit here, the day that matters.
+      OPENAI_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.openai_api_key})"
 
-    # Left to config.py's defaults on purpose: which model reads a post is a decision to change by restarting,
-    # not one to redeploy for. Clearing OPENAI_API_KEY is the rollback — the module then collects and reads
-    # nothing, a state its own tests walk.
+      # Left to config.py's defaults on purpose: which model reads a post is a decision to change by restarting,
+      # not one to redeploy for. Clearing OPENAI_API_KEY is the rollback — the module then collects and reads
+      # nothing, a state its own tests walk.
 
-    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.social_data_easy_auth.password
+      MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.social_data_easy_auth.password
 
-    # The module checks the caller's identity itself rather than trusting the block above is switched on.
-    REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
+      # The module checks the caller's identity itself rather than trusting the block above is switched on.
+      REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
 
-    # Which caller reaches which surface, by the `azp` claim and never by `X-MS-CLIENT-PRINCIPAL-ID`.
-    TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
-    REST_CALLER_APPLICATION_IDS = join(",", [
-      azuread_application.terminal.client_id,
-      azuread_application.pocket.client_id,
-    ])
+      # Which caller reaches which surface, by the `azp` claim and never by `X-MS-CLIENT-PRINCIPAL-ID`.
+      TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
+      REST_CALLER_APPLICATION_IDS = join(",", [
+        azuread_application.terminal.client_id,
+        azuread_application.pocket.client_id,
+      ])
 
-    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
-  }
+      APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
+    },
+    # All three or none — config.py refuses every partial form, because each of them is silence that reads
+    # like a working configuration. The threshold is left to config.py's own default.
+    var.telegram_alert_destination == "" ? {} : {
+      TELEGRAM_GATEWAY_URL   = "https://${local.telegram_gateway_hostname}"
+      TELEGRAM_GATEWAY_SCOPE = "${local.telegram_gateway_api_uri}/.default"
+      ALERT_DESTINATION      = var.telegram_alert_destination
+    }
+  )
 
   lifecycle {
     ignore_changes = [site_config[0].application_stack[0].docker_image_name]
@@ -1067,37 +1089,48 @@ resource "azurerm_linux_web_app" "strategy" {
     }
   }
 
-  app_settings = {
-    # The archive by its own hostname, and its REST contract rather than `/mcp`: that surface is narrowed for a model
-    # and too tight for a loop reading three hundred bars of three facts at once.
-    MARKET_DATA_URL = "https://${local.market_data_hostname}"
-    # What this module presents to the archive: a token of its own identity for the archive's audience. Set here
-    # because the absence of this setting is what selects local work, where there is no directory to ask.
-    MARKET_DATA_SCOPE = "${local.market_data_api_uri}/.default"
+  # Merged, because the gateway is the setting whose *absence* is a working configuration: without it this
+  # platform evaluates and records exactly as before and says nothing.
+  app_settings = merge(
+    {
+      # The archive by its own hostname, and its REST contract rather than `/mcp`: that surface is narrowed for a model
+      # and too tight for a loop reading three hundred bars of three facts at once.
+      MARKET_DATA_URL = "https://${local.market_data_hostname}"
+      # What this module presents to the archive: a token of its own identity for the archive's audience. Set here
+      # because the absence of this setting is what selects local work, where there is no directory to ask.
+      MARKET_DATA_SCOPE = "${local.market_data_api_uri}/.default"
 
-    # No credential in the URL and no AZURE_* triple: config.py refuses one, and the system-assigned identity is
-    # ambient. `DATABASE_USER` is the role the operator creates once for that identity, named after this app.
-    DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.strategy.name}?sslmode=require"
-    DATABASE_USER = local.strategy_app_name
+      # No credential in the URL and no AZURE_* triple: config.py refuses one, and the system-assigned identity is
+      # ambient. `DATABASE_USER` is the role the operator creates once for that identity, named after this app.
+      DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.strategy.name}?sslmode=require"
+      DATABASE_USER = local.strategy_app_name
 
-    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.strategy_easy_auth.password
+      MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.strategy_easy_auth.password
 
-    # The module does not take the block above on trust: were `auth_settings_v2` switched off by a careless edit,
-    # this setting is what keeps both surfaces from answering an unidentified caller.
-    REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
+      # The module does not take the block above on trust: were `auth_settings_v2` switched off by a careless edit,
+      # this setting is what keeps both surfaces from answering an unidentified caller.
+      REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
 
-    # Which caller reaches which surface once Easy Auth has let it through, by the `azp`/`appid` claim naming the
-    # application — never the principal-id header, which for a delegated token names the signed-in person.
-    TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
-    # Comma-separated, which `config.py` splits: two browsers reach the REST contract now and the module's own record
-    # has to name both, or the second is refused by the module after the platform has already let it through.
-    REST_CALLER_APPLICATION_IDS = join(",", [
-      azuread_application.terminal.client_id,
-      azuread_application.pocket.client_id,
-    ])
+      # Which caller reaches which surface once Easy Auth has let it through, by the `azp`/`appid` claim naming the
+      # application — never the principal-id header, which for a delegated token names the signed-in person.
+      TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
+      # Comma-separated, which `config.py` splits: two browsers reach the REST contract now and the module's own record
+      # has to name both, or the second is refused by the module after the platform has already let it through.
+      REST_CALLER_APPLICATION_IDS = join(",", [
+        azuread_application.terminal.client_id,
+        azuread_application.pocket.client_id,
+      ])
 
-    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
-  }
+      APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
+    },
+    # All three or none — config.py refuses every partial form. Only a decision naming a trade is announced,
+    # and only where it changes, so this channel speaks on the scale of setups rather than of bars.
+    var.telegram_alert_destination == "" ? {} : {
+      TELEGRAM_GATEWAY_URL   = "https://${local.telegram_gateway_hostname}"
+      TELEGRAM_GATEWAY_SCOPE = "${local.telegram_gateway_api_uri}/.default"
+      ALERT_DESTINATION      = var.telegram_alert_destination
+    }
+  )
 
   lifecycle {
     ignore_changes = [site_config[0].application_stack[0].docker_image_name]
@@ -1129,7 +1162,16 @@ module "telegram_gateway_easy_auth" {
   identifier_uri = local.telegram_gateway_api_uri
   redirect_uri   = "https://${local.telegram_gateway_hostname}/.auth/login/aad/callback"
 
-  # No scope: all three callers present client credentials, so there is nobody to consent on whose behalf.
+  # Three callers present client credentials and need no scope. This one exists for a fourth that is not a module:
+  # the operator, bootstrapping the first bot and the first destination. Those two routes are REST-only and reachable
+  # by nobody else — a gateway whose destinations only the gateway can create is a gateway that never sends.
+  scope = {
+    value                      = local.telegram_gateway_api_scope
+    admin_consent_display_name = "Manage the door to Telegram"
+    admin_consent_description  = "Allows the app to reach telegram-gateway as the signed-in operator, including adding bots and binding destinations."
+    user_consent_display_name  = "Manage your door to Telegram"
+    user_consent_description   = "Allows the app to add bots, bind who receives notifications, and send one."
+  }
 }
 
 resource "azurerm_linux_web_app" "telegram_gateway" {
@@ -1190,6 +1232,9 @@ resource "azurerm_linux_web_app" "telegram_gateway" {
         data.azuread_service_principal.workbench_managed_identity.client_id,
         data.azuread_service_principal.social_data_managed_identity.client_id,
         data.azuread_service_principal.strategy_managed_identity.client_id,
+        # The operator, through `az`. Not a module, and the only one of the four that is a person — the two routes
+        # it exists for are the ones a managed identity must never reach: adopting a bot and binding a destination.
+        local.azure_cli_client_id,
       ]
     }
 
@@ -1222,6 +1267,9 @@ resource "azurerm_linux_web_app" "telegram_gateway" {
       REST_CALLER_APPLICATION_IDS = join(",", [
         data.azuread_service_principal.social_data_managed_identity.client_id,
         data.azuread_service_principal.strategy_managed_identity.client_id,
+        # Easy Auth admits an application; this is what lets that application reach these routes. Both are needed
+        # and neither substitutes for the other — `caller_access.py` refuses on this list alone.
+        local.azure_cli_client_id,
       ])
 
       APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string

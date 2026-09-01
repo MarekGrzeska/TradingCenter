@@ -183,3 +183,19 @@ variable "telegram_account_session_configured" {
   type        = bool
   default     = false
 }
+
+variable "telegram_alert_destination" {
+  description = <<-EOT
+    The destination name `social-data` and `strategy` address when they notify the operator,
+    bound in `telegram-gateway` by the operator once — never a chat id.
+
+    Empty is the default and a working configuration: neither module is given a gateway
+    address, so both collect and decide exactly as before and say nothing. It is also the
+    rollback lever design.md names — clear this, apply, and the callers restart silent.
+
+    Setting it before the destination exists in the gateway is not an outage: the sends are
+    refused, nothing is marked as told, and the next pass tries again.
+  EOT
+  type        = string
+  default     = ""
+}

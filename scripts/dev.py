@@ -510,6 +510,15 @@ ADVISORIES: tuple[tuple[str, str, str, str], ...] = (
         ),
         "8090",
     ),
+    (
+        "workbench",
+        "TELEGRAM_MCP_URL",
+        (
+            "the agent cannot send a notification, and a team assigning those tools "
+            "refuses to run"
+        ),
+        "8100",
+    ),
 )
 
 # Settings that stopped existing, and what a `.env` still carrying them is a sign of. Said rather

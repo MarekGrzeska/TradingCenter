@@ -100,6 +100,13 @@ class Settings(BaseSettings):
     social_mcp_scope: str | None = None
     social_mcp_request_timeout_seconds: float = 15.0
 
+    # The fifth, and the first whose tool does something outside this system. Its ceiling is trading-mcp's
+    # number for trading-mcp's reason: a timeout on this side of a message that was already delivered is a
+    # notification the operator gets twice, or one this module reports as failed after it arrived.
+    telegram_mcp_url: str | None = None
+    telegram_mcp_scope: str | None = None
+    telegram_mcp_request_timeout_seconds: float = 35.0
+
     # Mirrors market-data's own field and reasoning: a request without an identity, accepted because this
     # was left off, opens every session in the database — and every call that costs real money.
     require_authenticated_principal: bool = False
@@ -121,6 +128,8 @@ class Settings(BaseSettings):
         "polymarket_mcp_scope",
         "social_mcp_url",
         "social_mcp_scope",
+        "telegram_mcp_url",
+        "telegram_mcp_scope",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -177,6 +186,9 @@ class Settings(BaseSettings):
         )
         self.social_mcp_url = _checked_server(
             "SOCIAL_MCP", self.social_mcp_url, self.social_mcp_scope
+        )
+        self.telegram_mcp_url = _checked_server(
+            "TELEGRAM_MCP", self.telegram_mcp_url, self.telegram_mcp_scope
         )
         return self
 

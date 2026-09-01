@@ -210,3 +210,18 @@ output "pocket_origin" {
   description = "Where the phone screen is served — the redirect URI above, the origin polymarket-data's CORS allows, and what deploy-pocket.yml smoke-checks."
   value       = local.pocket_origin
 }
+
+
+# --- the operator, as the one caller of telegram-gateway that is a person ---------------
+
+# The seventh pre-authorization and the only one whose client is not something in this repository. `telegram-gateway`
+# has no screen — the notification is its screen — so the operator's client is `az`, and the two routes this exists
+# for are the two a managed identity must never reach: adopting a bot and binding a destination.
+#
+# Without it `az account get-access-token --resource api://tradingcenter-telegram-gateway` meets a consent prompt
+# that a command line cannot answer.
+resource "azuread_application_pre_authorized" "telegram_gateway_cli" {
+  application_id       = module.telegram_gateway_easy_auth.application_id
+  authorized_client_id = local.azure_cli_client_id
+  permission_ids       = [module.telegram_gateway_easy_auth.scope_id]
+}

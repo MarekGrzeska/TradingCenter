@@ -22,3 +22,7 @@ operator_email = "you@example.com"
 # Leave false until the three Telegram account secrets are in Key Vault. False is a working configuration: the
 # gateway sends, and refuses to create bots naming the settings it wants.
 telegram_account_session_configured = false
+
+# The name social-data and strategy send their alerts to, bound in the gateway by hand. Empty leaves both silent,
+# which is a working configuration and the rollback lever.
+telegram_alert_destination = ""

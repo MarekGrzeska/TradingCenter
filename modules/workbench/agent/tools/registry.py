@@ -39,6 +39,9 @@ class ToolServerRegistry:
                 ToolServer(settings, prefix="polymarket_mcp"),
                 # The post archive. Nothing on that surface writes at all.
                 ToolServer(settings, prefix="social_mcp"),
+                # The door to Telegram. Its send tool is the only thing on any of these surfaces whose
+                # effect is visible outside this system — and it moves no account, so not that flag.
+                ToolServer(settings, prefix="telegram_mcp"),
                 *(local_sources or []),
             ]
         )

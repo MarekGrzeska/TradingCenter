@@ -68,6 +68,17 @@ class Settings(BaseSettings):
     # a busy day must cost a bounded amount, and the rest waits for the next pass.
     enrichment_batch_limit: int = 20
 
+    # The door to Telegram, and the setting whose *absence* is a working configuration: without it
+    # the module collects and reads exactly as before and tells nobody, which `/state` reports.
+    # The three go together — an address with no destination is a message with nowhere to go.
+    telegram_gateway_url: str | None = None
+    telegram_gateway_scope: str | None = None
+    alert_destination: str | None = None
+
+    # How impactful a post must be to be worth a notification. Eight rather than five: the operator
+    # reads every one of these on a phone, and a channel that speaks daily is one nobody looks at.
+    alert_min_impact_score: int = 8
+
     # Easy Auth authorizes an application, not a route, and both surfaces stand in one process — so
     # which caller reaches which of them is this module's own record.
     require_authenticated_principal: bool = False
@@ -86,11 +97,19 @@ class Settings(BaseSettings):
     def model_configured(self) -> bool:
         return bool(self.openai_api_key and self.openai_api_key.strip())
 
-    @field_validator("truth_social_feed_url", "openai_base_url")
+    @property
+    def alerts_configured(self) -> bool:
+        """Whether this deployment can tell anybody anything. Asked at runtime rather than refused
+        at startup: silence is a state this module supports, and one it reports."""
+        return bool(self.telegram_gateway_url and self.alert_destination)
+
+    @field_validator("truth_social_feed_url", "openai_base_url", "telegram_gateway_url")
     @classmethod
     def _usable_url(cls, value: str | None, info: ValidationInfo) -> str | None:
         if value is None or not value.strip():
-            return None if info.field_name == "openai_base_url" else value
+            # The feed has a default and is never unset; the other two are optional, and a line
+            # somebody stopped filling means the same as a line that is not there.
+            return value if info.field_name == "truth_social_feed_url" else None
         parsed = urlparse(value)
         if not parsed.hostname:
             raise ValueError(f"{str(info.field_name).upper()} is not a usable URL: {value!r}")
@@ -109,7 +128,7 @@ class Settings(BaseSettings):
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()
 
-    @field_validator("database_user")
+    @field_validator("database_user", "telegram_gateway_scope", "alert_destination")
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
         # `DATABASE_USER=` left in a .env is the same intent as the line being absent —
@@ -170,3 +189,48 @@ class Settings(BaseSettings):
         if value <= 0:
             raise ValueError(f"{str(info.field_name).upper()} must be positive; got {value}")
         return value
+
+    @field_validator("alert_min_impact_score")
+    @classmethod
+    def _within_the_score_range(cls, value: int) -> int:
+        # The reading is 1..10, so a threshold outside it is a channel that is either silent for
+        # ever or one that says everything — both of which look like a working configuration.
+        if not 1 <= value <= 10:
+            raise ValueError(f"ALERT_MIN_IMPACT_SCORE must be between 1 and 10; got {value}")
+        return value
+
+    @model_validator(mode="after")
+    def _the_gateway_is_whole_or_absent(self) -> Settings:
+        """An address, a destination, and — off this machine — a scope. Named as a refusal because
+        each partial form is silence that reads like a working configuration."""
+        if self.telegram_gateway_url is None:
+            if self.telegram_gateway_scope or self.alert_destination:
+                raise ValueError(
+                    "TELEGRAM_GATEWAY_SCOPE or ALERT_DESTINATION is set without "
+                    "TELEGRAM_GATEWAY_URL — there is no gateway for either to describe. All "
+                    "three absent is a supported configuration: the module collects and tells "
+                    "nobody, which /state reports."
+                )
+            return self
+
+        if not self.alert_destination:
+            raise ValueError(
+                "TELEGRAM_GATEWAY_URL is set without ALERT_DESTINATION — the gateway addresses "
+                "by the name the operator bound, and a message with no destination has nowhere "
+                "to go."
+            )
+
+        host = (urlparse(self.telegram_gateway_url).hostname or "").lower()
+        loopback = host == "localhost" or host.startswith("127.") or host == "::1"
+        if loopback and self.telegram_gateway_scope:
+            raise ValueError(
+                "TELEGRAM_GATEWAY_SCOPE is set for a gateway on this machine's loopback, where "
+                "there is no directory to ask for a token."
+            )
+        if not loopback and not self.telegram_gateway_scope:
+            raise ValueError(
+                "TELEGRAM_GATEWAY_URL points off this machine and TELEGRAM_GATEWAY_SCOPE is "
+                "not set — the gateway is behind Easy Auth, which refuses a request carrying "
+                "no token before the module sees it."
+            )
+        return self

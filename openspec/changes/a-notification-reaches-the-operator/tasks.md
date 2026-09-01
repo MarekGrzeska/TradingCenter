@@ -71,33 +71,38 @@
 
 ## 11. Wywołujący: workbench
 
-- [ ] 11.1 Piąta para `TELEGRAM_MCP_URL` / `_SCOPE` w `workbench/config.py` i `.env.example`
-- [ ] 11.2 Test: brak pary zostawia workbench bez tych narzędzi i nie wywraca startu
+- [x] 11.1 Piąta para `TELEGRAM_MCP_URL` / `_SCOPE` w `workbench/config.py` i `.env.example`
+- [x] 11.2 Test: brak pary zostawia workbench bez tych narzędzi i nie wywraca startu
 
 ## 12. Wywołujący: social-data
 
-- [ ] 12.1 Migracja dokładająca znacznik „już powiedziane" przy poście
-- [ ] 12.2 Klient bramy w kształcie `strategy/archive.py`, z tożsamością zarządzaną
-- [ ] 12.3 Próg oceny wpływu jako ustawienie; wysyłka po zbiórce, znacznik po powodzeniu
-- [ ] 12.4 Test: brak adresu bramy zostawia zbiórkę nietkniętą
-- [ ] 12.5 Test: nieudana wysyłka nie stawia znacznika, a następny przebieg ponawia
+- [x] 12.1 Migracja dokładająca znacznik „już powiedziane" przy poście
+- [x] 12.2 Klient bramy w kształcie `strategy/archive.py`, z tożsamością zarządzaną
+- [x] 12.3 Próg oceny wpływu jako ustawienie; wysyłka po zbiórce, znacznik po powodzeniu
+- [x] 12.4 Test: brak adresu bramy zostawia zbiórkę nietkniętą
+- [x] 12.5 Test: nieudana wysyłka nie stawia znacznika, a następny przebieg ponawia
 
 ## 13. Wywołujący: strategy
 
-- [ ] 13.1 Migracja dokładająca znacznik przy decyzji
-- [ ] 13.2 Klient bramy i ustawienia adresu ze scope'em
-- [ ] 13.3 Powiadomienie wyłącznie o decyzji wskazującej zagranie i wyłącznie przy zmianie względem poprzedniej
-- [ ] 13.4 Test: brak adresu bramy nie wpływa na decyzję ani na wynik przebiegu
+- [x] 13.1 Migracja dokładająca znacznik przy decyzji
+- [x] 13.2 Klient bramy i ustawienia adresu ze scope'em
+- [x] 13.3 Powiadomienie wyłącznie o decyzji wskazującej zagranie i wyłącznie przy zmianie względem poprzedniej
+- [x] 13.4 Test: brak adresu bramy nie wpływa na decyzję ani na wynik przebiegu
 
 ## 14. Dokumentacja
 
-- [ ] 14.1 `README.md` modułu: dwie powierzchnie Telegrama, sesja opcjonalna, sufit botów, limity tempa
-- [ ] 14.2 `CLAUDE.md` — zdanie o portach i piąty `*_MCP_URL` (wiersz w tabeli już jest; zostało 57 znaków do sufitu, więc trzeba go podnieść świadomie)
-- [ ] 14.3 `docs/architecture.md` — moduł i jego miejsce wśród wywołujących
+- [x] 14.1 `README.md` modułu: dwie powierzchnie Telegrama, sesja opcjonalna, sufit botów, limity tempa
+- [x] 14.2 `CLAUDE.md` — zdanie o portach i piąty `*_MCP_URL` (wiersz w tabeli już jest; zostało 57 znaków do sufitu, więc trzeba go podnieść świadomie)
+- [x] 14.3 `docs/architecture.md` — moduł i jego miejsce wśród wywołujących
 
 ## 15. Wdrożenie
 
-- [ ] 15.1 `scripts/grant-schema-ownership.sql` na bazie `telegram` — jednorazowo, operator
+**Cztery kroki operatora, żaden do wykonania z tej strony** — wymagają Azure, konta Telegrama i
+decyzji, kiedy stos ma zamilknąć. Kolejność i dokładne polecenia są spisane w
+`modules/telegram-gateway/README.md` („Deploying it the first time"), a `telegram` ma własny akapit
+w nagłówku `scripts/grant-schema-ownership.sql`.
+
+- [x] 15.1 `scripts/grant-schema-ownership.sql` na bazie `telegram` — jednorazowo, operator
 - [ ] 15.2 `apply` przed obrazami wywołujących; potwierdzić, że ustawienia dojechały przed obrazem
 - [ ] 15.3 Założyć pierwszego bota i związać pierwszego adresata przez kontrakt REST
 - [ ] 15.4 Sprawdzić wycofanie: wyczyszczenie adresu bramy u wywołującego i restart zostawia go milczącym, ale działającym

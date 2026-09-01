@@ -23,6 +23,34 @@ The shape that pays for it is worth copying: a caller records its own *already t
 **after** a successful send. A failed send leaves no marker, so the caller's next pass tries
 again — which is the whole retry mechanism this system has.
 
+## What each surface publishes
+
+| REST | |
+|---|---|
+| `POST /messages` | one message to a named destination, now |
+| `GET /bots` · `POST /bots/adopted` · `POST /bots/created` · `DELETE /bots/{username}` | the bots this gateway may speak as — adopted from a pasted token, or created through the creator bot |
+| `GET /destinations` · `POST /destinations` · `DELETE /destinations/{name}` | who can be written to, and the start link that binds one |
+| `GET /state` | whether bots can be created, how many there are, how many destinations receive |
+| `GET /` · `GET /ping` · `GET /health` | the deploy probe, liveness, and the database |
+
+At `/mcp` there are **two** tools: `send_telegram_message` and `telegram_destinations`. Creating a
+bot, deleting one and binding a destination are REST-only, and that is the boundary worth stating:
+a message can be taken back by saying the next thing, while a bot outlives the conversation that
+asked for it and still counts against the account's ceiling.
+
+**No response carries a bot token**, including the response to the request that created it. `Bot`
+and `BotCredential` are separate types for that reason — the read has no token to give — and
+`store.credential_of` is the only statement in the module that selects one.
+
+## Who calls it
+
+Three callers, and the two lists in `caller_access.py` keep them apart. The `workbench` reaches
+`/mcp` (`TELEGRAM_MCP_URL` / `_SCOPE`, the fifth pair of that shape). `social-data` and `strategy`
+reach the REST contract with their own managed identities, each carrying
+`TELEGRAM_GATEWAY_URL` / `_SCOPE` / `ALERT_DESTINATION` — all three or none, and none of them is a
+module that collects or decides exactly as before and says nothing. The split is not reading from
+writing, since both surfaces send: it is that creating a bot and binding a destination are REST.
+
 ## Telegram has two surfaces, and they are not two flavours of one thing
 
 **The bot surface** (`api.telegram.org/bot<token>`) is stateless, authorised by a bot token, and
@@ -62,3 +90,48 @@ loopback; set, it names the Postgres role and the credential becomes an Entra to
 connection. `DATABASE_POOL_SIZE` is 4 rather than the usual 10 on purpose: seven logical databases
 share one `B_Standard_B1ms` whose `max_connections` is 35, and this module's work is one HTTP call
 per message rather than a query per row of a screen.
+
+## Deploying it the first time
+
+The order is the one `CLAUDE.md` calls non-negotiable — the operator's `apply` reaches the app
+before the image that enforces its settings — and it has one step nothing here can do for itself.
+
+1. **The role, then the database.** `scripts/grant-schema-ownership.sql` against `dbname=telegram`,
+   after creating the principal for this App Service's managed identity. Exactly once, before the
+   first deploy: the module migrates itself at startup and cannot alter what it does not own.
+2. **`terraform apply`**, which creates the App Service, the Entra registration and the `telegram`
+   database, and puts the workbench's `TELEGRAM_MCP_URL` in place. The first apply needs
+   `-target=azurerm_linux_web_app.telegram_gateway` once, because the firewall rule reads outbound
+   addresses that do not exist until the app does.
+3. **Deploy**, and `deploy_probe.py` reads `/` for `"telegram-gateway"`.
+4. **A bot and a destination**, through the REST contract — and this is the one step whose caller is
+   a person rather than a module. There is no screen, so it is `curl` with a token from `az`, which
+   the registration pre-authorizes for exactly this:
+
+   ```bash
+   TOKEN=$(az account get-access-token \
+             --resource api://tradingcenter-telegram-gateway --query accessToken -o tsv)
+   BASE=https://app-tradingcenter-telegram-gateway.azurewebsites.net
+   JSON='Content-Type: application/json'
+
+   # The token comes from @BotFather: /newbot, a title, a username ending in `bot`.
+   curl -sS -X POST "$BASE/bots/adopted" \
+        -H "Authorization: Bearer $TOKEN" -H "$JSON" \
+        -d '{"token":"<from @BotFather>"}'
+
+   curl -sS -X POST "$BASE/destinations" \
+        -H "Authorization: Bearer $TOKEN" -H "$JSON" \
+        -d '{"name":"operator","bot":"<the @name>"}'
+   ```
+
+   The second answers with a start link. **Somebody taps it, from the account that should receive
+   the alerts**, within thirty minutes. Until that tap the gateway holds an intention rather than an
+   address, and `GET /state` says `destinations_ready` is zero. Where the account session is
+   configured, `POST /bots/created` replaces the first call and @BotFather is never opened by hand.
+5. **Only then the callers.** Set `telegram_alert_destination` in `terraform.tfvars` to the name
+   bound in step 4 and apply: `social-data` and `strategy` get their three settings and start
+   announcing. Setting it earlier is not an outage — the sends are refused, nothing is marked as
+   told, and each next pass tries again.
+
+Rolling back is the same lever in reverse: clear `telegram_alert_destination`, apply, and both
+callers collect and decide exactly as before while saying nothing. Their own tests walk that state.

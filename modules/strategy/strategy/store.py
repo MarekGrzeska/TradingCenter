@@ -404,6 +404,14 @@ async def last_decision(
     return _decision(row) if row else None
 
 
+async def mark_decision_notified(
+    conn: asyncpg.Connection, decision_id: int, *, at: datetime
+) -> None:
+    """Written only after the gateway answered with a success. The gateway remembers nothing it
+    sent, so this column is both the deduplication and the whole retry."""
+    await conn.execute("UPDATE decisions SET notified_at = $2 WHERE id = $1", decision_id, at)
+
+
 async def read_decision(conn: asyncpg.Connection, decision_id: int) -> RecordedDecision | None:
     row = await conn.fetchrow(
         f"SELECT {_DECISION_COLUMNS} FROM {_DECISION_SOURCE} WHERE d.id = $1", decision_id

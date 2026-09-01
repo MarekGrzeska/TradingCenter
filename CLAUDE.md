@@ -114,7 +114,12 @@ account, checked independently — and it is the one that reads least like a set
 operator asks about their positions and the agent says it cannot see them. `POLYMARKET_MCP_URL`
 is the third of the shape, and the only one whose tools can *write*: three of its nine change the
 list of observations, and none of the nine deletes anything. `SOCIAL_MCP_URL` is the fourth, and
-its four tools only read.
+its four tools only read. `TELEGRAM_MCP_URL` is the fifth and the one that leaves the system: its
+two tools send a message and list who can be sent to, and creating a bot or binding a destination
+stays REST-only, out of any conversation's reach. `social-data` and `strategy` reach that same
+gateway over its REST contract instead, each with its own `TELEGRAM_GATEWAY_URL` / `_SCOPE` /
+`ALERT_DESTINATION` — all three or none, and none is a module that collects or decides as usual
+and says nothing.
 
 **`trading-mcp` will not start on a wish.** `CAPITAL_GATEWAY_API_KEY` must be the gateway's own
 `GATEWAY_API_KEY` — the gateway checks that header on every caller, loopback included — and it
