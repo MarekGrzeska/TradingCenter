@@ -2,12 +2,14 @@
 
 Two rules, and both are about not becoming noise. **Only a decision that names a trade** — a refusal
 is the ordinary outcome of most passes, and announcing it would bury the one that matters. And
-**only when it is a change** from the last decision for that pair: the loop evaluates on every closed
-bar, so one setup that stands for ten bars is ten identical decisions.
+**only when it is a change** from the last decision for that pair — or a repetition of one nobody
+was told about: the loop evaluates on every closed bar, so one setup that stands for ten bars is ten
+identical decisions, and only the first of them is news.
 
 The marker is written after the gateway answered with a success, never before. A failed delivery
 leaves the decision unmarked, and this is deliberate rather than incidental: the gateway remembers
-nothing it sent, so the absence of this marker is the only retry there is.
+nothing it sent, so the absence of this marker is the only retry there is — which is why the marker
+is read here and not only written.
 
 The client below is this module's own, and duplicating `social_data.alerts` is the point: no module
 imports another, and the shape they share is thirty lines of httpx that each owns for itself.
@@ -107,12 +109,18 @@ def is_new_setup(decision: Decision, previous: RecordedDecision | None) -> bool:
     A trade, and one the operator has not already been told about: the same direction standing from
     the previous bar is the same setup, not a second one. A direction that flipped is a new setup and
     says so — that is a position to reverse, not a repetition.
+
+    "Already been told" is read from the previous decision's marker, not from its existence. The
+    gateway remembers nothing it sent, so a previous trade with no marker means nobody knows about
+    this setup at all, and the repetition is the first notification rather than the second.
     """
     if decision.action != "trade":
         return False
     if previous is None or previous.decision.action != "trade":
         return True
-    return previous.decision.direction != decision.direction
+    if previous.decision.direction != decision.direction:
+        return True
+    return previous.notified_at is None
 
 
 def message(strategy_id: str, symbol: str, decision: Decision) -> str:

@@ -76,8 +76,18 @@ class TestWhichDecisionIsWorthSaying:
         previous = _recorded(Decision.no_trade("no crossing"))
         assert is_new_setup(_trade(), previous) is True
 
+    def test_the_same_setup_is_announced_again_when_nobody_was_told(self) -> None:
+        """The retry, at the layer that decides it. An unmarked previous trade means the delivery
+        did not happen, so this repetition is the first notification rather than the second."""
+        previous = _recorded(_trade("long"), notified_at=None)
+        assert is_new_setup(_trade("long"), previous) is True
 
-def _recorded(decision: Decision) -> store.RecordedDecision:
+
+def _recorded(
+    decision: Decision, *, notified_at: datetime | None = BAR
+) -> store.RecordedDecision:
+    """A decision as it was written down. Announced by default, because that is the ordinary state
+    of the one before this — the interesting case is the other one, and it says so."""
     return store.RecordedDecision(
         id=1,
         strategy_id="baseline_ma_cross",
@@ -88,6 +98,7 @@ def _recorded(decision: Decision) -> store.RecordedDecision:
         reason_kind=None,
         facts={},
         created_at=BAR,
+        notified_at=notified_at,
     )
 
 
@@ -158,6 +169,43 @@ class TestThroughTheLoop:
             assert (
                 await conn.fetchval("SELECT notified_at FROM decisions WHERE id = $1", written.id)
             ) is None
+
+    async def test_a_refused_setup_is_tried_again_on_the_next_bar(self, pool) -> None:
+        """The whole retry this system has. The first delivery is refused, so no marker is written,
+        and the same setup on the next bar is news again rather than a repetition."""
+        watch = await a_watch(pool)
+        archive = FakeArchive(last_bar=BAR, facts=crossing())
+        await evaluate_once(
+            pool, archive, watch, _alerts(RecordingGateway(GatewayUnreachable("no answer")))
+        )
+
+        archive.last_bar = BAR + timedelta(minutes=15)
+        gateway = RecordingGateway()
+        result = await evaluate_once(pool, archive, watch, _alerts(gateway))
+
+        assert result.announced is True
+        assert len(gateway.sent) == 1
+        async with pool.acquire() as conn:
+            written = await store.last_decision(conn, watch.strategy_id, watch.symbol)
+            assert written is not None and written.notified_at is not None
+
+    async def test_a_gateway_configured_later_announces_the_setup_that_is_standing(
+        self, pool
+    ) -> None:
+        """Clearing the address and restarting is the rollback, so putting it back is the ordinary
+        way in. A channel that had nothing to say for the standing setup would stay silent until the
+        direction flipped, which can be a day."""
+        watch = await a_watch(pool)
+        archive = FakeArchive(last_bar=BAR, facts=crossing())
+        await evaluate_once(pool, archive, watch, None)
+
+        archive.last_bar = BAR + timedelta(minutes=15)
+        gateway = RecordingGateway()
+        result = await evaluate_once(pool, archive, watch, _alerts(gateway))
+
+        assert result.announced is True
+        [(_, text)] = gateway.sent
+        assert "US100" in text and "long" in text
 
     async def test_no_gateway_leaves_the_decision_and_the_pass_untouched(self, pool) -> None:
         """The rollback lever, and a supported state: the platform decides, and being unable to say

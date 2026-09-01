@@ -122,6 +122,28 @@ class TestDecisions:
         assert recorded is not None
         assert recorded.reason_kind == "coverage"
 
+    async def test_a_decision_carries_whether_anybody_was_told(self, db) -> None:
+        """The alert path decides on this field, so it has to survive the read. Absent means nobody
+        knows about this setup — which is what makes the next bar try again."""
+        params = await a_parameter_set(db)
+        await store.record_decision(
+            db,
+            strategy_id="baseline_ma_cross",
+            symbol="US100",
+            parameter_set_id=params.id,
+            as_of=BAR,
+            decision=Decision.trade(direction="long", entry=100.0, stop=98.0, target=110.0),
+            reason_kind=None,
+            facts={},
+        )
+        before = await store.last_decision(db, "baseline_ma_cross", "US100")
+        assert before is not None and before.notified_at is None
+
+        await store.mark_decision_notified(db, before.id, at=BAR + timedelta(minutes=1))
+
+        after = await store.last_decision(db, "baseline_ma_cross", "US100")
+        assert after is not None and after.notified_at == BAR + timedelta(minutes=1)
+
     async def test_pending_setups_counts_only_trades(self, db) -> None:
         """The number a trigger compares against a threshold — counted from the recorded
         decisions, so it is the very fact the woken team will read."""

@@ -29,8 +29,10 @@ przełącznik, telefon ma to, co mówi wiadomość. Naprawione w #229, cztery te
 przeciw poprzedniemu `message()`.
 
 **Znacznik `notified_at` w `strategy` jest zapisywany i przez nic nieczytany**, więc obiecane
-ponowienie tam nie istnieje. To jedyne ustalenie tego przeglądu, które zostaje otwarte — szczegóły
-w Findings.
+ponowienie tam nie istnieje. To jedyne poważne ustalenie tego przeglądu — szczegóły w Findings.
+Otwarte w chwili, gdy ten dokument powstawał; naprawione zaraz potem, przez
+`a-refused-alert-is-tried-again`, bo naprawa musiała ruszyć normatywne zdanie wymagania i nie
+mieściła się w zmianie, która już była zarchiwizowana.
 
 ## Verified
 
@@ -78,9 +80,9 @@ stąd nie da się bez tokenu do `/state`, a token operatora jest jego.
 
 | Severity | Where | Finding | Status |
 |---|---|---|---|
-| **Poważne** | `strategy/alerts.py:107` (`is_new_setup`) i `strategy/store.py:407` | `notified_at` w `strategy` jest **kolumną tylko do zapisu**. O powiadomieniu decyduje wyłącznie `is_new_setup(decision, previous)`, które porównuje kierunek z **poprzednią zapisaną decyzją** i nigdy nie pyta, czy tamta rzeczywiście dojechała. Skutek: odmowa bramy dokładnie na tej świecy, na której setup powstał, nie jest ponawiana — następna świeca z tym samym kierunkiem to „nie zmiana", więc milczy, i setup stojący dziesięć świec nie zostaje zapowiedziany ani razu. To jest wprost przeciw `design.md` („nieudana wysyłka nie stawia znacznika, więc następny przebieg pętli próbuje jeszcze raz") i przeciw uzasadnieniu w `strategy-alerts` („brak znacznika jest jedynym mechanizmem ponowienia"). Asymetria widać w samych nazwach testów: `social-data` ma `test_a_failed_delivery_leaves_no_marker_and_the_next_pass_retries`, `strategy` ma `test_a_failed_delivery_leaves_the_decision_recorded_and_unmarked` — i na tym kończy. Normatywne zdania obu wymagań są spełnione (znacznik nie jest stawiany po porażce; ta sama decyzja nie powiadamia dwa razy), więc `--strict` przechodzi; nie spełniona jest obietnica, którą oba niosą w prozie. | **otwarte, udokumentowane** — poprawka to jedno zapytanie w `is_new_setup`: powtórzony kierunek jest zmianą, jeśli poprzednia decyzja nie ma `notified_at`. Osobna zmiana, bo dotyka wymagania |
+| **Poważne** | `strategy/alerts.py:107` (`is_new_setup`) i `strategy/store.py:407` | `notified_at` w `strategy` jest **kolumną tylko do zapisu**. O powiadomieniu decyduje wyłącznie `is_new_setup(decision, previous)`, które porównuje kierunek z **poprzednią zapisaną decyzją** i nigdy nie pyta, czy tamta rzeczywiście dojechała. Skutek: odmowa bramy dokładnie na tej świecy, na której setup powstał, nie jest ponawiana — następna świeca z tym samym kierunkiem to „nie zmiana", więc milczy, i setup stojący dziesięć świec nie zostaje zapowiedziany ani razu. To jest wprost przeciw `design.md` („nieudana wysyłka nie stawia znacznika, więc następny przebieg pętli próbuje jeszcze raz") i przeciw uzasadnieniu w `strategy-alerts` („brak znacznika jest jedynym mechanizmem ponowienia"). Asymetria widać w samych nazwach testów: `social-data` ma `test_a_failed_delivery_leaves_no_marker_and_the_next_pass_retries`, `strategy` ma `test_a_failed_delivery_leaves_the_decision_recorded_and_unmarked` — i na tym kończy. Normatywne zdania obu wymagań są spełnione (znacznik nie jest stawiany po porażce; ta sama decyzja nie powiadamia dwa razy), więc `--strict` przechodzi; nie spełniona jest obietnica, którą oba niosą w prozie. | **FIXED** w `a-refused-alert-is-tried-again` — `is_new_setup` czyta `previous.notified_at`; osobna zmiana, bo normatywne zdanie wymagania musiało się zmienić razem z kodem |
 | Drobne | `social_data/ingest.py:104` | Ponowienie w `social-data` **ma termin ważności**: `since = now - COLLECT_WINDOW_HOURS` (domyślnie 24 h), więc post, którego brama odmawiała dłużej niż dobę, wypada z okna i nie zostanie zapowiedziany nigdy. Zachowanie jest spójne z resztą modułu — to samo okno ogranicza zbiórkę i wzbogacenie — ale żadne wymaganie tego nie mówi, a „ponawia w nieskończoność" jest naturalnym odczytaniem `social-data-alerts`. | **z projektu, zapisane tutaj** — 24 h ciszy bramy to i tak awaria, o której operator dowiaduje się inaczej |
-| Drobne | `telegram_gateway/bots.py:82` | `destroy` woła `creator.guard(can_create=can_create, held=0, ceiling=1)` wyłącznie po to, żeby sprawdzić `can_create`. Argumenty są atrapą dobraną tak, by sufit nie zadziałał — czyta się jak sprawdzenie sufitu przy kasowaniu, którym nie jest. Zachowanie poprawne, nazwa myląca. | **otwarte, kosmetyczne** |
+| Drobne | `telegram_gateway/bots.py:82` | `destroy` woła `creator.guard(can_create=can_create, held=0, ceiling=1)` wyłącznie po to, żeby sprawdzić `can_create`. Argumenty są atrapą dobraną tak, by sufit nie zadziałał — czyta się jak sprawdzenie sufitu przy kasowaniu, którym nie jest. Zachowanie poprawne, nazwa myląca. | **FIXED** — `creator.require_session` jest osobną funkcją, a `destroy` woła ją zamiast `guard` z sufitem-atrapą |
 | Poważne | `telegram_gateway/bot_api.py`, cały moduł | Token bota w ścieżce żądania wychodził do logu przez `httpx`, nie przez kod tego modułu. Znalezione przez test zadania 3.5. | **FIXED** w #226 — `redaction.py`, filtr na loggerze `httpx`/`httpcore` i na uchwytach roota, dopasowanie po kształcie tokenu, podstawienie zamiast usunięcia |
 | Poważne | `social_data/alerts.py:114` (`message`) | Alert szedł po angielsku, choć moduł miał polskie tłumaczenie tego posta. Znalezione **na produkcji**, godzinę po pierwszym prawdziwym powiadomieniu. | **FIXED** w #229 — `translated_content` z odwrotem na oryginał i jedną linijką mówiącą, że to oryginał; wyimek cięty z tego tekstu, który naprawdę idzie |
 
@@ -121,7 +123,7 @@ Testy bramy w `modules/telegram-gateway/tests/`, wywołujących w `tests/test_al
 |---|---|
 | Brak sesji konta jest wspierany — Wysyłka bez sesji | `test_config.py::TestTheAccountSession::test_all_three_absent_is_a_working_configuration` plus cały `test_sending.py`, który nie zna sesji |
 | — Zakładanie bez sesji | `test_bots.py::TestWhatIsCheckedBeforeSpeaking::test_no_account_session_names_the_settings`, `TestCreating::test_without_a_session_nothing_is_said_to_telegram`, `test_rest.py::TestBots::test_creating_one_without_an_account_session_names_the_missing_setting` |
-| Zakłada wyłącznie na żądanie — Start bez botów | `test_rest.py::TestState::test_a_gateway_with_nothing_in_it_says_so_rather_than_failing`, `test_tools_surface.py::test_an_empty_gateway_is_answered_rather_than_failed`, `test_sending.py::TestSending::test_an_unknown_name_is_refused_without_a_request` — **partial**, patrz Gaps |
+| Zakłada wyłącznie na żądanie — Start bez botów | `test_rest.py::TestState::test_a_gateway_with_nothing_in_it_says_so_rather_than_failing`, `test_tools_surface.py::test_an_empty_gateway_is_answered_rather_than_failed`, `test_sending.py::TestSending::test_an_unknown_name_is_refused_without_a_request`, `test_layering.py::test_nothing_creates_a_bot_on_its_own_initiative` |
 | Sufit sprawdzany przed rozmową — Sufit osiągnięty | `test_bots.py::TestWhatIsCheckedBeforeSpeaking::test_the_ceiling_refuses_before_telegram_is_asked`, `::test_room_under_the_ceiling_passes`, `TestCreating::test_at_the_ceiling_nothing_is_said_to_telegram` |
 | Odpowiedź bez tokenu jest odmową — Odpowiedź, której moduł nie rozumie | `test_bots.py::TestReadingTheCreatorBot` (3 testy), `TestCreating::test_an_unreadable_reply_stores_no_bot` |
 | Token nie wychodzi z modułu — Odczyt bota | `test_store.py::TestTheTokenDoesNotLeak::test_no_read_a_response_is_built_from_carries_the_token`, `test_rest.py::TestBots::test_reading_the_bots_carries_no_token` |
@@ -156,8 +158,8 @@ Testy bramy w `modules/telegram-gateway/tests/`, wywołujących w `tests/test_al
 
 | Requirement / Scenario | Proven by |
 |---|---|
-| Wysyłka kanałem bota — Sesja konta jest skonfigurowana | z konstrukcji: `sending.send` przyjmuje `BotApi`, a `CreatorBot` jest osiągalny wyłącznie z `bots.py` — **gap**, patrz niżej |
-| Sesja służy jednej rzeczy — Zakres użycia sesji | jw. — **gap** |
+| Wysyłka kanałem bota — Sesja konta jest skonfigurowana | `test_layering.py::test_the_sending_path_cannot_reach_the_account_session` (5 plików), `::test_mtproto_lives_in_one_file` |
+| Sesja służy jednej rzeczy — Zakres użycia sesji | `test_layering.py::test_the_account_session_has_one_importer_besides_the_route`, `::test_the_conversation_reaches_no_peer_but_the_creator_bot`, `::test_the_creator_bot_is_a_constant_and_not_a_setting` |
 | Sekret nie jest częścią adresu ani logu — Nieudane żądanie do Telegrama | `test_sending.py::TestTheTokenNeverReachesALog` (2 testy), cały `test_redaction.py` (9 testów) |
 | Brak sesji nie blokuje startu — Start bez sesji | `test_config.py::TestTheAccountSession::test_all_three_absent_is_a_working_configuration`, `::test_a_partial_session_is_refused_at_startup` (3 przypadki), `::test_a_blank_line_reads_as_absent` |
 
@@ -184,7 +186,8 @@ Testy bramy w `modules/telegram-gateway/tests/`, wywołujących w `tests/test_al
 
 ## Gaps
 
-Trzy scenariusze nie są udowodnione testem i każdy jest tu wypisany, a nie zagadany.
+Trzy scenariusze nie były udowodnione testem w chwili tego przeglądu. Każdy jest tu wypisany, a nie
+zagadany — dwa pierwsze zostały zamknięte zaraz po nim i mówią, czym.
 
 - **`telegram-gateway-upstream-access`, oba pierwsze wymagania** — „wysyłka MUST iść tożsamością
   bota także wtedy, gdy sesja konta jest skonfigurowana" i „sesja MUST służyć wyłącznie rozmowie z
@@ -193,11 +196,13 @@ Trzy scenariusze nie są udowodnione testem i każdy jest tu wypisany, a nie zag
   ten moduł nie ma `test_layering.py` — w odróżnieniu od `strategy` i `workbench`, które taki test
   mają. To jest ta klasa reguły, w której pudło jest ciche i **wychodzi poza system**: powiadomienie
   wysłane kontem operatora jest nieodróżnialne od tego, co operator napisał sam. Wart jednego testu
-  czytającego importy, dokładnie tak jak `strategy/tests/test_layering.py`.
+  czytającego importy, dokładnie tak jak `strategy/tests/test_layering.py`. **Zamknięte**:
+  `modules/telegram-gateway/tests/test_layering.py` — sześć reguł, 36 przypadków, czytane z AST.
 - **`telegram-gateway-bots`, „Start bez botów"** — połowa o działaniu bez botów jest pokryta
   (stan, narzędzia i wysyłka odmawiają zamiast się wywracać), połowa o „MUST NOT zakładać z własnej
   inicjatywy" nie ma asercji. Dziś prawdziwa z konstrukcji: jedyne wywołania `bots.create` są w
-  trasie REST. Ten sam test importów pokryłby i to.
+  trasie REST. **Zamknięte** tym samym testem importów —
+  `test_nothing_creates_a_bot_on_its_own_initiative`.
 - **„Nowa tabela jest od razu użyteczna"** — reguła o roli aplikacji będącej właścicielem schematu,
   ta sama co w każdym poprzednim module. Testy `db` chodzą jako superuser kontenera, więc nie mają
   jak jej zaobserwować; potwierdzeniem jest `grant-schema-ownership.sql` uruchomiony na bazie
