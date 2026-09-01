@@ -149,6 +149,70 @@ def test_the_message_carries_the_reading_and_where_to_read_the_rest() -> None:
     assert "…" in text
 
 
+def a_post(**overrides):
+    from social_data.models import Post
+
+    fields = {
+        "id": 1,
+        "source": TRUTH_SOCIAL,
+        "external_id": "1",
+        "author": "realDonaldTrump",
+        "content": "The United States is striking Iranian targets.",
+        "published_at": datetime.now(UTC),
+        "fetched_at": datetime.now(UTC),
+        "url": "https://trumpstruth.org/statuses/1",
+        "topics": ("tariffs",),
+        "impact_score": 9,
+        "analysed_model": "analyst",
+        "analysed_at": datetime.now(UTC),
+    }
+    fields.update(overrides)
+    return Post(**fields)
+
+
+class TestTheMessageSpeaksPolish:
+    """The notification is the one place the translation is used with no terminal to fall back to.
+    It carried the original for as long as this module has existed, which threw away the reading
+    it had paid a model for — found on production, 1 September 2026, on a post scored 10."""
+
+    def test_the_translation_is_what_the_operator_reads(self) -> None:
+        post = a_post(
+            content="The United States is striking Iranian targets.",
+            translated_content="Stany Zjednoczone atakują irańskie cele.",
+            translated_model="gpt-5.6-luna",
+            translated_at=datetime.now(UTC),
+        )
+
+        text = alerts.message(post)
+
+        assert "Stany Zjednoczone atakują irańskie cele." in text
+        assert "The United States is striking" not in text
+
+    def test_an_untranslated_post_falls_back_and_says_so(self) -> None:
+        """Translation and analysis are separate readings and either can fail alone, so a scored
+        post with no Polish is reachable. Silence there would read as an English post on purpose."""
+        text = alerts.message(a_post(translated_content=None))
+
+        assert "The United States is striking Iranian targets." in text
+        assert "tłumaczenie nie dotarło" in text
+
+    def test_a_translated_post_is_not_marked_as_a_fallback(self) -> None:
+        text = alerts.message(a_post(translated_content="Cokolwiek."))
+
+        assert "tłumaczenie nie dotarło" not in text
+
+    def test_the_excerpt_is_cut_from_the_translation_not_the_original(self) -> None:
+        """The ceiling is Telegram's and the gateway refuses rather than truncating, so cutting the
+        wrong text would either overrun or shorten something nobody reads."""
+        post = a_post(content="short", translated_content="słowo " * 400)
+
+        text = alerts.message(post)
+
+        assert len(text) < 4096
+        assert "…" in text
+        assert "short" not in text
+
+
 class TestBuild:
     def test_no_gateway_configured_is_a_supported_state(self, pool, settings) -> None:
         assert alerts.build(pool, settings) is None
