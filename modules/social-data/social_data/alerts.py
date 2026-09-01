@@ -111,8 +111,15 @@ def _detail(response: httpx.Response) -> str:
 
 def message(post: Post) -> str:
     """One post as the operator reads it on a phone: what it scored, who wrote it, and enough of it
-    to decide whether to open the terminal."""
-    text = " ".join(post.content.split())
+    to decide whether to open the terminal.
+
+    **In Polish where the module has it**, which is the point of translating at collection rather
+    than at reading time: the notification is the one place the reading is used with no terminal to
+    fall back to. The original stands in when a post was scored but not translated — the two are
+    separate readings and either can fail on its own — and the line below says which arrived.
+    """
+    body = post.translated_content or post.content
+    text = " ".join(body.split())
     if len(text) > EXCERPT_CHARS:
         text = text[:EXCERPT_CHARS].rstrip() + "…"
     lines = [
@@ -120,6 +127,10 @@ def message(post: Post) -> str:
         "",
         text,
     ]
+    if post.translated_content is None:
+        # Said rather than left to be inferred: an untranslated post is not an English post the
+        # operator asked for, it is a reading that did not arrive.
+        lines += ["", "(oryginał — tłumaczenie nie dotarło)"]
     if post.topics:
         lines += ["", ", ".join(post.topics)]
     if post.url:
