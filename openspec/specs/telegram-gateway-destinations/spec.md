@@ -1,10 +1,9 @@
-## Purpose
+# telegram-gateway-destinations Specification
 
+## Purpose
 Adresat: czym jest, jak powstaje bez przepisywania liczb z telefonu, i co się z nim dzieje, kiedy
 przestaje odbierać.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Adresat powstaje z tapnięcia, nie z konfiguracji
 
 Bot Telegrama nie może odezwać się pierwszy, więc adresat MUST powstawać z tego, że człowiek raz

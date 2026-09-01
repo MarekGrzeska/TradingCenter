@@ -1,10 +1,9 @@
-## Purpose
+# telegram-gateway-upstream-access Specification
 
+## Purpose
 Dwie powierzchnie Telegrama, którymi ta brama się posługuje, i jedna droga do każdej z nich — wraz z
 regułą, która nie pozwala im się zamienić rolami.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Wysyłka idzie kanałem bota, nigdy kontem użytkownika
 
 Moduł MUST wysyłać wiadomości wyłącznie tożsamością bota. Nawet gdy sesja konta użytkownika jest

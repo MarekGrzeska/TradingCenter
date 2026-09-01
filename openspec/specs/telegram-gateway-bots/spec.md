@@ -1,10 +1,9 @@
-## Purpose
+# telegram-gateway-bots Specification
 
+## Purpose
 Zakładanie bota bez otwierania Telegrama: kiedy moduł to potrafi, kiedy uczciwie odmawia, i dlaczego
 token, który sam wytworzył, nigdy nie wychodzi na zewnątrz.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Brak sesji konta jest konfiguracją wspieraną
 
 Zakładanie bota wymaga rozmowy z botem-twórcą Telegrama, a taką rozmowę może prowadzić wyłącznie

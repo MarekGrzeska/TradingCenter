@@ -1,10 +1,9 @@
-## Purpose
+# telegram-gateway-tools Specification
 
+## Purpose
 Zestaw narzędzi, który brama publikuje klientowi MCP: co model może przez nią zrobić — bo tu, w
 odróżnieniu od archiwów, może zrobić coś widocznego poza tym systemem — i gdzie przebiega granica.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Model wysyła, ale nie zakłada i nie wiąże
 
 Zestaw MUST zawierać narzędzie wysyłające wiadomość i narzędzie wyliczające adresatów. Zestaw MUST
