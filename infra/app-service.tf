@@ -77,9 +77,15 @@ locals {
   strategy_api_uri   = "api://tradingcenter-strategy"
   strategy_api_scope = "access_as_user"
 
-  # The gateway's own audience, and without a delegated scope for trading-mcp's reason taken one step further: no
-  # browser reaches this module at all. It has no screen — the notification is the screen.
-  telegram_gateway_api_uri = "api://tradingcenter-telegram-gateway"
+  # The gateway's own audience. It has no screen — the notification is the screen — so the delegated scope below is
+  # not a browser's: it is the operator's `az`, bootstrapping the first bot and the first destination by hand.
+  telegram_gateway_api_uri   = "api://tradingcenter-telegram-gateway"
+  telegram_gateway_api_scope = "access_as_user"
+
+  # Microsoft's own well-known registration for the Azure CLI, and the only client the operator has for a
+  # module with no screen. Bootstrapping the gateway is `curl` with a token from `az`, so this is what the
+  # scope below is pre-authorized for.
+  azure_cli_client_id = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"
 
   # There used to be a third of this shape, for the tool server the agent built teams through. Those tools are a
   # layer in the workbench now — no address, no audience, nothing for a caller to present.
@@ -1156,7 +1162,16 @@ module "telegram_gateway_easy_auth" {
   identifier_uri = local.telegram_gateway_api_uri
   redirect_uri   = "https://${local.telegram_gateway_hostname}/.auth/login/aad/callback"
 
-  # No scope: all three callers present client credentials, so there is nobody to consent on whose behalf.
+  # Three callers present client credentials and need no scope. This one exists for a fourth that is not a module:
+  # the operator, bootstrapping the first bot and the first destination. Those two routes are REST-only and reachable
+  # by nobody else — a gateway whose destinations only the gateway can create is a gateway that never sends.
+  scope = {
+    value                      = local.telegram_gateway_api_scope
+    admin_consent_display_name = "Manage the door to Telegram"
+    admin_consent_description  = "Allows the app to reach telegram-gateway as the signed-in operator, including adding bots and binding destinations."
+    user_consent_display_name  = "Manage your door to Telegram"
+    user_consent_description   = "Allows the app to add bots, bind who receives notifications, and send one."
+  }
 }
 
 resource "azurerm_linux_web_app" "telegram_gateway" {
@@ -1217,6 +1232,9 @@ resource "azurerm_linux_web_app" "telegram_gateway" {
         data.azuread_service_principal.workbench_managed_identity.client_id,
         data.azuread_service_principal.social_data_managed_identity.client_id,
         data.azuread_service_principal.strategy_managed_identity.client_id,
+        # The operator, through `az`. Not a module, and the only one of the four that is a person — the two routes
+        # it exists for are the ones a managed identity must never reach: adopting a bot and binding a destination.
+        local.azure_cli_client_id,
       ]
     }
 
@@ -1249,6 +1267,9 @@ resource "azurerm_linux_web_app" "telegram_gateway" {
       REST_CALLER_APPLICATION_IDS = join(",", [
         data.azuread_service_principal.social_data_managed_identity.client_id,
         data.azuread_service_principal.strategy_managed_identity.client_id,
+        # Easy Auth admits an application; this is what lets that application reach these routes. Both are needed
+        # and neither substitutes for the other — `caller_access.py` refuses on this list alone.
+        local.azure_cli_client_id,
       ])
 
       APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string

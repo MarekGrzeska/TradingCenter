@@ -104,10 +104,30 @@ before the image that enforces its settings — and it has one step nothing here
    `-target=azurerm_linux_web_app.telegram_gateway` once, because the firewall rule reads outbound
    addresses that do not exist until the app does.
 3. **Deploy**, and `deploy_probe.py` reads `/` for `"telegram-gateway"`.
-4. **A bot and a destination**, through the REST contract: `POST /bots/adopted` with a token from
-   @BotFather (or `POST /bots/created` where the account session is configured), then
-   `POST /destinations` — and somebody taps the start link it answers with. Until that tap the
-   gateway holds an intention, not an address, and `GET /state` says `destinations_ready` is zero.
+4. **A bot and a destination**, through the REST contract — and this is the one step whose caller is
+   a person rather than a module. There is no screen, so it is `curl` with a token from `az`, which
+   the registration pre-authorizes for exactly this:
+
+   ```bash
+   TOKEN=$(az account get-access-token \
+             --resource api://tradingcenter-telegram-gateway --query accessToken -o tsv)
+   BASE=https://app-tradingcenter-telegram-gateway.azurewebsites.net
+   JSON='Content-Type: application/json'
+
+   # The token comes from @BotFather: /newbot, a title, a username ending in `bot`.
+   curl -sS -X POST "$BASE/bots/adopted" \
+        -H "Authorization: Bearer $TOKEN" -H "$JSON" \
+        -d '{"token":"<from @BotFather>"}'
+
+   curl -sS -X POST "$BASE/destinations" \
+        -H "Authorization: Bearer $TOKEN" -H "$JSON" \
+        -d '{"name":"operator","bot":"<the @name>"}'
+   ```
+
+   The second answers with a start link. **Somebody taps it, from the account that should receive
+   the alerts**, within thirty minutes. Until that tap the gateway holds an intention rather than an
+   address, and `GET /state` says `destinations_ready` is zero. Where the account session is
+   configured, `POST /bots/created` replaces the first call and @BotFather is never opened by hand.
 5. **Only then the callers.** Set `telegram_alert_destination` in `terraform.tfvars` to the name
    bound in step 4 and apply: `social-data` and `strategy` get their three settings and start
    announcing. Setting it earlier is not an outage — the sends are refused, nothing is marked as
