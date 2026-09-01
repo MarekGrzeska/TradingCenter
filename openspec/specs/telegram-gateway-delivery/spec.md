@@ -1,10 +1,9 @@
-## Purpose
+# telegram-gateway-delivery Specification
 
+## Purpose
 Czym jest wysłanie wiadomości przez tę bramę: co wywołujący dostaje w odpowiedzi, które ograniczenia
 Telegrama są częścią kontraktu, a nie szczegółem implementacji, i czego moduł świadomie nie pamięta.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Wysłanie jest jednym aktem i nie zostawia śladu
 
 Moduł MUST wysłać wiadomość w trakcie obsługi żądania i MUST zwrócić wywołującemu wynik, jaki dał

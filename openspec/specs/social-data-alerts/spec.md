@@ -1,10 +1,9 @@
-## Purpose
+# social-data-alerts Specification
 
+## Purpose
 Kiedy post z archiwum jest wart obudzenia operatora, co znaczy „już o tym powiedziano", i co robi
 moduł, który nie ma dokąd wysłać.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Powiadamia post, który przekroczył próg oceny wpływu
 
 Moduł MUST wysłać powiadomienie o poście, którego ocena wpływu osiągnęła skonfigurowany próg, i MUST

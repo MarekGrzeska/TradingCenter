@@ -1,10 +1,9 @@
-## Purpose
+# telegram-gateway-caller-access Specification
 
+## Purpose
 Która tożsamość dochodzi do której powierzchni tej bramy — i dlaczego moduł sprawdza to sam, zamiast
 wierzyć, że coś przed nim jest włączone.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Moduł sprawdza wywołującego sam
 
 Moduł MUST sam odrzucić wywołującego, którego nie zna, nawet jeśli stoi za bramą uwierzytelniającą.

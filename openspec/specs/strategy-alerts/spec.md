@@ -1,10 +1,9 @@
-## Purpose
+# strategy-alerts Specification
 
+## Purpose
 Która decyzja platformy strategii jest warta powiadomienia operatora, i dlaczego pętla licząca ją co
 przebieg nie zamienia tego w powtarzalny alarm.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Powiadamia wejście, nie każdy przebieg
 
 Moduł MUST wysłać powiadomienie o decyzji wskazującej zagranie i MUST NOT wysyłać go o decyzji

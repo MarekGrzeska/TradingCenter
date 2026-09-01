@@ -84,14 +84,23 @@ def usable_username(username: str) -> str:
     return cleaned
 
 
+def require_session(*, can_create: bool) -> None:
+    """What every path through the creator bot needs: an account session to hold the conversation.
+
+    Its own function because deleting needs this half and not the ceiling — asking `guard` for it
+    with a ceiling nothing can reach reads like a check that is not being made.
+    """
+    if not can_create:
+        raise CreatingBotsUnavailable()
+
+
 def guard(*, can_create: bool, held: int, ceiling: int) -> None:
-    """Everything checked before a word is sent to Telegram.
+    """Everything checked before a word is sent to Telegram to create a bot.
 
     Both refusals are cheap and both would otherwise be expensive: one is a stack trace about a
     missing setting, the other is an attempt counted against the operator's account.
     """
-    if not can_create:
-        raise CreatingBotsUnavailable()
+    require_session(can_create=can_create)
     if held >= ceiling:
         raise TooManyBots(held=held, ceiling=ceiling)
 

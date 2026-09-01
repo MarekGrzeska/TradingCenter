@@ -1,10 +1,9 @@
-## Purpose
+# telegram-gateway-api Specification
 
+## Purpose
 Kontrakt REST bramy: co się przez niego robi, które trasy piszą, i co moduł mówi o sobie, gdy ktoś
 pyta, czy w ogóle jest w stanie cokolwiek wysłać.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Kontrakt rozdziela wysyłanie od zarządzania
 
 Kontrakt MUST rozdzielać wysłanie wiadomości od zarządzania botami i adresatami. Wysyłanie MUST być

@@ -79,7 +79,7 @@ async def destroy(
     Telegram first: a row deleted before the conversation succeeds leaves a bot alive that this
     module can no longer name, and it still counts against the account's ceiling of twenty.
     """
-    creator.guard(can_create=can_create, held=0, ceiling=1)
+    creator.require_session(can_create=can_create)
     await bot.delete(username=existing.username)
     await store.remove_bot(conn, existing.id)
     log.warning("deleted bot @%s and every destination behind it", existing.username)

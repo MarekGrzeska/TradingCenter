@@ -77,6 +77,9 @@ class RecordedDecision:
     reason_kind: ReasonKind | None
     facts: dict[str, Any]
     created_at: datetime
+    # When the operator was told, or `None`. Read on the alert path, where its absence is the retry:
+    # the gateway remembers nothing it sent, so this column is the only record that anybody knows.
+    notified_at: datetime | None = None
     strategy_revision_id: int | None = None
     # The revision's own number, joined in so a reader never has to resolve a surrogate id
     # to answer "which rule was this". `None` for a decision made by a coded entry.
@@ -408,7 +411,8 @@ async def mark_decision_notified(
     conn: asyncpg.Connection, decision_id: int, *, at: datetime
 ) -> None:
     """Written only after the gateway answered with a success. The gateway remembers nothing it
-    sent, so this column is both the deduplication and the whole retry."""
+    sent, so this column is both the deduplication and the whole retry — `is_new_setup` reads its
+    absence as "nobody was told", which is what makes the next bar try again."""
     await conn.execute("UPDATE decisions SET notified_at = $2 WHERE id = $1", decision_id, at)
 
 
@@ -576,7 +580,8 @@ _DECISION_SOURCE = "decisions d LEFT JOIN strategy_revisions sr ON sr.id = d.str
 _DECISION_COLUMNS = (
     "d.id, d.strategy_id, d.symbol, d.parameter_set_id, d.as_of, d.action, d.reason, "
     "d.reason_kind, d.direction, d.entry, d.stop, d.target, d.rr, d.score, d.features, "
-    "d.facts, d.created_at, d.strategy_revision_id, sr.version AS strategy_revision"
+    "d.facts, d.created_at, d.notified_at, d.strategy_revision_id, "
+    "sr.version AS strategy_revision"
 )
 
 
@@ -659,6 +664,7 @@ def _decision(row: asyncpg.Record) -> RecordedDecision:
         reason_kind=row["reason_kind"],
         facts=_json(row["facts"]),
         created_at=row["created_at"],
+        notified_at=row["notified_at"],
         strategy_revision_id=row["strategy_revision_id"],
         strategy_revision=row["strategy_revision"],
     )
