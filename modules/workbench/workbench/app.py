@@ -18,6 +18,7 @@ from fastapi import FastAPI
 from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
+from tc_runtime.openapi import require_response_fields
 
 import agent.surface
 import teams.surface
@@ -28,7 +29,6 @@ from agent.runtime import MIGRATIONS as AGENT_MIGRATIONS
 from agent.tools import ToolServerRegistry
 from teams import store as teams_store
 from teams.models_catalogue import ModelCatalogue as TeamsCatalogue
-from teams.openapi import require_response_fields
 from teams.provider import OpenAIProvider as TeamsProvider
 from teams.runner import RunRegistry
 from teams.runtime import MIGRATION_LOCK_KEY as TEAMS_LOCK_KEY

@@ -24,25 +24,22 @@ regression you could not, unless every consumer is exercised.
 
 | Module | Takes |
 |---|---|
-| `agent` | `db`, `migrate`, `schema_version`, `auth`, `routers.models_router` |
-| `teams` | `db`, `migrate`, `schema_version`, `auth`, `routers.models_router` |
-| `market-data` | `migrate`, `schema_version`, `db.advisory_lock` |
+| `workbench` (`agent`, `teams`) | `db`, `migrate`, `schema_version`, `auth`, `routers.models_router`, `openapi` |
+| `market-data` | `db`, `migrate`, `schema_version`, `caller_access`, `openapi` |
+| `polymarket-data`, `social-data`, `strategy`, `telegram-gateway` | `db`, `migrate`, `schema_version`, `caller_access`, `openapi` |
 
 The three MCP modules (`market-mcp`, `teams-mcp`, `trading-mcp`) took `network_identity`
 and `detail` from here until 18 August 2026, when both moved to `packages/tc-mcp-kit` — see
-"What moved out", below. None of them is a consumer of this package any more.
+"What moved out", below. `trading-mcp` is still not a consumer of this package: it has no
+database, and this package's tree is `alembic`, `sqlalchemy`, `asyncpg`, `azure-identity` and
+`aiohttp` for the modules that do.
 
-`market-data` takes the package **partially**, on purpose. Its `db.py` stays in the module
-at 56.2% identical to this one; what it does take from here is `advisory_lock`, which was
-the part of that file that genuinely was a copy.
-
-**What keeps the rest of it there, and it is not what the design predicted.** The design
-asked whether market-data's long migration window could be expressed as a parameter and
-left it open. The answer is yes, and it always was: the wait is `migration_lock_wait_seconds`
-in each module's own settings — 1500 s for market-data against 300 s for agent and teams —
-passed to `advisory_lock` at the call site. It was never a property of the file. What is
-actually market-data's own is `connect()`, which no other module has, plus its own pool
-defaults and the prose explaining both.
+`market-data` took this package **partially** until 2 September 2026, keeping a `db.py` that
+measured 56.2% identical to this one. What kept it there was `connect()`, which no other module
+had — so `connect()` came here instead, and what stays in the module is the lock key. The long
+migration window was never the reason: the wait is `migration_lock_wait_seconds` in each module's
+own settings — 1500 s for market-data against 300 s for the workbench's two — passed to
+`advisory_lock` at the call site, and it was never a property of the file.
 
 ## What is in here, and why exactly this
 
@@ -60,6 +57,21 @@ Condition 1 of the sharing rule is a number, so here are the numbers. Measured o
 `network_identity.py` (teams-mcp ↔ trading-mcp, 86.2%) was measured the same day and
 belongs to this table's history, not its present — it lived here until it moved to
 `tc-mcp-kit`; see "What moved out".
+
+Two more arrived on 2 September 2026, from the second application of the same rule, after four
+modules were written by copying the shape of the one before:
+
+| File | Best pair | Identical | Copies |
+|---|---|---|---|
+| `openapi.py` | polymarket-data ↔ social-data | 98.5% | 6 |
+| `caller_access.py` | social-data ↔ telegram-gateway | 94.3% | 5 |
+
+`caller_access` is here as machinery and not as a record: what each module says — its open
+paths, its REST paths, its tool prefix and the sentence it answers with while still starting —
+is a `Record` it constructs itself. Where the five disagreed on behaviour rather than on
+comments, the strict reading came here: a trailing slash normalises for a REST path but **not**
+for an open one, so `/ping/` is refused rather than admitted without identity. Two of the five
+had been generous there by accident.
 
 Where two copies disagreed, the better one came here and the reason is in the file:
 `schema_version.py` is teams' (it names the case where the *image* ships no revision;

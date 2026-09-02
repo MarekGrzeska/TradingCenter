@@ -19,8 +19,9 @@ telemetry.configure()
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from tc_runtime.openapi import require_response_fields
 
-from .caller_access import CallerAccess
+from .caller_access import RECORD, CallerAccess
 from .config import Settings
 from .db import MIGRATION_LOCK_KEY, advisory_lock
 from .db import pool as make_pool
@@ -32,7 +33,7 @@ from .ingest.live import store_closed_candle
 from .jobs import FutureRequest, JobRunner, interrupt_orphaned_chunks
 from .market_status import MarketStatus
 from .models import Candle
-from .openapi import add_stream_messages, require_response_fields
+from .openapi import add_stream_messages
 from .routers import candles, indicators, instruments, jobs, meta, pairs, stream
 from .runtime import MIGRATIONS
 from .tickets import TicketStore
@@ -237,7 +238,7 @@ def create_app() -> FastAPI:
     # One layer rather than a dependency per router: `/mcp` is a mounted app, so `dependencies=`
     # could not reach it. Added first, so it ends up inside the caller-access layer.
     app.add_middleware(ToolSurfaceAddress)
-    app.add_middleware(CallerAccess, state=app.state)
+    app.add_middleware(CallerAccess, state=app.state, record=RECORD)
 
     return app
 

@@ -483,6 +483,34 @@ it does not protect on its own is the fourth thing the old rule gave for free �
 change cannot break a module its author was not looking at — and that is what condition 3
 buys back, in CI rather than in production.
 
+### The second time, and what the number does not say
+
+The rule was applied again on 2 September 2026, after four modules were added in twelve days
+and each was written by copying the shape of the one before it. `measure-duplication.py`,
+repaired the same day to see them at all, printed **40 pairs at or above 70%, about 3 197
+lines existing only as a copy**. Five things moved:
+
+| Into | What | Was |
+|---|---|---|
+| `tc_runtime.caller_access` | the record's machinery — the claim reader, the surface split, the ASGI layer | 5 copies, 995 lines |
+| `tc_runtime.openapi` | making a response model's fields required, and printing the same bytes twice | 6 copies |
+| `tc_mcp_kit.mounted_server` | mounting one FastMCP under `/mcp`, with the three notes each way it broke in production | 5 copies |
+| `tc_mcp_kit.outbound_identity` | the token a module presents when calling another one | 7 copies in 6 modules |
+| `tc_runtime.db` | `connect`, the one function market-data still held alone | 1 copy |
+
+Afterwards: **29 pairs, about 949 lines.** What is left is not a backlog, and this is the
+part the number does not say on its own. A module's `caller_access.py` is now its paths and
+its reason; its `mcp_app.py` is its name and its instructions; its `openapi.py` is which
+document it publishes. Two such files still read as 80% identical, because an import block, an
+`__all__` and a three-line function are most of a forty-line file — and the 20% that differs
+is the entire content. Condition 2 is what stops the rest: making *those* differences into
+parameters means one module built from a table of five modules' data, which is the base class
+condition 2 exists to refuse. **The measurement is a candidate list, not a verdict.**
+
+`capital-gateway` is out of all of it, also on the measurement: its own `caller_access.py` is
+58 lines and 22% identical to the rest, because its door is a shared key rather than a record
+of applications, and Easy Auth in front of it validates nothing.
+
 **What this costs, stated plainly.** A module is no longer deleted by deleting its
 directory alone: its entry comes out of the packages' consumer lists too, and a package
 with no consumers left goes with it. And the build context of a containerised module is

@@ -59,8 +59,9 @@ to mean something (specs/trading-mcp-transport).
 
 ## Packages it takes
 
-`tc-mcp-kit`, for the caller-identity middleware and the helper that turns an upstream's
-refusal into a sentence — not `tc-runtime`, which this module does not take at all: it has
+`tc-mcp-kit`, for the caller-identity middleware, the helper that turns an upstream's refusal
+into a sentence, and the token this module presents to the gateway (`outbound_identity`) — not
+`tc-runtime`, which this module does not take at all: it has
 no database, and `tc-runtime`'s tree is `alembic`, `sqlalchemy`, `asyncpg`, `azure-identity`
 and `aiohttp` for modules that do. Its own error taxonomy stays here: distinguishing a
 provider's refusal from an access failure is this module's job and nobody else's.

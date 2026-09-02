@@ -19,7 +19,7 @@ owns the single rate gate and the demo-only guard, and going around it breaks bo
 - `config.py` — settings, the provider-host guard, and the budgets this module may spend.
 - `models.py`, `periods.py` — a candle, a coverage range, and the gateway's two spellings of
   a period start reduced to one instant.
-- `db.py` — the connection string, in the two shapes asyncpg and SQLAlchemy each insist on.
+- `db.py` — the migration lock key, and `tc-runtime`'s database helpers re-exported under it.
 - `store.py` — the only door to the candle table: closed candles in, one row per period.
 - `coverage.py` — what the archive has verified, and so which absences are answers.
 - `tracking.py` — which pairs are collected, and whether collection is actually happening.
@@ -71,15 +71,17 @@ archive has actually verified.
 
 ## Packages it takes
 
-`tc-runtime`, partially: `migrate`, `schema_version` and the advisory-lock helper. This
-module keeps its own `db.py` — it has `connect()`, which nothing else does, and its own
-pool defaults (`packages/tc-runtime/README.md`).
+`tc-runtime`: `db` whole — `connect()` moved into it on 2 September 2026, being the only
+function this module still held alone — plus `migrate`, `schema_version`, the advisory-lock
+helper, `caller_access` and `openapi`. What stays here is the lock key, the wait that goes with
+it, and the record itself.
 
-`tc-mcp-kit`, for one thing: `slim_tool_schemas`, which takes the scaffolding pydantic
-writes for its own sake out of every published tool schema — 22,6% of what a client reads
-before each turn, and not one field, type or `required` entry with it. The caller-identity
-middleware in that package is *not* taken: it answers "is anybody there", and this module
-has two surfaces and needs the narrower answer `caller_access.py` gives.
+`tc-mcp-kit`: `slim_tool_schemas`, which takes the scaffolding pydantic writes for its own sake
+out of every published tool schema — 22,6% of what a client reads before each turn, and not one
+field, type or `required` entry with it — and `mounted_server`, which is the mounting under
+`/mcp` this module used to write out. The caller-*identity* middleware in that package is still
+not taken: it answers "is anybody there", and this module has two surfaces and needs the
+narrower answer `caller_access.py` gives.
 
 ## Run
 

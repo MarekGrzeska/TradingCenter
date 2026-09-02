@@ -12,6 +12,7 @@ import pytest
 
 from market_data.caller_access import (
     OPEN_PATHS,
+    RECORD,
     REST_PATHS,
     CallerAccess,
     Surface,
@@ -56,7 +57,7 @@ def _wrap(require: bool = True):
         await send({"type": "http.response.body", "body": response.content})
 
     state = types.SimpleNamespace(settings=_settings(require))
-    return CallerAccess(sentinel, state=state), reached
+    return CallerAccess(sentinel, state=state, record=RECORD), reached
 
 
 def _client(app) -> httpx.AsyncClient:
@@ -307,7 +308,7 @@ async def test_missing_settings_refuse_rather_than_allow() -> None:
     async def sentinel(scope, receive, send):  # pragma: no cover - must not be reached
         reached.append(scope.get("path", ""))
 
-    layer = CallerAccess(sentinel, state=types.SimpleNamespace())
+    layer = CallerAccess(sentinel, state=types.SimpleNamespace(), record=RECORD)
 
     async with _client(layer) as client:
         response = await client.get("/pairs", headers=_as(TERMINAL))
@@ -326,7 +327,7 @@ async def test_an_open_path_answers_before_the_settings_exist() -> None:
         await send({"type": "http.response.start", "status": 200, "headers": []})
         await send({"type": "http.response.body", "body": b"{}"})
 
-    layer = CallerAccess(sentinel, state=types.SimpleNamespace())
+    layer = CallerAccess(sentinel, state=types.SimpleNamespace(), record=RECORD)
 
     async with _client(layer) as client:
         response = await client.get("/ping")

@@ -22,7 +22,7 @@ from tc_runtime.db import pool as make_pool
 
 from . import alerts
 from .archive import Archive, http_client
-from .caller_access import CallerAccess
+from .caller_access import RECORD, CallerAccess
 from .config import Settings
 from .errors import (
     ArchiveRefused,
@@ -155,7 +155,7 @@ def create_app() -> FastAPI:
     # One layer rather than a dependency per router: `/mcp` is a mounted app, so `dependencies=` could
     # not reach it. Added first, so it ends up inside the caller-access layer.
     app.add_middleware(ToolSurfaceAddress)
-    app.add_middleware(CallerAccess, state=app.state)
+    app.add_middleware(CallerAccess, state=app.state, record=RECORD)
 
     return app
 
