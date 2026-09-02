@@ -262,8 +262,8 @@ diff can have broken** — a `changes` job works that out first. `live` tests st
 not a module: `scripts`, `infra` and `openspec`.
 
 Two pairings pull in a job you would not expect, and each is a real check: `market_data/contract.py`
-**or anything under `modules/workbench/`** runs the terminal's job, because `contract:check` and the
-terminal's hand-written DTOs are the checks for those seams; anything under `capital-gateway` runs
+**or anything under `modules/workbench/`** runs the terminal's job, because `contract:check` over six
+generated contracts is the check for those seams; anything under `capital-gateway` runs
 trading-mcp's, which holds a committed snapshot of the gateway's whole OpenAPI document — the whole
 module, because a document is built from routes as well as models.
 

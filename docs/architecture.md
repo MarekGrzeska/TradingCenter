@@ -93,8 +93,8 @@ spent them: one `Identity` per audience off one MSAL session, so a leaked token 
 module rather than four, and an audience says which resource it is for again.
 
 That edge is the one thing in this diagram with no committed copy of its contract
-anywhere. Every other arrow has one — the terminal's generated types, trading-mcp's
-snapshot of the gateway's document, the terminal's hand-written agent DTOs — because HTTP
+anywhere. Every other arrow has one — the terminal's six generated contracts, trading-mcp's
+snapshot of the gateway's document — because HTTP
 does not describe itself at call time. MCP does: the tool names, descriptions and argument
 schemas arrive in the same session that uses them, so there is no second copy to drift and
 nothing to regenerate. The trade is that a tool added on the archive's side reaches the

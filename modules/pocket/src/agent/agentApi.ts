@@ -1,7 +1,7 @@
 /**
- * The workbench's conversation, hand-written against its OpenAPI rather than generated — the generator
- * is wired to the archive's contract alone, and the conversation's surface is hand-written on the
- * terminal's side too.
+ * The workbench's conversation, over types generated from its own OpenAPI document
+ * (`contract.agent.generated.ts`) — since P8 on this side and the terminal's alike. The `map*` functions
+ * stay hand-written: they turn ISO strings into dates and snake into camel.
  *
  * **The browser never speaks MCP.** The tools this screen shows running are the workbench's: it holds
  * the model key and the tool servers' addresses, and `polymarket-data`'s tool surface admits its
@@ -9,9 +9,10 @@
  */
 
 import { noIdentity, type Identity } from "../auth/identity";
+import type { components } from "../data/contract.agent.generated";
 import { jsonClient, type FailureKind } from "../data/http";
 import { readAgentStream, type AgentStreamEvent } from "./stream";
-import { mapToolCall, type AgentToolCall, type RawToolCall } from "./toolCall";
+import { mapToolCall, type AgentToolCall } from "./toolCall";
 
 export type { AgentToolCall, ToolOutcome } from "./toolCall";
 export type { AgentStreamEvent } from "./stream";
@@ -45,29 +46,12 @@ export interface AgentMessage {
   toolCalls: AgentToolCall[];
 }
 
-interface RawModel {
-  id: string;
-  display_name: string;
-  cost_rank: number;
-}
-
-interface RawSession {
-  id: number;
-  title: string | null;
-  current_model_id: string;
-  created_at: string;
-  last_active_at: string;
-}
-
-interface RawMessage {
-  id: number;
-  role: string;
-  content: string;
-  incomplete: boolean;
-  stopped?: boolean;
-  created_at: string;
-  tool_calls?: RawToolCall[];
-}
+type Wire = components["schemas"];
+type RawModel = Wire["ModelOut"];
+type RawSession = Wire["SessionOut"];
+// `stopped` and `tool_calls` are required on the wire and still read with a fallback below: a screen
+// deployed ahead of the module reads a transcript without them, and it must open rather than throw.
+type RawMessage = Wire["MessageOut"];
 
 function mapSession(raw: RawSession): AgentSession {
   return {

@@ -163,9 +163,9 @@ change can have broken. A first job works out which those are from the diff; a c
 One exception is worth knowing: the terminal's job also runs when `market_data/contract.py`
 changes, or anything at all under `modules/workbench/`, even if no terminal file did.
 `contract:check` exists to catch exactly that pairing with `market_data/contract.py`, and
-the workbench's teams surface is generated the same way; its conversation contract has no
-generator to fail, so the terminal's own tests against its hand-written DTOs are what catch
-it instead — and none of them run at all if the job never fires. The whole workbench rather
+both of the workbench's surfaces are generated the same way since P8 — before it the
+conversation's contract had no generator to fail, and only the terminal's own tests stood
+between a renamed field and a blank panel. The whole workbench rather
 than either `contract.py`, because a document is built from routes as well as models, and
 `weekdays-on-the-shorter-rhythms` merged green over exactly that.
 
