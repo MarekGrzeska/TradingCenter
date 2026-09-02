@@ -23,7 +23,7 @@
 
 - [x] 4.1 Trzy `azurerm_monitor_metric_alert` z `for_each`, próg trzy przebiegi
 - [x] 4.2 `terraform fmt` i `validate`
-- [ ] 4.3 `apply` operatora — bez niego metryka jest emitowana i nieczytana
+- [x] 4.3 `apply` operatora — bez niego metryka jest emitowana i nieczytana
 
 ## 5. Runbook
 
