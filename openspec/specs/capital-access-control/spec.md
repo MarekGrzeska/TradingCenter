@@ -11,12 +11,20 @@ każdego wywołującego — na trasach HTTP i przy zestawianiu połączenia WebS
 poświadczenia albo z poświadczeniem nieuznanym MUST zostać odrzucone przed dotknięciem providera,
 odpowiedzią `401`.
 
-Poświadczenie ma dwie postacie i moduł MUST uznawać obie: **klucz współdzielony**, którym
-posługują się moduły wołające go po sieci wewnętrznej, oraz **uwierzytelniony wołający**,
-którego aplikację moduł rozpoznaje z oświadczeń tokenu. Druga postać istnieje, ponieważ
-przeglądarka nie może nieść klucza: sekret w pobranym kodzie jest sekretem opublikowanym.
-Moduł MUST sprawdzać obie sam — rozpoznanie aplikacji jest jego własnym sprawdzeniem, nie
-zaufaniem do listy w konfiguracji platformy.
+Poświadczenie ma dwie postacie — **klucz współdzielony** i **uwierzytelniony wołający**, którego
+aplikację moduł rozpoznaje z oświadczeń zwalidowanego tokenu — i **która z nich otwiera drzwi,
+zależy od miejsca**. Na produkcji, gdzie przed modułem stoi uwierzytelniający platformy, tożsamością
+na trasach HTTP MUST być wyłącznie aplikacja z oświadczeń tokenu: moduł wołający po sieci
+wewnętrznej sięga wszystkiego, wołający z przeglądarki rachunku, a klucz współdzielony MUST NOT
+otwierać żadnej trasy HTTP, choćby był właściwy. Klucz pozostaje poświadczeniem dokładnie dwóch
+miejsc: zestawienia WebSocketa, którego uwierzytelniający platformy nie umie przepuścić, i pracy
+lokalnej, gdzie nie ma platformy, która nazwałaby kogokolwiek.
+
+Druga postać istnieje, ponieważ przeglądarka nie może nieść klucza: sekret w pobranym kodzie jest
+sekretem opublikowanym. Pierwsza przestaje otwierać trasy HTTP na produkcji, bo klucz jest jeden dla
+trzech wołających i wycieka z każdego `.env`, a token nazywa aplikację, której go wydano. Moduł MUST
+sprawdzać obie sam — rozpoznanie aplikacji jest jego własnym sprawdzeniem, nie zaufaniem do listy w
+konfiguracji platformy.
 
 Ograniczenia dostępu po stronie platformy MUST NOT być traktowane jako spełnienie tego wymagania.
 Są warstwą dodatkową, konfigurowaną osobno i osobno psowalną.
@@ -45,11 +53,64 @@ Są warstwą dodatkową, konfigurowaną osobno i osobno psowalną.
 - **WHEN** przychodzi żądanie od uwierzytelnionej aplikacji, której moduł nie rozpoznaje
 - **THEN** moduł odpowiada `401`
 
+#### Scenario: Właściwy klucz bez tożsamości na produkcji
+
+- **WHEN** w konfiguracji produkcyjnej przychodzi żądanie HTTP z właściwym kluczem współdzielonym
+  i bez nazwanej aplikacji
+- **THEN** moduł odpowiada `401`
+- **AND** nie wykonuje żadnego wywołania do providera
+
+#### Scenario: Moduł wołający na produkcji
+
+- **WHEN** w konfiguracji produkcyjnej przychodzi żądanie od aplikacji z listy modułów
+  wołających, bez klucza
+- **THEN** moduł przyjmuje żądanie na każdej trasie, także składającej zlecenie
+
+#### Scenario: Klucz lokalnie
+
+- **WHEN** poza konfiguracją produkcyjną przychodzi żądanie z właściwym kluczem współdzielonym
+- **THEN** moduł przyjmuje żądanie
+
 #### Scenario: Zestawienie WebSocketa bez poświadczenia
 
 - **WHEN** konsument zestawia połączenie WebSocket bez poświadczenia
 - **THEN** moduł odmawia zestawienia połączenia
 - **AND** nie zapisuje konsumenta do rozgłaszania
+
+### Requirement: Tożsamość pochodzi wyłącznie ze zwalidowanego tokenu
+
+Moduł rozpoznaje uwierzytelnionego wołającego z oświadczeń tokenu. Oświadczenia MUST pochodzić z
+tokenu, który ktoś zweryfikował — podpis, wystawca i audiencja — zanim moduł uzna kogokolwiek za
+rozpoznanego. Nagłówek niosący oświadczenia, którego nie poprzedziła weryfikacja, MUST NOT być
+traktowany jako tożsamość: jest wtedy tym samym, czym jest nagłówek od dowolnego wołającego, czyli
+danymi, a nie stwierdzeniem.
+
+Wdrożenie MUST postawić przed modułem uwierzytelniającego, który **odrzuca** token nieważny,
+zamiast przepuszczać żądanie dalej bez oświadczeń. Konfiguracja, w której nieważny token dociera
+do modułu nierozpoznany, MUST być traktowana jako niespełnienie tego wymagania, a nie jako
+łagodniejszy wariant — jej objawem jest odmowa dla każdego wołającego z przeglądarki, nieodróżnialna
+od wygasłej sesji operatora.
+
+Wymaganie MUST dać się sprawdzić z zewnątrz, bez wiedzy o konfiguracji: żądanie z tokenem
+nieważnym MUST zostać odrzucone, zanim dotknie modułu.
+
+#### Scenario: Nieważny token nie dociera do modułu
+
+- **WHEN** przychodzi żądanie z tokenem, którego nie da się zweryfikować
+- **THEN** zostaje odrzucone, zanim dotknie modułu
+- **AND** odmowa pochodzi od warstwy uwierzytelniającej, nie od rejestru tras modułu
+
+#### Scenario: Oświadczenia bez weryfikacji nie są tożsamością
+
+- **WHEN** żądanie niesie nagłówek z oświadczeniami, którego nie poprzedziła weryfikacja tokenu
+- **THEN** moduł MUST NOT uznać wołającego za rozpoznanego
+- **AND** odpowiada tak, jak na wywołanie bez poświadczenia
+
+#### Scenario: Terminal z ważnym tokenem zostaje rozpoznany
+
+- **WHEN** terminal wywołuje trasę rachunku z ważnym tokenem swojej aplikacji
+- **THEN** żądanie dociera do modułu z oświadczeniami, którym moduł może wierzyć
+- **AND** dalszy dostęp rozstrzyga rejestr tras
 
 ### Requirement: Bez skonfigurowanego poświadczenia moduł nie wstaje
 
