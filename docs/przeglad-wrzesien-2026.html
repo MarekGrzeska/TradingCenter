@@ -183,12 +183,12 @@
   <div class="inner">
     <span class="kicker">TradingCenter · przegląd architektury</span>
     <h1>Dziesięć modułów, jeden pomiar</h1>
-    <p class="lede">Dwanaście dni po „następnych cięciach” system podwoił liczbę modułów. Ten dokument mierzy, <b>co z tego jest architekturą, a co jest kopią</b> — i układa z tego plan, którego każda faza ma liczbę na wejściu i na wyjściu. <b>Fazy 0, 1 i 2 są wykonane, a z fazy 3 — P6</b>; poniżej stan po nich, a nie przed.</p>
+    <p class="lede">Dwanaście dni po „następnych cięciach” system podwoił liczbę modułów. Ten dokument mierzy, <b>co z tego jest architekturą, a co jest kopią</b> — i układa z tego plan, którego każda faza ma liczbę na wejściu i na wyjściu. <b>Fazy 0, 1, 2 i P6 są wykonane, wieczorem doszły P5 i P7</b>; poniżej stan po nich, a nie przed.</p>
     <div class="strip">
       <span>TradingCenter / architektura</span>
-      <span>pomiar 1 września · <b>stan 2 września 2026 po apply, main @ e360e0a</b></span>
+      <span>pomiar 1 września · <b>stan 2 września 2026, 18:00, main @ 8f5a0b3</b></span>
       <span>środowisko <b>demo</b></span>
-      <span>wykonane: <b>#231</b> · <b>#232</b> · <b>#233</b> · <b>#234</b> · <b>#235</b> · <b>apply</b></span>
+      <span>wykonane: <b>#231</b>–<b>#238</b> · dwa <b>apply</b></span>
     </div>
   </div>
 </header>
@@ -377,9 +377,9 @@
             <tr><td><b>Obliczenia</b></td><td>1 × App Service Plan <code>B3</code>, <code>worker_count = 1</code>, 8 aplikacji <code>always_on</code></td><td>capital.com liczy 10 req/s na <em>rachunek</em>; drugi worker wydałby ten sam budżet dwa razy</td><td>8 × 150–310 MB w 7 GB; alert pamięci zdjęto 20.08 („wejście do decyzji, nie zdarzenie”), a trzy komentarze w <code>app-service.tf</code> nadal go nazywają</td></tr>
             <tr><td><b>Dane</b></td><td>1 × PostgreSQL Flexible <code>B_Standard_B1ms</code>, 32 GB, 7 dni kopii, 7 baz, TLS wymuszony, tylko Entra</td><td>darmowy pakiet to 750 h <em>jednego</em> B1ms przez 12 miesięcy</td><td><code>max_connections</code> 35 przeciw sumie pul 64 (§04); pakiet darmowy ma datę końca, której nikt nie zapisał</td></tr>
             <tr><td><b>Tożsamość</b></td><td>8 × Easy Auth (moduł <code>easy-auth-app</code>), 2 × SP dla front-endów, 10 pre-autoryzacji, 22 listy wołających w <code>app_settings</code></td><td>Easy Auth autoryzuje aplikację, nie trasę — moduł trzyma własny zapis <code>caller_access.py</code></td><td>nowy wołający = apply + restart + wpis w dwóch listach; udokumentowane, nie zautomatyzowane</td></tr>
-            <tr><td><b>Sekrety</b></td><td>Key Vault: klucz Capital, klucz bramki, token GHCR; OIDC dla CI; jeden zapisany sekret — token wdrożeniowy SWA</td><td>SWA nie ma ścieżki OIDC</td><td>plik planu z sekretami trafił do historii gita 19.08; <code>.gitignore</code> naprawiony 31.08, rotacja nieudokumentowana</td></tr>
+            <tr><td><b>Sekrety</b></td><td>Key Vault: klucz Capital, klucz bramki (od #238 otwiera na produkcji tylko strumień), token GHCR; OIDC dla CI; jeden zapisany sekret — token wdrożeniowy SWA</td><td>SWA nie ma ścieżki OIDC</td><td>plik planu z sekretami trafił do historii gita 19.08; <code>.gitignore</code> naprawiony 31.08, rotacja nieudokumentowana</td></tr>
             <tr><td><b>Obserwacja</b></td><td>App Insights + LAW (30 dni), <b>3 alerty</b>, <b>1 webtest</b> — wszystkie na market-data lub bazie</td><td>„alerty 9 → 3” z rachunku po refactorze; sześć miało powód, który przestał istnieć</td><td>cztery pętle zbierające w czterech nowszych modułach nie emitują żadnej metryki</td></tr>
-            <tr><td><b>CI</b></td><td><code>checks.yml</code>: 16 jobów filtrowanych diffem; 10 × <code>deploy-*.yml</code> na push do <code>main</code>; <code>terraform.yml</code> plan, apply ręczny</td><td>bez ochrony gałęzi (plan darmowy) — pominięty job nic nie blokuje</td><td>deploy rusza <em>równolegle</em> z checkami, nie po nich; sonda łapie start, nie regresję</td></tr>
+            <tr><td><b>CI</b></td><td><code>checks.yml</code>: 16 jobów filtrowanych diffem; 10 × <code>deploy-*.yml</code> na push do <code>main</code>; <code>terraform.yml</code> plan, apply ręczny</td><td>bez ochrony gałęzi (plan darmowy) — pominięty job nic nie blokuje</td><td>od #236 deploy rusza <em>po</em> zielonych checkach tego samego SHA (<code>workflow_run</code>); sonda łapie start, bramka — co się zmieniło od ostatniego zielonego przebiegu</td></tr>
           </tbody>
         </table>
       </div>
@@ -425,7 +425,7 @@
     <section>
       <div class="eyebrow">04 · Słabe strony</div>
       <h2>Gdzie system przestał mówić prawdę o sobie</h2>
-      <p class="intro">Dwanaście punktów, każdy z pomiarem, ułożonych od tego, co było sprzeczne z własną regułą repozytorium, przez to, co grozi produkcji, po to, co kosztuje tylko czytelnika. <b>Osiem z nich jest zamkniętych</b> — zielone, z numerem PR-a; cztery stoją, i jedno z nich ma pomiar z dziś wieczorem.</p>
+      <p class="intro">Dwanaście punktów, każdy z pomiarem, ułożonych od tego, co było sprzeczne z własną regułą repozytorium, przez to, co grozi produkcji, po to, co kosztuje tylko czytelnika. <b>Dziesięć z nich jest zamkniętych</b> — zielone, z numerem PR-a; dwa stoją: ręczny kontrakt terminala i pojedyncze punkty, które są konsekwencją darmowego pakietu.</p>
 
       <div class="fails">
         <div class="fail done">
@@ -456,10 +456,11 @@
           <p><b>Wykonane, dla trzech pętli z czterech.</b> <code>tc_runtime.liveness</code> niesie mechanizm, <code>tc_runtime.telemetry</code> konfigurację, którą dwa moduły miały jako kopie, a trzy tylko w połowie. Spóźnienie liczone <em>w przebiegach własnego interwału pętli</em>, nie w sekundach — z tego powodu, dla którego wiek świecy jest w okresach. Trzy alerty, próg trzy przebiegi. <b>telegram-gateway zostaje bez alertu celowo</b>: jego watcher to długi poll na przyjętego bota, więc brama bez botów nie ma pętli, a cisza jest tam stanem wspieranym — alert zapaliłby się w dniu, w którym operator niczego nie podpiął.</p>
           <p>Dwa miejsca, w których ten plan był <em>zły</em>, i zostały poprawione zamiast wykonane: wiek idzie na <code>/health</code>, nie na <code>/ping</code> (plan mówił inaczej i był sprzeczny z <code>market-data-liveness</code>); lista wyciszanych loggerów jest parametrem bez domyślnej wartości, bo <code>httpx</code> na INFO jest szumem w czterech modułach i <em>dowodem</em> w piątym — telegram-gateway redaguje token bota dokładnie z tej linii, a pakiet z domyślną listą usunął rzecz badaną. Złapał to jego własny test, nie przegląd.</p>
         </div>
-        <div class="fail">
-          <h3>Deploy nie czeka na checki <span class="tag att">kolejność</span></h3>
+        <div class="fail done">
+          <h3><strong>Deploy nie czekał na checki</strong> <span class="tag done">wykonane · #236 · #237</span></h3>
           <p>Push do <code>main</code> uruchamia <code>checks</code> i <code>deploy-*</code> w tej samej sekundzie. Sonda dowodzi, że proces wstał — regresji w logice nie widzi. Merge z czerwonym testem jest dziś na produkcji, zanim CI zdąży to powiedzieć; cofnięcie to ręczne <code>az</code> (~40 s) bez slotu. Przy dziesięciu deployach dziennie to statystyka, nie hipoteza.</p>
-          <p><b>Zmierzone 2 września, 10:20.</b> Deploy #233 (d889472): sześć workflow <code>deploy-*</code> zielonych, <code>checks</code> zielone — i wszystkie siedem uruchomione w tej samej minucie. Wynik dobry, kolejność nadal zła; P5 stoi. <b>I drugi raz o 15:55</b>: deploy-workbench dla #234 (3a5c8f1) zakończony sondą na zielono, zanim <code>checks</code> tego samego SHA skończyły się liczyć.</p>
+          <p><b>Zmierzone 2 września, 10:20.</b> Deploy #233 (d889472): sześć workflow <code>deploy-*</code> zielonych, <code>checks</code> zielone — i wszystkie siedem uruchomione w tej samej minucie. Wynik dobry, kolejność nadal zła. <b>I drugi raz o 15:55</b>: deploy-workbench dla #234 (3a5c8f1) zakończony sondą na zielono, zanim <code>checks</code> tego samego SHA skończyły się liczyć.</p>
+          <p><b>Wykonane 2 września, #236.</b> Dziesięć workflow deploy na <code>workflow_run</code> po <code>checks</code>, tylko przy <code>conclusion == success</code>; <code>workflow_dispatch</code> jako drzwi operatora. Dwie rzeczy, które <code>workflow_run</code> zabiera, oddaje <code>scripts/deploy_gate.py</code>: filtr ścieżek (diff tego, co obraz zapieka, od <em>ostatniego zielonego przebiegu checks</em>, nie od <code>HEAD^</code> — dwa merge'e minutę po sobie anulują pierwszemu checks, a <code>HEAD^</code> zgubiłby jego moduły) i właściwy SHA (<code>github.sha</code> pod <code>workflow_run</code> to głowa gałęzi, nie sprawdzony commit). Pierwszy żywy przebieg o 17:34: checks 25 s, potem dziesięć deployów — <b>wszystkie „nic się nie zmieniło", wszystkie pominięte, wszystkie zielone</b>. Bramka chodzi z <code>scripts/</code>, a git liczył pathspecy względem katalogu roboczego: szukała <code>scripts/modules/workbench</code>. Naprawione w #237 z testem na prawdziwym repozytorium tymczasowym; dowód na żywo o 17:48 przy #238 — „changed since 868d0be", obraz bramki zbudowany i serwujący. Cena, zapisana: od merge do sondy dochodzi czas checks, tu 25 s do 6 min.</p>
         </div>
         <div class="fail done">
           <h3><strong>Osiem aktywnych zmian OpenSpec, prawda o module w niescalonej delcie</strong> <span class="tag done">wykonane · #231</span></h3>
@@ -480,9 +481,10 @@
           <h3>Jeden kontrakt terminala nadal pisany ręcznie <span class="tag att">agentApi.ts</span></h3>
           <p>Pięć kontraktów jest generowanych i sprawdzanych w CI; ten do rozmowy (610 linii) jest „hand-written against the module's OpenAPI” z komentarzem, że generator jest podpięty do market-data. Zmiana w <code>agent/contract.py</code> uruchamia job terminala, ale job ten nie ma jak zobaczyć dryfu, bo nie ma pliku, który by się różnił. Bliźniaki <code>teamsApi.ts</code> 850 / <code>agentApi.ts</code> 610 z K3 nadal niezmierzone.</p>
         </div>
-        <div class="fail">
-          <h3>Jeden klucz statyczny dla czterech wołających <span class="tag att">GATEWAY_API_KEY</span></h3>
-          <p>Bramka nie stoi za żadną listą adresów; drzwi trzyma jeden współdzielony klucz, który ma market-data, trading-mcp, terminal i operator. Rotacja to zmiana w czterech miejscach naraz. <code>architecture.md</code> nazwał lepszy mechanizm — listę aplikacji jak w każdym innym module — i odłożył go „na własną propozycję”. Propozycji nie ma. Do tego rotacja sekretów z planu w historii gita (19.08) nie ma śladu w commitach.</p>
+        <div class="fail done">
+          <h3><strong>Jeden klucz statyczny otwierał wszystko</strong> <span class="tag done">wykonane · #238</span></h3>
+          <p>Bramka nie stoi za żadną listą adresów; drzwi trzymał jeden współdzielony klucz, który ma market-data, trading-mcp i każdy <code>.env</code>. Od <code>the-gateway-door-authenticates</code> platforma wymagała tokenu, ale o tym, <em>jak daleko</em> wołający sięga, nadal rozstrzygał klucz: sprawdzany jako pierwszy, otwierał <code>/orders</code> — także dla tokenu terminala, gdyby ktoś miał oba. <code>architecture.md</code> nazwał lepszy mechanizm i odłożył go „na własną propozycję”.</p>
+          <p><b>Wykonane 2 września, <code>the-key-opens-only-the-stream</code> (#238), apply przed merge.</b> Na produkcji rozstrzyga aplikacja z oświadczeń tokenu: <code>MODULE_CALLER_APPLICATION_IDS</code> (market-data, trading-mcp) sięga wszystkiego, przeglądarka rachunku, a klucz nie otwiera żadnej trasy HTTP — zostaje poświadczeniem <code>/ws/stream</code> i pracy lokalnej. Wołający nie zmienili ani linii, bo token już wysyłali. Jedna poprawka do tego dokumentu: „z P2 to jest import, nie nowy plik” było błędem — <code>tc-runtime</code> wniósłby do jedynego modułu bez bazy sterownik bazy, alembic i SQLAlchemy dla trzydziestu linii; bramka zostaje przy własnej kopii, z powodem w <code>design.md</code>. Rotacja sekretów z historii gita (19.08) nadal bez śladu w commitach.</p>
         </div>
         <div class="fail">
           <h3>Cztery pojedyncze punkty, jeden z nich celowy <span class="tag att">SPOF</span></h3>
@@ -494,7 +496,7 @@
     <section>
       <div class="eyebrow">05 · Propozycje</div>
       <h2>Od największego zwrotu</h2>
-      <p>Każda pozycja ma koszt w dniach i zysk, który da się sprawdzić. Kolumna „OpenSpec” mówi, czy to zmiana wymagania lub kontraktu — test z <code>CLAUDE.md</code> jest mechaniczny: nazwać pliki. <b>P1, P2, P3, P4 i P6 są wykonane</b>, i przy P2 ta kolumna okazała się pomylona: czwarta kategoria wyzwalacza jest dla zmiany, która <em>odwraca</em> regułę nośną, a ta ją stosuje — do tego zmiana bez delty zapala <code>--strict</code> na czerwono, czyli dokładnie to, co P1 naprawiło.</p>
+      <p>Każda pozycja ma koszt w dniach i zysk, który da się sprawdzić. Kolumna „OpenSpec” mówi, czy to zmiana wymagania lub kontraktu — test z <code>CLAUDE.md</code> jest mechaniczny: nazwać pliki. <b>P1–P7 są wykonane</b>, i przy P2 ta kolumna okazała się pomylona: czwarta kategoria wyzwalacza jest dla zmiany, która <em>odwraca</em> regułę nośną, a ta ją stosuje — do tego zmiana bez delty zapala <code>--strict</code> na czerwono, czyli dokładnie to, co P1 naprawiło.</p>
       <div class="table-wrap">
         <table>
           <thead>
@@ -505,9 +507,9 @@
             <tr class="shipped"><td class="n">P2 ✓</td><td><b><code>tc-runtime</code> bierze kształt modułu archiwum.</b> <code>caller_access</code> jako jedna klasa z listami w parametrach; <code>ManagedIdentityAuth</code> jako jeden plik; szkielet <code>mcp_app</code>/<code>openapi</code>; market-data dokańcza przejście na pakietową pulę z parametrem czekania.</td><td>wykonane<br><b>#232</b></td><td>nie — patrz akapit wyżej</td><td><b>spełnione.</b> 3 197 → 949 linii kopii (−1 254 netto), siedem <code>_ManagedIdentityAuth</code> → jedno, testy przeniesione do <code>packages/</code>, każdy dokument OpenAPI bajt w bajt ten sam</td></tr>
             <tr class="shipped"><td class="n">P3 ✓</td><td><b>Budżet połączeń jako liczba.</b> Każdy moduł nazywa <code>DATABASE_POOL_SIZE</code> w <code>config.py</code>, w <code>.env.example</code> i w <code>app_settings</code>; test sumuje oba źródła i odmawia powyżej 30.</td><td>wykonane<br><b>#233</b></td><td>nie — żadne wymaganie nie mówi, jak duża może być pula; to liczba w <code>infra/**</code> z testem</td><td><b>spełnione.</b> 64 → 29 przy budżecie 30; test czerwony przy 33 i przy wartości różniącej się między <code>config.py</code> a Terraformem</td></tr>
             <tr class="shipped"><td class="n">P4 ✓</td><td><b>Cisza jest awarią w każdym module.</b> Metryka „przebiegi od ostatniego ukończonego” na pętlę, z <code>tc-runtime</code>, i jeden alert na moduł z pętlą. <em>Nie</em> na <code>/ping</code>: wiek idzie na <code>/health</code>, bo sonda ma mówić, że proces żyje.</td><td>wykonane<br><b>#233</b></td><td>tak — <code>a-stopped-loop-wakes-somebody</code>, trzy wymagania liveness</td><td><b>spełnione dla trzech pętli.</b> telegram-gateway bez alertu celowo. Operatorowi zostaje <code>apply</code> i stoper od zatrzymania pętli do powiadomienia</td></tr>
-            <tr><td class="n">P5</td><td><b>Deploy po checkach.</b> <code>deploy-*.yml</code> na <code>workflow_run</code> po zielonym <code>checks</code> dla tego samego SHA, z <code>workflow_dispatch</code> jako drzwiami awaryjnymi.</td><td>0,5 dnia</td><td>nie</td><td>merge z czerwonym testem nie dociera na produkcję; czas od merge do sondy wydłuża się o czas checków, i to jest cena<br><b>stan 2.09:</b> deploy #233 zielony w sześciu modułach, start równolegle z checkami — nadal do zrobienia</td></tr>
+            <tr class="shipped"><td class="n">P5 ✓</td><td><b>Deploy po checkach.</b> <code>deploy-*.yml</code> na <code>workflow_run</code> po zielonym <code>checks</code> dla tego samego SHA, z <code>workflow_dispatch</code> jako drzwiami awaryjnymi; bramka <code>deploy_gate.py</code> oddaje filtr ścieżek i właściwy SHA.</td><td>wykonane<br><b>#236</b> · <b>#237</b></td><td>nie</td><td><b>spełnione</b> po jednej poprawce: pierwszy przebieg pominął wszystko przez katalog roboczy gita; #237 naprawia z testem, #238 dowodzi na żywo. Cena zapisana: 25 s–6 min więcej od merge do sondy</td></tr>
             <tr class="shipped"><td class="n">P6 ✓</td><td><b>Szósty serwer narzędzi.</b> <code>STRATEGY_MCP_URL</code> w workbenchu, <code>pending_setups</code> jako źródło wyzwalacza obok pięciu pozostałych; lista wołających w strategy <em>już</em> miała tożsamość workbencha.</td><td>wykonane<br><b>#234</b></td><td>tak — <code>a-decision-wakes-a-team</code>: wymaganie w <code>teams-triggers</code>, para w <code>infra</code></td><td><b>spełnione w kodzie.</b> Godziny, nie 2–3 dni — obie połowy szwu już stały. Zespół budzi się z decyzji przez pętlę, zero zużycia przed wyzwoleniem: <code>test_a_setup_counted_by_the_strategy_platform_wakes_the_team_once</code>. Obraz na produkcji od 15:58, para po apply tego samego wieczoru; zmiana zarchiwizowana (#235)</td></tr>
-            <tr><td class="n">P7</td><td><b>Bramka dostaje listę aplikacji.</b> Klucz zostaje dla <code>/ws/stream</code> (powód z 20.08 stoi), reszta tras przechodzi na ten sam zapis wołających co pozostałe moduły — z P2 to jest import, nie nowy plik.</td><td>1–2 dni</td><td>tak — infra i wymaganie</td><td>rotacja klucza dotyka jednego miejsca; wołający bez tożsamości odmówiony przed modułem</td></tr>
+            <tr class="shipped"><td class="n">P7 ✓</td><td><b>Bramka dostaje listę aplikacji.</b> Klucz zostaje dla <code>/ws/stream</code> (powód z 20.08 stoi) i pracy lokalnej; na produkcji o każdej trasie HTTP rozstrzyga aplikacja z tokenu. <em>Nie</em> import z pakietu — patrz §04.</td><td>wykonane<br><b>#238</b></td><td>tak — <code>the-key-opens-only-the-stream</code>: wymaganie w <code>capital-access-control</code>, ustawienie w infra</td><td><b>spełnione w kodzie i na platformie</b> (apply przed merge, obraz 8f5a0b3 serwuje). Klucz sam na produkcji: 401 od modułu — test <code>test_in_production_the_right_key_alone_opens_no_route</code>. Zostaje operatorowi 4.2: token terminala na <code>/orders</code> → 403, z sesji w przeglądarce</td></tr>
             <tr><td class="n">P8</td><td><b>Szósty kontrakt generowany.</b> <code>agentApi.ts</code> z generatora, jak pięć pozostałych; przy okazji pomiar bliźniaków teams/agent w terminalu tym samym narzędziem co provider.</td><td>1 dzień</td><td>nie</td><td><code>contract:check</code> czerwony na zmianie w <code>agent/contract.py</code>; liczba z pomiaru zapisana, niezależnie od wyniku</td></tr>
             <tr><td class="n">P9</td><td><b>Data końca darmowego pakietu i plan po niej</b> — jeden akapit w <code>infra/database.tf</code> i w runbooku: kiedy, ile, i czy B1ms zostaje.</td><td>1 godzina</td><td>nie</td><td>ktoś wie dzień wcześniej, nie dzień później</td></tr>
           </tbody>
@@ -526,7 +528,7 @@
     <section>
       <div class="eyebrow">06 · Plan</div>
       <h2>Cztery fazy, każda z liczbą na wyjściu</h2>
-      <p class="intro">Kolejność nie jest tym, co najbardziej boli, tylko tym, co najtaniej zdejmuje ryzyko następnej fazy. Faza 0 sprawia, że pomiar mówi prawdę; faza 1 odejmuje kod; faza 2 dokłada oczy; faza 3 domyka produkt. Nic tu nie wymaga zatrzymania stosu ani migracji. <b>Fazy 0, 1 i 2 są wykonane, z fazy 3 — P6</b> — z dwiema poprawkami w kolejności, opisanymi niżej.</p>
+      <p class="intro">Kolejność nie jest tym, co najbardziej boli, tylko tym, co najtaniej zdejmuje ryzyko następnej fazy. Faza 0 sprawia, że pomiar mówi prawdę; faza 1 odejmuje kod; faza 2 dokłada oczy; faza 3 domyka produkt. Nic tu nie wymaga zatrzymania stosu ani migracji. <b>Fazy 0, 1 i 2 są wykonane w całości, z fazy 3 — P6</b> — z dwiema poprawkami w kolejności, opisanymi niżej.</p>
       <div class="quote">Najpierw sprawić, żeby narzędzie pomiaru widziało system. Potem ciąć to, co pokaże.</div>
 
       <div class="phase shipped">
@@ -549,13 +551,13 @@
         </div>
       </div>
       <div class="phase shipped">
-        <div class="no">2<small>P3 + P4 wykonane · #233</small></div>
+        <div class="no">2<small>wykonane · #233 · #236–#238</small></div>
         <div>
           <h3>Oczy</h3>
-          <p><b>P3 wykonane</b>: każdy moduł nazywa <code>DATABASE_POOL_SIZE</code> w trzech miejscach, test sumuje oba źródła, 64 → 29. <b>P5 nadal nie</b> — kolejność deployu jest niezależna od wszystkiego w tej fazie i idzie osobno, bo zmienia to, <em>kiedy</em> produkcja dostaje merge, a nie <em>co</em> dostaje.</p>
+          <p><b>P3 wykonane</b>: każdy moduł nazywa <code>DATABASE_POOL_SIZE</code> w trzech miejscach, test sumuje oba źródła, 64 → 29. <b>P5 wykonane wieczorem</b> (#236, poprawka #237): zmienia to, <em>kiedy</em> produkcja dostaje merge, nie <em>co</em> — i pierwszy przebieg pokazał, że bramka, która milczy, wygląda dokładnie jak bramka, która działa; dopiero deploy bramki przy #238 był dowodem.</p>
           <p>Potem liveness jako jedna rzecz w pakiecie — <code>tc_runtime.liveness</code>, metryka wieku ostatniego przebiegu, emitowana tą samą drogą co w market-data — i cztery wymagania OpenSpec, po jednym na moduł z pętlą, każde z własnym powodem (bo próbka co minutę i post co godzinę to różne „za długo”). Alerty: jeden na moduł, wszystkie do tej samej grupy operatora, runbook <code>kiedy-produkcja-milczy</code> dostaje cztery wiersze. Potem P7: bramka bierze zapis wołających z pakietu, klucz zostaje tylko na <code>/ws/stream</code>.</p>
-          <p class="done">Wyjście, osiągnięte: suma pul <b>29 ≤ 30</b>, pilnowana testem · trzy alerty na trzy pętle, próg trzy przebiegi.</p>
-          <p><b>Zostaje w tej fazie</b>: P7 (bramka na listę aplikacji) i P5. <b>Apply wykonany 2 września wieczorem</b> — jeden, dla P3, P4 i P6 naraz: 3 alerty dodane, 6 aplikacji zmienionych, 0 zniszczonych; po nim sześć alertów w grupie zasobów, <code>DATABASE_POOL_SIZE</code> na wszystkich sześciu aplikacjach z bazą, każda zrestartowana odpowiada 200 na swojej otwartej ścieżce. Zmierzone wcześniej tego samego dnia: bez apply w Azure były trzy alerty jak przed #233, więc P3 i P4 przez osiem godzin były w obrazie, nie w platformie. Zostaje operatorowi jedno, czego nie da się zrobić z repozytorium: stoper od zatrzymania pętli na produkcji do powiadomienia — zadanie 6.2 zmiany <code>a-stopped-loop-wakes-somebody</code>, która dlatego zostaje aktywna.</p>
+          <p class="done">Wyjście, osiągnięte: suma pul <b>29 ≤ 30</b>, pilnowana testem · trzy alerty na trzy pętle, próg trzy przebiegi · deploy po zielonych checks, z bramką od ostatniego zielonego przebiegu · klucz bramki otwiera na produkcji tylko strumień.</p>
+          <p><b>Nic nie zostaje w tej fazie.</b> P7 (#238) poszło po jednym <code>apply</code> przed merge — ustawienie pod starym obrazem nic nie zmienia, obraz z pustą listą odmówiłby modułom. <b>Wcześniejszy apply, 2 września wieczorem</b> — jeden, dla P3, P4 i P6 naraz: 3 alerty dodane, 6 aplikacji zmienionych, 0 zniszczonych; po nim sześć alertów w grupie zasobów, <code>DATABASE_POOL_SIZE</code> na wszystkich sześciu aplikacjach z bazą, każda zrestartowana odpowiada 200 na swojej otwartej ścieżce. Zmierzone wcześniej tego samego dnia: bez apply w Azure były trzy alerty jak przed #233, więc P3 i P4 przez osiem godzin były w obrazie, nie w platformie. Zostaje operatorowi jedno, czego nie da się zrobić z repozytorium: stoper od zatrzymania pętli na produkcji do powiadomienia — zadanie 6.2 zmiany <code>a-stopped-loop-wakes-somebody</code>, która dlatego zostaje aktywna.</p>
         </div>
       </div>
       <div class="phase shipped">
@@ -575,7 +577,7 @@
 
 <footer>
   <div class="inner">
-    <span>Przegląd TradingCenter · pomiary z 1 września 2026 · stan po fazach 0–2, P6 i apply, main @ e360e0a · poprzednik: docs/archive/nastepne-ciecia.html</span>
+    <span>Przegląd TradingCenter · pomiary z 1 września 2026 · stan po fazach 0–2 i P6, P5, P7, main @ 8f5a0b3 · poprzednik: docs/archive/nastepne-ciecia.html</span>
     <span>Tryb jasny — jedyny</span>
   </div>
 </footer>
