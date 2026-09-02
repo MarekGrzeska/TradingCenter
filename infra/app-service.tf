@@ -162,7 +162,13 @@ resource "azurerm_linux_web_app" "capital_gateway" {
     GATEWAY_API_KEY    = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.gateway_api_key})"
 
     # Who may reach this module past the door, read by the module itself: Easy Auth authorizes an application and not a
-    # route, and this app serves the account next to the routes that place orders.
+    # route, and this app serves the account next to the routes that place orders. Since `the-key-opens-only-the-stream`
+    # the application decides on every HTTP route and the shared key opens none of them — the two service callers are
+    # named here as well as on `allowed_applications` below, and neither list substitutes for the other.
+    MODULE_CALLER_APPLICATION_IDS = jsonencode([
+      data.azuread_service_principal.market_data_managed_identity.client_id,
+      data.azuread_service_principal.trading_mcp_managed_identity.client_id,
+    ])
     BROWSER_CALLER_APPLICATION_IDS = jsonencode([azuread_application.terminal.client_id])
 
     MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.capital_gateway_easy_auth.password

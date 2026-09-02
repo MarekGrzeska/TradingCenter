@@ -123,12 +123,14 @@ asks the gateway whether the account is a demo one *before* it opens a port. Bot
 compare the two files and refuse up front, because otherwise the symptom is the whole stack
 going down with "a service exited".
 
-**The gateway's door asks for different things in different places, and the key is only half of
-it.** Locally the shared key is the whole credential and nothing changes. In production, since
+**The gateway's door asks for different things in different places, and in production the key
+opens no HTTP route at all.** Locally the shared key is the whole credential. In production, since
 `the-gateway-door-authenticates`, the gateway's Easy Auth requires a validated token: `market-data`
 and `trading-mcp` present tokens of their own managed identities (`GATEWAY_SCOPE`,
-`CAPITAL_GATEWAY_SCOPE`) beside the key, and the terminal presents the operator's. A caller with
-only the key is refused by the platform before the module sees it. Two exceptions, both
+`CAPITAL_GATEWAY_SCOPE`) beside the key, and the terminal presents the operator's. Since
+`the-key-opens-only-the-stream` the application that token names is what decides — the two modules
+reach everything (`MODULE_CALLER_APPLICATION_IDS`), the terminal the account — and a caller with
+only the key is refused twice, by the platform and by the module. Two exceptions, both
 deliberate: `/` is the health route, and **`/ws/stream` is the one path in this system whose door
 is the shared key alone** — an authenticator in front of a WebSocket upgrade intercepts it and
 never completes it, which killed every candle feed for an hour on 20 August 2026, so that check
@@ -277,8 +279,8 @@ App Service will serve *and* whether the process inside came up; two more deploy
 Static Web Apps. `workflow_dispatch` is the door around the gate.
 **No App Service in this resource group carries an address restriction at all** — measured
 20 August 2026 against the opposite premise, which is why `capital-gateway` went unprobed until
-then. What holds its door is its own shared key, checked in `RequireGatewayKey`; the Easy Auth in
-front of it validates nothing, because `AllowAnonymous` passes a bearer token through untouched.
+then. What held its door then was its own shared key; the Easy Auth in front of it validated nothing,
+because `AllowAnonymous` passed a bearer token through untouched. Both are different today (above).
 `terraform.yml` plans on
 infra PRs; `terraform-apply.yml` is a manual dispatch that applies and refuses any plan touching
 `azuread_*`, since CI holds `Application.Read.All` and not write.

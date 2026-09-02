@@ -8,12 +8,16 @@ arrives when it closes — stays inside the module.
 **Demo only.** Any endpoint other than the demo host is refused at startup, so this cannot
 place an order with real money.
 
-**Every call needs this module's own caller key**, sent as `X-Gateway-Key` — a header
-missing or a value that mismatches is `401` before capital.com is touched, on every route
-and at WebSocket handshake alike. The one exception is `GET /`, the health probe the
-hosting platform polls with no credential. This key has nothing to do with the capital.com
-credentials above it; it is what today's one caller, `market-data`, presents to this
-module, not what this module presents to the provider.
+**Every call needs a credential, and which one depends on where the module stands.** Locally
+it is this module's own caller key, sent as `X-Gateway-Key` — a header missing or a value that
+mismatches is `401` before capital.com is touched, on every route and at WebSocket handshake
+alike. In production a platform authenticator stands in front, and the application its
+validated token names decides: `market-data` and `trading-mcp` (`MODULE_CALLER_APPLICATION_IDS`)
+reach everything, the terminal (`BROWSER_CALLER_APPLICATION_IDS`) the account only, and the
+key opens **no** HTTP route there — a key leaked from any `.env` is not a caller. The key stays
+the credential of exactly one production path, `/ws/stream`, which the authenticator cannot
+stand in front of. The one route with no credential at all is `GET /`, the health probe. None
+of this has anything to do with the capital.com credentials above it.
 
 ## What
 

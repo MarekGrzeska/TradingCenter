@@ -1,5 +1,8 @@
-"""Who may reach this module, and which part of it: a module presents the shared
-`X-Gateway-Key` and reaches everything, a browser a validated token and the account only."""
+"""Who may reach this module, and which part of it. In production the application a validated token
+names decides — a module reaches everything, a browser the account only — and the shared `X-Gateway-Key`
+opens no HTTP route; it stays the credential of `/ws/stream` and of local work. Its own thirty lines
+rather than `tc_runtime.caller_access`, which would bring a database driver into a module with no
+database (the-key-opens-only-the-stream/design.md)."""
 
 from __future__ import annotations
 
