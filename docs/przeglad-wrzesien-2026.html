@@ -183,12 +183,12 @@
   <div class="inner">
     <span class="kicker">TradingCenter · przegląd architektury</span>
     <h1>Dziesięć modułów, jeden pomiar</h1>
-    <p class="lede">Dwanaście dni po „następnych cięciach” system podwoił liczbę modułów. Ten dokument mierzy, <b>co z tego jest architekturą, a co jest kopią</b> — i układa z tego plan, którego każda faza ma liczbę na wejściu i na wyjściu. <b>Fazy 0, 1, 2 i P6 są wykonane, wieczorem doszły P5 i P7</b>; poniżej stan po nich, a nie przed.</p>
+    <p class="lede">Dwanaście dni po „następnych cięciach” system podwoił liczbę modułów. Ten dokument mierzy, <b>co z tego jest architekturą, a co jest kopią</b> — i układa z tego plan, którego każda faza ma liczbę na wejściu i na wyjściu. <b>Wszystkie cztery fazy są wykonane — P1 do P9 w jeden dzień</b>; poniżej stan po nich, a nie przed, i to, co z planu okazało się nieprawdą po drodze.</p>
     <div class="strip">
       <span>TradingCenter / architektura</span>
-      <span>pomiar 1 września · <b>stan 2 września 2026, 18:00, main @ 8f5a0b3</b></span>
+      <span>pomiar 1 września · <b>stan 2 września 2026, wieczór, main @ 64b8cac</b></span>
       <span>środowisko <b>demo</b></span>
-      <span>wykonane: <b>#231</b>–<b>#238</b> · dwa <b>apply</b></span>
+      <span>wykonane: <b>#231</b>–<b>#240</b> · dwa <b>apply</b></span>
     </div>
   </div>
 </header>
@@ -356,8 +356,8 @@
             <tr><td><b>strategy</b></td><td class="n">8080</td><td><code>strategy</code></td><td>REST, 4 narzędzia</td><td>terminal · <b>workbench</b> (od #234, na produkcji po apply)</td><td class="n">5 620 / 321</td><td><span class="tag att">brak</span></td></tr>
             <tr><td><b>social-data</b></td><td class="n">8090</td><td><code>social</code></td><td>REST, 4 narzędzia</td><td>terminal, pocket, workbench</td><td class="n">2 492 / 100</td><td><span class="tag att">brak</span></td></tr>
             <tr><td><b>telegram-gateway</b></td><td class="n">8100</td><td><code>telegram</code></td><td>REST, 2 narzędzia</td><td>workbench, social-data, strategy</td><td class="n">2 567 / 162</td><td><span class="tag att">brak</span></td></tr>
-            <tr><td><b>terminal</b></td><td class="n">5173</td><td>—</td><td>konsument, 5 kontraktów generowanych + 1 ręczny</td><td>przeglądarka</td><td class="n">24 931 / 65 plików</td><td>—</td></tr>
-            <tr><td><b>pocket</b></td><td class="n">5174</td><td>—</td><td>konsument, kontrakty współdzielone z terminalem</td><td>telefon</td><td class="n">3 277 / 13 plików</td><td>—</td></tr>
+            <tr><td><b>terminal</b></td><td class="n">5173</td><td>—</td><td>konsument, 6 kontraktów generowanych (od #239)</td><td>przeglądarka</td><td class="n">24 931 / 65 plików</td><td>—</td></tr>
+            <tr><td><b>pocket</b></td><td class="n">5174</td><td>—</td><td>konsument, 3 kontrakty generowane własnym generatorem (od #239 także rozmowy)</td><td>telefon</td><td class="n">3 277 / 13 plików</td><td>—</td></tr>
           </tbody>
         </table>
       </div>
@@ -375,7 +375,7 @@
           </thead>
           <tbody>
             <tr><td><b>Obliczenia</b></td><td>1 × App Service Plan <code>B3</code>, <code>worker_count = 1</code>, 8 aplikacji <code>always_on</code></td><td>capital.com liczy 10 req/s na <em>rachunek</em>; drugi worker wydałby ten sam budżet dwa razy</td><td>8 × 150–310 MB w 7 GB; alert pamięci zdjęto 20.08 („wejście do decyzji, nie zdarzenie”), a trzy komentarze w <code>app-service.tf</code> nadal go nazywają</td></tr>
-            <tr><td><b>Dane</b></td><td>1 × PostgreSQL Flexible <code>B_Standard_B1ms</code>, 32 GB, 7 dni kopii, 7 baz, TLS wymuszony, tylko Entra</td><td>darmowy pakiet to 750 h <em>jednego</em> B1ms przez 12 miesięcy</td><td><code>max_connections</code> 35 przeciw sumie pul 64 (§04); pakiet darmowy ma datę końca, której nikt nie zapisał</td></tr>
+            <tr><td><b>Dane</b></td><td>1 × PostgreSQL Flexible <code>B_Standard_B1ms</code>, 32 GB, 7 dni kopii, 7 baz, TLS wymuszony, tylko Entra</td><td>darmowy pakiet to 750 h <em>jednego</em> B1ms przez 12 miesięcy</td><td><code>max_connections</code> 35 przeciw sumie pul 29 od #233; koniec pakietu darmowego ograniczony od góry w <code>database.tf</code> (#240) — dokładny dzień jest w portalu, operatora</td></tr>
             <tr><td><b>Tożsamość</b></td><td>8 × Easy Auth (moduł <code>easy-auth-app</code>), 2 × SP dla front-endów, 10 pre-autoryzacji, 22 listy wołających w <code>app_settings</code></td><td>Easy Auth autoryzuje aplikację, nie trasę — moduł trzyma własny zapis <code>caller_access.py</code></td><td>nowy wołający = apply + restart + wpis w dwóch listach; udokumentowane, nie zautomatyzowane</td></tr>
             <tr><td><b>Sekrety</b></td><td>Key Vault: klucz Capital, klucz bramki (od #238 otwiera na produkcji tylko strumień), token GHCR; OIDC dla CI; jeden zapisany sekret — token wdrożeniowy SWA</td><td>SWA nie ma ścieżki OIDC</td><td>plik planu z sekretami trafił do historii gita 19.08; <code>.gitignore</code> naprawiony 31.08, rotacja nieudokumentowana</td></tr>
             <tr><td><b>Obserwacja</b></td><td>App Insights + LAW (30 dni), <b>3 alerty</b>, <b>1 webtest</b> — wszystkie na market-data lub bazie</td><td>„alerty 9 → 3” z rachunku po refactorze; sześć miało powód, który przestał istnieć</td><td>cztery pętle zbierające w czterech nowszych modułach nie emitują żadnej metryki</td></tr>
@@ -425,7 +425,7 @@
     <section>
       <div class="eyebrow">04 · Słabe strony</div>
       <h2>Gdzie system przestał mówić prawdę o sobie</h2>
-      <p class="intro">Dwanaście punktów, każdy z pomiarem, ułożonych od tego, co było sprzeczne z własną regułą repozytorium, przez to, co grozi produkcji, po to, co kosztuje tylko czytelnika. <b>Dziesięć z nich jest zamkniętych</b> — zielone, z numerem PR-a; dwa stoją: ręczny kontrakt terminala i pojedyncze punkty, które są konsekwencją darmowego pakietu.</p>
+      <p class="intro">Dwanaście punktów, każdy z pomiarem, ułożonych od tego, co było sprzeczne z własną regułą repozytorium, przez to, co grozi produkcji, po to, co kosztuje tylko czytelnika. <b>Jedenaście z nich jest zamkniętych</b> — zielone, z numerem PR-a; jeden stoi, i stoi celowo: pojedyncze punkty, które są konsekwencją darmowego pakietu, mają od #240 datę graniczną i decyzję.</p>
 
       <div class="fails">
         <div class="fail done">
@@ -460,7 +460,7 @@
           <h3><strong>Deploy nie czekał na checki</strong> <span class="tag done">wykonane · #236 · #237</span></h3>
           <p>Push do <code>main</code> uruchamia <code>checks</code> i <code>deploy-*</code> w tej samej sekundzie. Sonda dowodzi, że proces wstał — regresji w logice nie widzi. Merge z czerwonym testem jest dziś na produkcji, zanim CI zdąży to powiedzieć; cofnięcie to ręczne <code>az</code> (~40 s) bez slotu. Przy dziesięciu deployach dziennie to statystyka, nie hipoteza.</p>
           <p><b>Zmierzone 2 września, 10:20.</b> Deploy #233 (d889472): sześć workflow <code>deploy-*</code> zielonych, <code>checks</code> zielone — i wszystkie siedem uruchomione w tej samej minucie. Wynik dobry, kolejność nadal zła. <b>I drugi raz o 15:55</b>: deploy-workbench dla #234 (3a5c8f1) zakończony sondą na zielono, zanim <code>checks</code> tego samego SHA skończyły się liczyć.</p>
-          <p><b>Wykonane 2 września, #236.</b> Dziesięć workflow deploy na <code>workflow_run</code> po <code>checks</code>, tylko przy <code>conclusion == success</code>; <code>workflow_dispatch</code> jako drzwi operatora. Dwie rzeczy, które <code>workflow_run</code> zabiera, oddaje <code>scripts/deploy_gate.py</code>: filtr ścieżek (diff tego, co obraz zapieka, od <em>ostatniego zielonego przebiegu checks</em>, nie od <code>HEAD^</code> — dwa merge'e minutę po sobie anulują pierwszemu checks, a <code>HEAD^</code> zgubiłby jego moduły) i właściwy SHA (<code>github.sha</code> pod <code>workflow_run</code> to głowa gałęzi, nie sprawdzony commit). Pierwszy żywy przebieg o 17:34: checks 25 s, potem dziesięć deployów — <b>wszystkie „nic się nie zmieniło", wszystkie pominięte, wszystkie zielone</b>. Bramka chodzi z <code>scripts/</code>, a git liczył pathspecy względem katalogu roboczego: szukała <code>scripts/modules/workbench</code>. Naprawione w #237 z testem na prawdziwym repozytorium tymczasowym; dowód na żywo o 17:48 przy #238 — „changed since 868d0be", obraz bramki zbudowany i serwujący. Cena, zapisana: od merge do sondy dochodzi czas checks, tu 25 s do 6 min.</p>
+          <p><b>Wykonane 2 września, #236.</b> Dziesięć workflow deploy na <code>workflow_run</code> po <code>checks</code>, tylko przy <code>conclusion == success</code>; <code>workflow_dispatch</code> jako drzwi operatora. Dwie rzeczy, które <code>workflow_run</code> zabiera, oddaje <code>scripts/deploy_gate.py</code>: filtr ścieżek (diff tego, co obraz zapieka, od <em>ostatniego zielonego przebiegu checks</em>, nie od <code>HEAD^</code> — dwa merge'e minutę po sobie anulują pierwszemu checks, a <code>HEAD^</code> zgubiłby jego moduły) i właściwy SHA (<code>github.sha</code> pod <code>workflow_run</code> to głowa gałęzi, nie sprawdzony commit). Pierwszy żywy przebieg o 17:34: checks 25 s, potem dziesięć deployów — <b>wszystkie „nic się nie zmieniło", wszystkie pominięte, wszystkie zielone</b>. Bramka chodzi z <code>scripts/</code>, a git liczył pathspecy względem katalogu roboczego: szukała <code>scripts/modules/workbench</code>. Naprawione w #237 z testem na prawdziwym repozytorium tymczasowym; dowód na żywo o 17:48 przy #238 — „changed since 868d0be", obraz bramki zbudowany i serwujący. Cena, zapisana: od merge do sondy dochodzi czas checks, tu 25 s do 6 min. <b>I scenariusz, dla którego bramka liczy od ostatniego zielonego przebiegu, zdarzył się tego samego wieczoru</b>: merge #239 i #240 trzy sekundy po sobie, <code>checks</code> P8 anulowane przez push P9 — a deploy z 64b8cac policzył diff od poprzedniego zielonego 8dcf874, zbudował workbench, terminal i pocket ze zmianami P8 i pominął siedem pozostałych. Przeciw <code>HEAD^</code> P8 nigdy by nie wyjechało.</p>
         </div>
         <div class="fail done">
           <h3><strong>Osiem aktywnych zmian OpenSpec, prawda o module w niescalonej delcie</strong> <span class="tag done">wykonane · #231</span></h3>
@@ -477,9 +477,10 @@
           <p><code>README.md</code> wymieniał pięć modułów z dziesięciu i kolejność startu bez czterech usług. <code>CLAUDE.md</code> mówi „cztery <code>deploy-*.yml</code>” przy dziesięciu — i ma 22 438 z 23 000 znaków pułapu — <b>562 znaki zapasu</b>, gdy jeden moduł kosztuje w nim wiersz tabeli (130–320 znaków), wiersz komend i zdanie o porcie. Jedenasty moduł się zmieści, dwunasty nie. Cięcie K1 z 20.08 zostało wykonane — te 13 plików leży w <code>docs/archive/</code> — ale przeprowadzka po nim zostawiła nowy zestaw.</p>
           <p><b>Wykonane.</b> README na dziesięć modułów: tabela, kolejność startu, siedem baz logicznych, pięć ustawień serwerów narzędzi, joby CI, dziesięć workflow deploy — plus skreślone zdanie, że bramka wpuszcza tylko dwa adresy (żaden App Service tutaj nie ma ograniczenia adresów, zmierzone 20.08). <code>CLAUDE.md</code>: zapas <span class="hl">562 → 1 171 znaków</span>, wzięty z prozy, która ma dom w <code>architecture.md</code>, nie z żadnej pułapki. <code>dev.py --explain</code> mówił „cztery serwery narzędzi” (pięć) i że pocket czyta jeden moduł (trzy). Trzy dokumenty do <code>docs/archive/</code>. <b>Zostaje</b>: nie ma przewodnika modułowego dla czterech najnowszych modułów — luka, nie nieprawda.</p>
         </div>
-        <div class="fail">
-          <h3>Jeden kontrakt terminala nadal pisany ręcznie <span class="tag att">agentApi.ts</span></h3>
-          <p>Pięć kontraktów jest generowanych i sprawdzanych w CI; ten do rozmowy (610 linii) jest „hand-written against the module's OpenAPI” z komentarzem, że generator jest podpięty do market-data. Zmiana w <code>agent/contract.py</code> uruchamia job terminala, ale job ten nie ma jak zobaczyć dryfu, bo nie ma pliku, który by się różnił. Bliźniaki <code>teamsApi.ts</code> 850 / <code>agentApi.ts</code> 610 z K3 nadal niezmierzone.</p>
+        <div class="fail done">
+          <h3><strong>Jeden kontrakt terminala był pisany ręcznie — i drugi w pockecie</strong> <span class="tag done">wykonane · #239</span></h3>
+          <p>Pięć kontraktów było generowanych i sprawdzanych w CI; ten do rozmowy (610 linii) był „hand-written against the module's OpenAPI” z komentarzem, że generator jest podpięty do market-data. Zmiana w <code>agent/contract.py</code> uruchamiała job terminala, ale job nie miał jak zobaczyć dryfu, bo nie było pliku, który by się różnił. Pomiar znalazł jeszcze jedno: <b>pocket miał własny ręczny <code>agentApi.ts</code></b> (185 linii), którego przegląd nie policzył.</p>
+          <p><b>Wykonane.</b> <code>agent/openapi.py</code> drukuje dokument powierzchni rozmowy tak, jak <code>teams/openapi.py</code> drukuje zespołów; oba front-endy generują z niego <code>contract.agent.generated.ts</code>, a surowe typy w obu <code>agentApi.ts</code> są aliasami do generatora. Strumień zdarzeń tury zostaje ręczny — OpenAPI nie opisuje SSE. Job pocketa w CI patrzy odtąd na <code>modules/workbench/agent/</code>. <b>Bliźniaki zmierzone tym samym <code>SequenceMatcher</code>, co pakiety: <span class="hl">teamsApi.ts i agentApi.ts są identyczne w 10,9% na 93 liniach</span></b> — to nie są bliźniaki i nie ma czego rozdzielać; K3 zamknięte liczbą, nie refaktorem. <code>agentApi.ts</code> 610 → 548 linii.</p>
         </div>
         <div class="fail done">
           <h3><strong>Jeden klucz statyczny otwierał wszystko</strong> <span class="tag done">wykonane · #238</span></h3>
@@ -488,7 +489,7 @@
         </div>
         <div class="fail">
           <h3>Cztery pojedyncze punkty, jeden z nich celowy <span class="tag att">SPOF</span></h3>
-          <p>Jeden worker (celowo — budżet 10 req/s), jeden plan, jeden serwer bazy, jeden rachunek demo dla produkcji, testów live i każdego deployu. Trzy ostatnie są konsekwencją darmowego pakietu i są w porządku, dopóki ktoś zapisał, kiedy pakiet się kończy i co się wtedy zmienia. Nikt nie zapisał.</p>
+          <p>Jeden worker (celowo — budżet 10 req/s), jeden plan, jeden serwer bazy, jeden rachunek demo dla produkcji, testów live i każdego deployu. Trzy ostatnie są konsekwencją darmowego pakietu i są w porządku, dopóki ktoś zapisał, kiedy pakiet się kończy i co się wtedy zmienia. <b>Zapisane w połowie (#240)</b>: serwer powstał 9 sierpnia 2026, więc pakiet kończy się <em>nie później</em> niż rok po tej dacie; dokładnego dnia CLI nie umie przeczytać (subskrypcja od upgrade'u czyta się jako PayAsYouGo), jest w portalu i to jest jedna linia operatora. Decyzja zapisana obok SKU: B1ms zostaje, rzędu 15–20 USD miesięcznie; B2s albo drugi serwer nie są decyzją tej daty, tylko <code>plan_memory</code> i budżetu pul. Karta zostaje żółta, bo trzy punkty pojedyncze nadal są trzema.</p>
         </div>
       </div>
     </section>
@@ -496,7 +497,7 @@
     <section>
       <div class="eyebrow">05 · Propozycje</div>
       <h2>Od największego zwrotu</h2>
-      <p>Każda pozycja ma koszt w dniach i zysk, który da się sprawdzić. Kolumna „OpenSpec” mówi, czy to zmiana wymagania lub kontraktu — test z <code>CLAUDE.md</code> jest mechaniczny: nazwać pliki. <b>P1–P7 są wykonane</b>, i przy P2 ta kolumna okazała się pomylona: czwarta kategoria wyzwalacza jest dla zmiany, która <em>odwraca</em> regułę nośną, a ta ją stosuje — do tego zmiana bez delty zapala <code>--strict</code> na czerwono, czyli dokładnie to, co P1 naprawiło.</p>
+      <p>Każda pozycja ma koszt w dniach i zysk, który da się sprawdzić. Kolumna „OpenSpec” mówi, czy to zmiana wymagania lub kontraktu — test z <code>CLAUDE.md</code> jest mechaniczny: nazwać pliki. <b>P1–P9 są wykonane</b>, i przy P2 ta kolumna okazała się pomylona: czwarta kategoria wyzwalacza jest dla zmiany, która <em>odwraca</em> regułę nośną, a ta ją stosuje — do tego zmiana bez delty zapala <code>--strict</code> na czerwono, czyli dokładnie to, co P1 naprawiło.</p>
       <div class="table-wrap">
         <table>
           <thead>
@@ -510,8 +511,8 @@
             <tr class="shipped"><td class="n">P5 ✓</td><td><b>Deploy po checkach.</b> <code>deploy-*.yml</code> na <code>workflow_run</code> po zielonym <code>checks</code> dla tego samego SHA, z <code>workflow_dispatch</code> jako drzwiami awaryjnymi; bramka <code>deploy_gate.py</code> oddaje filtr ścieżek i właściwy SHA.</td><td>wykonane<br><b>#236</b> · <b>#237</b></td><td>nie</td><td><b>spełnione</b> po jednej poprawce: pierwszy przebieg pominął wszystko przez katalog roboczy gita; #237 naprawia z testem, #238 dowodzi na żywo. Cena zapisana: 25 s–6 min więcej od merge do sondy</td></tr>
             <tr class="shipped"><td class="n">P6 ✓</td><td><b>Szósty serwer narzędzi.</b> <code>STRATEGY_MCP_URL</code> w workbenchu, <code>pending_setups</code> jako źródło wyzwalacza obok pięciu pozostałych; lista wołających w strategy <em>już</em> miała tożsamość workbencha.</td><td>wykonane<br><b>#234</b></td><td>tak — <code>a-decision-wakes-a-team</code>: wymaganie w <code>teams-triggers</code>, para w <code>infra</code></td><td><b>spełnione w kodzie.</b> Godziny, nie 2–3 dni — obie połowy szwu już stały. Zespół budzi się z decyzji przez pętlę, zero zużycia przed wyzwoleniem: <code>test_a_setup_counted_by_the_strategy_platform_wakes_the_team_once</code>. Obraz na produkcji od 15:58, para po apply tego samego wieczoru; zmiana zarchiwizowana (#235)</td></tr>
             <tr class="shipped"><td class="n">P7 ✓</td><td><b>Bramka dostaje listę aplikacji.</b> Klucz zostaje dla <code>/ws/stream</code> (powód z 20.08 stoi) i pracy lokalnej; na produkcji o każdej trasie HTTP rozstrzyga aplikacja z tokenu. <em>Nie</em> import z pakietu — patrz §04.</td><td>wykonane<br><b>#238</b></td><td>tak — <code>the-key-opens-only-the-stream</code>: wymaganie w <code>capital-access-control</code>, ustawienie w infra</td><td><b>spełnione w kodzie i na platformie</b> (apply przed merge, obraz 8f5a0b3 serwuje). Klucz sam na produkcji: 401 od modułu — test <code>test_in_production_the_right_key_alone_opens_no_route</code>. Zostaje operatorowi 4.2: token terminala na <code>/orders</code> → 403, z sesji w przeglądarce</td></tr>
-            <tr><td class="n">P8</td><td><b>Szósty kontrakt generowany.</b> <code>agentApi.ts</code> z generatora, jak pięć pozostałych; przy okazji pomiar bliźniaków teams/agent w terminalu tym samym narzędziem co provider.</td><td>1 dzień</td><td>nie</td><td><code>contract:check</code> czerwony na zmianie w <code>agent/contract.py</code>; liczba z pomiaru zapisana, niezależnie od wyniku</td></tr>
-            <tr><td class="n">P9</td><td><b>Data końca darmowego pakietu i plan po niej</b> — jeden akapit w <code>infra/database.tf</code> i w runbooku: kiedy, ile, i czy B1ms zostaje.</td><td>1 godzina</td><td>nie</td><td>ktoś wie dzień wcześniej, nie dzień później</td></tr>
+            <tr class="shipped"><td class="n">P8 ✓</td><td><b>Szósty kontrakt generowany</b> — na obu ekranach, bo pocket miał drugi ręczny <code>agentApi.ts</code>, którego przegląd nie policzył; pomiar bliźniaków teams/agent tym samym narzędziem co pakiety.</td><td>wykonane<br><b>#239</b></td><td>nie</td><td><b>spełnione.</b> <code>contract:check</code> w terminalu i pockecie czyta <code>agent.openapi</code>; liczba zapisana: <b>10,9% na 93 liniach</b> — nie bliźniaki</td></tr>
+            <tr class="shipped"><td class="n">P9 ✓</td><td><b>Data końca darmowego pakietu i plan po niej</b> — akapit obok SKU w <code>infra/database.tf</code>: górna granica daty, cena po niej, B1ms zostaje.</td><td>wykonane<br><b>#240</b></td><td>nie — komentarz, plan bez różnicy</td><td><b>spełnione w połowie, celowo</b>: granica „nie później niż 9 sierpnia 2027” jest w pliku; dokładny dzień jest w portalu i jest jedną linią operatora</td></tr>
           </tbody>
         </table>
       </div>
@@ -528,7 +529,7 @@
     <section>
       <div class="eyebrow">06 · Plan</div>
       <h2>Cztery fazy, każda z liczbą na wyjściu</h2>
-      <p class="intro">Kolejność nie jest tym, co najbardziej boli, tylko tym, co najtaniej zdejmuje ryzyko następnej fazy. Faza 0 sprawia, że pomiar mówi prawdę; faza 1 odejmuje kod; faza 2 dokłada oczy; faza 3 domyka produkt. Nic tu nie wymaga zatrzymania stosu ani migracji. <b>Fazy 0, 1 i 2 są wykonane w całości, z fazy 3 — P6</b> — z dwiema poprawkami w kolejności, opisanymi niżej.</p>
+      <p class="intro">Kolejność nie jest tym, co najbardziej boli, tylko tym, co najtaniej zdejmuje ryzyko następnej fazy. Faza 0 sprawia, że pomiar mówi prawdę; faza 1 odejmuje kod; faza 2 dokłada oczy; faza 3 domyka produkt. Nic tu nie wymaga zatrzymania stosu ani migracji. <b>Wszystkie cztery fazy są wykonane</b> — z dwiema poprawkami w kolejności i trzema miejscami, w których plan był nieprawdą, opisanymi niżej.</p>
       <div class="quote">Najpierw sprawić, żeby narzędzie pomiaru widziało system. Potem ciąć to, co pokaże.</div>
 
       <div class="phase shipped">
@@ -561,15 +562,16 @@
         </div>
       </div>
       <div class="phase shipped">
-        <div class="no">3<small>P6 wykonane · #234 · P8 zostaje</small></div>
+        <div class="no">3<small>wykonane · #234 · #239</small></div>
         <div>
           <h3>Domknięcie</h3>
           <p>Plan mówił: 3–4 dni, tożsamość workbencha na liście strategy, nowe źródło wyzwalacza. <b>Wyszło inaczej w dwóch miejscach</b>: tożsamość już tam była, a zegar workbencha od fazy 2 pyta każdy skonfigurowany serwer, który ogłasza nazwę — więc „źródło wyzwalacza” to jedna linia w rejestrze, nie nowy rodzaj. Zmiana, która miała dodawać kod, dodała go najmniej ze wszystkich: parę ustawień w trzech <code>config.py</code>, wpis w dwóch rejestrach, parę w Terraformie i jeden test przez pętlę. Reguła „obserwowanie rynku nie kosztuje tokenów modelu” trzyma się sama, bo droga jest ta sama, co dla ceny.</p>
-          <p class="done">Wyjście, osiągnięte w połowie: decyzja strategii budzi zespół bez udziału operatora — w teście, i na produkcji od wieczornego apply. Zostaje P8: szósty kontrakt generowany i liczba z pomiaru <code>teamsApi</code>/<code>agentApi</code>.</p>
+          <p class="done">Wyjście, osiągnięte: decyzja strategii budzi zespół bez udziału operatora — w teście, i na produkcji od wieczornego apply · sześć kontraktów sprawdzanych w CI, na dwóch ekranach · liczba z pomiaru <code>teamsApi</code>/<code>agentApi</code> zapisana: 10,9%.</p>
         </div>
       </div>
 
       <h3 class="sub">Jak poznamy, że plan był dobry</h3>
+      <p>Trzy rzeczy w tym planie okazały się nieprawdą, i to jest ważniejsze od tego, że wykonano go w całości: P6 kosztowało godziny zamiast dni, bo obie połowy szwu już stały; P7 nie było importem z pakietu, bo pakiet ważył więcej niż kopia; P8 miało jeden ręczny kontrakt do policzenia, a miało dwa. Do tego jedna rzecz, której plan nie przewidział wcale: bramka deployu, która milczy, wygląda dokładnie jak bramka, która działa — pierwszy przebieg P5 pominął dziesięć deployów na zielono, i dopiero deploy bramki przy P7 był dowodem.</p>
       <p>Nie po liczbie linii, choć spadła — 3 197 → 949. Po tym, że <span class="hl">jedenasty moduł powstanie z pakietu, a nie z kopii dziesiątego</span> — i że jego pierwsza cisza obudzi kogoś, zanim obudzi go operator. Obie połowy mają teraz warunki, żeby się wydarzyć: pakiet niesie obudowę, a <code>tc_runtime.liveness</code> niesie pytanie „kiedy ta pętla ostatnio coś skończyła”. Czego nie wiadomo, dopóki operator nie zrobi <code>apply</code> i nie zatrzyma pętli na produkcji ze stoperem w ręku. Jeśli za dwanaście dni <code>measure-duplication.py --threshold 70</code> znów wypisze 40 par, plan nie zadziałał niezależnie od tego, ile z niego wykonano.</p>
     </section>
   </div>
@@ -577,7 +579,7 @@
 
 <footer>
   <div class="inner">
-    <span>Przegląd TradingCenter · pomiary z 1 września 2026 · stan po fazach 0–2 i P6, P5, P7, main @ 8f5a0b3 · poprzednik: docs/archive/nastepne-ciecia.html</span>
+    <span>Przegląd TradingCenter · pomiary z 1 września 2026 · stan po wszystkich fazach, P1–P9, main @ 64b8cac · poprzednik: docs/archive/nastepne-ciecia.html</span>
     <span>Tryb jasny — jedyny</span>
   </div>
 </footer>
