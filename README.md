@@ -194,9 +194,13 @@ credentials in CI to earn a green tick is a bad trade. They stay behind `--run-l
 
 ### Deploys and infrastructure
 
-Pushing to `main` deploys the module that changed — ten `deploy-*.yml` workflows, eight of
-them a few lines over [`_deploy-app-service.yml`](.github/workflows/_deploy-app-service.yml)
-and two over the Static Web Apps action. Each deploy ends by checking the thing actually
+A green `checks` run on `main` deploys the modules that changed since the last one — ten
+`deploy-*.yml` workflows on `workflow_run`, eight of them a few lines over
+[`_deploy-app-service.yml`](.github/workflows/_deploy-app-service.yml) and two over the Static
+Web Apps action, each opening with [`scripts/deploy_gate.py`](scripts/deploy_gate.py), which
+diffs what the image bakes in against the previous green run's commit. A merge with a red test
+no longer reaches production before CI has said so; `workflow_dispatch` is the operator's door
+around the gate. Each deploy ends by checking the thing actually
 answers, not merely that Azure accepted the request: `market-data` is probed on
 `/ws/candles`, the one path Easy Auth lets through to the container — and still that one
 rather than the tool surface it also serves, since `/mcp` answers nothing without a session

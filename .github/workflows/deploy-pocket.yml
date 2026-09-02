@@ -1,11 +1,13 @@
 name: deploy-pocket
 
+# The push to `main` no longer deploys by itself: since P5 (2 September 2026) the real site waits for a green
+# `checks` run of the same commit, and `workflow_dispatch` is the operator's door around that. Pull requests
+# keep their preview environments, which is the one thing here that still runs before the checks.
 on:
-  push:
+  workflow_run:
+    workflows: [checks]
+    types: [completed]
     branches: [main]
-    paths:
-      - "modules/pocket/**"
-      - ".github/workflows/deploy-pocket.yml"
   pull_request:
     branches: [main]
     # `closed` is not decoration: a merged PR's preview environment outlives it
@@ -20,6 +22,7 @@ on:
 # token is the same narrow, flagged exception to design.md's "no stored Azure secret" the terminal's is.
 permissions:
   contents: read
+  actions: read # deploy_gate.py lists the checks runs
   pull-requests: write # Azure/static-web-apps-deploy comments preview URLs on PRs
 
 concurrency:
@@ -30,7 +33,36 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Whether there is anything to deploy, and which commit — the same question the App Service workflows ask in
+  # `_deploy-app-service.yml`, and for the same reason: under `workflow_run` there is no path filter and
+  # `github.sha` may be a commit nobody has checked yet. A pull request preview passes straight through.
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.gate.outputs.deploy }}
+      sha: ${{ steps.gate.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - id: gate
+        working-directory: scripts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          PATHS: |
+            modules/pocket
+            .github/workflows/deploy-pocket.yml
+        run: uv run python deploy_gate.py --event "$EVENT" --sha "$SHA" --paths "$PATHS"
+
   deploy:
+    needs: gate
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -38,11 +70,15 @@ jobs:
     # PRs get a preview environment; only `main` is the real site. Skipped for PRs from forks, which never have
     # the deployment token, and for a PR being closed, which is `close_preview`'s job.
     if: >-
+      needs.gate.outputs.deploy == 'true' &&
       github.event.action != 'closed' &&
+      (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success') &&
       (github.event_name != 'pull_request' ||
        github.event.pull_request.head.repo.full_name == github.repository)
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
 
       - uses: pnpm/action-setup@v4
         with:

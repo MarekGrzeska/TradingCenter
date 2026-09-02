@@ -1,33 +1,40 @@
 name: deploy-telegram-gateway
 
-# Only a push to `main` deploys — the pull_request federated credential (github-oidc.tf)
-# cannot even authenticate to Azure, so this cannot run from a fork's PR by construction.
+# After a green `checks` run of this commit, never on the push itself: since P5 (2 September 2026) a merge with
+# a red test stops here instead of reaching production before CI has finished saying so. `workflow_dispatch` is
+# the operator's door around it. The pull_request federated credential (github-oidc.tf) cannot authenticate to
+# Azure, so this cannot run from a fork's PR by construction.
 on:
-  push:
+  workflow_run:
+    workflows: [checks]
+    types: [completed]
     branches: [main]
-    paths:
-      - "modules/telegram-gateway/**"
-      # Path dependencies are baked into this image, so a merged package fix that never redeploys its
-      # consumers never reaches production. Exactly the packages this module's pyproject.toml names.
-      - "packages/tc-runtime/**"
-      - "packages/tc-mcp-kit/**"
-      - ".github/workflows/deploy-telegram-gateway.yml"
-      - ".github/workflows/_deploy-app-service.yml"
-      - "scripts/deploy_probe.py"
   workflow_dispatch: {}
 
 # Declared on the caller, and nowhere else will do: a reusable workflow can only *narrow* the caller's token,
 # and `id-token` is never granted by default — without this every deploy fails at `azure/login`.
 permissions:
   contents: read
+  actions: read # deploy_gate.py lists the checks runs
   id-token: write # azure/login's OIDC exchange
   packages: write # docker push to GHCR
 
 jobs:
   deploy:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     uses: ./.github/workflows/_deploy-app-service.yml
     with:
       module: telegram-gateway
+      # What this image bakes in, as git pathspecs: the gate diffs them since the last green checks run.
+      # Path dependencies are baked into this image, so a merged package fix that never redeploys its
+      # consumers never reaches production. Exactly the packages this module's pyproject.toml names.
+      paths: |
+        modules/telegram-gateway
+        packages/tc-runtime
+        packages/tc-mcp-kit
+        .github/workflows/deploy-telegram-gateway.yml
+        .github/workflows/_deploy-app-service.yml
+        scripts/deploy_probe.py
       app_name: app-tradingcenter-telegram-gateway
       # `/` is excluded from Easy Auth and answers a constant naming the service, which only the running module
       # can produce — and the name matters because eight applications share one plan. It carries the schema too:
