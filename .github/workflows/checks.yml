@@ -91,7 +91,7 @@ jobs:
           # ceiling. trading-mcp watches the gateway's *whole* directory: its snapshot is built from routes and DTOs both.
           # The second front end, filtered on the one module it reads: it keeps its own generated copy of that
           # schema, so `contract:check` there is the check for this seam exactly as it is for the terminal.
-          PATTERNS[pocket]='^modules/pocket/|^modules/polymarket-data/polymarket_data/(contract|openapi)\.py$|^modules/social-data/social_data/(contract|openapi)\.py$'
+          PATTERNS[pocket]='^modules/pocket/|^modules/polymarket-data/polymarket_data/(contract|openapi)\.py$|^modules/social-data/social_data/(contract|openapi)\.py$|^modules/workbench/agent/'
           PATTERNS[trading-mcp]="^modules/trading-mcp/|^modules/capital-gateway/|$tc_mcp_kit"
           # The same two packages as market-data, for the same two reasons. It has no upstream in this repository, so
           # unlike trading-mcp there is no second module in this pattern.

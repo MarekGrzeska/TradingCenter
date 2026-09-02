@@ -39,6 +39,19 @@ const SOURCES = [
  */
 `,
   },
+  {
+    name: "agent",
+    moduleDir: resolve(app, "..", "workbench"),
+    pythonModule: "agent.openapi",
+    output: join(app, "src", "data", "contract.agent.generated.ts"),
+    banner: `/**
+ * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
+ *
+ * Printed from the workbench's conversation surface by \`python -m agent.openapi\`. The turn's event stream is
+ * not in it — OpenAPI does not describe SSE — so \`stream.ts\` stays hand-written against \`agent-chat\`.
+ */
+`,
+  },
 ];
 
 function schemaJson(source, envDir) {

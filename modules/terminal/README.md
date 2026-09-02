@@ -77,8 +77,8 @@ before it is asked anything else.
   whole — every pair, every failure, and the one Retry, which covers the whole job because
   that is what it has always done.
 - `teams/` — the `Teams` tab: the catalogue of operator-defined teams, and one team open on
-  a canvas (`@xyflow/react`) as its agents and the dependencies between them. Unlike the
-  agent's hand-written DTOs, this module's client (`teamsApi.ts`) is built on types
+  a canvas (`@xyflow/react`) as its agents and the dependencies between them. Like the
+  agent's client since P8, this module's client (`teamsApi.ts`) is built on types
   generated from its own OpenAPI document — its surface is graphs and revisions, wide
   enough that a renamed field would arrive as `undefined` rather than as a compile error.
   Both pickers in the agent panel are built from what the module publishes: the model
@@ -199,6 +199,11 @@ reads it, instead of arriving as `undefined` and showing up as a blank cell.
 
 The `map*` functions stay hand-written. They are not transcription: they turn ISO strings
 into epoch seconds, which is what keeps one timestamp spelling across the module.
+
+Six sources since P8: market-data, the workbench's two surfaces (`teams.openapi`,
+`agent.openapi`), polymarket-data, social-data and strategy. The conversation's was the
+last hand-written one, and the one seam `contract:check` could not see drift across; its
+event stream (`stream.ts`) stays hand-written, because OpenAPI does not describe SSE.
 
 From `market-data` — everything about candles:
 

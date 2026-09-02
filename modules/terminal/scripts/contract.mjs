@@ -35,7 +35,20 @@ const SOURCES = [
  * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
  *
  * Printed from the workbench's teams surface by \`python -m teams.openapi\` — that surface's own routers, not
- * the whole process's: the conversation's contract is hand-written in \`agentApi.ts\` and stays that way.
+ * the whole process's. The conversation's surface is the source below, printed the same way.
+ */
+`,
+  },
+  {
+    name: "agent",
+    moduleDir: resolve(terminal, "..", "workbench"),
+    pythonModule: "agent.openapi",
+    output: join(terminal, "src", "data", "contract.agent.generated.ts"),
+    banner: `/**
+ * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
+ *
+ * Printed from the workbench's conversation surface by \`python -m agent.openapi\`. The turn's event stream is
+ * not in it — OpenAPI does not describe SSE — so \`stream.ts\` stays hand-written against \`agent-chat\`.
  */
 `,
   },

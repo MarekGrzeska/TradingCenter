@@ -195,8 +195,8 @@ were a byte-identical copy in two of them.
 
 ## Contract
 
-FastAPI serves its own OpenAPI at `/openapi.json`. The teams surface's document is generated
-into the terminal by `pnpm contract:generate` (`python -m teams.openapi`, printing that
-surface's own routers and prefixes rather than the whole process's); the conversation's DTOs
-(`modules/terminal/src/agent/agentApi.ts`) are written by hand against it instead, and the
-terminal's own tests are what catch a drift there.
+FastAPI serves its own OpenAPI at `/openapi.json`. Each surface's document is generated into
+the terminal by `pnpm contract:generate` — `python -m teams.openapi` and `python -m
+agent.openapi`, each printing its own routers and prefixes rather than the whole process's —
+and `contract:check` in CI fails the day either moves. The turn's event stream is the one
+thing neither document describes; `stream.ts` in the terminal is written against `agent-chat`.

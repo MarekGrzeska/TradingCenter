@@ -1,5 +1,6 @@
 import { noIdentity, type Identity } from "../auth/identity";
 import { resolveEndpoints } from "../data/config";
+import type { components } from "../data/contract.agent.generated";
 import { jsonClient, statusMapper } from "../data/http";
 import { workbenchIdentity } from "../data/marketData";
 import { parseIsoToEpochSeconds } from "../data/time";
@@ -10,9 +11,13 @@ import { mapToolCall, type AgentToolCall, type RawToolCall } from "./toolCall";
 export type { AgentToolCall, ToolOutcome } from "./toolCall";
 
 /**
- * Hand-written against the module's OpenAPI rather than generated: the generator is wired to market-data's contract
- * alone. Money and rates travel as strings and stay strings — this file renders them, it does not add them.
+ * Over types generated from the conversation surface's own OpenAPI document (`contract.agent.generated.ts`), the
+ * sixth contract checked in CI — until P8 this file was hand-written and the one seam `contract:check` could not
+ * see. The `map*` functions stay hand-written: they turn ISO strings into epoch seconds and snake into camel.
+ * Money and rates travel as strings and stay strings — this file renders them, it does not add them.
  */
+
+type Wire = components["schemas"];
 
 export interface AgentModel {
   id: string;
@@ -201,53 +206,13 @@ export interface AgentApi {
   updatePrompt(withTools: string, withoutTools: string, signal: AbortSignal): Promise<AgentPrompt>;
 }
 
-interface RawModel {
-  id: string;
-  display_name: string;
-  cost_rank: number;
-  input_rate_per_1m: string;
-  output_rate_per_1m: string;
-}
-
-interface RawSession {
-  id: number;
-  title: string | null;
-  current_model_id: string;
-  created_at: string;
-  last_active_at: string;
-}
-
-interface RawMessage {
-  id: number;
-  role: string;
-  content: string;
-  model_id: string | null;
-  prompt_version: string | null;
-  incomplete: boolean;
-  /** Optional for the same reason `tool_calls` is: a terminal deployed ahead of the
-   *  module reads a transcript without it. */
-  stopped?: boolean;
-  created_at: string;
-  /** Optional here and required on the module's own contract: a terminal deployed ahead of the agent reads
-   *  a transcript without it, and the panel must open rather than throw. */
-  tool_calls?: RawToolCall[];
-}
-
-interface RawChartFocus {
-  from: string | null;
-  to: string | null;
-  around: string | null;
-  bars: number | null;
-  last_bars: number | null;
-}
-
-interface RawChartCommand {
-  sequence: number;
-  symbol: string | null;
-  resolution: string | null;
-  indicators: Array<{ id: string; params: Record<string, number>; color: string | null }> | null;
-  focus: RawChartFocus | null;
-}
+type RawModel = Wire["ModelOut"];
+type RawSession = Wire["SessionOut"];
+// `stopped` and `tool_calls` are required on the wire and still read with a fallback below: a terminal
+// deployed ahead of the module reads a transcript without them, and the panel must open rather than throw.
+type RawMessage = Wire["MessageOut"];
+type RawChartFocus = Wire["ChartFocusOut"];
+type RawChartCommand = Wire["ChartCommandOut"];
 
 function mapChartFocus(raw: RawChartFocus): AgentChartFocus {
   return {
@@ -300,43 +265,34 @@ function mapChartCommand(raw: RawChartCommand): AgentChartCommand {
   };
 }
 
-interface RawDrawing {
-  id: number;
-  symbol: string;
-  geometry: Record<string, unknown> & { kind: string };
-  label: string | null;
-  color: string | null;
-  hidden?: boolean;
-  created_at: string;
-  updated_at: string;
-}
+type RawDrawing = Wire["ChartDrawingOut"];
 
 function mapDrawingGeometry(raw: RawDrawing["geometry"]): AgentDrawingGeometry | null {
   // A `kind` this terminal has no shape for is skipped, not thrown on: a module deployed ahead of the
-  // terminal may publish a fourth shape, and one unknown object must not take the whole read down.
-  if (raw.kind === "level") {
+  // terminal may publish a fourth shape, and one unknown object must not take the whole read down. The
+  // `string` widening is that case written into the type — the generated union knows only three.
+  const kind: string = raw.kind;
+  if (kind === "level" && raw.kind === "level") {
     return {
       kind: "level",
-      price: raw.price as number,
-      at: raw.at == null ? null : parseIsoToEpochSeconds(raw.at as string),
+      price: raw.price,
+      at: raw.at == null ? null : parseIsoToEpochSeconds(raw.at),
     };
   }
-  if (raw.kind === "zone") {
+  if (kind === "zone" && raw.kind === "zone") {
     return {
       kind: "zone",
-      top: raw.top as number,
-      bottom: raw.bottom as number,
-      from: raw.from == null ? null : parseIsoToEpochSeconds(raw.from as string),
-      to: raw.to == null ? null : parseIsoToEpochSeconds(raw.to as string),
+      top: raw.top,
+      bottom: raw.bottom,
+      from: raw.from == null ? null : parseIsoToEpochSeconds(raw.from),
+      to: raw.to == null ? null : parseIsoToEpochSeconds(raw.to),
     };
   }
-  if (raw.kind === "trendline") {
-    const a = raw.a as { time: string; price: number };
-    const b = raw.b as { time: string; price: number };
+  if (kind === "trendline" && raw.kind === "trendline") {
     return {
       kind: "trendline",
-      a: { time: parseIsoToEpochSeconds(a.time), price: a.price },
-      b: { time: parseIsoToEpochSeconds(b.time), price: b.price },
+      a: { time: parseIsoToEpochSeconds(raw.a.time), price: raw.a.price },
+      b: { time: parseIsoToEpochSeconds(raw.b.time), price: raw.b.price },
     };
   }
   return null;
@@ -373,27 +329,9 @@ function drawingPatchToWire(
   return wire;
 }
 
-interface RawUsageAggregate {
-  key: string;
-  input_tokens: number;
-  output_tokens: number;
-  cost: string;
-  unknown_count: number;
-}
-
-interface RawUsageSummary {
-  total_cost: string;
-  by_model: RawUsageAggregate[];
-  by_session: RawUsageAggregate[];
-  by_day: RawUsageAggregate[];
-}
-
-interface RawPrompt {
-  version: string;
-  with_tools: string;
-  without_tools: string;
-  updated_at: string;
-}
+type RawUsageAggregate = Wire["UsageAggregateOut"];
+type RawUsageSummary = Wire["UsageSummaryOut"];
+type RawPrompt = Wire["PromptOut"];
 
 function mapModel(raw: RawModel): AgentModel {
   return {
