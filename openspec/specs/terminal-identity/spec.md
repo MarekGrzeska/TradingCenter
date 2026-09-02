@@ -51,9 +51,9 @@ także wtedy, gdy automatyczne logowanie już się nie powiodło.
 
 Terminal MUST dokładać poświadczenie do każdego żądania HTTP kierowanego do modułu, który go
 wymaga — archiwum (świec, pokrycia, zleceń, usunięć oraz katalogu instrumentów, który archiwum
-proxuje), workbencha, gatewaya i archiwum rynków predykcyjnych. Dokładanie MUST być własnością
-wspólnej warstwy wywołań, nie decyzją pojedynczego wywołania: trasa dopisana później MUST nieść
-poświadczenie bez pamiętania o tym przez autora.
+proxuje), workbencha, gatewaya, archiwum rynków predykcyjnych oraz platformy strategii.
+Dokładanie MUST być własnością wspólnej warstwy wywołań, nie decyzją pojedynczego wywołania:
+trasa dopisana później MUST nieść poświadczenie bez pamiętania o tym przez autora.
 
 **Poświadczenie nie jest jedno, jest jedno na moduł.** Każdy z tych modułów stoi za własną bramą
 i przyjmuje token wystawiony dla **własnej publiczności**, więc wspólna warstwa MUST wiedzieć, po
@@ -64,6 +64,12 @@ z nich przestało być tym samym, co reguła, którą naprawdę niesie.
 Moduł, dla którego terminal nie ma skonfigurowanego zakresu, MUST być traktowany jak moduł bez
 konfiguracji tożsamości (patrz „Brak konfiguracji tożsamości oznacza pracę bez niej"), a nie jak
 moduł, do którego wolno wysłać cudze poświadczenie.
+
+Rejestracja modułu, którą zbudowano wyłącznie dla wołających maszynowych, nie ma zakresu
+delegowanego — a bez niego przeglądarka nie ma o co poprosić i token operatora nie powstaje.
+Dopuszczenie terminala do takiego modułu MUST obejmować dodanie tego zakresu, nie samo
+wpisanie terminala na listę wołających: lista mówi, kto może wejść, a zakres jest tym, co
+pozwala poprosić o klucz.
 
 #### Scenario: Nowa trasa w kodzie terminala
 
@@ -80,6 +86,13 @@ moduł, do którego wolno wysłać cudze poświadczenie.
 - **WHEN** terminal woła dwa różne moduły w tej samej sesji operatora
 - **THEN** do każdego trafia poświadczenie wystawione dla publiczności tego modułu
 - **AND** poświadczenie wzięte dla jednego MUST NOT zostać wysłane do drugiego
+
+#### Scenario: Moduł dopuszczony bez zakresu delegowanego
+
+- **WHEN** terminal jest na liście wołających modułu, którego rejestracja nie ogłasza zakresu
+  delegowanego
+- **THEN** terminal nie ma o co poprosić i woła ten moduł bez poświadczenia
+- **AND** moduł odmawia — co jest odmową konfiguracji, nie awarią modułu
 
 ### Requirement: Odmowa z powodu tożsamości jest odróżniona od awarii źródła
 

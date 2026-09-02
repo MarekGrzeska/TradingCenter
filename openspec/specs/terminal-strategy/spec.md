@@ -1,10 +1,9 @@
-## Purpose
+# terminal-strategy Specification
 
+## Purpose
 Ekran operatora nad platformą strategii: co widzi, co może zacząć i zatrzymać, i dlaczego
 jest w przeważającej części listą odmów, a nie listą okazji.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Odmowy są treścią ekranu, nie jego szumem
 
 Lista decyzji MUST domyślnie pokazywać także decyzje odmowne i MUST NOT wymagać od
@@ -77,21 +76,6 @@ decyduje o pieniądzach.
 - **THEN** widzi jego fakty i zakresy parametrów
 - **AND** nie ma na ekranie akcji zmieniającej sam wpis
 
-### Requirement: Decyzję da się przeczytać do tego, na czym stanęła
-
-Szczegóły decyzji MUST pokazywać powód, a dla decyzji o wejściu także kierunek, poziomy
-i stosunek zysku do ryzyka. Dla każdej decyzji MUST być dostępne odczytanie faktów, na
-których stanęła, oraz wersji parametrów, którą została policzona.
-
-Decyzja bez tego jest anegdotą. Spór „czemu system wszedł" rozstrzyga się odczytaniem tego,
-co system wtedy widział, a nie tego, co widać dzisiaj.
-
-#### Scenario: Operator sprawdza setup
-
-- **WHEN** operator otwiera decyzję o wejściu
-- **THEN** widzi kierunek, wejście, obronę, cel i stosunek zysku do ryzyka
-- **AND** ma dostęp do odczytów, na których ta decyzja stanęła
-
 ### Requirement: Ekran niczego nie zleca na rachunku
 
 Ekran MUST NOT oferować złożenia, zmiany ani zamknięcia zlecenia, i MUST NOT przedstawiać
@@ -105,24 +89,3 @@ inaczej byłby jedynym miejscem w systemie, które obiecuje wykonanie tam, gdzie
 - **WHEN** ekran pokazuje decyzję o wejściu
 - **THEN** nie ma przy niej akcji składającej zlecenie
 - **AND** nie jest ona przedstawiona jako otwarta pozycja
-
-### Requirement: Raporty backtestu są czytane, a nie uruchamiane
-
-Zachowane raporty backtestu MUST być czytelne z ekranu wraz z modelem kosztów, wersją
-parametrów i zakresem danych, na których powstały. Ekran MUST NOT oferować uruchomienia
-przebiegu.
-
-Przebieg po latach świec to minuty pracy i trzymanie żądania przez cały ten czas; jest
-komendą właśnie po to, żeby długi przebieg nie był czymś, co da się odpalić przypadkiem.
-Raport bez modelu kosztów nie jest wynikiem, więc ekran pokazujący raport bez nich
-pokazywałby liczbę, nie odpowiedź.
-
-#### Scenario: Operator czyta raport
-
-- **WHEN** operator otwiera zachowany raport backtestu
-- **THEN** widzi metryki wraz z modelem kosztów, wersją parametrów i zakresem danych
-
-#### Scenario: Operator szuka przycisku uruchamiającego przebieg
-
-- **WHEN** operator ogląda listę raportów
-- **THEN** nie ma na ekranie akcji uruchamiającej backtest

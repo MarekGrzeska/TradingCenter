@@ -31,6 +31,11 @@ jest odpowiadana backfillem, odmowa strategii — czytaniem strategii.
 - `infra/`: **delegowany scope w Easy Auth strategii**. Dziś ta rejestracja go nie ma —
   powstała dla wołających maszynowych — więc przeglądarka nie ma o co poprosić i token
   operatora nie istnieje. To jest jedyna przyczyna dzisiejszego 401.
+- **Wycięte przy archiwizacji (2 września 2026), do `a-decision-and-a-report-can-be-read`:**
+  podgląd odczytów, na których stanęła decyzja, i widok zachowanych raportów backtestu.
+  Oba wymagania czekały na pierwszą decyzję i pierwszy raport do obejrzenia, których
+  w chwili archiwizacji nadal nie było; spec główny nie ma nieść wymagania bez ekranu.
+  Poziomy i stosunek zysku do ryzyka są w wierszu decyzji; klient czyta już `/backtests`.
 - Poza zakresem: wykresy nad decyzjami, uruchamianie backtestu z ekranu (to komenda,
   świadomie), edycja wpisu strategii (wpis jest kodem w obrazie).
 
