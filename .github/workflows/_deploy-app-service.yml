@@ -10,6 +10,13 @@ on:
         description: The directory under modules/. Also the image suffix and the buildx cache scope — those three have never differed.
         required: true
         type: string
+      paths:
+        description: >-
+          What this image bakes in, as git pathspecs one per line. A workflow started by
+          `workflow_run` has no path filter, so `deploy_gate.py` asks the question instead:
+          did any of these change since the last green checks run on the branch?
+        required: true
+        type: string
       app_name:
         description: The App Service name. Not derivable — capital-gateway's app is `app-tradingcenter-gateway`.
         required: true
@@ -54,11 +61,41 @@ on:
 
 permissions:
   contents: read
+  actions: read # deploy_gate.py lists the checks runs
   id-token: write # azure/login's OIDC exchange
   packages: write # docker push to GHCR
 
 jobs:
+  # Whether there is anything to deploy, and which commit. Under `workflow_run` the checked commit is
+  # `workflow_run.head_sha`, and `github.sha` is whatever `main` points at by now — the same thing until two
+  # pushes land close together, when it is a commit nobody has checked yet.
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.gate.outputs.deploy }}
+      sha: ${{ steps.gate.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # The gate diffs against a commit that may be several merges back.
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - id: gate
+        working-directory: scripts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          PATHS: ${{ inputs.paths }}
+        run: uv run python deploy_gate.py --event "$EVENT" --sha "$SHA" --paths "$PATHS"
+
   deploy:
+    needs: gate
+    if: needs.gate.outputs.deploy == 'true'
     runs-on: ubuntu-latest
     # Not only an approval gate: the federated credential in `github-oidc.tf` has `:environment:production`
     # in its subject, so a job without this cannot authenticate to Azure at all.
@@ -70,6 +107,8 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
 
       # Lowercased because a Docker reference cannot carry the capitals in
       # `github.repository`.
@@ -95,7 +134,7 @@ jobs:
           # Relative to the workspace, not to the context — the same path for all seven.
           file: modules/${{ inputs.module }}/Dockerfile
           push: true
-          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          tags: ${{ steps.image.outputs.name }}:${{ needs.gate.outputs.sha }}
           cache-from: type=gha,scope=${{ inputs.module }}
           cache-to: type=gha,scope=${{ inputs.module }},mode=max
 
@@ -108,7 +147,7 @@ jobs:
       - uses: azure/webapps-deploy@v3
         with:
           app-name: ${{ inputs.app_name }}
-          images: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          images: ${{ steps.image.outputs.name }}:${{ needs.gate.outputs.sha }}
 
       - uses: astral-sh/setup-uv@v5
         with:
@@ -120,7 +159,7 @@ jobs:
         working-directory: scripts
         env:
           APP_NAME: ${{ inputs.app_name }}
-          EXPECTED_IMAGE: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          EXPECTED_IMAGE: ${{ steps.image.outputs.name }}:${{ needs.gate.outputs.sha }}
           PROBE_PATH: ${{ inputs.probe_path }}
           EXPECTED_STATUS: ${{ inputs.expected_status }}
           BODY_CONTAINS: ${{ inputs.body_contains }}

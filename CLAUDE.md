@@ -268,10 +268,13 @@ module, because a document is built from routes as well as models.
 **There is no branch protection on this repository** — a private repo on the free plan cannot have
 it — so a skipped job blocks nothing.
 
-Ten `deploy-*.yml` workflows deploy on pushes to `main` — eight of ~20 lines calling
-`_deploy-app-service.yml` and ending in `scripts/deploy_probe.py`, which asks whether this commit's
-image is the one App Service will serve *and* whether the process inside came up — the second being
-the one that used to go unasked; two more deploy the front ends to Static Web Apps.
+Ten `deploy-*.yml` workflows deploy **after a green `checks` run of the same commit** (`workflow_run`,
+since 2 September 2026 — before that they raced the checks and won) — eight of ~25 lines calling
+`_deploy-app-service.yml`, which starts with `scripts/deploy_gate.py` (did anything the image bakes in
+change since the last green checks run? not since `HEAD^`, which loses a merge whose checks were
+cancelled) and ends in `scripts/deploy_probe.py`, which asks whether this commit's image is the one
+App Service will serve *and* whether the process inside came up; two more deploy the front ends to
+Static Web Apps. `workflow_dispatch` is the door around the gate.
 **No App Service in this resource group carries an address restriction at all** — measured
 20 August 2026 against the opposite premise, which is why `capital-gateway` went unprobed until
 then. What holds its door is its own shared key, checked in `RequireGatewayKey`; the Easy Auth in

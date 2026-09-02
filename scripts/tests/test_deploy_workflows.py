@@ -73,10 +73,11 @@ class TestSharedWorkflow:
         assert permissions["id-token"] == "write"  # azure/login's OIDC exchange
         assert permissions["packages"] == "write"  # docker push to GHCR
 
-    def test_tags_the_image_with_the_commit_and_never_latest(self) -> None:
+    def test_tags_the_image_with_the_checked_commit_and_never_latest(self) -> None:
         steps = load(SHARED)["jobs"]["deploy"]["steps"]
         build = next(s for s in steps if str(s.get("uses", "")).startswith("docker/build-push"))
-        assert "${{ github.sha }}" in build["with"]["tags"]
+        # The gate's `sha`, not `github.sha`: under `workflow_run` the second is the branch head, not the checked commit.
+        assert "${{ needs.gate.outputs.sha }}" in build["with"]["tags"]
         assert "latest" not in build["with"]["tags"]
 
     def test_the_probe_reads_its_values_from_env_not_from_interpolation(self) -> None:
@@ -159,10 +160,60 @@ def test_the_deploy_filter_watches_every_package_the_image_bakes_in(module: Path
     assert workflow.is_file(), f"{module.name} has a Dockerfile and no deploy workflow"
 
     declared = set(PATH_DEPENDENCY.findall((module / "pyproject.toml").read_text("utf-8")))
-    paths = load(workflow)[True]["push"]["paths"]
+    paths = gate_paths(workflow)
 
     for package in declared:
-        assert f"packages/{package}/**" in paths, (
+        assert f"packages/{package}" in paths, (
             f"deploy-{module.name}.yml does not watch packages/{package}, which its image "
             "bakes in"
         )
+
+
+def gate_paths(workflow: Path) -> list[str]:
+    """The pathspecs the gate diffs — `with.paths` on the caller's job, one per line."""
+    job = next(j for j in load(workflow)["jobs"].values() if j.get("uses") == SHARED_REF)
+    return [line.strip() for line in job["with"]["paths"].splitlines() if line.strip()]
+
+
+def all_deploy_workflows() -> list[Path]:
+    return sorted(WORKFLOWS.glob("deploy-*.yml"))
+
+
+# P5, 2 September 2026: until then a push to `main` ran `checks` and every `deploy-*` in the same second, so a
+# merge with a red test was serving before CI had finished saying so. Measured twice that day, on #233 and #234.
+
+
+@pytest.mark.parametrize("path", all_deploy_workflows(), ids=lambda p: p.name)
+def test_nothing_deploys_on_the_push_itself(path: Path) -> None:
+    on = load(path)[True]
+    assert "push" not in on, f"{path.name} still deploys on the push, before checks"
+    assert on["workflow_run"]["workflows"] == ["checks"]
+    assert on["workflow_run"]["types"] == ["completed"]
+    assert on["workflow_run"]["branches"] == ["main"]
+    assert "workflow_dispatch" in on, "the operator's door around the gate"
+
+
+@pytest.mark.parametrize("path", all_deploy_workflows(), ids=lambda p: p.name)
+def test_the_deploy_waits_for_a_green_checks_run(path: Path) -> None:
+    """`completed` fires on failure and on cancellation too — a superseded run is cancelled, and its commit
+    is covered by the next green one's diff, which is the gate's whole reason for diffing from the last green."""
+    condition = load(path)["jobs"]["deploy"]["if"]
+    assert "workflow_run.conclusion == 'success'" in condition, path.name
+    assert "workflow_dispatch" in condition or "!= 'workflow_run'" in condition, path.name
+
+
+@pytest.mark.parametrize("path", all_deploy_workflows(), ids=lambda p: p.name)
+def test_the_gate_may_list_the_checks_runs(path: Path) -> None:
+    assert (load(path).get("permissions") or {}).get("actions") == "read", path.name
+
+
+@pytest.mark.parametrize("path", [SHARED, WORKFLOWS / "deploy-terminal.yml", WORKFLOWS / "deploy-pocket.yml"], ids=lambda p: p.name)
+def test_the_checked_commit_is_the_one_built_never_the_branch_head(path: Path) -> None:
+    """`github.sha` under `workflow_run` is whatever `main` points at now — the checked commit only until two
+    pushes land close together. Every checkout, tag and probe takes the gate's `sha` output instead."""
+    text = path.read_text(encoding="utf-8")
+    jobs = load(path)["jobs"]
+    assert "gate" in jobs and jobs["deploy"]["needs"] == "gate", path.name
+    deploy_section = text.split("  deploy:\n", 1)[1]
+    assert "${{ github.sha }}" not in deploy_section, f"{path.name}: the deploy job reads github.sha"
+    assert "needs.gate.outputs.sha" in deploy_section, path.name
