@@ -120,23 +120,22 @@ async def lifespan(app: FastAPI):
 _UNAUTHENTICATED_PATHS = frozenset({"/", "/docs", "/openapi.json"})
 
 
-class RequireGatewayKey(BaseHTTPMiddleware):
-    """Rejects every request but the health probe unless it carries a credential this module
-    recognises: a module's shared key, or a browser's platform-validated token (`caller_access.py`)."""
+class GatewayDoor(BaseHTTPMiddleware):
+    """Who gets past the door, and how far. The application a platform-validated token names decides —
+    a module reaches everything, a browser the account (`caller_access.py`) — and the shared key opens an
+    HTTP route only off production, where no platform stands in front to name anyone. On production it
+    is the credential of `/ws/stream` alone, checked inside that handler."""
 
     async def dispatch(self, request: Request, call_next):
         if request.url.path in _UNAUTHENTICATED_PATHS:
             return await call_next(request)
 
         settings = request.app.state.settings
-        expected: str = settings.gateway_api_key
         provided = request.headers.get(API_KEY_HEADER, "")
-        # Compared as bytes: hmac.compare_digest raises TypeError on a `str` holding a non-ASCII
-        # character, so encoding first turns a garbage header into the intended 401, not a 500.
-        if provided and hmac.compare_digest(provided.encode(), expected.encode()):
-            return await call_next(request)
-
         application = calling_application(request.headers.get(PRINCIPAL_HEADER))
+
+        if application and application in settings.module_caller_application_ids:
+            return await call_next(request)
         if application and application in settings.browser_caller_application_ids:
             if not browser_caller_may_reach(request.url.path):
                 # A refusal about permission, not about the provider: this request never left
@@ -147,12 +146,23 @@ class RequireGatewayKey(BaseHTTPMiddleware):
                 )
             return await call_next(request)
 
+        # Compared as bytes: hmac.compare_digest raises TypeError on a `str` holding a non-ASCII
+        # character, so encoding first turns a garbage header into the intended 401, not a 500.
+        expected: str = settings.gateway_api_key
+        if (
+            not is_production()
+            and provided
+            and hmac.compare_digest(provided.encode(), expected.encode())
+        ):
+            return await call_next(request)
+
         # The refusal says which door it was: until 21 August 2026 it answered 401 silently, and
         # three different faults produced that same silence. An application id is public; the key is not.
         log.warning(
-            "refused %s: caller key %s, principal header %s, application %s",
+            "refused %s: caller key %s (opens %s), principal header %s, application %s",
             request.url.path,
             "present" if provided else "absent",
+            "no HTTP route in production" if is_production() else "every route locally",
             "present" if request.headers.get(PRINCIPAL_HEADER) else "absent",
             application or "unreadable",
         )
@@ -177,7 +187,7 @@ app = FastAPI(
     docs_url="/docs" if not is_production() else None,
     openapi_url="/openapi.json" if not is_production() else None,
 )
-app.add_middleware(RequireGatewayKey)
+app.add_middleware(GatewayDoor)
 
 
 @app.exception_handler(GatewayError)
@@ -423,7 +433,7 @@ async def stream(websocket: WebSocket, the_hub: Hub = Depends(hub)) -> None:
     # accept() — accepting and closing after would register the caller with the hub in between.
     expected: str = websocket.app.state.settings.gateway_api_key
     provided = websocket.headers.get(API_KEY_HEADER, "")
-    # See RequireGatewayKey.dispatch above: compared as bytes so a non-ASCII header
+    # See GatewayDoor.dispatch above: compared as bytes so a non-ASCII header
     # cannot turn a refused handshake into an unhandled exception.
     if not provided or not hmac.compare_digest(provided.encode(), expected.encode()):
         await websocket.close(code=4401, reason="missing or invalid caller key")

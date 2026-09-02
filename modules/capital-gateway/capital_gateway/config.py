@@ -43,8 +43,10 @@ class Settings(BaseSettings):
     capital_base_url: str = DEMO_BASE_URL
     capital_stream_url: str = DEMO_STREAM_URL
     gateway_api_key: str
-    # Applications allowed in without the shared key, on a token the platform already validated.
-    # Empty everywhere but production, and empty means nobody. The door itself is app-service.tf.
+    # Who reaches what in production, by the application a platform-validated token names. Modules reach
+    # everything, browsers the account; the shared key opens no HTTP route there — it is the credential of
+    # `/ws/stream` and of local work. Empty everywhere but production, and empty means nobody.
+    module_caller_application_ids: list[str] = []
     browser_caller_application_ids: list[str] = []
 
     @field_validator("capital_api_key", "capital_identifier", "capital_password", "gateway_api_key")

@@ -20,6 +20,7 @@ from capital_gateway.config import API_KEY_HEADER, DEMO_BASE_URL
 API = f"{DEMO_BASE_URL}/api/v1"
 GATEWAY_KEY = "gateway-caller-key"
 TERMINAL_APP_ID = "11111111-2222-3333-4444-555555555555"
+MARKET_DATA_APP_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
 
 def _principal(application_id: str) -> str:
@@ -262,8 +263,8 @@ def test_with_no_application_configured_the_door_is_shut(client: TestClient) -> 
 
 
 @respx.mock
-def test_the_key_still_reaches_everything(with_terminal: TestClient) -> None:
-    """The modules' own path, unchanged by any of this."""
+def test_off_production_the_key_still_reaches_everything(with_terminal: TestClient) -> None:
+    """Local work, where no platform stands in front to name anyone: the key is the whole credential."""
     respx.post(f"{API}/session").mock(
         return_value=httpx.Response(200, headers={"CST": "c", "X-SECURITY-TOKEN": "s"}, json={})
     )
@@ -273,6 +274,69 @@ def test_the_key_still_reaches_everything(with_terminal: TestClient) -> None:
         response = client.get("/positions", headers={API_KEY_HEADER: GATEWAY_KEY})
 
     assert response.status_code == 200
+
+
+@pytest.fixture
+def production_with_callers(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    """The gateway as deployed after the-key-opens-only-the-stream: a platform in front, one module
+    and one browser on its lists, and the key opening no HTTP route."""
+    gen = _imported_with(
+        monkeypatch,
+        GATEWAY_ENV="production",
+        MODULE_CALLER_APPLICATION_IDS=f'["{MARKET_DATA_APP_ID}"]',
+        BROWSER_CALLER_APPLICATION_IDS=f'["{TERMINAL_APP_ID}"]',
+    )
+    app = next(gen)
+    yield TestClient(app)
+    next(gen, None)
+
+
+def test_in_production_the_right_key_alone_opens_no_route(production_with_callers: TestClient) -> None:
+    """specs/capital-access-control, "Właściwy klucz bez tożsamości na produkcji": a key leaked from any
+    `.env` is not a caller. The provider is never asked."""
+    with respx.mock:
+        route = respx.get(f"{API}/positions")
+        with production_with_callers as client:
+            response = client.get("/positions", headers={API_KEY_HEADER: GATEWAY_KEY})
+
+    assert response.status_code == 401
+    assert not route.called
+
+
+@respx.mock
+def test_in_production_a_module_application_reaches_every_route(
+    production_with_callers: TestClient,
+) -> None:
+    # specs/capital-access-control, "Moduł wołający na produkcji" — no key on the request at all.
+    respx.post(f"{API}/session").mock(
+        return_value=httpx.Response(200, headers={"CST": "c", "X-SECURITY-TOKEN": "s"}, json={})
+    )
+    respx.get(f"{API}/positions").mock(return_value=httpx.Response(200, json={"positions": []}))
+
+    with production_with_callers as client:
+        response = client.get("/positions", headers={PRINCIPAL_HEADER: _principal(MARKET_DATA_APP_ID)})
+
+    assert response.status_code == 200
+
+
+def test_in_production_a_browser_with_the_key_is_still_not_a_trader(
+    production_with_callers: TestClient,
+) -> None:
+    """The case this change exists for: the terminal's token plus a leaked key opened `/orders` before."""
+    with respx.mock:
+        route = respx.post(f"{API}/positions")
+        with production_with_callers as client:
+            response = client.post(
+                "/orders",
+                json={"symbol": "GOLD", "direction": "BUY", "size": 1, "order_type": "MARKET"},
+                headers={
+                    PRINCIPAL_HEADER: _principal(TERMINAL_APP_ID),
+                    API_KEY_HEADER: GATEWAY_KEY,
+                },
+            )
+
+    assert response.status_code == 403
+    assert not route.called
 
 
 
