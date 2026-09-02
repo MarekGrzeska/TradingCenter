@@ -183,12 +183,12 @@
   <div class="inner">
     <span class="kicker">TradingCenter · przegląd architektury</span>
     <h1>Dziesięć modułów, jeden pomiar</h1>
-    <p class="lede">Dwanaście dni po „następnych cięciach” system podwoił liczbę modułów. Ten dokument mierzy, <b>co z tego jest architekturą, a co jest kopią</b> — i układa z tego plan, którego każda faza ma liczbę na wejściu i na wyjściu. <b>Fazy 0 i 1 są wykonane</b>; poniżej stan po nich, a nie przed.</p>
+    <p class="lede">Dwanaście dni po „następnych cięciach” system podwoił liczbę modułów. Ten dokument mierzy, <b>co z tego jest architekturą, a co jest kopią</b> — i układa z tego plan, którego każda faza ma liczbę na wejściu i na wyjściu. <b>Fazy 0, 1 i 2 są wykonane</b>; poniżej stan po nich, a nie przed.</p>
     <div class="strip">
       <span>TradingCenter / architektura</span>
-      <span>pomiar 1 września · <b>stan 2 września 2026, main @ 9eb65c1</b></span>
+      <span>pomiar 1 września · <b>stan 2 września 2026, main @ d889472</b></span>
       <span>środowisko <b>demo</b></span>
-      <span>wykonane: <b>#231</b> · <b>#232</b></span>
+      <span>wykonane: <b>#231</b> · <b>#232</b> · <b>#233</b></span>
     </div>
   </div>
 </header>
@@ -424,7 +424,7 @@
     <section>
       <div class="eyebrow">04 · Słabe strony</div>
       <h2>Gdzie system przestał mówić prawdę o sobie</h2>
-      <p class="intro">Dwanaście punktów, każdy z pomiarem, ułożonych od tego, co było sprzeczne z własną regułą repozytorium, przez to, co grozi produkcji, po to, co kosztuje tylko czytelnika. <b>Pięć z nich jest zamkniętych</b> — zielone, z numerem PR-a; siedem stoi.</p>
+      <p class="intro">Dwanaście punktów, każdy z pomiarem, ułożonych od tego, co było sprzeczne z własną regułą repozytorium, przez to, co grozi produkcji, po to, co kosztuje tylko czytelnika. <b>Siedem z nich jest zamkniętych</b> — zielone, z numerem PR-a; pięć stoi.</p>
 
       <div class="fails">
         <div class="fail done">
@@ -443,13 +443,16 @@
           <h3>Seam „rdzeń decyduje, zespół się spiera” istnieje w README, nie w kodzie <span class="tag stop">strategy → teams</span></h3>
           <p><code>strategy</code> publikuje cztery narzędzia i nazywa <code>pending_setups</code> „hakiem dla wyzwalaczy workbencha”. Workbench nie ma <code>STRATEGY_MCP_URL</code>, jego wyzwalacze czytają wyłącznie <code>MARKET_MCP_URL</code> i <code>TRADING_MCP_URL</code> (<code>teams/scheduler/clock.py:397</code>), a w katalogach <code>agent/</code>, <code>teams/</code>, <code>workbench/</code> słowo „strategy” nie pada ani razu. Moduł, którego racją bytu jest wybudzić zespół, nie ma jak tego zrobić — jego decyzja dociera dziś tylko na telefon operatora.</p>
         </div>
-        <div class="fail stop">
-          <h3>Suma pul połączeń przekracza serwer <span class="tag stop">64 &gt; 35</span></h3>
-          <p>market-data, polymarket-data, social-data, strategy i dwie pule workbencha idą z domyślnym <code>max_size=10</code>; telegram-gateway jedyny obniżył do 4 i zapisał dlaczego. Suma maksimów: <b>64</b> przeciw <code>max_connections</code> 35 na B1ms. Dziś to działa, bo <code>min_size=1</code> i ruch jest mały; pierwszy dzień, w którym cztery archiwa wejdą w backfill jednocześnie, skończy się <code>too many connections</code> w module, który akurat był ostatni — i żaden test tego nie łapie, bo budżet nie jest nigdzie zapisany jako liczba.</p>
+        <div class="fail done">
+          <h3><strong>Suma pul połączeń przekraczała serwer</strong> <span class="tag done">wykonane · #233</span></h3>
+          <p>Pięć modułów szło z domyślnym <code>max_size=10</code>, workbench brał dwie takie pule; telegram-gateway jedyny obniżył do 4 i zapisał dlaczego. Suma maksimów: <b>64</b> przeciw <code>max_connections</code> 35 na B1ms. Działało, bo <code>min_size=1</code> i dni były ciche.</p>
+          <p><b>Wykonane.</b> Każdy moduł nazywa swój udział trzy razy — w <code>config.py</code>, w <code>.env.example</code> i w <code>app_settings</code>: <span class="hl">market-data 8, workbench 4×2, telegram 4, trzy archiwa po 3 — razem 29</span> przy budżecie 30 i serwerze na 35. <code>test_pool_budget.py</code> sumuje <em>oba</em> źródła, bo każde z osobna przepuściłoby całość: moduł wdrożony bez ustawienia bierze swoją wartość domyślną, a Terraform jest tym, co produkcja dostaje naprawdę. Test odmawia też wartości, która różni się między nimi. Sprawdzony na czerwono przy 33.</p>
         </div>
-        <div class="fail stop">
-          <h3>Cztery pętle bez metryki, trzy alerty na jeden moduł <span class="tag stop">cisza niezauważona</span></h3>
-          <p>Telemetrię emitują tylko capital-gateway i market-data. Próbkowanie polymarket, zbieranie social, pętla strategii i watcher telegram-gateway nie mają ani metryki, ani alertu, ani webtestu. Zmiana <code>a-silent-feed-is-a-broken-feed</code> (24.08) zmierzyła dokładnie ten tryb awarii — pokój strumienia milczący przez 36 godzin — i naprawiła go w jednym module. Runbook <code>kiedy-produkcja-milczy</code> zna tylko <code>alert-candle-age-stale</code>.</p>
+        <div class="fail done">
+          <h3><strong>Cztery pętle bez metryki, trzy alerty na jeden moduł</strong> <span class="tag done">wykonane · #233</span></h3>
+          <p>Telemetrię emitowały tylko capital-gateway i market-data. <code>a-silent-feed-is-a-broken-feed</code> (24.08) zmierzyło dokładnie ten tryb awarii — pokój strumienia milczący czternaście godzin — i naprawiło go w jednym module.</p>
+          <p><b>Wykonane, dla trzech pętli z czterech.</b> <code>tc_runtime.liveness</code> niesie mechanizm, <code>tc_runtime.telemetry</code> konfigurację, którą dwa moduły miały jako kopie, a trzy tylko w połowie. Spóźnienie liczone <em>w przebiegach własnego interwału pętli</em>, nie w sekundach — z tego powodu, dla którego wiek świecy jest w okresach. Trzy alerty, próg trzy przebiegi. <b>telegram-gateway zostaje bez alertu celowo</b>: jego watcher to długi poll na przyjętego bota, więc brama bez botów nie ma pętli, a cisza jest tam stanem wspieranym — alert zapaliłby się w dniu, w którym operator niczego nie podpiął.</p>
+          <p>Dwa miejsca, w których ten plan był <em>zły</em>, i zostały poprawione zamiast wykonane: wiek idzie na <code>/health</code>, nie na <code>/ping</code> (plan mówił inaczej i był sprzeczny z <code>market-data-liveness</code>); lista wyciszanych loggerów jest parametrem bez domyślnej wartości, bo <code>httpx</code> na INFO jest szumem w czterech modułach i <em>dowodem</em> w piątym — telegram-gateway redaguje token bota dokładnie z tej linii, a pakiet z domyślną listą usunął rzecz badaną. Złapał to jego własny test, nie przegląd.</p>
         </div>
         <div class="fail">
           <h3>Deploy nie czeka na checki <span class="tag att">kolejność</span></h3>
@@ -488,7 +491,7 @@
     <section>
       <div class="eyebrow">05 · Propozycje</div>
       <h2>Od największego zwrotu</h2>
-      <p>Każda pozycja ma koszt w dniach i zysk, który da się sprawdzić. Kolumna „OpenSpec” mówi, czy to zmiana wymagania lub kontraktu — test z <code>CLAUDE.md</code> jest mechaniczny: nazwać pliki. <b>P1 i P2 są wykonane</b>, i przy P2 ta kolumna okazała się pomylona: czwarta kategoria wyzwalacza jest dla zmiany, która <em>odwraca</em> regułę nośną, a ta ją stosuje — do tego zmiana bez delty zapala <code>--strict</code> na czerwono, czyli dokładnie to, co P1 naprawiło.</p>
+      <p>Każda pozycja ma koszt w dniach i zysk, który da się sprawdzić. Kolumna „OpenSpec” mówi, czy to zmiana wymagania lub kontraktu — test z <code>CLAUDE.md</code> jest mechaniczny: nazwać pliki. <b>P1, P2, P3 i P4 są wykonane</b>, i przy P2 ta kolumna okazała się pomylona: czwarta kategoria wyzwalacza jest dla zmiany, która <em>odwraca</em> regułę nośną, a ta ją stosuje — do tego zmiana bez delty zapala <code>--strict</code> na czerwono, czyli dokładnie to, co P1 naprawiło.</p>
       <div class="table-wrap">
         <table>
           <thead>
@@ -497,8 +500,8 @@
           <tbody>
             <tr class="shipped"><td class="n">P1 ✓</td><td><b>Prawda w repozytorium.</b> Zarchiwizować pięć gotowych zmian; README na dziesięć modułów; poprawić „cztery deploy” i odzyskać zapas w <code>CLAUDE.md</code>; dokończyć K1 (przewodnik z lotu ptaka i poprzedni audyt do <code>docs/archive/</code>); naprawić <code>MODULES</code> w <code>measure-duplication.py</code>.</td><td>wykonane<br><b>#231</b></td><td>nie</td><td><b>spełnione.</b> 9 nowych capability w <code>specs/</code>, <code>validate --all --strict</code> 96/96, narzędzie widzi dziesięć pakietów, zapas guide 1 171 znaków</td></tr>
             <tr class="shipped"><td class="n">P2 ✓</td><td><b><code>tc-runtime</code> bierze kształt modułu archiwum.</b> <code>caller_access</code> jako jedna klasa z listami w parametrach; <code>ManagedIdentityAuth</code> jako jeden plik; szkielet <code>mcp_app</code>/<code>openapi</code>; market-data dokańcza przejście na pakietową pulę z parametrem czekania.</td><td>wykonane<br><b>#232</b></td><td>nie — patrz akapit wyżej</td><td><b>spełnione.</b> 3 197 → 949 linii kopii (−1 254 netto), siedem <code>_ManagedIdentityAuth</code> → jedno, testy przeniesione do <code>packages/</code>, każdy dokument OpenAPI bajt w bajt ten sam</td></tr>
-            <tr><td class="n">P3</td><td><b>Budżet połączeń jako liczba.</b> Każdy moduł nazywa <code>DATABASE_POOL_SIZE</code> w <code>.env.example</code> i w <code>app_settings</code>; test w <code>scripts/tests</code> sumuje wartości z <code>infra/</code> i odmawia powyżej 30.</td><td>0,5 dnia</td><td>infra — tak</td><td>suma pul ≤ 30 w Terraformie, test czerwony przy 31</td></tr>
-            <tr><td class="n">P4</td><td><b>Cisza jest awarią w każdym module.</b> Jedna metryka „wiek ostatniego przebiegu” na pętlę, emitowana z <code>tc-runtime</code>, i jeden alert na moduł z pętlą; sonda <code>/ping</code> odpowiada wiekiem, żeby webtest mógł go czytać.</td><td>2 dni</td><td>tak — wymaganie liveness ×4</td><td>zatrzymanie pętli w polymarket, social, strategy, telegram budzi operatora w ≤ 15 min, zmierzone przez zatrzymanie</td></tr>
+            <tr class="shipped"><td class="n">P3 ✓</td><td><b>Budżet połączeń jako liczba.</b> Każdy moduł nazywa <code>DATABASE_POOL_SIZE</code> w <code>config.py</code>, w <code>.env.example</code> i w <code>app_settings</code>; test sumuje oba źródła i odmawia powyżej 30.</td><td>wykonane<br><b>#233</b></td><td>nie — żadne wymaganie nie mówi, jak duża może być pula; to liczba w <code>infra/**</code> z testem</td><td><b>spełnione.</b> 64 → 29 przy budżecie 30; test czerwony przy 33 i przy wartości różniącej się między <code>config.py</code> a Terraformem</td></tr>
+            <tr class="shipped"><td class="n">P4 ✓</td><td><b>Cisza jest awarią w każdym module.</b> Metryka „przebiegi od ostatniego ukończonego” na pętlę, z <code>tc-runtime</code>, i jeden alert na moduł z pętlą. <em>Nie</em> na <code>/ping</code>: wiek idzie na <code>/health</code>, bo sonda ma mówić, że proces żyje.</td><td>wykonane<br><b>#233</b></td><td>tak — <code>a-stopped-loop-wakes-somebody</code>, trzy wymagania liveness</td><td><b>spełnione dla trzech pętli.</b> telegram-gateway bez alertu celowo. Operatorowi zostaje <code>apply</code> i stoper od zatrzymania pętli do powiadomienia</td></tr>
             <tr><td class="n">P5</td><td><b>Deploy po checkach.</b> <code>deploy-*.yml</code> na <code>workflow_run</code> po zielonym <code>checks</code> dla tego samego SHA, z <code>workflow_dispatch</code> jako drzwiami awaryjnymi.</td><td>0,5 dnia</td><td>nie</td><td>merge z czerwonym testem nie dociera na produkcję; czas od merge do sondy wydłuża się o czas checków, i to jest cena</td></tr>
             <tr><td class="n">P6</td><td><b>Szósty serwer narzędzi.</b> <code>STRATEGY_MCP_URL</code> w workbenchu, <code>pending_setups</code> jako źródło wyzwalacza obok market i trading; lista wołających w strategy dostaje tożsamość workbencha.</td><td>2–3 dni</td><td>tak — kontrakt i infra</td><td>zespół budzi się z decyzji strategii bez tokenów modelu na obserwację; test przez pętlę, jak w <code>test_a_refused_setup_is_tried_again</code></td></tr>
             <tr><td class="n">P7</td><td><b>Bramka dostaje listę aplikacji.</b> Klucz zostaje dla <code>/ws/stream</code> (powód z 20.08 stoi), reszta tras przechodzi na ten sam zapis wołających co pozostałe moduły — z P2 to jest import, nie nowy plik.</td><td>1–2 dni</td><td>tak — infra i wymaganie</td><td>rotacja klucza dotyka jednego miejsca; wołający bez tożsamości odmówiony przed modułem</td></tr>
@@ -542,13 +545,14 @@
           <p>P3 i P5 miały iść równolegle w tej fazie i <b>nie poszły</b> — jedno odejmowanie na raz czyta się w PR, a suma pul i kolejność deployu nie zależały od pakietów. Wracają jako pierwsze pozycje fazy 2.</p>
         </div>
       </div>
-      <div class="phase">
-        <div class="no">2<small>następna · P3 + P5 + P4 + P7</small></div>
+      <div class="phase shipped">
+        <div class="no">2<small>P3 + P4 wykonane · #233</small></div>
         <div>
           <h3>Oczy</h3>
-          <p>Zaczyna od dwóch rzeczy odłożonych z fazy 1, bo obie są pół dnia i żadna nie dotyka modułu: <b>P3</b> — każdy moduł nazywa <code>DATABASE_POOL_SIZE</code>, a test w <code>scripts/tests</code> sumuje wartości z Terraforma i odmawia powyżej 30; <b>P5</b> — <code>deploy-*.yml</code> na <code>workflow_run</code> po zielonych checkach.</p>
+          <p><b>P3 wykonane</b>: każdy moduł nazywa <code>DATABASE_POOL_SIZE</code> w trzech miejscach, test sumuje oba źródła, 64 → 29. <b>P5 nadal nie</b> — kolejność deployu jest niezależna od wszystkiego w tej fazie i idzie osobno, bo zmienia to, <em>kiedy</em> produkcja dostaje merge, a nie <em>co</em> dostaje.</p>
           <p>Potem liveness jako jedna rzecz w pakiecie — <code>tc_runtime.liveness</code>, metryka wieku ostatniego przebiegu, emitowana tą samą drogą co w market-data — i cztery wymagania OpenSpec, po jednym na moduł z pętlą, każde z własnym powodem (bo próbka co minutę i post co godzinę to różne „za długo”). Alerty: jeden na moduł, wszystkie do tej samej grupy operatora, runbook <code>kiedy-produkcja-milczy</code> dostaje cztery wiersze. Potem P7: bramka bierze zapis wołających z pakietu, klucz zostaje tylko na <code>/ws/stream</code>.</p>
-          <p class="done">Wyjście: suma pul ≤ 30 pilnowana testem · merge z czerwonym testem nie dociera na produkcję · zatrzymanie każdej z czterech pętli zmierzone stoperem do alertu · rotacja <code>GATEWAY_API_KEY</code> dotyka jednego miejsca.</p>
+          <p class="done">Wyjście, osiągnięte: suma pul <b>29 ≤ 30</b>, pilnowana testem · trzy alerty na trzy pętle, próg trzy przebiegi.</p>
+          <p><b>Zostaje w tej fazie</b>: P7 (bramka na listę aplikacji) i P5. Zostaje operatorowi: <code>apply</code> — bez niego moduły emitują metrykę, której nikt nie czyta, co jest stanem gorszym niż po i lepszym niż przed — oraz stoper od zatrzymania pętli na produkcji do powiadomienia.</p>
         </div>
       </div>
       <div class="phase">
@@ -561,7 +565,7 @@
       </div>
 
       <h3 class="sub">Jak poznamy, że plan był dobry</h3>
-      <p>Nie po liczbie linii, choć spadła — 3 197 → 949. Po tym, że <span class="hl">jedenasty moduł powstanie z pakietu, a nie z kopii dziesiątego</span> — i że jego pierwsza cisza obudzi kogoś, zanim obudzi go operator. Pierwsza połowa ma teraz warunki, żeby się wydarzyć; druga jest całą fazą 2 i jeszcze się nie wydarzyła. Jeśli za dwanaście dni <code>measure-duplication.py --threshold 70</code> znów wypisze 40 par, plan nie zadziałał niezależnie od tego, ile z niego wykonano.</p>
+      <p>Nie po liczbie linii, choć spadła — 3 197 → 949. Po tym, że <span class="hl">jedenasty moduł powstanie z pakietu, a nie z kopii dziesiątego</span> — i że jego pierwsza cisza obudzi kogoś, zanim obudzi go operator. Obie połowy mają teraz warunki, żeby się wydarzyć: pakiet niesie obudowę, a <code>tc_runtime.liveness</code> niesie pytanie „kiedy ta pętla ostatnio coś skończyła”. Czego nie wiadomo, dopóki operator nie zrobi <code>apply</code> i nie zatrzyma pętli na produkcji ze stoperem w ręku. Jeśli za dwanaście dni <code>measure-duplication.py --threshold 70</code> znów wypisze 40 par, plan nie zadziałał niezależnie od tego, ile z niego wykonano.</p>
     </section>
   </div>
 </main>
