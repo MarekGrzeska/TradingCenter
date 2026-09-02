@@ -103,6 +103,13 @@ class Settings(BaseSettings):
     telegram_mcp_scope: str | None = None
     telegram_mcp_request_timeout_seconds: float = 35.0
 
+    # The sixth, and the one the clock reads: `pending_setups` is the number a trigger compares against its
+    # threshold, over the same session a woken team then reads the decision from. One database, no upstream —
+    # social-mcp's ceiling.
+    strategy_mcp_url: str | None = None
+    strategy_mcp_scope: str | None = None
+    strategy_mcp_request_timeout_seconds: float = 15.0
+
     # A ceiling on the whole run, not on one agent: the thing an operator waits on is the run. A setting
     # rather than a constant, unlike the per-agent round ceiling, which is a safety property.
     run_timeout_seconds: float = 900.0
@@ -140,6 +147,8 @@ class Settings(BaseSettings):
         "social_mcp_scope",
         "telegram_mcp_url",
         "telegram_mcp_scope",
+        "strategy_mcp_url",
+        "strategy_mcp_scope",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -201,6 +210,9 @@ class Settings(BaseSettings):
         )
         self.telegram_mcp_url = self._coherent_tool_server_url(
             url=self.telegram_mcp_url, scope=self.telegram_mcp_scope, env_prefix="TELEGRAM_MCP"
+        )
+        self.strategy_mcp_url = self._coherent_tool_server_url(
+            url=self.strategy_mcp_url, scope=self.strategy_mcp_scope, env_prefix="STRATEGY_MCP"
         )
         return self
 

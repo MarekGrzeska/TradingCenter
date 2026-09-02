@@ -68,6 +68,12 @@ class Settings(BaseSettings):
     telegram_mcp_scope: str | None = None
     telegram_mcp_request_timeout_seconds: float = 35.0
 
+    # The sixth pair, and the one a trigger reads: `pending_setups` on the strategy platform is the number a team
+    # wakes on, travelling the same road as every other reading. Its tools read one database, so social-data's ceiling.
+    strategy_mcp_url: str | None = None
+    strategy_mcp_scope: str | None = None
+    strategy_mcp_request_timeout_seconds: float = 15.0
+
     # No `TEAMS_MCP_*`: the teams tools are a layer in this process now, so a `.env` from before this change carries
     # three settings that are read by nothing.
 
@@ -107,6 +113,12 @@ class Settings(BaseSettings):
         "trading_mcp_scope",
         "polymarket_mcp_url",
         "polymarket_mcp_scope",
+        "social_mcp_url",
+        "social_mcp_scope",
+        "telegram_mcp_url",
+        "telegram_mcp_scope",
+        "strategy_mcp_url",
+        "strategy_mcp_scope",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -146,6 +158,9 @@ class Settings(BaseSettings):
             telegram_mcp_url=self.telegram_mcp_url,
             telegram_mcp_scope=self.telegram_mcp_scope,
             telegram_mcp_request_timeout_seconds=self.telegram_mcp_request_timeout_seconds,
+            strategy_mcp_url=self.strategy_mcp_url,
+            strategy_mcp_scope=self.strategy_mcp_scope,
+            strategy_mcp_request_timeout_seconds=self.strategy_mcp_request_timeout_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
         )
 
@@ -175,6 +190,9 @@ class Settings(BaseSettings):
             telegram_mcp_url=self.telegram_mcp_url,
             telegram_mcp_scope=self.telegram_mcp_scope,
             telegram_mcp_request_timeout_seconds=self.telegram_mcp_request_timeout_seconds,
+            strategy_mcp_url=self.strategy_mcp_url,
+            strategy_mcp_scope=self.strategy_mcp_scope,
+            strategy_mcp_request_timeout_seconds=self.strategy_mcp_request_timeout_seconds,
             run_timeout_seconds=self.run_timeout_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
             scheduler_enabled=self.scheduler_enabled,

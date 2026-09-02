@@ -107,7 +107,7 @@ copied before `agent-and-teams-one-workbench` carries `TEAMS_MCP_URL` (read by n
 carries `DATABASE_URL`, `OPENAI_API_KEY` or `MODELS` unprefixed, which refuses to start rather
 than misbehaving. `dev.py` says all of it at startup.
 
-**The five `*_MCP_URL` settings share one shape: the *absence* of each is a working
+**The six `*_MCP_URL` settings share one shape: the *absence* of each is a working
 configuration**, not a mistake. Without one, the conversation simply has no tools from that
 server — while a team whose agents were *assigned* those tools refuses to run rather than answer
 without them, and that asymmetry is the whole trap. Which server each names, and what its tools

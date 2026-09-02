@@ -38,7 +38,7 @@ Everything else is one setting for the whole process — `workbench/config.py` i
 code that reads the environment, and both surfaces' own `Settings` are built from it by
 argument, with every validator they had.
 
-## Three tool servers on a network, and two sources that are not
+## Six tool servers on a network, and two sources that are not
 
 The model can ask **market-data** for candles, coverage, indicators and levels mid-answer,
 read *and move* the demo account through **trading-mcp** — positions, balance and working
@@ -52,6 +52,12 @@ The third pair, `POLYMARKET_MCP_URL` / `POLYMARKET_MCP_SCOPE`, is shaped exactly
 before it and read once for both surfaces. Three of that server's nine tools write, which is
 the one place it differs from market-data's read-only surface — and what they write is a
 watch list, not an account. Nothing this system does on Polymarket touches money.
+
+The fourth, fifth and sixth pairs — `SOCIAL_MCP_URL`, `TELEGRAM_MCP_URL`, `STRATEGY_MCP_URL` —
+are the same shape again. The last is the one the teams' clock reads: `pending_setups` on the
+strategy platform is a number a trigger compares against its threshold, and it travels the
+same road as every other reading rather than a client of its own, so the woken team reads the
+very decision that woke it.
 
 The **team tools** are the fourth source and they are not on a network at all. They keep every
 name, description, ceiling and refusal they had as a module; what went is the transport.
@@ -155,8 +161,8 @@ migration cannot fix: an upgrade that reported success without arriving, and an 
 than the schema it found — the second being a rollback that moved the code back and left the
 database where it was.
 
-Needs no network tool server: `MARKET_MCP_URL`, `TRADING_MCP_URL` and `POLYMARKET_MCP_URL`
-left unset each mean no tools from that one, and a server configured but not answering means
+Needs no network tool server: each of the six `*_MCP_URL` settings
+left unset means no tools from that one, and a server configured but not answering means
 the same thing for that turn. Pointing any of them off loopback needs its own `*_SCOPE` set too — the process
 refuses to start otherwise, the same way it refuses a remote database with no identity, and
 the message names which server it is about. There is no setting for the team tools and there
