@@ -16,15 +16,22 @@ from collections import defaultdict
 
 REPO = pathlib.Path(__file__).resolve().parent.parent
 
-# module directory -> its import package. Kept explicit rather than globbed: a new module
-# is a line here, and a module that is not Python has no business being guessed at.
+# label -> the package's path under `modules/`. Explicit rather than globbed, so a new module is a
+# line here — and `test_measure_duplication.py` fails when it is not, because this list naming three
+# deleted modules and none of the four newest is how the measurement read zero for twelve days.
+# The workbench contributes three: its packages may not import each other, so they copy like modules.
 MODULES = {
-    "agent": "agent",
-    "teams": "teams",
-    "market-data": "market_data",
-    "capital-gateway": "capital_gateway",
-    "teams-mcp": "teams_mcp",
-    "trading-mcp": "trading_mcp",
+    "capital-gateway": "capital-gateway/capital_gateway",
+    "market-data": "market-data/market_data",
+    "polymarket-data": "polymarket-data/polymarket_data",
+    "social-data": "social-data/social_data",
+    "strategy": "strategy/strategy",
+    "telegram-gateway": "telegram-gateway/telegram_gateway",
+    "trading-mcp": "trading-mcp/trading_mcp",
+    "workbench:agent": "workbench/agent",
+    "workbench:teams": "workbench/teams",
+    "workbench:teams_tools": "workbench/teams_tools",
+    "workbench": "workbench/workbench",
 }
 
 
@@ -53,16 +60,23 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    # The console this is read on is a Windows one, whose default codepage cannot encode the
+    # arrow below. Without this the script dies on its own output.
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+
     by_name: dict[str, dict[str, pathlib.Path]] = defaultdict(dict)
-    for module, package in MODULES.items():
-        root = REPO / "modules" / module / package
+    for label, package in MODULES.items():
+        root = REPO / "modules" / package
         if not root.is_dir():
-            print(f"skipping {module}: no {package}/ directory", file=sys.stderr)
-            continue
+            # Loud and fatal. A missing directory used to be a warning, and a measurement that
+            # reports nothing because it looked nowhere is worse than no measurement at all.
+            print(f"{label}: no modules/{package}/ directory", file=sys.stderr)
+            return 2
         for path in root.rglob("*.py"):
             if path.name == "__init__.py":
                 continue
-            by_name[str(path.relative_to(root))][module] = path
+            by_name[str(path.relative_to(root))][label] = path
 
     rows = []
     copied_lines = 0

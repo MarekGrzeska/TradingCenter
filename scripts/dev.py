@@ -227,7 +227,7 @@ SERVICES: tuple[Service, ...] = (
             "Last among the back ends: nothing else calls it, so nothing waits on it. The "
             "conversation and the teams catalogue are one process here — 8050 has belonged "
             "to nobody since `agent-and-teams-one-workbench`, and 8070 stopped being "
-            "nobody's when polymarket-data claimed it. It calls four tool servers now, "
+            "nobody's when polymarket-data claimed it. It calls five tool servers now, "
             "and each tool list is read on the first turn that wants one, so a server "
             "still coming up means a turn answered without those tools rather than an "
             "error anyone would notice."
@@ -259,8 +259,8 @@ SERVICES: tuple[Service, ...] = (
         colour=BRIGHT_MAGENTA,
         health_path=None,
         why=(
-            "After the terminal and for its reason, with one upstream rather than four: it "
-            "reads polymarket-data and nothing else. Bound to loopback like everything else "
+            "After the terminal and for its reason, with three upstreams rather than six: it "
+            "reads polymarket-data, social-data and the workbench. Bound to loopback like everything else "
             "here — a phone on the same Wi-Fi needs `pnpm dev --host` in the module, which "
             "publishes the dev server to the network and is nobody's default."
         ),

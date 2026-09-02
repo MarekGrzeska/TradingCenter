@@ -1,0 +1,450 @@
+<title>Mniej modułów, czy Kubernetes?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  h3.sub {
+    font-family: var(--head); font-weight: 700; font-size: 21px; letter-spacing: -0.02em;
+    color: var(--ink); margin: 34px 0 10px;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+  ul { max-width: 68ch; padding-left: 22px; margin: 0 0 16px; }
+  li { margin-bottom: 6px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0 0 8px; font-size: 15px; max-width: 72ch; }
+  .fail p:last-child { margin-bottom: 0; }
+  .fail .m { font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); }
+
+  .phase { display: grid; grid-template-columns: 96px 1fr; gap: 0 22px; padding: 22px 0; border-top: 1px solid var(--line); }
+  .phase:last-child { border-bottom: 1px solid var(--line); }
+  .phase .no { font-family: var(--head); font-weight: 800; font-size: 34px; line-height: 1; letter-spacing: -0.04em; color: var(--navy); }
+  .phase .no small { display: block; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; color: var(--ink-3); margin-top: 8px; font-weight: 400; text-transform: uppercase; }
+  .phase h3 { font-family: var(--head); font-weight: 700; font-size: 21px; letter-spacing: -0.02em; color: var(--ink); margin: 0 0 8px; }
+  .phase p { font-size: 15.5px; }
+  .phase .done { font-family: var(--mono); font-size: 12.5px; color: var(--green); margin-top: 6px; }
+  @media (max-width: 620px) { .phase { grid-template-columns: 1fr; } }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">TradingCenter · dwa pomysły na wzrost</span>
+    <h1>Mniej modułów, czy Kubernetes?</h1>
+    <p class="lede">Pięć modułów 20 sierpnia, dziesięć 1 września. Dwa odruchy są naturalne: <b>skleić kilka</b>, żeby było ich mniej, i <b>przenieść całość na AKS</b>, żeby rosło taniej. Ten dokument liczy oba i dochodzi do tego samego wniosku dwiema drogami: <b>rośnie liczba kopii, nie liczba modułów</b> — i żadna z tych dwóch zmian nie odejmuje kopii.</p>
+    <div class="strip">
+      <span>TradingCenter / architektura</span>
+      <span>1 września 2026 · <b>main @ faa550c</b></span>
+      <span>towarzyszy: <b>przeglad-wrzesien-2026.html</b></span>
+      <span>ceny: <b>rząd wielkości, nie oferta</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">~150</div><div class="l">linii Terraforma na moduł — z 1 304 w <code>app-service.tf</code></div></div>
+      <div class="cell"><div class="v">~250 MB</div><div class="l">pamięci na moduł — z 7 168 MB planu B3</div></div>
+      <div class="cell"><div class="v">10 / 35</div><div class="l">połączeń do bazy na moduł — z 35 dostępnych na B1ms</div></div>
+      <div class="cell"><div class="v">~700</div><div class="l">linii szkieletu kopiowanych z poprzedniego modułu</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">Co rośnie</div>
+      <h2>Który sufit uderzy pierwszy</h2>
+      <p class="intro">„Aplikacja się rozrasta” jest odczuciem. Odczucie ma pięć składowych i tylko dwie z nich mają sufit blisko. Żadna z tych dwóch nie jest obliczeniami.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Wymiar</th><th class="n">Dziś (8 procesów)</th><th class="n">Koszt modułu</th><th class="n">Sufit</th><th>Co uderza</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>Pamięć planu</b></td><td class="n">~2 000 MB</td><td class="n">150–310 MB</td><td class="n">7 168 MB (B3)</td><td>miejsce na ~20 kolejnych modułów; CPU 4 vCPU prawie bezczynne — <em>nie</em> ten sufit</td></tr>
+            <tr><td><b>Połączenia do bazy</b></td><td class="n">64 na papierze</td><td class="n">+10 (domyślne <code>max_size</code>)</td><td class="n">35 (B1ms)</td><td><span class="tag stop">przekroczony</span> na papierze od trzeciego archiwum; trzyma się na <code>min_size=1</code></td></tr>
+            <tr><td><b>Terraform + Entra</b></td><td class="n">1 304 linii, 8 rejestracji, 10 pre-autoryzacji</td><td class="n">+150 linii, +1 rejestracja, +sekret, +2 listy</td><td class="n">brak</td><td>nie sufit — koszt czytania i każdego <code>apply</code>, który jest ręczny z zasady</td></tr>
+            <tr><td><b>Szkielet kodu</b></td><td class="n">5 kopii × ~700 linii</td><td class="n">+700 linii, +~200 testów</td><td class="n">70% (reguła pakietu)</td><td><span class="tag stop">przekroczony</span> — <code>caller_access</code> 76–95%, <code>openapi</code> 87–98%, siedem <code>_ManagedIdentityAuth</code></td></tr>
+            <tr><td><b>Głowa operatora</b></td><td class="n">131 zmiennych <code>.env</code>, 10 portów, 22 listy wołających</td><td class="n">+15 zmiennych, +1 port, +2 listy</td><td class="n">23 000 znaków <code>CLAUDE.md</code></td><td><span class="tag att">562 znaki zapasu</span>: jedenasty moduł się zmieści, dwunasty nie</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 1000 300" role="img" aria-label="Ile modułów mieści każdy sufit: pamięć planu około 28, przewodnik CLAUDE.md 11, połączenia do bazy 3,5 przy domyślnej puli i 8,75 przy puli 4; dziś jest 10 modułów i 6 procesów z pulą">
+            <g font-family="Karla, sans-serif" font-size="13" fill="currentColor">
+              <text x="20" y="28" font-weight="700" font-size="12" font-family="Roboto Mono, monospace" letter-spacing="0.1em">ILE MODUŁÓW MIEŚCI SUFIT</text>
+              <line x1="240" y1="44" x2="240" y2="270" stroke="currentColor" stroke-width="1" opacity="0.35"></line>
+              <!-- scale: 1 module = 24px, origin 240 -->
+              <g font-size="10" font-family="Roboto Mono, monospace" opacity="0.6" text-anchor="middle">
+                <text x="240" y="284">0</text><text x="360" y="284">5</text><text x="480" y="284">10</text><text x="600" y="284">15</text><text x="720" y="284">20</text><text x="840" y="284">25</text><text x="960" y="284">30</text>
+              </g>
+              <g stroke="currentColor" stroke-width="1" opacity="0.12">
+                <line x1="360" y1="44" x2="360" y2="270"></line><line x1="480" y1="44" x2="480" y2="270"></line><line x1="600" y1="44" x2="600" y2="270"></line><line x1="720" y1="44" x2="720" y2="270"></line><line x1="840" y1="44" x2="840" y2="270"></line><line x1="960" y1="44" x2="960" y2="270"></line>
+              </g>
+              <!-- today marker at 10 modules -->
+              <line x1="480" y1="44" x2="480" y2="270" stroke="#f2c313" stroke-width="3"></line>
+              <rect x="452" y="46" width="56" height="16" fill="#f2c313"></rect>
+              <text x="480" y="58" text-anchor="middle" font-size="10" font-weight="700" font-family="Roboto Mono, monospace" fill="#14306b">DZIŚ 10</text>
+
+              <!-- bar 1: memory ~28 -->
+              <text x="20" y="96" font-weight="700">Pamięć planu B3</text>
+              <text x="20" y="112" font-size="11" opacity="0.65">7 168 MB / ~250 MB</text>
+              <rect x="240" y="86" width="672" height="22" fill="#e0f0e8"></rect>
+              <rect x="240" y="86" width="240" height="22" fill="#17734c" opacity="0.55"></rect>
+              <text x="920" y="102" font-size="12" font-weight="700" font-family="Roboto Mono, monospace" fill="#17734c">≈ 28</text>
+
+              <!-- bar 2: CLAUDE.md 11 -->
+              <text x="20" y="150" font-weight="700">Przewodnik CLAUDE.md</text>
+              <text x="20" y="166" font-size="11" opacity="0.65">23 000 zn. / ~2 200 zn. na moduł</text>
+              <rect x="240" y="140" width="264" height="22" fill="#fdf3d0"></rect>
+              <rect x="240" y="140" width="240" height="22" fill="#f2c313" opacity="0.7"></rect>
+              <text x="512" y="156" font-size="12" font-weight="700" font-family="Roboto Mono, monospace" fill="#8a6708">11</text>
+
+              <!-- bar 3: DB connections default pool 3.5 -->
+              <text x="20" y="204" font-weight="700">Połączenia, pula domyślna</text>
+              <text x="20" y="220" font-size="11" opacity="0.65">35 / 10 na proces</text>
+              <rect x="240" y="194" width="84" height="22" fill="#fae7e4"></rect>
+              <rect x="240" y="194" width="84" height="22" fill="#b8322a" opacity="0.6"></rect>
+              <text x="332" y="210" font-size="12" font-weight="700" font-family="Roboto Mono, monospace" fill="#b8322a">3,5 — a pulę trzyma 6 procesów</text>
+
+              <!-- bar 4: DB connections pool 4 -> 8.75 -->
+              <text x="20" y="248" font-weight="700">Połączenia, pula 4</text>
+              <text x="20" y="264" font-size="11" opacity="0.65">35 / 4 — jak telegram-gateway</text>
+              <rect x="240" y="238" width="210" height="22" fill="#fdf3d0"></rect>
+              <rect x="240" y="238" width="210" height="22" fill="#f2c313" opacity="0.7"></rect>
+              <text x="458" y="254" font-size="12" font-weight="700" font-family="Roboto Mono, monospace" fill="#8a6708">8,75 — wciąż mniej niż dziś</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — sufity przeliczone na moduły, żółta linia to stan dzisiejszy. Pamięć nie jest problemem na długo. Problemem jest baza (na papierze przekroczona) i przewodnik (jeden moduł zapasu) — a obu nie naprawia ani sklejanie modułów, ani zmiana platformy. Bazę naprawia liczba w konfiguracji; przewodnik — usunięcie z niego tego, co da się wyprowadzić z pakietu.</figcaption>
+      </figure>
+      <p>Jedna rzecz z tej tabeli wymaga poprawki od razu, bo jest fałszem w kodzie: <code>app-service.tf</code> w trzech komentarzach każe „czytać <code>plan_memory</code> (alert przy 92%)”, a alert <code>alert-plan-memory-high</code> zdjęto 20.08 z zapisanym powodem — „wejście do decyzji o SKU, nie zdarzenie”. Metryka <code>MemoryPercentage</code> istnieje; alertu nie ma. Ktoś, kto uwierzy komentarzowi, będzie czekał na powiadomienie, które nie przyjdzie.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">Pomysł pierwszy</div>
+      <h2>Sklejanie modułów</h2>
+      <p class="intro">Repozytorium ma już regułę, kiedy sklejać, wyprowadzoną z dwóch wykonanych i jednego odrzuconego scalenia. Trzeba ją tylko przyłożyć do dzisiejszych dziesięciu.</p>
+      <div class="quote">Zwija się to, co stoi przed właścicielem swoich danych. Nie zwija się tego, co stoi przed inną granicą bezpieczeństwa.</div>
+      <p>Tak brzmi werdykt z <code>zwiniecie-trading-mcp</code> (20.08). Dwa scalenia, które przeszły — <code>market-mcp</code> do <code>market-data</code> i <code>agent</code> + <code>teams</code> + <code>teams-mcp</code> w <code>workbench</code> — miały wspólną cechę: <strong>rusztowanie granicy stanowiło 20% pakietu</strong> (416 z 2 078 linii) albo bliźniaki różniły się <em>typem, nie zachowaniem</em>, więc pakiet ich nie obejmował. Scalenie, które nie przeszło, stało przed rachunkiem — inną granicą bezpieczeństwa — i netto oddawało 220 linii przy 1,4 : 1.</p>
+      <p>Z tą regułą w ręku każdy kandydat rozstrzyga się jednym pytaniem: <span class="hl">czy to, co dziś się powtarza między nimi, różni się parametrem (wtedy pakiet), czy typem i tożsamością (wtedy scalenie)?</span></p>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Kandydat</th><th>Co kusi</th><th>Co się traci</th><th>Reguła mówi</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>polymarket-data + social-data</b> (+ każde następne archiwum) → jeden proces „archiwa”, N schematów</td>
+              <td>szkielet 71–98% identyczny; −1 App Service, −1 rejestracja Entra, −1 deploy, −1 job CI, −10 połączeń, −~250 MB</td>
+              <td>jedna domena awarii dla dwóch dostawców (padający feed Truth Social restartuje próbkowanie Polymarket); jedna lista wołających dla powierzchni o <em>różnych regułach zapisu</em> (trzy narzędzia piszą / żadne nie pisze); „jedne drzwi do dostawcy” tracą nazwę</td>
+              <td><span class="tag stop">nie</span> — to, co identyczne, różni się <em>parametrem</em>: listą wołających, nazwą bazy, kluczem blokady. To jest definicja pakietu. Scalenie usuwa te same linie i dokłada sprzężenie, którego pakiet nie dokłada.</td>
+            </tr>
+            <tr>
+              <td><b>strategy → market-data</b> (strategia jako warstwa archiwum)</td>
+              <td>strategy czyta archiwum po REST bez snapshotu kontraktu; klient <code>archive.py</code> (386 linii) + własne <code>_ManagedIdentityAuth</code> to rusztowanie granicy, jak w market-mcp</td>
+              <td>strategy ma <em>własny</em> stan (katalog, rewizje, decyzje, runner) i własną bazę — nie jest proxy; market-data rośnie o 5 600 linii i drugi łańcuch migracji</td>
+              <td><span class="tag att">nie dziś</span> — rusztowanie to ~500 z 5 620 linii, <b>9%</b> wobec 20% w market-mcp. Poniżej progu, który uzasadnił tamto scalenie. Tańsza odpowiedź: snapshot kontraktu market-data w strategy (tak jak trading-mcp ma snapshot bramki), jeden plik i jeden skrypt.</td>
+            </tr>
+            <tr>
+              <td><b>strategy → workbench</b> (decyzja obok wykonania)</td>
+              <td>strategy nie ma dziś żadnego wołającego swojego <code>/mcp</code>; workbench ma runner, scheduler, dwa schematy — trzeci by się zmieścił</td>
+              <td>zdanie „strategy nigdy nie dotyka rachunku: decyduje, zespoły wykonują” przestaje być granicą procesu i staje się konwencją w jednym procesie, który trzyma narzędzia handlowe</td>
+              <td><span class="tag stop">nie</span> — to jest <em>inna granica bezpieczeństwa</em>, ta sama, która trzyma trading-mcp osobno. Że seam jest niepodłączony, to argument za podłączeniem (<code>STRATEGY_MCP_URL</code>, P6 w przeglądzie), nie za usunięciem.</td>
+            </tr>
+            <tr>
+              <td><b>trading-mcp → capital-gateway</b></td>
+              <td>−1 proces, −2 723 linii generowanego snapshotu, −1 hop</td>
+              <td>bramka nie jest właścicielem rachunku; zły wpis w zapisie tras wpuszcza złożenie zlecenia</td>
+              <td><span class="tag stop">nie</span> — policzone 20.08, netto 220 linii, powód stoi; dodanie pięciu modułów nie zmieniło w nim niczego.</td>
+            </tr>
+            <tr>
+              <td><b>telegram-gateway → workbench</b> albo do social-data</td>
+              <td>najmłodszy moduł, 2 567 linii, dwa narzędzia</td>
+              <td>trzech wołających (workbench, social, strategy) — scalenie z jednym z nich zmusza pozostałych dwóch do wołania sąsiada; jedyne drzwi <em>na zewnątrz</em> systemu tracą osobną tożsamość i osobną listę</td>
+              <td><span class="tag stop">nie</span> — drzwi z trzema wołającymi są modułem z definicji; to ten sam kształt, dla którego capital-gateway jest osobno.</td>
+            </tr>
+            <tr>
+              <td><b>terminal + pocket</b> → jedno SWA, dwie trasy</td>
+              <td>−1 SWA (darmowe), −1 deploy; dzielą pięć wygenerowanych kontraktów</td>
+              <td>„dzieli kontrakt, nie kod” zamienia się w jeden bundle, jeden lock i jedną datę wdrożenia dla dwóch odbiorców</td>
+              <td><span class="tag att">nie teraz</span> — oszczędność jest zerowa w pieniądzu i jednym plikiem workflow w pracy. Wraca, jeśli pocket zacznie kopiować komponenty terminala — wtedy to pomiar bliźniaków, nie scalenie.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 class="sub">Wniosek</h3>
+      <p>Żaden z sześciu kandydatów nie przechodzi reguły, którą repozytorium samo wyprowadziło. To nie jest wynik zaskakujący: cztery nowe moduły powstały <em>tam, gdzie leży granica danych albo granica bezpieczeństwa</em>, i granice te są poprawne. <span class="hl">Powtarza się nie treść modułów, tylko ich obudowa</span> — i obudowa jest tym, po co istnieje <code>packages/</code>. Reguła pakietu (≥ 70% identyczności, każda różnica parametrem, każdy konsument testowany) jest dziś spełniona przez pięć plików i złamana przez to, że pakiet ich nie wchłonął.</p>
+      <p>Jest jeszcze trzecia droga między „moduł” a „scalenie”, i workbench już nią poszedł: <strong>jeden proces, kilka pakietów, test warstwowania</strong>. Jest poprawna tylko wtedy, gdy pakiety mają <em>jedną tożsamość i jednego operatora</em> — agent i teams to ta sama rozmowa na tym samym ekranie. Dwa archiwa dwóch dostawców z różnymi regułami zapisu tego warunku nie spełniają.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">Pomysł drugi</div>
+      <h2>Przeniesienie na AKS</h2>
+      <p class="intro">Kubernetes daje trzy rzeczy, których App Service B3 dziś nie daje, i zabiera jedną, na której stoi cały model bezpieczeństwa. Trzeba je nazwać osobno, bo dwie z trzech da się kupić taniej.</p>
+
+      <h3 class="sub">Co AKS naprawdę kupuje</h3>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>Wdrożenie, które nie jest przerwą <span class="tag ok">rolling update + readiness</span></h3>
+          <p>Dziś kontener, który nie wstaje, to przestój do ręcznego <code>az</code> (~40 s po diagnozie), bo plan B nie ma slotów. Na AKS nowy pod nie dostaje ruchu, dopóki nie odpowie sondą, a stary żyje do tej chwili. To jest realna, dzisiejsza bolączka (16.08, 20.08 w historii) — ale kupuje ją też P0v3 ze slotami i Container Apps z rewizjami, bez migracji.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Limit zasobów na proces <span class="tag ok">requests / limits</span></h3>
+          <p>App Service nie ma limitu pamięci per aplikacja: jeden moduł z wyciekiem zabiera plan ośmiu. Na AKS (i w Container Apps) każdy kontener ma swój sufit i swój restart. To jest argument, którego App Service nie odpiera — tylko że przy 2 GB z 7 GB zajętych jest to argument na wyrost, dopóki metryka nie pokaże pierwszego wycieku.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Skalowanie per usługa <span class="tag ok">HPA</span></h3>
+          <p>Kupuje niewiele, i to trzeba powiedzieć wprost: <code>worker_count = 1</code> jest decyzją, bo capital.com liczy 10 req/s na rachunek; bramka i strumień świec <em>muszą</em> być jedną repliką; żaden z pozostałych modułów nie jest dziś ograniczony CPU. Poziome skalowanie nie ma tu czego skalować.</p>
+        </div>
+      </div>
+
+      <h3 class="sub">Co AKS zabiera</h3>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Easy Auth jest nośna, i nie istnieje na AKS <span class="tag stop">8 × easy-auth-app</span></h3>
+          <p>Każdy moduł czyta tożsamość wołającego z nagłówków, które stawia platforma: <code>tc_runtime/auth.py</code> z <code>X-MS-CLIENT-PRINCIPAL-ID</code>, sześć <code>caller_access.py</code> z <code>X-MS-CLIENT-PRINCIPAL</code> (blob z <code>azp</code>/<code>appid</code>), <code>routers/stream.py</code> z obu. Na AKS nikt tych nagłówków nie stawia. Do napisania: walidacja JWT (JWKS, issuer, audience, wersja tokenu) w każdym module albo proxy OIDC przed ingressem — czyli od nowa warstwa, której dojście do stanu „fail-closed” kosztowało dwa zmierzone dni odmawiania wszystkich żądań (19.08, 20.08). Osiem rejestracji Entra, ich sekrety i przekierowania <code>/.auth/login/aad/callback</code> tracą sens; logowanie terminala i pocketa idzie przez MSAL bezpośrednio.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Tożsamość zarządzana, Key Vault, sonda — trzy przepisania <span class="tag stop">infra + scripts</span></h3>
+          <p>Osiem tożsamości systemowych → Workload Identity (konto usługi + poświadczenie federacyjne na moduł, zmiana w każdym <code>allowed_applications</code> i w rolach bazy). <code>@Microsoft.KeyVault(...)</code> w app settings → sterownik CSI albo External Secrets. <code>deploy_probe.py</code>, <code>_deploy-app-service.yml</code>, dziesięć workflow → Helm/Kustomize, <code>kubelogin</code>, nowa sonda. <code>app-service.tf</code> (1 304 linie) → od zera. Wszystko to jest praca <em>bez jednej linii wartości dla operatora</em>: po migracji system robi dokładnie to, co przed nią.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Klaster to drugi etat <span class="tag stop">jeden operator</span></h3>
+          <p>Wersja Kubernetesa wygasa co ~14 miesięcy i wymaga upgrade'u; obrazy węzłów, ingress-nginx, cert-manager, CoreDNS mają własne cykle. <code>terraform apply</code> jest tu ręczny z zasady — upgrade klastra też będzie. AKS Automatic zdejmuje część tego kosztem warstwy Standard i minimalnej liczby węzłów, czyli pieniędzy. Zespół ma jedną osobę i jest to najważniejsza liczba w tej sekcji.</p>
+        </div>
+        <div class="fail">
+          <h3>Pieniądze: dwa do trzech razy więcej za to samo <span class="tag att">rząd wielkości</span></h3>
+          <p>Ceny katalogowe pay-as-you-go, przybliżone — do potwierdzenia w kalkulatorze przed jakąkolwiek decyzją; tu chodzi o proporcje, nie o kwoty.</p>
+        </div>
+      </div>
+
+      <div class="table-wrap" style="margin-top:14px">
+        <table>
+          <thead>
+            <tr><th>Opcja</th><th>Zasoby</th><th>Cofnięcie wdrożenia</th><th>Limit per proces</th><th>Model tożsamości</th><th>Praca migracji</th><th class="n">≈ $/mies.</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>App Service B3</b> (dziś)</td><td>4 vCPU / 7 GB, wspólne</td><td>ręczne <code>az</code>, ~40 s po diagnozie</td><td>brak</td><td>Easy Auth</td><td>—</td><td class="n">55–75</td></tr>
+            <tr><td><b>App Service P0v3</b> + sloty</td><td>1 vCPU / 4 GB, wspólne</td><td><span class="tag ok">swap slotu</span></td><td>brak</td><td>Easy Auth <b>bez zmian</b></td><td>1 linia SKU, 8 slotów w tf, deploy → slot + swap; tydzień <code>CpuPercentage</code> przed decyzją (1 vCPU)</td><td class="n">60–75</td></tr>
+            <tr><td><b>App Service P1v3</b> + sloty</td><td>2 vCPU / 8 GB, wspólne</td><td><span class="tag ok">swap slotu</span></td><td>brak</td><td>Easy Auth <b>bez zmian</b></td><td>jak wyżej</td><td class="n">110–130</td></tr>
+            <tr><td><b>Container Apps</b> (min. 1 replika × 8)</td><td>per aplikacja 0,25–4 vCPU</td><td><span class="tag ok">rewizje, podział ruchu</span></td><td><span class="tag ok">tak</span></td><td>wbudowane auth — <b>te same nagłówki</b> <code>X-MS-CLIENT-PRINCIPAL*</code>; kod bez zmian</td><td><code>app-service.tf</code> → <code>container-apps.tf</code>, workflow, sonda; 3–5 dni</td><td class="n">120–160</td></tr>
+            <tr><td><b>AKS</b> (Free tier, 2 × B2ms, LB Standard)</td><td>4 vCPU / 16 GB, z czego ~1,5 GB system</td><td><span class="tag ok">rolling + readiness</span></td><td><span class="tag ok">tak</span></td><td><span class="tag stop">do napisania</span> — JWT w modułach albo proxy OIDC</td><td>auth, identity, sekrety, manifesty, sonda, cały <code>app-service.tf</code>; 3–4 tygodnie + stały koszt utrzymania</td><td class="n">170–220 + czas</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">Werdykt</h3>
+      <p><strong>Nie — i nie dlatego, że AKS jest zły, tylko dlatego, że nie odpowiada na żadną z dwóch liczb, które naprawdę uderzają.</strong> Nie zmniejsza liczby połączeń do bazy ani liczby kopii szkieletu; zwiększa liczbę rzeczy, które jeden operator musi rozumieć; kosztuje przepisanie warstwy, która jako jedyna w tym systemie była dwa razy zmierzona w produkcji przez awarię. Z trzech rzeczy, które kupuje, dwie (cofnięcie wdrożenia, limit per proces) daje Container Apps <em>z tym samym kodem</em>, a pierwszą z nich — P0v3 ze slotami za cenę dzisiejszego planu.</p>
+      <p>Komentarz nad planem mówi „jeden wspólny plan bije tyle samo Container Apps”, i przy pięciu modułach z <code>always_on</code> to była prawda. Przy ośmiu jest pytaniem, które trzeba zadać jeszcze raz — ale z liczbą, nie z odczuciem: tydzień <code>MemoryPercentage</code> i <code>CpuPercentage</code> planu, obok rachunku za Container Apps przy ośmiu replikach minimalnych.</p>
+      <p>Warunki, przy których AKS wraca na stół — zapisane teraz, żeby nie wracał z odczucia:</p>
+      <ul>
+        <li>pojawia się moduł ograniczony CPU, który <em>nie</em> stoi za budżetem capital.com i potrzebuje więcej niż jednej repliki;</li>
+        <li>drugi operator, dla którego klaster jest narzędziem, nie kosztem;</li>
+        <li>wymaganie przenośności (drugi cloud, on-prem) — wtedy Easy Auth i tak trzeba zastąpić, a AKS jest tego naturalnym miejscem;</li>
+        <li>Container Apps okażą się za ciasne w mierzalny sposób (limit rewizji, brak funkcji sieciowej, koszt profilu dedykowanego).</li>
+      </ul>
+    </section>
+
+    <section>
+      <div class="eyebrow">Zamiast tego</div>
+      <h2>Co odejmuje kopie</h2>
+      <p class="intro">Pięć kroków, każdy tańszy niż najtańsze z obu rozważanych; razem zamykają wszystko, co „rozrastanie się” naprawdę znaczy. Dwa pierwsze są w planie z <code>przeglad-wrzesien-2026</code> i tu tylko dostają uzasadnienie z tej strony.</p>
+      <div class="phase">
+        <div class="no">1<small>P2 z przeglądu</small></div>
+        <div>
+          <h3>Pakiet bierze obudowę</h3>
+          <p><code>tc-runtime</code> wchłania <code>caller_access</code>, <code>ManagedIdentityAuth</code>, szkielet <code>mcp_app</code>/<code>openapi</code>. Jedenasty moduł powstaje z importu i listy, nie z kopii dziesiątego. To jest jedyny krok, który zmienia <em>koszt krańcowy</em> modułu — z ~700 linii do ~50.</p>
+          <p class="done">Wyjście: <code>measure-duplication.py --threshold 70</code> pusty; siedem <code>_ManagedIdentityAuth</code> → jedno.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="no">2<small>P3 z przeglądu</small></div>
+        <div>
+          <h3>Budżet bazy jako liczba w Terraformie</h3>
+          <p>Każda aplikacja dostaje <code>DATABASE_POOL_SIZE</code> w <code>app_settings</code>; test w <code>scripts/tests</code> sumuje i odmawia powyżej 30. To zdejmuje jedyny sufit, który dziś jest przekroczony — bez zmiany SKU i bez migracji. Następny SKU bazy (B2s, 100 połączeń) dopiero wtedy, gdy suma <em>potrzebnych</em>, nie domyślnych, pul przekroczy 30.</p>
+          <p class="done">Wyjście: suma pul ≤ 30, test czerwony przy 31.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="no">3<small>nowe</small></div>
+        <div>
+          <h3>Cofnięcie wdrożenia za cenę dzisiejszego planu</h3>
+          <p>Tydzień <code>CpuPercentage</code> i <code>MemoryPercentage</code> planu. Jeśli CPU trzyma się poniżej ~25% — P0v3 ze slotem <code>staging</code> na każdą aplikację i <code>swap</code> po sondzie zamiast wdrożenia w miejsce. Jeśli nie — P1v3. Zmiana infrastruktury, więc OpenSpec; kod modułów nietknięty; <code>deploy_probe.py</code> pyta slot przed swapem, co jest lepszym pytaniem niż dzisiejsze „czy wstało po fakcie”.</p>
+          <p class="done">Wyjście: kontener, który nie wstaje, nie dociera do ruchu; „failed container start is downtime” przestaje być prawdą.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="no">4<small>nowe</small></div>
+        <div>
+          <h3>Przewodnik przestaje rosnąć z modułem</h3>
+          <p>Wiersz na moduł w <code>CLAUDE.md</code> (130–320 znaków) jest tym, co uderza w sufit jako pierwsze. Tabela modułów przenosi się do <code>docs/architecture.md</code> jako jedyne źródło, a przewodnik trzyma zdanie: „dziesięć modułów, lista w <code>architecture.md</code>, porty w <code>dev.py --explain</code>”. Test pułapu zostaje; zapas rośnie z 562 do ~3 000 znaków bez podnoszenia sufitu.</p>
+          <p class="done">Wyjście: nowy moduł nie dotyka <code>CLAUDE.md</code>; trzy komentarze o nieistniejącym alercie poprawione przy okazji.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="no">5<small>warunkowe</small></div>
+        <div>
+          <h3>Container Apps — gdy liczba, nie odczucie, o to poprosi</h3>
+          <p>Zapisany próg: <code>MemoryPercentage</code> planu powyżej 70% przez tydzień, albo pierwszy zmierzony wyciek w jednym module, albo moduł potrzebujący własnego SKU. Wtedy Container Apps z wbudowanym auth — kod nie zmienia ani linii, tf wymienia jeden plik, sonda pyta rewizję. AKS zostaje na liście z warunkami z poprzedniej sekcji.</p>
+          <p class="done">Wyjście: decyzja o platformie ma datę i liczbę, nie nastrój.</p>
+        </div>
+      </div>
+
+      <h3 class="sub">Jednym zdaniem</h3>
+      <p>System nie jest za duży na App Service ani za rozdrobniony na dziesięć modułów. <span class="hl">Jest za bardzo skopiowany — cztery razy w dwanaście dni — i na to nie ma platformy, jest pakiet.</span> Kiedy pakiet wchłonie obudowę, a baza dostanie liczbę, „rozrastanie się” przestanie być odczuciem, bo krańcowy koszt modułu spadnie do listy wołających i jednego <code>apply</code>. Wtedy — i z metryką w ręku — pytanie o platformę będzie pytaniem o pieniądze, a nie o strach.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Mniej modułów, czy Kubernetes? · TradingCenter · 1 września 2026 · main @ faa550c · towarzyszy: przeglad-wrzesien-2026.html</span>
+    <span>Tryb jasny — jedyny</span>
+  </div>
+</footer>

@@ -101,28 +101,6 @@ i kontrakt REST podlegają temu samemu limitowi.
   wskazuje narzędzie
 - **THEN** moduł odmawia tak samo
 
-### Requirement: Zakończenie obserwacji zatrzymuje zbieranie i nie rusza danych
-
-Zakończenie obserwacji MUST zatrzymać próbkowanie wydarzenia i zwolnić związany z nim ruch do
-dostawcy. MUST NOT usunąć ani jednej zebranej próbki: zebrana historia rozstrzygniętego albo
-porzuconego rynku jest materiałem, na którym da się coś sprawdzić, a jej wartość nie kończy się
-wraz z zainteresowaniem.
-
-Ponowne objęcie obserwacją tego samego wydarzenia MUST podjąć zbieranie i MUST zachować historię
-zebraną wcześniej, uzupełniając przerwę, a nie zaczynając od pustego miejsca.
-
-#### Scenario: Zakończenie obserwacji
-
-- **WHEN** obserwacja wydarzenia zostaje zakończona
-- **THEN** moduł przestaje próbkować jego rynki
-- **AND** zebrana historia pozostaje odczytywalna
-
-#### Scenario: Ponowne objęcie obserwacją
-
-- **WHEN** wydarzenie, którego obserwację zakończono, zostaje objęte obserwacją ponownie
-- **THEN** wcześniejsza historia jest nadal odczytywalna
-- **AND** moduł uzupełnia przerwę, zamiast zaczynać serię od nowa
-
 ### Requirement: Rozstrzygnięty rynek przestaje być próbkowany sam
 
 Rynek rozstrzygnięty u dostawcy ma cenę, która się już nie zmieni. Moduł MUST przestać go
@@ -165,3 +143,36 @@ tak samo jak cisza na rynku.
   taktów próbkowania
 - **THEN** stan tej obserwacji stwierdza, że zbieranie nie nadąża albo ustało
 
+### Requirement: Usunięcie obserwacji zabiera wszystko i jest jedynym wyjściem z listy
+
+Moduł MUST pozwalać usunąć obserwację w całości: wydarzenie, jego rynki, jego wyniki, każdą
+zebraną próbkę i każdy zapis zebranego zakresu. Usunięcie MUST być niepodzielne — albo znika
+wszystko, albo nie znika nic.
+
+Usunięcie MUST być jedynym sposobem, w jaki wydarzenie schodzi z listy obserwacji. Moduł MUST NOT
+udostępniać zatrzymania zbierania bez usunięcia: obserwacja, która nie zbiera i nie znika, jest
+miejscem na liście, o którym nikt nie umie powiedzieć, po co tam jest.
+
+Ponowne objęcie obserwacją usuniętego wydarzenia MUST zacząć od pustego archiwum. Jest to różnica
+warta powiedzenia wprost, bo do niedawna zachodziła odwrotna: zakończona obserwacja podjęta na
+nowo zachowywała historię. Po usunięciu nie ma czego zachować, i to jest cała treść tej czynności.
+
+Usunięcie MUST być osiągalne wyłącznie przez kontrakt REST i MUST NOT być osiągalne narzędziem.
+
+#### Scenario: Usunięcie obserwacji
+
+- **WHEN** obserwacja wydarzenia zostaje usunięta
+- **THEN** wydarzenie nie występuje już na liście obserwacji
+- **AND** nie pozostaje po nim żadna zebrana próbka ani żaden zapis zebranego zakresu
+- **AND** moduł przestaje je próbkować
+
+#### Scenario: Ponowne objęcie obserwacją po usunięciu
+
+- **WHEN** usunięte wydarzenie zostaje objęte obserwacją ponownie
+- **THEN** obserwacja rusza z pustym archiwum
+- **AND** moduł MUST NOT twierdzić, że jakikolwiek okres tego wydarzenia jest już zebrany
+
+#### Scenario: Próba zatrzymania obserwacji bez usunięcia
+
+- **WHEN** konsument szuka sposobu zatrzymania zbierania bez usunięcia obserwacji
+- **THEN** moduł żadnego nie udostępnia — ani w kontrakcie, ani w zestawie narzędzi
