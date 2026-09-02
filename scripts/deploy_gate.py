@@ -29,11 +29,16 @@ IsAncestor = Callable[[str, str], bool]
 Changed = Callable[[str, str, Sequence[str]], bool]
 
 
+def _same_commit(one: str, other: str) -> bool:
+    """A full sha and its abbreviation name one commit; the operator's hand types the short one."""
+    return one.startswith(other) or other.startswith(one)
+
+
 def previous_green(sha: str, green_heads: Sequence[str], is_ancestor: IsAncestor) -> str | None:
     """The newest green head that is not this commit and lies behind it. This commit's own run is in the
     list — it is the one that started us — and a head off a rewritten history is not a base for anything."""
     for head in green_heads:
-        if head != sha and is_ancestor(head, sha):
+        if not _same_commit(head, sha) and is_ancestor(head, sha):
             return head
     return None
 
@@ -79,19 +84,24 @@ def _green_heads(workflow: str, branch: str, limit: int) -> list[str]:
     return [run["headSha"] for run in json.loads(out)]
 
 
+def repository_root() -> str:
+    """Where a pathspec is relative to. The gate runs from `scripts/`, where `uv run` finds its lock, and git
+    resolves `modules/workbench` against the working directory: on 2 September 2026 every deploy of f5a78b2
+    reported "nothing changed" and skipped, because it was looking for `scripts/modules/workbench`."""
+    return subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"], check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
 def _is_ancestor(base: str, sha: str) -> bool:
-    return (
-        subprocess.run(["git", "merge-base", "--is-ancestor", base, sha], check=False).returncode
-        == 0
-    )
+    command = ["git", "merge-base", "--is-ancestor", base, sha]
+    return subprocess.run(command, check=False, cwd=repository_root()).returncode == 0
 
 
 def _changed(base: str, sha: str, paths: Sequence[str]) -> bool:
     # `--quiet` exits 1 when there is a difference — that is the answer, not a failure.
-    return (
-        subprocess.run(["git", "diff", "--quiet", base, sha, "--", *paths], check=False).returncode
-        == 1
-    )
+    command = ["git", "diff", "--quiet", base, sha, "--", *paths]
+    return subprocess.run(command, check=False, cwd=repository_root()).returncode == 1
 
 
 def main(argv: Sequence[str] | None = None) -> int:
