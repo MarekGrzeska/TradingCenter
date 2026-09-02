@@ -11,6 +11,13 @@ resource "azurerm_postgresql_flexible_server" "main" {
 
   # Covered by the free-tier grant for the first 12 months, and that grant is 750 hours of *one* B1ms — which is
   # exactly why there is one server for every database rather than one each.
+  #
+  # When it ends, and what then (P9, 2 September 2026). The 12 months run from the account's sign-up, which the
+  # subscription no longer names (`quotaId` reads PayAsYouGo since the upgrade) and the CLI cannot read; this server
+  # was created 2026-08-09, so the grant ends **no later than 2026-08-09 + 12 months** — the exact day is in the
+  # portal under the subscription's free services, and is the operator's to write here. After it: B1ms stays.
+  # List price for one B1ms with 32 GB and 7 days of backups is on the order of USD 15–20 a month; a second server,
+  # or B2s, is not a decision this date makes — `plan_memory` and the pool budget (`test_pool_budget.py`) are.
   sku_name   = "B_Standard_B1ms"
   storage_mb = 32768
 
