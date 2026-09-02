@@ -241,7 +241,7 @@ def _check_trigger_tool(tool_name: str, *, announced: AnnouncedSnapshot) -> None
         else None
     )
     try:
-        check_trigger_tool(tool_name, announced_tools=names)
+        check_trigger_tool(tool_name, announced_tools=names, unconfigured=announced.unconfigured)
     except DefinitionRefused as err:
         raise HTTPException(422, detail=str(err)) from err
 

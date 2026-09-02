@@ -371,6 +371,10 @@ def _walk(payload: Any, field_path: str) -> Any:
     return current
 
 
+def _url_setting(label: str) -> str:
+    return f"{label.replace('-', '_').upper()}_URL"
+
+
 async def _server_announcing(
     servers: list[ToolServer], tool_name: str
 ) -> ToolServer | None:
@@ -391,12 +395,11 @@ async def _evaluate_condition(
 ) -> tuple[bool | None, str | None]:
     """`(result, unavailable_reason)` — `result` is `None` exactly when the reason is set. All three
     silences are one fact from a trigger's seat: it did not learn what the market is doing."""
+    if not tool_registry.remote():
+        # Derived from the registry, not listed: a hand-kept list here named two servers on the day there were five.
+        unset = ", ".join(_url_setting(label) for label in tool_registry.unconfigured())
+        return None, f"no tool server is configured (none of {unset} is set), so the condition could not be read"
     configured = tool_registry.configured()
-    if not configured:
-        return None, (
-            "no tool server is configured (neither MARKET_MCP_URL nor TRADING_MCP_URL "
-            "is set), so the condition could not be read"
-        )
 
     arguments = trigger["arguments"]
     if isinstance(arguments, str):

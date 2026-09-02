@@ -515,6 +515,12 @@ resource "azurerm_linux_web_app" "workbench" {
     TELEGRAM_MCP_URL   = "https://${local.telegram_gateway_hostname}"
     TELEGRAM_MCP_SCOPE = "${local.telegram_gateway_api_uri}/.default"
 
+    # The sixth, and the one the teams' clock reads: `pending_setups` is the number a trigger wakes a team on. The
+    # other half of this pairing — the workbench in strategy's `allowed_applications` and TOOL_CALLER_APPLICATION_IDS —
+    # has stood since `the-screen-is-mostly-refusals`; this pair is what was missing. Same rollback: clear and restart.
+    STRATEGY_MCP_URL   = "https://${local.strategy_hostname}"
+    STRATEGY_MCP_SCOPE = "${local.strategy_api_uri}/.default"
+
     # The teams surface's own clock, in this app's `lifespan` rather than a timer calling in, which would need its own
     # registration. **The one setting here whose value is a decision**: config.py defaults it on, this states it.
     SCHEDULER_ENABLED = "true"

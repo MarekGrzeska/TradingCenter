@@ -217,6 +217,7 @@ async def test_announced_snapshot_says_which_servers_have_no_address() -> None:
         "market-mcp",
         "polymarket-mcp",
         "social-mcp",
+        "strategy-mcp",
         "telegram-mcp",
         "trading-mcp",
     )

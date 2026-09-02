@@ -77,6 +77,7 @@ def test_from_settings_builds_the_servers_that_are_on_a_network() -> None:
         "polymarket-mcp",
         "social-mcp",
         "telegram-mcp",
+        "strategy-mcp",
     ]
 
 
@@ -92,6 +93,7 @@ def test_a_local_source_is_appended_to_the_servers_rather_than_replacing_one() -
         "polymarket-mcp",
         "social-mcp",
         "telegram-mcp",
+        "strategy-mcp",
         "team tools",
     ]
 

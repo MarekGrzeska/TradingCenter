@@ -72,7 +72,7 @@ prints the reason for each rather than repeating it here. In short: `market-data
 to the gateway as it starts; `trading-mcp` asks the gateway whether it is bound to the demo
 account and refuses to open a port if it is not; the three archives after it answer to their
 own upstreams and wait on nothing above them; `strategy` reads market-data's REST; the
-`workbench` reads five tool lists on the first turn that wants one; the front ends read the
+`workbench` reads six tool lists on the first turn that wants one; the front ends read the
 back ends. Starting anything early fills the console with retries, or — in the
 conversation's case — quietly produces a turn answered without tools, which is worse because
 nothing reports it. Each step waits for the one before it to actually answer. Ctrl+C stops
@@ -81,10 +81,11 @@ the services.
 The chain used to be shorter, and both directions are real: `teams` and `teams-mcp` became
 the workbench, taking three arrows out, and five modules have been added since.
 
-The `workbench` reads five tool-server settings, and the *absence* of each is a working
+The `workbench` reads six tool-server settings, and the *absence* of each is a working
 configuration rather than a mistake: `MARKET_MCP_URL` for the archive's tools,
 `TRADING_MCP_URL` for the ones that place orders, `POLYMARKET_MCP_URL`, `SOCIAL_MCP_URL`
-and `TELEGRAM_MCP_URL` for the other three. `.env.example` has all five, and the scripts say
+and `TELEGRAM_MCP_URL` for the next three, and `STRATEGY_MCP_URL` for the one a trigger reads
+to wake a team. `.env.example` has all six, and the scripts say
 so at startup if an older `.env` does not — including when it still carries a setting this
 merge stopped reading, such as `TEAMS_MCP_URL`. The consequence of each absence differs,
 which is why the messages do: the conversation without a tool server's tools answers from the

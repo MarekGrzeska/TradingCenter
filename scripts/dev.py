@@ -227,7 +227,7 @@ SERVICES: tuple[Service, ...] = (
             "Last among the back ends: nothing else calls it, so nothing waits on it. The "
             "conversation and the teams catalogue are one process here — 8050 has belonged "
             "to nobody since `agent-and-teams-one-workbench`, and 8070 stopped being "
-            "nobody's when polymarket-data claimed it. It calls five tool servers now, "
+            "nobody's when polymarket-data claimed it. It calls six tool servers now, "
             "and each tool list is read on the first turn that wants one, so a server "
             "still coming up means a turn answered without those tools rather than an "
             "error anyone would notice."
@@ -518,6 +518,15 @@ ADVISORIES: tuple[tuple[str, str, str, str], ...] = (
             "refuses to run"
         ),
         "8100",
+    ),
+    (
+        "workbench",
+        "STRATEGY_MCP_URL",
+        (
+            "no trigger can read what a strategy decided, so no setup wakes a team, and "
+            "a team assigning those tools refuses to run"
+        ),
+        "8080",
     ),
 )
 

@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from typing import Any
 
 import asyncpg
 import pytest
@@ -42,6 +43,20 @@ def _register_value_tool(mcp: FastMCP, box: list[float]) -> None:
         return _ValueOut(value=box[0])
 
 
+class _PendingOut(BaseModel):
+    strategy_id: str
+    pending: int
+
+
+def _register_pending_setups(mcp: FastMCP, box: list[int]) -> None:
+    """The shape of the strategy platform's own tool, with the number moved by hand the way a
+    recorded decision would move it."""
+
+    @mcp.tool(name="pending_setups", description="How many setups a strategy is standing on.")
+    def pending_setups(strategy_id: str, window_hours: int = 24) -> _PendingOut:
+        return _PendingOut(strategy_id=strategy_id, pending=box[0])
+
+
 def _register_refusing_tool(mcp: FastMCP) -> None:
     @mcp.tool(name="always_refuses", description="Always refuses, for testing.")
     def always_refuses() -> str:
@@ -71,6 +86,7 @@ async def _trigger(
     comparison: str = "gt",
     cooldown_seconds: int = 900,
     tool_name: str = "read_value",
+    arguments: dict[str, Any] | None = None,
     field_path: str = "value",
 ) -> asyncpg.Record:
     async with pool.acquire() as conn:
@@ -81,7 +97,7 @@ async def _trigger(
             revision_mode="pinned",
             pinned_revision_id=revision_id,
             tool_name=tool_name,
-            arguments={},
+            arguments=arguments or {},
             field_path=field_path,
             comparison=comparison,
             threshold=Decimal(threshold),
@@ -167,6 +183,40 @@ async def test_a_condition_crossing_the_threshold_fires_exactly_once(pool: async
         await clock.tick()
 
         assert len(await _fires(pool, trigger_id=trigger["id"])) == 1
+
+
+async def test_a_setup_counted_by_the_strategy_platform_wakes_the_team_once(pool: asyncpg.Pool) -> None:
+    """specs/teams-triggers, "Decyzja platformy strategii jest źródłem warunku": the sixth server is
+    read the same road as the first, so what differs from the test above is which setting carries
+    the address and which name the trigger calls."""
+    box = [0]
+    async with serving(build=lambda mcp: _register_pending_setups(mcp, box)) as url:
+        settings = settings_for(None, strategy_mcp_url=url)
+        team_id, revision_id = await _team_and_revision(pool)
+        trigger = await _trigger(
+            pool,
+            team_id=team_id,
+            revision_id=revision_id,
+            tool_name="pending_setups",
+            arguments={"strategy_id": "baseline_ma_cross"},
+            field_path="pending",
+            comparison="gte",
+            threshold="1",
+        )
+        clock = _clock(pool, provider=ScriptedProvider(default=says("a setup is standing")), settings=settings)
+
+        await clock.tick()
+        assert await _fires(pool, trigger_id=trigger["id"]) == []
+        async with pool.acquire() as conn:
+            assert await conn.fetchval("SELECT count(*) FROM usage") == 0
+
+        box[0] = 1
+        await _make_due_again(pool, trigger["id"])
+        await asyncio.gather(*await clock.tick())
+
+    fires = await _fires(pool, trigger_id=trigger["id"])
+    assert [fire["outcome"] for fire in fires] == ["started"]
+    assert fires[0]["run_id"] is not None
 
 
 async def test_a_flapping_condition_within_cooldown_is_suppressed(pool: asyncpg.Pool) -> None:

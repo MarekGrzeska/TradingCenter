@@ -83,7 +83,7 @@ def _every_assigned_tool_is_announced(
                 f"agent {agent.key!r} is assigned tool(s) {unknown}, and "
                 f"{' and '.join(announced.unconfigured)} "
                 f"{'has' if len(announced.unconfigured) == 1 else 'have'} no address "
-                f"configured to check them against — set {_url_settings(announced)}, "
+                f"configured to check them against — set {_url_settings(announced.unconfigured)}, "
                 "or assign only tools this module announces "
                 f"({sorted(known)})"
             )
@@ -95,21 +95,22 @@ def _every_assigned_tool_is_announced(
         )
 
 
-def _url_settings(announced: AnnouncedSnapshot) -> str:
+def _url_settings(unconfigured: Collection[str]) -> str:
     """The settings the operator has to fill, derived from the labels rather than listed. A hand-kept list
     here named two servers on the day there were three, and it would have gone on naming two."""
-    return " and/or ".join(
-        f"{label.replace('-', '_').upper()}_URL" for label in announced.unconfigured
-    )
+    return " and/or ".join(f"{label.replace('-', '_').upper()}_URL" for label in unconfigured)
 
 
-def check_trigger_tool(tool_name: str, *, announced_tools: Collection[str] | None) -> None:
+def check_trigger_tool(
+    tool_name: str, *, announced_tools: Collection[str] | None, unconfigured: Collection[str] = ()
+) -> None:
     """The same shape of check `_every_assigned_tool_is_announced` runs for a team's own agents, run instead
-    for the one tool a trigger's condition calls."""
+    for the one tool a trigger's condition calls. `unconfigured` is what the refusal tells the operator to set."""
     if announced_tools is None:
         raise DefinitionRefused(
             f"trigger names tool {tool_name!r}, but this module has no tool server to "
-            "check it against — configure MARKET_MCP_URL, or do not save this trigger"
+            f"check it against — set {_url_settings(unconfigured) or 'a tool server address'}, "
+            "or do not save this trigger"
         )
     known = set(announced_tools)
     if tool_name not in known:
