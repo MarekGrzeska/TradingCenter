@@ -62,8 +62,9 @@ def main() -> int:
 
     # The console this is read on is a Windows one, whose default codepage cannot encode the
     # arrow below. Without this the script dies on its own output.
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if reconfigure is not None:
+        reconfigure(encoding="utf-8")
 
     by_name: dict[str, dict[str, pathlib.Path]] = defaultdict(dict)
     for label, package in MODULES.items():

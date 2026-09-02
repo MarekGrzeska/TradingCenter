@@ -9,8 +9,6 @@ import pathlib
 import subprocess
 import sys
 
-import pytest
-
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 SCRIPT = REPO_ROOT / "scripts" / "measure-duplication.py"
 
@@ -65,15 +63,16 @@ def test_the_list_names_nothing_that_is_gone() -> None:
     assert not stale, f"measure-duplication.py names {', '.join(stale)}, which no longer exists."
 
 
-@pytest.mark.parametrize("threshold", [70.0])
-def test_the_script_runs_and_reports(threshold: float) -> None:
-    """End to end, because the two lists above can both be right while the run itself is broken."""
+def test_the_script_runs_and_reports() -> None:
+    """End to end, because the two lists above can both be right while the run itself is broken.
+    It has been: the arrow in the output killed the script on a Windows console."""
     result = subprocess.run(
-        [sys.executable, str(SCRIPT), "--threshold", str(threshold)],
+        [sys.executable, str(SCRIPT), "--threshold", "70"],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
         encoding="utf-8",
+        check=False,
     )
     assert result.returncode == 0, result.stderr
     assert "pair(s) at or above" in result.stdout
