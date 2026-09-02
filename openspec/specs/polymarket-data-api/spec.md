@@ -4,38 +4,6 @@
 Kontrakt REST, którym terminal rozmawia z modułem: co jest obserwowane, jak to zmienić, jakie są
 ceny, jak wyglądała historia i jak zmieniła się w oknach — oraz to, że kasowanie danych jest tutaj.
 ## Requirements
-### Requirement: Obserwacje są zarządzalne przez kontrakt
-
-Kontrakt MUST pozwalać odczytać listę obserwacji, objąć wydarzenie obserwacją i zakończyć
-obserwację. Wskazanie wydarzenia MUST przyjmować zarówno adres strony dostawcy, jak i sam
-identyfikator wydarzenia, i MAY nieść grupę, do której wydarzenie ma trafić.
-
-Objęcie obserwacją MUST być niepodzielne: albo powstaje obserwacja wraz z całą strukturą rynków
-i wyników, albo nie powstaje nic. Wydarzenie już obserwowane MUST NOT tworzyć drugiej obserwacji —
-powtórzone żądanie MAY zaktualizować grupę i MUST powiedzieć, że obserwacja już trwała.
-
-#### Scenario: Objęcie obserwacją po adresie
-
-- **WHEN** operator wskazuje adres strony wydarzenia
-- **THEN** powstaje obserwacja wraz z rynkami i wynikami tego wydarzenia
-- **AND** odpowiedź niesie to, co zostało zapisane
-
-#### Scenario: Wydarzenie już obserwowane
-
-- **WHEN** operator wskazuje wydarzenie, które jest już obserwowane
-- **THEN** nie powstaje druga obserwacja
-- **AND** odpowiedź stwierdza, że obserwacja już trwała
-
-#### Scenario: Zakończenie obserwacji
-
-- **WHEN** operator kończy obserwację wydarzenia
-- **THEN** próbkowanie ustaje
-- **AND** historia tego wydarzenia pozostaje odczytywalna
-
-#### Scenario: Zakończenie obserwacji, której nie ma
-
-- **WHEN** operator kończy obserwację wydarzenia, które nie jest obserwowane
-- **THEN** odpowiedź nazywa to wprost, zamiast zgłaszać awarię
 
 ### Requirement: Grupy są zarządzalne przez kontrakt
 
@@ -111,13 +79,16 @@ moment, z którego faktycznie pochodzi.
 
 ### Requirement: Kasowanie danych jest czynnością kontraktu, a nie narzędzia
 
-Kasowanie zebranej historii MUST być osiągalne wyłącznie przez kontrakt REST i MUST być odrębną
-czynnością od zakończenia obserwacji. Żądanie MUST wskazywać, czego dotyczy, i MUST NOT być
-skutkiem ubocznym niczego innego.
+Kasowanie zebranej historii MUST być osiągalne wyłącznie przez kontrakt REST. Żądanie MUST
+wskazywać, czego dotyczy, i MUST NOT być skutkiem ubocznym niczego innego. To samo MUST
+obowiązywać usunięcie obserwacji w całości — wraz z wydarzeniem, jego rynkami, wynikami
+i wszystkim, co dla niego zebrano.
 
 Skasowanie MUST usunąć próbki i zapis zebranego zakresu razem, w jednej niepodzielnej operacji —
 zakres uchodzący za zebrany po usunięciu próbek jest wiążący dla planowania i sprawi, że
-uzupełnianie już tam nie wróci.
+uzupełnianie już tam nie wróci. Usunięcie obserwacji MUST być niepodzielne w tym samym sensie:
+obserwacja bez swojej historii i historia bez swojej obserwacji są oba stanem, którego nikt nie
+zamawiał.
 
 #### Scenario: Operator kasuje historię wydarzenia
 
@@ -152,3 +123,39 @@ było niepoprawne. Konsument MUST móc rozpoznać, czy ma ponowić, poprawić ż
 - **THEN** odpowiedź nazywa dostawcę jako przyczynę
 - **AND** żadna niekompletna obserwacja nie zostaje zapisana
 
+### Requirement: Obserwacje zakłada się i usuwa przez kontrakt
+
+Kontrakt MUST pozwalać odczytać listę obserwacji, objąć wydarzenie obserwacją i usunąć
+obserwację. Wskazanie wydarzenia MUST przyjmować zarówno adres strony dostawcy, jak i sam
+identyfikator wydarzenia, i MAY nieść grupę, do której wydarzenie ma trafić.
+
+Objęcie obserwacją MUST być niepodzielne: albo powstaje obserwacja wraz z całą strukturą rynków
+i wyników, albo nie powstaje nic. Wydarzenie już obserwowane MUST NOT tworzyć drugiej obserwacji —
+powtórzone żądanie MAY zaktualizować grupę i MUST powiedzieć, że obserwacja już trwała.
+
+**Zatrzymanie obserwacji bez usunięcia jej MUST NOT być czynnością kontraktu.** Obserwacja albo
+jest zbierana, albo jej nie ma: trzeci stan to miejsce na liście, które nic nie robi, a jego
+jedynym producentem było żądanie istniejące po to, żeby je wytwarzać.
+
+#### Scenario: Objęcie obserwacją po adresie
+
+- **WHEN** operator wskazuje adres strony wydarzenia
+- **THEN** powstaje obserwacja wraz z rynkami i wynikami tego wydarzenia
+- **AND** odpowiedź niesie to, co zostało zapisane
+
+#### Scenario: Wydarzenie objęte obserwacją po raz drugi
+
+- **WHEN** operator wskazuje wydarzenie, które jest już obserwowane
+- **THEN** nie powstaje druga obserwacja
+- **AND** odpowiedź stwierdza, że obserwacja już trwała
+
+#### Scenario: Usunięcie obserwacji przez kontrakt
+
+- **WHEN** operator usuwa obserwację wydarzenia
+- **THEN** wydarzenie znika z listy obserwacji
+- **AND** nie pozostaje po nim ani jedna próbka ani jeden zapis zebranego zakresu
+
+#### Scenario: Usunięcie obserwacji, której moduł nie prowadzi
+
+- **WHEN** operator usuwa obserwację wydarzenia, którego moduł nie obserwuje
+- **THEN** odpowiedź nazywa to wprost, zamiast zgłaszać awarię

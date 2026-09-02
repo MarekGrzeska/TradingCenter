@@ -25,17 +25,17 @@ package cannot give it, the change is wrong, not the rule.
 | `modules/market-data` | the candle archive and its own indicators. Owns the PostgreSQL. Two surfaces: the REST contract, and eleven read-only MCP tools at `/mcp` — reduced for a model, no tool writes. |
 | `modules/workbench` | the operator's conversation with a model **and** the teams they compose — one process, two surfaces, two schemas (`agent`, `teams`), two OpenAI keys, two model catalogues. |
 | `modules/trading-mcp` | MCP tools over the gateway's demo account. Network transport only, one named caller (the workbench). Demo checked against the gateway, not against a setting. |
-| `modules/polymarket-data` | the prediction-market archive. Owns its PostgreSQL, the only door to Polymarket. Two surfaces like market-data — but two of its tools **write**, and both only *add* to the list of observations; an observation is collected or removed with all its history, and removing is REST-only. |
-| `modules/social-data` | the post archive: what was said, when, and what a model made of it. Owns its PostgreSQL, the door to Truth Social. Two surfaces, and **nothing on either writes** — the reading is stamped with its model and overwritten, never versioned, and there is no backfill. |
-| `modules/strategy` | the strategy platform. A strategy is a catalogue entry — declared facts, parameters, one pure `evaluate` — and the entry is code in the image **or** an immutable revision the operator wrote. Owns its PostgreSQL, reads market-data's REST, and **never touches an account**: it decides, teams execute. |
+| `modules/polymarket-data` | the prediction-market archive. Owns its PostgreSQL, the only door to Polymarket. Two surfaces like market-data — but two of its tools **write**, and both only *add*; an observation is collected or removed with all its history, and removing is REST-only. |
+| `modules/social-data` | the post archive: what was said, when, and what a model made of it. Owns its PostgreSQL, the door to Truth Social. Two surfaces, **nothing on either writes** — the reading is stamped with its model and overwritten, never versioned, and there is no backfill. |
+| `modules/strategy` | the strategy platform. A strategy is a catalogue entry — declared facts, parameters, one pure `evaluate` — code in the image **or** an immutable revision the operator wrote. Owns its PostgreSQL, reads market-data's REST, and **never touches an account**: it decides, teams execute. |
 | `modules/terminal` | React+TS · the operator's screen. Consumes the others, publishes nothing — a consumer, not a peer. Call it the **terminal**, never a "console" or "dashboard". |
-| `modules/pocket` | React+TS · the archive on a phone, and a chat with the workbench beside it — mobile-first, two audiences, no MCP of its own. A second consumer, sharing the terminal's generated contract and none of its code. |
+| `modules/pocket` | React+TS · the archive on a phone, and a chat with the workbench beside it — mobile-first, no MCP of its own. A second consumer, sharing the terminal's generated contract and none of its code. |
 | `modules/telegram-gateway` | the one door to Telegram. Any module sends a notification; it creates its own bots, and remembers nothing it sent. |
 | `packages/tc-runtime` | database, migrations, schema check, Easy Auth. |
 | `packages/tc-mcp-kit` | speaking MCP: caller-identity middleware, the upstream-refusal helper, the tool-schema slimmer. |
-| `packages/tc-openai` | the streamed OpenAI call, with tools — one file, taken only by the workbench, whose two surfaces were 79,4% identical here. |
+| `packages/tc-openai` | the streamed OpenAI call, with tools — one file, taken only by the workbench, whose two surfaces were 79,4% identical here. Duplication across modules is measured by `scripts/measure-duplication.py`. |
 | `infra/` | Terraform · Azure. `infra/bootstrap/` is a separate root with local state. |
-| `openspec/` · `docs/` | specs (the truth) and proposals · architecture and reference, true today. `docs/archive/` is the road, not the state. A new `docs/*.html` copies `docs/style-template.html`; the written system is `docs/style.md`. |
+| `openspec/` · `docs/` | specs (the truth) and proposals · architecture and reference, true today. `docs/archive/` is the road, not the state. A new `docs/*.html` copies `docs/style-template.html`. |
 
 **Inside `modules/workbench` the rule has a second form**, because two things that were
 modules are packages of one: `agent/` and `teams/` never import each other, `teams_tools/`
@@ -107,19 +107,15 @@ copied before `agent-and-teams-one-workbench` carries `TEAMS_MCP_URL` (read by n
 carries `DATABASE_URL`, `OPENAI_API_KEY` or `MODELS` unprefixed, which refuses to start rather
 than misbehaving. `dev.py` says all of it at startup.
 
-**`MARKET_MCP_URL` is the setting whose *absence* is a working configuration**, not a mistake:
-without it the conversation has no archive tools, and a team whose agents were *assigned* tools
-refuses to run rather than answer without them. `TRADING_MCP_URL` is the same shape for the
-account, checked independently — and it is the one that reads least like a setting, because the
-operator asks about their positions and the agent says it cannot see them. `POLYMARKET_MCP_URL`
-is the third of the shape, and the only one whose tools can *write*: three of its nine change the
-list of observations, and none of the nine deletes anything. `SOCIAL_MCP_URL` is the fourth, and
-its four tools only read. `TELEGRAM_MCP_URL` is the fifth and the one that leaves the system: its
-two tools send a message and list who can be sent to, and creating a bot or binding a destination
-stays REST-only, out of any conversation's reach. `social-data` and `strategy` reach that same
-gateway over its REST contract instead, each with its own `TELEGRAM_GATEWAY_URL` / `_SCOPE` /
-`ALERT_DESTINATION` — all three or none, and none is a module that collects or decides as usual
-and says nothing.
+**The five `*_MCP_URL` settings share one shape: the *absence* of each is a working
+configuration**, not a mistake. Without one, the conversation simply has no tools from that
+server — while a team whose agents were *assigned* those tools refuses to run rather than answer
+without them, and that asymmetry is the whole trap. Which server each names, and what its tools
+may do, is the module table above; `TRADING_MCP_URL` reads least like a setting, because the
+symptom of its absence is the operator asking about their positions and the agent saying it cannot
+see them. `social-data` and `strategy` reach the Telegram gateway over its REST contract instead,
+each with its own `TELEGRAM_GATEWAY_URL` / `_SCOPE` / `ALERT_DESTINATION` — all three or none, and
+none is a module that collects or decides as usual and says nothing.
 
 **`trading-mcp` will not start on a wish.** `CAPITAL_GATEWAY_API_KEY` must be the gateway's own
 `GATEWAY_API_KEY` — the gateway checks that header on every caller, loopback included — and it
@@ -260,29 +256,27 @@ repository on 26 August 2026, so a long comment is a regression now, not a lefto
 ## CI
 
 `checks.yml` runs one job per module on every PR and push to `main`, and **only for the modules the
-diff can have broken** — a `changes` job works that out first. `live` tests stay out. Two jobs are
-not a module: `scripts` and `infra`.
+diff can have broken** — a `changes` job works that out first. `live` tests stay out. Three jobs are
+not a module: `scripts`, `infra` and `openspec`.
 
-Three pairings pull in a job you would not expect, and each is a real check: `market_data/contract.py`
+Two pairings pull in a job you would not expect, and each is a real check: `market_data/contract.py`
 **or anything under `modules/workbench/`** runs the terminal's job, because `contract:check` and the
 terminal's hand-written DTOs are the checks for those seams; anything under `capital-gateway` runs
-trading-mcp's, which holds a committed snapshot of the gateway's whole OpenAPI document. The whole
-module rather than either `contract.py`, because a document is built from routes as well as models.
+trading-mcp's, which holds a committed snapshot of the gateway's whole OpenAPI document — the whole
+module, because a document is built from routes as well as models.
 
 **There is no branch protection on this repository** — a private repo on the free plan cannot have
 it — so a skipped job blocks nothing.
 
-Four `deploy-*.yml` workflows deploy on pushes to `main`, each ~20 lines calling
+Ten `deploy-*.yml` workflows deploy on pushes to `main` — eight of ~20 lines calling
 `_deploy-app-service.yml` and ending in `scripts/deploy_probe.py`, which asks whether this commit's
 image is the one App Service will serve *and* whether the process inside came up — the second being
-the one that used to go unasked. `capital-gateway` went without that probe until
-20 August 2026, on a premise nobody had checked: that it admits only the service plan's own
-outbound addresses. **No App Service in this resource group carries an address restriction at
-all** — `az webapp config access-restriction show` answers `Allow` / "Allow all" for every one of
-the four, and the gateway's `/` answered a laptop on the first try. What holds its door is its own
-shared key, checked in `RequireGatewayKey`; the Easy Auth in front of it validates nothing, because
-`AllowAnonymous` passes a bearer token through untouched. It probes `/` for `"capital-gateway"`
-now, like every other module. `terraform.yml` plans on
+the one that used to go unasked; two more deploy the front ends to Static Web Apps.
+**No App Service in this resource group carries an address restriction at all** — measured
+20 August 2026 against the opposite premise, which is why `capital-gateway` went unprobed until
+then. What holds its door is its own shared key, checked in `RequireGatewayKey`; the Easy Auth in
+front of it validates nothing, because `AllowAnonymous` passes a bearer token through untouched.
+`terraform.yml` plans on
 infra PRs; `terraform-apply.yml` is a manual dispatch that applies and refuses any plan touching
 `azuread_*`, since CI holds `Application.Read.All` and not write.
 

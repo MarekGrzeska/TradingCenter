@@ -1,0 +1,558 @@
+<title>Przegląd TradingCenter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  h3.sub {
+    font-family: var(--head); font-weight: 700; font-size: 21px; letter-spacing: -0.02em;
+    color: var(--ink); margin: 34px 0 10px;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+  ul { max-width: 68ch; padding-left: 22px; margin: 0 0 16px; }
+  li { margin-bottom: 6px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0 0 8px; font-size: 15px; max-width: 72ch; }
+  .fail p:last-child { margin-bottom: 0; }
+  .fail .m { font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); }
+
+  .phase { display: grid; grid-template-columns: 96px 1fr; gap: 0 22px; padding: 22px 0; border-top: 1px solid var(--line); }
+  .phase:last-child { border-bottom: 1px solid var(--line); }
+  .phase .no { font-family: var(--head); font-weight: 800; font-size: 34px; line-height: 1; letter-spacing: -0.04em; color: var(--navy); }
+  .phase .no small { display: block; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; color: var(--ink-3); margin-top: 8px; font-weight: 400; text-transform: uppercase; }
+  .phase h3 { font-family: var(--head); font-weight: 700; font-size: 21px; letter-spacing: -0.02em; color: var(--ink); margin: 0 0 8px; }
+  .phase p { font-size: 15.5px; }
+  .phase .done { font-family: var(--mono); font-size: 12.5px; color: var(--green); margin-top: 6px; }
+  @media (max-width: 620px) { .phase { grid-template-columns: 1fr; } }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">TradingCenter · przegląd architektury</span>
+    <h1>Dziesięć modułów, jeden pomiar</h1>
+    <p class="lede">Dwanaście dni po „następnych cięciach” system podwoił liczbę modułów. Ten dokument mierzy, <b>co z tego jest architekturą, a co jest kopią</b> — i układa z tego plan, którego każda faza ma liczbę na wejściu i na wyjściu.</p>
+    <div class="strip">
+      <span>TradingCenter / architektura</span>
+      <span>1 września 2026 · <b>main @ faa550c</b></span>
+      <span>środowisko <b>demo</b></span>
+      <span>poprzednik: <b>archive/nastepne-ciecia.html</b> (20.08)</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">10</div><div class="l">modułów · 8 App Service, 2 Static Web Apps</div></div>
+      <div class="cell"><div class="v">70 tys.</div><div class="l">linii produkcyjnych · 64 tys. linii testów (0,92)</div></div>
+      <div class="cell"><div class="v">3 034</div><div class="l">testów Pythona zbieranych · plus 78 plików Vitest</div></div>
+      <div class="cell"><div class="v">847</div><div class="l">commitów w 26 dni · 66 zmian OpenSpec w archiwum</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Mapa</div>
+      <h2>Co działa dziś i kto z kim rozmawia</h2>
+      <p class="intro">Jedno repozytorium, dziesięć procesów, żadnego wspólnego runtime. Każda strzałka poniżej jest opublikowanym kontraktem — REST, WebSocket albo MCP — i każda ma po stronie wołającego tożsamość, którą wołany sprawdza sam.</p>
+      <p>Trzy rzeczy warto przeczytać z rysunku, zanim przejdzie się do tabeli. <strong>Workbench</strong> jest jedynym miejscem, gdzie model dostaje narzędzia, i ma dziś pięć serwerów narzędzi. <strong>Telegram-gateway</strong> jest pierwszym modułem, którego skutek jest poza systemem, i ma trzech wołających. <span class="hl">Powierzchnia <code>/mcp</code> modułu <code>strategy</code> ma czterech wołających w specyfikacji i zero w kodzie</span> — workbench nie zna ustawienia, które by ją wskazało.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 1000 470" role="img" aria-label="Mapa dziesięciu modułów TradingCenter: capital-gateway zasila market-data, workbench woła pięć serwerów narzędzi po MCP, strategy czyta market-data po REST, strategy i social-data piszą do telegram-gateway, terminal i pocket czytają wszystko po REST, a strategy /mcp nie ma żadnego wołającego">
+            <defs>
+              <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+              <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#14306b"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif" font-size="13">
+              <!-- external providers, dashed -->
+              <g stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 4" fill="none">
+                <rect x="20" y="16" width="140" height="40"></rect>
+                <rect x="240" y="16" width="140" height="40"></rect>
+                <rect x="440" y="16" width="140" height="40"></rect>
+                <rect x="640" y="16" width="140" height="40"></rect>
+                <rect x="840" y="16" width="140" height="40"></rect>
+              </g>
+              <g fill="currentColor" text-anchor="middle" font-weight="700">
+                <text x="90" y="41">capital.com</text>
+                <text x="310" y="41">polymarket.com</text>
+                <text x="510" y="41">trumpstruth.org</text>
+                <text x="710" y="41">OpenAI ×2</text>
+                <text x="910" y="41">Telegram</text>
+              </g>
+
+              <!-- row: doors -->
+              <g stroke="currentColor" stroke-width="1.4" fill="none">
+                <rect x="20" y="110" width="140" height="52"></rect>
+                <rect x="240" y="110" width="140" height="52"></rect>
+                <rect x="440" y="110" width="140" height="52"></rect>
+                <rect x="840" y="110" width="140" height="52"></rect>
+              </g>
+              <g fill="currentColor" text-anchor="middle">
+                <text x="90" y="132" font-weight="700">capital-gateway</text>
+                <text x="90" y="150" font-size="10.5" font-family="Roboto Mono, monospace" opacity="0.65">8010 · bez bazy</text>
+                <text x="310" y="132" font-weight="700">polymarket-data</text>
+                <text x="310" y="150" font-size="10.5" font-family="Roboto Mono, monospace" opacity="0.65">8070 · REST + /mcp</text>
+                <text x="510" y="132" font-weight="700">social-data</text>
+                <text x="510" y="150" font-size="10.5" font-family="Roboto Mono, monospace" opacity="0.65">8090 · REST + /mcp</text>
+                <text x="910" y="132" font-weight="700">telegram-gateway</text>
+                <text x="910" y="150" font-size="10.5" font-family="Roboto Mono, monospace" opacity="0.65">8100 · REST + /mcp</text>
+              </g>
+              <!-- provider arrows -->
+              <g stroke="currentColor" stroke-width="1.2" marker-end="url(#a1)">
+                <line x1="90" y1="56" x2="90" y2="106"></line>
+                <line x1="310" y1="56" x2="310" y2="106"></line>
+                <line x1="510" y1="56" x2="510" y2="106"></line>
+                <line x1="910" y1="56" x2="910" y2="106"></line>
+              </g>
+              <g font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">
+                <text x="98" y="86">REST + WS · 10 req/s</text>
+                <text x="318" y="86">gamma + clob</text>
+                <text x="518" y="86">feed publiczny</text>
+                <text x="918" y="86">Bot API · MTProto</text>
+              </g>
+
+              <!-- row: the middle -->
+              <g stroke="currentColor" stroke-width="1.4" fill="none">
+                <rect x="20" y="230" width="140" height="52"></rect>
+                <rect x="240" y="230" width="140" height="52"></rect>
+              </g>
+              <rect x="440" y="230" width="140" height="52" fill="none" stroke="#14306b" stroke-width="1.8"></rect>
+              <rect x="640" y="230" width="140" height="52" fill="#14306b" stroke="#14306b" stroke-width="1.4"></rect>
+              <g fill="currentColor" text-anchor="middle">
+                <text x="90" y="252" font-weight="700">market-data</text>
+                <text x="90" y="270" font-size="10.5" font-family="Roboto Mono, monospace" opacity="0.65">8020 · REST + /mcp</text>
+                <text x="310" y="252" font-weight="700">trading-mcp</text>
+                <text x="310" y="270" font-size="10.5" font-family="Roboto Mono, monospace" opacity="0.65">8060 · tylko demo</text>
+                <text x="510" y="252" font-weight="700" fill="#14306b">strategy</text>
+                <text x="510" y="270" font-size="10.5" font-family="Roboto Mono, monospace" fill="#14306b">8080 · /mcp: 0 wołających</text>
+                <text x="710" y="252" font-weight="700" fill="#ffffff">workbench</text>
+                <text x="710" y="270" font-size="10.5" font-family="Roboto Mono, monospace" fill="#f2c313">8030 · 5 serwerów narzędzi</text>
+              </g>
+              <!-- gateway -> market-data -->
+              <line x1="90" y1="162" x2="90" y2="226" stroke="currentColor" stroke-width="1.2" marker-end="url(#a1)"></line>
+              <text x="98" y="200" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">HTTP + WS · klucz</text>
+              <!-- trading-mcp -> gateway -->
+              <line x1="310" y1="226" x2="160" y2="140" stroke="currentColor" stroke-width="1.2" marker-end="url(#a1)"></line>
+              <text x="250" y="200" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">REST + klucz · demo?</text>
+              <!-- strategy -> market-data REST -->
+              <line x1="440" y1="256" x2="164" y2="256" stroke="#14306b" stroke-width="1.4" marker-end="url(#a2)"></line>
+              <text x="300" y="300" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#14306b">REST · tożsamość zarządzana · bez snapshotu</text>
+              <!-- OpenAI -> workbench -->
+              <line x1="710" y1="56" x2="710" y2="226" stroke="currentColor" stroke-width="1.2" marker-end="url(#a1)"></line>
+              <text x="718" y="200" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">2 klucze</text>
+              <!-- workbench -> tool servers (MCP) -->
+              <g stroke="#14306b" stroke-width="1.4" fill="none" marker-end="url(#a2)">
+                <path d="M 640 246 C 600 246, 560 200, 160 230"></path>
+                <path d="M 640 262 C 560 300, 420 290, 384 262"></path>
+                <path d="M 660 230 C 640 190, 420 180, 380 156"></path>
+                <path d="M 690 230 C 680 200, 600 190, 580 150"></path>
+                <path d="M 780 246 L 836 150"></path>
+              </g>
+              <rect x="560" y="176" width="150" height="18" fill="#f2c313"></rect>
+              <text x="635" y="189" text-anchor="middle" font-size="10" font-weight="700" font-family="Roboto Mono, monospace" fill="#14306b" letter-spacing="0.08em">MCP · 5 × _MCP_URL</text>
+              <!-- strategy / social -> telegram REST -->
+              <g stroke="currentColor" stroke-width="1.2" fill="none" marker-end="url(#a1)">
+                <path d="M 580 240 C 700 300, 820 240, 900 166"></path>
+                <path d="M 580 130 L 836 130"></path>
+              </g>
+              <text x="708" y="122" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">REST · post nad progiem</text>
+              <text x="790" y="292" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">REST · decyzja, która się zmieniła</text>
+
+              <!-- row: consumers -->
+              <g stroke="currentColor" stroke-width="1.4" fill="none">
+                <rect x="240" y="392" width="200" height="52"></rect>
+                <rect x="560" y="392" width="200" height="52"></rect>
+              </g>
+              <g fill="currentColor" text-anchor="middle">
+                <text x="340" y="414" font-weight="700">terminal</text>
+                <text x="340" y="432" font-size="10.5" font-family="Roboto Mono, monospace" opacity="0.65">5173 · SWA · 6 źródeł</text>
+                <text x="660" y="414" font-weight="700">pocket</text>
+                <text x="660" y="432" font-size="10.5" font-family="Roboto Mono, monospace" opacity="0.65">5174 · SWA · 3 źródła</text>
+              </g>
+              <line x1="20" y1="340" x2="980" y2="340" stroke="currentColor" stroke-width="1" stroke-dasharray="2 5" opacity="0.5"></line>
+              <text x="500" y="332" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">REST · token operatora · jedno Entra „audience” na moduł</text>
+              <g stroke="currentColor" stroke-width="1.2" fill="none" marker-start="url(#a1)">
+                <line x1="90" y1="286" x2="300" y2="388"></line>
+                <line x1="510" y1="286" x2="360" y2="388"></line>
+                <line x1="710" y1="286" x2="400" y2="388"></line>
+                <line x1="710" y1="286" x2="640" y2="388"></line>
+                <line x1="510" y1="166" x2="700" y2="388"></line>
+              </g>
+              <text x="24" y="460" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">terminal czyta też polymarket-data i capital-gateway (katalog instrumentów); pocket — polymarket-data i social-data. Pominięte, żeby rysunek dał się przeczytać.</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — stan runtime na 1 września 2026. Granatowe strzałki to krawędzie, o które toczy się ten dokument: pięć serwerów narzędzi workbencha, odczyt archiwum przez <code>strategy</code> bez snapshotu kontraktu, i ramka <code>strategy</code> — jedyny moduł z powierzchnią MCP, której nikt nie woła.</figcaption>
+      </figure>
+
+      <h3 class="sub">Moduł po module</h3>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Moduł</th><th class="n">Port</th><th>Baza</th><th>Powierzchnie</th><th>Kto woła</th><th class="n">Prod / testy</th><th>Telemetria</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>capital-gateway</b></td><td class="n">8010</td><td>żadna</td><td>REST, <code>/ws/stream</code></td><td>market-data, trading-mcp, terminal</td><td class="n">2 448 / 255</td><td><span class="tag ok">tak</span></td></tr>
+            <tr><td><b>market-data</b></td><td class="n">8020</td><td><code>market_data</code></td><td>REST, 11 narzędzi</td><td>terminal, workbench, strategy</td><td class="n">10 914 / 973</td><td><span class="tag ok">tak</span></td></tr>
+            <tr><td><b>workbench</b></td><td class="n">8030</td><td><code>agent</code>, <code>teams</code></td><td>REST strumieniowany; narzędzia zespołów w procesie</td><td>terminal, pocket</td><td class="n">12 728 / 911</td><td><span class="tag att">brak</span></td></tr>
+            <tr><td><b>trading-mcp</b></td><td class="n">8060</td><td>żadna</td><td>MCP, zapis na rachunek</td><td>workbench (jeden)</td><td class="n">933 / 97</td><td><span class="tag att">brak</span></td></tr>
+            <tr><td><b>polymarket-data</b></td><td class="n">8070</td><td><code>polymarket</code></td><td>REST, 9 narzędzi (3 piszą)</td><td>terminal, pocket, workbench</td><td class="n">3 527 / 157</td><td><span class="tag att">brak</span></td></tr>
+            <tr><td><b>strategy</b></td><td class="n">8080</td><td><code>strategy</code></td><td>REST, 4 narzędzia</td><td>terminal · <b>/mcp: nikt</b></td><td class="n">5 620 / 321</td><td><span class="tag att">brak</span></td></tr>
+            <tr><td><b>social-data</b></td><td class="n">8090</td><td><code>social</code></td><td>REST, 4 narzędzia</td><td>terminal, pocket, workbench</td><td class="n">2 492 / 100</td><td><span class="tag att">brak</span></td></tr>
+            <tr><td><b>telegram-gateway</b></td><td class="n">8100</td><td><code>telegram</code></td><td>REST, 2 narzędzia</td><td>workbench, social-data, strategy</td><td class="n">2 567 / 162</td><td><span class="tag att">brak</span></td></tr>
+            <tr><td><b>terminal</b></td><td class="n">5173</td><td>—</td><td>konsument, 5 kontraktów generowanych + 1 ręczny</td><td>przeglądarka</td><td class="n">24 931 / 65 plików</td><td>—</td></tr>
+            <tr><td><b>pocket</b></td><td class="n">5174</td><td>—</td><td>konsument, kontrakty współdzielone z terminalem</td><td>telefon</td><td class="n">3 277 / 13 plików</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px">Do tego trzy pakiety kompilowane w obrazy: <code>tc-runtime</code> (333 linie: pula, blokada migracji, Easy Auth), <code>tc-mcp-kit</code> (160: tożsamość wołającego, odmowa upstreamu, odchudzanie schematów), <code>tc-openai</code> (246: jedno strumieniowane wywołanie z narzędziami, jeden konsument). Razem 739 linii — 1% kodu produkcyjnego — i to jest cały kod, który istnieje raz.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Infrastruktura</div>
+      <h2>Jeden plan, jeden serwer, jeden rachunek</h2>
+      <p class="intro">Azure, Terraform, `apply` wyłącznie z ręki operatora. Osiem aplikacji na jednym planie B3 z jednym workerem, siedem baz logicznych na jednym B1ms, dwa Static Web Apps, jeden Key Vault, jeden Log Analytics.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Warstwa</th><th>Co stoi</th><th>Dlaczego tak</th><th>Co to znaczy przy dziesięciu modułach</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>Obliczenia</b></td><td>1 × App Service Plan <code>B3</code>, <code>worker_count = 1</code>, 8 aplikacji <code>always_on</code></td><td>capital.com liczy 10 req/s na <em>rachunek</em>; drugi worker wydałby ten sam budżet dwa razy</td><td>8 × 150–310 MB w 7 GB; alert pamięci zdjęto 20.08 („wejście do decyzji, nie zdarzenie”), a trzy komentarze w <code>app-service.tf</code> nadal go nazywają</td></tr>
+            <tr><td><b>Dane</b></td><td>1 × PostgreSQL Flexible <code>B_Standard_B1ms</code>, 32 GB, 7 dni kopii, 7 baz, TLS wymuszony, tylko Entra</td><td>darmowy pakiet to 750 h <em>jednego</em> B1ms przez 12 miesięcy</td><td><code>max_connections</code> 35 przeciw sumie pul 64 (§04); pakiet darmowy ma datę końca, której nikt nie zapisał</td></tr>
+            <tr><td><b>Tożsamość</b></td><td>8 × Easy Auth (moduł <code>easy-auth-app</code>), 2 × SP dla front-endów, 10 pre-autoryzacji, 22 listy wołających w <code>app_settings</code></td><td>Easy Auth autoryzuje aplikację, nie trasę — moduł trzyma własny zapis <code>caller_access.py</code></td><td>nowy wołający = apply + restart + wpis w dwóch listach; udokumentowane, nie zautomatyzowane</td></tr>
+            <tr><td><b>Sekrety</b></td><td>Key Vault: klucz Capital, klucz bramki, token GHCR; OIDC dla CI; jeden zapisany sekret — token wdrożeniowy SWA</td><td>SWA nie ma ścieżki OIDC</td><td>plik planu z sekretami trafił do historii gita 19.08; <code>.gitignore</code> naprawiony 31.08, rotacja nieudokumentowana</td></tr>
+            <tr><td><b>Obserwacja</b></td><td>App Insights + LAW (30 dni), <b>3 alerty</b>, <b>1 webtest</b> — wszystkie na market-data lub bazie</td><td>„alerty 9 → 3” z rachunku po refactorze; sześć miało powód, który przestał istnieć</td><td>cztery pętle zbierające w czterech nowszych modułach nie emitują żadnej metryki</td></tr>
+            <tr><td><b>CI</b></td><td><code>checks.yml</code>: 16 jobów filtrowanych diffem; 10 × <code>deploy-*.yml</code> na push do <code>main</code>; <code>terraform.yml</code> plan, apply ręczny</td><td>bez ochrony gałęzi (plan darmowy) — pominięty job nic nie blokuje</td><td>deploy rusza <em>równolegle</em> z checkami, nie po nich; sonda łapie start, nie regresję</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px">Ścieżka wdrożenia jest jedna i dobra: obraz do GHCR → <code>azure/webapps-deploy</code> → <code>scripts/deploy_probe.py</code>, która pyta o dwie rzeczy naraz — czy App Service serwuje ten obraz <em>i</em> czy proces w środku wstał. Migracje wykonuje <code>lifespan</code> modułu pod blokadą doradczą, więc merge do <code>main</code> zostawia produkcję działającą bez kroku operatora. To jest to, co w tym systemie działa najlepiej, i plan poniżej niczego tu nie rusza poza kolejnością.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Mocne strony</div>
+      <h2>Czego nie ruszać</h2>
+      <p>Lista równie ważna jak następna. Każda pozycja ma w repozytorium test albo pomiar, który jej broni — to nie są opinie o kodzie, tylko rzeczy, które ktoś zmierzył i zapisał, dlaczego.</p>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>Decyzje przez pomiar, z zapisaną odmową <span class="tag ok">metoda</span></h3>
+          <p>Sześć precedensów: dwa serwery narzędzi zwinięte, jeden zostawiony z arytmetyką, reguła współdzielenia odwrócona liczbą 959, konsolidacja specyfikacji zmierzona i wycofana, alerty 9 → 3 z powodem per alert. Architektura, w której „optymalizacja” bywa odrzucona, jest architekturą, którą ktoś mierzy.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Granice pilnowane testem, nie zrozumieniem <span class="tag ok">test_layering</span></h3>
+          <p>Warstwowanie workbencha, ścieżka wysyłki w telegram-gateway, brak pliku snapshotu w schemacie bramki, pułap <code>CLAUDE.md</code>, sufit powierzchni narzędzi — każda reguła nośna ma przypadek, który czerwienieje. Reguła bez przypadku, który pada, jest preferencją.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Autoryzacja domykana na „nie” <span class="tag ok">fail-closed</span></h3>
+          <p>Zapis wołający-przeciw-powierzchni w pięciu modułach, tożsamość z <code>azp</code>/<code>appid</code>, nigdy z nagłówka osoby; trasa, której zapis nie nazywa, jest odmówiona. <code>trading-mcp</code> nie otwiera portu, zanim bramka nie potwierdzi demo. Nic tu nie da się wycelować w prawdziwe pieniądze zmienną środowiskową.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Moduł migruje sam, pod własną tożsamością <span class="tag ok">lifespan</span></h3>
+          <p>Siedem blokad doradczych kluczowanych portem, sonda wdrożeniowa pytająca o proces, a nie o płaszczyznę sterowania. Standard „merge zostawia produkcję działającą” jest spełniony przez każdą bazę, którą repozytorium posiada.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Kontrakty mają kopię tam, gdzie HTTP nie opisuje się sam <span class="tag ok">contract:check</span></h3>
+          <p>Pięć wygenerowanych kontraktów w terminalu, snapshot całego OpenAPI bramki w trading-mcp, złoty plik wskaźników, CI wołające job konsumenta przy zmianie producenta. Dryf jest czerwony w PR, nie cichy na produkcji.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Dyscyplina testów z bilansem <span class="tag ok">0,92</span></h3>
+          <p>Osiem reguł „ile testu wystarczy” z listą wyjątków, gdzie chybienie jest cichą korupcją, a nie czerwonym CI. Stosunek 0,92 po dodaniu pięciu modułów — nowe moduły trzymają proporcję, nie rozdmuchują jej.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Nowy moduł ma kształt <span class="tag ok">wzorzec archiwum</span></h3>
+          <p>Cztery moduły z 12 dni — polymarket-data, social-data, strategy, telegram-gateway — powstały w jednym kształcie: własna baza, REST + <code>/mcp</code> w jednym procesie, zapis wołających, <code>runtime.py</code> z kluczem blokady. To jest zaleta i jednocześnie źródło §04: kształt był kopiowany, a nie wyjęty przed czwartą kopią.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Słabe strony</div>
+      <h2>Gdzie system przestał mówić prawdę o sobie</h2>
+      <p class="intro">Dwanaście punktów, każdy z pomiarem. Ułożone od tego, co jest sprzeczne z własną regułą repozytorium, przez to, co grozi produkcji, po to, co kosztuje tylko czytelnika.</p>
+
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Ręczne kopie wróciły, i przekraczają własny próg <span class="tag stop">reguła 1 współdzielenia</span></h3>
+          <p>Warunek dopuszczenia pakietu to ≥ 70% identyczności linia w linię między dwoma modułami. Zmierzone dziś tym samym <code>SequenceMatcher</code>, którym mierzył <code>measure-duplication.py</code>:</p>
+          <p class="m">measure-duplication.py --threshold 70 · <b>40 par, ~3 197 linii istnieje tylko jako kopia</b><br>openapi.py 98,5% (polymarket↔social) · caller_access.py 94,3% (social↔telegram) · mcp_app.py 87,8% ×3<br>runtime.py 85,7% ×3 · app.py 73,5% · plus workbench: routers/models.py 90,0%, provider.py 89,2%, auth.py 86,4%<br>class _ManagedIdentityAuth(httpx.Auth) · <b>7 kopii</b> w 6 modułach</p>
+          <p>To jest ten sam stan, który 18 sierpnia mierzył 959 linii i cztery bugi naprawione w jednej kopii — tym razem w kształcie „modułu archiwum”, skopiowanym cztery razy w dwanaście dni. <span class="hl">Reguła, która została odwrócona, żeby to się nie powtórzyło, nie została zastosowana do żadnego z czterech nowych modułów.</span></p>
+        </div>
+        <div class="fail stop">
+          <h3>Narzędzie pilnujące reguły 1 nie widzi połowy modułów <span class="tag stop">measure-duplication.py</span></h3>
+          <p>Jego słownik <code>MODULES</code> wymienia <code>agent</code>, <code>teams</code>, <code>teams-mcp</code> — trzy katalogi, które nie istnieją — a nie wymienia polymarket-data, social-data, strategy ani telegram-gateway. Pomiar, na którym reguła stoi, od 20 sierpnia mierzy pusty zbiór i wypisuje zero.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Seam „rdzeń decyduje, zespół się spiera” istnieje w README, nie w kodzie <span class="tag stop">strategy → teams</span></h3>
+          <p><code>strategy</code> publikuje cztery narzędzia i nazywa <code>pending_setups</code> „hakiem dla wyzwalaczy workbencha”. Workbench nie ma <code>STRATEGY_MCP_URL</code>, jego wyzwalacze czytają wyłącznie <code>MARKET_MCP_URL</code> i <code>TRADING_MCP_URL</code> (<code>teams/scheduler/clock.py:397</code>), a w katalogach <code>agent/</code>, <code>teams/</code>, <code>workbench/</code> słowo „strategy” nie pada ani razu. Moduł, którego racją bytu jest wybudzić zespół, nie ma jak tego zrobić — jego decyzja dociera dziś tylko na telefon operatora.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Suma pul połączeń przekracza serwer <span class="tag stop">64 &gt; 35</span></h3>
+          <p>market-data, polymarket-data, social-data, strategy i dwie pule workbencha idą z domyślnym <code>max_size=10</code>; telegram-gateway jedyny obniżył do 4 i zapisał dlaczego. Suma maksimów: <b>64</b> przeciw <code>max_connections</code> 35 na B1ms. Dziś to działa, bo <code>min_size=1</code> i ruch jest mały; pierwszy dzień, w którym cztery archiwa wejdą w backfill jednocześnie, skończy się <code>too many connections</code> w module, który akurat był ostatni — i żaden test tego nie łapie, bo budżet nie jest nigdzie zapisany jako liczba.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Cztery pętle bez metryki, trzy alerty na jeden moduł <span class="tag stop">cisza niezauważona</span></h3>
+          <p>Telemetrię emitują tylko capital-gateway i market-data. Próbkowanie polymarket, zbieranie social, pętla strategii i watcher telegram-gateway nie mają ani metryki, ani alertu, ani webtestu. Zmiana <code>a-silent-feed-is-a-broken-feed</code> (24.08) zmierzyła dokładnie ten tryb awarii — pokój strumienia milczący przez 36 godzin — i naprawiła go w jednym module. Runbook <code>kiedy-produkcja-milczy</code> zna tylko <code>alert-candle-age-stale</code>.</p>
+        </div>
+        <div class="fail">
+          <h3>Deploy nie czeka na checki <span class="tag att">kolejność</span></h3>
+          <p>Push do <code>main</code> uruchamia <code>checks</code> i <code>deploy-*</code> w tej samej sekundzie. Sonda dowodzi, że proces wstał — regresji w logice nie widzi. Merge z czerwonym testem jest dziś na produkcji, zanim CI zdąży to powiedzieć; cofnięcie to ręczne <code>az</code> (~40 s) bez slotu. Przy dziesięciu deployach dziennie to statystyka, nie hipoteza.</p>
+        </div>
+        <div class="fail">
+          <h3>Osiem aktywnych zmian OpenSpec, pięć z odhaczonymi zadaniami <span class="tag att">prawda w kolejce</span></h3>
+          <p><code>a-silent-feed-is-a-broken-feed</code> (13/13), <code>a-strategy-can-be-clicked-together</code> (27/27), <code>a-refused-alert-is-tried-again</code> (9/9) czekają na archiwizację; <code>social-data-collects-the-posts</code> ma 52/53 — przez co <code>openspec/specs/</code> zawiera dla modułu na produkcji <b>jedną</b> specyfikację (<code>social-data-alerts</code>) i żadnej dla API, magazynu, zbierania. <code>alerts-that-still-have-a-reason</code> to sam <code>proposal.md</code> z 20.08. „Specs are the truth” — dziś prawda o social-data jest w delcie, której nikt nie scalił.</p>
+        </div>
+        <div class="fail">
+          <h3><code>market-data</code> wzięło pakiet w połowie <span class="tag att">tc-runtime</span></h3>
+          <p>Pięć modułów bierze pulę z <code>tc_runtime.db</code>; market-data trzyma własne <code>db.py</code> (194 linie) z własnym <code>create_pool</code>, <code>Credential</code> i <code>asyncpg_dsn</code>, a z pakietu bierze tylko blokadę. Dwie implementacje tej samej rzeczy w repozytorium, którego reguła mówi „jedna kopia albo żadna”. Powód — 1500 s czekania na blokadę — jest parametrem, nie plikiem.</p>
+        </div>
+        <div class="fail">
+          <h3>Dokumentacja opisuje system sprzed dwóch przeprowadzek <span class="tag att">K1 nie wykonane</span></h3>
+          <p><code>README.md</code> wymieniał pięć modułów z dziesięciu i kolejność startu bez czterech usług. <code>CLAUDE.md</code> mówi „cztery <code>deploy-*.yml</code>” przy dziesięciu — i ma 22 438 z 23 000 znaków pułapu — <b>562 znaki zapasu</b>, gdy jeden moduł kosztuje w nim wiersz tabeli (130–320 znaków), wiersz komend i zdanie o porcie. Jedenasty moduł się zmieści, dwunasty nie. Cięcie K1 z 20.08 zostało wykonane — te 13 plików leży w <code>docs/archive/</code> — ale przeprowadzka, która nastąpiła po nim, zostawiła nowy zestaw: <code>przewodnik-po-projekcie</code> („z lotu ptaka”) zna pięć modułów z dziesięciu, a pięć przewodników modułowych opisuje pięć modułów i nie ma odpowiednika dla czterech najnowszych.</p>
+        </div>
+        <div class="fail">
+          <h3>Jeden kontrakt terminala nadal pisany ręcznie <span class="tag att">agentApi.ts</span></h3>
+          <p>Pięć kontraktów jest generowanych i sprawdzanych w CI; ten do rozmowy (610 linii) jest „hand-written against the module's OpenAPI” z komentarzem, że generator jest podpięty do market-data. Zmiana w <code>agent/contract.py</code> uruchamia job terminala, ale job ten nie ma jak zobaczyć dryfu, bo nie ma pliku, który by się różnił. Bliźniaki <code>teamsApi.ts</code> 850 / <code>agentApi.ts</code> 610 z K3 nadal niezmierzone.</p>
+        </div>
+        <div class="fail">
+          <h3>Jeden klucz statyczny dla czterech wołających <span class="tag att">GATEWAY_API_KEY</span></h3>
+          <p>Bramka nie stoi za żadną listą adresów; drzwi trzyma jeden współdzielony klucz, który ma market-data, trading-mcp, terminal i operator. Rotacja to zmiana w czterech miejscach naraz. <code>architecture.md</code> nazwał lepszy mechanizm — listę aplikacji jak w każdym innym module — i odłożył go „na własną propozycję”. Propozycji nie ma. Do tego rotacja sekretów z planu w historii gita (19.08) nie ma śladu w commitach.</p>
+        </div>
+        <div class="fail">
+          <h3>Cztery pojedyncze punkty, jeden z nich celowy <span class="tag att">SPOF</span></h3>
+          <p>Jeden worker (celowo — budżet 10 req/s), jeden plan, jeden serwer bazy, jeden rachunek demo dla produkcji, testów live i każdego deployu. Trzy ostatnie są konsekwencją darmowego pakietu i są w porządku, dopóki ktoś zapisał, kiedy pakiet się kończy i co się wtedy zmienia. Nikt nie zapisał.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Propozycje</div>
+      <h2>Od największego zwrotu</h2>
+      <p>Każda pozycja ma koszt w dniach i zysk, który da się sprawdzić. Kolumna „OpenSpec” mówi, czy to zmiana wymagania lub kontraktu — test z <code>CLAUDE.md</code> jest mechaniczny: nazwać pliki.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Propozycja</th><th>Koszt</th><th>OpenSpec</th><th>Jak poznamy, że się udało</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="n">P1</td><td><b>Prawda w repozytorium.</b> Zarchiwizować pięć gotowych zmian; README na dziesięć modułów; poprawić „cztery deploy” i odzyskać zapas w <code>CLAUDE.md</code>; dokończyć K1 (przewodnik z lotu ptaka i poprzedni audyt do <code>docs/archive/</code>); naprawić <code>MODULES</code> w <code>measure-duplication.py</code>.</td><td>1 dzień</td><td>nie</td><td><code>openspec/specs/</code> ma specyfikacje social-data; <code>measure-duplication.py --threshold 70</code> widzi wszystkie dziesięć modułów, nie sześć nieistniejących; pułap guide ≥ 1 000 znaków zapasu</td></tr>
+            <tr><td class="n">P2</td><td><b><code>tc-runtime</code> bierze kształt modułu archiwum.</b> <code>caller_access</code> jako jedna klasa z listami w parametrach; <code>ManagedIdentityAuth</code> jako jeden plik; szkielet <code>mcp_app</code>/<code>openapi</code>; market-data dokańcza przejście na pakietową pulę z parametrem czekania.</td><td>3–4 dni</td><td>tak — propozycja mówi, co wypisał pomiar</td><td>~1 500 linii produkcyjnych i ~700 testów mniej z 3 197 zmierzonych; siedem <code>_ManagedIdentityAuth</code> → jedno; test w <code>packages/</code> raz, w konsumencie jeden test integracji</td></tr>
+            <tr><td class="n">P3</td><td><b>Budżet połączeń jako liczba.</b> Każdy moduł nazywa <code>DATABASE_POOL_SIZE</code> w <code>.env.example</code> i w <code>app_settings</code>; test w <code>scripts/tests</code> sumuje wartości z <code>infra/</code> i odmawia powyżej 30.</td><td>0,5 dnia</td><td>infra — tak</td><td>suma pul ≤ 30 w Terraformie, test czerwony przy 31</td></tr>
+            <tr><td class="n">P4</td><td><b>Cisza jest awarią w każdym module.</b> Jedna metryka „wiek ostatniego przebiegu” na pętlę, emitowana z <code>tc-runtime</code>, i jeden alert na moduł z pętlą; sonda <code>/ping</code> odpowiada wiekiem, żeby webtest mógł go czytać.</td><td>2 dni</td><td>tak — wymaganie liveness ×4</td><td>zatrzymanie pętli w polymarket, social, strategy, telegram budzi operatora w ≤ 15 min, zmierzone przez zatrzymanie</td></tr>
+            <tr><td class="n">P5</td><td><b>Deploy po checkach.</b> <code>deploy-*.yml</code> na <code>workflow_run</code> po zielonym <code>checks</code> dla tego samego SHA, z <code>workflow_dispatch</code> jako drzwiami awaryjnymi.</td><td>0,5 dnia</td><td>nie</td><td>merge z czerwonym testem nie dociera na produkcję; czas od merge do sondy wydłuża się o czas checków, i to jest cena</td></tr>
+            <tr><td class="n">P6</td><td><b>Szósty serwer narzędzi.</b> <code>STRATEGY_MCP_URL</code> w workbenchu, <code>pending_setups</code> jako źródło wyzwalacza obok market i trading; lista wołających w strategy dostaje tożsamość workbencha.</td><td>2–3 dni</td><td>tak — kontrakt i infra</td><td>zespół budzi się z decyzji strategii bez tokenów modelu na obserwację; test przez pętlę, jak w <code>test_a_refused_setup_is_tried_again</code></td></tr>
+            <tr><td class="n">P7</td><td><b>Bramka dostaje listę aplikacji.</b> Klucz zostaje dla <code>/ws/stream</code> (powód z 20.08 stoi), reszta tras przechodzi na ten sam zapis wołających co pozostałe moduły — z P2 to jest import, nie nowy plik.</td><td>1–2 dni</td><td>tak — infra i wymaganie</td><td>rotacja klucza dotyka jednego miejsca; wołający bez tożsamości odmówiony przed modułem</td></tr>
+            <tr><td class="n">P8</td><td><b>Szósty kontrakt generowany.</b> <code>agentApi.ts</code> z generatora, jak pięć pozostałych; przy okazji pomiar bliźniaków teams/agent w terminalu tym samym narzędziem co provider.</td><td>1 dzień</td><td>nie</td><td><code>contract:check</code> czerwony na zmianie w <code>agent/contract.py</code>; liczba z pomiaru zapisana, niezależnie od wyniku</td></tr>
+            <tr><td class="n">P9</td><td><b>Data końca darmowego pakietu i plan po niej</b> — jeden akapit w <code>infra/database.tf</code> i w runbooku: kiedy, ile, i czy B1ms zostaje.</td><td>1 godzina</td><td>nie</td><td>ktoś wie dzień wcześniej, nie dzień później</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 class="sub">Czego nie proponuję</h3>
+      <ul>
+        <li><strong>Zwinięcia trading-mcp</strong> — zmierzone 20.08, odmowa stoi z trzech powodów, z których żaden nie zmienił się przez dodanie pięciu modułów.</li>
+        <li><strong>Jednej bazy zamiast siedmiu</strong> ani wspólnego procesu dla „modułów archiwum” — to byłoby wycofanie granicy, na której stoi wszystko w §03.</li>
+        <li><strong>Kolejki w telegram-gateway</strong> — powód zapisany w <code>design.md</code> tej zmiany; ponowienie z dzisiejszego PR #230 zamyka lukę, którą kolejka miałaby zamykać.</li>
+        <li><strong>Bramki przed polymarket ani social</strong> — argument z <code>architecture.md</code> („granica biegnie tam, gdzie kończy się odczyt, a zaczyna pieniądz”) jest dobry i aktualny.</li>
+        <li><strong>Drugiego workera ani B2 dla bazy</strong> bez tygodnia <code>plan_memory</code> i P3 przed sobą — dokładać zasobów, zanim policzy się, ile ich schodzi, to jest wzorzec, który repozytorium już raz nazwało.</li>
+      </ul>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Plan</div>
+      <h2>Cztery fazy, każda z liczbą na wyjściu</h2>
+      <p class="intro">Kolejność nie jest tym, co najbardziej boli, tylko tym, co najtaniej zdejmuje ryzyko następnej fazy. Faza 0 sprawia, że pomiar mówi prawdę; faza 1 odejmuje kod; faza 2 dokłada oczy; faza 3 domyka produkt. Nic tu nie wymaga zatrzymania stosu ani migracji.</p>
+      <div class="quote">Najpierw sprawić, żeby narzędzie pomiaru widziało system. Potem ciąć to, co pokaże.</div>
+
+      <div class="phase">
+        <div class="no">0<small>1 dzień · P1 + P9</small></div>
+        <div>
+          <h3>Prawda</h3>
+          <p>Jeden PR bez OpenSpec: archiwizacja pięciu zmian z odhaczonymi zadaniami (każda przez <code>/opsx:archive</code> i <code>trim-openspec-archive.sh</code>), README na dziesięć wierszy, dwie poprawki w <code>CLAUDE.md</code> z odzyskaniem zapasu, K1 z 20.08 wykonane dosłownie, słownik <code>MODULES</code> w <code>measure-duplication.py</code> na dzisiejsze katalogi, data końca pakietu darmowego w <code>database.tf</code>.</p>
+          <p class="done">Wyjście: <code>measure-duplication.py --threshold 70</code> wypisuje 40 par i 3 197 linii; <code>openspec validate --all --strict</code> czysty; specs social-data w <code>openspec/specs/</code>.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="no">1<small>4–5 dni · P2 + P3 + P5</small></div>
+        <div>
+          <h3>Odejmowanie</h3>
+          <p>Jedna propozycja OpenSpec dla <code>tc-runtime</code>, która cytuje liczby z fazy 0 — i po jednym PR na moduł, w kolejności od najświeższego (telegram-gateway, social-data, polymarket-data, strategy, market-data), bo najświeższy ma najmniej lokalnych odchyleń. Każdy PR: moduł traci <code>caller_access.py</code>, <code>_ManagedIdentityAuth</code> i szkielet <code>mcp_app</code>/<code>openapi</code>, zostaje mu jego lista i jego powód; testy zapisu wołających schodzą do jednego testu integracji na moduł. Równolegle, bo niezależne: P3 (pule jako liczba z testem w <code>scripts/tests</code>) i P5 (deploy po checkach) — oba pół dnia, oba bez ryzyka dla produkcji.</p>
+          <p>Twardy warunek z <code>rachunek-po-refactorze</code>: split mechaniczny kończy się <strong>diffem uzasadnień</strong>. Zielone testy dowodzą zachowania, nie zachowanych powodów — a te pięć kopii różni się głównie komentarzami, i to one mają przeżyć jako docstring parametru, nie zginąć w scaleniu.</p>
+          <p class="done">Wyjście: −1 500 linii produkcyjnych, −700 testów, jedno <code>_ManagedIdentityAuth</code>; suma pul ≤ 30 pilnowana testem; <code>deploy-*</code> mają <code>workflow_run</code>.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="no">2<small>3–4 dni · P4 + P7</small></div>
+        <div>
+          <h3>Oczy</h3>
+          <p>Liveness jako jedna rzecz w pakiecie — <code>tc_runtime.liveness</code>, metryka wieku ostatniego przebiegu, emitowana tą samą drogą co w market-data — i cztery wymagania OpenSpec, po jednym na moduł z pętlą, każde z własnym powodem (bo próbka co minutę i post co godzinę to różne „za długo”). Alerty: jeden na moduł, wszystkie do tej samej grupy operatora, runbook <code>kiedy-produkcja-milczy</code> dostaje cztery wiersze. Potem P7: bramka bierze zapis wołających z pakietu, klucz zostaje tylko na <code>/ws/stream</code>.</p>
+          <p class="done">Wyjście: zatrzymanie każdej z czterech pętli zmierzone stoperem do alertu; rotacja <code>GATEWAY_API_KEY</code> dotyka jednego miejsca.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="no">3<small>3–4 dni · P6 + P8</small></div>
+        <div>
+          <h3>Domknięcie</h3>
+          <p>Szósty serwer narzędzi: <code>STRATEGY_MCP_URL</code>, tożsamość workbencha na liście strategy, <code>pending_setups</code> jako źródło wyzwalacza w <code>teams-triggers</code> — z zachowaniem reguły „obserwowanie rynku nie kosztuje tokenów modelu”. To jest zmiana, dla której cały moduł <code>strategy</code> powstał, i jedyna w tym planie, która dodaje kod zamiast go odejmować. Na koniec P8: szósty kontrakt generowany i pomiar bliźniaków w terminalu.</p>
+          <p class="done">Wyjście: decyzja strategii budzi zespół bez udziału operatora; sześć kontraktów sprawdzanych w CI; liczba z pomiaru <code>teamsApi</code>/<code>agentApi</code> zapisana.</p>
+        </div>
+      </div>
+
+      <h3 class="sub">Jak poznamy, że plan był dobry</h3>
+      <p>Nie po liczbie linii, choć ona spadnie. Po tym, że <span class="hl">jedenasty moduł powstanie z pakietu, a nie z kopii dziesiątego</span> — i że jego pierwsza cisza obudzi kogoś, zanim obudzi go operator. Jeśli za dwanaście dni <code>measure-duplication.py --threshold 70</code> znów wypisze 40 par, plan nie zadziałał niezależnie od tego, ile z niego wykonano.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Przegląd TradingCenter · pomiary z 1 września 2026 na main @ faa550c · poprzednik: docs/archive/nastepne-ciecia.html</span>
+    <span>Tryb jasny — jedyny</span>
+  </div>
+</footer>

@@ -144,26 +144,6 @@ operatorowi wraz z jej przyczyną. Widok MUST NOT przedstawiać odmowy jako nied
 - **THEN** widok pokazuje odmowę wraz z przyczyną i tym, co zrobić najpierw
 - **AND** MUST NOT przedstawić jej jako awarii modułu
 
-### Requirement: Zakończenie obserwacji nie rusza danych i mówi o tym
-
-Operator MUST móc zakończyć obserwację wydarzenia z tej zakładki. Zakończenie MUST zatrzymać
-próbkowanie i MUST NOT usunąć ani jednej zebranej próbki.
-
-Widok MUST powiedzieć to przed wykonaniem czynności. Wymaganie istnieje, bo przycisk zatrzymujący
-zbieranie, postawiony obok zebranych danych, czyta się jak przycisk kasujący te dane — a te dwie
-czynności są tu rozdzielone celowo i tylko jedna z nich jest nieodwracalna.
-
-#### Scenario: Zakończenie obserwacji
-
-- **WHEN** operator kończy obserwację wydarzenia
-- **THEN** próbkowanie tego wydarzenia ustaje
-- **AND** zebrana historia pozostaje nienaruszona
-
-#### Scenario: Operator jest uprzedzony, co się stanie
-
-- **WHEN** operator sięga po zakończenie obserwacji
-- **THEN** widok MUST powiedzieć, że dane zostają, zanim czynność zostanie wykonana
-
 ### Requirement: Grupy obserwacji są operatora
 
 Operator MUST móc tworzyć grupy obserwacji, przypisywać do nich wydarzenia i je kasować. Grupy
@@ -215,24 +195,29 @@ rozdzielonych brakiem pokrycia odcinkiem, który sugeruje przebieg pomiędzy nim
 
 ### Requirement: Kasowanie zebranej historii jest tutaj i wymaga potwierdzenia
 
-Terminal MUST udostępniać operatorowi usunięcie zebranej historii, i MUST być jedynym miejscem,
-w którym da się to zrobić. Czynność MUST wymagać potwierdzenia nazywającego, czego dotyczy
-i że jest nieodwracalna.
+Terminal MUST udostępniać operatorowi usunięcie obserwacji wraz z całą zebraną historią, i MUST
+być jedynym miejscem, w którym da się to zrobić. Czynność MUST wymagać potwierdzenia nazywającego,
+czego dotyczy i że jest nieodwracalna.
 
 Nieodwracalność jest tu inna niż przy archiwum świec i MUST być powiedziana wprost: dostawca nie
 oddaje historii rynku, który się rozstrzygnął, a dla pozostałych sięga tylko tak daleko, jak sięga.
 Usunięte dane w większości przypadków nie dadzą się zebrać ponownie żadnym kosztem.
 
+Zakres MUST być nazwany jako całość, a nie jako jedna z dwóch rzeczy do wyboru: zatrzymania
+zbierania bez usunięcia nie ma, więc potwierdzenie MUST NOT sugerować, że obserwacja przetrwa
+czynność albo że historia przetrwa usunięcie obserwacji.
+
 #### Scenario: Usunięcie zebranej historii
 
-- **WHEN** operator potwierdza usunięcie zebranej historii
-- **THEN** historia zostaje usunięta, a widok pokazuje, że jej nie ma
+- **WHEN** operator potwierdza usunięcie
+- **THEN** wydarzenie znika z listy obserwacji wraz z całą swoją historią
 
 #### Scenario: Potwierdzenie mówi, co się stanie
 
-- **WHEN** operator sięga po usunięcie zebranej historii
+- **WHEN** operator sięga po usunięcie
 - **THEN** widok MUST zażądać potwierdzenia
-- **AND** potwierdzenie MUST nazwać zakres usunięcia i jego nieodwracalność
+- **AND** potwierdzenie MUST nazwać zakres usunięcia — wydarzenie i wszystko, co dla niego
+  zebrano — oraz jego nieodwracalność
 
 #### Scenario: Odstąpienie od usunięcia
 
@@ -260,3 +245,27 @@ osobnym krokiem po stronie infrastruktury i może po prostu jeszcze nie dotrzeć
 - **WHEN** moduł odmawia żądaniu z powodu tożsamości wołającego
 - **THEN** zakładka MUST przedstawić to jako odmowę, a nie jako niedostępność modułu
 
+### Requirement: Zwinięty wiersz identyfikuje obserwację i nie udaje odczytu
+
+Wydarzenie zwinięte MUST nieść to, po czym operator je rozpozna i czym może w nim ruszyć: tytuł,
+grupę, stan zbierania i usunięcie. Zwinięty wiersz MUST NOT pokazywać prawdopodobieństwa żadnego
+wyniku — ani liczbą, ani paskiem, ani „liderem" rynku.
+
+Skrót do jednej ceny na rynek jest sprowadzeniem rynku do jednej ceny „za", którego widok
+rozwinięty ma zakaz; zwinięcie nie jest wyjątkiem od tej reguły, tylko miejscem, w którym łatwo
+ją obejść. Odczyt jest po rozwinięciu, gdzie każdy rynek niesie wszystkie swoje wyniki.
+
+**Stan zbierania zostaje**, mimo że nie jest ani tytułem, ani grupą: obecność na liście nie
+dowodzi, że ceny przychodzą, i zwinięty wiersz jest jedynym miejscem, w którym operator dowie się
+o zatrzymanym zbieraniu, zanim cokolwiek rozwinie.
+
+#### Scenario: Wydarzenie zwinięte
+
+- **WHEN** operator ogląda listę obserwacji bez rozwijania żadnej
+- **THEN** każdy wiersz niesie tytuł, grupę, stan zbierania i sposób usunięcia
+- **AND** MUST NOT nieść prawdopodobieństwa żadnego wyniku
+
+#### Scenario: Rozwinięcie wydarzenia
+
+- **WHEN** operator rozwija wydarzenie
+- **THEN** widok pokazuje jego rynki wraz ze wszystkimi wynikami i ich prawdopodobieństwami
