@@ -109,9 +109,10 @@ asserts the behaviour rather than the order.
 
 ## Packages it takes
 
-`tc-runtime` (database, migrations, schema check, Easy Auth principal, `GET /models`),
-`tc-openai` (the streamed call) and `tc-mcp-kit` (the upstream-refusal helper and the
-tool-schema slimmer). All **build-time** path dependencies compiled into this module's
+`tc-runtime` (database, migrations, schema check, Easy Auth principal, `GET /models`, and the
+response-field rule the teams document is built with), `tc-openai` (the streamed call) and
+`tc-mcp-kit` (the upstream-refusal helper, the tool-schema slimmer, and the token each surface
+presents to a tool server). All **build-time** path dependencies compiled into this module's
 image — no module imports another module.
 
 ## Run

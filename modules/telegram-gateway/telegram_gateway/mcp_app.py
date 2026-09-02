@@ -1,17 +1,34 @@
-"""One FastMCP instance, mounted at `/mcp` in this module's own application — the same shape as
-`market-data`'s, down to the two production failures that shaped it, written out rather than inherited."""
+"""What this module announces on its tool surface: its name, its instructions, and which tools go on
+it. Two, and one of them leaves the system — creating a bot and binding a destination stay REST-only,
+out of any conversation's reach. The mounting is `tc_mcp_kit.mounted_server`."""
 
 from __future__ import annotations
 
-from contextlib import AbstractAsyncContextManager, nullcontext
-
 from mcp.server.fastmcp import FastMCP
-from mcp.server.transport_security import TransportSecuritySettings
 from starlette.types import ASGIApp
-from tc_mcp_kit.tool_schemas import slim_tool_schemas
+from tc_mcp_kit.mounted_server import (
+    MOUNT_PATH,
+    ToolSurfaceAddress,
+    tool_surface_session,
+)
+from tc_mcp_kit.mounted_server import (
+    build_mcp_app as _mount,
+)
+from tc_mcp_kit.mounted_server import (
+    build_server as _build,
+)
 
 from . import tools
 from .tools import ToolContext
+
+__all__ = [
+    "INSTRUCTIONS",
+    "MOUNT_PATH",
+    "ToolSurfaceAddress",
+    "build_mcp_app",
+    "build_server",
+    "tool_surface_session",
+]
 
 INSTRUCTIONS = (
     "The one door to Telegram: send a notification to somebody the operator has already bound. "
@@ -25,50 +42,9 @@ INSTRUCTIONS = (
 
 
 def build_server(app) -> FastMCP:
-    mcp = FastMCP(
-        "telegram-gateway",
-        instructions=INSTRUCTIONS,
-        # Off, explicitly: FastMCP turns DNS-rebinding protection on for a loopback host and then
-        # answers 421 to every request. Behind Easy Auth a page cannot mint a token, so it buys nothing.
-        transport_security=TransportSecuritySettings(enable_dns_rebinding_protection=False),
-    )
-
-    tools.register(mcp, ToolContext(app=app))
-
-    # Every tool's schema, minus what pydantic writes for its own sake. The whole set is read by the
-    # model in every turn of a conversation, and this is the fifth such set in the system.
-    slim_tool_schemas(mcp)
-
-    return mcp
+    return _build("telegram-gateway", INSTRUCTIONS, lambda mcp: tools.register(mcp, ToolContext(app=app)))
 
 
 def build_mcp_app(app) -> tuple[FastMCP, ASGIApp]:
-    """The streamable-http transport and the server behind it, to be mounted under `/mcp`. Both, because
-    the path becomes `/mcp/mcp` unset, and a mounted app's lifespan never runs to start its task group."""
-    mcp = build_server(app)
-    mcp.settings.streamable_http_path = "/"
-    return mcp, mcp.streamable_http_app()
-
-
-MOUNT_PATH = "/mcp"
-
-
-def tool_surface_session(app) -> AbstractAsyncContextManager:
-    """The session manager's lifetime, held open for as long as the app serves. `nullcontext` when
-    nothing was mounted: a suite's own application without a tool surface has nothing to start."""
-    mcp = getattr(app.state, "mcp_server", None)
-    return nullcontext() if mcp is None else mcp.session_manager.run()
-
-
-class ToolSurfaceAddress:
-    """Makes `/mcp` and `/mcp/` the same address, in front of routing. Starlette answers `/mcp` with a
-    307 to `/mcp/`, and an MCP client does not follow a redirect on a POST."""
-
-    def __init__(self, app: ASGIApp) -> None:
-        self._app = app
-
-    async def __call__(self, scope, receive, send) -> None:
-        if scope["type"] == "http" and scope.get("path") == MOUNT_PATH:
-            with_slash = f"{MOUNT_PATH}/"
-            scope = {**scope, "path": with_slash, "raw_path": with_slash.encode()}
-        await self._app(scope, receive, send)
+    """The streamable-http transport and the server behind it, to be mounted under `/mcp`."""
+    return _mount(build_server(app))

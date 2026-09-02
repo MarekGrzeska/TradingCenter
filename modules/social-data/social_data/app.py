@@ -15,7 +15,7 @@ from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
 from . import alerts, enrichment, mcp_app
-from .caller_access import CallerAccess
+from .caller_access import RECORD, CallerAccess
 from .config import Settings
 from .ingest import Ingest
 from .providers.truth_social import TruthSocialFeed
@@ -121,7 +121,7 @@ def create_app() -> FastAPI:
     # In front of the whole application, and in this order: the address fix runs before routing, and
     # the caller record before that, so nothing decides who may call after routing has begun.
     app.add_middleware(mcp_app.ToolSurfaceAddress)
-    app.add_middleware(CallerAccess, state=app.state)
+    app.add_middleware(CallerAccess, state=app.state, record=RECORD)
     return app
 
 

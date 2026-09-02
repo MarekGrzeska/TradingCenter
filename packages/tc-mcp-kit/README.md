@@ -1,8 +1,9 @@
 # tc-mcp-kit
 
-The caller-identity middleware and the upstream-refusal helper, shared by `market-data`,
-`teams-mcp` and `trading-mcp`. A **build-time** dependency like `tc-runtime` — see
-`docs/architecture.md`, "What may be shared, and what may not".
+Caller identity in both directions, the upstream-refusal helper, the tool-schema slimmer and the
+mounting of a FastMCP under `/mcp` — taken by every Python module here except `capital-gateway`. A
+**build-time** dependency like `tc-runtime` — see `docs/architecture.md`, "What may be shared, and
+what may not".
 
 ```
 uv run pytest · uv run ruff check . · uv run pyright
@@ -48,12 +49,24 @@ both, and taking one has never implied taking the other.
   health probe is exempt by path, in every module, unconditionally.
 - `detail.detail` — one upstream refusal, however FastAPI spelled it (a `detail` string or
   its own list of validation objects), flattened to one sentence a model can act on.
+- `outbound_identity.ManagedIdentityAuth` — the token this module presents when it calls
+  another one, per request rather than per connection. Seven copies in six modules until
+  2 September 2026. Two behaviours, because the copies had two: a caller that also holds a
+  shared key logs and sends the request anyway (`send_without_token=` says what the log will
+  say), and a caller with nothing else to present lets the error out.
+- `mounted_server` — one FastMCP under `/mcp` inside a module's own application: the transport
+  settings, the `/mcp` ≡ `/mcp/` middleware, and the session manager's lifetime. Five copies
+  until the same day; what stays in a module is its name, its instructions and its tools.
 - `tool_schemas.slim_tool_schemas` — the published tool surface without the scaffolding
   pydantic emits: `title` repeating the field's own name, `anyOf` of bare types where a
   type list says the same, and defaults on a reply nobody constructs. 22,6% of what the
-  three servers announce in every turn, and not one field, type or `required` entry with
-  it. This is the one file here that was **not** measured as a copy first — see
-  `docs/architecture.md`, condition 1's second route.
+  servers announce in every turn, and not one field, type or `required` entry with it. This is
+  the one file here that was **not** measured as a copy first — see `docs/architecture.md`,
+  condition 1's second route.
+
+`azure-identity` is in this package's dependency list for `outbound_identity`, and it widens
+nothing: every module taking this package already declares it, because every one of them
+presents a token somewhere. Checked before adding it, which is the mistake D1 was written about.
 
 ## What it does not do
 

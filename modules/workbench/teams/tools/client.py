@@ -18,6 +18,7 @@ from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared._httpx_utils import create_mcp_http_client
 from mcp.shared.exceptions import McpError
+from tc_mcp_kit.outbound_identity import ManagedIdentityAuth
 
 from ..config import Settings
 
@@ -76,19 +77,6 @@ class ToolOutcome:
     def ok(self) -> bool:
         return self.kind is ToolOutcomeKind.OK
 
-
-class _ManagedIdentityAuth(httpx.Auth):
-    """A bearer token per request rather than per connection: the streamable-http transport fixes its
-    headers when the connection opens, and a session outliving its token fails for no readable reason."""
-
-    def __init__(self, credential: DefaultAzureCredential, scope: str) -> None:
-        self._credential = credential
-        self._scope = scope
-
-    async def async_auth_flow(self, request: httpx.Request):
-        token = await self._credential.get_token(self._scope)
-        request.headers["Authorization"] = f"Bearer {token.token}"
-        yield request
 
 
 class ToolServer:
@@ -279,7 +267,7 @@ class ToolServer:
             stack = AsyncExitStack()
             try:
                 auth = (
-                    _ManagedIdentityAuth(self._credential, self._scope)
+                    ManagedIdentityAuth(self._credential, self._scope)
                     if self._credential is not None and self._scope is not None
                     else None
                 )

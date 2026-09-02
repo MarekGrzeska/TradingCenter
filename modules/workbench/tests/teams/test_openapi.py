@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from teams.openapi import document, require_response_fields
+from teams.openapi import document
 
 
 def test_document_is_a_valid_looking_openapi_object() -> None:
@@ -18,10 +18,3 @@ def test_the_document_describes_this_surface_and_not_the_one_beside_it() -> None
     # Where this surface's two collided with the conversation's, its own moved.
     assert "/teams/models" in paths
     assert "/teams/usage" in paths
-
-
-def test_require_response_fields_is_idempotent() -> None:
-    schema = document()
-    once = require_response_fields(schema)
-    twice = require_response_fields(once)
-    assert once == twice

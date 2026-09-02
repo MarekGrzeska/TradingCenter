@@ -31,8 +31,8 @@ package cannot give it, the change is wrong, not the rule.
 | `modules/terminal` | React+TS · the operator's screen. Consumes the others, publishes nothing — a consumer, not a peer. Call it the **terminal**, never a "console" or "dashboard". |
 | `modules/pocket` | React+TS · the archive on a phone, and a chat with the workbench beside it — mobile-first, no MCP of its own. A second consumer, sharing the terminal's generated contract and none of its code. |
 | `modules/telegram-gateway` | the one door to Telegram. Any module sends a notification; it creates its own bots, and remembers nothing it sent. |
-| `packages/tc-runtime` | database, migrations, schema check, Easy Auth. |
-| `packages/tc-mcp-kit` | speaking MCP: caller-identity middleware, the upstream-refusal helper, the tool-schema slimmer. |
+| `packages/tc-runtime` | database, migrations, schema check, Easy Auth, the caller-access machinery, the OpenAPI response rule. |
+| `packages/tc-mcp-kit` | caller identity both ways, the upstream-refusal helper, the tool-schema slimmer, mounting a FastMCP at `/mcp`. |
 | `packages/tc-openai` | the streamed OpenAI call, with tools — one file, taken only by the workbench, whose two surfaces were 79,4% identical here. Duplication across modules is measured by `scripts/measure-duplication.py`. |
 | `infra/` | Terraform · Azure. `infra/bootstrap/` is a separate root with local state. |
 | `openspec/` · `docs/` | specs (the truth) and proposals · architecture and reference, true today. `docs/archive/` is the road, not the state. A new `docs/*.html` copies `docs/style-template.html`. |

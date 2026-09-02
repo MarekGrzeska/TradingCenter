@@ -15,6 +15,7 @@ from tc_runtime.db import (
     _credential,
     _TokenProvider,
     asyncpg_dsn,
+    connect,
     pool,
     sqlalchemy_url,
 )
@@ -32,7 +33,14 @@ def test_sqlalchemy_gets_the_driver_named() -> None:
     assert sqlalchemy_url(PLAIN) == "postgresql+asyncpg://someone:secret@db.internal:5432/agent"
 
 
-@pytest.mark.parametrize("url", ["", "not-a-url-at-all"])
+def test_a_password_with_punctuation_survives_translation() -> None:
+    """Only the scheme is rewritten; everything after it is the operator's business."""
+    url = "postgresql://u:p%40ss+word@h:5432/d?sslmode=require"
+    assert asyncpg_dsn(url).endswith("u:p%40ss+word@h:5432/d?sslmode=require")
+    assert sqlalchemy_url(url).endswith("u:p%40ss+word@h:5432/d?sslmode=require")
+
+
+@pytest.mark.parametrize("url", ["", "not-a-url-at-all", "postgresql:/agent"])
 def test_a_connection_string_without_a_scheme_names_itself(url: str) -> None:
     with pytest.raises(ValueError, match="not a usable connection string"):
         asyncpg_dsn(url)
@@ -157,3 +165,27 @@ async def test_a_connection_failure_is_logged_without_the_credential(monkeypatch
     logged = caplog.text
     assert "db.internal:5432/agent" in logged
     assert "super-secret-token" not in logged
+
+
+async def test_connect_with_a_user_passes_it_and_a_token_provider(monkeypatch) -> None:
+    """The single-connection half of the same rule the pool test states: identity auth means a user
+    and a token provider, never a password this process could have written down."""
+    captured = {}
+
+    class _FakeConnection:
+        async def close(self) -> None:
+            pass
+
+    async def fake_connect(dsn, **kwargs):
+        captured.update(kwargs)
+        return _FakeConnection()
+
+    monkeypatch.setattr(db.asyncpg, "connect", fake_connect)
+    monkeypatch.setattr(db, "_credential", lambda *a: _FakeCredential(["t"]))
+
+    async with connect(NO_CREDENTIAL_URL, user="app-tradingcenter-agent"):
+        pass
+
+    assert captured["user"] == "app-tradingcenter-agent"
+    assert isinstance(captured["password"], _TokenProvider)
+    assert await captured["password"]() == "t"

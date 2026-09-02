@@ -4,12 +4,11 @@ every write. Reads retry once on a 5xx; writes never — the gateway accepts no 
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncGenerator
 
 import httpx
-from azure.core.exceptions import AzureError
 from azure.identity.aio import DefaultAzureCredential
 from tc_mcp_kit.detail import detail
+from tc_mcp_kit.outbound_identity import ManagedIdentityAuth
 
 from .config import Settings
 from .errors import GatewayRefused, GatewayUnavailable, NotDemoEnvironment
@@ -23,27 +22,6 @@ DEMO_ENVIRONMENT = "demo"
 log = logging.getLogger(__name__)
 
 
-class _ManagedIdentityAuth(httpx.Auth):
-    """A bearer token on every request, from this module's own identity — per request, because this
-    process outlives a token. One that cannot be had is logged and the key goes alone."""
-
-    def __init__(self, credential: DefaultAzureCredential, scope: str) -> None:
-        self._credential = credential
-        self._scope = scope
-
-    async def async_auth_flow(
-        self, request: httpx.Request
-    ) -> AsyncGenerator[httpx.Request, httpx.Response]:
-        try:
-            token = await self._credential.get_token(self._scope)
-        # Every way this fails is an `AzureError`: no identity on the host, a directory that will
-        # not issue for this audience, a metadata endpoint not answering. All mean no token now.
-        except AzureError as err:
-            log.warning("no token for %s, sending the caller key alone: %s", self._scope, err)
-        else:
-            request.headers["Authorization"] = f"Bearer {token.token}"
-        yield request
-
 
 class GatewayClient:
     def __init__(self, settings: Settings) -> None:
@@ -54,7 +32,7 @@ class GatewayClient:
             timeout=settings.capital_gateway_request_timeout_seconds,
             headers={GATEWAY_KEY_HEADER: settings.capital_gateway_api_key},
             auth=(
-                _ManagedIdentityAuth(self._credential, scope)
+                ManagedIdentityAuth(self._credential, scope, send_without_token="sending the caller key alone")
                 if self._credential is not None and scope
                 else None
             ),

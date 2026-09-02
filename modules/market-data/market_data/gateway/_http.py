@@ -4,12 +4,11 @@ unreadable. That three-way split was written out at six call sites before it mov
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncGenerator
 from typing import Any
 
 import httpx
-from azure.core.exceptions import AzureError
 from azure.identity.aio import DefaultAzureCredential
+from tc_mcp_kit.outbound_identity import ManagedIdentityAuth
 
 from ..errors import GatewayRefused, GatewayUnreachable, UnreadablePayload
 
@@ -24,29 +23,6 @@ DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=300.0, write=10.0, pool=5.0)
 GATEWAY_KEY_HEADER = "X-Gateway-Key"
 
 
-class _ManagedIdentityAuth(httpx.Auth):
-    """A bearer token on every request, from this module's own identity. Per request, because one read
-    at start-up expires under a long process; a token that cannot be had is logged and the key goes alone."""
-
-    def __init__(self, credential: DefaultAzureCredential, scope: str) -> None:
-        self._credential = credential
-        self._scope = scope
-
-    async def async_auth_flow(
-        self, request: httpx.Request
-    ) -> AsyncGenerator[httpx.Request, httpx.Response]:
-        try:
-            token = await self._credential.get_token(self._scope)
-        # Every way this fails is an `AzureError`: no identity on the host, a directory that will
-        # not issue for this audience, a metadata endpoint not answering. All mean no token now.
-        except AzureError as err:
-            log.warning(
-                "no token for %s, sending the caller key alone: %s", self._scope, err
-            )
-        else:
-            request.headers["Authorization"] = f"Bearer {token.token}"
-        yield request
-
 
 def http_client(
     api_key: str,
@@ -55,7 +31,9 @@ def http_client(
 ) -> httpx.AsyncClient:
     """A client sized for deep reads, presenting this module's caller key on every request. `scope`
     names the gateway's audience where this module has an identity; without one the key is the whole credential."""
-    auth = _ManagedIdentityAuth(DefaultAzureCredential(), scope) if scope else None
+    auth = ManagedIdentityAuth(
+        DefaultAzureCredential(), scope, send_without_token="sending the caller key alone"
+    ) if scope else None
     return httpx.AsyncClient(
         timeout=timeout,
         headers={GATEWAY_KEY_HEADER: api_key},

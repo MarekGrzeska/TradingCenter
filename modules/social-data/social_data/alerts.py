@@ -14,12 +14,11 @@ the other choice would need the gateway to remember messages.
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncGenerator
 from datetime import UTC, datetime
 
 import httpx
-from azure.core.exceptions import AzureError
 from azure.identity.aio import DefaultAzureCredential
+from tc_mcp_kit.outbound_identity import ManagedIdentityAuth
 
 from . import store
 from .models import Post
@@ -48,32 +47,15 @@ class GatewayUnreachable(Exception):
     """The gateway did not answer at all."""
 
 
-class _ManagedIdentityAuth(httpx.Auth):
-    """A bearer token on every request, from this module's own identity — per request, because one
-    fetched at start-up expires. The same shape `strategy` presents to the archive."""
-
-    def __init__(self, credential: DefaultAzureCredential, scope: str) -> None:
-        self._credential = credential
-        self._scope = scope
-
-    async def async_auth_flow(
-        self, request: httpx.Request
-    ) -> AsyncGenerator[httpx.Request, httpx.Response]:
-        try:
-            token = await self._credential.get_token(self._scope)
-        except AzureError as err:
-            log.warning("no token for %s; the gateway will refuse this request: %s", self._scope, err)
-        else:
-            request.headers["Authorization"] = f"Bearer {token.token}"
-        yield request
-
 
 def http_client(
     scope: str | None = None, timeout: httpx.Timeout = DEFAULT_TIMEOUT
 ) -> httpx.AsyncClient:
     """A client for the gateway, presenting this module's identity where it has one. Left out —
     local work, and every test — nothing is presented, which the gateway supports on loopback."""
-    auth = _ManagedIdentityAuth(DefaultAzureCredential(), scope) if scope else None
+    auth = ManagedIdentityAuth(
+        DefaultAzureCredential(), scope, send_without_token="the gateway will refuse this request"
+    ) if scope else None
     return httpx.AsyncClient(timeout=timeout, auth=auth)
 
 

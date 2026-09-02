@@ -1751,6 +1751,7 @@ name = "tc-mcp-kit"
 version = "0.1.0"
 source = { editable = "../../packages/tc-mcp-kit" }
 dependencies = [
+    { name = "azure-identity" },
     { name = "httpx" },
     { name = "mcp" },
     { name = "starlette" },
@@ -1758,6 +1759,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "azure-identity", specifier = ">=1.19" },
     { name = "httpx", specifier = ">=0.27" },
     { name = "mcp", specifier = ">=1.27,<2" },
     { name = "starlette", specifier = ">=0.37" },

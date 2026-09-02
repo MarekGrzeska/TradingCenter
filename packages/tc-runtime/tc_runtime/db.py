@@ -124,6 +124,43 @@ def identity_connect_args(
 
 
 @asynccontextmanager
+async def connect(
+    database_url: str,
+    *,
+    user: str | None = None,
+    client_id: str | None = None,
+    client_secret: str | None = None,
+    tenant_id: str | None = None,
+) -> AsyncIterator[asyncpg.Connection]:
+    """One connection, closed on the way out. `user` selects identity-based auth: a token is fetched
+    fresh and presented as the password, and `database_url` is expected to carry no credential."""
+    if user is None:
+        try:
+            conn = await asyncpg.connect(asyncpg_dsn(database_url))
+        except Exception:
+            log.exception("could not connect to %s", _connection_target(database_url))
+            raise
+        try:
+            yield conn
+        finally:
+            await conn.close()
+        return
+
+    async with _credential(client_id, client_secret, tenant_id) as credential:
+        try:
+            conn = await asyncpg.connect(
+                asyncpg_dsn(database_url), user=user, password=_TokenProvider(credential)
+            )
+        except Exception:
+            log.exception("could not connect to %s as %s", _connection_target(database_url), user)
+            raise
+        try:
+            yield conn
+        finally:
+            await conn.close()
+
+
+@asynccontextmanager
 async def pool(
     database_url: str,
     *,

@@ -4,14 +4,14 @@ is too tight for a loop reading three hundred bars. A read that fails is never a
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncGenerator, Iterable, Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
 import httpx
-from azure.core.exceptions import AzureError
 from azure.identity.aio import DefaultAzureCredential
+from tc_mcp_kit.outbound_identity import ManagedIdentityAuth
 
 from .errors import ArchiveRefused, ArchiveUnreachable
 from .periods import bars_between, period_length, window_for
@@ -32,32 +32,15 @@ REQUEST_CEILING_BARS = 200_000
 CEILING_MARGIN_BARS = 1_000
 
 
-class _ManagedIdentityAuth(httpx.Auth):
-    """A bearer token on every request, from this module's own identity — per request, because one read
-    at start-up expires. Unlike the gateway's twin there is no shared key to fall back to."""
-
-    def __init__(self, credential: DefaultAzureCredential, scope: str) -> None:
-        self._credential = credential
-        self._scope = scope
-
-    async def async_auth_flow(
-        self, request: httpx.Request
-    ) -> AsyncGenerator[httpx.Request, httpx.Response]:
-        try:
-            token = await self._credential.get_token(self._scope)
-        except AzureError as err:
-            log.warning("no token for %s; the archive will refuse this request: %s", self._scope, err)
-        else:
-            request.headers["Authorization"] = f"Bearer {token.token}"
-        yield request
-
 
 def http_client(
     scope: str | None = None, timeout: httpx.Timeout = DEFAULT_TIMEOUT
 ) -> httpx.AsyncClient:
     """A client for the archive, presenting this module's identity where it has one. Left out — local
     work, and every test — nothing is presented, which the archive supports."""
-    auth = _ManagedIdentityAuth(DefaultAzureCredential(), scope) if scope else None
+    auth = ManagedIdentityAuth(
+        DefaultAzureCredential(), scope, send_without_token="the archive will refuse this request"
+    ) if scope else None
     return httpx.AsyncClient(timeout=timeout, auth=auth)
 
 
