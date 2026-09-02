@@ -116,6 +116,8 @@
   td b { color: var(--ink); font-weight: 700; }
   td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
   tr.void td { color: var(--ink-3); background: var(--red-soft); }
+  tr.shipped td { background: var(--green-soft); }
+  tr.shipped td:first-child { color: var(--green); font-weight: 700; }
 
   pre {
     background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
@@ -133,6 +135,7 @@
   .tag.ok { background: var(--green-soft); color: var(--green); }
   .tag.att { background: var(--yellow-soft); color: #8a6708; }
   .tag.stop { background: var(--red-soft); color: var(--red); }
+  .tag.done { background: var(--navy); color: #ffffff; }
 
   .quote {
     background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
@@ -147,6 +150,9 @@
   }
   .fail.stop { border-left-color: var(--red); }
   .fail.ok { border-left-color: var(--green); }
+  .fail.done { border-left-color: var(--green); background: linear-gradient(90deg, var(--green-soft) 0 3px, var(--card) 3px); }
+  .fail.done h3 { color: var(--ink-3); }
+  .fail.done h3 strong { color: var(--ink); }
   .fail h3 {
     font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
     color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -162,6 +168,8 @@
   .phase h3 { font-family: var(--head); font-weight: 700; font-size: 21px; letter-spacing: -0.02em; color: var(--ink); margin: 0 0 8px; }
   .phase p { font-size: 15.5px; }
   .phase .done { font-family: var(--mono); font-size: 12.5px; color: var(--green); margin-top: 6px; }
+  .phase.shipped { background: linear-gradient(90deg, var(--green-soft) 0 4px, transparent 4px); }
+  .phase.shipped .no { color: var(--green); }
   @media (max-width: 620px) { .phase { grid-template-columns: 1fr; } }
 
   footer {
@@ -175,12 +183,12 @@
   <div class="inner">
     <span class="kicker">TradingCenter · przegląd architektury</span>
     <h1>Dziesięć modułów, jeden pomiar</h1>
-    <p class="lede">Dwanaście dni po „następnych cięciach” system podwoił liczbę modułów. Ten dokument mierzy, <b>co z tego jest architekturą, a co jest kopią</b> — i układa z tego plan, którego każda faza ma liczbę na wejściu i na wyjściu.</p>
+    <p class="lede">Dwanaście dni po „następnych cięciach” system podwoił liczbę modułów. Ten dokument mierzy, <b>co z tego jest architekturą, a co jest kopią</b> — i układa z tego plan, którego każda faza ma liczbę na wejściu i na wyjściu. <b>Fazy 0 i 1 są wykonane</b>; poniżej stan po nich, a nie przed.</p>
     <div class="strip">
       <span>TradingCenter / architektura</span>
-      <span>1 września 2026 · <b>main @ faa550c</b></span>
+      <span>pomiar 1 września · <b>stan 2 września 2026, main @ 9eb65c1</b></span>
       <span>środowisko <b>demo</b></span>
-      <span>poprzednik: <b>archive/nastepne-ciecia.html</b> (20.08)</span>
+      <span>wykonane: <b>#231</b> · <b>#232</b></span>
     </div>
   </div>
 </header>
@@ -191,7 +199,7 @@
       <div class="cell"><div class="v">10</div><div class="l">modułów · 8 App Service, 2 Static Web Apps</div></div>
       <div class="cell"><div class="v">70 tys.</div><div class="l">linii produkcyjnych · 64 tys. linii testów (0,92)</div></div>
       <div class="cell"><div class="v">3 034</div><div class="l">testów Pythona zbieranych · plus 78 plików Vitest</div></div>
-      <div class="cell"><div class="v">847</div><div class="l">commitów w 26 dni · 66 zmian OpenSpec w archiwum</div></div>
+      <div class="cell"><div class="v">949</div><div class="l">linii kopii po fazie 1 · było 3 197</div></div>
     </div>
 
     <section>
@@ -416,18 +424,20 @@
     <section>
       <div class="eyebrow">04 · Słabe strony</div>
       <h2>Gdzie system przestał mówić prawdę o sobie</h2>
-      <p class="intro">Dwanaście punktów, każdy z pomiarem. Ułożone od tego, co jest sprzeczne z własną regułą repozytorium, przez to, co grozi produkcji, po to, co kosztuje tylko czytelnika.</p>
+      <p class="intro">Dwanaście punktów, każdy z pomiarem, ułożonych od tego, co było sprzeczne z własną regułą repozytorium, przez to, co grozi produkcji, po to, co kosztuje tylko czytelnika. <b>Pięć z nich jest zamkniętych</b> — zielone, z numerem PR-a; siedem stoi.</p>
 
       <div class="fails">
-        <div class="fail stop">
-          <h3>Ręczne kopie wróciły, i przekraczają własny próg <span class="tag stop">reguła 1 współdzielenia</span></h3>
-          <p>Warunek dopuszczenia pakietu to ≥ 70% identyczności linia w linię między dwoma modułami. Zmierzone dziś tym samym <code>SequenceMatcher</code>, którym mierzył <code>measure-duplication.py</code>:</p>
+        <div class="fail done">
+          <h3><strong>Ręczne kopie wróciły, i przekraczały własny próg</strong> <span class="tag done">wykonane · #232</span></h3>
+          <p>Warunek dopuszczenia pakietu to ≥ 70% identyczności linia w linię między dwoma modułami. Zmierzone 1 września tym samym <code>SequenceMatcher</code>, którym mierzy <code>measure-duplication.py</code>:</p>
           <p class="m">measure-duplication.py --threshold 70 · <b>40 par, ~3 197 linii istnieje tylko jako kopia</b><br>openapi.py 98,5% (polymarket↔social) · caller_access.py 94,3% (social↔telegram) · mcp_app.py 87,8% ×3<br>runtime.py 85,7% ×3 · app.py 73,5% · plus workbench: routers/models.py 90,0%, provider.py 89,2%, auth.py 86,4%<br>class _ManagedIdentityAuth(httpx.Auth) · <b>7 kopii</b> w 6 modułach</p>
-          <p>To jest ten sam stan, który 18 sierpnia mierzył 959 linii i cztery bugi naprawione w jednej kopii — tym razem w kształcie „modułu archiwum”, skopiowanym cztery razy w dwanaście dni. <span class="hl">Reguła, która została odwrócona, żeby to się nie powtórzyło, nie została zastosowana do żadnego z czterech nowych modułów.</span></p>
+          <p>To był ten sam stan, który 18 sierpnia mierzył 959 linii i cztery bugi naprawione w jednej kopii — tym razem w kształcie „modułu archiwum”, skopiowanym cztery razy w dwanaście dni.</p>
+          <p><b>Wykonane 2 września.</b> Pięć rzeczy przeszło do pakietów, każda dlatego, że jej różnica była już parametrem: <code>tc_runtime.caller_access</code> (5 kopii, 995 linii), <code>tc_mcp_kit.outbound_identity</code> (7 kopii w 6 modułach), <code>tc_mcp_kit.mounted_server</code> (5), <code>tc_runtime.openapi</code> (6), <code>tc_runtime.db.connect</code> (1). <span class="hl">3 197 → 949 linii kopii</span>, −1 254 linie netto, każdy dokument OpenAPI bajt w bajt ten sam. Przy okazji jedno zachowanie wybrane zamiast scalone: <code>/ping/</code> jest teraz odmawiane, a nie wpuszczane bez tożsamości — dwie z pięciu kopii były tu hojne przez przypadek.</p>
         </div>
-        <div class="fail stop">
-          <h3>Narzędzie pilnujące reguły 1 nie widzi połowy modułów <span class="tag stop">measure-duplication.py</span></h3>
-          <p>Jego słownik <code>MODULES</code> wymienia <code>agent</code>, <code>teams</code>, <code>teams-mcp</code> — trzy katalogi, które nie istnieją — a nie wymienia polymarket-data, social-data, strategy ani telegram-gateway. Pomiar, na którym reguła stoi, od 20 sierpnia mierzy pusty zbiór i wypisuje zero.</p>
+        <div class="fail done">
+          <h3><strong>Narzędzie pilnujące reguły 1 nie widziało połowy modułów</strong> <span class="tag done">wykonane · #231</span></h3>
+          <p>Jego słownik <code>MODULES</code> wymieniał <code>agent</code>, <code>teams</code>, <code>teams-mcp</code> — trzy katalogi, które nie istnieją — a nie wymieniał polymarket-data, social-data, strategy ani telegram-gateway. Pomiar, na którym reguła stoi, od 20 sierpnia czytał pusty zbiór i wypisywał zero.</p>
+          <p><b>Wykonane.</b> Dziesięć pakietów Pythona, brakujący katalog jest teraz błędem, a nie ostrzeżeniem na stderr, i skrypt koduje własne wyjście — na Windowsie zabijała go własna strzałka. <code>test_measure_duplication.py</code> czyta listę pakietów z gita, więc nie zwietrzeje po raz drugi.</p>
         </div>
         <div class="fail stop">
           <h3>Seam „rdzeń decyduje, zespół się spiera” istnieje w README, nie w kodzie <span class="tag stop">strategy → teams</span></h3>
@@ -445,17 +455,20 @@
           <h3>Deploy nie czeka na checki <span class="tag att">kolejność</span></h3>
           <p>Push do <code>main</code> uruchamia <code>checks</code> i <code>deploy-*</code> w tej samej sekundzie. Sonda dowodzi, że proces wstał — regresji w logice nie widzi. Merge z czerwonym testem jest dziś na produkcji, zanim CI zdąży to powiedzieć; cofnięcie to ręczne <code>az</code> (~40 s) bez slotu. Przy dziesięciu deployach dziennie to statystyka, nie hipoteza.</p>
         </div>
-        <div class="fail">
-          <h3>Osiem aktywnych zmian OpenSpec, pięć z odhaczonymi zadaniami <span class="tag att">prawda w kolejce</span></h3>
-          <p><code>a-silent-feed-is-a-broken-feed</code> (13/13), <code>a-strategy-can-be-clicked-together</code> (27/27), <code>a-refused-alert-is-tried-again</code> (9/9) czekają na archiwizację; <code>social-data-collects-the-posts</code> ma 52/53 — przez co <code>openspec/specs/</code> zawiera dla modułu na produkcji <b>jedną</b> specyfikację (<code>social-data-alerts</code>) i żadnej dla API, magazynu, zbierania. <code>alerts-that-still-have-a-reason</code> to sam <code>proposal.md</code> z 20.08. „Specs are the truth” — dziś prawda o social-data jest w delcie, której nikt nie scalił.</p>
+        <div class="fail done">
+          <h3><strong>Osiem aktywnych zmian OpenSpec, prawda o module w niescalonej delcie</strong> <span class="tag done">wykonane · #231</span></h3>
+          <p><code>openspec/specs/</code> zawierało dla social-data — modułu na produkcji — <b>jedną</b> specyfikację (<code>social-data-alerts</code>) i żadnej dla API, magazynu, zbierania. „Specs are the truth”, a prawda leżała w delcie, której nikt nie scalił.</p>
+          <p><b>Wykonane.</b> Sześć zmian zarchiwizowanych ze scaleniem delt: <b>9 nowych capability</b> (siedem social-data, <code>strategy-configurator</code>, <code>terminal-strategy-configurator</code>) i 12 zmodyfikowanych. <code>alerts-that-still-have-a-reason</code> zarchiwizowane jako <em>wykonane</em>, nie porzucone — <code>monitoring.tf</code> trzyma dokładnie te trzy alerty, które wymienia jej tabela; była też jedyną pozycją psującą <code>openspec validate --all --strict</code>, dziś <b>96/96</b>. Zostały dwie: trzy sprawdzenia operatora wymagające sesji w przeglądarce i dwa widoki, których nie zbudowano.</p>
         </div>
-        <div class="fail">
-          <h3><code>market-data</code> wzięło pakiet w połowie <span class="tag att">tc-runtime</span></h3>
-          <p>Pięć modułów bierze pulę z <code>tc_runtime.db</code>; market-data trzyma własne <code>db.py</code> (194 linie) z własnym <code>create_pool</code>, <code>Credential</code> i <code>asyncpg_dsn</code>, a z pakietu bierze tylko blokadę. Dwie implementacje tej samej rzeczy w repozytorium, którego reguła mówi „jedna kopia albo żadna”. Powód — 1500 s czekania na blokadę — jest parametrem, nie plikiem.</p>
+        <div class="fail done">
+          <h3><strong><code>market-data</code> wzięło pakiet w połowie</strong> <span class="tag done">wykonane · #232</span></h3>
+          <p>Trzymało własne <code>db.py</code> (194 linie) z własnym <code>create_pool</code>, <code>Credential</code> i <code>asyncpg_dsn</code>, a z pakietu brało tylko blokadę — dwie implementacje tej samej rzeczy w repozytorium, którego reguła mówi „jedna kopia albo żadna”.</p>
+          <p><b>Wykonane.</b> Jedyną funkcją, której naprawdę nie miał nikt inny, było <code>connect()</code> — więc to ono przeszło do pakietu, a w module został klucz blokady. Czekanie 1 500 s nigdy nie było powodem: to <code>migration_lock_wait_seconds</code> w miejscu wywołania, i zawsze było.</p>
         </div>
-        <div class="fail">
-          <h3>Dokumentacja opisuje system sprzed dwóch przeprowadzek <span class="tag att">K1 nie wykonane</span></h3>
-          <p><code>README.md</code> wymieniał pięć modułów z dziesięciu i kolejność startu bez czterech usług. <code>CLAUDE.md</code> mówi „cztery <code>deploy-*.yml</code>” przy dziesięciu — i ma 22 438 z 23 000 znaków pułapu — <b>562 znaki zapasu</b>, gdy jeden moduł kosztuje w nim wiersz tabeli (130–320 znaków), wiersz komend i zdanie o porcie. Jedenasty moduł się zmieści, dwunasty nie. Cięcie K1 z 20.08 zostało wykonane — te 13 plików leży w <code>docs/archive/</code> — ale przeprowadzka, która nastąpiła po nim, zostawiła nowy zestaw: <code>przewodnik-po-projekcie</code> („z lotu ptaka”) zna pięć modułów z dziesięciu, a pięć przewodników modułowych opisuje pięć modułów i nie ma odpowiednika dla czterech najnowszych.</p>
+        <div class="fail done">
+          <h3><strong>Dokumentacja opisywała system sprzed dwóch przeprowadzek</strong> <span class="tag done">wykonane · #231</span></h3>
+          <p><code>README.md</code> wymieniał pięć modułów z dziesięciu i kolejność startu bez czterech usług. <code>CLAUDE.md</code> mówi „cztery <code>deploy-*.yml</code>” przy dziesięciu — i ma 22 438 z 23 000 znaków pułapu — <b>562 znaki zapasu</b>, gdy jeden moduł kosztuje w nim wiersz tabeli (130–320 znaków), wiersz komend i zdanie o porcie. Jedenasty moduł się zmieści, dwunasty nie. Cięcie K1 z 20.08 zostało wykonane — te 13 plików leży w <code>docs/archive/</code> — ale przeprowadzka po nim zostawiła nowy zestaw.</p>
+          <p><b>Wykonane.</b> README na dziesięć modułów: tabela, kolejność startu, siedem baz logicznych, pięć ustawień serwerów narzędzi, joby CI, dziesięć workflow deploy — plus skreślone zdanie, że bramka wpuszcza tylko dwa adresy (żaden App Service tutaj nie ma ograniczenia adresów, zmierzone 20.08). <code>CLAUDE.md</code>: zapas <span class="hl">562 → 1 171 znaków</span>, wzięty z prozy, która ma dom w <code>architecture.md</code>, nie z żadnej pułapki. <code>dev.py --explain</code> mówił „cztery serwery narzędzi” (pięć) i że pocket czyta jeden moduł (trzy). Trzy dokumenty do <code>docs/archive/</code>. <b>Zostaje</b>: nie ma przewodnika modułowego dla czterech najnowszych modułów — luka, nie nieprawda.</p>
         </div>
         <div class="fail">
           <h3>Jeden kontrakt terminala nadal pisany ręcznie <span class="tag att">agentApi.ts</span></h3>
@@ -475,15 +488,15 @@
     <section>
       <div class="eyebrow">05 · Propozycje</div>
       <h2>Od największego zwrotu</h2>
-      <p>Każda pozycja ma koszt w dniach i zysk, który da się sprawdzić. Kolumna „OpenSpec” mówi, czy to zmiana wymagania lub kontraktu — test z <code>CLAUDE.md</code> jest mechaniczny: nazwać pliki.</p>
+      <p>Każda pozycja ma koszt w dniach i zysk, który da się sprawdzić. Kolumna „OpenSpec” mówi, czy to zmiana wymagania lub kontraktu — test z <code>CLAUDE.md</code> jest mechaniczny: nazwać pliki. <b>P1 i P2 są wykonane</b>, i przy P2 ta kolumna okazała się pomylona: czwarta kategoria wyzwalacza jest dla zmiany, która <em>odwraca</em> regułę nośną, a ta ją stosuje — do tego zmiana bez delty zapala <code>--strict</code> na czerwono, czyli dokładnie to, co P1 naprawiło.</p>
       <div class="table-wrap">
         <table>
           <thead>
             <tr><th>#</th><th>Propozycja</th><th>Koszt</th><th>OpenSpec</th><th>Jak poznamy, że się udało</th></tr>
           </thead>
           <tbody>
-            <tr><td class="n">P1</td><td><b>Prawda w repozytorium.</b> Zarchiwizować pięć gotowych zmian; README na dziesięć modułów; poprawić „cztery deploy” i odzyskać zapas w <code>CLAUDE.md</code>; dokończyć K1 (przewodnik z lotu ptaka i poprzedni audyt do <code>docs/archive/</code>); naprawić <code>MODULES</code> w <code>measure-duplication.py</code>.</td><td>1 dzień</td><td>nie</td><td><code>openspec/specs/</code> ma specyfikacje social-data; <code>measure-duplication.py --threshold 70</code> widzi wszystkie dziesięć modułów, nie sześć nieistniejących; pułap guide ≥ 1 000 znaków zapasu</td></tr>
-            <tr><td class="n">P2</td><td><b><code>tc-runtime</code> bierze kształt modułu archiwum.</b> <code>caller_access</code> jako jedna klasa z listami w parametrach; <code>ManagedIdentityAuth</code> jako jeden plik; szkielet <code>mcp_app</code>/<code>openapi</code>; market-data dokańcza przejście na pakietową pulę z parametrem czekania.</td><td>3–4 dni</td><td>tak — propozycja mówi, co wypisał pomiar</td><td>~1 500 linii produkcyjnych i ~700 testów mniej z 3 197 zmierzonych; siedem <code>_ManagedIdentityAuth</code> → jedno; test w <code>packages/</code> raz, w konsumencie jeden test integracji</td></tr>
+            <tr class="shipped"><td class="n">P1 ✓</td><td><b>Prawda w repozytorium.</b> Zarchiwizować pięć gotowych zmian; README na dziesięć modułów; poprawić „cztery deploy” i odzyskać zapas w <code>CLAUDE.md</code>; dokończyć K1 (przewodnik z lotu ptaka i poprzedni audyt do <code>docs/archive/</code>); naprawić <code>MODULES</code> w <code>measure-duplication.py</code>.</td><td>wykonane<br><b>#231</b></td><td>nie</td><td><b>spełnione.</b> 9 nowych capability w <code>specs/</code>, <code>validate --all --strict</code> 96/96, narzędzie widzi dziesięć pakietów, zapas guide 1 171 znaków</td></tr>
+            <tr class="shipped"><td class="n">P2 ✓</td><td><b><code>tc-runtime</code> bierze kształt modułu archiwum.</b> <code>caller_access</code> jako jedna klasa z listami w parametrach; <code>ManagedIdentityAuth</code> jako jeden plik; szkielet <code>mcp_app</code>/<code>openapi</code>; market-data dokańcza przejście na pakietową pulę z parametrem czekania.</td><td>wykonane<br><b>#232</b></td><td>nie — patrz akapit wyżej</td><td><b>spełnione.</b> 3 197 → 949 linii kopii (−1 254 netto), siedem <code>_ManagedIdentityAuth</code> → jedno, testy przeniesione do <code>packages/</code>, każdy dokument OpenAPI bajt w bajt ten sam</td></tr>
             <tr><td class="n">P3</td><td><b>Budżet połączeń jako liczba.</b> Każdy moduł nazywa <code>DATABASE_POOL_SIZE</code> w <code>.env.example</code> i w <code>app_settings</code>; test w <code>scripts/tests</code> sumuje wartości z <code>infra/</code> i odmawia powyżej 30.</td><td>0,5 dnia</td><td>infra — tak</td><td>suma pul ≤ 30 w Terraformie, test czerwony przy 31</td></tr>
             <tr><td class="n">P4</td><td><b>Cisza jest awarią w każdym module.</b> Jedna metryka „wiek ostatniego przebiegu” na pętlę, emitowana z <code>tc-runtime</code>, i jeden alert na moduł z pętlą; sonda <code>/ping</code> odpowiada wiekiem, żeby webtest mógł go czytać.</td><td>2 dni</td><td>tak — wymaganie liveness ×4</td><td>zatrzymanie pętli w polymarket, social, strategy, telegram budzi operatora w ≤ 15 min, zmierzone przez zatrzymanie</td></tr>
             <tr><td class="n">P5</td><td><b>Deploy po checkach.</b> <code>deploy-*.yml</code> na <code>workflow_run</code> po zielonym <code>checks</code> dla tego samego SHA, z <code>workflow_dispatch</code> jako drzwiami awaryjnymi.</td><td>0,5 dnia</td><td>nie</td><td>merge z czerwonym testem nie dociera na produkcję; czas od merge do sondy wydłuża się o czas checków, i to jest cena</td></tr>
@@ -507,32 +520,35 @@
     <section>
       <div class="eyebrow">06 · Plan</div>
       <h2>Cztery fazy, każda z liczbą na wyjściu</h2>
-      <p class="intro">Kolejność nie jest tym, co najbardziej boli, tylko tym, co najtaniej zdejmuje ryzyko następnej fazy. Faza 0 sprawia, że pomiar mówi prawdę; faza 1 odejmuje kod; faza 2 dokłada oczy; faza 3 domyka produkt. Nic tu nie wymaga zatrzymania stosu ani migracji.</p>
+      <p class="intro">Kolejność nie jest tym, co najbardziej boli, tylko tym, co najtaniej zdejmuje ryzyko następnej fazy. Faza 0 sprawia, że pomiar mówi prawdę; faza 1 odejmuje kod; faza 2 dokłada oczy; faza 3 domyka produkt. Nic tu nie wymaga zatrzymania stosu ani migracji. <b>Fazy 0 i 1 są wykonane</b> — z jedną poprawką w kolejności, opisaną niżej.</p>
       <div class="quote">Najpierw sprawić, żeby narzędzie pomiaru widziało system. Potem ciąć to, co pokaże.</div>
 
-      <div class="phase">
-        <div class="no">0<small>1 dzień · P1 + P9</small></div>
+      <div class="phase shipped">
+        <div class="no">0<small>wykonane · #231</small></div>
         <div>
           <h3>Prawda</h3>
           <p>Jeden PR bez OpenSpec: archiwizacja pięciu zmian z odhaczonymi zadaniami (każda przez <code>/opsx:archive</code> i <code>trim-openspec-archive.sh</code>), README na dziesięć wierszy, dwie poprawki w <code>CLAUDE.md</code> z odzyskaniem zapasu, K1 z 20.08 wykonane dosłownie, słownik <code>MODULES</code> w <code>measure-duplication.py</code> na dzisiejsze katalogi, data końca pakietu darmowego w <code>database.tf</code>.</p>
-          <p class="done">Wyjście: <code>measure-duplication.py --threshold 70</code> wypisuje 40 par i 3 197 linii; <code>openspec validate --all --strict</code> czysty; specs social-data w <code>openspec/specs/</code>.</p>
+          <p class="done">Wyjście, osiągnięte: <code>--threshold 70</code> wypisał 40 par i 3 197 linii · <code>validate --all --strict</code> 96/96 · dziewięć nowych capability, w tym siedem social-data.</p>
+          <p>Czego faza 0 nie zrobiła: <b>P9</b> (data końca darmowego pakietu w <code>database.tf</code>) — bo tej daty nie da się przeczytać z repozytorium, a zgadnięta byłaby gorsza niż jej brak. Zostaje jako pytanie do portalu Azure, nie jako edycja pliku. Do listy dołączyły trzy rzeczy, których pomiar nie przewidział, a które okazały się nieprawdą w kodzie: „cztery serwery narzędzi” w <code>dev.py</code>, „pocket czyta jeden moduł”, i zdanie README, że bramka wpuszcza tylko dwa adresy.</p>
         </div>
       </div>
-      <div class="phase">
-        <div class="no">1<small>4–5 dni · P2 + P3 + P5</small></div>
+      <div class="phase shipped">
+        <div class="no">1<small>wykonane · #232</small></div>
         <div>
           <h3>Odejmowanie</h3>
-          <p>Jedna propozycja OpenSpec dla <code>tc-runtime</code>, która cytuje liczby z fazy 0 — i po jednym PR na moduł, w kolejności od najświeższego (telegram-gateway, social-data, polymarket-data, strategy, market-data), bo najświeższy ma najmniej lokalnych odchyleń. Każdy PR: moduł traci <code>caller_access.py</code>, <code>_ManagedIdentityAuth</code> i szkielet <code>mcp_app</code>/<code>openapi</code>, zostaje mu jego lista i jego powód; testy zapisu wołających schodzą do jednego testu integracji na moduł. Równolegle, bo niezależne: P3 (pule jako liczba z testem w <code>scripts/tests</code>) i P5 (deploy po checkach) — oba pół dnia, oba bez ryzyka dla produkcji.</p>
-          <p>Twardy warunek z <code>rachunek-po-refactorze</code>: split mechaniczny kończy się <strong>diffem uzasadnień</strong>. Zielone testy dowodzą zachowania, nie zachowanych powodów — a te pięć kopii różni się głównie komentarzami, i to one mają przeżyć jako docstring parametru, nie zginąć w scaleniu.</p>
-          <p class="done">Wyjście: −1 500 linii produkcyjnych, −700 testów, jedno <code>_ManagedIdentityAuth</code>; suma pul ≤ 30 pilnowana testem; <code>deploy-*</code> mają <code>workflow_run</code>.</p>
+          <p>Plan mówił: propozycja OpenSpec, potem po jednym PR na moduł od najświeższego. <b>Wyszedł jeden PR na wszystkie</b>, i to była poprawka, nie skrót: pięć kopii przechodzi razem albo pakiet ma dwa kształty naraz, a warunek 3 reguły i tak każe uruchomić testy każdego konsumenta przy każdej zmianie pakietu — czyli pięć PR-ów to pięć razy ten sam zestaw jobów.</p>
+          <p>Twardy warunek z <code>rachunek-po-refactorze</code> — split mechaniczny kończy się <strong>diffem uzasadnień</strong> — został spełniony przez konstrukcję: każdy moduł zachował swój docstring, swoje ścieżki i swoje zdanie o starcie, a różnice komentarzy poszły w parametry (<code>send_without_token=</code> jest dosłownie tym, co dana kopia wypisywała do logu). Jedna różnica okazała się zachowaniem, nie komentarzem, i została <em>wybrana</em>, a nie scalona: <code>/ping/</code> odmawiane zamiast wpuszczanego bez tożsamości.</p>
+          <p class="done">Wyjście, osiągnięte: 3 197 → 949 linii kopii · siedem <code>_ManagedIdentityAuth</code> → jedno · trzynaście jobów CI zielonych, w tym <code>contract:check</code> obu front-endów.</p>
+          <p>P3 i P5 miały iść równolegle w tej fazie i <b>nie poszły</b> — jedno odejmowanie na raz czyta się w PR, a suma pul i kolejność deployu nie zależały od pakietów. Wracają jako pierwsze pozycje fazy 2.</p>
         </div>
       </div>
       <div class="phase">
-        <div class="no">2<small>3–4 dni · P4 + P7</small></div>
+        <div class="no">2<small>następna · P3 + P5 + P4 + P7</small></div>
         <div>
           <h3>Oczy</h3>
-          <p>Liveness jako jedna rzecz w pakiecie — <code>tc_runtime.liveness</code>, metryka wieku ostatniego przebiegu, emitowana tą samą drogą co w market-data — i cztery wymagania OpenSpec, po jednym na moduł z pętlą, każde z własnym powodem (bo próbka co minutę i post co godzinę to różne „za długo”). Alerty: jeden na moduł, wszystkie do tej samej grupy operatora, runbook <code>kiedy-produkcja-milczy</code> dostaje cztery wiersze. Potem P7: bramka bierze zapis wołających z pakietu, klucz zostaje tylko na <code>/ws/stream</code>.</p>
-          <p class="done">Wyjście: zatrzymanie każdej z czterech pętli zmierzone stoperem do alertu; rotacja <code>GATEWAY_API_KEY</code> dotyka jednego miejsca.</p>
+          <p>Zaczyna od dwóch rzeczy odłożonych z fazy 1, bo obie są pół dnia i żadna nie dotyka modułu: <b>P3</b> — każdy moduł nazywa <code>DATABASE_POOL_SIZE</code>, a test w <code>scripts/tests</code> sumuje wartości z Terraforma i odmawia powyżej 30; <b>P5</b> — <code>deploy-*.yml</code> na <code>workflow_run</code> po zielonych checkach.</p>
+          <p>Potem liveness jako jedna rzecz w pakiecie — <code>tc_runtime.liveness</code>, metryka wieku ostatniego przebiegu, emitowana tą samą drogą co w market-data — i cztery wymagania OpenSpec, po jednym na moduł z pętlą, każde z własnym powodem (bo próbka co minutę i post co godzinę to różne „za długo”). Alerty: jeden na moduł, wszystkie do tej samej grupy operatora, runbook <code>kiedy-produkcja-milczy</code> dostaje cztery wiersze. Potem P7: bramka bierze zapis wołających z pakietu, klucz zostaje tylko na <code>/ws/stream</code>.</p>
+          <p class="done">Wyjście: suma pul ≤ 30 pilnowana testem · merge z czerwonym testem nie dociera na produkcję · zatrzymanie każdej z czterech pętli zmierzone stoperem do alertu · rotacja <code>GATEWAY_API_KEY</code> dotyka jednego miejsca.</p>
         </div>
       </div>
       <div class="phase">
@@ -545,14 +561,14 @@
       </div>
 
       <h3 class="sub">Jak poznamy, że plan był dobry</h3>
-      <p>Nie po liczbie linii, choć ona spadnie. Po tym, że <span class="hl">jedenasty moduł powstanie z pakietu, a nie z kopii dziesiątego</span> — i że jego pierwsza cisza obudzi kogoś, zanim obudzi go operator. Jeśli za dwanaście dni <code>measure-duplication.py --threshold 70</code> znów wypisze 40 par, plan nie zadziałał niezależnie od tego, ile z niego wykonano.</p>
+      <p>Nie po liczbie linii, choć spadła — 3 197 → 949. Po tym, że <span class="hl">jedenasty moduł powstanie z pakietu, a nie z kopii dziesiątego</span> — i że jego pierwsza cisza obudzi kogoś, zanim obudzi go operator. Pierwsza połowa ma teraz warunki, żeby się wydarzyć; druga jest całą fazą 2 i jeszcze się nie wydarzyła. Jeśli za dwanaście dni <code>measure-duplication.py --threshold 70</code> znów wypisze 40 par, plan nie zadziałał niezależnie od tego, ile z niego wykonano.</p>
     </section>
   </div>
 </main>
 
 <footer>
   <div class="inner">
-    <span>Przegląd TradingCenter · pomiary z 1 września 2026 na main @ faa550c · poprzednik: docs/archive/nastepne-ciecia.html</span>
+    <span>Przegląd TradingCenter · pomiary z 1 września 2026 · stan po fazach 0 i 1, main @ 9eb65c1 · poprzednik: docs/archive/nastepne-ciecia.html</span>
     <span>Tryb jasny — jedyny</span>
   </div>
 </footer>

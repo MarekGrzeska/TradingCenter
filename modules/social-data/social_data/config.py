@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     # How long this module waits for another process to finish migrating.
     migration_lock_wait_seconds: float = 300.0
 
+    # Three, for polymarket-data's reason: collecting is one pass, and nothing here writes on a
+    # request. Seven databases share one `B_Standard_B1ms` whose `max_connections` is 35 —
+    # `scripts/tests/test_pool_budget.py` refuses a total above 30.
+    database_pool_size: int = 3
+
     # Seconds between passes over the feed. Posts arrive in bursts and the feed is one request per
     # date, so this is minutes rather than the archive's seconds.
     collect_interval_seconds: int = 300
@@ -102,6 +107,13 @@ class Settings(BaseSettings):
         """Whether this deployment can tell anybody anything. Asked at runtime rather than refused
         at startup: silence is a state this module supports, and one it reports."""
         return bool(self.telegram_gateway_url and self.alert_destination)
+
+    @field_validator("database_pool_size")
+    @classmethod
+    def _pool_is_usable(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError(f"DATABASE_POOL_SIZE must be at least 1; got {value}")
+        return value
 
     @field_validator("truth_social_feed_url", "openai_base_url", "telegram_gateway_url")
     @classmethod

@@ -9,6 +9,8 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 
+from tc_runtime.liveness import LoopHeartbeat
+
 from . import parsing, provider, store
 from .models import Sample, Surface
 
@@ -39,9 +41,13 @@ class Ingest:
         window_days: int,
         default_backfill_days: int,
         db_concurrency: int,
+        heartbeat: LoopHeartbeat | None = None,
     ) -> None:
         self._pool = pool
         self._client = client
+        # `None` in a test that drives `tick()` itself: what the loop reports is the loop's, and a
+        # caller with no loop has nothing to report.
+        self._heartbeat = heartbeat
         self._interval = interval_seconds
         self._window = timedelta(days=window_days)
         self._default_depth = timedelta(days=default_backfill_days)
@@ -112,6 +118,11 @@ class Ingest:
             except Exception:
                 # One bad round is not the end of collection.
                 log.exception("a sampling round failed")
+            else:
+                # After the pass and only after it: a round that raised is a round that did not
+                # happen, and a heartbeat beaten regardless would report a stopped loop as healthy.
+                if self._heartbeat is not None:
+                    self._heartbeat.beat()
             await asyncio.sleep(self._interval)
 
     async def _close_gaps_quietly(self) -> None:

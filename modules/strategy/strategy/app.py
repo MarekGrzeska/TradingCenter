@@ -4,21 +4,22 @@ process that answers proves it migrated — but it never reaches the archive, or
 from __future__ import annotations
 
 import logging
-import os
 from contextlib import asynccontextmanager
 
-# Root logger configuration, before anything else imports and starts logging. Without this the process
-# writes into the void, and a silent process looks exactly like an idle one.
-logging.basicConfig(
-    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
-    format="%(levelname)-5.5s [%(name)s] %(message)s",
-)
+from tc_runtime import telemetry
+
+# Above `from fastapi import ...` and not merely before `FastAPI(...)`: the auto-instrumentation
+# patches the class attribute, and the import binds this module's name to the unpatched one.
+# `httpx` quiet because one evaluation pass logs a line per provider call and says nothing
+# this module does not log itself.
+telemetry.configure(quiet=("httpx", "httpcore"))
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-from tc_runtime import migrate, schema_version
+from tc_runtime import liveness, migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
+from tc_runtime.liveness import Heartbeats, LoopHeartbeat
 
 from . import alerts
 from .archive import Archive, http_client
@@ -52,6 +53,7 @@ async def lifespan(app: FastAPI):
             client_id=settings.azure_client_id,
             client_secret=settings.azure_client_secret,
             tenant_id=settings.azure_tenant_id,
+            max_size=settings.database_pool_size,
         ) as pool,
         http_client(settings.market_data_scope) as client,
     ):
@@ -77,11 +79,18 @@ async def lifespan(app: FastAPI):
         # and saying so is something it does when there is somewhere to say it.
         app.state.alerts = alerts.build(settings)
 
+        # One heartbeat per loop, on the state so `/health` can answer with it and so the metric's
+        # callback can read it without awaiting. "evaluate" is what the alert's `loop` dimension says.
+        heartbeats = Heartbeats(LoopHeartbeat("evaluate", expected_seconds=settings.evaluation_interval_seconds))
+        app.state.heartbeats = heartbeats
+        liveness.register_metrics("strategy", heartbeats)
+
         loop = EvaluationLoop(
             pool,
             app.state.archive,
             interval_seconds=settings.evaluation_interval_seconds,
             alerts=app.state.alerts,
+            heartbeat=heartbeats["evaluate"],
         )
         app.state.loop = loop
         loop.start()

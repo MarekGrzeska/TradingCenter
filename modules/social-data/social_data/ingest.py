@@ -14,6 +14,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 
+from tc_runtime.liveness import LoopHeartbeat
+
 from . import store
 from .models import RawPost
 from .providers import PostSource, SourceError
@@ -60,9 +62,13 @@ class Ingest:
         enrich: Callable[[datetime], object] | None = None,
         announce: Callable[[datetime], object] | None = None,
         clock: Callable[[], datetime] = _now,
+        heartbeat: LoopHeartbeat | None = None,
     ) -> None:
         self._pool = pool
         self._sources = tuple(sources)
+        # `None` in a test that drives `tick()` itself: what the loop reports is the loop's, and a
+        # caller with no loop has nothing to report.
+        self._heartbeat = heartbeat
         self._interval = interval_seconds
         self._window = timedelta(hours=window_hours)
         self._enrich = enrich
@@ -97,6 +103,11 @@ class Ingest:
             except Exception:
                 # One bad round is not the end of collection.
                 log.exception("a collection round failed")
+            else:
+                # After the pass and only after it: a round that raised is a round that did not
+                # happen, and a heartbeat beaten regardless would report a stopped loop as healthy.
+                if self._heartbeat is not None:
+                    self._heartbeat.beat()
             await asyncio.sleep(self._interval)
 
     async def tick(self) -> list[Collected]:

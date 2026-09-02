@@ -4,14 +4,21 @@ order inside the lifespan is what to read twice: the database is migrated before
 from __future__ import annotations
 
 import logging
-import os
-import sys
 from contextlib import asynccontextmanager
 
+from tc_runtime import telemetry
+
+# Above `from fastapi import ...` and not merely before `FastAPI(...)`: the auto-instrumentation
+# patches the class attribute, and the import binds this module's name to the unpatched one.
+# `httpx` quiet because one sampling pass logs a line per provider call and says nothing
+# this module does not log itself.
+telemetry.configure(quiet=("httpx", "httpcore"))
+
 from fastapi import FastAPI
-from tc_runtime import migrate, schema_version
+from tc_runtime import liveness, migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
+from tc_runtime.liveness import Heartbeats, LoopHeartbeat
 
 from . import mcp_app, provider
 from .caller_access import RECORD, CallerAccess
@@ -23,19 +30,9 @@ from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 log = logging.getLogger(__name__)
 
 
-def configure_logging() -> None:
-    """Give the root logger a level and somewhere to write, because nothing else does. Uvicorn configures
-    only its own, so without this a deployed container prints the access log and nothing this module wrote."""
-    logging.basicConfig(
-        level=os.environ.get("LOG_LEVEL", "INFO").upper(),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        stream=sys.stdout,
-    )
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    configure_logging()
     settings = Settings()  # type: ignore[call-arg]
     app.state.settings = settings
 
@@ -46,6 +43,7 @@ async def lifespan(app: FastAPI):
             client_id=settings.azure_client_id,
             client_secret=settings.azure_client_secret,
             tenant_id=settings.azure_tenant_id,
+            max_size=settings.database_pool_size,
         ) as pool,
         provider.client(
             gamma_base_url=settings.gamma_base_url,
@@ -70,6 +68,12 @@ async def lifespan(app: FastAPI):
 
         # After the migration and not before it: sampling started earlier would write to a
         # schema it does not know, and a bad write is not undone by a later error response.
+        # One heartbeat per loop, on the state so `/health` can answer with it and so the metric's
+        # callback can read it without awaiting. "sample" is what the alert's `loop` dimension says.
+        heartbeats = Heartbeats(LoopHeartbeat("sample", expected_seconds=settings.sample_interval_seconds))
+        app.state.heartbeats = heartbeats
+        liveness.register_metrics("polymarket_data", heartbeats)
+
         ingest = Ingest(
             pool,
             polymarket,
@@ -77,6 +81,7 @@ async def lifespan(app: FastAPI):
             window_days=settings.history_window_days,
             default_backfill_days=settings.default_backfill_days,
             db_concurrency=settings.sampler_db_concurrency,
+            heartbeat=heartbeats["sample"],
         )
         app.state.ingest = ingest
         await ingest.start()

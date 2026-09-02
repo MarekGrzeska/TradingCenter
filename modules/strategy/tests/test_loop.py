@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
 from builders import crossing_facts
 from fakes import FakeArchive
+from tc_runtime.liveness import LoopHeartbeat
 
 from strategy import store
 from strategy.archive import Gap
 from strategy.errors import ArchiveUnreachable
-from strategy.runner.loop import evaluate_all, evaluate_once
+from strategy.runner.loop import EvaluationLoop, evaluate_all, evaluate_once
 
 pytestmark = pytest.mark.db
 
@@ -154,3 +156,20 @@ class TestEveryWatch:
     async def test_no_watches_at_all_is_a_supported_state(self, pool) -> None:
         """Zero is not a degraded platform; it is a platform nobody has asked anything of."""
         assert await evaluate_all(pool, FakeArchive()) == []
+
+
+async def test_a_finished_pass_beats_the_heartbeat(pool):
+    """The rule itself is `tc-runtime`'s and tested there; this is the one test that the loop here
+    actually asks for it — without which the metric an alert stands on reports a stopped loop."""
+    heartbeat = LoopHeartbeat("evaluate", expected_seconds=60)
+    loop = EvaluationLoop(pool, FakeArchive(), interval_seconds=60, heartbeat=heartbeat)
+
+    loop.start()
+    try:
+        async with asyncio.timeout(5):
+            while not heartbeat.has_run:
+                await asyncio.sleep(0.01)
+    finally:
+        await loop.aclose()
+
+    assert heartbeat.has_run

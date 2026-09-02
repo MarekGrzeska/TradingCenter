@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     # twenty-five market-data allows itself is sized for an index over the candle table.
     migration_lock_wait_seconds: float = 300.0
 
+    # Three: the runner evaluates one watch at a time, and a backtest reads market-data over HTTP
+    # rather than out of this database. Seven databases share one `B_Standard_B1ms` whose
+    # `max_connections` is 35 — `scripts/tests/test_pool_budget.py` refuses a total above 30.
+    database_pool_size: int = 3
+
     # How often the loop wakes to ask whether a new bar has closed — not the resolution it decides on.
     # Waking more often than the bar closes costs one cheap query that finds nothing new.
     evaluation_interval_seconds: int = 60
@@ -77,6 +82,13 @@ class Settings(BaseSettings):
         """Whether this deployment can tell the operator anything. Asked at runtime rather than
         refused at startup: silence is a state this module supports."""
         return bool(self.telegram_gateway_url and self.alert_destination)
+
+    @field_validator("database_pool_size")
+    @classmethod
+    def _pool_is_usable(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError(f"DATABASE_POOL_SIZE must be at least 1; got {value}")
+        return value
 
     @field_validator("market_data_url")
     @classmethod

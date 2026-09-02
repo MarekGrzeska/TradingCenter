@@ -132,3 +132,45 @@ resource "azurerm_monitor_metric_alert" "market_data_availability" {
     action_group_id = azurerm_monitor_action_group.operator.id
   }
 }
+
+# A loop that stops is the failure mode nothing here reported: it holds no connection, answers no request and raises
+# nothing, so the process stays up, `/ping` stays green and the archive quietly stops growing. Measured in market-data
+# on 24 August 2026 — one stream room silent for fourteen hours — and fixed there alone until 2 September.
+#
+# The metric is in *passes of the loop's own interval*, for the reason `candle_age_periods` is in periods: a sampling
+# pass every minute and a collection every five are both healthy, and one threshold in seconds would be wrong for one
+# of them. Three, matching the candle alert: two is a restart landing badly, three is a loop that stopped.
+locals {
+  # The modules with a loop worth watching, and the metric each one publishes. telegram-gateway is deliberately absent:
+  # its watcher is a long poll per adopted bot, so a gateway with no bots has no loop, and silence there is a supported
+  # state rather than a failure — an alert on it would fire on the day the operator has bound nothing.
+  loop_alerts = {
+    polymarket-data = "polymarket_data.loop_passes_late"
+    social-data     = "social_data.loop_passes_late"
+    strategy        = "strategy.loop_passes_late"
+  }
+}
+
+resource "azurerm_monitor_metric_alert" "loop_stopped" {
+  for_each = local.loop_alerts
+
+  name                = "alert-${each.key}-loop-stopped"
+  resource_group_name = azurerm_resource_group.main.name
+  scopes              = [azurerm_application_insights.main.id]
+  description         = "A loop in ${each.key} has not finished a pass in three of its own intervals."
+  severity            = 1
+  frequency           = "PT5M"
+  window_size         = "PT5M"
+
+  criteria {
+    metric_namespace = "azure.applicationinsights"
+    metric_name      = each.value
+    aggregation      = "Maximum"
+    operator         = "GreaterThan"
+    threshold        = 3
+  }
+
+  action {
+    action_group_id = azurerm_monitor_action_group.operator.id
+  }
+}

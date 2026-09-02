@@ -9,6 +9,7 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 from builders import TRUTH_SOCIAL, raw_post
 from fakes import FakeSource
+from tc_runtime.liveness import LoopHeartbeat
 
 from social_data import store
 from social_data.ingest import Ingest, dates_touched
@@ -197,3 +198,27 @@ async def test_the_loop_collects_without_anybody_asking(pool):
     assert source.asked, "the loop asked its source for nothing"
     async with pool.acquire() as conn:
         assert await store.post_by_external_id(conn, TRUTH_SOCIAL, "a") is not None
+
+
+async def test_a_finished_pass_beats_the_heartbeat(pool):
+    """The rule itself is `tc-runtime`'s and tested there; this is the one test that the loop here
+    actually asks for it — without which the metric an alert stands on reports a stopped loop."""
+    heartbeat = LoopHeartbeat("collect", expected_seconds=60)
+    ingest = Ingest(
+        pool,
+        [FakeSource([])],
+        interval_seconds=60,
+        window_hours=24,
+        clock=at(JUST_BEFORE_MIDNIGHT),
+        heartbeat=heartbeat,
+    )
+
+    await ingest.start()
+    try:
+        async with asyncio.timeout(5):
+            while not heartbeat.has_run:
+                await asyncio.sleep(0.01)
+    finally:
+        await ingest.stop()
+
+    assert heartbeat.has_run

@@ -497,6 +497,26 @@
 
 <p style="margin-top:1.6rem">Pomiar <code>live</code>, na który czekała grupa 1, przeszedł 8/8 i rozstrzygnął otwartą gałąź projektu: capital.com <em>oddaje</em> w REST bieżący, niedomknięty okres. Zmiana <code>history-boundary-and-live-daily-candle</code> jest zarchiwizowana, delty wtopione w <code>openspec/specs/</code>.</p>
 
+<h2>Dopisane 2 września 2026 — trzy alerty, których tu nie było</h2>
+
+<p>Ten dokument znał jeden alert, bo we wrześniu 2026 jeden moduł miał pętlę wartą pilnowania. Doszły trzy, każdy z własnym rytmem, i żaden nie emitował ani jednej metryki. Zmiana <code>a-stopped-loop-wakes-somebody</code> dokłada po jednym alercie na moduł; <code>telegram-gateway</code> zostaje bez alertu celowo, bo jego watcher to długi poll na przyjętego bota, a brama bez botów nie ma pętli.</p>
+
+<div class="evidence">
+  <span class="ev-label">infra/monitoring.tf, po tej zmianie</span>
+  alert-polymarket-data-loop-stopped &nbsp; polymarket_data.loop_passes_late &nbsp; &gt; 3<br>
+  alert-social-data-loop-stopped &nbsp;&nbsp;&nbsp;&nbsp; social_data.loop_passes_late &nbsp;&nbsp;&nbsp;&nbsp; &gt; 3<br>
+  alert-strategy-loop-stopped &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; strategy.loop_passes_late &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &gt; 3
+</div>
+
+<p><strong>Co znaczy „3".</strong> Metryka jest w <em>przebiegach własnego interwału pętli</em>, nie w sekundach — z tego samego powodu, dla którego wiek świecy jest w okresach: próbkowanie co minutę i zbieranie co pięć są oba zdrowe. Dwa przebiegi to restart, który źle wypadł. Trzy to pętla, która stanęła.</p>
+
+<div class="move">
+  <strong>Co zrobić, gdy któryś się zapali</strong>
+  Najpierw <code>/health</code> tego modułu — niesie wiek każdej pętli i jej oczekiwany interwał, więc od razu widać, czy stanęła jedna, czy proces wstał i nie zdążył ukończyć ani jednego przebiegu (wtedy wiek jest ogromny, bo <code>NEVER_RAN</code>, i to jest odpowiedź, nie usterka metryki). Potem log: przebieg, który rzucił wyjątkiem, jest tam zapisany i <em>nie</em> odnotowuje bicia — to jest cała różnica między „pętla się budzi" a „pętla pracuje". Restart kontenera jest ostatnim ruchem, nie pierwszym: pętla, która stanęła bez wyjątku, zostawia ślad tylko dopóki proces żyje.
+</div>
+
+<p>Czego ten alert nie mówi: że pętla robi coś <em>sensownego</em>. Przebieg, który poszedł do końca i nic nie znalazł, jest ukończonym przebiegiem — i tak ma być, bo cichy dzień jest stanem wspieranym. Na „zbiera, ale zbiera nic" odpowiadają <code>/state</code> i ekrany, nie ten alert.</p>
+
 <h2>Czego nie proponuję</h2>
 
 <p><strong>Automatycznego uruchamiania migracji w workflow deploya.</strong> Kusi, bo usuwa krok, o którym się zapomina. Ale decyzja z <code>Dockerfile</code>a — że restart nie ma ścigać się o migrację — jest słuszna, a workflow, który migruje przed wdrożeniem, wprowadza własne okno: stary kod działa przez chwilę przy nowym schemacie. Dziś to okno byłoby nieszkodliwe, jutro przy migracji zmieniającej kolumnę już nie. Bramka, która <em>zatrzymuje</em> rozjazd, jest tańsza od automatu, który go tworzy w drugą stronę. Tą bramką jest PR #53 i stoi w module, nie w workflow — sprawdzenie, które podróżuje razem z obrazem, działa też wtedy, gdy kontener wstaje z powodu innego niż wdrożenie.</p>
