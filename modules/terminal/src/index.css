@@ -271,6 +271,60 @@
   color: var(--color-primary);
 }
 
+.decision-openable {
+  cursor: pointer;
+}
+
+/* The decision dialog: a label and its lines, four abreast. */
+.detail-list dt {
+  margin-bottom: 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-secondary);
+}
+
+.detail-list dd {
+  color: var(--color-ink-secondary);
+}
+
+/* One table per fact, newest bar first. Right-aligned numbers, so a crossing reads as two
+   columns swapping order rather than as two strings of different length. */
+.readings {
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.readings caption {
+  padding-bottom: 0.25rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.readings th,
+.readings td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.25rem 1rem 0.25rem 0;
+  text-align: right;
+  white-space: nowrap;
+  color: var(--color-ink-secondary);
+}
+
+.readings th {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-secondary);
+}
+
+.readings td:first-child,
+.readings th:first-child {
+  color: var(--color-ink-faint);
+}
+
 html {
   color-scheme: dark;
 }

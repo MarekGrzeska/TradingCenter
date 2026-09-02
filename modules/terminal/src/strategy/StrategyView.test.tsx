@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { MarketDataError } from "../data/types";
@@ -154,6 +154,147 @@ describe("the refusals are the screen", () => {
     expect(await screen.findByText("long")).toBeInTheDocument();
     expect(screen.getByText("100.50 / 98.50")).toBeInTheDocument();
     expect(screen.getByText("3.00R")).toBeInTheDocument();
+  });
+});
+
+describe("reading a decision", () => {
+  const SNAPSHOT = {
+    symbol: "US100",
+    as_of: "2026-08-22T10:00:00+00:00",
+    candles: [],
+    values: {
+      fast: {
+        key: "fast",
+        resolution: "HOUR",
+        times: ["2026-08-22T09:00:00+00:00", "2026-08-22T10:00:00+00:00"],
+        lines: { value: [101.2, 101.9] },
+        markers: [],
+        zones: [],
+      },
+    },
+  };
+
+  it("opens to the readings it stood on and the parameters it was computed with", async () => {
+    const api = fakeApi({
+      readDecision: vi
+        .fn()
+        .mockResolvedValue({ ...decision({ features: { spread: 0.7 } }), facts: SNAPSHOT }),
+      listParameterSets: vi.fn().mockResolvedValue([
+        {
+          id: 5,
+          strategyId: "baseline_ma_cross",
+          version: 2,
+          params: { fast_period: 20, stop_atr: 2 },
+          createdAt: new Date("2026-08-22T09:00:00Z"),
+        },
+      ]),
+    });
+
+    render(<StrategyView api={api} />);
+    await userEvent.click(await screen.findByTestId("decision-row"));
+
+    const dialog = await screen.findByRole("dialog");
+    // The version, not only the values — and the values, which are what a dispute is about.
+    expect(within(dialog).getByTestId("decision-parameters")).toHaveTextContent("zestaw #5 · v2");
+    expect(within(dialog).getByTestId("decision-parameters")).toHaveTextContent("fast_period = 20");
+    expect(within(dialog).getByTestId("decision-features")).toHaveTextContent("spread = 0.7000");
+    // The snapshot the platform kept, offset 0 first: what the rule called "now".
+    const readings = await within(dialog).findByTestId("decision-readings");
+    expect(within(readings).getAllByRole("row").map((row) => row.textContent)).toEqual([
+      "−świecavalue",
+      expect.stringMatching(/^0.*101\.90$/),
+      expect.stringMatching(/^1.*101\.20$/),
+    ]);
+    expect(api.readDecision).toHaveBeenCalledWith(1, expect.anything());
+  });
+
+  it("keeps a detail it could not read beside the row that has the rest", async () => {
+    const api = fakeApi({
+      readDecision: vi
+        .fn()
+        .mockRejectedValue(new MarketDataError("unreachable", "strategy did not answer")),
+    });
+
+    render(<StrategyView api={api} />);
+    await userEvent.click(await screen.findByTestId("decision-row"));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText(/did not answer/)).toBeInTheDocument();
+    // The row's own facts still stand: the reason came with the list.
+    expect(within(dialog).getByTestId("decision-verdict")).toHaveTextContent(/did not cross/);
+  });
+
+  it("offers nothing to do on the account from a setup", async () => {
+    const api = fakeApi({
+      listDecisions: vi
+        .fn()
+        .mockResolvedValue([
+          decision({ action: "trade", reasonKind: null, direction: "long", entry: 100.5, stop: 98.5, target: 106.5, rr: 3 }),
+        ]),
+      readDecision: vi.fn().mockResolvedValue({ ...decision(), facts: {} }),
+    });
+
+    render(<StrategyView api={api} />);
+    await userEvent.click(await screen.findByTestId("decision-row"));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByTestId("decision-levels")).toHaveTextContent("cel 106.50");
+    // A setup is a reading. The only button in this dialog is the one that closes it.
+    expect(within(dialog).getAllByRole("button").map((one) => one.getAttribute("aria-label"))).toEqual([
+      "Close",
+    ]);
+  });
+});
+
+describe("backtest reports", () => {
+  it("are read with their cost model, and never started from here", async () => {
+    const api = fakeApi({
+      listBacktests: vi.fn().mockResolvedValue([
+        {
+          id: 1,
+          strategyId: "baseline_ma_cross",
+          symbol: "US100",
+          resolution: "HOUR",
+          rangeFrom: new Date("2026-01-01T00:00:00Z"),
+          rangeTo: new Date("2026-06-30T00:00:00Z"),
+          params: { fast_period: 20, stop_atr: 2 },
+          costs: { spread: 0.5, slippage: 0.1, commission_r: 0 },
+          report: {
+            metrics: { trades: 12, wins: 7, win_rate: 0.58, expectancy_r: 0.42, total_r: 5.04, max_drawdown_r: 2.1, unresolved: 1 },
+            refusals: {},
+            bars: 4300,
+            strategy_revision: null,
+          },
+          ranAt: new Date("2026-08-01T12:00:00Z"),
+        },
+      ]),
+    });
+
+    render(<StrategyView api={api} />);
+
+    const row = await screen.findByTestId("backtest-row");
+    expect(row).toHaveTextContent("spread 0.5 · poślizg 0.1 · prowizja 0R");
+    expect(row).toHaveTextContent("fast_period=20, stop_atr=2");
+    expect(row).toHaveTextContent("0.42R");
+    expect(screen.queryByRole("button", { name: /backtest|przebieg|uruchom/i })).toBeNull();
+  });
+
+  it("says what an empty list means", async () => {
+    render(<StrategyView api={fakeApi()} />);
+
+    expect(await screen.findByTestId("no-backtests")).toHaveTextContent(/komendą/);
+  });
+
+  it("keeps a refusal beside the list it refused", async () => {
+    const api = fakeApi({
+      listBacktests: vi
+        .fn()
+        .mockRejectedValue(new MarketDataError("refused", "this caller has no access to backtests")),
+    });
+
+    render(<StrategyView api={api} />);
+
+    expect(await screen.findByText(/no access to backtests/)).toBeInTheDocument();
   });
 });
 

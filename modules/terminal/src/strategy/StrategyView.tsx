@@ -5,6 +5,8 @@ import { useRead } from "../data/query";
 import type { ArchiveAdmin } from "../data/source";
 import { Button } from "../ui/Button";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
+import { BacktestsPanel } from "./BacktestsPanel";
+import { DecisionDialog } from "./DecisionDialog";
 import { DecisionRow } from "./DecisionRow";
 import { DefinitionsPanel } from "./DefinitionsPanel";
 import { StartWatchDialog } from "./StartWatchDialog";
@@ -42,6 +44,7 @@ export function StrategyView({
 
   const [starting, setStarting] = useState(false);
   const [chosen, setChosen] = useState<string | null>(null);
+  const [opened, setOpened] = useState<Decision | null>(null);
 
   const strategies = useRead<Strategy[]>({
     key: ["strategy", "catalogue"],
@@ -195,11 +198,17 @@ export function StrategyView({
             </thead>
             <tbody>
               {decisions.value.map((decision) => (
-                <DecisionRow key={decision.id} decision={decision} />
+                <DecisionRow key={decision.id} decision={decision} onOpen={setOpened} />
               ))}
             </tbody>
           </table>
         </div>
+      )}
+
+      <BacktestsPanel client={client} strategyId={chosen} />
+
+      {opened !== null && (
+        <DecisionDialog client={client} decision={opened} onClose={() => setOpened(null)} />
       )}
 
       {starting && (

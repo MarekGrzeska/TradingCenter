@@ -1,38 +1,10 @@
-import type { Decision, ReasonKind } from "./strategyApi";
+import { formatBar, formatLevel, KIND_LABEL, KIND_TONE } from "./decisionFormat";
+import type { Decision } from "./strategyApi";
 
 /**
- * The kind of refusal is a badge because the three have three answers: fetch history, read the strategy, change the
- * limit. **The revision travels with the row** — today's rule beside last week's decision answers convincingly and wrongly.
+ * **The revision travels with the row** — today's rule beside last week's decision answers convincingly and wrongly.
+ * The kind of refusal is a badge; why is in `decisionFormat.ts`, which the dialog shares.
  */
-
-const KIND_LABEL: Record<ReasonKind, string> = {
-  strategy: "strategia",
-  coverage: "brak danych",
-  limit: "limit",
-};
-
-/** `coverage` is the one that wants attention: it is answered by doing something to the
- *  archive. The other two are the system deciding, which is not a warning. */
-const KIND_TONE: Record<ReasonKind, string> = {
-  strategy: "kind-ordinary",
-  coverage: "kind-missing",
-  limit: "kind-limit",
-};
-
-function formatBar(at: Date): string {
-  return at.toLocaleString(undefined, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-/** Two decimal places and a sign, so a level lines up with the one above it. */
-function formatLevel(value: number | null): string {
-  return value === null ? "—" : value.toFixed(2);
-}
 
 export function DecisionRow({
   decision,
@@ -46,8 +18,9 @@ export function DecisionRow({
 
   return (
     <tr
-      className={isTrade ? "decision decision-trade" : "decision"}
+      className={`${isTrade ? "decision decision-trade" : "decision"}${onOpen === undefined ? "" : " decision-openable"}`}
       onClick={onOpen === undefined ? undefined : () => onOpen(decision)}
+      title={onOpen === undefined ? undefined : "otwórz: odczyty, parametry, cechy"}
       data-testid="decision-row"
     >
       <td className="decision-bar">{formatBar(decision.asOf)}</td>

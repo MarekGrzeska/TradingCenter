@@ -21,8 +21,10 @@ To jest zmiana OpenSpec, bo dodaje dwa wymagania do `terminal-strategy`.
   to jest komenda i ma nią zostać.
 - Bez zmian w `modules/strategy` i bez zmian w kontrakcie: obie trasy istnieją.
 
-Warunek wejścia: pierwsza decyzja o wejściu i pierwszy raport na produkcji. Wcześniej ta zmiana
-stoi celowo.
+Pierwotny warunek wejścia — pierwsza decyzja o wejściu i pierwszy raport na produkcji — został
+uchylony tego samego dnia decyzją operatora: kontrakt obu tras istnieje, a zapis faktów
+(`facts_snapshot`) i raportu (`Report.as_dict`) mają znany kształt po stronie modułu, więc widoki
+da się zbudować i sprawdzić na builderach. Oba zbudowane 2 września 2026.
 
 ## Capabilities
 
@@ -33,7 +35,9 @@ stoi celowo.
 
 ## Impact
 
-- `modules/terminal/src/strategy/**`: podgląd odczytów przy decyzji, widok raportów.
+- `modules/terminal/src/strategy/**`: `DecisionDialog.tsx`, `BacktestsPanel.tsx`, `readings.ts`
+  (parser zapisu faktów i raportu), `decisionFormat.ts` (etykiety i formatery wspólne dla wiersza
+  i dialogu — poza plikiem komponentu, bo tego wymaga reguła fast-refresh).
 - `design.md` pominięte celowo: kształt podstrony jest w archiwum
   `the-screen-is-mostly-refusals`, a jej decyzje projektowe — odmowy jako treść, typy z
   generatora, jeden zakres na moduł — stoją bez zmian.
