@@ -64,6 +64,7 @@ async def lifespan(app: FastAPI):
             client_id=conversation_settings.azure_client_id,
             client_secret=conversation_settings.azure_client_secret,
             tenant_id=conversation_settings.azure_tenant_id,
+            max_size=settings.database_pool_size,
         ) as conversation_pool,
         make_pool(
             teams_settings.database_url,
@@ -71,6 +72,7 @@ async def lifespan(app: FastAPI):
             client_id=teams_settings.azure_client_id,
             client_secret=teams_settings.azure_client_secret,
             tenant_id=teams_settings.azure_tenant_id,
+            max_size=settings.database_pool_size,
         ) as teams_pool,
     ):
         # Built here rather than beside the conversation's, because one of its sources is served by this process and

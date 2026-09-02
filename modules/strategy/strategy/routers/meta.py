@@ -4,6 +4,15 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
+
+def loops(request) -> dict:
+    """How long since each of this module's loops last finished a pass. On `/health` and never on
+    `/ping`: this is the module's own work going well, which is a different question from whether
+    the process is alive, and a probe that conflates them reddens for the wrong reason."""
+    heartbeats = getattr(request.app.state, "heartbeats", None)
+    return {} if heartbeats is None else heartbeats.as_dict()
+
+
 router = APIRouter()
 
 
@@ -26,6 +35,7 @@ async def health(request: Request) -> dict:
         "database": "reachable",
         "watching": int(watching or 0),
         "evaluating": bool(loop and loop.running),
+        "loops": loops(request),
     }
 
 

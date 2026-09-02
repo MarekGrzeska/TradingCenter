@@ -4,16 +4,21 @@ inside the lifespan is what to read twice: the database is migrated before anyth
 from __future__ import annotations
 
 import logging
-import os
-import sys
 from contextlib import asynccontextmanager
+
+from tc_runtime import telemetry
+
+# Above `from fastapi import ...` and not merely before `FastAPI(...)`: the auto-instrumentation
+# patches the class attribute, and the import binds this module's name to the unpatched one. Nothing
+# is quietened: `httpx`'s request line carries the bot token, and `redaction.py` exists to redact it.
+telemetry.configure()
 
 from fastapi import FastAPI
 from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
-from . import mcp_app, redaction
+from . import mcp_app
 from .binding import Watcher
 from .bot_api import bot_api
 from .caller_access import RECORD, CallerAccess
@@ -24,22 +29,9 @@ from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 log = logging.getLogger(__name__)
 
 
-def configure_logging() -> None:
-    """Give the root logger a level and somewhere to write, because nothing else does. Uvicorn configures
-    only its own, so without this a deployed container prints the access log and nothing this module wrote."""
-    logging.basicConfig(
-        level=os.environ.get("LOG_LEVEL", "INFO").upper(),
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
-        stream=sys.stdout,
-    )
-    # After the handlers exist, and on the handlers rather than on a logger: `httpx` logs every
-    # request it makes at INFO, and a Telegram URL carries the token in its path.
-    redaction.install()
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    configure_logging()
     settings = Settings()  # type: ignore[call-arg]
     app.state.settings = settings
 

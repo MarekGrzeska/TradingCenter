@@ -8,6 +8,8 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 
+from tc_runtime.liveness import LoopHeartbeat
+
 from .. import resolver
 from ..alerts import Alerts, is_new_setup
 from ..archive import Archive
@@ -191,6 +193,7 @@ class EvaluationLoop:
         *,
         interval_seconds: int,
         alerts: Alerts | None = None,
+        heartbeat: LoopHeartbeat | None = None,
     ) -> None:
         self._pool = pool
         self._archive = archive
@@ -198,6 +201,9 @@ class EvaluationLoop:
         # `None` where no gateway is configured, which is a supported state: the platform decides
         # either way, and being unable to say so is never a reason not to have decided.
         self._alerts = alerts
+        # `None` in a test that drives a pass itself: what the loop reports is the loop's, and a
+        # caller with no loop has nothing to report.
+        self._heartbeat = heartbeat
         self._task: asyncio.Task | None = None
 
     @property
@@ -230,4 +236,9 @@ class EvaluationLoop:
                 # The loop outlives any one failure: everything below it already handles its own, and this is the
                 # backstop that keeps a surprise from ending the process's whole reason for running.
                 log.exception("an evaluation pass failed")
+            else:
+                # After the pass and only after it: a pass that raised is a pass that did not happen, and a
+                # heartbeat beaten regardless would report a stopped loop as healthy.
+                if self._heartbeat is not None:
+                    self._heartbeat.beat()
             await asyncio.sleep(self._interval)

@@ -336,6 +336,10 @@ resource "azurerm_linux_web_app" "market_data" {
     DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.prod.name}?sslmode=require"
     DATABASE_USER = local.market_data_app_name
 
+    # This module's share of the server's 35 connections — the largest share: the only module writing a row per closed candle per pair while serving two surfaces.
+    # The whole budget is one number, checked by `scripts/tests/test_pool_budget.py`.
+    DATABASE_POOL_SIZE = "8"
+
     # The module migrates inside the lifespan, so the warm-up window must outlast the longest migration. 1800 is the
     # platform's ceiling, so `migration_lock_wait_seconds` sits at 1500: the module has to give up first and say why.
     WEBSITES_CONTAINER_START_TIME_LIMIT = "1800"
@@ -447,6 +451,10 @@ resource "azurerm_linux_web_app" "workbench" {
     AGENT_DATABASE_URL = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.agent.name}?sslmode=require"
     TEAMS_DATABASE_URL = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.teams.name}?sslmode=require"
     DATABASE_USER      = local.workbench_app_name
+
+    # This module's share of the server's 35 connections — four for **each** of this process's two pools, so eight of the server's 35 — a turn holds one connection while the model answers.
+    # The whole budget is one number, checked by `scripts/tests/test_pool_budget.py`.
+    DATABASE_POOL_SIZE = "4"
 
     # The one credential no identity can replace: OpenAI is not in Entra. Key Vault references rather than literals, so
     # neither value enters state or a log — and **two keys still**, so the teams experiments bill on their own line.
@@ -795,6 +803,10 @@ resource "azurerm_linux_web_app" "polymarket_data" {
     DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.polymarket.name}?sslmode=require"
     DATABASE_USER = local.polymarket_data_app_name
 
+    # This module's share of the server's 35 connections — the sampling loop is one query per pass, and both surfaces read.
+    # The whole budget is one number, checked by `scripts/tests/test_pool_budget.py`.
+    DATABASE_POOL_SIZE = "3"
+
     # Polymarket's two public surfaces, set here rather than left to the module's defaults for the reason every other
     # upstream address is: a default that changed under a dependency bump would move it with nothing here to say so.
     GAMMA_BASE_URL = "https://gamma-api.polymarket.com"
@@ -925,6 +937,10 @@ resource "azurerm_linux_web_app" "social_data" {
       # identity is ambient. That user is the role `scripts/grant-schema-ownership.sql` creates, named after this app.
       DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.social.name}?sslmode=require"
       DATABASE_USER = local.social_data_app_name
+
+      # This module's share of the server's 35 connections — collecting is one pass, and nothing here writes on a request.
+      # The whole budget is one number, checked by `scripts/tests/test_pool_budget.py`.
+      DATABASE_POOL_SIZE = "3"
 
       # The feed, set here rather than left to the module's default for the reason every other upstream address is:
       # it is somebody's side project, and the day it moves is a deployment.
@@ -1105,6 +1121,10 @@ resource "azurerm_linux_web_app" "strategy" {
       DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.strategy.name}?sslmode=require"
       DATABASE_USER = local.strategy_app_name
 
+      # This module's share of the server's 35 connections — the runner evaluates one watch at a time, and a backtest reads market-data over HTTP.
+      # The whole budget is one number, checked by `scripts/tests/test_pool_budget.py`.
+      DATABASE_POOL_SIZE = "3"
+
       MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.strategy_easy_auth.password
 
       # The module does not take the block above on trust: were `auth_settings_v2` switched off by a careless edit,
@@ -1251,6 +1271,10 @@ resource "azurerm_linux_web_app" "telegram_gateway" {
       # identity is ambient. That user is the role `scripts/grant-schema-ownership.sql` creates for this app.
       DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.telegram.name}?sslmode=require"
       DATABASE_USER = local.telegram_gateway_app_name
+
+      # This module's share of the server's 35 connections — one HTTP call per message, not a query per row.
+      # The whole budget is one number, checked by `scripts/tests/test_pool_budget.py`.
+      DATABASE_POOL_SIZE = "4"
 
       # Telegram's bot surface, set here rather than left to the module's default for the reason every other
       # upstream address is: a default that moved under a dependency bump would move with nothing to say so.

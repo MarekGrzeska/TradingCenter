@@ -70,6 +70,7 @@ async def lifespan(app: FastAPI):
             client_id=settings.azure_client_id,
             client_secret=settings.azure_client_secret,
             tenant_id=settings.azure_tenant_id,
+            max_size=settings.database_pool_size,
         ) as pool,
         http_client(settings.gateway_api_key, settings.gateway_scope) as client,
     ):

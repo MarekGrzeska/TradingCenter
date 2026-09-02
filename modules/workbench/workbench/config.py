@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     # they are the same size of small, and neither is market-data's candle table.
     migration_lock_wait_seconds: float = 300.0
 
+    # Four for *each* of this process's two pools, so this module's share of the server is eight: a
+    # turn holds one connection while the model is answering, and the model is the slow part. Seven
+    # databases share one `B_Standard_B1ms` whose `max_connections` is 35 —
+    # `scripts/tests/test_pool_budget.py` counts this one twice and refuses a total above 30.
+    database_pool_size: int = 4
+
     agent_openai_api_key: str
     teams_openai_api_key: str
 
@@ -71,6 +77,13 @@ class Settings(BaseSettings):
     scheduler_failure_threshold: int = 3
 
     require_authenticated_principal: bool = False
+
+    @field_validator("database_pool_size")
+    @classmethod
+    def _pool_is_usable(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError(f"DATABASE_POOL_SIZE must be at least 1; got {value}")
+        return value
 
     @field_validator(
         "agent_database_url",

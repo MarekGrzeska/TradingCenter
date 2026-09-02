@@ -49,6 +49,11 @@ class Settings(BaseSettings):
     # the agent's five, and not thirty: App Service caps the container start at 1800s and must not win.
     migration_lock_wait_seconds: float = 1500.0
 
+    # Eight — the largest share, because this is the only module writing a row per closed candle
+    # per pair while serving two surfaces. Seven databases share one `B_Standard_B1ms` whose
+    # `max_connections` is 35: `scripts/tests/test_pool_budget.py` refuses a total above 30.
+    database_pool_size: int = 8
+
     # One backfill at a time by default: a deep read is dozens of back-to-back requests through the
     # gateway's shared rate gate, and two together starve the chart an operator is looking at.
     backfill_concurrency: int = 1
@@ -158,6 +163,7 @@ class Settings(BaseSettings):
         "max_tracked_pairs",
         "stream_ticket_ttl_seconds",
         "indicator_concurrency",
+        "database_pool_size",
     )
     @classmethod
     def _positive(cls, value: int, info: ValidationInfo) -> int:

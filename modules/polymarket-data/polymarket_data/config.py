@@ -45,6 +45,11 @@ class Settings(BaseSettings):
     # market-data's twenty-five: no migration here comes close to the length of a start.
     migration_lock_wait_seconds: float = 300.0
 
+    # Three: the sampling loop is one query per pass, and both surfaces read. Seven databases share
+    # one `B_Standard_B1ms` whose `max_connections` is 35 — `scripts/tests/test_pool_budget.py`
+    # adds every module's number up and refuses a total above 30.
+    database_pool_size: int = 3
+
     # Measured 22 August 2026: 30 sequential calls in 2.5 s drew no refusal. The source application
     # throttled to 6 for a year, so 6 is the starting value — to raise on evidence, not a limit hit.
     provider_concurrency: int = 6
@@ -82,6 +87,13 @@ class Settings(BaseSettings):
     @property
     def rest_caller_ids(self) -> frozenset[str]:
         return _identifiers(self.rest_caller_application_ids)
+
+    @field_validator("database_pool_size")
+    @classmethod
+    def _pool_is_usable(cls, value: int) -> int:
+        if value < 1:
+            raise ValueError(f"DATABASE_POOL_SIZE must be at least 1; got {value}")
+        return value
 
     @field_validator("gamma_base_url", "clob_base_url")
     @classmethod

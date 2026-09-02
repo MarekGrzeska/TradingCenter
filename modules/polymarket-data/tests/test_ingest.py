@@ -3,12 +3,14 @@ writes nothing."""
 
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import fakes
 import pytest
+from tc_runtime.liveness import LoopHeartbeat
 
 from polymarket_data import parsing, provider, store
 from polymarket_data.ingest import Ingest
@@ -370,3 +372,28 @@ class TestCollectionsShareOfThePool:
 
         assert written == 12, "every event was still sampled"
         assert counting.peak <= 2
+
+
+async def test_a_finished_pass_beats_the_heartbeat(pool):
+    """The rule itself is `tc-runtime`'s and tested there; this is the one test that the loop here
+    actually asks for it — without which the metric an alert stands on reports a stopped loop."""
+    heartbeat = LoopHeartbeat("sample", expected_seconds=60)
+    sampler = Ingest(
+        pool,
+        fakes.FakeProvider(),  # type: ignore[arg-type]
+        interval_seconds=60,
+        window_days=15,
+        default_backfill_days=90,
+        db_concurrency=3,
+        heartbeat=heartbeat,
+    )
+
+    await sampler.start()
+    try:
+        async with asyncio.timeout(5):
+            while not heartbeat.has_run:
+                await asyncio.sleep(0.01)
+    finally:
+        await sampler.stop()
+
+    assert heartbeat.has_run

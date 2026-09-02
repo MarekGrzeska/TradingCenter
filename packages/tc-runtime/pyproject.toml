@@ -19,6 +19,9 @@ dependencies = [
     # `auth` and `routers` are FastAPI-shaped. A module that only wants `db` still installs it; splitting the package
     # would be two packages for a dependency every consumer already has.
     "fastapi>=0.110",
+    # `liveness` creates an observable gauge and `telemetry` exports it. One dependency rather than
+    # two: the Azure distribution brings the OpenTelemetry API it is configured through.
+    "azure-monitor-opentelemetry>=1.6",
 ]
 
 [build-system]
