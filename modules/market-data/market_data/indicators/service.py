@@ -3,6 +3,7 @@ module owns. An indicator measures, it never decides. Two callers now, so refusa
 
 from __future__ import annotations
 
+import asyncio
 import math
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -205,14 +206,58 @@ async def compute(symbol: str, body: IndicatorsRequest, db, limiter) -> Indicato
                 )
 
     available_warmup_bars = first_requested
-    series = _build_series(rows)
     times_all = [row.period_start for row in rows]
-    session_close_before = _session_close_before(times_all, body.resolution, gaps)
 
+    # The arithmetic runs on a worker thread: numpy and TA-Lib hold the interpreter for tens of
+    # milliseconds over a few thousand candles, and this loop also serves the candle stream.
+    results = await asyncio.to_thread(
+        _compute_results,
+        resolved,
+        rows,
+        times_all,
+        minute_rows,
+        body.resolution,
+        gaps,
+        available_warmup_bars,
+        first_requested,
+        htf_periods,
+        start,
+        missing_series,
+    )
+
+    return IndicatorsOut(
+        symbol=symbol,
+        resolution=body.resolution,
+        price_side=PriceSide.BID,
+        derived=derived,
+        algorithm_version=ALGORITHM_VERSION,
+        times=times_all[first_requested:],
+        warmup_from=rows[0].period_start if rows else None,
+        uncovered=[Uncovered(from_=gap_start, to=gap_end) for gap_start, gap_end in gaps],
+        results=results,
+    )
+
+
+def _compute_results(
+    resolved: Sequence[tuple[IndicatorSpec, dict[str, float]]],
+    rows: Sequence[Candle | DerivedCandle],
+    times_all: Sequence[datetime],
+    minute_rows: Sequence[Candle | DerivedCandle],
+    resolution: Resolution,
+    gaps: Sequence[tuple[datetime, datetime]],
+    available_warmup_bars: int,
+    first_requested: int,
+    htf_periods: dict[Resolution, list[tuple[datetime, Candle]]],
+    start: datetime,
+    missing_series: dict[Resolution, str],
+) -> list[IndicatorResultOut]:
+    """Everything after the reads and before the response: pure, synchronous, and therefore the part
+    that runs off the event loop."""
+    series = _build_series(rows)
+    session_close_before = _session_close_before(times_all, resolution, gaps)
     minute_series = _build_series(minute_rows) if minute_rows else None
     minute_times = [row.period_start for row in minute_rows] if minute_rows else None
-
-    results = [
+    return [
         _result_out(
             entry,
             params,
@@ -229,18 +274,6 @@ async def compute(symbol: str, body: IndicatorsRequest, db, limiter) -> Indicato
         )
         for entry, params in resolved
     ]
-
-    return IndicatorsOut(
-        symbol=symbol,
-        resolution=body.resolution,
-        price_side=PriceSide.BID,
-        derived=derived,
-        algorithm_version=ALGORITHM_VERSION,
-        times=times_all[first_requested:],
-        warmup_from=rows[0].period_start if rows else None,
-        uncovered=[Uncovered(from_=gap_start, to=gap_end) for gap_start, gap_end in gaps],
-        results=results,
-    )
 
 
 def _build_series(rows: Sequence[Candle | DerivedCandle]) -> Series:
