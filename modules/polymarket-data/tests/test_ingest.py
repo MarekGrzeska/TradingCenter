@@ -397,3 +397,41 @@ async def test_a_finished_pass_beats_the_heartbeat(pool):
         await sampler.stop()
 
     assert heartbeat.has_run
+
+
+class CountingProvider(fakes.FakeProvider):
+    """Records how many outcomes are inside `price_history` at once; each call yields so the others
+    can start, which is what the real provider's latency does for free."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.in_flight = 0
+        self.most_in_flight = 0
+
+    async def price_history(self, token_id, *, since, until, fidelity_minutes=1):
+        self.in_flight += 1
+        self.most_in_flight = max(self.most_in_flight, self.in_flight)
+        try:
+            await asyncio.sleep(0.01)
+            return await super().price_history(
+                token_id, since=since, until=until, fidelity_minutes=fidelity_minutes
+            )
+        finally:
+            self.in_flight -= 1
+
+
+async def test_a_backfill_works_on_a_few_outcomes_at_a_time(pool) -> None:
+    """Every outcome of an event backfilling together was a 655 MB peak against 290 at rest: a
+    fifteen-day window is ~21 600 points parsed and turned into samples before they are written,
+    and an event has many outcomes. The event still gets all of them, a few at a time."""
+    names = tuple(f"O{i}" for i in range(10))
+    payload = fakes.event_payload(
+        markets=(fakes.market_payload("m-1", outcomes=names, prices=("0.1",) * 10, last_trade=None),)
+    )
+    event_id = await track(pool, payload)
+    fake = CountingProvider()
+
+    await ingest(pool, fake, window_days=15).backfill_event(event_id, since=_now() - timedelta(days=1))
+
+    assert len({token for token, _, _ in fake.history_calls}) == 10, "every outcome was asked for"
+    assert fake.most_in_flight <= 4

@@ -24,6 +24,11 @@ EDGE_SLACK = timedelta(seconds=90)
 # concludes the provider has nothing older. Half a day: less is an ordinary thin first minute.
 NOTHING_OLDER_SLACK = timedelta(hours=12)
 
+# How many outcomes a backfill works on at once. A fifteen-day window at one-minute fidelity is ~21 600
+# points, parsed and turned into samples before they are written; every outcome of an event doing that
+# together was the 655 MB peak measured on 4 September 2026, against ~290 MB at rest.
+BACKFILL_OUTCOMES_AT_ONCE = 4
+
 
 def _now() -> datetime:
     return datetime.now(UTC)
@@ -52,6 +57,9 @@ class Ingest:
         self._window = timedelta(days=window_days)
         self._default_depth = timedelta(days=default_backfill_days)
         self._connections = asyncio.Semaphore(db_concurrency)
+        # Separate from `_connections`: an outcome holds this for its whole backfill and takes a
+        # connection inside it, so sharing one semaphore would have the holders wait on themselves.
+        self._outcomes = asyncio.Semaphore(BACKFILL_OUTCOMES_AT_ONCE)
         self._task: asyncio.Task | None = None
         # Backfills started by tracking, held so they are cancelled with the module rather
         # than left writing into a closing pool.
@@ -226,21 +234,24 @@ class Ingest:
         written = 0
         window_start = since
         now = _now()
-        while window_start < now:
-            window_end = min(window_start + self._window, now)
-            try:
-                written += await self._fill_window(outcome_id, token_id, window_start, window_end)
-            except provider.ProviderError as err:
-                # This window only. The rest of the range is still worth having, and this one
-                # stays uncollected so a later run comes back to it.
-                log.warning(
-                    "backfill window %s..%s for outcome %s failed: %s",
-                    window_start.isoformat(),
-                    window_end.isoformat(),
-                    outcome_id,
-                    err,
-                )
-            window_start = window_end
+        async with self._outcomes:
+            while window_start < now:
+                window_end = min(window_start + self._window, now)
+                try:
+                    written += await self._fill_window(
+                        outcome_id, token_id, window_start, window_end
+                    )
+                except provider.ProviderError as err:
+                    # This window only. The rest of the range is still worth having, and this one
+                    # stays uncollected so a later run comes back to it.
+                    log.warning(
+                        "backfill window %s..%s for outcome %s failed: %s",
+                        window_start.isoformat(),
+                        window_end.isoformat(),
+                        outcome_id,
+                        err,
+                    )
+                window_start = window_end
         return written
 
     async def _fill_window(
