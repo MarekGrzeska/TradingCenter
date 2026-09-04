@@ -859,3 +859,50 @@ class TestPartialAnswer:
 
         assert response.status_code == 200
         assert reads.count(Resolution.MINUTE_5) == 1, reads
+
+
+async def test_the_arithmetic_does_not_hold_the_event_loop(api, pool, monkeypatch) -> None:
+    """This loop also serves the candle stream, and will serve the conversation beside it: a request
+    that computes for a while must not stall everything else awaiting on it. The computation is
+    stretched to a known 300 ms so the measurement is about where it runs, not how fast numpy is."""
+    import time
+
+    from market_data.indicators import service
+
+    async with pool.acquire() as conn:
+        await write_candles(conn, [candle(m) for m in range(30, -1, -1)])
+    unstretched = service._compute_results
+
+    def stretched(*args):
+        time.sleep(0.3)
+        return unstretched(*args)
+
+    monkeypatch.setattr(service, "_compute_results", stretched)
+
+    longest_gap = 0.0
+
+    async def tick_until(done: asyncio.Event) -> None:
+        nonlocal longest_gap
+        last = time.perf_counter()
+        while not done.is_set():
+            await asyncio.sleep(0.005)
+            now = time.perf_counter()
+            longest_gap = max(longest_gap, now - last)
+            last = now
+
+    done = asyncio.Event()
+    ticker = asyncio.create_task(tick_until(done))
+    response = await api.post(
+        "/indicators/US100",
+        json={
+            "resolution": "MINUTE",
+            "from": (NOW - timedelta(minutes=10)).isoformat(),
+            "to": (NOW + timedelta(minutes=1)).isoformat(),
+            "specs": [{"id": "sma", "params": {"period": 5}}],
+        },
+    )
+    done.set()
+    await ticker
+
+    assert response.status_code == 200
+    assert longest_gap < 0.15, f"the loop stood still for {longest_gap:.3f}s during the computation"
