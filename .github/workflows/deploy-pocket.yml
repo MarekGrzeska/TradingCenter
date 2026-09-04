@@ -98,7 +98,7 @@ jobs:
       # instead, which against a deployed archive is a screen that 401s on every read.
       - run: pnpm build
         env:
-          VITE_POLYMARKET_HTTP: https://app-tradingcenter-polymarket-data.azurewebsites.net
+          VITE_POLYMARKET_HTTP: https://app-tradingcenter-agent.azurewebsites.net/polymarket
           VITE_SOCIAL_HTTP: https://app-tradingcenter-social-data.azurewebsites.net
           # The conversation, which is the only way this app reaches a tool. The host keeps the `-agent`
           # spelling because the App Service does: a name here is an identity, not a label.
@@ -109,7 +109,7 @@ jobs:
           VITE_ENTRA_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
           # A literal, like the terminal's four: the same kind of public fact as the hostname beside it, and a
           # scope left unset is no credential rather than another module's.
-          VITE_ENTRA_SCOPE_POLYMARKET: api://tradingcenter-polymarket-data/access_as_user
+          VITE_ENTRA_SCOPE_POLYMARKET: api://tradingcenter-agent/access_as_user
           # **One scope per back end**: a token minted for one module is not sent to another. Left unset, the
           # agent tab says it has no audience rather than presenting the archive's and meeting a 401.
           VITE_ENTRA_SCOPE_WORKBENCH: api://tradingcenter-agent/access_as_user

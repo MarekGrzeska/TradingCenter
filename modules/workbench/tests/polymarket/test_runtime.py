@@ -12,9 +12,11 @@ def test_this_modules_lock_key_is_still_its_own() -> None:
 
 
 def test_migrations_live_beside_the_package() -> None:
-    """`Dockerfile` copies `polymarket_data/` and `migrations/` as siblings, so an
-    expression that resolves here has to resolve in the image too."""
-    assert MIGRATIONS.name == "migrations"
+    """The workbench's `Dockerfile` copies `polymarket_data/` and `migrations/` as siblings, so an
+    expression that resolves here has to resolve in the image too — this chain is one of that
+    directory's subdirectories, beside the conversation's and the teams'."""
+    assert MIGRATIONS.name == "polymarket"
+    assert MIGRATIONS.parent.name == "migrations"
     assert (MIGRATIONS / "env.py").is_file()
 
 

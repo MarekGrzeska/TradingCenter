@@ -34,9 +34,8 @@ class ToolServerRegistry:
                 # The one whose writes land on the account. No operator identity: the account is one and
                 # shared, and trading-mcp reads no such header.
                 ToolServer(settings, prefix="trading_mcp", can_move_the_account=True),
-                # The prediction-market archive. Reads only: the three tools of its nine that write write
-                # a watch list, not an account.
-                ToolServer(settings, prefix="polymarket_mcp"),
+                # No polymarket server: the prediction-market archive is a package of this process since
+                # `one-process-per-security-boundary`, and its tools arrive through `local_sources`.
                 # The post archive. Nothing on that surface writes at all.
                 ToolServer(settings, prefix="social_mcp"),
                 # The door to Telegram. Its send tool is the only thing on any of these surfaces whose

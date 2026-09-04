@@ -30,14 +30,12 @@ GOOD_ENV: dict[str, str] = {
         "TEAMS_OPENAI_API_KEY=sk-test-teams\n"
         "MARKET_MCP_URL=http://127.0.0.1:8020\n"
         "TRADING_MCP_URL=http://127.0.0.1:8060\n"
-        "POLYMARKET_MCP_URL=http://127.0.0.1:8070\n"
+        "POLYMARKET_DATABASE_URL=postgresql://polymarket:pw@127.0.0.1:55432/polymarket\n"
         "SOCIAL_MCP_URL=http://127.0.0.1:8090\n"
         "TELEGRAM_MCP_URL=http://127.0.0.1:8100\n"
         "STRATEGY_MCP_URL=http://127.0.0.1:8080\n"
     ),
     "trading-mcp": "CAPITAL_GATEWAY_API_KEY=shared-secret\n",
-    # No credential to carry: both of Polymarket's surfaces are public.
-    "polymarket-data": "DATABASE_URL=postgresql://polymarket:pw@127.0.0.1:55432/polymarket\n",
     # Nor here: the model key is optional, and without it the module collects and reads nothing.
     "social-data": "DATABASE_URL=postgresql://social:pw@127.0.0.1:55432/social\n",
     "strategy": "DATABASE_URL=postgresql://strategy:pw@127.0.0.1:55432/strategy\n",
@@ -152,14 +150,13 @@ class TestRefusals:
         assert any(f"modules/{module}/.env is missing" in p for p in problems)
 
     def test_the_modules_needing_an_env_are_the_ones_holding_a_credential(self) -> None:
-        """What is listed here is what has no default to fall back on: a secret for four of the five, and for
-        `polymarket-data` one public setting — `DATABASE_URL` is undefaulted wherever a module owns a database."""
+        """What is listed here is what has no default to fall back on: a secret for most, and for the rest
+        one public setting — `DATABASE_URL` is undefaulted wherever a module owns a database."""
         assert {module for module, _ in REQUIRED_ENV} == {
             "capital-gateway",
             "market-data",
             "workbench",
             "trading-mcp",
-            "polymarket-data",
             "social-data",
             # Listed for market-data's reason rather than trading-mcp's: no secret of its
             # own, but `DATABASE_URL` has no default, so the process exits at start.
@@ -247,7 +244,6 @@ class TestStartOrder:
             "capital-gateway",
             "market-data",
             "trading-mcp",
-            "polymarket-data",
             "social-data",
             "strategy",
             "telegram-gateway",
@@ -262,7 +258,6 @@ class TestStartOrder:
             "market-data": 8020,
             "workbench": 8030,
             "trading-mcp": 8060,
-            "polymarket-data": 8070,
             "social-data": 8090,
             "strategy": 8080,
             "telegram-gateway": 8100,
@@ -271,10 +266,9 @@ class TestStartOrder:
         }
 
     def test_the_ports_that_stopped_being_anybodys_are_not_listened_on(self) -> None:
-        """8040 went with market-mcp and 8050 with teams-mcp; a `.env` still naming either is a tool server that
-        reads as down. 8070 left this list deliberately, which is the edit CLAUDE.md's port line makes with it."""
-        assert {8040, 8050}.isdisjoint({service.port for service in SERVICES})
-        assert 8070 in {service.port for service in SERVICES}
+        """8040 went with market-mcp, 8050 with teams-mcp and 8070 with polymarket-data into the workbench; a
+        `.env` still naming any of them is a tool server that reads as down."""
+        assert {8040, 8050, 8070}.isdisjoint({service.port for service in SERVICES})
 
     def test_every_back_end_is_waited_for(self) -> None:
         """A service started and not waited for is what `dev.ps1` once did to teams-mcp."""

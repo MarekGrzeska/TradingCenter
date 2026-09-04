@@ -20,7 +20,6 @@ locals {
     "market-data"      = local.market_data_app_name
     "workbench"        = local.workbench_app_name
     "trading-mcp"      = local.trading_mcp_app_name
-    "polymarket-data"  = local.polymarket_data_app_name
     "social-data"      = local.social_data_app_name
     "strategy"         = local.strategy_app_name
     "telegram-gateway" = local.telegram_gateway_app_name
@@ -34,7 +33,6 @@ locals {
   trading_mcp_app_name = "app-tradingcenter-trading-mcp"
   # Named after the module from the first day, which is the one thing `workbench_app_name` above cannot be — a
   # rename later is a new identity, a new Postgres role and an edit in every module that names the old one.
-  polymarket_data_app_name  = "app-tradingcenter-polymarket-data"
   social_data_app_name      = "app-tradingcenter-social-data"
   strategy_app_name         = "app-tradingcenter-strategy"
   telegram_gateway_app_name = "app-tradingcenter-telegram-gateway"
@@ -45,7 +43,6 @@ locals {
   market_data_hostname      = "${local.market_data_app_name}.azurewebsites.net"
   workbench_hostname        = "${local.workbench_app_name}.azurewebsites.net"
   trading_mcp_hostname      = "${local.trading_mcp_app_name}.azurewebsites.net"
-  polymarket_data_hostname  = "${local.polymarket_data_app_name}.azurewebsites.net"
   social_data_hostname      = "${local.social_data_app_name}.azurewebsites.net"
   strategy_hostname         = "${local.strategy_app_name}.azurewebsites.net"
   telegram_gateway_hostname = "${local.telegram_gateway_app_name}.azurewebsites.net"
@@ -64,8 +61,6 @@ locals {
 
   # The same shape for the prediction-market archive, and with a delegated scope too: the workbench reaches it
   # with a managed identity and the terminal as a person, so its door is asked to recognise both.
-  polymarket_data_api_uri   = "api://tradingcenter-polymarket-data"
-  polymarket_data_api_scope = "access_as_user"
 
   # The post archive's own audience, with a delegated scope for polymarket-data's reason: the workbench reaches it
   # with a managed identity and both screens reach it as the operator, so its door recognises both.
@@ -506,11 +501,22 @@ resource "azurerm_linux_web_app" "workbench" {
     TRADING_MCP_URL   = "https://${local.trading_mcp_hostname}"
     TRADING_MCP_SCOPE = "${local.trading_mcp_api_uri}/.default"
 
-    # The third tool server, same rule and same rollback. **This pair MUST reach the app before the image that uses
-    # it**: an apply landing after the deploy is an outage in between, and neither half substitutes for the other.
-    POLYMARKET_MCP_URL   = "https://${local.polymarket_data_hostname}"
-    POLYMARKET_MCP_SCOPE = "${local.polymarket_data_api_uri}/.default"
-
+    # No POLYMARKET_MCP_URL: the prediction-market archive is a package of this process since
+    # `one-process-per-security-boundary`, served under `/polymarket`. Its database, under its own name, and the
+    # two lists its route record reads. The tool list is empty on purpose — nothing outside this process calls
+    # `/polymarket/mcp`; the conversation calls those tools as functions.
+    POLYMARKET_DATABASE_URL       = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.polymarket.name}?sslmode=require"
+    POLYMARKET_DATABASE_POOL_SIZE = "3"
+    POLYMARKET_GAMMA_BASE_URL     = "https://gamma-api.polymarket.com"
+    POLYMARKET_CLOB_BASE_URL      = "https://clob.polymarket.com"
+    # Measured, not decorative: the provider's edge refuses `Python-urllib/*` with 403 "error code: 1010" on both
+    # surfaces (22 August 2026), and a library default changing on a bump would read as an access refusal.
+    POLYMARKET_PROVIDER_USER_AGENT = "tradingcenter-polymarket-data/0.1 (+https://github.com/MarekGrzeska)"
+    TOOL_CALLER_APPLICATION_IDS    = ""
+    REST_CALLER_APPLICATION_IDS = join(",", [
+      azuread_application.terminal.client_id,
+      azuread_application.pocket.client_id,
+    ])
     # The fourth, same rule and same rollback — clear this pair and restart, and the conversation runs without
     # post tools, which is a state its own tests walk.
     SOCIAL_MCP_URL   = "https://${local.social_data_hostname}"
@@ -551,7 +557,6 @@ locals {
     "market-data"      = azurerm_linux_web_app.market_data.identity[0].principal_id
     "workbench"        = azurerm_linux_web_app.workbench.identity[0].principal_id
     "trading-mcp"      = azurerm_linux_web_app.trading_mcp.identity[0].principal_id
-    "polymarket-data"  = azurerm_linux_web_app.polymarket_data.identity[0].principal_id
     "social-data"      = azurerm_linux_web_app.social_data.identity[0].principal_id
     "strategy"         = azurerm_linux_web_app.strategy.identity[0].principal_id
     "telegram-gateway" = azurerm_linux_web_app.telegram_gateway.identity[0].principal_id
@@ -715,146 +720,8 @@ output "trading_mcp_hostname" {
   value = azurerm_linux_web_app.trading_mcp.default_hostname
 }
 
-# polymarket-data: shaped like trading-mcp, one backend caller with a managed identity. Behind it is a watch list, never
-# money — the narrow gate is that **the tool caller must not reach the route that deletes collected history**.
-module "polymarket_data_easy_auth" {
-  source = "./modules/easy-auth-app"
 
-  display_name   = "app-tradingcenter-polymarket-data-easyauth"
-  identifier_uri = local.polymarket_data_api_uri
-  redirect_uri   = "https://${local.polymarket_data_hostname}/.auth/login/aad/callback"
 
-  # A delegated scope since `polymarket-screen-opens-the-archive`. It had none while the workbench was the only
-  # caller: a managed identity presenting client credentials has no consent screen and nothing to consent to.
-  scope = {
-    value                      = local.polymarket_data_api_scope
-    admin_consent_display_name = "Read and manage the prediction-market archive"
-    admin_consent_description  = "Allows the app to reach polymarket-data as the signed-in operator, including removing collected history."
-    user_consent_display_name  = "Read and manage your prediction-market archive"
-    user_consent_description   = "Allows the app to read what you track on Polymarket, change that list, and remove collected history."
-  }
-}
-
-resource "azurerm_linux_web_app" "polymarket_data" {
-  name                = local.polymarket_data_app_name
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
-  service_plan_id     = azurerm_service_plan.main.id
-  https_only          = true
-
-  # Two things need it, and Polymarket is neither — that upstream is public. It is the database, through an Entra
-  # token fetched at connection time, and the GHCR pull token in Key Vault.
-  identity {
-    type = "SystemAssigned"
-  }
-
-  site_config {
-    always_on = true
-
-    # **The preflight is answered by the platform, never by the app** — the fourth time this trap has been walked into,
-    # measured again on 22 August 2026. `polymarket_data` MUST NOT add a middleware: two layers double the header.
-    cors {
-      allowed_origins     = [local.terminal_origin, local.pocket_origin]
-      support_credentials = false
-    }
-
-    # No `ip_restriction`, like the other apps. Nothing in this root has ever set one;
-    # what differs between these apps is only which credential their door asks for.
-
-    application_stack {
-      # Placeholder — `deploy-polymarket-data.yml` pushes the real GHCR image; the
-      # lifecycle block below is what stops Terraform reverting it.
-      docker_image_name = "mcr.microsoft.com/appsvc/staticsite:latest"
-
-      docker_registry_url      = local.ghcr_registry_url
-      docker_registry_username = local.ghcr_registry_username
-      docker_registry_password = local.ghcr_registry_password
-    }
-  }
-
-  auth_settings_v2 {
-    auth_enabled           = true
-    require_authentication = true
-    unauthenticated_action = "Return401"
-    default_provider       = "azureactivedirectory"
-
-    # The health route and nothing else — the platform restarts the container off this response and speaks no Easy
-    # Auth, and `deploy_probe.py` reads the same path. It answers with the module's own state, naming no tracked event.
-    excluded_paths = ["/"]
-
-    active_directory_v2 {
-      client_id                  = module.polymarket_data_easy_auth.client_id
-      tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
-      client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
-
-      # Both spellings of the same request, for market-data's reason: by scope name the audience is the `api://` uri,
-      # as `<client-id>/.default` it is the client id.
-      allowed_audiences = [
-        local.polymarket_data_api_uri,
-        module.polymarket_data_easy_auth.client_id,
-      ]
-
-      # Three callers, named, each reaching exactly one of this module's two surfaces — the workbench the nine tools
-      # at `/mcp`, the terminal and pocket the REST contract. Being on this list is not what separates them; the
-      # settings below are. Easy Auth authorizes an application, not a route.
-      allowed_applications = [
-        data.azuread_service_principal.workbench_managed_identity.client_id,
-        azuread_application.terminal.client_id,
-        azuread_application.pocket.client_id,
-      ]
-    }
-
-    login {
-      token_store_enabled = true
-    }
-  }
-
-  app_settings = {
-    # No credential in the URL and no AZURE_* triple — config.py refuses one when DATABASE_USER is set, and the
-    # identity is ambient. That user is the role `scripts/grant-schema-ownership.sql` creates, named after this app.
-    DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.polymarket.name}?sslmode=require"
-    DATABASE_USER = local.polymarket_data_app_name
-
-    # This module's share of the server's 35 connections — the sampling loop is one query per pass, and both surfaces read.
-    # The whole budget is one number, checked by `scripts/tests/test_pool_budget.py`.
-    DATABASE_POOL_SIZE = "3"
-
-    # Polymarket's two public surfaces, set here rather than left to the module's defaults for the reason every other
-    # upstream address is: a default that changed under a dependency bump would move it with nothing here to say so.
-    GAMMA_BASE_URL = "https://gamma-api.polymarket.com"
-    CLOB_BASE_URL  = "https://clob.polymarket.com"
-
-    # Measured, not decorative: the provider's edge refuses `Python-urllib/*` with 403 "error code: 1010" on both
-    # surfaces (22 August 2026), and a library default changing on a bump would read as an access refusal.
-    PROVIDER_USER_AGENT = "tradingcenter-polymarket-data/0.1 (+https://github.com/MarekGrzeska)"
-
-    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.polymarket_data_easy_auth.password
-
-    # The module checks the caller's identity itself rather than trusting the block above is switched on — the same
-    # refusal to take the platform on faith market-data, trading-mcp and the workbench all make.
-    REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
-
-    # Which caller reaches which surface, by the `azp` claim and never by `X-MS-CLIENT-PRINCIPAL-ID`. What separates the
-    # two is not reading from writing but that **removing collected history is a REST route**.
-    TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
-    # Comma-separated, which `config.py` splits: two browsers reach the REST contract now and the module's own record
-    # has to name both, or the second is refused by the module after the platform has already let it through.
-    REST_CALLER_APPLICATION_IDS = join(",", [
-      azuread_application.terminal.client_id,
-      azuread_application.pocket.client_id,
-    ])
-
-    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
-  }
-
-  lifecycle {
-    ignore_changes = [site_config[0].application_stack[0].docker_image_name]
-  }
-}
-
-output "polymarket_data_hostname" {
-  value = azurerm_linux_web_app.polymarket_data.default_hostname
-}
 # social-data: the same door as polymarket-data, and one difference behind it — **nothing on either surface writes**.
 # What the record separates is which caller reaches which surface, not what either may change.
 module "social_data_easy_auth" {
@@ -1011,15 +878,7 @@ output "social_data_managed_identity_principal_id" {
 }
 
 
-output "terminal_entra_scope_polymarket" {
-  description = "The scope the terminal asks for when it wants a token for polymarket-data. `deploy-terminal.yml` carries this as a literal beside the four hostnames, like the workbench's and the gateway's — a repository variable per scope would be four chances to leave one unset, and the failure surfaces at sign-in as a message about an unknown resource."
-  value       = "${local.polymarket_data_api_uri}/${local.polymarket_data_api_scope}"
-}
 
-output "polymarket_data_managed_identity_principal_id" {
-  description = "The operator's one-off Postgres role creation in the `polymarket` database needs this object id (scripts/grant-schema-ownership.sql)."
-  value       = azurerm_linux_web_app.polymarket_data.identity[0].principal_id
-}
 
 # There is no teams-mcp block below this line any more: those tools became a layer inside the workbench, and what went
 # with it is a whole App Service, its Easy Auth registration and secret, an identity, a policy — and a network hop.

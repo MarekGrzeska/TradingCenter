@@ -152,18 +152,8 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "workbench_outbound"
   end_ip_address   = each.value
 }
 
-# The third of the same shape and the same two-apply first convergence. The addresses are the plan's, so this overlaps
-# the two above entirely — written out anyway, because a rule named after its app survives that app being removed.
-resource "azurerm_postgresql_flexible_server_firewall_rule" "polymarket_data_outbound" {
-  for_each = toset(azurerm_linux_web_app.polymarket_data.possible_outbound_ip_address_list)
 
-  name             = "AllowPolymarketDataOutbound-${replace(each.value, ".", "-")}"
-  server_id        = azurerm_postgresql_flexible_server.main.id
-  start_ip_address = each.value
-  end_ip_address   = each.value
-}
-
-# The fourth, same shape and same first convergence: `terraform apply -target=azurerm_linux_web_app.social_data`
+# Same shape and same first convergence for social-data: `terraform apply -target=azurerm_linux_web_app.social_data`
 # once, then the normal unrestricted apply.
 resource "azurerm_postgresql_flexible_server_firewall_rule" "social_data_outbound" {
   for_each = toset(azurerm_linux_web_app.social_data.possible_outbound_ip_address_list)

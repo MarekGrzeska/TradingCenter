@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from agent.config import ModelCatalogueEntry as AgentModelCatalogueEntry
 from agent.config import Settings as AgentSettings
+from polymarket_data.config import Settings as PolymarketSettings
 from teams.config import ModelCatalogueEntry as TeamsModelCatalogueEntry
 from teams.config import Settings as TeamsSettings
 
@@ -50,12 +51,6 @@ class Settings(BaseSettings):
     trading_mcp_scope: str | None = None
     trading_mcp_request_timeout_seconds: float = 35.0
 
-    # The third pair, read by both surfaces and optional on its own: unset means neither can say what a market prices
-    # an event at, which is the state both were in before that module existed.
-    polymarket_mcp_url: str | None = None
-    polymarket_mcp_scope: str | None = None
-    polymarket_mcp_request_timeout_seconds: float = 35.0
-
     # The fourth pair, same shape as the three above: unset means neither surface can say what was posted.
     # Its tools read one database and reach nothing outward, so the ceiling is the archive's, not the provider's.
     social_mcp_url: str | None = None
@@ -84,6 +79,15 @@ class Settings(BaseSettings):
 
     require_authenticated_principal: bool = False
 
+    # The prediction-market archive is a package of this process (`one-process-per-security-boundary`): its own
+    # database under its own name, and the two caller lists its route record reads. Everything else it needs is
+    # read under `POLYMARKET_` by `for_polymarket`, or is the one setting the whole process shares.
+    polymarket_database_url: str
+    # Who may reach `/polymarket/mcp` from outside — nobody today, since the conversation calls those tools in this
+    # process — and which browsers reach `/polymarket` over REST.
+    tool_caller_application_ids: str = ""
+    rest_caller_application_ids: str = ""
+
     @field_validator("database_pool_size")
     @classmethod
     def _pool_is_usable(cls, value: int) -> int:
@@ -94,6 +98,7 @@ class Settings(BaseSettings):
     @field_validator(
         "agent_database_url",
         "teams_database_url",
+        "polymarket_database_url",
         "agent_openai_api_key",
         "teams_openai_api_key",
     )
@@ -111,8 +116,6 @@ class Settings(BaseSettings):
         "market_mcp_scope",
         "trading_mcp_url",
         "trading_mcp_scope",
-        "polymarket_mcp_url",
-        "polymarket_mcp_scope",
         "social_mcp_url",
         "social_mcp_scope",
         "telegram_mcp_url",
@@ -149,9 +152,6 @@ class Settings(BaseSettings):
             trading_mcp_url=self.trading_mcp_url,
             trading_mcp_scope=self.trading_mcp_scope,
             trading_mcp_request_timeout_seconds=self.trading_mcp_request_timeout_seconds,
-            polymarket_mcp_url=self.polymarket_mcp_url,
-            polymarket_mcp_scope=self.polymarket_mcp_scope,
-            polymarket_mcp_request_timeout_seconds=self.polymarket_mcp_request_timeout_seconds,
             social_mcp_url=self.social_mcp_url,
             social_mcp_scope=self.social_mcp_scope,
             social_mcp_request_timeout_seconds=self.social_mcp_request_timeout_seconds,
@@ -181,9 +181,6 @@ class Settings(BaseSettings):
             trading_mcp_url=self.trading_mcp_url,
             trading_mcp_scope=self.trading_mcp_scope,
             trading_mcp_request_timeout_seconds=self.trading_mcp_request_timeout_seconds,
-            polymarket_mcp_url=self.polymarket_mcp_url,
-            polymarket_mcp_scope=self.polymarket_mcp_scope,
-            polymarket_mcp_request_timeout_seconds=self.polymarket_mcp_request_timeout_seconds,
             social_mcp_url=self.social_mcp_url,
             social_mcp_scope=self.social_mcp_scope,
             social_mcp_request_timeout_seconds=self.social_mcp_request_timeout_seconds,
@@ -198,4 +195,21 @@ class Settings(BaseSettings):
             scheduler_enabled=self.scheduler_enabled,
             scheduler_poll_interval_seconds=self.scheduler_poll_interval_seconds,
             scheduler_failure_threshold=self.scheduler_failure_threshold,
+        )
+
+    def for_polymarket(self) -> PolymarketSettings:
+        """The archive's own settings: what the process shares is passed by hand, what is the archive's alone is read
+        under `POLYMARKET_` — the same `.env` this class reads, or none where this class reads none."""
+        return PolymarketSettings(
+            _env_prefix="POLYMARKET_",  # pyright: ignore[reportCallIssue]
+            _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
+            database_url=self.polymarket_database_url,
+            database_user=self.database_user,
+            azure_client_id=self.azure_client_id,
+            azure_client_secret=self.azure_client_secret,
+            azure_tenant_id=self.azure_tenant_id,
+            migration_lock_wait_seconds=self.migration_lock_wait_seconds,
+            require_authenticated_principal=self.require_authenticated_principal,
+            tool_caller_application_ids=self.tool_caller_application_ids,
+            rest_caller_application_ids=self.rest_caller_application_ids,
         )

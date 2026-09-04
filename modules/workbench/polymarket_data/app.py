@@ -1,18 +1,15 @@
 """The published surface: FastAPI over the prediction-market archive. Only assembly lives here, and the
-order inside the lifespan is what to read twice: the database is migrated before anything is written."""
+order inside `serving` is what to read twice: the database is migrated before anything is written.
+
+A package of the workbench process since `one-process-per-security-boundary`: the host mounts `create_app()`
+under `/polymarket` and enters `serving` from its own lifespan, because a mounted application's lifespan is
+never run. `app` and `lifespan` below are what `python -m polymarket_data.openapi` and the tests build.
+"""
 
 from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-
-from tc_runtime import telemetry
-
-# Above `from fastapi import ...` and not merely before `FastAPI(...)`: the auto-instrumentation
-# patches the class attribute, and the import binds this module's name to the unpatched one.
-# `httpx` quiet because one sampling pass logs a line per provider call and says nothing
-# this module does not log itself.
-telemetry.configure(quiet=("httpx", "httpcore"))
 
 from fastapi import FastAPI
 from tc_runtime import liveness, migrate, schema_version
@@ -30,10 +27,9 @@ from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 log = logging.getLogger(__name__)
 
 
-
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    settings = Settings()  # type: ignore[call-arg]
+async def serving(app: FastAPI, settings: Settings):
+    """Everything this package needs running, on `app.state`, for as long as the block is open."""
     app.state.settings = settings
 
     async with (
@@ -94,6 +90,14 @@ async def lifespan(app: FastAPI):
                 yield
             finally:
                 await ingest.stop()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Standalone: the settings read from this process's environment, then `serving`."""
+    settings = Settings()  # type: ignore[call-arg]
+    async with serving(app, settings):
+        yield
 
 
 def create_app() -> FastAPI:

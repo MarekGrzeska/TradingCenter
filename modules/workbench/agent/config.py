@@ -86,14 +86,6 @@ class Settings(BaseSettings):
     # of an order that had already been sent — the one failure shape this must never produce silently.
     trading_mcp_request_timeout_seconds: float = 35.0
 
-    # The third of the three: unset, the module runs and cannot answer what a market prices an event at.
-    # Two of its nine tools reach the provider live, which is why the ceiling below is not market-mcp's.
-    polymarket_mcp_url: str | None = None
-    polymarket_mcp_scope: str | None = None
-    # A little past polymarket-data's own ceiling on the provider, for trading-mcp's reason rather than
-    # market-mcp's: two of its tools ask Polymarket while the operator waits.
-    polymarket_mcp_request_timeout_seconds: float = 35.0
-
     # The fourth: unset, the module runs and cannot say what was posted. Its tools read one database and
     # reach nothing outward while the operator waits, so the ceiling is market-mcp's rather than the other two's.
     social_mcp_url: str | None = None
@@ -130,8 +122,6 @@ class Settings(BaseSettings):
         "market_mcp_scope",
         "trading_mcp_url",
         "trading_mcp_scope",
-        "polymarket_mcp_url",
-        "polymarket_mcp_scope",
         "social_mcp_url",
         "social_mcp_scope",
         "telegram_mcp_url",
@@ -188,9 +178,6 @@ class Settings(BaseSettings):
         )
         self.trading_mcp_url = _checked_server(
             "TRADING_MCP", self.trading_mcp_url, self.trading_mcp_scope
-        )
-        self.polymarket_mcp_url = _checked_server(
-            "POLYMARKET_MCP", self.polymarket_mcp_url, self.polymarket_mcp_scope
         )
         self.social_mcp_url = _checked_server(
             "SOCIAL_MCP", self.social_mcp_url, self.social_mcp_scope

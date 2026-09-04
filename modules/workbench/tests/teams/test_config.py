@@ -103,11 +103,11 @@ def test_every_server_configured_independently_is_accepted() -> None:
         market_mcp_url="http://127.0.0.1:8020",
         trading_mcp_url="https://trading-mcp.example.com",
         trading_mcp_scope="api://some-app/.default",
-        polymarket_mcp_url="http://127.0.0.1:8070",
+        social_mcp_url="http://127.0.0.1:8090",
     )
     assert resolved.market_mcp_url == "http://127.0.0.1:8020"
     assert resolved.trading_mcp_url == "https://trading-mcp.example.com"
-    assert resolved.polymarket_mcp_url == "http://127.0.0.1:8070"
+    assert resolved.social_mcp_url == "http://127.0.0.1:8090"
 
 
 def test_two_servers_configured_and_the_third_unset_is_accepted() -> None:
@@ -117,4 +117,4 @@ def test_two_servers_configured_and_the_third_unset_is_accepted() -> None:
         market_mcp_url="http://127.0.0.1:8020",
         trading_mcp_url="http://127.0.0.1:8060",
     )
-    assert resolved.polymarket_mcp_url is None
+    assert resolved.social_mcp_url is None

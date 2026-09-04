@@ -38,16 +38,35 @@ def build_server(name: str, instructions: str, register: Callable[[FastMCP], Non
 def build_mcp_app(server: FastMCP) -> tuple[FastMCP, ASGIApp]:
     """The streamable-http transport and the server behind it, to be mounted under `/mcp`. Both,
     because the path becomes `/mcp/mcp` unset, and a mounted app's lifespan never runs to start its
-    task group."""
+    task group. The transport is a forwarder to whichever session manager the current lifespan
+    started, not the manager itself — see `tool_surface_session`."""
     server.settings.streamable_http_path = "/"
-    return server, server.streamable_http_app()
+    return server, _ToolSurface(server)
+
+
+class _ToolSurface:
+    """The mounted ASGI end of the tool surface, resolved per request rather than bound at build time."""
+
+    def __init__(self, server: FastMCP) -> None:
+        self._server = server
+
+    async def __call__(self, scope, receive, send) -> None:
+        await self._server.session_manager.handle_request(scope, receive, send)
 
 
 def tool_surface_session(app) -> AbstractAsyncContextManager:
     """The session manager's lifetime, held open for as long as the app serves. `nullcontext` when
-    nothing was mounted: a suite's own application without a tool surface has nothing to start."""
+    nothing was mounted: a suite's own application without a tool surface has nothing to start.
+
+    A fresh manager each time: one instance refuses a second `run()`, and FastMCP offers no way to
+    replace it short of its private slot. A process serves once, but the workbench's tests start the
+    process many times in one interpreter, and so did every module folded into it."""
     mcp = getattr(app.state, "mcp_server", None)
-    return nullcontext() if mcp is None else mcp.session_manager.run()
+    if mcp is None:
+        return nullcontext()
+    mcp._session_manager = None  # noqa: SLF001 - the only reset there is
+    mcp.streamable_http_app()
+    return mcp.session_manager.run()
 
 
 class ToolSurfaceAddress:
