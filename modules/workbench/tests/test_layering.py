@@ -10,11 +10,11 @@ import pytest
 
 MODULE_ROOT = Path(__file__).resolve().parent.parent
 
-FORBIDDEN = {
-    "agent": {"teams", "teams_tools", "workbench"},
-    "teams": {"agent", "teams_tools", "workbench"},
-    "teams_tools": {"agent", "teams", "workbench"},
-}
+# The packages that share this process, and the one that assembles them. A package folded in later is one entry
+# here, not a new row of forbidden pairs: every package is forbidden every other package and the assembly.
+PACKAGES = ("agent", "teams", "teams_tools")
+ASSEMBLY = "workbench"
+FORBIDDEN = {package: (set(PACKAGES) - {package}) | {ASSEMBLY} for package in PACKAGES}
 
 
 def _imported_top_level_packages(tree: ast.AST) -> set[str]:
@@ -45,6 +45,6 @@ def test_the_assembly_is_the_one_place_that_knows_all_three() -> None:
     """Stated as a positive so the rule cannot be satisfied by nothing importing anything:
     if `workbench` stopped reaching all three, something else would have had to."""
     imported: set[str] = set()
-    for path in _sources("workbench"):
+    for path in _sources(ASSEMBLY):
         imported |= _imported_top_level_packages(ast.parse(path.read_text(encoding="utf-8")))
-    assert {"agent", "teams", "teams_tools"} <= imported
+    assert set(PACKAGES) <= imported
