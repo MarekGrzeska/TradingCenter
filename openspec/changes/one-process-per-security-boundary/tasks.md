@@ -9,8 +9,8 @@
 - [x] 1.1 `tests/test_layering.py` w workbenchu: mapa zakazów generowana z listy pakietów (`PACKAGES`), składanie nazwane osobno; siódmy pakiet to jedna pozycja na liście, nie edycja testu
 - [x] 1.2 `workbench/assembly.py`: `mount_package(app, prefix, subapp, state)` — montaż pod-aplikacji pod przedrostkiem z zapełnieniem `subapp.state` przez gospodarza; jeden test, że trasy pod-aplikacji odpowiadają pod przedrostkiem i że `/health` gospodarza nie koliduje z `/health` pakietu
 - [x] 1.3 Obraz workbencha lokalnie w Dockerze: RSS pod ruchem, liczba do tabeli w design.md zamiast „≈" — 173 MB, wpisane
-- [ ] 1.4 `polymarket-data`: `/events/{id}/changes` liczone w SQL po stronie bazy (siedem okien × outcome bez ładowania wierszy), jeden test na szczyt; osobny PR na ścieżce bug fix, przed etapem 2
-- [ ] 1.5 `market-data`: obliczenia wskaźników w `asyncio.to_thread`, jeden test, że równoległe żądanie nie czeka na wskaźnik; osobny PR, przed etapem 3
+- [x] 1.4 `polymarket-data`: szczyt 655 MB — hipoteza o `/events/{id}/changes` obalona (odczyty `LIMIT 1` po indeksie); przyczyną był backfill wszystkich outcome'ów naraz; ograniczony do czterech równocześnie, jeden test (PR #245)
+- [x] 1.5 `market-data`: obliczenia wskaźników w `asyncio.to_thread`, jeden test, że pętla nie stoi w czasie obliczenia (318 ms → < 150 ms) (PR #244)
 
 ## 2. Trzy pętle tego samego kształtu — jeden PR na moduł, w tej kolejności
 
