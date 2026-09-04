@@ -121,3 +121,10 @@ def polymarket_settings() -> object:
     from workbench.config import Settings
 
     return Settings().for_polymarket()  # type: ignore[call-arg]
+
+
+def social_settings() -> object:
+    """The post archive's chain — the fourth."""
+    from workbench.config import Settings
+
+    return Settings().for_social()  # type: ignore[call-arg]

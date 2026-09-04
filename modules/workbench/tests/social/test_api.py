@@ -8,9 +8,10 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from builders import TRUTH_SOCIAL, raw_post
 
 from social_data import store
+
+from .builders import TRUTH_SOCIAL, raw_post
 
 pytestmark = pytest.mark.db
 

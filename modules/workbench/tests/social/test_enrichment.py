@@ -6,12 +6,13 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
-from builders import NOON, TRUTH_SOCIAL, raw_post
-from fakes import FakeModel, FakeSource
 
 from social_data import enrichment, store
 from social_data.enrichment import Enrichment, ModelUnusable, analysis_from
 from social_data.ingest import Ingest
+
+from .builders import NOON, TRUTH_SOCIAL, raw_post
+from .fakes import FakeModel, FakeSource
 
 WINDOW_STARTS = NOON - timedelta(hours=1)
 JUST_AFTER_NOON = NOON + timedelta(minutes=1)

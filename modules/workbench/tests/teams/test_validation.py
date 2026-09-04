@@ -64,7 +64,7 @@ def test_assigned_tools_with_no_tool_server_are_refused_and_say_so() -> None:
     announced = AnnouncedSnapshot(
         by_name={"memory_read": ["team-memory"]},
         unreachable=[],
-        unconfigured=("market-mcp", "trading-mcp", "social-mcp"),
+        unconfigured=("market-mcp", "trading-mcp", "telegram-mcp"),
         configured_servers=(),
     )
 
@@ -76,7 +76,7 @@ def test_assigned_tools_with_no_tool_server_are_refused_and_say_so() -> None:
     # the day there were three. `\b` because a longer name can *contain* `MARKET_MCP_URL`.
     assert re.search(r"\bMARKET_MCP_URL", str(err.value))
     assert re.search(r"\bTRADING_MCP_URL", str(err.value))
-    assert re.search(r"\bSOCIAL_MCP_URL", str(err.value))
+    assert re.search(r"\bTELEGRAM_MCP_URL", str(err.value))
 
 
 def test_the_settings_named_are_only_the_ones_without_an_address() -> None:
@@ -86,14 +86,14 @@ def test_the_settings_named_are_only_the_ones_without_an_address() -> None:
     announced = AnnouncedSnapshot(
         by_name={"memory_read": ["team-memory"]},
         unreachable=[],
-        unconfigured=("social-mcp",),
+        unconfigured=("telegram-mcp",),
         configured_servers=("market-mcp",),
     )
 
     with pytest.raises(DefinitionRefused) as err:
         check_definition(definition, model_ids=MODELS, announced=announced)
 
-    assert re.search(r"\bSOCIAL_MCP_URL", str(err.value))
+    assert re.search(r"\bTELEGRAM_MCP_URL", str(err.value))
     assert not re.search(r"\bMARKET_MCP_URL", str(err.value))
 
 
@@ -124,7 +124,7 @@ def test_a_name_three_servers_announce_is_refused_naming_all_three() -> None:
     because a message naming two of three sends the operator round the same refusal twice."""
     definition = TeamDefinition(agents=[_agent("scout", tools=["get_event"])])
     announced = AnnouncedSnapshot(
-        by_name={"get_event": ["market-mcp", "trading-mcp", "social-mcp"]}, unreachable=[]
+        by_name={"get_event": ["market-mcp", "trading-mcp", "telegram-mcp"]}, unreachable=[]
     )
 
     with pytest.raises(DefinitionRefused) as err:
@@ -133,7 +133,7 @@ def test_a_name_three_servers_announce_is_refused_naming_all_three() -> None:
     message = str(err.value)
     assert "market-mcp" in message
     assert "trading-mcp" in message
-    assert "social-mcp" in message
+    assert "telegram-mcp" in message
 
 
 def test_a_tool_not_confirmed_because_a_server_was_unreachable_says_so() -> None:

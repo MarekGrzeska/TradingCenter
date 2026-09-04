@@ -19,6 +19,7 @@ COPY modules/workbench/agent ./agent
 COPY modules/workbench/teams ./teams
 COPY modules/workbench/teams_tools ./teams_tools
 COPY modules/workbench/polymarket_data ./polymarket_data
+COPY modules/workbench/social_data ./social_data
 COPY modules/workbench/migrations ./migrations
 RUN uv sync --frozen --no-dev
 

@@ -9,12 +9,13 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from builders import TRUTH_SOCIAL, raw_post
-from fakes import FakeSource
 
 from social_data import alerts, store
 from social_data.alerts import Alerts, GatewayRefused, GatewayUnreachable
 from social_data.ingest import Ingest
+
+from .builders import TRUTH_SOCIAL, raw_post
+from .fakes import FakeSource
 
 pytestmark = pytest.mark.db
 

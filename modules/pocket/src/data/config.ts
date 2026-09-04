@@ -18,8 +18,8 @@ export function workbenchBase(
   return base(raw, "/workbench-api");
 }
 
-/** `social-data`, the post archive. Its own address for the reason the workbench has one, and its own
- *  audience: a token minted for one module is never sent to another. */
+/** `social-data`, the post archive — the workbench's address plus `/social`, since the archive is a package
+ *  of that process, and so the workbench's audience. Its own setting still, because it is its own contract. */
 export function postsBase(
   raw: string | undefined = import.meta.env.VITE_SOCIAL_HTTP as string | undefined,
 ): string {

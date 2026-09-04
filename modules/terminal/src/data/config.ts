@@ -41,16 +41,17 @@ export interface Endpoints {
   /** The workbench: the conversation, its cost, the catalogues and a run's progress. **One address**, because
    *  they are one process. Its own rather than a path under the archive's, since SWA cannot proxy a stream. */
   workbenchHttp: string;
-  /** `polymarket-data`, for the prediction-market archive. Its own address for the reason the workbench has
-   *  one — a different App Service behind a different gate — and its own scope: it accepts only its audience. */
+  /** `polymarket-data`, for the prediction-market archive — the workbench's address plus `/polymarket` since
+   *  the archive became a package of that process, and so the workbench's scope. Kept as its own setting,
+   *  because the archive is still its own contract. */
   polymarketHttp: string;
   /** `strategy`, for the strategy platform: the catalogue of entries, which pairs are
    *  watched, every decision with the reason it carries, and the backtest reports that
    *  were kept. Its own address and its own scope for the same reason as the two above —
    *  a different App Service behind a different gate. */
   strategyHttp: string;
-  /** `social-data`, for the posts: the archive of what was said and what a model made of it.
-   *  Its own address and its own scope, for the reason the two above have theirs. */
+  /** `social-data`, for the posts: the archive of what was said and what a model made of it. The
+   *  workbench's address plus `/social`, for the reason the prediction-market archive is. */
   socialHttp: string;
   /** `capital-gateway`, for the account. It used to have no address here at all; what changed is that the
    *  gateway recognises an authenticated browser. In dev this is a prefix the dev server proxies. */

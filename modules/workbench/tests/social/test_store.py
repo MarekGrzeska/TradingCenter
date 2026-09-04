@@ -7,10 +7,11 @@ from datetime import UTC, datetime, timedelta
 
 import asyncpg
 import pytest
-from builders import NOON, TRUTH_SOCIAL, raw_post
 
 from social_data import store
 from social_data.models import Operation
+
+from .builders import NOON, TRUTH_SOCIAL, raw_post
 
 pytestmark = pytest.mark.db
 

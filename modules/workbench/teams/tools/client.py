@@ -327,9 +327,8 @@ class ToolServerRegistry:
                 "trading-mcp": ToolServer(
                     settings, prefix="trading_mcp", can_move_the_account=True
                 ),
-                # No polymarket server: that archive is a package of this process, and the assembly
-                # adds its tools to `local` — no address, no identity, no session.
-                "social-mcp": ToolServer(settings, prefix="social_mcp"),
+                # No polymarket and no social server: both archives are packages of this process, and the
+                # assembly adds their tools to `local` — no address, no identity, no session.
                 # Sends a notification, and that is all it can do here: creating a bot and binding a
                 # destination are REST-only in that module, out of reach of any team.
                 "telegram-mcp": ToolServer(settings, prefix="telegram_mcp"),

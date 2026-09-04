@@ -23,9 +23,8 @@ package cannot give it, the change is wrong, not the rule.
 |---|---|
 | `modules/capital-gateway` | capital.com: trading, deep history, live stream. Demo only, and the only door to the provider. |
 | `modules/market-data` | the candle archive and its own indicators. Owns the PostgreSQL. Two surfaces: the REST contract, and eleven read-only MCP tools at `/mcp` — reduced for a model, no tool writes. |
-| `modules/workbench` | the operator's conversation with a model, the teams they compose, **and the prediction-market archive** — one process, three packages that never import each other (`agent`, `teams`, `polymarket_data`), three schemas, two OpenAI keys. The archive is served under `/polymarket`: its REST contract, its `/mcp` (two tools **write**, both only *add*; removing an observation is REST-only), and the only door to Polymarket. Its tools reach the conversation as functions, not over MCP. |
+| `modules/workbench` | the operator's conversation with a model, the teams they compose, **and two archives** — one process, four packages that never import each other (`agent`, `teams`, `polymarket_data`, `social_data`), four schemas, two OpenAI keys. The prediction-market archive is served under `/polymarket`: its REST contract, its `/mcp` (two tools **write**, both only *add*; removing an observation is REST-only), and the only door to Polymarket. The post archive under `/social`: what was said, when, and what a model made of it — the door to Truth Social, **nothing on either surface writes**, the reading is stamped with its model and overwritten, never versioned, no backfill. Both archives' tools reach the conversation as functions, not over MCP. |
 | `modules/trading-mcp` | MCP tools over the gateway's demo account. Network transport only, one named caller (the workbench). Demo checked against the gateway, not against a setting. |
-| `modules/social-data` | the post archive: what was said, when, and what a model made of it. Owns its PostgreSQL, the door to Truth Social. Two surfaces, **nothing on either writes** — the reading is stamped with its model and overwritten, never versioned, and there is no backfill. |
 | `modules/strategy` | the strategy platform. A strategy is a catalogue entry — declared facts, parameters, one pure `evaluate` — code in the image **or** an immutable revision the operator wrote. Owns its PostgreSQL, reads market-data's REST, and **never touches an account**: it decides, teams execute. |
 | `modules/terminal` | React+TS · the operator's screen. Consumes the others, publishes nothing — a consumer, not a peer. Call it the **terminal**, never a "console" or "dashboard". |
 | `modules/pocket` | React+TS · the archive on a phone, and a chat with the workbench beside it — mobile-first, no MCP of its own. A second consumer, sharing the terminal's generated contract and none of its code. |
@@ -37,7 +36,7 @@ package cannot give it, the change is wrong, not the rule.
 | `openspec/` · `docs/` | specs (the truth) and proposals · architecture and reference, true today. `docs/archive/` is the road, not the state. A new `docs/*.html` copies `docs/style-template.html`. |
 
 **Inside `modules/workbench` the rule has a second form**, because things that were modules
-are packages of one: `agent/`, `teams/` and `polymarket_data/` never import each other,
+are packages of one: `agent/`, `teams/`, `polymarket_data/` and `social_data/` never import each other,
 `teams_tools/` imports none of them, and `workbench/` — the assembly — is the only place that
 imports all of them, mounting a former module whole under a prefix (`workbench/assembly.py`).
 `tests/test_layering.py` reads the imports and refuses; it is a test, not an understanding. This
@@ -57,9 +56,8 @@ module runs `uv run pytest` · `ruff check .` · `pyright`, the terminal and `po
 |---|---|
 | `capital-gateway` | `uv run uvicorn capital_gateway.app:app --reload --port 8010` |
 | `market-data` | `uv run alembic upgrade head`, then `uv run uvicorn market_data.app:app --reload --port 8020` |
-| `workbench` | three chains — `uv run alembic -c alembic-agent.ini upgrade head`, `-c alembic-teams.ini` **and** `-c alembic-polymarket.ini` (the process runs all three itself) — then `uv run uvicorn workbench.app:app --reload --port 8030` |
+| `workbench` | four chains — `uv run alembic -c alembic-agent.ini upgrade head`, `-c alembic-teams.ini`, `-c alembic-polymarket.ini` **and** `-c alembic-social.ini` (the process runs all four itself) — then `uv run uvicorn workbench.app:app --reload --port 8030` |
 | `trading-mcp` | `uv run python -m trading_mcp` (8060) · plus `uv run python scripts/contract.py check`, its snapshot of the gateway's OpenAPI |
-| `social-data` | `uv run alembic upgrade head`, then `uv run uvicorn social_data.app:app --reload --port 8090` |
 | `strategy` | `uv run alembic upgrade head`, then `uv run uvicorn strategy.app:app --reload --port 8080` |
 | `terminal` | `pnpm dev` (5173) |
 | `pocket` | `pnpm dev` (5174) · the dev scripts start it too; `--host` is what a phone on the same Wi-Fi needs |
@@ -74,11 +72,11 @@ The whole stack: `./scripts/dev.sh` or `./scripts/dev.ps1`, both thin wrappers o
 sits where it does are one table at the top of that file — `uv run python scripts/dev.py
 --explain` prints it, so it is not repeated here.
 
-**Ports are fixed: 8010 gateway, 8020 market-data (REST *and* `/mcp`), 8030 workbench (REST, and the
-archive's REST *and* `/mcp` under `/polymarket`), 8060 trading-mcp, 8080 strategy, 8090 social-data,
-8100 telegram-gateway (all three REST *and* `/mcp`), 5173 terminal, 5174 pocket. 8040, 8050 and 8070
+**Ports are fixed: 8010 gateway, 8020 market-data (REST *and* `/mcp`), 8030 workbench (REST, and each
+archive's REST *and* `/mcp` under `/polymarket` and `/social`), 8060 trading-mcp, 8080 strategy,
+8100 telegram-gateway (both REST *and* `/mcp`), 5173 terminal, 5174 pocket. 8040, 8050, 8070 and 8090
 are nobody's** — a `.env` still pointing at any of them is a tool server that reads as down. 8070 was
-polymarket-data's until `one-process-per-security-boundary` folded it into the workbench.
+polymarket-data's and 8090 social-data's until `one-process-per-security-boundary` folded both into the workbench.
 
 ## Things that will bite you
 
@@ -88,7 +86,7 @@ the dev scripts — Docker is required to run the stack, not only to test it. Le
 `DATABASE_URL` pointing at any remote host is refused at startup, by `dev.py` and `config.py`
 both. Production uses an Entra identity instead. Do not "restore" the brief arrangement where
 dev ran on the Azure server; it was reversed the same day it was made. The further databases
-(`agent`, `teams`, `polymarket`, and the rest) live in that same container, and the dev scripts create each
+(`agent`, `teams`, `polymarket`, `social`, and the rest) live in that same container, and the dev scripts create each
 role and database themselves — `docker-entrypoint-initdb.d` only fires on an empty volume.
 
 **The terminal's contract is generated.** After changing `market_data/contract.py`, run
@@ -104,19 +102,19 @@ surfaces, and a prefix marks the four things doubled on purpose — `AGENT_`/`TE
 its own model. Everything else is one setting for the whole process, read only by
 `workbench/config.py`. Second, three traps, the same mistake at three dates: a file copied
 before `market-mcp-into-market-data` points `MARKET_MCP_URL` at 8040, where nothing listens; one
-copied before `agent-and-teams-one-workbench` carries `TEAMS_MCP_URL` or `POLYMARKET_MCP_URL` (read by nothing) and
+copied before `agent-and-teams-one-workbench` carries `TEAMS_MCP_URL`, `POLYMARKET_MCP_URL` or `SOCIAL_MCP_URL` (read by nothing) and
 carries `DATABASE_URL`, `OPENAI_API_KEY` or `MODELS` unprefixed, which refuses to start rather
 than misbehaving. `dev.py` says all of it at startup.
 
-**The five `*_MCP_URL` settings share one shape: the *absence* of each is a working
+**The four `*_MCP_URL` settings share one shape: the *absence* of each is a working
 configuration**, not a mistake. Without one, the conversation simply has no tools from that
 server — while a team whose agents were *assigned* those tools refuses to run rather than answer
 without them, and that asymmetry is the whole trap. Which server each names, and what its tools
 may do, is the module table above; `TRADING_MCP_URL` reads least like a setting, because the
 symptom of its absence is the operator asking about their positions and the agent saying it cannot
-see them. `social-data` and `strategy` reach the Telegram gateway over its REST contract instead,
-each with its own `TELEGRAM_GATEWAY_URL` / `_SCOPE` / `ALERT_DESTINATION` — all three or none, and
-none is a module that collects or decides as usual and says nothing.
+see them. The workbench's post archive and `strategy` reach the Telegram gateway over its REST contract
+instead, each with its own `TELEGRAM_GATEWAY_URL` / `_SCOPE` / `ALERT_DESTINATION` — all three or none,
+and none is a caller that collects or decides as usual and says nothing.
 
 **`trading-mcp` will not start on a wish.** `CAPITAL_GATEWAY_API_KEY` must be the gateway's own
 `GATEWAY_API_KEY` — the gateway checks that header on every caller, loopback included — and it

@@ -15,7 +15,7 @@ const app = resolve(here, "..");
 const SOURCES = [
   {
     name: "social-data",
-    moduleDir: resolve(app, "..", "social-data"),
+    moduleDir: resolve(app, "..", "workbench"),
     pythonModule: "social_data.openapi",
     output: join(app, "src", "data", "contract.social.generated.ts"),
     banner: `/**

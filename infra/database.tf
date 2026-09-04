@@ -153,18 +153,7 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "workbench_outbound"
 }
 
 
-# Same shape and same first convergence for social-data: `terraform apply -target=azurerm_linux_web_app.social_data`
-# once, then the normal unrestricted apply.
-resource "azurerm_postgresql_flexible_server_firewall_rule" "social_data_outbound" {
-  for_each = toset(azurerm_linux_web_app.social_data.possible_outbound_ip_address_list)
-
-  name             = "AllowSocialDataOutbound-${replace(each.value, ".", "-")}"
-  server_id        = azurerm_postgresql_flexible_server.main.id
-  start_ip_address = each.value
-  end_ip_address   = each.value
-}
-
-# The fifth, and the last thing to say about the shape is that it repeats: `terraform apply
+# The last of them, and the thing to say about the shape is that it repeats: `terraform apply
 # -target=azurerm_linux_web_app.strategy` once, then the normal unrestricted apply.
 resource "azurerm_postgresql_flexible_server_firewall_rule" "strategy_outbound" {
   for_each = toset(azurerm_linux_web_app.strategy.possible_outbound_ip_address_list)

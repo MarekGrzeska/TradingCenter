@@ -7,18 +7,19 @@ A post is a market input the way a candle is: it happened at a moment, it is wor
 everybody has scrolled past it, and the question asked of it later is not the question asked at the
 time. This module keeps them. It decides nothing and alerts on nothing.
 
-```bash
-uv run alembic upgrade head
-uv run uvicorn social_data.app:app --reload --port 8090
-uv run pytest        # unit; anything needing a database skips without Docker
-uv run pytest -m db  # against a throwaway PostgreSQL (testcontainers)
-uv run ruff check .
-uv run pyright
-```
+**A package of the workbench since `one-process-per-security-boundary`**, served whole under
+`/social` of that process — its REST contract, its `/mcp`, its caller record — with its own database
+and its own migration chain (`alembic-social.ini`, lock key 8090, the port it used to have). Its four
+tools reach the conversation and the teams as functions, so there is no `SOCIAL_MCP_URL` anywhere. What
+is the archive's alone is read under `SOCIAL_` in the workbench's `.env`; the door to Telegram
+(`TELEGRAM_GATEWAY_URL` / `_SCOPE` / `ALERT_DESTINATION`) is the process's, unprefixed.
 
-Port **8090**. Not 8040 or 8050, which stay nobody's on purpose: a `.env` left pointing at either
-has to keep reading as a server that is off, rather than reaching a working module that is not the
-one it meant.
+```bash
+# from modules/workbench
+uv run alembic -c alembic-social.ini upgrade head   # the process does this itself at startup
+uv run uvicorn workbench.app:app --reload --port 8030 # the archive answers under /social
+uv run pytest tests/social                            # `db` tests skip without Docker
+```
 
 ## What it collects
 

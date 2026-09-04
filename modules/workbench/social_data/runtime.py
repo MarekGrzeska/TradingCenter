@@ -7,7 +7,7 @@ from pathlib import Path
 
 # `social_data/` and `migrations/` are siblings — in the repository and in the image
 # (`Dockerfile` copies both), so one expression locates it in both.
-MIGRATIONS = Path(__file__).resolve().parent.parent / "migrations"
+MIGRATIONS = Path(__file__).resolve().parent.parent / "migrations" / "social"
 
 # Advisory locks are scoped to one database, so the value only has to be stable. It carries the
 # module's port, like every other key here, so a log line naming it says which module took it.
