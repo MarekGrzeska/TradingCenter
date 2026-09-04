@@ -166,6 +166,28 @@ def test_configure_logging_silences_the_exporter_that_would_describe_itself(monk
         assert logging.getLogger(name).level == logging.WARNING
 
 
+def test_the_candle_stream_is_kept_out_of_the_trace(monkeypatch) -> None:
+    """Every frame `/ws/candles` sends was one dependency row — a quarter-million in two weeks. The
+    instrumentor reads its exclusions once, from the environment, so they must be there before it is."""
+    import os
+    import sys
+    import types
+
+    monkeypatch.setenv("APPLICATIONINSIGHTS_CONNECTION_STRING", "InstrumentationKey=test")
+    monkeypatch.delenv(telemetry.EXCLUDED_URLS_SETTING, raising=False)
+    seen: dict[str, str | None] = {}
+    stub = types.ModuleType("azure.monitor.opentelemetry")
+    stub.configure_azure_monitor = lambda: seen.update(  # type: ignore[attr-defined]
+        excluded=os.environ.get(telemetry.EXCLUDED_URLS_SETTING)
+    )
+    monkeypatch.setitem(sys.modules, "azure.monitor.opentelemetry", stub)
+    monkeypatch.setattr(telemetry, "configure_logging", lambda: None)
+
+    telemetry.configure()
+
+    assert seen["excluded"] == "/ws/candles"
+
+
 def test_log_level_can_be_turned_down_without_a_deploy(monkeypatch) -> None:
     monkeypatch.setenv("LOG_LEVEL", "warning")
     root = logging.getLogger()

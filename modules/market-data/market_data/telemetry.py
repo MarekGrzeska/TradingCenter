@@ -36,6 +36,11 @@ REFRESH_INTERVAL_SECONDS = 60
 # each upload, and that line is telemetry, uploaded, logged. 165 entries in fifteen quiet minutes.
 NOISY_LOGGERS = ("azure", "httpx", "httpcore", "urllib3")
 
+# The instrumentation records every frame `/ws/candles` sends as a dependency — a quarter-million rows in two
+# weeks, measured 4 September 2026. Read once, when the FastAPI instrumentor is first imported.
+EXCLUDED_URLS_SETTING = "OTEL_PYTHON_FASTAPI_EXCLUDED_URLS"
+UNTRACED_PATHS = "/ws/candles"
+
 
 class CandleAgeGauge:
     """The last-computed age of each pair's newest candle, for pairs whose market isn't known to be
@@ -84,6 +89,7 @@ def configure() -> None:
     configure_logging()
     if not os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING"):
         return
+    os.environ.setdefault(EXCLUDED_URLS_SETTING, UNTRACED_PATHS)
     from azure.monitor.opentelemetry import configure_azure_monitor
 
     configure_azure_monitor()

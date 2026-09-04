@@ -8,8 +8,14 @@ import os
 import sys
 
 # Libraries whose INFO is traffic rather than information: `httpx` narrates every request, which at ten a second
-# is the whole log, and `websockets` narrates frames. Their warnings still come through.
-NOISY_LOGGERS = ("httpx", "httpcore", "websockets", "azure.core.pipeline.policies.http_logging_policy")
+# is the whole log, and `websockets` narrates frames. `azure` is the exporter logging each upload — a line that is
+# telemetry, uploaded, logged: 1.3 million of them in two weeks. Their warnings still come through.
+NOISY_LOGGERS = ("azure", "httpx", "httpcore", "websockets")
+
+# The instrumentation records every WebSocket frame `/ws/stream` sends as a dependency — 8.8 million rows, 84% of
+# the workspace's ingest, measured 4 September 2026. Read once, when the FastAPI instrumentor is first imported.
+EXCLUDED_URLS_SETTING = "OTEL_PYTHON_FASTAPI_EXCLUDED_URLS"
+UNTRACED_PATHS = "/ws/stream"
 
 
 def configure() -> None:
@@ -20,6 +26,7 @@ def configure() -> None:
         # Every local run: without a connection string there is nothing to export to, and
         # stdout is what a developer is reading anyway.
         return
+    os.environ.setdefault(EXCLUDED_URLS_SETTING, UNTRACED_PATHS)
     from azure.monitor.opentelemetry import configure_azure_monitor
 
     configure_azure_monitor()
