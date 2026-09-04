@@ -64,7 +64,7 @@ def tool_surface_session(app) -> AbstractAsyncContextManager:
     mcp = getattr(app.state, "mcp_server", None)
     if mcp is None:
         return nullcontext()
-    mcp._session_manager = None  # noqa: SLF001 - the only reset there is
+    mcp._session_manager = None
     mcp.streamable_http_app()
     return mcp.session_manager.run()
 

@@ -28,7 +28,7 @@ const SOURCES = [
   },
   {
     name: "polymarket-data",
-    moduleDir: resolve(app, "..", "polymarket-data"),
+    moduleDir: resolve(app, "..", "workbench"),
     pythonModule: "polymarket_data.openapi",
     output: join(app, "src", "data", "contract.polymarket.generated.ts"),
     banner: `/**
