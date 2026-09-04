@@ -100,6 +100,13 @@ więc godzina to godzina bez powiadomień, nie godzina otwartych drzwi), odczyt 
 Lekcja z 20 sierpnia (AllowAnonymous przepuszczał tokeny bez walidacji) mówi, że to platforma dziś
 naprawdę waliduje — dlatego alternatywa jest tylko alternatywą, dopóki liczba jej nie poprze.
 
+**Zmierzone 4 września 2026, 19:09–19:49 UTC**, telegram-gateway z wyłączonym `auth_settings_v2`: working set
+spadł z 283 MB do 178–181 MB, czyli **sidecar Auth to ~105 MB**, a kontener tożsamości plus Python to ~180.
+Dokładnie na progu. Wniosek: alternatywa „JWT w module” zdejmuje ~105 MB z każdej aplikacji, która zostaje
+procesem, i nie wyklucza tego planu — każde zwinięcie zdejmuje obie pary (~230 MB), a walidacja w module
+zdjęłaby resztę z trzech procesów docelowych (~315 MB). Decyzja o niej to osobna propozycja (0.3); ten plan
+nie czeka na nią, bo jej zysk jest addytywny, nie zamienny.
+
 ### Godzina na B2 po etapie 3, nie przed etapem 2
 
 Przed etapem 2 test niczego nie rozstrzyga (127% B2). Po etapie 3 (cztery procesy) rozstrzyga

@@ -1,7 +1,7 @@
 ## 0. Decyzja i pomiar, bez kodu
 
 - [ ] 0.1 Operator potwierdza odwrócenie reguły (proposal.md, „What Changes", pierwszy punkt) — bez tego etapy 2–5 nie ruszają
-- [ ] 0.2 Pomiar sidecara Auth: godzina bez `auth_settings_v2` na `app-tradingcenter-telegram-gateway`, odczyt `AverageMemoryWorkingSet` przed i po, powrót; liczba do design.md („Sidecar Auth mierzy się przed etapem 2")
+- [x] 0.2 Pomiar sidecara Auth (283 → 178 MB, sidecar ≈ 105 MB; design.md): godzina bez `auth_settings_v2` na `app-tradingcenter-telegram-gateway`, odczyt `AverageMemoryWorkingSet` przed i po, powrót; liczba do design.md („Sidecar Auth mierzy się przed etapem 2")
 - [ ] 0.3 Jeśli Auth ≥ 100 MB: ten plan czeka, powstaje osobna propozycja „walidacja JWT w module"; jeśli < 100 MB: dalej
 
 ## 1. Szkielet gospodarza (bez zmian w infrastrukturze)
