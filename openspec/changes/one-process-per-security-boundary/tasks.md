@@ -25,7 +25,7 @@
 
 ## 3. market-data do gospodarza, i godzina na B2
 
-- [ ] 3.1 Decyzja o nazwie katalogu gospodarza (design.md, Open Questions) — przed tym PR-em, bo od niego market-data przestaje być słowem w tabeli
+- [x] 3.1 Decyzja o nazwie katalogu gospodarza (design.md, „Workbench jest gospodarzem"): `modules/workbench` zostaje — 5 września 2026, przed PR-em 3.2, bo od niego market-data przestaje być słowem w tabeli
 - [ ] 3.2 **market-data → pakiet gospodarza**: montaż pod `/market`, `/ws/candles` → `/market/ws/candles` z tym samym biletem; migracja pod kluczem 8020, ingest, rollupy, jobs, gauge wieku świec w lifespan gospodarza; `MARKET_DATABASE_URL` i przedrostki; źródło jedenastu narzędzi w procesie, `MARKET_MCP_URL`/`_SCOPE` znikają
 - [ ] 3.3 strategy przechodzi na wstrzyknięty protokół `Archive` (3b): `archive.py` i `_ManagedIdentityAuth` znikają, `MARKET_DATA_URL/_SCOPE` znikają; jeden test integracji, że strategia widzi te same świece co REST
 - [ ] 3.4 Brama: `MODULE_CALLER_APPLICATION_IDS` i `allowed_applications` dostają tożsamość gospodarza zamiast market-data; `GATEWAY_*` stają się ustawieniami gospodarza
