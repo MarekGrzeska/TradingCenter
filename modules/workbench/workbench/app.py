@@ -5,15 +5,15 @@ databases to this image's revision."""
 from __future__ import annotations
 
 import logging
-import os
 from contextlib import asynccontextmanager
 
-# Root logger configuration, before anything else imports and starts logging: nothing else sets a level or a
-# destination, so without this the process writes into the void and a silent process looks exactly like an idle one.
-logging.basicConfig(
-    level=os.environ.get("LOG_LEVEL", "INFO").upper(),
-    format="%(levelname)-5.5s [%(name)s] %(message)s",
-)
+from tc_runtime import telemetry
+
+# Above `from fastapi import ...` and not merely before `FastAPI(...)`: the auto-instrumentation patches the class
+# attribute, and the import binds this module's name to the unpatched one. Logging always; Application Insights only
+# with a connection string. Until 5 September 2026 this process configured logging alone, so the loop gauges the two
+# archives register (`liveness.register_metrics`) were never exported and both loop alerts went without data.
+telemetry.configure(quiet=("httpx", "httpcore"))
 
 from fastapi import FastAPI
 from tc_runtime import migrate, schema_version
