@@ -186,12 +186,12 @@ async def test_a_condition_crossing_the_threshold_fires_exactly_once(pool: async
 
 
 async def test_a_setup_counted_by_the_strategy_platform_wakes_the_team_once(pool: asyncpg.Pool) -> None:
-    """specs/teams-triggers, "Decyzja platformy strategii jest źródłem warunku": the sixth server is
-    read the same road as the first, so what differs from the test above is which setting carries
-    the address and which name the trigger calls."""
+    """specs/teams-triggers, "Decyzja platformy strategii jest źródłem warunku": the tool is found by name
+    on whichever source announces it, so what differs from the test above is which server carries it here
+    and which name the trigger calls. In the process it is a local source; a stand-in server is the same road."""
     box = [0]
     async with serving(build=lambda mcp: _register_pending_setups(mcp, box)) as url:
-        settings = settings_for(None, strategy_mcp_url=url)
+        settings = settings_for(None, telegram_mcp_url=url)
         team_id, revision_id = await _team_and_revision(pool)
         trigger = await _trigger(
             pool,

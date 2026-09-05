@@ -77,7 +77,7 @@ class TestARunChangesNothingElse:
                 facts={},
             )
 
-        from test_backtest import a_history
+        from .test_backtest import a_history
 
         archive = a_history()
         await backtest.run(

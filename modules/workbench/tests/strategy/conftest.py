@@ -1,11 +1,9 @@
 """Shared fixtures — chiefly the throwaway PostgreSQL the `db` tests run against, a container per session
-because the schema is part of what is under test. Without Docker they skip, saying what to start."""
+because the schema is part of what is under test. The Docker skip is the root conftest's."""
 
 from __future__ import annotations
 
-import os
 from collections.abc import AsyncIterator, Iterator
-from pathlib import Path
 
 import asyncpg
 import httpx
@@ -14,12 +12,6 @@ from tc_runtime.db import asyncpg_dsn, sqlalchemy_url
 
 from strategy.app import create_app
 from strategy.config import Settings
-
-MODULE_ROOT = Path(__file__).resolve().parent.parent
-
-# Testcontainers' reaper bind-mounts the Docker socket, which on macOS lives under a home directory the VM refuses
-# to mount. Safe to disable: the container fixture is a context manager, so every exit still stops it.
-os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
 # Emptied between tests so one test's rows are never another's premise; TRUNCATE rather than re-migrating, since the
 # schema is the same for every test. One statement naming every table, so the foreign keys need no CASCADE.
@@ -31,51 +23,6 @@ TABLES = (
     "strategy_revisions",
     "strategy_definitions",
 )
-
-# Generous, because Docker Desktop wakes its VM lazily and a first call after an idle
-# spell can take several seconds.
-DOCKER_PING_TIMEOUT = 15
-
-DOCKER_SOCKETS = (
-    Path("/var/run/docker.sock"),
-    Path.home() / ".docker/run/docker.sock",
-    Path.home() / ".colima/default/docker.sock",
-    Path.home() / ".rd/docker.sock",
-)
-
-
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    reason = _reason_to_skip_db_tests()
-    if reason is None:
-        return
-    skip = pytest.mark.skip(reason=reason)
-    for item in items:
-        if "db" in item.keywords:
-            item.add_marker(skip)
-
-
-def _reason_to_skip_db_tests() -> str | None:
-    """Why the `db` tests cannot run here, or `None` to let them run. Only a machine with no Docker at all
-    earns a skip: a silent skip where Docker was expected is indistinguishable from a pass."""
-    try:
-        import docker
-    except ImportError:
-        return "the docker package is not installed"
-
-    try:
-        docker.from_env(timeout=DOCKER_PING_TIMEOUT).ping()
-    except Exception as err:  # noqa: BLE001 - any failure here means "not answering"
-        if _docker_is_installed():
-            print(f"\ndocker is installed but not answering ({err}); running `db` tests anyway")
-            return None
-        return "no Docker daemon for the PostgreSQL container"
-    return None
-
-
-def _docker_is_installed() -> bool:
-    return bool(os.environ.get("DOCKER_HOST")) or any(
-        socket.exists() for socket in DOCKER_SOCKETS
-    )
 
 
 @pytest.fixture(scope="session")

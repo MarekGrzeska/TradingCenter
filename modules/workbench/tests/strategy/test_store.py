@@ -5,11 +5,12 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from builders import crossing_facts
 
 from strategy import store
 from strategy.catalogue import get
 from strategy.spec import Decision
+
+from .builders import crossing_facts
 
 pytestmark = pytest.mark.db
 

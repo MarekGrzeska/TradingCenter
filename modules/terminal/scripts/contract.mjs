@@ -80,7 +80,7 @@ const SOURCES = [
   },
   {
     name: "strategy",
-    moduleDir: resolve(terminal, "..", "strategy"),
+    moduleDir: resolve(terminal, "..", "workbench"),
     pythonModule: "strategy.openapi",
     output: join(terminal, "src", "data", "contract.strategy.generated.ts"),
     banner: `/**

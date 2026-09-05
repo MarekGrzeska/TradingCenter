@@ -332,9 +332,8 @@ class ToolServerRegistry:
                 # Sends a notification, and that is all it can do here: creating a bot and binding a
                 # destination are REST-only in that module, out of reach of any team.
                 "telegram-mcp": ToolServer(settings, prefix="telegram_mcp"),
-                # The one a trigger reads: `pending_setups` is a number the clock compares against a
-                # threshold, and it arrives here the same way every other reading does.
-                "strategy-mcp": ToolServer(settings, prefix="strategy_mcp"),
+                # No strategy server: the platform is a package of this process, and `pending_setups` — the
+                # number a trigger wakes a team on — is announced by a local source the assembly adds.
             },
             {MEMORY_LABEL: MemoryToolSource(pool)},
         )

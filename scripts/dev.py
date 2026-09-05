@@ -89,7 +89,7 @@ BLUE, MAGENTA, CYAN, YELLOW, GREEN, RED, DIM, RESET = (
 )
 # Bright green went to trading-mcp, the one tool server that is still a process of its own.
 BRIGHT_GREEN = "\033[92m"
-# And bright blue to the strategy platform. Two services sharing a colour is the one thing
+# Two services sharing a colour is the one thing
 # this field exists to prevent — the logs interleave, and colour is how a reader tells them apart.
 BRIGHT_BLUE = "\033[94m"
 # And bright magenta to the phone screen, whose log interleaves with the terminal's cyan.
@@ -148,22 +148,6 @@ SERVICES: tuple[Service, ...] = (
         ),
     ),
     Service(
-        name="strategy",
-        module="strategy",
-        port=8080,
-        command=("uv", "run", "uvicorn", "strategy.app:app", "--reload", "--port", "8080"),
-        log_prefix="strategy",
-        colour=BRIGHT_BLUE,
-        health_path="/health",
-        why=(
-            "After market-data, whose REST contract is the only thing it reads — but not "
-            "waiting on it the way trading-mcp waits on the gateway: this one starts "
-            "without reaching its upstream at all, and an archive still coming up costs "
-            "it one evaluation that records why it could not see. Before the workbench, "
-            "because a trigger there reads pending_setups here."
-        ),
-    ),
-    Service(
         name="telegram-gateway",
         module="telegram-gateway",
         port=8100,
@@ -177,8 +161,8 @@ SERVICES: tuple[Service, ...] = (
             "Independent of everything above it — its upstream is Telegram, and it sends "
             "only when somebody asks. Before the workbench for the reason every tool server "
             "is: the tool list is read on the first turn that wants one. Its other two "
-            "callers, the workbench's post archive and strategy, do not wait on it at all — "
-            "without a gateway to reach they collect and decide as usual, and simply say nothing."
+            "callers — the workbench's post archive and strategy platform, one process — do not wait "
+            "on it at all: without a gateway to reach they collect and decide as usual, and say nothing."
         ),
     ),
     Service(
@@ -194,7 +178,7 @@ SERVICES: tuple[Service, ...] = (
             "conversation and the teams catalogue are one process here — 8050 has belonged "
             "to nobody since `agent-and-teams-one-workbench`, and 8070 to nobody since "
             "`one-process-per-security-boundary` folded polymarket-data into this process, "
-            "8090 since it folded social-data in too. It calls four tool servers now, "
+            "8090 since it folded social-data in, 8080 since strategy. It calls three tool servers now, "
             "and each tool list is read on the first turn that wants one, so a server "
             "still coming up means a turn answered without those tools rather than an "
             "error anyone would notice."
@@ -235,7 +219,7 @@ SERVICES: tuple[Service, ...] = (
     ),
 )
 
-# Every migration chain and which module owns it; `workbench` appears four times because it owns four databases.
+# Every migration chain and which module owns it; `workbench` appears five times because it owns five databases.
 # Redundant with each module's startup migration, and kept because it fails readably rather than under a lock.
 MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
     ("market-data", None),
@@ -243,7 +227,7 @@ MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
     ("workbench", "alembic-teams.ini"),
     ("workbench", "alembic-polymarket.ini"),
     ("workbench", "alembic-social.ini"),
-    ("strategy", None),
+    ("workbench", "alembic-strategy.ini"),
     ("telegram-gateway", None),
 )
 
@@ -295,7 +279,6 @@ REQUIRED_ENV: tuple[tuple[str, str], ...] = (
         "trading-mcp",
         "copy .env.example and set CAPITAL_GATEWAY_API_KEY to the gateway's own GATEWAY_API_KEY",
     ),
-    ("strategy", "copy .env.example; the defaults match compose.yaml"),
     # The three account-session lines are meant to stay empty: without them the module sends and
     # refuses to create bots, which is a configuration it supports rather than a missing step.
     (
@@ -462,15 +445,6 @@ ADVISORIES: tuple[tuple[str, str, str, str], ...] = (
         ),
         "8100",
     ),
-    (
-        "workbench",
-        "STRATEGY_MCP_URL",
-        (
-            "no trigger can read what a strategy decided, so no setup wakes a team, and "
-            "a team assigning those tools refuses to run"
-        ),
-        "8080",
-    ),
 )
 
 # Settings that stopped existing, and what a `.env` still carrying them is a sign of. Said rather
@@ -499,8 +473,15 @@ RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
         ),
     ),
     (
+        "STRATEGY_MCP_URL",
+        (
+            "the strategy platform is a package of this process since the same change; its tools "
+            "need no address, and STRATEGY_DATABASE_URL is the line this file needs instead"
+        ),
+    ),
+    (
         "DATABASE_URL",
-        "the workbench owns four databases: AGENT_, TEAMS_, POLYMARKET_ and SOCIAL_DATABASE_URL",
+        "the workbench owns five databases: AGENT_, TEAMS_, POLYMARKET_, SOCIAL_ and STRATEGY_DATABASE_URL",
     ),
     (
         "OPENAI_API_KEY",
@@ -906,6 +887,7 @@ def ready_lines(*, start_front_ends: bool) -> list[str]:
         f"  Workbench docs      http://{LOOPBACK}:8030/docs",
         f"  Polymarket docs     http://{LOOPBACK}:8030/polymarket/docs",
         f"  Social docs         http://{LOOPBACK}:8030/social/docs",
+        f"  Strategy docs       http://{LOOPBACK}:8030/strategy/docs",
         (
             "  Database            market_data, agent, teams, polymarket, social, strategy, "
             "telegram @ localhost:55432 "

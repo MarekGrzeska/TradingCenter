@@ -1,18 +1,15 @@
-"""The published surface: FastAPI over the platform, plus the evaluation loop. The lifespan is all-or-nothing, so a
-process that answers proves it migrated — but it never reaches the archive, or it could not start while one restarts."""
+"""The published surface: FastAPI over the platform, plus the evaluation loop. `serving` is all-or-nothing, so a
+process that answers proves it migrated — but it never reaches the archive, or it could not start while one restarts.
+
+A package of the workbench process since `one-process-per-security-boundary`: the host mounts `create_app()` under
+`/strategy` and enters `serving` from its own lifespan, because a mounted application's lifespan is never run. `app`
+and `lifespan` below are what `python -m strategy.openapi` and the tests build.
+"""
 
 from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
-
-from tc_runtime import telemetry
-
-# Above `from fastapi import ...` and not merely before `FastAPI(...)`: the auto-instrumentation
-# patches the class attribute, and the import binds this module's name to the unpatched one.
-# `httpx` quiet because one evaluation pass logs a line per provider call and says nothing
-# this module does not log itself.
-telemetry.configure(quiet=("httpx", "httpcore"))
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -41,9 +38,8 @@ log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    settings = Settings()  # type: ignore[call-arg]
-
+async def serving(app: FastAPI, settings: Settings):
+    """Everything this package needs running, on `app.state`, for as long as the block is open."""
     # Constructed, not connected: reaching the archive at startup would make this process's health
     # depend on another module's, and there is nothing useful to do with the answer then.
     async with (
@@ -104,6 +100,14 @@ async def lifespan(app: FastAPI):
                 yield
         finally:
             await loop.aclose()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Standalone: the settings read from this process's environment, then `serving`."""
+    settings = Settings()  # type: ignore[call-arg]
+    async with serving(app, settings):
+        yield
 
 
 async def _refused(request: Request, exc: StrategyError) -> JSONResponse:
@@ -169,6 +173,4 @@ def create_app() -> FastAPI:
     return app
 
 
-# The ASGI entrypoint every deployment names — `uvicorn strategy.app:app` in the
-# Dockerfile, in `scripts/dev.py` and in the README.
 app = create_app()

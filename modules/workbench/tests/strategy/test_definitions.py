@@ -4,9 +4,10 @@ about is the refusal — an hour later a rule that cannot run is a strategy that
 from __future__ import annotations
 
 import pytest
-from fakes import FakeArchive
 
 from strategy.errors import ArchiveUnreachable
+
+from .fakes import FakeArchive
 
 pytestmark = pytest.mark.db
 

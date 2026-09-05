@@ -108,7 +108,7 @@ jobs:
           # The prediction-market archive. Its own host and its own scope, like every
           # other back end here.
           VITE_POLYMARKET_HTTP: https://app-tradingcenter-agent.azurewebsites.net/polymarket
-          VITE_STRATEGY_HTTP: https://app-tradingcenter-strategy.azurewebsites.net
+          VITE_STRATEGY_HTTP: https://app-tradingcenter-agent.azurewebsites.net/strategy
           VITE_SOCIAL_HTTP: https://app-tradingcenter-agent.azurewebsites.net/social
           VITE_ENTRA_CLIENT_ID: ${{ vars.TERMINAL_ENTRA_CLIENT_ID }}
           VITE_ENTRA_TENANT_ID: ${{ vars.TERMINAL_ENTRA_TENANT_ID }}
@@ -119,7 +119,7 @@ jobs:
           VITE_ENTRA_SCOPE_WORKBENCH: api://tradingcenter-agent/access_as_user
           VITE_ENTRA_SCOPE_GATEWAY: api://tradingcenter-capital-gateway/access_as_user
           VITE_ENTRA_SCOPE_POLYMARKET: api://tradingcenter-agent/access_as_user
-          VITE_ENTRA_SCOPE_STRATEGY: api://tradingcenter-strategy/access_as_user
+          VITE_ENTRA_SCOPE_STRATEGY: api://tradingcenter-agent/access_as_user
           VITE_ENTRA_SCOPE_SOCIAL: api://tradingcenter-agent/access_as_user
 
       - uses: Azure/static-web-apps-deploy@v1

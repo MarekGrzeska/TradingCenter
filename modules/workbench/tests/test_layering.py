@@ -12,7 +12,7 @@ MODULE_ROOT = Path(__file__).resolve().parent.parent
 
 # The packages that share this process, and the one that assembles them. A package folded in later is one entry
 # here, not a new row of forbidden pairs: every package is forbidden every other package and the assembly.
-PACKAGES = ("agent", "teams", "teams_tools", "polymarket_data", "social_data")
+PACKAGES = ("agent", "teams", "teams_tools", "polymarket_data", "social_data", "strategy")
 ASSEMBLY = "workbench"
 FORBIDDEN = {package: (set(PACKAGES) - {package}) | {ASSEMBLY} for package in PACKAGES}
 

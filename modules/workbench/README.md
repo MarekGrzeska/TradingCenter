@@ -38,26 +38,28 @@ Everything else is one setting for the whole process — `workbench/config.py` i
 code that reads the environment, and both surfaces' own `Settings` are built from it by
 argument, with every validator they had.
 
-## Four tool servers on a network, and four sources that are not
+## Three tool servers on a network, and five sources that are not
 
 The model can ask **market-data** for candles, coverage, indicators and levels mid-answer,
 read *and move* the demo account through **trading-mcp** — positions, balance and working
 orders on the reading side, orders sent, closed, amended and cancelled on the other — and
 ask the **prediction-market archive** what a market prices an event at, of its archive or of
-the provider live, and the **post archive** what was said and what a model made of it. At most
+the provider live, the **post archive** what was said and what a model made of it, and the
+**strategy platform** what it decided and how many setups it stands on. At most
 eight calls per turn, a number in the code rather than a setting. Each network server is
 configured and fails on its own: one being absent or unreachable costs the model that server's
 tools and nothing else.
 
-The two archives are not servers any more. Since `one-process-per-security-boundary` each is a
-package of this process, mounted whole under `/polymarket` and `/social`, and its tools reach
-both registries as functions (`workbench/local_tools.py`) — same names, descriptions, ceilings
-and refusals, no address, no identity, no session. Two of the prediction-market archive's nine
-tools write, and what they write is a watch list, not an account; nothing on the post archive's
-four writes at all. Nothing this system does on Polymarket touches money.
+The two archives and the strategy platform are not servers any more. Since
+`one-process-per-security-boundary` each is a package of this process, mounted whole under
+`/polymarket`, `/social` and `/strategy`, and its tools reach both registries as functions
+(`workbench/local_tools.py`) — same names, descriptions, ceilings and refusals, no address, no
+identity, no session. Two of the prediction-market archive's nine tools write, and what they
+write is a watch list, not an account; nothing on the post archive's four or the platform's
+writes at all. Nothing this system does on Polymarket touches money.
 
-The third and fourth pairs — `TELEGRAM_MCP_URL`, `STRATEGY_MCP_URL` — are the same shape as the
-first two. The last is the one the teams' clock reads: `pending_setups` on the
+The third pair — `TELEGRAM_MCP_URL` — is the same shape as the first two. The platform's local
+source is the one the teams' clock reads: `pending_setups` on the
 strategy platform is a number a trigger compares against its threshold, and it travels the
 same road as every other reading rather than a client of its own, so the woken team reads the
 very decision that woke it.
@@ -93,7 +95,7 @@ anything at all.
 Two tools, `memory_read` and `memory_write`, announced by **a source that is this process
 itself** — no address, no identity, no session. It is the same shape as the team tools
 above, on the other surface: those join the conversation's registry, this one joins the
-teams registry beside `market-mcp`, `trading-mcp` and the two archives. Announcing them touches no database
+teams registry beside `market-mcp`, `trading-mcp`, the two archives and the strategy platform. Announcing them touches no database
 (the descriptors are constants), which is what lets the save-time paths build a registry out
 of settings alone and still publish the names; calling them needs the pool, and by then
 there is a run. Which agent may read and which may write is the mechanism that was already

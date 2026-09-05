@@ -9,8 +9,8 @@ from pathlib import Path
 
 # `strategy/` and `migrations/` are siblings — in the repository and in the image
 # (`Dockerfile` copies both), so one expression locates it in both.
-MIGRATIONS = Path(__file__).resolve().parent.parent / "migrations"
+MIGRATIONS = Path(__file__).resolve().parent.parent / "migrations" / "strategy"
 
 # Advisory locks are scoped to one database and this module has its own, so the value only has to be stable. It is
-# this module's port, following the convention the other three set, so a log line naming the key says which module.
+# the port this module had before it joined the workbench, like every other key here, so a log line names the chain.
 MIGRATION_LOCK_KEY = 8080

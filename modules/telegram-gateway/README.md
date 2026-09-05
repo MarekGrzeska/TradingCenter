@@ -45,7 +45,7 @@ and `BotCredential` are separate types for that reason — the read has no token
 ## Who calls it
 
 Three callers, and the two lists in `caller_access.py` keep them apart. The `workbench` reaches
-`/mcp` (`TELEGRAM_MCP_URL` / `_SCOPE`, the third pair of that shape). The workbench's post archive and `strategy`
+`/mcp` (`TELEGRAM_MCP_URL` / `_SCOPE`, the third pair of that shape). The workbench's post archive and strategy platform
 reach the REST contract with their own managed identities, each carrying
 `TELEGRAM_GATEWAY_URL` / `_SCOPE` / `ALERT_DESTINATION` — all three or none, and none of them is a
 module that collects or decides exactly as before and says nothing. The split is not reading from
@@ -129,7 +129,7 @@ before the image that enforces its settings — and it has one step nothing here
    address, and `GET /state` says `destinations_ready` is zero. Where the account session is
    configured, `POST /bots/created` replaces the first call and @BotFather is never opened by hand.
 5. **Only then the callers.** Set `telegram_alert_destination` in `terraform.tfvars` to the name
-   bound in step 4 and apply: the workbench (for its post archive) and `strategy` get their three settings and start
+   bound in step 4 and apply: the workbench (for its post archive and strategy platform) gets the three settings and starts
    announcing. Setting it earlier is not an outage — the sends are refused, nothing is marked as
    told, and each next pass tries again.
 

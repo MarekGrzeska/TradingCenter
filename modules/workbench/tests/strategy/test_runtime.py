@@ -13,7 +13,9 @@ def test_the_lock_key_is_this_modules_own() -> None:
 
 def test_the_migrations_are_beside_the_package() -> None:
     """`strategy/` and `migrations/` are siblings in the repository and in the image, so one expression locates them
-    in both. A wrong path here is a module that starts against an empty database and reports success."""
+    in both — this chain one of that directory's subdirectories, beside the other four. A wrong path here is a
+    package that starts against an empty database and reports success."""
+    assert MIGRATIONS.name == "strategy"
     assert MIGRATIONS.is_dir()
     assert (MIGRATIONS / "env.py").is_file()
     assert (MIGRATIONS / "versions").is_dir()

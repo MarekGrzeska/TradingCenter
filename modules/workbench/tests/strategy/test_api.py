@@ -5,10 +5,11 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from fakes import FakeArchive
 
 from strategy import store
 from strategy.spec import Decision
+
+from .fakes import FakeArchive
 
 pytestmark = pytest.mark.db
 

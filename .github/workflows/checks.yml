@@ -26,7 +26,6 @@ jobs:
       capital-gateway: ${{ steps.filter.outputs.capital-gateway }}
       market-data: ${{ steps.filter.outputs.market-data }}
       trading-mcp: ${{ steps.filter.outputs.trading-mcp }}
-      strategy: ${{ steps.filter.outputs.strategy }}
       workbench: ${{ steps.filter.outputs.workbench }}
       terminal: ${{ steps.filter.outputs.terminal }}
       pocket: ${{ steps.filter.outputs.pocket }}
@@ -82,9 +81,9 @@ jobs:
           # One module where there were three. It takes `tc-mcp-kit` as well as the
           # other two, because the team tools moved into it with their schema slimmer.
           PATTERNS[workbench]="^modules/workbench/|$tc_runtime|$tc_openai|$tc_mcp_kit"
-          # The terminal is filtered on three other modules because its `contract:check` is the check for those seams.
+          # The terminal is filtered on two other modules because its `contract:check` is the check for those seams.
           # The workbench whole, since its schema is built from routes and from models those files import.
-          PATTERNS[terminal]='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/workbench/|^modules/strategy/strategy/(contract|openapi|rule)\.py$'
+          PATTERNS[terminal]='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/workbench/'
           # market-data takes `tc-mcp-kit` since the tool surface moved in — the slimmer keeps eleven tools under their
           # ceiling. trading-mcp watches the gateway's *whole* directory: its snapshot is built from routes and DTOs both.
           # The second front end, filtered on the one module it reads: it keeps its own generated copy of that
@@ -94,9 +93,6 @@ jobs:
           # Both packages since the tool surface landed. No pairing with another module's job: its
           # upstream is Telegram rather than anything here.
           PATTERNS[telegram-gateway]="^modules/telegram-gateway/|$tc_runtime|$tc_mcp_kit"
-          # No third pairing here, deliberately: this module reads market-data over its published REST contract at
-          # runtime and keeps no snapshot of it, so there is nothing to go stale.
-          PATTERNS[strategy]="^modules/strategy/|$tc_runtime|$tc_mcp_kit"
           # The archive-shape check, plus the script that is the shape. There used to be a third pairing above —
           # teams-mcp's snapshot of the teams document — gone with the module that kept it.
           PATTERNS[openspec]='^openspec/|^scripts/trim-openspec-archive\.sh$'
@@ -231,25 +227,6 @@ jobs:
       - run: uv run pyright
       # The `db` tests run here; the `live` ones stay behind --run-live, because they would talk to the
       # real Telegram as the operator's own account.
-      - run: uv run pytest -q
-
-  strategy:
-    name: strategy
-    needs: changes
-    if: needs.changes.outputs.strategy == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: modules/strategy
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-      - run: uv run ruff check .
-      - run: uv run pyright
-      # The `db` tests are gated on Docker and this runner has it, so they run. Nothing reaches market-data: the
-      # archive is an HTTP contract doubled at the transport, which is where the "cannot see" refusals come from.
       - run: uv run pytest -q
 
   packages:

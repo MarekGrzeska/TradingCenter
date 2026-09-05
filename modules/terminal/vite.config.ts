@@ -50,7 +50,6 @@ export default defineConfig(({ mode }) => {
   const archive = env.ARCHIVE_PROXY_TARGET || "http://localhost:8020";
   const workbench = env.WORKBENCH_PROXY_TARGET || "http://localhost:8030";
   const gateway = env.GATEWAY_PROXY_TARGET || "http://localhost:8010";
-    const strategy = env.STRATEGY_PROXY_TARGET || "http://localhost:8080";
   const gatewayKey = env.GATEWAY_PROXY_KEY || env.GATEWAY_API_KEY || "";
 
   return {
@@ -103,13 +102,12 @@ export default defineConfig(({ mode }) => {
           configure: quietProxyErrors("workbench", workbench),
         },
 
-        // The strategy platform, same shape and same reason as the archive above: a token in production, nothing
-        // locally.
+        // The strategy platform, served by the workbench under /strategy, same shape and same reason as above.
         "/strategy-api": {
-          target: strategy,
+          target: workbench,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/strategy-api/, ""),
-          configure: quietProxyErrors("strategy", strategy),
+          rewrite: (path) => path.replace(/^\/strategy-api/, "/strategy"),
+          configure: quietProxyErrors("workbench", workbench),
         },
       },
     },
