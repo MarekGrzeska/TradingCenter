@@ -280,6 +280,48 @@ files, all invalidated the day the bot is replaced. The name survives that; the 
 A bot cannot open a conversation, so the name becomes an address only when a person taps
 `t.me/<bot>?start=<nonce>` — one tap, and it cannot be reduced to zero.
 
+## One process per security boundary
+
+Stage 2 of `one-process-per-security-boundary` landed on 5 September 2026, and the three
+sections above describe three *packages* now, not three modules. Each keeps everything it
+had — its database and migration chain, its REST contract, its `/mcp`, its caller record, its
+loop and its heartbeat — and lost exactly one thing: its own process. The workbench mounts
+each whole under a prefix and enters its `serving` from its own lifespan, because a mounted
+application's lifespan never runs; the tools each published reach the conversation and the
+teams as functions, so `POLYMARKET_MCP_URL`, `SOCIAL_MCP_URL` and `STRATEGY_MCP_URL` no
+longer exist.
+
+```
+   ┌───────────────────────── app-tradingcenter-agent ─────────────────────────┐
+   │  workbench/  — the assembly, the only package that imports the others     │
+   │  agent  ·  teams  ·  teams_tools                                          │
+   │  polymarket_data  under /polymarket    (Polymarket, lock key 8070)        │
+   │  social_data      under /social        (Truth Social, lock key 8090)      │
+   │  strategy         under /strategy      (market-data's REST, key 8080)     │
+   │  five databases, one identity, one Easy Auth registration                 │
+   └───────────────────────────────────────────────────────────────────────────┘
+        │ /mcp, managed identity              │ REST, the same identity
+        ▼                                     ▼
+    market-data · trading-mcp            telegram-gateway · market-data
+```
+
+The rule between packages is the module rule in a second form: none of them imports another,
+and `workbench/` alone imports all of them — `tests/test_layering.py` reads the imports and
+refuses. What is *shared* is the process and its identity: one App Service, one managed
+identity on every caller list, one Easy Auth registration, one `TELEGRAM_GATEWAY_URL` for both
+callers that notify. What is *not* shared is any of the data: five databases, five chains, five
+advisory-lock keys that are the ports the packages used to listen on.
+
+Three things were measured on the way and are worth keeping. The working set of the whole
+process with all three packages inside is 357–375 MB, against 393 + 290 + 273 + 263 MB for the
+four App Services it replaced. The loop metrics of a mounted package reach Application Insights
+only if the *host* configures telemetry — the packages stopped exporting the minute their own
+processes went, and both loop alerts sat without data until the workbench called
+`telemetry.configure` (#248). And a caller record written for an application alone reads the
+path *within* its mount, or every route under the prefix is refused — Starlette leaves the
+prefix in `path` and puts it in `root_path` (#249); local runs, with the requirement off, never
+show either.
+
 ## The order path
 
 The workbench's teams surface has one more edge than the diagram above draws, and it is

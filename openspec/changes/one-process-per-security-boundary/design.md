@@ -139,6 +139,10 @@ trzech osobnych aplikacji. Bramka skrócona z doby do godziny decyzją operatora
 dostały dane dopiero po #248 (workbench nie konfigurował telemetrii), a rekord wołających pod montażem
 wymagał #249 — obie rzeczy, których lokalne testy nie widziały.
 
+Trzecia liczba (po 2.7, 5 września, 09:59–10:44 UTC, z pełnym etapem 2 od ~11:35): workbench z trzema
+pakietami raportuje 357–375 MB wobec 393 + 290 + 273 + 263 = 1 219 MB czterech osobnych aplikacji; plan
+ma pięć App Service zamiast ośmiu.
+
 ## Risks / Trade-offs
 
 - **Jedna domena awarii dla sześciu** → App Service nie ma limitu per aplikacja, więc plan był nią
