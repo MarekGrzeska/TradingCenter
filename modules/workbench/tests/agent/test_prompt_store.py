@@ -57,7 +57,7 @@ async def test_without_tools_says_the_archive_is_out_of_reach(db) -> None:
     revision = await store.latest_prompt_revision(db)
     lowered = revision.without_tools_body.lower()
     # Not "you have no tools" any more: the chart tool is this module's own and is offered whether or not
-    # market-mcp answers. What this variant must still say is that no market data can be read.
+    # telegram-mcp answers. What this variant must still say is that no market data can be read.
     assert "cannot reach the archive" in lowered
     assert "cannot see candles" in lowered
 

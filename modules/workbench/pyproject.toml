@@ -1,7 +1,7 @@
 [project]
 name = "workbench"
 version = "0.1.0"
-description = "The operator's conversation with a model, the teams they compose, two archives and the strategy platform — one process, five schemas"
+description = "The operator's conversation with a model, the teams they compose, three archives and the strategy platform — one process, six schemas"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.110",
@@ -48,6 +48,12 @@ dependencies = [
     # not through `tc-openai`: one call per post with a fixed response schema, no stream and no tools.
     "defusedxml>=0.7",
     "openai>=1.60",
+    # The candle archive's three, since it joined this process: the client half of the gateway's stream, the
+    # indicator kernel's only dependency (`market_data/indicators/kernel.py`, deliberately nothing else), and the
+    # candle-age gauge's exporter — a no-op without APPLICATIONINSIGHTS_CONNECTION_STRING.
+    "websockets>=13",
+    "numpy>=2.0",
+    "azure-monitor-opentelemetry>=1.6",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.
@@ -67,7 +73,7 @@ line-length = 100
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
 [tool.pyright]
-include = ["workbench", "agent", "teams", "teams_tools", "polymarket_data", "social_data", "strategy", "migrations"]
+include = ["workbench", "agent", "teams", "teams_tools", "polymarket_data", "social_data", "strategy", "market_data", "migrations"]
 typeCheckingMode = "basic"
 
 [tool.pytest.ini_options]
@@ -76,7 +82,7 @@ pythonpath = ["."]
 testpaths = ["tests"]
 markers = [
     "db: needs a real PostgreSQL (a throwaway container, started on demand — see conftest)",
-    "live: calls a real OpenAI model (needs --run-live and a configured key)",
+    "live: calls a real OpenAI model, or reads through a running capital-gateway (needs --run-live)",
 ]
 
 [dependency-groups]
@@ -89,4 +95,7 @@ dev = [
     # leftover table is indistinguishable from a migration that works.
     "testcontainers[postgres]>=4.8",
     "respx>=0.21",
+    # An independent oracle for `tests/market/test_indicators_talib_comparison.py`, dev-only: `market_data/indicators`
+    # imports nothing from it (design.md, "Własne jądro na numpy, TA-Lib wyłącznie jako wyrocznia testowa").
+    "ta-lib>=0.7.1",
 ]

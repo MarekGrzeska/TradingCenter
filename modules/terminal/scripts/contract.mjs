@@ -15,14 +15,15 @@ const terminal = resolve(here, "..");
 const SOURCES = [
   {
     name: "market-data",
-    moduleDir: resolve(terminal, "..", "market-data"),
+    moduleDir: resolve(terminal, "..", "workbench"),
     pythonModule: "market_data.openapi",
     output: join(terminal, "src", "data", "contract.generated.ts"),
     banner: `/**
  * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
  *
- * Printed from market-data's own Pydantic models by \`python -m market_data.openapi\`, the subscription's
- * Snapshot and CandleChange included though they have no HTTP path — so \`tsc\` is what notices a change.
+ * Printed from the candle archive's own Pydantic models by \`python -m market_data.openapi\` — a package of the
+ * workbench, served under /market — the subscription's Snapshot and CandleChange included though they have no
+ * HTTP path, so \`tsc\` is what notices a change.
  */
 `,
   },

@@ -41,7 +41,7 @@ def settings_for(url: str | None, **overrides) -> Settings:
         database_url="postgresql://localhost:5432/teams",
         openai_api_key="key",
         models=ONE_MODEL,  # type: ignore[arg-type]
-        market_mcp_url=url,
+        telegram_mcp_url=url,
         _env_file=None,  # type: ignore[call-arg]
         **overrides,
     )

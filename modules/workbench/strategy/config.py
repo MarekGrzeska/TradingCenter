@@ -23,7 +23,7 @@ class Settings(BaseSettings):
 
     # The REST contract, not the tool surface at `/mcp`: that surface is narrowed for a model, which is
     # right for an agent and too tight for a loop.
-    market_data_url: str = "http://localhost:8020"
+    market_data_url: str = "http://localhost:8030/market"
     # The archive's own audience, when this module has an identity to present. Absent is a working
     # configuration and the local one; set, every request carries a bearer token.
     market_data_scope: str | None = None

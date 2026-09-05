@@ -23,10 +23,10 @@ MAX_CONNECTIONS = 35
 BUDGET = 30
 
 # module directory -> (config path, Terraform's resource name, how many pools that one setting sizes).
-# The workbench is the only entry above one pool: two schemas, two pools, one process, one setting. The
-# three packages joined it, each with a pool of its own, sized by `POLYMARKET_`/`SOCIAL_`/`STRATEGY_DATABASE_POOL_SIZE`.
+# The workbench is the only entry above one pool: two schemas, two pools, one process, one setting. The four
+# packages joined it, each with a pool of its own, sized by `MARKET_`/`POLYMARKET_`/`SOCIAL_`/`STRATEGY_DATABASE_POOL_SIZE`.
 MODULES = {
-    "market-data": ("market_data/config.py", "market_data", 1),
+    "workbench/market": ("market_data/config.py", "workbench", 1),
     "workbench/polymarket": ("polymarket_data/config.py", "workbench", 1),
     "workbench/social": ("social_data/config.py", "workbench", 1),
     "workbench/strategy": ("strategy/config.py", "workbench", 1),

@@ -35,6 +35,12 @@ APPLICATION_CLAIMS = (
 
 UNAUTHENTICATED = "anonymous"
 
+# A caller inside the process, named in the ASGI scope rather than in a header: a package of the workbench reading
+# another package's REST contract through `httpx.ASGITransport`. Nothing arriving over the network can put a key on
+# a scope — the server builds the scope from the request, and a header is only ever a header — so this cannot be
+# forged the way `X-MS-CLIENT-PRINCIPAL` could be if the platform ever stopped overwriting it.
+IN_PROCESS_CALLER = "tc_runtime.in_process_caller"
+
 
 def calling_application(headers: dict[bytes, bytes]) -> str | None:
     """The application identifier this request was issued to, or `None`. `None` is a refusal, never a
@@ -57,6 +63,19 @@ def calling_application(headers: dict[bytes, bytes]) -> str | None:
             if claim.get("typ") == name and claim.get("val"):
                 return str(claim["val"]).strip()
     return None
+
+
+def in_process(app: ASGIApp, name: str) -> ASGIApp:
+    """`app`, reached as this process rather than as a caller: every request through the returned application
+    carries `name` on its scope, which `CallerAccess` admits. For `httpx.ASGITransport` and nothing else — an
+    application served on a port must never be wrapped in this."""
+
+    async def named(scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] in ("http", "websocket"):
+            scope = {**scope, IN_PROCESS_CALLER: name}
+        await app(scope, receive, send)
+
+    return named
 
 
 class Surface(str, Enum):
@@ -159,6 +178,14 @@ class CallerAccess:
             # reach this. "The settings were missing" must never be the reading that allows all.
             log.error("request refused: settings are not on the application state yet")
             await self._refuse(scope, receive, send, 503, self._record.starting_detail)
+            return
+
+        in_process = scope.get(IN_PROCESS_CALLER)
+        if in_process:
+            # This process asking itself. Admitted on every surface the record names, and logged as
+            # what it is: the archive's route record lists applications, and a process is not one.
+            log.info("request on %s from this process (%s)", path, in_process)
+            await self._app(scope, receive, send)
             return
 
         headers = dict(scope.get("headers", []))

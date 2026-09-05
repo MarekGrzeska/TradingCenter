@@ -30,7 +30,8 @@ class ToolServerRegistry:
         this class stays buildable from settings, which is all it can know by itself."""
         return cls(
             [
-                ToolServer(settings, prefix="market_mcp"),
+                # No market server: the candle archive is a package of this process since
+                # `one-process-per-security-boundary`, and its eleven tools arrive through `local_sources`.
                 # The one whose writes land on the account. No operator identity: the account is one and
                 # shared, and trading-mcp reads no such header.
                 ToolServer(settings, prefix="trading_mcp", can_move_the_account=True),

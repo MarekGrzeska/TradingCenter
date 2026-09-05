@@ -131,14 +131,15 @@ class TestOneFileAtATime:
     def test_a_module_runs_its_own_job(self) -> None:
         decisions = decide(["modules/workbench/agent/turn.py"])
         assert decisions["workbench"]
-        assert not decisions["market-data"]
+        assert not decisions["trading-mcp"]
 
-    def test_market_datas_contract_reaches_the_terminal(self) -> None:
+    def test_the_archives_contract_reaches_the_terminal(self) -> None:
         """The terminal keeps generated types built from that schema, and `contract:check` only runs if its
-        job does. The second copy — market-mcp's snapshot — is gone with the module that held it."""
-        decisions = decide(["modules/market-data/market_data/contract.py"])
-        assert decisions["market-data"]
+        job does. The archive is a package of the workbench, so its job is the workbench's."""
+        decisions = decide(["modules/workbench/market_data/contract.py"])
+        assert decisions["workbench"]
         assert decisions["terminal"]
+        assert not decisions["pocket"]
 
     def test_the_gateway_reaches_trading_mcp(self) -> None:
         """trading-mcp keeps a snapshot of the gateway's whole OpenAPI document."""
@@ -176,21 +177,21 @@ class TestOneFileAtATime:
         decisions = decide(["packages/tc-runtime/tc_runtime/db.py"])
         assert decisions["packages"]
         assert decisions["workbench"]
-        assert decisions["market-data"]
+        assert decisions["telegram-gateway"]
 
     def test_tc_openai_reaches_only_its_consumer(self) -> None:
         """Two consumers became one when they became one module; the property this holds is the other half,
         that a package's edit must not run a module which does not take it."""
         decisions = decide(["packages/tc-openai/tc_openai/provider.py"])
         assert decisions["workbench"]
-        assert not decisions["market-data"]
+        assert not decisions["telegram-gateway"]
         assert not decisions["trading-mcp"]
 
     def test_tc_mcp_kit_reaches_everything_that_speaks_mcp(self) -> None:
-        """The archive, trading-mcp and the workbench — the last two hold a database, which is why the old
+        """trading-mcp, the workbench and telegram-gateway — two of them hold a database, which is why the old
         reason for this package existing apart from `tc-runtime` had to be rewritten twice."""
         decisions = decide(["packages/tc-mcp-kit/tc_mcp_kit/network_identity.py"])
-        assert decisions["market-data"]
+        assert decisions["telegram-gateway"]
         assert decisions["trading-mcp"]
         assert decisions["workbench"]
         assert not decisions["capital-gateway"]

@@ -156,6 +156,24 @@ def strategy_migrated_url(strategy_postgres_url: str) -> str:
 
 
 @pytest.fixture(scope="session")
+def market_postgres_url() -> Iterator[str]:
+    from testcontainers.community.postgres import PostgresContainer
+
+    with PostgresContainer("postgres:17-alpine", driver=None) as pg:
+        yield pg.get_connection_url()
+
+
+@pytest.fixture(scope="session")
+def market_migrated_url(market_postgres_url: str) -> str:
+    from tc_runtime.migrate import upgrade_to_head
+
+    from market_data.runtime import MIGRATIONS
+
+    upgrade_to_head(MIGRATIONS, sqlalchemy_url(market_postgres_url))
+    return market_postgres_url
+
+
+@pytest.fixture(scope="session")
 def agent_migrated_url(agent_postgres_url: str) -> str:
     """The same database with the conversation's migrations applied — through the same function the process
     runs at startup, so the schema under test is the one a deployment actually applies."""
@@ -194,6 +212,7 @@ def workbench_env(
     polymarket_migrated_url: str,
     social_migrated_url: str,
     strategy_migrated_url: str,
+    market_migrated_url: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The smallest environment `workbench.app` will start in: everything the process refuses to start
@@ -203,6 +222,12 @@ def workbench_env(
     monkeypatch.setenv("POLYMARKET_DATABASE_URL", polymarket_migrated_url)
     monkeypatch.setenv("SOCIAL_DATABASE_URL", social_migrated_url)
     monkeypatch.setenv("STRATEGY_DATABASE_URL", strategy_migrated_url)
+    monkeypatch.setenv("MARKET_DATABASE_URL", market_migrated_url)
+    # The archive's only upstream. A closed loopback port: with no tracked pair nothing subscribes, and a
+    # test that tracks one meets a refused connection rather than a gateway.
+    monkeypatch.setenv("GATEWAY_BASE_URL", "http://127.0.0.1:9")
+    monkeypatch.setenv("GATEWAY_STREAM_URL", "ws://127.0.0.1:9/ws/stream")
+    monkeypatch.setenv("GATEWAY_API_KEY", "test-gateway-key")
     # The post archive's first pass runs the moment the process starts; pointed at a closed loopback port it
     # fails fast and logs, and no test here reaches a public feed.
     monkeypatch.setenv("SOCIAL_TRUTH_SOCIAL_FEED_URL", "http://127.0.0.1:9/feed")

@@ -112,21 +112,10 @@ SERVICES: tuple[Service, ...] = (
         # "/" specifically — every other route needs X-Gateway-Key, and "/" is the one
         # exception carved out for exactly this kind of health probe.
         health_path="/",
-        why="First: everything below either calls it or calls something that does.",
-    ),
-    Service(
-        name="market-data",
-        module="market-data",
-        port=8020,
-        command=("uv", "run", "uvicorn", "market_data.app:app", "--reload", "--port", "8020"),
-        log_prefix="archive ",
-        colour=MAGENTA,
-        health_path="/health",
         why=(
-            "After the gateway: it opens a subscription per tracked pair the moment it "
-            "starts, so a gateway not listening yet costs it a round of backoff. It also "
-            "serves the tool surface at /mcp, which is why nothing here starts a separate "
-            "one any more."
+            "First: everything below either calls it or calls something that does. The "
+            "archive that used to sit right behind it is a package of the workbench now, "
+            "and opens its subscriptions from there."
         ),
     ),
     Service(
@@ -178,10 +167,12 @@ SERVICES: tuple[Service, ...] = (
             "conversation and the teams catalogue are one process here — 8050 has belonged "
             "to nobody since `agent-and-teams-one-workbench`, and 8070 to nobody since "
             "`one-process-per-security-boundary` folded polymarket-data into this process, "
-            "8090 since it folded social-data in, 8080 since strategy. It calls three tool servers now, "
-            "and each tool list is read on the first turn that wants one, so a server "
-            "still coming up means a turn answered without those tools rather than an "
-            "error anyone would notice."
+            "8090 since it folded social-data in, 8080 since strategy, 8020 since market-data. "
+            "The archive inside it opens a subscription per tracked pair the moment it starts, "
+            "so a gateway not listening yet costs it a round of backoff. It calls two tool "
+            "servers over the network now, and each tool list is read on the first turn that "
+            "wants one, so a server still coming up means a turn answered without those tools "
+            "rather than an error anyone would notice."
         ),
     ),
     Service(
@@ -219,10 +210,10 @@ SERVICES: tuple[Service, ...] = (
     ),
 )
 
-# Every migration chain and which module owns it; `workbench` appears five times because it owns five databases.
+# Every migration chain and which module owns it; `workbench` appears six times because it owns six databases.
 # Redundant with each module's startup migration, and kept because it fails readably rather than under a lock.
 MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
-    ("market-data", None),
+    ("workbench", "alembic-market.ini"),
     ("workbench", "alembic-agent.ini"),
     ("workbench", "alembic-teams.ini"),
     ("workbench", "alembic-polymarket.ini"),
@@ -266,12 +257,12 @@ def is_loopback(host: str | None) -> bool:
 # Which `.env` each module needs, and what is missing from it if it is absent.
 REQUIRED_ENV: tuple[tuple[str, str], ...] = (
     ("capital-gateway", "copy .env.example and fill in demo credentials"),
-    ("market-data", "copy .env.example; the defaults match compose.yaml"),
 # Two OpenAI keys, deliberately — the conversation's and the teams experiments', so the bill
-# splits. `workbench/config.py` refuses to build Settings without either.
+# splits. `workbench/config.py` refuses to build Settings without either — or without the
+# gateway's key, which the archive inside it presents on every call.
     (
         "workbench",
-        "copy .env.example and fill in AGENT_OPENAI_API_KEY and TEAMS_OPENAI_API_KEY",
+        "copy .env.example and fill in AGENT_OPENAI_API_KEY, TEAMS_OPENAI_API_KEY and GATEWAY_API_KEY",
     ),
     # trading-mcp cannot fall back the way teams-mcp does: `config.py` requires the
     # gateway's caller key, and the gateway checks it on loopback too.
@@ -309,7 +300,7 @@ def preflight(env: Environment, *, start_front_ends: bool) -> list[str]:
             "uv is not on PATH (runs every Python service) — https://docs.astral.sh/uv/"
         )
 
-    # The database lives in a container, so Docker runs the stack, not only market-data's
+    # The database lives in a container, so Docker runs the stack, not only the archive's
     # tests (openspec/changes/local-dev-database-in-docker).
     if not env.which("docker"):
         problems.append(
@@ -367,7 +358,7 @@ def _database_host_problems(env: Environment) -> list[str]:
     startup; refusing here is earlier, before anything has been launched, and names the file to fix."""
     problems: list[str] = []
     for module, key in (
-        ("market-data", "DATABASE_URL"),
+        ("workbench", "MARKET_DATABASE_URL"),
         ("workbench", "AGENT_DATABASE_URL"),
         ("workbench", "TEAMS_DATABASE_URL"),
     ):
@@ -388,45 +379,41 @@ def _gateway_key_problems(env: Environment) -> list[str]:
     before it opens a port, so a mismatch is not a failed tool call later but a run that dies at start."""
     gateway_env = env.read_env("capital-gateway")
     trading_env = env.read_env("trading-mcp")
-    if gateway_env is None or trading_env is None:
+    workbench_env = env.read_env("workbench")
+    if gateway_env is None or trading_env is None or workbench_env is None:
         return []  # already reported as a missing file
 
     gateway_key = env_value(gateway_env, "GATEWAY_API_KEY")
     trading_key = env_value(trading_env, "CAPITAL_GATEWAY_API_KEY")
+    # The archive inside the workbench presents the same key on every call and handshake; a mismatch
+    # there is not a refused start but an archive that collects nothing and says so hours later.
+    archive_key = env_value(workbench_env, "GATEWAY_API_KEY")
 
+    problems: list[str] = []
     if not trading_key:
-        return [
-            (
-                "modules/trading-mcp/.env has no CAPITAL_GATEWAY_API_KEY — the gateway "
-                "requires it from every caller, loopback included"
-            )
-        ]
-    if gateway_key and gateway_key != trading_key:
-        return [
-            (
-                "modules/trading-mcp/.env's CAPITAL_GATEWAY_API_KEY does not match "
-                "modules/capital-gateway/.env's GATEWAY_API_KEY — trading-mcp would be "
-                "refused by the gateway and exit before it listens"
-            )
-        ]
-    return []
+        problems.append(
+            "modules/trading-mcp/.env has no CAPITAL_GATEWAY_API_KEY — the gateway "
+            "requires it from every caller, loopback included"
+        )
+    elif gateway_key and gateway_key != trading_key:
+        problems.append(
+            "modules/trading-mcp/.env's CAPITAL_GATEWAY_API_KEY does not match "
+            "modules/capital-gateway/.env's GATEWAY_API_KEY — trading-mcp would be "
+            "refused by the gateway and exit before it listens"
+        )
+    if archive_key and gateway_key and gateway_key != archive_key:
+        problems.append(
+            "modules/workbench/.env's GATEWAY_API_KEY does not match "
+            "modules/capital-gateway/.env's GATEWAY_API_KEY — the archive inside the "
+            "workbench would be refused on every subscription and collect nothing"
+        )
+    return problems
 
 
 # Each of these is a supported state, and each looks from the operator's seat like a broken
 # module rather than a missing line. That is the whole reason they are said out loud.
 
 ADVISORIES: tuple[tuple[str, str, str, str], ...] = (
-# 8020, not 8040: the archive serves its own tools at /mcp since `market-mcp-into-market-data`,
-# and a .env copied before that change points at a port nothing listens on.
-    (
-        "workbench",
-        "MARKET_MCP_URL",
-        (
-            "the agent will run without tools, and a team whose agents assign them will "
-            "refuse to run rather than answer without them"
-        ),
-        "8020",
-    ),
     (
         "workbench",
         "TRADING_MCP_URL",
@@ -480,8 +467,16 @@ RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
         ),
     ),
     (
+        "MARKET_MCP_URL",
+        (
+            "the candle archive is a package of this process since the same change, served under "
+            "/market; its eleven tools need no address, and MARKET_DATABASE_URL plus the gateway's "
+            "GATEWAY_API_KEY are the lines this file needs instead"
+        ),
+    ),
+    (
         "DATABASE_URL",
-        "the workbench owns five databases: AGENT_, TEAMS_, POLYMARKET_, SOCIAL_ and STRATEGY_DATABASE_URL",
+        "the workbench owns six databases: MARKET_, AGENT_, TEAMS_, POLYMARKET_, SOCIAL_ and STRATEGY_DATABASE_URL",
     ),
     (
         "OPENAI_API_KEY",
@@ -880,9 +875,9 @@ def ready_lines(*, start_front_ends: bool) -> list[str]:
             "  Pocket (phone)      http://localhost:5174",
         ]
     lines += [
-        f"  market-data docs    http://{LOOPBACK}:8020/docs",
         f"  Gateway docs        http://{LOOPBACK}:8010/docs",
-        f"  Archive tools       http://{LOOPBACK}:8020/mcp",
+        f"  Archive docs        http://{LOOPBACK}:8030/market/docs",
+        f"  Archive tools       http://{LOOPBACK}:8030/market/mcp",
         f"  trading-mcp health  http://{LOOPBACK}:8060/health",
         f"  Workbench docs      http://{LOOPBACK}:8030/docs",
         f"  Polymarket docs     http://{LOOPBACK}:8030/polymarket/docs",

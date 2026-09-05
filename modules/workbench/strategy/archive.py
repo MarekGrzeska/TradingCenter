@@ -91,6 +91,7 @@ class Archive:
     """The archive's REST contract, as the four questions this module asks of it."""
 
     def __init__(self, base_url: str, client: httpx.AsyncClient) -> None:
+        # Empty for a client that carries its own authority — the host's in-process one.
         self._base_url = base_url.rstrip("/")
         self._client = client
 

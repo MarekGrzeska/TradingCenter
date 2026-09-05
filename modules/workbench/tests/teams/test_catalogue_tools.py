@@ -38,7 +38,7 @@ def client(
     """The app against a stand-in tool server announcing three tools. `db` is depended on
     for its truncation — every test here starts against an empty catalogue."""
     with serving_sync() as url:
-        monkeypatch.setenv("MARKET_MCP_URL", url)
+        monkeypatch.setenv("TELEGRAM_MCP_URL", url)
         for key, value in _ENV.items():
             monkeypatch.setenv(key, value)
         with TestClient(app) as started:
@@ -91,7 +91,7 @@ def test_a_definition_naming_a_tool_the_server_does_not_announce_is_refused(
 
 def test_the_names_come_from_the_server_not_from_this_module(client: TestClient) -> None:
     """The assertion that fails the day someone writes a local list of tool names: the stand-in publishes
-    exactly three, and a fourth market-mcp really has is refused because *this* server does not announce it."""
+    exactly three, and a fourth telegram-mcp really has is refused because *this* server does not announce it."""
     response = client.post("/teams", json=_body(["get_candles"]), headers=OWNER)
 
     assert response.status_code == 422

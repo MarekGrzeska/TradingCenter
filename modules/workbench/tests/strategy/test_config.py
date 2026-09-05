@@ -68,12 +68,12 @@ class TestTheUpstream:
         # The archive is reached over its REST contract; a `ws://` here is a setting
         # copied from the wrong line.
         with pytest.raises(ValidationError) as refused:
-            build(market_data_url="ws://127.0.0.1:8020")
+            build(market_data_url="ws://127.0.0.1:8100")
         assert "http or https" in str(refused.value)
 
     def test_a_trailing_slash_is_dropped(self) -> None:
-        assert build(market_data_url="http://127.0.0.1:8020/").market_data_url == (
-            "http://127.0.0.1:8020"
+        assert build(market_data_url="http://127.0.0.1:8100/").market_data_url == (
+            "http://127.0.0.1:8100"
         )
 
 

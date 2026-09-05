@@ -28,7 +28,7 @@ def _agent(key: str, *, model_id: str = "gpt-5.6-luna", tools: list[str] | None 
     )
 
 
-def snapshot(*names: str, from_: str = "market-mcp", unreachable: list[str] | None = None) -> AnnouncedSnapshot:
+def snapshot(*names: str, from_: str = "telegram-mcp", unreachable: list[str] | None = None) -> AnnouncedSnapshot:
     return AnnouncedSnapshot(by_name={name: [from_] for name in names}, unreachable=unreachable or [])
 
 
@@ -64,7 +64,7 @@ def test_assigned_tools_with_no_tool_server_are_refused_and_say_so() -> None:
     announced = AnnouncedSnapshot(
         by_name={"memory_read": ["team-memory"]},
         unreachable=[],
-        unconfigured=("market-mcp", "trading-mcp", "telegram-mcp"),
+        unconfigured=("telegram-mcp", "trading-mcp"),
         configured_servers=(),
     )
 
@@ -73,10 +73,9 @@ def test_assigned_tools_with_no_tool_server_are_refused_and_say_so() -> None:
 
     assert "scout" in str(err.value)
     # Every setting the operator has to fill, derived from the labels rather than listed: a hand-kept list named two on
-    # the day there were three. `\b` because a longer name can *contain* `MARKET_MCP_URL`.
-    assert re.search(r"\bMARKET_MCP_URL", str(err.value))
-    assert re.search(r"\bTRADING_MCP_URL", str(err.value))
+    # the day there were three. `\b` because a longer name can *contain* `TELEGRAM_MCP_URL`.
     assert re.search(r"\bTELEGRAM_MCP_URL", str(err.value))
+    assert re.search(r"\bTRADING_MCP_URL", str(err.value))
 
 
 def test_the_settings_named_are_only_the_ones_without_an_address() -> None:
@@ -86,15 +85,15 @@ def test_the_settings_named_are_only_the_ones_without_an_address() -> None:
     announced = AnnouncedSnapshot(
         by_name={"memory_read": ["team-memory"]},
         unreachable=[],
-        unconfigured=("telegram-mcp",),
-        configured_servers=("market-mcp",),
+        unconfigured=("trading-mcp",),
+        configured_servers=("telegram-mcp",),
     )
 
     with pytest.raises(DefinitionRefused) as err:
         check_definition(definition, model_ids=MODELS, announced=announced)
 
-    assert re.search(r"\bTELEGRAM_MCP_URL", str(err.value))
-    assert not re.search(r"\bMARKET_MCP_URL", str(err.value))
+    assert re.search(r"\bTRADING_MCP_URL", str(err.value))
+    assert not re.search(r"\bTELEGRAM_MCP_URL", str(err.value))
 
 
 def test_a_team_assigning_no_tools_passes_without_a_tool_server() -> None:
@@ -107,7 +106,7 @@ def test_a_team_assigning_no_tools_passes_without_a_tool_server() -> None:
 def test_a_name_two_servers_announce_is_refused_naming_both() -> None:
     definition = TeamDefinition(agents=[_agent("scout", tools=["place_order"])])
     announced = AnnouncedSnapshot(
-        by_name={"place_order": ["market-mcp", "trading-mcp"]}, unreachable=[]
+        by_name={"place_order": ["telegram-mcp", "trading-mcp"]}, unreachable=[]
     )
 
     with pytest.raises(DefinitionRefused) as err:
@@ -115,7 +114,7 @@ def test_a_name_two_servers_announce_is_refused_naming_both() -> None:
 
     assert "scout" in str(err.value)
     assert "place_order" in str(err.value)
-    assert "market-mcp" in str(err.value)
+    assert "telegram-mcp" in str(err.value)
     assert "trading-mcp" in str(err.value)
 
 
@@ -124,14 +123,14 @@ def test_a_name_three_servers_announce_is_refused_naming_all_three() -> None:
     because a message naming two of three sends the operator round the same refusal twice."""
     definition = TeamDefinition(agents=[_agent("scout", tools=["get_event"])])
     announced = AnnouncedSnapshot(
-        by_name={"get_event": ["market-mcp", "trading-mcp", "telegram-mcp"]}, unreachable=[]
+        by_name={"get_event": ["telegram-mcp", "trading-mcp", "telegram-mcp"]}, unreachable=[]
     )
 
     with pytest.raises(DefinitionRefused) as err:
         check_definition(definition, model_ids=MODELS, announced=announced)
 
     message = str(err.value)
-    assert "market-mcp" in message
+    assert "telegram-mcp" in message
     assert "trading-mcp" in message
     assert "telegram-mcp" in message
 
@@ -165,8 +164,8 @@ def test_a_trigger_naming_a_tool_the_server_does_not_announce_is_refused() -> No
 def test_a_trigger_with_no_tool_server_is_refused_and_names_every_setting() -> None:
     with pytest.raises(DefinitionRefused) as err:
         check_trigger_tool(
-            "get_candles", announced_tools=None, unconfigured=["market-mcp", "telegram-mcp"]
+            "get_candles", announced_tools=None, unconfigured=["telegram-mcp", "telegram-mcp"]
         )
 
-    assert "MARKET_MCP_URL" in str(err.value)
+    assert "TELEGRAM_MCP_URL" in str(err.value)
     assert "TELEGRAM_MCP_URL" in str(err.value)

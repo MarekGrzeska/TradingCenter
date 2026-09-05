@@ -10,17 +10,20 @@ reason to exist was that the conversation built teams at a neighbour's address. 
 is the same behaviour with one process, one image and one App Service under it
 (`openspec/changes/agent-and-teams-one-workbench`).
 
-## The four packages, and the rule between them
+## The eight packages, and the rule between them
 
 | Package | What |
 |---|---|
 | `agent/` | the conversation: sessions, transcripts, streamed turns, the chart and drawing tools it owns, and every model call priced at the moment it happens |
 | `teams/` | teams as **data** — a graph the operator composes, versioned append-only, its runs, their cost, and the clock that fires a schedule |
 | `teams_tools/` | the MCP tools that build and run a team by talking, reaching the teams routes in this same process |
+| `market_data/` | the candle archive, under `/market`: what the gateway saw and does not keep, its indicators, the candle stream, and eleven read-only tools — its own README beside it |
+| `polymarket_data/` | the prediction-market archive, under `/polymarket` |
+| `social_data/` | the post archive, under `/social` |
+| `strategy/` | the strategy platform, under `/strategy`, reading the candle archive through its own application rather than over the network (`workbench/archive_client.py`) |
 | `workbench/` | the assembly: one settings read, one FastAPI, one lifespan |
 
-**`agent/` and `teams/` import neither each other nor `teams_tools/`; `teams_tools/` imports
-neither of them; `workbench/` may import all three and is the only place that may.** That is
+**No package imports another; `workbench/` may import all of them and is the only place that may.** That is
 the second form of "no module imports another module", and it is a test rather than an
 understanding — `tests/test_layering.py` reads the imports and refuses. The first convenient
 dependency gets written in a hurry, and a rule with no failing case is a preference.
@@ -38,7 +41,7 @@ Everything else is one setting for the whole process — `workbench/config.py` i
 code that reads the environment, and both surfaces' own `Settings` are built from it by
 argument, with every validator they had.
 
-## Three tool servers on a network, and five sources that are not
+## Two tool servers on a network, and six sources that are not
 
 The model can ask **market-data** for candles, coverage, indicators and levels mid-answer,
 read *and move* the demo account through **trading-mcp** — positions, balance and working
@@ -50,9 +53,9 @@ eight calls per turn, a number in the code rather than a setting. Each network s
 configured and fails on its own: one being absent or unreachable costs the model that server's
 tools and nothing else.
 
-The two archives and the strategy platform are not servers any more. Since
+The three archives and the strategy platform are not servers any more. Since
 `one-process-per-security-boundary` each is a package of this process, mounted whole under
-`/polymarket`, `/social` and `/strategy`, and its tools reach both registries as functions
+`/market`, `/polymarket`, `/social` and `/strategy`, and its tools reach both registries as functions
 (`workbench/local_tools.py`) — same names, descriptions, ceilings and refusals, no address, no
 identity, no session. Two of the prediction-market archive's nine tools write, and what they
 write is a watch list, not an account; nothing on the post archive's four or the platform's
@@ -166,7 +169,7 @@ migration cannot fix: an upgrade that reported success without arriving, and an 
 than the schema it found — the second being a rollback that moved the code back and left the
 database where it was.
 
-Needs no network tool server: each of the six `*_MCP_URL` settings
+Needs no network tool server: each of the two `*_MCP_URL` settings
 left unset means no tools from that one, and a server configured but not answering means
 the same thing for that turn. Pointing any of them off loopback needs its own `*_SCOPE` set too — the process
 refuses to start otherwise, the same way it refuses a remote database with no identity, and

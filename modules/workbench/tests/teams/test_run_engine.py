@@ -174,7 +174,7 @@ async def test_a_tool_call_is_written_as_it_resolves(pool: asyncpg.Pool) -> None
 
         @property
         def configured(self) -> bool:
-            # The base class reads this off MARKET_MCP_URL, which this stub has none
+            # The base class reads this off TELEGRAM_MCP_URL, which this stub has none
             # of — it answers directly instead of opening a session.
             return True
 
@@ -195,7 +195,7 @@ async def test_a_tool_call_is_written_as_it_resolves(pool: asyncpg.Pool) -> None
         pool,
         definition,
         provider=provider,
-        tool_registry=ToolServerRegistry({"market-mcp": OneTool()}),
+        tool_registry=ToolServerRegistry({"telegram-mcp": OneTool()}),
     )
     run, steps, calls, usage = await _trace(pool, run_id)
 

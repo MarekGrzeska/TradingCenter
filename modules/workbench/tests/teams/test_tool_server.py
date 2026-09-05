@@ -234,7 +234,7 @@ async def test_a_slow_server_times_out_as_unavailable_not_as_a_refusal() -> None
             return "never"  # pragma: no cover - the call never gets this far
 
     async with serving(build=build) as url:
-        client = ToolServer(settings_for(url, market_mcp_request_timeout_seconds=1.0))
+        client = ToolServer(settings_for(url, telegram_mcp_request_timeout_seconds=1.0))
         try:
             outcome = await client.call("sleeps", {})
         finally:
@@ -254,7 +254,7 @@ async def test_no_configured_server_means_no_list_and_no_calls() -> None:
     finally:
         await client.aclose()
 
-    assert "MARKET_MCP_URL is unset" in str(raised.value)
+    assert "TELEGRAM_MCP_URL is unset" in str(raised.value)
     assert outcome.kind is ToolOutcomeKind.UNAVAILABLE
     assert "no tool server is configured" in outcome.text
 

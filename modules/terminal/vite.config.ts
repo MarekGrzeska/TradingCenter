@@ -47,7 +47,8 @@ function quietProxyErrors(label: string, target: string): ProxyOptions["configur
   // `VITE_ARCHIVE_HTTP`; the gateway's key is added here too, because a browser cannot hold a shared secret.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const archive = env.ARCHIVE_PROXY_TARGET || "http://localhost:8020";
+  // The archive is a package of the workbench, served under `/market`: one process, one port, one path more.
+  const archive = env.ARCHIVE_PROXY_TARGET || "http://localhost:8030/market";
   const workbench = env.WORKBENCH_PROXY_TARGET || "http://localhost:8030";
   const gateway = env.GATEWAY_PROXY_TARGET || "http://localhost:8010";
   const gatewayKey = env.GATEWAY_PROXY_KEY || env.GATEWAY_API_KEY || "";
@@ -63,7 +64,7 @@ export default defineConfig(({ mode }) => {
           ws: true,
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/archive-api/, ""),
-          configure: quietProxyErrors("market-data", archive),
+          configure: quietProxyErrors("workbench", archive),
         },
 
         // The workbench's own address, not a path under the archive's — one entry where there were two, since the

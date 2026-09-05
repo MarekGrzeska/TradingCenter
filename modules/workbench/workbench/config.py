@@ -1,6 +1,7 @@
 """The one place this process reads its environment. What stays doubled carries a prefix and is doubled on purpose:
-two schemas, two OpenAI keys so the experiments bill on their own line, and two catalogues. The three packages that
-joined this process read what is theirs alone under a prefix of their own: `POLYMARKET_`, `SOCIAL_`, `STRATEGY_`."""
+two schemas, two OpenAI keys so the experiments bill on their own line, and two catalogues. The four packages that
+joined this process read what is theirs alone under a prefix of their own: `POLYMARKET_`, `SOCIAL_`, `STRATEGY_`,
+`MARKET_` — and the gateway, which only the archive reaches, is the process's, unprefixed."""
 
 from __future__ import annotations
 
@@ -9,6 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from agent.config import ModelCatalogueEntry as AgentModelCatalogueEntry
 from agent.config import Settings as AgentSettings
+from market_data.config import Settings as MarketSettings
 from polymarket_data.config import Settings as PolymarketSettings
 from social_data.config import Settings as SocialSettings
 from strategy.config import Settings as StrategySettings
@@ -44,11 +46,9 @@ class Settings(BaseSettings):
     agent_default_model_id: str
     teams_models: list[TeamsModelCatalogueEntry] = Field(default_factory=list)
 
-    # One address for one archive. Unset means neither surface has archive tools, which is
-    # a supported state for both and the state each was in before the setting existed.
-    market_mcp_url: str | None = None
-    market_mcp_scope: str | None = None
-    market_mcp_request_timeout_seconds: float = 15.0
+    # No `MARKET_MCP_*` since `one-process-per-security-boundary`: the candle archive is a package of this process,
+    # served under `/market`, and its eleven tools reach both surfaces as functions. A `.env` still carrying the
+    # pair predates that change.
 
     trading_mcp_url: str | None = None
     trading_mcp_scope: str | None = None
@@ -79,11 +79,17 @@ class Settings(BaseSettings):
     polymarket_database_url: str
     social_database_url: str
     strategy_database_url: str
-    # Where the strategy platform reads candles and indicators: market-data's REST contract, by its public hostname
-    # and with this process's identity (stage 3a of `one-process-per-security-boundary`; 3b injects the archive
-    # instead). Not `MARKET_MCP_URL`, which names the tool surface — narrowed for a model and too tight for a loop.
-    market_data_url: str = "http://localhost:8020"
-    market_data_scope: str | None = None
+    # The candle archive's database — the largest table this repository has, and the one migration whose lock
+    # wait is the archive's own (`market_data.config`), not this process's 300 seconds.
+    market_database_url: str
+    # The archive's only upstream, and the one door out of this process to the provider. Unprefixed: the settings
+    # market-data read as a process, with the same three refusals (`market_data.config`) — never capital.com itself.
+    gateway_base_url: str = "http://localhost:8010"
+    gateway_stream_url: str = "ws://localhost:8010/ws/stream"
+    gateway_api_key: str
+    gateway_scope: str | None = None
+    # No `MARKET_DATA_URL` or `_SCOPE` either: the strategy platform reads the archive in this process, through the
+    # archive's own application (`workbench/archive_client.py`) — no address, no token, no hop through the platform.
     # Who may reach `/polymarket/mcp` and `/social/mcp` from outside — nobody today, since the conversation calls
     # those tools in this process — and which browsers reach `/polymarket` and `/social` over REST.
     tool_caller_application_ids: str = ""
@@ -110,6 +116,8 @@ class Settings(BaseSettings):
         "polymarket_database_url",
         "social_database_url",
         "strategy_database_url",
+        "market_database_url",
+        "gateway_api_key",
         "agent_openai_api_key",
         "teams_openai_api_key",
     )
@@ -123,8 +131,6 @@ class Settings(BaseSettings):
 
     @field_validator(
         "database_user",
-        "market_mcp_url",
-        "market_mcp_scope",
         "trading_mcp_url",
         "trading_mcp_scope",
         "telegram_mcp_url",
@@ -132,12 +138,12 @@ class Settings(BaseSettings):
         "telegram_gateway_url",
         "telegram_gateway_scope",
         "alert_destination",
-        "market_data_scope",
+        "gateway_scope",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
-        # `MARKET_MCP_URL=` left in a .env is the same intent as the line being absent. Both surfaces' own settings say
-        # this too; it has to happen here as well, because what reaches them is what this class hands over.
+        # `TRADING_MCP_URL=` left in a .env is the same intent as the line being absent. Both surfaces' own settings
+        # say this too; it has to happen here as well, because what reaches them is what this class hands over.
         if value is None or not value.strip():
             return None
         return value.strip()
@@ -155,11 +161,8 @@ class Settings(BaseSettings):
             openai_api_key=self.agent_openai_api_key,
             models=self.agent_models,
             default_model_id=self.agent_default_model_id,
-            market_mcp_url=self.market_mcp_url,
-            market_mcp_scope=self.market_mcp_scope,
-            market_mcp_request_timeout_seconds=self.market_mcp_request_timeout_seconds,
-            # No teams server: those tools are reached in this process, and the field they
-            # used to fill is gone from `agent.config.Settings` with them.
+            # No market server and no teams server: both are reached in this process, and the fields they
+            # used to fill are gone from `agent.config.Settings` with them.
             trading_mcp_url=self.trading_mcp_url,
             trading_mcp_scope=self.trading_mcp_scope,
             trading_mcp_request_timeout_seconds=self.trading_mcp_request_timeout_seconds,
@@ -180,9 +183,6 @@ class Settings(BaseSettings):
             migration_lock_wait_seconds=self.migration_lock_wait_seconds,
             openai_api_key=self.teams_openai_api_key,
             models=self.teams_models,
-            market_mcp_url=self.market_mcp_url,
-            market_mcp_scope=self.market_mcp_scope,
-            market_mcp_request_timeout_seconds=self.market_mcp_request_timeout_seconds,
             trading_mcp_url=self.trading_mcp_url,
             trading_mcp_scope=self.trading_mcp_scope,
             trading_mcp_request_timeout_seconds=self.trading_mcp_request_timeout_seconds,
@@ -234,8 +234,8 @@ class Settings(BaseSettings):
         )
 
     def for_strategy(self) -> StrategySettings:
-        """The strategy platform's own settings, the same way. The archive's address and audience are the process's,
-        like the gateway trio; what is the platform's alone is read under `STRATEGY_`."""
+        """The strategy platform's own settings, the same way. What is the platform's alone is read under
+        `STRATEGY_`; the archive it reads is not a setting at all any more, but a client the host builds."""
         return StrategySettings(
             _env_prefix="STRATEGY_",  # pyright: ignore[reportCallIssue]
             _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
@@ -248,9 +248,29 @@ class Settings(BaseSettings):
             require_authenticated_principal=self.require_authenticated_principal,
             tool_caller_application_ids=self.tool_caller_application_ids,
             rest_caller_application_ids=self.rest_caller_application_ids,
-            market_data_url=self.market_data_url,
-            market_data_scope=self.market_data_scope,
+            # No archive address: the host hands the platform a client over the archive's own application.
             telegram_gateway_url=self.telegram_gateway_url,
             telegram_gateway_scope=self.telegram_gateway_scope,
             alert_destination=self.alert_destination,
+        )
+
+    def for_market(self) -> MarketSettings:
+        """The candle archive's own settings, the same way: shared things by hand, the gateway quartet from this
+        process, its own — pool, backfill depth, tracked-pair ceiling, ticket TTL — under `MARKET_`. Its lock wait
+        is not this process's: an index over the candle table outlasts a start-up, and the archive says how long."""
+        return MarketSettings(
+            _env_prefix="MARKET_",  # pyright: ignore[reportCallIssue]
+            _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
+            database_url=self.market_database_url,
+            database_user=self.database_user,
+            azure_client_id=self.azure_client_id,
+            azure_client_secret=self.azure_client_secret,
+            azure_tenant_id=self.azure_tenant_id,
+            gateway_base_url=self.gateway_base_url,
+            gateway_stream_url=self.gateway_stream_url,
+            gateway_api_key=self.gateway_api_key,
+            gateway_scope=self.gateway_scope,
+            require_authenticated_principal=self.require_authenticated_principal,
+            tool_caller_application_ids=self.tool_caller_application_ids,
+            rest_caller_application_ids=self.rest_caller_application_ids,
         )

@@ -1,5 +1,5 @@
 # `terminal` — Free tier, with Static Web Apps' own built-in Entra ID login rather than a custom registration like
-# market-data's: "built-in" is the platform's own multi-tenant app, so there is nothing here to register or rotate.
+# the workbench's: "built-in" is the platform's own multi-tenant app, so there is nothing here to register or rotate.
 resource "azurerm_static_web_app" "terminal" {
   name                = "swa-tradingcenter-terminal"
   resource_group_name = azurerm_resource_group.main.name

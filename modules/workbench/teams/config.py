@@ -66,17 +66,10 @@ class Settings(BaseSettings):
     # there is nothing here to fall back to (specs/teams-models).
     models: list[ModelCatalogueEntry] = Field(default_factory=list)
 
-    # Unset means no tools, deliberately: a team whose agents carry none never reaches this, and one that
-    # does is refused at run time rather than left to guess.
-    market_mcp_url: str | None = None
-    # api://<market-mcp-app-id>/.default — the scope this module's managed identity
-    # requests a token for. Set only when `market_mcp_url` is not loopback.
-    market_mcp_scope: str | None = None
-    # Per tool call. The operator is watching a panel, and market-mcp's own ceiling is 10s — a little more
-    # here leaves room for its work without turning one slow call into a run that never ends.
-    market_mcp_request_timeout_seconds: float = 15.0
-
-    # Same shape as market-mcp's three above, and independently optional: a team whose agents carry no
+    # No `MARKET_MCP_*` since `one-process-per-security-boundary`: the candle archive is a package of this
+    # process, and its tools reach a run through `local` — no address, no identity, no session. Unset below
+    # means no tools from that server: a team whose agents carry none never reaches it, and one that does is
+    # refused at run time rather than left to guess. Independently optional: a team whose agents carry no
     # write tool never touches this one even when it is unreachable.
     trading_mcp_url: str | None = None
     trading_mcp_scope: str | None = None
@@ -119,8 +112,6 @@ class Settings(BaseSettings):
 
     @field_validator(
         "database_user",
-        "market_mcp_url",
-        "market_mcp_scope",
         "trading_mcp_url",
         "trading_mcp_scope",
         "telegram_mcp_url",
@@ -128,7 +119,7 @@ class Settings(BaseSettings):
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
-        # `MARKET_MCP_URL=` left in a .env is the same intent as the line being absent: an empty string is
+        # `TRADING_MCP_URL=` left in a .env is the same intent as the line being absent: an empty string is
         # not a value, it is a line someone stopped filling.
         if value is None or not value.strip():
             return None
@@ -170,9 +161,6 @@ class Settings(BaseSettings):
     def _tool_server_modes_are_coherent(self) -> Settings:
         """The same rule every module here sets for a mode: name one, or none, never both — checked
         independently per configured server, so an operator fixing one need not guess which a bare error names."""
-        self.market_mcp_url = self._coherent_tool_server_url(
-            url=self.market_mcp_url, scope=self.market_mcp_scope, env_prefix="MARKET_MCP"
-        )
         self.trading_mcp_url = self._coherent_tool_server_url(
             url=self.trading_mcp_url, scope=self.trading_mcp_scope, env_prefix="TRADING_MCP"
         )

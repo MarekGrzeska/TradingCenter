@@ -137,7 +137,7 @@ async def test_a_team_that_assigns_tools_is_refused_when_no_server_is_configured
 
     message = str(raised.value)
     assert "'get_last_price'" in message
-    assert "market-mcp" in message and "trading-mcp" in message
+    assert "telegram-mcp" in message and "trading-mcp" in message
     assert "not configured" in message
 
 
@@ -195,7 +195,7 @@ async def test_announced_snapshot_names_the_servers_own_tools() -> None:
         snapshot = await announced_snapshot(settings_for(url))
 
     assert {"get_last_price", "read_indicators"} <= set(snapshot.by_name)
-    assert snapshot.by_name["get_last_price"] == ["market-mcp"]
+    assert snapshot.by_name["get_last_price"] == ["telegram-mcp"]
     assert snapshot.unreachable == []
 
 
@@ -214,7 +214,6 @@ async def test_announced_snapshot_says_which_servers_have_no_address() -> None:
     snapshot = await announced_snapshot(settings_for(None))
 
     assert snapshot.unconfigured == (
-        "market-mcp",
         "telegram-mcp",
         "trading-mcp",
     )
@@ -226,8 +225,8 @@ async def test_announced_snapshot_names_an_unreachable_configured_server() -> No
     snapshot = await announced_snapshot(settings_for(f"http://127.0.0.1:{free_port()}"))
 
     assert set(snapshot.by_name) == set(MEMORY_TOOL_NAMES)
-    assert snapshot.unreachable == ["market-mcp"]
-    assert snapshot.configured_servers == ("market-mcp",)
+    assert snapshot.unreachable == ["telegram-mcp"]
+    assert snapshot.configured_servers == ("telegram-mcp",)
 
 
 async def test_an_unknown_agent_key_is_a_programming_error() -> None:
@@ -280,14 +279,14 @@ async def test_a_name_two_servers_both_announce_refuses_the_run_naming_both() ->
 
     message = str(raised.value)
     assert "'place_order'" in message
-    assert "market-mcp" in message
+    assert "telegram-mcp" in message
     assert "trading-mcp" in message
     assert isinstance(raised.value, ToolAccessError)
 
 
-async def test_a_name_three_servers_announce_names_all_three() -> None:
-    """A message that stops at two sends the operator to unconfigure one server and meet this same refusal
-    again — which is what the wording said until the third server existed."""
+async def test_a_name_two_servers_announce_names_both() -> None:
+    """A message that stops at one sends the operator to unconfigure a server and meet this same refusal
+    again — which is what the wording said until the second server existed."""
     definition = team(agent("reader", ["get_event"]))
 
     def one_tool(mcp) -> None:
@@ -296,13 +295,10 @@ async def test_a_name_three_servers_announce_names_all_three() -> None:
             return "unused"
 
     async with (
-        serving(build=one_tool) as market_url,
-        serving(build=one_tool) as trading_url,
         serving(build=one_tool) as telegram_url,
+        serving(build=one_tool) as trading_url,
     ):
-        registry = _registry(
-            market_url, trading_mcp_url=trading_url, telegram_mcp_url=telegram_url
-        )
+        registry = _registry(telegram_url, trading_mcp_url=trading_url)
         try:
             with pytest.raises(ToolNameCollision) as raised:
                 await plan_tools(definition, registry)
@@ -311,9 +307,8 @@ async def test_a_name_three_servers_announce_names_all_three() -> None:
 
     message = str(raised.value)
     assert "'get_event'" in message
-    assert "market-mcp" in message
-    assert "trading-mcp" in message
     assert "telegram-mcp" in message
+    assert "trading-mcp" in message
 
 
 async def test_tools_from_both_servers_resolve_to_the_server_that_announced_them() -> None:
@@ -335,7 +330,7 @@ async def test_tools_from_both_servers_resolve_to_the_server_that_announced_them
             assert names == ["read_indicators", "place_order"]
 
             # Dispatch reaches the right server: read_indicators only exists on
-            # the market-mcp stand-in and place_order only on the trading-mcp one.
+            # the telegram-mcp stand-in and place_order only on the trading-mcp one.
             from teams.tools import ToolOutcomeKind
 
             first = await plan.call(

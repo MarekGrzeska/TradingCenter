@@ -9,8 +9,9 @@ and `lifespan` below are what `python -m strategy.openapi` and the tests build.
 from __future__ import annotations
 
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 
+import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from tc_runtime import liveness, migrate, schema_version
@@ -38,10 +39,13 @@ log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def serving(app: FastAPI, settings: Settings):
-    """Everything this package needs running, on `app.state`, for as long as the block is open."""
+async def serving(app: FastAPI, settings: Settings, archive_client: httpx.AsyncClient | None = None):
+    """Everything this package needs running, on `app.state`, for as long as the block is open. `archive_client`
+    is how the host hands the archive in when both are packages of one process (stage 3b of
+    `one-process-per-security-boundary`); left out, the platform reaches it over HTTP at `market_data_url`."""
     # Constructed, not connected: reaching the archive at startup would make this process's health
     # depend on another module's, and there is nothing useful to do with the answer then.
+    own_client = archive_client is None
     async with (
         make_pool(
             settings.database_url,
@@ -51,7 +55,7 @@ async def serving(app: FastAPI, settings: Settings):
             tenant_id=settings.azure_tenant_id,
             max_size=settings.database_pool_size,
         ) as pool,
-        http_client(settings.market_data_scope) as client,
+        (http_client(settings.market_data_scope) if own_client else nullcontext(archive_client)) as client,
     ):
         # One connection held for the whole of it: the advisory lock is session scoped, so handing
         # the connection back to the pool in between would release it early.
@@ -67,7 +71,8 @@ async def serving(app: FastAPI, settings: Settings):
 
         app.state.settings = settings
         app.state.pool = pool
-        app.state.archive = Archive(settings.market_data_url, client)
+        # An injected client answers on its own authority; the platform's setting is the standalone road.
+        app.state.archive = Archive("" if not own_client else settings.market_data_url, client)
 
         # Started last, once everything a pass could need is on the state. A platform with no active
         # watches starts and serves the same way — zero is supported, not degraded.

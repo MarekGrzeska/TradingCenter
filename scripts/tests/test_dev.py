@@ -22,13 +22,13 @@ from dev import (
 
 GOOD_ENV: dict[str, str] = {
     "capital-gateway": "CAPITAL_LOGIN=x\nGATEWAY_API_KEY=shared-secret\n",
-    "market-data": "DATABASE_URL=postgresql://market_data:pw@localhost:55432/market_data\n",
     "workbench": (
+        "MARKET_DATABASE_URL=postgresql://market_data:pw@localhost:55432/market_data\n"
+        "GATEWAY_API_KEY=shared-secret\n"
         "AGENT_DATABASE_URL=postgresql://agent:pw@127.0.0.1:55432/agent\n"
         "TEAMS_DATABASE_URL=postgresql://teams:pw@localhost:55432/teams\n"
         "AGENT_OPENAI_API_KEY=sk-test\n"
         "TEAMS_OPENAI_API_KEY=sk-test-teams\n"
-        "MARKET_MCP_URL=http://127.0.0.1:8020\n"
         "TRADING_MCP_URL=http://127.0.0.1:8060\n"
         "POLYMARKET_DATABASE_URL=postgresql://polymarket:pw@127.0.0.1:55432/polymarket\n"
         "SOCIAL_DATABASE_URL=postgresql://social:pw@127.0.0.1:55432/social\n"
@@ -93,7 +93,7 @@ class TestRefusals:
     @pytest.mark.parametrize(
         ("module", "key"),
         [
-            ("market-data", "DATABASE_URL"),
+            ("workbench", "MARKET_DATABASE_URL"),
             ("workbench", "AGENT_DATABASE_URL"),
             ("workbench", "TEAMS_DATABASE_URL"),
         ],
@@ -151,10 +151,9 @@ class TestRefusals:
         one public setting — `DATABASE_URL` is undefaulted wherever a module owns a database."""
         assert {module for module, _ in REQUIRED_ENV} == {
             "capital-gateway",
-            "market-data",
             "workbench",
             "trading-mcp",
-            # Listed for market-data's reason rather than trading-mcp's: no secret of its
+            # Listed for the archive's old reason rather than trading-mcp's: no secret of its
             # own, but `DATABASE_URL` has no default, so the process exits at start.
             "telegram-gateway",
         }
@@ -173,7 +172,7 @@ class TestRefusals:
 
     def test_every_problem_is_reported_together(self) -> None:
         """Finding out about the second one after two services are running means killing them."""
-        files = {"market-data": GOOD_ENV["market-data"]}
+        files = {"telegram-gateway": GOOD_ENV["telegram-gateway"]}
 
         problems = preflight(
             environment(files=files, on_path=set(), busy_ports={8010}),
@@ -237,7 +236,6 @@ class TestStartOrder:
         """All three documented drifts were a difference between this list and itself."""
         assert [service.name for service in SERVICES] == [
             "capital-gateway",
-            "market-data",
             "trading-mcp",
             "telegram-gateway",
             "workbench",
@@ -248,7 +246,6 @@ class TestStartOrder:
     def test_ports_are_the_fixed_ones(self) -> None:
         assert {service.name: service.port for service in SERVICES} == {
             "capital-gateway": 8010,
-            "market-data": 8020,
             "workbench": 8030,
             "trading-mcp": 8060,
             "telegram-gateway": 8100,
@@ -257,9 +254,10 @@ class TestStartOrder:
         }
 
     def test_the_ports_that_stopped_being_anybodys_are_not_listened_on(self) -> None:
-        """8040 went with market-mcp, 8050 with teams-mcp, 8070 with polymarket-data, 8090 with social-data and
-        8080 with strategy into the workbench; a `.env` still naming any of them is a tool server that reads as down."""
-        assert {8040, 8050, 8070, 8080, 8090}.isdisjoint({service.port for service in SERVICES})
+        """8040 went with market-mcp, 8050 with teams-mcp, 8070 with polymarket-data, 8090 with social-data, 8080
+        with strategy and 8020 with market-data into the workbench; a `.env` still naming any of them is a tool
+        server that reads as down."""
+        assert {8020, 8040, 8050, 8070, 8080, 8090}.isdisjoint({service.port for service in SERVICES})
 
     def test_every_back_end_is_waited_for(self) -> None:
         """A service started and not waited for is what `dev.ps1` once did to teams-mcp."""

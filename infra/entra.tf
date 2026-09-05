@@ -1,9 +1,9 @@
 # There used to be a `sp-tradingcenter-market-data-dev` registration here, for the local process. Local work moved to a
 # container the same day, retiring the identity and its yearly rotation — and config.py holds local runs to loopback.
 
-# --- the terminal, as a caller of market-data ---------------------------------------
+# --- the terminal, as a caller of the workbench ---------------------------------------
 
-# The browser half of the pair whose other half is `module.market_data_easy_auth`. It holds no secret and cannot: a
+# The browser half of the pair whose other half is `module.workbench_easy_auth`. It holds no secret and cannot: a
 # single-page application authenticates the *operator*, and what it gets back travels in an `Authorization` header.
 resource "azuread_application" "terminal" {
   display_name = "app-tradingcenter-terminal"
@@ -14,17 +14,8 @@ resource "azuread_application" "terminal" {
     redirect_uris = ["${local.terminal_origin}/"]
   }
 
-  required_resource_access {
-    resource_app_id = module.market_data_easy_auth.client_id
-
-    resource_access {
-      id   = module.market_data_easy_auth.scope_id
-      type = "Scope"
-    }
-  }
-
-  # Ready for whenever the terminal asks for a token scoped to the workbench by name rather than reusing market-data's.
-  # There used to be a third block, for teams: one process, one registration, one scope to ask for.
+  # One process, one registration, one scope to ask for — the archive's own went with its process in stage 3 of
+  # `one-process-per-security-boundary`, and teams' before it.
   required_resource_access {
     resource_app_id = module.workbench_easy_auth.client_id
 
@@ -51,14 +42,6 @@ resource "azuread_application" "terminal" {
 
 resource "azuread_service_principal" "terminal" {
   client_id = azuread_application.terminal.client_id
-}
-
-# Consent, decided here instead of on a screen: without this the operator is asked whether they agree to give their own
-# terminal access to their own archive — a question with one sensible answer, asked of the person who configured both.
-resource "azuread_application_pre_authorized" "terminal" {
-  application_id       = module.market_data_easy_auth.application_id
-  authorized_client_id = azuread_application.terminal.client_id
-  permission_ids       = [module.market_data_easy_auth.scope_id]
 }
 
 # The same for the gateway's own API, standing ready rather than in use: it is what makes asking for the gateway by name
@@ -113,8 +96,8 @@ output "terminal_entra_tenant_id" {
 }
 
 output "terminal_entra_scope" {
-  description = "The scope the terminal asks for when it wants a token for market-data."
-  value       = "${local.market_data_api_uri}/${local.market_data_api_scope}"
+  description = "The scope the terminal asks for when it wants a token for the workbench — the archive's, since the archive is a package of it."
+  value       = "${local.workbench_api_uri}/${local.workbench_api_scope}"
 }
 
 # --- pocket, as a caller of polymarket-data ------------------------------------------

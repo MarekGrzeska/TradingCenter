@@ -96,8 +96,10 @@ jobs:
       # scope name travel in every authorization request the browser makes.
       - run: pnpm build
         env:
-          VITE_ARCHIVE_HTTP: https://app-tradingcenter-market-data.azurewebsites.net
-          VITE_ARCHIVE_WS: wss://app-tradingcenter-market-data.azurewebsites.net/ws
+          # The archive is a package of the workbench since stage 3 of `one-process-per-security-boundary`: one host,
+          # the `/market` prefix, and the workbench's own scope below where market-data's used to be.
+          VITE_ARCHIVE_HTTP: https://app-tradingcenter-agent.azurewebsites.net/market
+          VITE_ARCHIVE_WS: wss://app-tradingcenter-agent.azurewebsites.net/market/ws
           # Left unset the panel falls back to `/agent-api`, which Static Web Apps answers with a 404, so nothing
           # leaves the browser and the module's log stays healthy while the tab says it cannot read the catalogue.
           # The host keeps the `-agent` spelling because the App Service does (`local.workbench_app_name`).
@@ -115,7 +117,7 @@ jobs:
           # **One scope per back end**: a token minted for one module is not sent to another (specs/terminal-identity).
           # Literals rather than four `vars`, being the same kind of public fact as the hostnames beside them — and a
           # scope left out is no credential rather than another module's, which the tab can name.
-          VITE_ENTRA_SCOPE: ${{ vars.TERMINAL_ENTRA_SCOPE }}
+          VITE_ENTRA_SCOPE: api://tradingcenter-agent/access_as_user
           VITE_ENTRA_SCOPE_WORKBENCH: api://tradingcenter-agent/access_as_user
           VITE_ENTRA_SCOPE_GATEWAY: api://tradingcenter-capital-gateway/access_as_user
           VITE_ENTRA_SCOPE_POLYMARKET: api://tradingcenter-agent/access_as_user

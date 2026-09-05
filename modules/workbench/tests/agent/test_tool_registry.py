@@ -72,7 +72,6 @@ def test_from_settings_builds_the_servers_that_are_on_a_network() -> None:
     # Reaching inside on purpose: which sources get built is the arrangement this test pins. The team
     # tools cannot be among them — settings hold no address for something in this process.
     assert [server.label for server in registry._servers] == [
-        "market-mcp",
         "trading-mcp",
         "telegram-mcp",
     ]
@@ -85,7 +84,6 @@ def test_a_local_source_is_appended_to_the_servers_rather_than_replacing_one() -
 
     labels = [server.label for server in registry._servers]
     assert labels == [
-        "market-mcp",
         "trading-mcp",
         "telegram-mcp",
         "team tools",
@@ -117,7 +115,7 @@ def test_only_trading_mcp_is_built_as_a_server_that_can_move_the_account() -> No
 async def test_whether_a_name_moves_the_account_is_answered_by_its_own_server() -> None:
     # specs/agent-trading, "Wywołanie ruszające rachunek zostawia ślad przed wysłaniem" —
     # the registry has to route this question the same way it routes the call itself.
-    market = _Server("market-mcp", ["get_candles"])
+    market = _Server("telegram-mcp", ["get_candles"])
     trading = _Server(
         "trading-mcp", ["get_positions", "place_order"], account_tools=frozenset({"place_order"})
     )
@@ -138,13 +136,13 @@ async def test_a_name_nobody_announced_does_not_move_the_account() -> None:
 
 
 def test_nothing_configured_means_no_tools_rather_than_an_error() -> None:
-    registry = ToolServerRegistry([_Server("market-mcp", [], configured=False)])
+    registry = ToolServerRegistry([_Server("telegram-mcp", [], configured=False)])
     assert registry.configured is False
 
 
 async def test_the_union_of_both_catalogues_reaches_the_model() -> None:
     registry = ToolServerRegistry(
-        [_Server("market-mcp", ["get_candles"]), _Server("team tools", ["create_team"])]
+        [_Server("telegram-mcp", ["get_candles"]), _Server("team tools", ["create_team"])]
     )
 
     names = [tool.name for tool in await registry.list_tools()]
@@ -153,7 +151,7 @@ async def test_the_union_of_both_catalogues_reaches_the_model() -> None:
 
 
 async def test_one_server_being_unreachable_leaves_the_others_tools_in_place() -> None:
-    market = _UnreachableServer("market-mcp", ["get_candles"])
+    market = _UnreachableServer("telegram-mcp", ["get_candles"])
     teams = _Server("team tools", ["create_team"])
     registry = ToolServerRegistry([market, teams])
 
@@ -163,7 +161,7 @@ async def test_one_server_being_unreachable_leaves_the_others_tools_in_place() -
 
 
 async def test_a_call_reaches_the_source_that_announced_the_name() -> None:
-    market = _Server("market-mcp", ["get_candles"])
+    market = _Server("telegram-mcp", ["get_candles"])
     teams = _Server("team tools", ["create_team"])
     registry = ToolServerRegistry([market, teams])
     await registry.list_tools()
@@ -177,7 +175,7 @@ async def test_a_call_reaches_the_source_that_announced_the_name() -> None:
 async def test_the_operators_identity_travels_to_every_source_the_registry_dispatches_to() -> None:
     """The registry does not decide who needs it — the source does, and the one that does not want it never
     looks at it. Keeping the decision in one place is what stops a further source being added without one."""
-    market = _Server("market-mcp", ["get_candles"])
+    market = _Server("telegram-mcp", ["get_candles"])
     registry = ToolServerRegistry([market])
     await registry.list_tools()
 
@@ -187,7 +185,7 @@ async def test_the_operators_identity_travels_to_every_source_the_registry_dispa
 
 
 async def test_a_name_nobody_announces_is_an_outcome_not_an_exception() -> None:
-    registry = ToolServerRegistry([_Server("market-mcp", ["get_candles"])])
+    registry = ToolServerRegistry([_Server("telegram-mcp", ["get_candles"])])
     await registry.list_tools()
 
     outcome = await registry.call("create_team", {})
@@ -199,7 +197,7 @@ async def test_a_name_nobody_announces_is_an_outcome_not_an_exception() -> None:
 async def test_a_name_two_servers_both_announce_is_offered_by_neither() -> None:
     """Guessing would send an operator's "run it" to whichever server sorted first."""
     registry = ToolServerRegistry(
-        [_Server("market-mcp", ["run_team"]), _Server("team tools", ["run_team"])]
+        [_Server("telegram-mcp", ["run_team"]), _Server("team tools", ["run_team"])]
     )
 
     names = [tool.name for tool in await registry.list_tools()]
@@ -210,7 +208,7 @@ async def test_a_name_two_servers_both_announce_is_offered_by_neither() -> None:
 
 
 async def test_closing_the_registry_closes_every_server() -> None:
-    market, teams = _Server("market-mcp", []), _Server("team tools", [])
+    market, teams = _Server("telegram-mcp", []), _Server("team tools", [])
     await ToolServerRegistry([market, teams]).aclose()
 
     assert market.closed and teams.closed
@@ -219,8 +217,8 @@ async def test_closing_the_registry_closes_every_server() -> None:
 @pytest.mark.parametrize(
     ("prefix", "url", "scope", "expected"),
     [
-        ("MARKET_MCP", "https://market.example.com", None, "MARKET_MCP_SCOPE"),
-        ("MARKET_MCP", "http://127.0.0.1:8020", "api://market/.default", "loopback"),
+        ("TELEGRAM_MCP", "https://telegram.example.com", None, "TELEGRAM_MCP_SCOPE"),
+        ("TELEGRAM_MCP", "http://127.0.0.1:8100", "api://telegram/.default", "loopback"),
         ("TRADING_MCP", "https://trading.example.com", None, "TRADING_MCP_SCOPE"),
         ("TRADING_MCP", "http://127.0.0.1:8060", "api://trading/.default", "loopback"),
         ("TRADING_MCP", None, "api://trading/.default", "TRADING_MCP_URL"),
@@ -237,18 +235,18 @@ def test_each_servers_mode_is_refused_on_its_own_terms(prefix, url, scope, expec
 
 
 def test_one_server_configured_and_the_other_absent_is_a_working_configuration() -> None:
-    settings = _settings(market_mcp_url="http://127.0.0.1:8020")
+    settings = _settings(telegram_mcp_url="http://127.0.0.1:8100")
 
-    assert settings.market_mcp_url == "http://127.0.0.1:8020"
+    assert settings.telegram_mcp_url == "http://127.0.0.1:8100"
     assert settings.trading_mcp_url is None
 
 
 def test_the_trading_server_is_configured_without_touching_the_other() -> None:
     settings = _settings(trading_mcp_url="http://127.0.0.1:8060/")
 
-    # The trailing slash goes, the same as market-mcp's, so nothing downstream builds `//mcp`.
+    # The trailing slash goes, so nothing downstream builds `//mcp`.
     assert settings.trading_mcp_url == "http://127.0.0.1:8060"
-    assert settings.market_mcp_url is None
+    assert settings.telegram_mcp_url is None
 
 
 def test_the_trading_servers_ceiling_matches_what_trading_mcp_waits_for() -> None:

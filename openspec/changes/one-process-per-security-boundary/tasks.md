@@ -26,11 +26,11 @@
 ## 3. market-data do gospodarza, i godzina na B2
 
 - [x] 3.1 Decyzja o nazwie katalogu gospodarza (design.md, „Workbench jest gospodarzem"): `modules/workbench` zostaje — 5 września 2026, przed PR-em 3.2, bo od niego market-data przestaje być słowem w tabeli
-- [ ] 3.2 **market-data → pakiet gospodarza**: montaż pod `/market`, `/ws/candles` → `/market/ws/candles` z tym samym biletem; migracja pod kluczem 8020, ingest, rollupy, jobs, gauge wieku świec w lifespan gospodarza; `MARKET_DATABASE_URL` i przedrostki; źródło jedenastu narzędzi w procesie, `MARKET_MCP_URL`/`_SCOPE` znikają
-- [ ] 3.3 strategy przechodzi na wstrzyknięty protokół `Archive` (3b): `archive.py` i `_ManagedIdentityAuth` znikają, `MARKET_DATA_URL/_SCOPE` znikają; jeden test integracji, że strategia widzi te same świece co REST
-- [ ] 3.4 Brama: `MODULE_CALLER_APPLICATION_IDS` i `allowed_applications` dostają tożsamość gospodarza zamiast market-data; `GATEWAY_*` stają się ustawieniami gospodarza
-- [ ] 3.5 Terraform: `azurerm_linux_web_app.market_data` znika jak w 2.2; alerty `candle_age`, `database_unreachable` (scope bazy bez zmian) i web test `/ping` → `/market/ping` wskazują gospodarza; rejestracje `terminal`/`pocket` dla market-data znikają; plan `0 to add` na dotacji
-- [ ] 3.6 Terminal i pocket: `VITE_ARCHIVE_HTTP`/`_WS` → gospodarz + `/market`, jeden scope; kontrakty zielone
+- [x] 3.2 **market-data → pakiet gospodarza** (5 września 2026, jeden PR z 3.3–3.6): montaż pod `/market`, `/ws/candles` → `/market/ws/candles` z tym samym biletem; migracja pod kluczem 8020, ingest, rollupy, jobs, gauge wieku świec w lifespan gospodarza; `MARKET_DATABASE_URL` i przedrostki; źródło jedenastu narzędzi w procesie, `MARKET_MCP_URL`/`_SCOPE` znikają
+- [x] 3.3 strategy czyta archiwum w procesie (3b): klient nad aplikacją archiwum przez `httpx.ASGITransport`, żądanie nazwane na scope ASGI jako ten proces (`tc_runtime.caller_access.in_process`); `archive.py` zostaje jako klient REST z wstrzykniętym transportem, `MARKET_DATA_URL/_SCOPE` znikają z gospodarza; jeden test integracji, że strategia widzi świecę, której odmawia się sieci
+- [x] 3.4 Brama: `MODULE_CALLER_APPLICATION_IDS` i `allowed_applications` dostają tożsamość gospodarza zamiast market-data; `GATEWAY_*` stają się ustawieniami gospodarza
+- [x] 3.5 Terraform (do apply przez operatora): `azurerm_linux_web_app.market_data` znika jak w 2.2; alerty `candle_age`, `database_unreachable` (scope bazy bez zmian) i web test `/ping` → `/market/ping` wskazują gospodarza; rejestracje `terminal`/`pocket` dla market-data znikają; plan `0 to add` na dotacji
+- [x] 3.6 Terminal (pocket nie czyta archiwum): `VITE_ARCHIVE_HTTP`/`_WS` → gospodarz + `/market`, jeden scope; kontrakty zielone
 - [ ] 3.7 Bramka 3: cztery aplikacje, `candle_age` zielony przez dobę z otwartym rynkiem, working set w tabeli
 - [ ] 3.8 **Godzina na B2**: spokojna godzina z otwartym rynkiem, `az appservice plan update --sku B2`, `MemoryPercentage` co 5 minut, które aplikacje restartowały, powrót tą samą komendą z `B3`; wynik do design.md jako liczba zamiast dwóch kolumn
 - [ ] 3.9 Decyzja z 3.8: < 85% → etap 5; 85–100% → etap 4; restarty/OOM → B3 zostaje, etap 5 bez SKU, powód przy `sku_name` w `app-service.tf`

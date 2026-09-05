@@ -16,12 +16,12 @@ modules move here one at a time.
 | Module | What | Contract |
 |---|---|---|
 | [capital-gateway](modules/capital-gateway/) | capital.com — trading, deep history, a live stream. Demo only, and the only door to the provider. | HTTP + WebSocket |
-| [market-data](modules/market-data/) | The candle archive — what the gateway saw and does not keep. Owns a PostgreSQL. Serves two surfaces: the REST contract, and eleven read-only MCP tools at `/mcp`, reduced for a model rather than proxied for a chart. | HTTP + OpenAPI, MCP (streamable HTTP) |
 | [workbench](modules/workbench/) | The operator's conversation with a model, and the teams of agents they compose — one process over two schemas. Two databases, two OpenAI keys, two model catalogues; the tools that build and run a team are a layer inside it rather than a module beside it. | HTTP + OpenAPI, streamed |
 | [trading-mcp](modules/trading-mcp/) | MCP tools over the gateway's **demo account** — positions, balance, and orders a team can actually place. Network transport only, one named caller, demo checked against the gateway rather than against a setting. | MCP (streamable HTTP) |
 | [polymarket-data](modules/workbench/polymarket_data/) | The prediction-market archive and the only door to Polymarket — a package of the workbench process since `one-process-per-security-boundary`, served under `/polymarket`. Owns its PostgreSQL database; two of its tools write, both only add. |
 | [social-data](modules/workbench/social_data/) | The post archive: what was said, when, and what a model made of it — a package of the workbench process since `one-process-per-security-boundary`, served under `/social`. Owns its PostgreSQL database, the door to Truth Social; **nothing on either surface writes**. |
-| [strategy](modules/workbench/strategy/) | The strategy platform — a package of the workbench process since `one-process-per-security-boundary`, served under `/strategy`. A strategy is a catalogue entry — declared facts, parameters, one pure `evaluate` — and the entry is code in the image **or** an immutable revision the operator wrote. Owns its PostgreSQL database, reads market-data's REST, and **never touches an account**: it decides, teams execute. |
+| [market-data](modules/workbench/market_data/) | The candle archive — what the gateway saw and does not keep — a package of the workbench process since stage 3 of `one-process-per-security-boundary`, served under `/market`. Owns a PostgreSQL. Serves two surfaces: the REST contract and the candle stream, and eleven read-only MCP tools at `/market/mcp`, reduced for a model rather than proxied for a chart. |
+| [strategy](modules/workbench/strategy/) | The strategy platform — a package of the workbench process since `one-process-per-security-boundary`, served under `/strategy`. A strategy is a catalogue entry — declared facts, parameters, one pure `evaluate` — and the entry is code in the image **or** an immutable revision the operator wrote. Owns its PostgreSQL database, reads the archive inside the same process, and **never touches an account**: it decides, teams execute. |
 | [telegram-gateway](modules/telegram-gateway/) | The one door to Telegram. Any module sends a notification; it creates its own bots, and remembers nothing it sent. | HTTP + OpenAPI, MCP (streamable HTTP) |
 | [terminal](modules/terminal/) | The operator's screen — charts in a grid, the archive's collection, the agent panel, the teams canvas, and the screens the four newer archives publish. | consumes six modules |
 | [pocket](modules/pocket/) | The archive on a phone, and a chat with the workbench beside it — mobile-first, two audiences, no MCP of its own. A second consumer, sharing the terminal's generated contract and none of its code. | consumes the workbench, and both archives through it |
@@ -62,16 +62,16 @@ uv run python scripts/dev.py --explain
 Both bring the same things up in the same order:
 
 ```
-migrations -> capital-gateway -> market-data -> trading-mcp
-           -> telegram-gateway -> workbench -> terminal -> pocket
+migrations -> capital-gateway -> trading-mcp -> telegram-gateway
+           -> workbench -> terminal -> pocket
 ```
 
 The order is not tidiness — every arrow in it is a real dependency, and `dev.py --explain`
-prints the reason for each rather than repeating it here. In short: `market-data` subscribes
-to the gateway as it starts; `trading-mcp` asks the gateway whether it is bound to the demo
-account and refuses to open a port if it is not; the `workbench` — two archives and the strategy
-platform inside it, the archives answering to their own upstreams and the platform reading
-market-data's REST — reads three tool lists on the first turn that wants one; the front ends read the
+prints the reason for each rather than repeating it here. In short: `trading-mcp` asks the gateway
+whether it is bound to the demo account and refuses to open a port if it is not; the `workbench` —
+three archives and the strategy platform inside it, the candle archive subscribing to the gateway as
+it starts, the other two answering to their own upstreams and the platform reading the candle archive
+in the same process — reads two tool lists on the first turn that wants one; the front ends read the
 back ends. Starting anything early fills the console with retries, or — in the
 conversation's case — quietly produces a turn answered without tools, which is worse because
 nothing reports it. Each step waits for the one before it to actually answer. Ctrl+C stops
@@ -172,21 +172,20 @@ than either `contract.py`, because a document is built from routes as well as mo
 | Job | Runs |
 |---|---|
 | `capital-gateway` | `ruff check`, `pyright`, `pytest` |
-| `market-data` | `ruff check`, `pyright`, `pytest` — **including the database tests**, since the runner has Docker and `conftest` only skips them where it is absent, and including the tool surface it serves at `/mcp` |
 | `trading-mcp` | the same three plus `contract.py check` — its snapshot is `capital-gateway`'s document, so **any** change under that module runs this job |
-| `telegram-gateway` | `ruff check`, `pyright`, `pytest` — same database-test behaviour as market-data's, against its own container |
-| `workbench` | `ruff check`, `pyright`, `pytest` — same database-test behaviour, against five containers, one per schema (the two archives' and the strategy platform's among them); its `live` tests need a real OpenAI key and stay behind `--run-live` |
+| `telegram-gateway` | `ruff check`, `pyright`, `pytest` — **including the database tests**, since the runner has Docker and `conftest` only skips them where it is absent |
+| `workbench` | `ruff check`, `pyright`, `pytest` — same database-test behaviour, against six containers, one per schema (the three archives' and the strategy platform's among them), the candle archive's tool surface included; its `live` tests need a real OpenAI key and stay behind `--run-live` |
 | `packages` | the three build-time packages, tested once here rather than in each consumer |
 | `terminal`, `pocket` | `contract:check`, `lint`, `typecheck`, `test` |
 | `scripts`, `infra`, `openspec` | the repository's own tooling: `pytest` over `scripts/`, `terraform fmt`/`validate`, and `openspec validate --all --strict` with the archive-trim check |
 
 `contract:check` runs before the terminal's tests on purpose: it compares the terminal's
-generated TypeScript against the schema `market-data` builds from its own models, and a
+generated TypeScript against the schema the candle archive builds from its own models, and a
 stale copy makes every conclusion that suite reaches about the wire rest on an out-of-date
 premise. Regenerate with `pnpm contract:generate` after changing a model in
 `market_data/contract.py`. There used to be a second copy of that schema — market-mcp kept
 a committed OpenAPI snapshot and a script that policed it — and the module holding it is a
-route inside `market-data` now, so the tools read those models directly and there is
+route inside the archive now, so the tools read those models directly and there is
 nothing left to go stale.
 
 The `live` tests are not run — they need a real Capital demo session, and putting provider
@@ -201,11 +200,10 @@ Web Apps action, each opening with [`scripts/deploy_gate.py`](scripts/deploy_gat
 diffs what the image bakes in against the previous green run's commit. A merge with a red test
 no longer reaches production before CI has said so; `workflow_dispatch` is the operator's door
 around the gate. Each deploy ends by checking the thing actually
-answers, not merely that Azure accepted the request: `market-data` is probed on
-`/ws/candles`, the one path Easy Auth lets through to the container — and still that one
-rather than the tool surface it also serves, since `/mcp` answers nothing without a session
-and a caller identity; `trading-mcp` is probed on `/health`, excluded from Easy Auth the
-same way, where the answer proves more than liveness —
+answers, not merely that Azure accepted the request: the workbench is probed on `/health`,
+which its lifespan does not answer until all six databases — the candle archive's among
+them — are at the image's revision; `trading-mcp` is probed on `/health`, excluded from Easy
+Auth the same way, where the answer proves more than liveness —
 that process refuses to listen at all unless the gateway just told it the account is a demo
 one, so a 200 means it reached the gateway, through its firewall, with the shared key; the
 `workbench` and the four newer back ends ask both questions, the control plane for which
