@@ -4,11 +4,12 @@ difference is intended: the interpreter computes features in one place, so the t
 from __future__ import annotations
 
 import pytest
-from builders import crossing_facts
 
 from strategy.catalogue.baseline import moving_average_cross as coded
 from strategy.catalogue.baseline_rule import BASELINE_RULE
 from strategy.interpreter import spec_from_rule
+
+from .builders import crossing_facts
 
 twin = spec_from_rule(
     strategy_id="baseline_ma_cross_twin",

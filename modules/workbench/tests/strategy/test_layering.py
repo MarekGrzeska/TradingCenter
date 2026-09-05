@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-PACKAGE_ROOT = Path(__file__).resolve().parent.parent / "strategy"
+PACKAGE_ROOT = Path(__file__).resolve().parent.parent.parent / "strategy"
 
 # What the pure layer is allowed to know about this module. `rule` and `periods` are contract, not
 # runtime: the vocabulary a written rule is spelled in, and the archive's list of resolutions.

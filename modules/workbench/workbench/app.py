@@ -1,5 +1,5 @@
-"""The published surface: one FastAPI over both halves of the workbench and the two archives mounted under them,
-assembly only. The lifespan is all-or-nothing, so a process that answers the deploy probe has already brought four
+"""The published surface: one FastAPI over both halves of the workbench and the three packages mounted under them,
+assembly only. The lifespan is all-or-nothing, so a process that answers the deploy probe has already brought five
 databases to this image's revision."""
 
 from __future__ import annotations
@@ -24,6 +24,7 @@ from tc_runtime.openapi import require_response_fields
 import agent.surface
 import polymarket_data.app
 import social_data.app
+import strategy.app
 import teams.surface
 from agent.models_catalogue import ModelCatalogue as AgentCatalogue
 from agent.provider import OpenAIProvider as AgentProvider
@@ -54,9 +55,11 @@ async def lifespan(app: FastAPI):
     teams_settings = settings.for_teams()
     polymarket_settings = settings.for_polymarket()
     social_settings = settings.for_social()
-    # Each archive's tools, called as functions: the server its own `/mcp` mounts, minus the transport.
+    strategy_settings = settings.for_strategy()
+    # Each package's tools, called as functions: the server its own `/mcp` mounts, minus the transport.
     polymarket_tools = ConversationLocalTools("polymarket-data", polymarket_app.state.mcp_server)
     social_tools = ConversationLocalTools("social-data", social_app.state.mcp_server)
+    strategy_tools = ConversationLocalTools("strategy", strategy_app.state.mcp_server)
 
     # Constructed, not connected: a session opens on the first turn that wants a tool. Reaching market-data at startup
     # would make this process's health depend on another module's, whose answer is to run without its tools.
@@ -64,7 +67,7 @@ async def lifespan(app: FastAPI):
         app, operator_identity_optional=not settings.require_authenticated_principal
     )
     conversation_tools = ToolServerRegistry.from_settings(
-        conversation_settings, local_sources=[team_tools, polymarket_tools, social_tools]
+        conversation_settings, local_sources=[team_tools, polymarket_tools, social_tools, strategy_tools]
     )
 
     async with (
@@ -84,10 +87,11 @@ async def lifespan(app: FastAPI):
             tenant_id=teams_settings.azure_tenant_id,
             max_size=settings.database_pool_size,
         ) as teams_pool,
-        # A mounted application's lifespan is never run, so each archive's pool, migration, loop and
+        # A mounted application's lifespan is never run, so each package's pool, migration, loop and
         # tool session are entered here, beside this process's own two.
         polymarket_data.app.serving(polymarket_app, polymarket_settings),
         social_data.app.serving(social_app, social_settings),
+        strategy.app.serving(strategy_app, strategy_settings),
     ):
         # Built here rather than beside the conversation's, because one of its sources is served by this process and
         # reads the teams database directly: announcing needs no pool, calling does, and this is the first point with one.
@@ -99,6 +103,10 @@ async def lifespan(app: FastAPI):
         )
         teams_tool_servers.local["social-data"] = TeamsLocalTools(
             "social-data", social_app.state.mcp_server
+        )
+        # The one the clock reads: `pending_setups` is the number a trigger wakes a team on.
+        teams_tool_servers.local["strategy"] = TeamsLocalTools(
+            "strategy", strategy_app.state.mcp_server
         )
 
         # The `try` opens before the schema checks, not after: `ToolServer.__init__` already holds a credential when a
@@ -197,7 +205,8 @@ app = FastAPI(
         "later. Read-only tools over the candle archive reach market-data; the tools that "
         "build and run teams are a layer in this process, and so are the two archives it "
         "serves under /polymarket and /social — prediction markets, and posts with what a "
-        "model made of them."
+        "model made of them — and the strategy platform under /strategy, which decides and "
+        "never touches an account."
     ),
     version="0.1.0",
     lifespan=lifespan,
@@ -234,3 +243,5 @@ polymarket_app = polymarket_data.app.create_app()
 mount_package(app, "/polymarket", polymarket_app)
 social_app = social_data.app.create_app()
 mount_package(app, "/social", social_app)
+strategy_app = strategy.app.create_app()
+mount_package(app, "/strategy", strategy_app)

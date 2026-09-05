@@ -128,3 +128,10 @@ def social_settings() -> object:
     from workbench.config import Settings
 
     return Settings().for_social()  # type: ignore[call-arg]
+
+
+def strategy_settings() -> object:
+    """The strategy platform's chain — the fifth."""
+    from workbench.config import Settings
+
+    return Settings().for_strategy()  # type: ignore[call-arg]

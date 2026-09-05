@@ -23,7 +23,7 @@
 --                           because one App Service presents one identity since the two
 --                           modules became the workbench;
 --   with dbname=polymarket, role=app-tradingcenter-agent;  -- the workbench serves the archive
---   with dbname=strategy,   role=app-tradingcenter-strategy;
+--   with dbname=strategy,   role=app-tradingcenter-agent;  -- the workbench serves the strategy platform
 --   with dbname=social,     role=app-tradingcenter-agent;  -- the workbench serves the post archive too
 --   and with dbname=telegram, role=app-tradingcenter-telegram-gateway.
 --

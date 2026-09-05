@@ -186,7 +186,7 @@ variable "telegram_account_session_configured" {
 
 variable "telegram_alert_destination" {
   description = <<-EOT
-    The destination name the workbench's post archive and `strategy` address when they notify the operator,
+    The destination name the workbench's post archive and strategy platform address when they notify the operator,
     bound in `telegram-gateway` by the operator once — never a chat id.
 
     Empty is the default and a working configuration: neither caller is given a gateway

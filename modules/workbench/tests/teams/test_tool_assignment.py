@@ -215,7 +215,6 @@ async def test_announced_snapshot_says_which_servers_have_no_address() -> None:
 
     assert snapshot.unconfigured == (
         "market-mcp",
-        "strategy-mcp",
         "telegram-mcp",
         "trading-mcp",
     )

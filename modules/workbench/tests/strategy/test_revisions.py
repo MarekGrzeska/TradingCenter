@@ -6,8 +6,6 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 import pytest
-from builders import crossing_facts
-from fakes import FakeArchive
 
 from strategy import resolver, store
 from strategy.catalogue.baseline_rule import BASELINE_RULE
@@ -15,6 +13,9 @@ from strategy.errors import StrategyError, UnknownRevision
 from strategy.interpreter import interpret
 from strategy.runner.loop import evaluate_once
 from strategy.store import facts_from_snapshot
+
+from .builders import crossing_facts
+from .fakes import FakeArchive
 
 pytestmark = pytest.mark.db
 

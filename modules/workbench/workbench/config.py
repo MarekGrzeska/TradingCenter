@@ -1,6 +1,6 @@
 """The one place this process reads its environment. What stays doubled carries a prefix and is doubled on purpose:
-two schemas, two OpenAI keys so the experiments bill on their own line, and two catalogues. The two archives that
-joined this process read what is theirs alone under a prefix of their own, `POLYMARKET_` and `SOCIAL_`."""
+two schemas, two OpenAI keys so the experiments bill on their own line, and two catalogues. The three packages that
+joined this process read what is theirs alone under a prefix of their own: `POLYMARKET_`, `SOCIAL_`, `STRATEGY_`."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from agent.config import ModelCatalogueEntry as AgentModelCatalogueEntry
 from agent.config import Settings as AgentSettings
 from polymarket_data.config import Settings as PolymarketSettings
 from social_data.config import Settings as SocialSettings
+from strategy.config import Settings as StrategySettings
 from teams.config import ModelCatalogueEntry as TeamsModelCatalogueEntry
 from teams.config import Settings as TeamsSettings
 
@@ -61,12 +62,6 @@ class Settings(BaseSettings):
     telegram_mcp_scope: str | None = None
     telegram_mcp_request_timeout_seconds: float = 35.0
 
-    # The fourth pair, and the one a trigger reads: `pending_setups` on the strategy platform is the number a team
-    # wakes on, travelling the same road as every other reading. Its tools read one database, so market-data's ceiling.
-    strategy_mcp_url: str | None = None
-    strategy_mcp_scope: str | None = None
-    strategy_mcp_request_timeout_seconds: float = 15.0
-
     # No `TEAMS_MCP_*`: the teams tools are a layer in this process now, so a `.env` from before this change carries
     # three settings that are read by nothing.
 
@@ -83,6 +78,12 @@ class Settings(BaseSettings):
     # `for_polymarket` and `for_social`, or is the one setting the whole process shares.
     polymarket_database_url: str
     social_database_url: str
+    strategy_database_url: str
+    # Where the strategy platform reads candles and indicators: market-data's REST contract, by its public hostname
+    # and with this process's identity (stage 3a of `one-process-per-security-boundary`; 3b injects the archive
+    # instead). Not `MARKET_MCP_URL`, which names the tool surface — narrowed for a model and too tight for a loop.
+    market_data_url: str = "http://localhost:8020"
+    market_data_scope: str | None = None
     # Who may reach `/polymarket/mcp` and `/social/mcp` from outside — nobody today, since the conversation calls
     # those tools in this process — and which browsers reach `/polymarket` and `/social` over REST.
     tool_caller_application_ids: str = ""
@@ -90,8 +91,8 @@ class Settings(BaseSettings):
 
     # The door out of the post archive: where telegram-gateway answers over REST, and the destination the operator
     # bound there. All three or none — the archive's own settings refuse every partial form — and none is a working
-    # configuration in which posts are collected and nobody is told. Unprefixed, because the strategy platform will
-    # read the same three when it joins this process, and one door has one address.
+    # configuration in which posts are collected and nobody is told. Unprefixed, because the strategy platform reads
+    # the same three, and one door has one address.
     telegram_gateway_url: str | None = None
     telegram_gateway_scope: str | None = None
     alert_destination: str | None = None
@@ -108,6 +109,7 @@ class Settings(BaseSettings):
         "teams_database_url",
         "polymarket_database_url",
         "social_database_url",
+        "strategy_database_url",
         "agent_openai_api_key",
         "teams_openai_api_key",
     )
@@ -127,11 +129,10 @@ class Settings(BaseSettings):
         "trading_mcp_scope",
         "telegram_mcp_url",
         "telegram_mcp_scope",
-        "strategy_mcp_url",
-        "strategy_mcp_scope",
         "telegram_gateway_url",
         "telegram_gateway_scope",
         "alert_destination",
+        "market_data_scope",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -165,9 +166,6 @@ class Settings(BaseSettings):
             telegram_mcp_url=self.telegram_mcp_url,
             telegram_mcp_scope=self.telegram_mcp_scope,
             telegram_mcp_request_timeout_seconds=self.telegram_mcp_request_timeout_seconds,
-            strategy_mcp_url=self.strategy_mcp_url,
-            strategy_mcp_scope=self.strategy_mcp_scope,
-            strategy_mcp_request_timeout_seconds=self.strategy_mcp_request_timeout_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
         )
 
@@ -191,9 +189,6 @@ class Settings(BaseSettings):
             telegram_mcp_url=self.telegram_mcp_url,
             telegram_mcp_scope=self.telegram_mcp_scope,
             telegram_mcp_request_timeout_seconds=self.telegram_mcp_request_timeout_seconds,
-            strategy_mcp_url=self.strategy_mcp_url,
-            strategy_mcp_scope=self.strategy_mcp_scope,
-            strategy_mcp_request_timeout_seconds=self.strategy_mcp_request_timeout_seconds,
             run_timeout_seconds=self.run_timeout_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
             scheduler_enabled=self.scheduler_enabled,
@@ -233,6 +228,28 @@ class Settings(BaseSettings):
             require_authenticated_principal=self.require_authenticated_principal,
             tool_caller_application_ids=self.tool_caller_application_ids,
             rest_caller_application_ids=self.rest_caller_application_ids,
+            telegram_gateway_url=self.telegram_gateway_url,
+            telegram_gateway_scope=self.telegram_gateway_scope,
+            alert_destination=self.alert_destination,
+        )
+
+    def for_strategy(self) -> StrategySettings:
+        """The strategy platform's own settings, the same way. The archive's address and audience are the process's,
+        like the gateway trio; what is the platform's alone is read under `STRATEGY_`."""
+        return StrategySettings(
+            _env_prefix="STRATEGY_",  # pyright: ignore[reportCallIssue]
+            _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
+            database_url=self.strategy_database_url,
+            database_user=self.database_user,
+            azure_client_id=self.azure_client_id,
+            azure_client_secret=self.azure_client_secret,
+            azure_tenant_id=self.azure_tenant_id,
+            migration_lock_wait_seconds=self.migration_lock_wait_seconds,
+            require_authenticated_principal=self.require_authenticated_principal,
+            tool_caller_application_ids=self.tool_caller_application_ids,
+            rest_caller_application_ids=self.rest_caller_application_ids,
+            market_data_url=self.market_data_url,
+            market_data_scope=self.market_data_scope,
             telegram_gateway_url=self.telegram_gateway_url,
             telegram_gateway_scope=self.telegram_gateway_scope,
             alert_destination=self.alert_destination,

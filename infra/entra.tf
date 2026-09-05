@@ -45,8 +45,8 @@ resource "azuread_application" "terminal" {
     }
   }
 
-  # **No block for the strategy platform, and that is the pattern rather than an omission** — `polymarket-data` has none
-  # either. A `resource_access.id` must be concrete at plan time, and a scope this same apply creates is not.
+  # **No block for any package of the workbench, and that is the pattern rather than an omission**: a `resource_access.id`
+  # must be concrete at plan time, and a scope this same apply creates is not.
 }
 
 resource "azuread_service_principal" "terminal" {
@@ -98,15 +98,9 @@ resource "azuread_application_pre_authorized" "workbench_terminal" {
   permission_ids       = [module.workbench_easy_auth.scope_id]
 }
 
-# No pre-authorization for either archive: both are served by the workbench, whose scope the one above covers.
+# No pre-authorization for the archives or the strategy platform: all three are served by the workbench, whose
+# scope the one above covers.
 
-# The sixth. The strategy platform shipped for machine callers, so its registration announced no delegated scope at all
-# — the terminal was on its caller list and still met a 401, because there was nothing for a browser to ask for.
-resource "azuread_application_pre_authorized" "strategy_terminal" {
-  application_id       = module.strategy_easy_auth.application_id
-  authorized_client_id = azuread_application.terminal.client_id
-  permission_ids       = [module.strategy_easy_auth.scope_id]
-}
 
 # The three values the terminal's build needs. All three are public by nature — a client id and a scope name travel in
 # every authorization request the browser makes — so they go through `vars`, never `secrets`.

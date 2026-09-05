@@ -133,6 +133,12 @@ z dwiema pulami do lokalnej bazy, oboma rejestrami narzędzi i schedulerem, po s
 minutach: **173 MB** (RSS Pythona 198, anon 164, cache plików 6). W App Service ta sama aplikacja
 raportuje p50 393 MB; różnica ~220 MB to dwa sidecary, zgodnie z podłogą z tabeli.
 
+Druga liczba (bramka 2.5/2.6, 5 września, 07:30–08:15 UTC): workbench z oboma archiwami w środku raportuje
+`AverageMemoryWorkingSet` 286 → 344 MB w pierwszej godzinie po deployu — wobec 393 + 290 + 273 = 956 MB
+trzech osobnych aplikacji. Bramka skrócona z doby do godziny decyzją operatora; alerty pętli obu archiwów
+dostały dane dopiero po #248 (workbench nie konfigurował telemetrii), a rekord wołających pod montażem
+wymagał #249 — obie rzeczy, których lokalne testy nie widziały.
+
 ## Risks / Trade-offs
 
 - **Jedna domena awarii dla sześciu** → App Service nie ma limitu per aplikacja, więc plan był nią

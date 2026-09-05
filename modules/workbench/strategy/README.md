@@ -6,6 +6,16 @@ decision. Everything around that is written once and shared: fetching the facts,
 every strategy is subject to, recording each decision with its reason, the read-only tool
 surface, and the backtest.
 
+**A package of the workbench since `one-process-per-security-boundary`**, served whole under
+`/strategy` of that process — its REST contract, its `/mcp`, its caller record — with its own
+database and its own migration chain (`alembic-strategy.ini`, lock key 8080, the port it used to
+have). Its tools reach the conversation and the teams as functions, so there is no
+`STRATEGY_MCP_URL` anywhere, and `pending_setups` is a local source the teams' clock reads. What
+is the platform's alone is read under `STRATEGY_` in the workbench's `.env`; the archive it reads
+(`MARKET_DATA_URL` / `_SCOPE`) and the door to Telegram are the process's, unprefixed. The
+backtest CLI (`python -m strategy.backtest`) still builds `Settings()` from the unprefixed
+environment, so run it with `STRATEGY_`-less names or from a shell that exports them.
+
 This is the move `market-data` already made one level down. Its indicator catalogue is a
 contract for an entry plus one machinery around it, and adding an indicator touches exactly
 one file. The same shape, one level up: adding a strategy must not change a file of this

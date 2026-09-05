@@ -6,14 +6,15 @@ import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from builders import crossing_facts
-from fakes import FakeArchive
 from tc_runtime.liveness import LoopHeartbeat
 
 from strategy import store
 from strategy.archive import Gap
 from strategy.errors import ArchiveUnreachable
 from strategy.runner.loop import EvaluationLoop, evaluate_all, evaluate_once
+
+from .builders import crossing_facts
+from .fakes import FakeArchive
 
 pytestmark = pytest.mark.db
 

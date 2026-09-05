@@ -189,16 +189,20 @@ async def test_the_loop_collects_without_anybody_asking(pool):
 
     await ingest.start()
     try:
-        for _ in range(100):
-            if source.asked:
+        # Waited for the row rather than for the source being asked: the source answers before the pass
+        # writes, and stopping the loop in between cancels the write it was about to make.
+        stored = None
+        for _ in range(200):
+            async with pool.acquire() as conn:
+                stored = await store.post_by_external_id(conn, TRUTH_SOCIAL, "a")
+            if stored is not None:
                 break
             await asyncio.sleep(0.02)
     finally:
         await ingest.stop()
 
     assert source.asked, "the loop asked its source for nothing"
-    async with pool.acquire() as conn:
-        assert await store.post_by_external_id(conn, TRUTH_SOCIAL, "a") is not None
+    assert stored is not None
 
 
 async def test_a_finished_pass_beats_the_heartbeat(pool):

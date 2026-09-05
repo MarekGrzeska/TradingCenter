@@ -395,20 +395,19 @@ async def _evaluate_condition(
 ) -> tuple[bool | None, str | None]:
     """`(result, unavailable_reason)` — `result` is `None` exactly when the reason is set. All three
     silences are one fact from a trigger's seat: it did not learn what the market is doing."""
-    if not tool_registry.remote():
-        # Derived from the registry, not listed: a hand-kept list here named two servers on the day there were five.
-        unset = ", ".join(_url_setting(label) for label in tool_registry.unconfigured())
-        return None, f"no tool server is configured (none of {unset} is set), so the condition could not be read"
-    configured = tool_registry.configured()
-
     arguments = trigger["arguments"]
     if isinstance(arguments, str):
         arguments = json.loads(arguments)
 
-    # Which server owns the name is asked here rather than assumed: since phase 2 there are two, and a
-    # trigger names one tool without saying whose. The list is cached, so this costs one round trip.
-    server = await _server_announcing(configured, trigger["tool_name"])
+    # Which source owns the name is asked here rather than assumed: a trigger names one tool without saying
+    # whose, and since `one-process-per-security-boundary` the one it usually means — `pending_setups` — is a
+    # local source, not a server with an address. The list is cached, so this costs one round trip.
+    server = await _server_announcing(tool_registry.configured(), trigger["tool_name"])
     if server is None:
+        if not tool_registry.remote():
+            # Derived from the registry, not listed: a hand-kept list here named two servers on the day there were five.
+            unset = ", ".join(_url_setting(label) for label in tool_registry.unconfigured())
+            return None, f"no tool server is configured (none of {unset} is set), so the condition could not be read"
         return None, (
             f"no configured tool server announces {trigger['tool_name']!r}, "
             "or none could be asked"

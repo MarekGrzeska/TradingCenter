@@ -153,16 +153,6 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "workbench_outbound"
 }
 
 
-# The last of them, and the thing to say about the shape is that it repeats: `terraform apply
-# -target=azurerm_linux_web_app.strategy` once, then the normal unrestricted apply.
-resource "azurerm_postgresql_flexible_server_firewall_rule" "strategy_outbound" {
-  for_each = toset(azurerm_linux_web_app.strategy.possible_outbound_ip_address_list)
-
-  name             = "AllowStrategyOutbound-${replace(each.value, ".", "-")}"
-  server_id        = azurerm_postgresql_flexible_server.main.id
-  start_ip_address = each.value
-  end_ip_address   = each.value
-}
 
 # The sixth, same shape and same first convergence: `terraform apply
 # -target=azurerm_linux_web_app.telegram_gateway` once, then the normal unrestricted apply.

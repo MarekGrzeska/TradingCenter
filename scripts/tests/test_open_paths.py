@@ -52,15 +52,15 @@ def _open_paths(resource_name: str) -> set[str] | None:
 def test_the_apps_are_found_at_all() -> None:
     """A regex that matched nothing would make every test below pass by looking away."""
     names = [name for name, _ in _web_apps()]
-    assert len(names) >= 5, names
-    assert "market_data" in names and "strategy" in names
+    assert len(names) >= 4, names
+    assert "market_data" in names and "telegram_gateway" in names
 
 
 def test_the_modules_that_keep_this_record_still_keep_it() -> None:
     """Stated positively, so the check cannot be satisfied by the record disappearing: if a module stopped
     keeping an `OPEN_PATHS`, the parametrised test below would skip it in silence."""
     keeping = {name for name, _ in _web_apps() if _open_paths(name) is not None}
-    assert {"market_data", "strategy"} <= keeping
+    assert {"market_data", "telegram_gateway"} <= keeping
 
 
 @pytest.mark.parametrize("resource_name,excluded", _web_apps(), ids=lambda value: str(value))

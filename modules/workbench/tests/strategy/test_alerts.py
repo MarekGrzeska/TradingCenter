@@ -9,13 +9,14 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from builders import crossing_facts
-from fakes import FakeArchive
 
 from strategy import store
 from strategy.alerts import Alerts, GatewayRefused, GatewayUnreachable, is_new_setup, message
 from strategy.runner.loop import evaluate_once
 from strategy.spec import Decision
+
+from .builders import crossing_facts
+from .fakes import FakeArchive
 
 BAR = datetime(2026, 8, 20, 10, 0, tzinfo=UTC)
 

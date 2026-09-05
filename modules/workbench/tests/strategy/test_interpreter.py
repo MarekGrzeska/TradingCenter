@@ -4,8 +4,6 @@ is neither a number nor a zero, and a question that cannot be answered refuses r
 from __future__ import annotations
 
 import pytest
-from builders import facts as build_facts
-from builders import line
 
 from strategy.interpreter import interpret, spec_from_rule
 from strategy.rule import (
@@ -27,6 +25,9 @@ from strategy.rule import (
     Setup,
 )
 from strategy.spec import FactValue
+
+from .builders import facts as build_facts
+from .builders import line
 
 UNSETTLED = "the reading has not settled"
 NO_SETUP = "nothing to take here"

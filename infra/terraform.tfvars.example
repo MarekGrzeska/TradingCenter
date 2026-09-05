@@ -23,6 +23,6 @@ operator_email = "you@example.com"
 # gateway sends, and refuses to create bots naming the settings it wants.
 telegram_account_session_configured = false
 
-# The name the workbench's post archive and strategy send their alerts to, bound in the gateway by hand. Empty leaves both silent,
+# The name the workbench's post archive and strategy platform send their alerts to, bound in the gateway by hand. Empty leaves both silent,
 # which is a working configuration and the rollback lever.
 telegram_alert_destination = ""

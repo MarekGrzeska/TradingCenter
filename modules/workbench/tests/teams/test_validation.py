@@ -165,8 +165,8 @@ def test_a_trigger_naming_a_tool_the_server_does_not_announce_is_refused() -> No
 def test_a_trigger_with_no_tool_server_is_refused_and_names_every_setting() -> None:
     with pytest.raises(DefinitionRefused) as err:
         check_trigger_tool(
-            "get_candles", announced_tools=None, unconfigured=["market-mcp", "strategy-mcp"]
+            "get_candles", announced_tools=None, unconfigured=["market-mcp", "telegram-mcp"]
         )
 
     assert "MARKET_MCP_URL" in str(err.value)
-    assert "STRATEGY_MCP_URL" in str(err.value)
+    assert "TELEGRAM_MCP_URL" in str(err.value)

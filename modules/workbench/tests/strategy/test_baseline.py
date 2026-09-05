@@ -4,9 +4,10 @@ decide". The readings are built in `builders.py`, so what a test changes is the 
 from __future__ import annotations
 
 import pytest
-from builders import crossing_facts
 
 from strategy.catalogue import get
+
+from .builders import crossing_facts
 
 SPEC = get("baseline_ma_cross")
 PARAMS = SPEC.resolve_params()
@@ -81,10 +82,10 @@ class TestWhatItRefusesToGuess:
         assert "settled" in (decision.reason or "")
 
     def test_a_fact_the_archive_could_not_compute_is_named(self) -> None:
-        from builders import facts, line
-
         from strategy.catalogue.baseline import FAST, RANGE, SLOW
         from strategy.spec import FactValue
+
+        from .builders import facts, line
 
         broken = FactValue(key=RANGE, resolution="HOUR", error="no minute series for US100")
         decision = SPEC.evaluate(
@@ -102,9 +103,9 @@ class TestWhatItRefusesToGuess:
         assert "no minute series" in (decision.reason or "")
 
     def test_a_missing_fact_is_not_read_as_a_reading(self) -> None:
-        from builders import facts, line
-
         from strategy.catalogue.baseline import FAST, SLOW
+
+        from .builders import facts, line
 
         decision = SPEC.evaluate(
             facts(values={FAST: line(FAST, "ema", [99.0, 101.0]), SLOW: line(SLOW, "ema", [100.0, 100.0])}),

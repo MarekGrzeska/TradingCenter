@@ -21,7 +21,7 @@ modules move here one at a time.
 | [trading-mcp](modules/trading-mcp/) | MCP tools over the gateway's **demo account** — positions, balance, and orders a team can actually place. Network transport only, one named caller, demo checked against the gateway rather than against a setting. | MCP (streamable HTTP) |
 | [polymarket-data](modules/workbench/polymarket_data/) | The prediction-market archive and the only door to Polymarket — a package of the workbench process since `one-process-per-security-boundary`, served under `/polymarket`. Owns its PostgreSQL database; two of its tools write, both only add. |
 | [social-data](modules/workbench/social_data/) | The post archive: what was said, when, and what a model made of it — a package of the workbench process since `one-process-per-security-boundary`, served under `/social`. Owns its PostgreSQL database, the door to Truth Social; **nothing on either surface writes**. |
-| [strategy](modules/strategy/) | The strategy platform. A strategy is a catalogue entry — declared facts, parameters, one pure `evaluate` — and the entry is code in the image **or** an immutable revision the operator wrote. Owns a PostgreSQL, reads market-data's REST, and **never touches an account**: it decides, teams execute. | HTTP + OpenAPI, MCP (streamable HTTP) |
+| [strategy](modules/workbench/strategy/) | The strategy platform — a package of the workbench process since `one-process-per-security-boundary`, served under `/strategy`. A strategy is a catalogue entry — declared facts, parameters, one pure `evaluate` — and the entry is code in the image **or** an immutable revision the operator wrote. Owns its PostgreSQL database, reads market-data's REST, and **never touches an account**: it decides, teams execute. |
 | [telegram-gateway](modules/telegram-gateway/) | The one door to Telegram. Any module sends a notification; it creates its own bots, and remembers nothing it sent. | HTTP + OpenAPI, MCP (streamable HTTP) |
 | [terminal](modules/terminal/) | The operator's screen — charts in a grid, the archive's collection, the agent panel, the teams canvas, and the screens the four newer archives publish. | consumes six modules |
 | [pocket](modules/pocket/) | The archive on a phone, and a chat with the workbench beside it — mobile-first, two audiences, no MCP of its own. A second consumer, sharing the terminal's generated contract and none of its code. | consumes the workbench, and both archives through it |
@@ -63,16 +63,15 @@ Both bring the same things up in the same order:
 
 ```
 migrations -> capital-gateway -> market-data -> trading-mcp
-           -> strategy -> telegram-gateway -> workbench
-           -> terminal -> pocket
+           -> telegram-gateway -> workbench -> terminal -> pocket
 ```
 
 The order is not tidiness — every arrow in it is a real dependency, and `dev.py --explain`
 prints the reason for each rather than repeating it here. In short: `market-data` subscribes
 to the gateway as it starts; `trading-mcp` asks the gateway whether it is bound to the demo
-account and refuses to open a port if it is not; `strategy` reads market-data's REST; the
-`workbench` — two archives inside it answering to their own upstreams — reads four tool lists on
-the first turn that wants one; the front ends read the
+account and refuses to open a port if it is not; the `workbench` — two archives and the strategy
+platform inside it, the archives answering to their own upstreams and the platform reading
+market-data's REST — reads three tool lists on the first turn that wants one; the front ends read the
 back ends. Starting anything early fills the console with retries, or — in the
 conversation's case — quietly produces a turn answered without tools, which is worse because
 nothing reports it. Each step waits for the one before it to actually answer. Ctrl+C stops
@@ -81,19 +80,19 @@ the services.
 The chain used to be shorter, and both directions are real: `teams` and `teams-mcp` became
 the workbench, taking three arrows out, and five modules have been added since.
 
-The `workbench` reads four tool-server settings, and the *absence* of each is a working
+The `workbench` reads three tool-server settings, and the *absence* of each is a working
 configuration rather than a mistake: `MARKET_MCP_URL` for the archive's tools,
-`TRADING_MCP_URL` for the ones that place orders, `TELEGRAM_MCP_URL` for the one that sends,
-and `STRATEGY_MCP_URL` for the one a trigger reads to wake a team. The prediction-market and
-post archives' tools need no address: both are packages of the process. `.env.example` has all
-four, and the scripts say so at startup if an older `.env` does not — including when it still
-carries a setting a merge stopped reading, such as `TEAMS_MCP_URL`, `POLYMARKET_MCP_URL` or
-`SOCIAL_MCP_URL`. The consequence of each absence differs,
+`TRADING_MCP_URL` for the ones that place orders, and `TELEGRAM_MCP_URL` for the one that sends.
+The two archives' tools and the strategy platform's — `pending_setups` among them, the one a
+trigger reads to wake a team — need no address: all three are packages of the process.
+`.env.example` has all three, and the scripts say so at startup if an older `.env` does not —
+including when it still carries a setting a merge stopped reading, such as `TEAMS_MCP_URL`,
+`POLYMARKET_MCP_URL`, `SOCIAL_MCP_URL` or `STRATEGY_MCP_URL`. The consequence of each absence differs,
 which is why the messages do: the conversation without a tool server's tools answers from the
 model alone, while a team whose agents were *assigned* tools refuses to run at all rather than
-guess. The workbench's post archive and `strategy` reach the Telegram gateway over its REST contract instead,
-each with its own `TELEGRAM_GATEWAY_URL` — all of that module's settings or none, and none is
-a module that collects or decides as usual and says nothing.
+guess. The workbench's post archive and strategy platform reach the Telegram gateway over its REST contract instead,
+through one `TELEGRAM_GATEWAY_URL` — all three settings or none, and none is a process that
+collects and decides as usual and says nothing.
 
 `trading-mcp` is the one module that needs a credential even locally: the gateway checks
 its `X-Gateway-Key` on every caller, loopback included, so `CAPITAL_GATEWAY_API_KEY` there
@@ -175,8 +174,8 @@ than either `contract.py`, because a document is built from routes as well as mo
 | `capital-gateway` | `ruff check`, `pyright`, `pytest` |
 | `market-data` | `ruff check`, `pyright`, `pytest` — **including the database tests**, since the runner has Docker and `conftest` only skips them where it is absent, and including the tool surface it serves at `/mcp` |
 | `trading-mcp` | the same three plus `contract.py check` — its snapshot is `capital-gateway`'s document, so **any** change under that module runs this job |
-| `strategy`, `telegram-gateway` | `ruff check`, `pyright`, `pytest` — same database-test behaviour as market-data's, each against its own container |
-| `workbench` | `ruff check`, `pyright`, `pytest` — same database-test behaviour, against four containers, one per schema (the two archives' among them); its `live` tests need a real OpenAI key and stay behind `--run-live` |
+| `telegram-gateway` | `ruff check`, `pyright`, `pytest` — same database-test behaviour as market-data's, against its own container |
+| `workbench` | `ruff check`, `pyright`, `pytest` — same database-test behaviour, against five containers, one per schema (the two archives' and the strategy platform's among them); its `live` tests need a real OpenAI key and stay behind `--run-live` |
 | `packages` | the three build-time packages, tested once here rather than in each consumer |
 | `terminal`, `pocket` | `contract:check`, `lint`, `typecheck`, `test` |
 | `scripts`, `infra`, `openspec` | the repository's own tooling: `pytest` over `scripts/`, `terraform fmt`/`validate`, and `openspec validate --all --strict` with the archive-trim check |

@@ -93,11 +93,6 @@ class Settings(BaseSettings):
     telegram_mcp_scope: str | None = None
     telegram_mcp_request_timeout_seconds: float = 35.0
 
-    # The sixth: what a strategy decided, and how many setups it is standing on. Reads one database and reaches
-    # nothing outward, so market-mcp's ceiling — and here for the reason the other four are, one setting per process.
-    strategy_mcp_url: str | None = None
-    strategy_mcp_scope: str | None = None
-    strategy_mcp_request_timeout_seconds: float = 15.0
 
     # Mirrors market-data's own field and reasoning: a request without an identity, accepted because this
     # was left off, opens every session in the database — and every call that costs real money.
@@ -118,8 +113,6 @@ class Settings(BaseSettings):
         "trading_mcp_scope",
         "telegram_mcp_url",
         "telegram_mcp_scope",
-        "strategy_mcp_url",
-        "strategy_mcp_scope",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -173,9 +166,6 @@ class Settings(BaseSettings):
         )
         self.telegram_mcp_url = _checked_server(
             "TELEGRAM_MCP", self.telegram_mcp_url, self.telegram_mcp_scope
-        )
-        self.strategy_mcp_url = _checked_server(
-            "STRATEGY_MCP", self.strategy_mcp_url, self.strategy_mcp_scope
         )
         return self
 

@@ -47,8 +47,7 @@ export interface Endpoints {
   polymarketHttp: string;
   /** `strategy`, for the strategy platform: the catalogue of entries, which pairs are
    *  watched, every decision with the reason it carries, and the backtest reports that
-   *  were kept. Its own address and its own scope for the same reason as the two above —
-   *  a different App Service behind a different gate. */
+   *  were kept. The workbench's address plus `/strategy`, like the two archives. */
   strategyHttp: string;
   /** `social-data`, for the posts: the archive of what was said and what a model made of it. The
    *  workbench's address plus `/social`, for the reason the prediction-market archive is. */

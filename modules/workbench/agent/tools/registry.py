@@ -39,9 +39,8 @@ class ToolServerRegistry:
                 # The door to Telegram. Its send tool is the only thing on any of these surfaces whose
                 # effect is visible outside this system — and it moves no account, so not that flag.
                 ToolServer(settings, prefix="telegram_mcp"),
-                # The strategy platform: what it decided and how many setups it stands on. Every tool
-                # there carries readOnlyHint, and the module has no route to an account to move.
-                ToolServer(settings, prefix="strategy_mcp"),
+                # No strategy server either: the platform is the third package of this process, and its
+                # read-only tools arrive through `local_sources` like the two archives'.
                 *(local_sources or []),
             ]
         )
