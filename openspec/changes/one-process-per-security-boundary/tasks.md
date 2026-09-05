@@ -21,7 +21,7 @@
 - [x] 2.5 Bramka 2.1: doba z zielonym alertem pętli na nowej metryce; working set workbencha zmierzony i wpisany do tabeli design.md — skrócona decyzją operatora 5 września (metryki pętli obu archiwów wróciły po #248, alerty z danymi; working set workbencha z dwoma archiwami ≈ 340 MB, w design.md)
 - [x] 2.6 **social-data → `workbench/social_data/`**: to samo co 2.1–2.4, przedrostek `/social`, klucz 8090; `TELEGRAM_GATEWAY_*` social-data staje się ustawieniem workbencha; lista wołających telegram-gateway dostaje tożsamość workbencha zamiast social-data (PR nadbudowany na #246; bramka jak 2.5 — doba obserwacji po apply i merge — osobno)
 - [x] 2.7 **strategy → `workbench/strategy/`**: to samo, przedrostek `/strategy`, klucz 8080; `MARKET_DATA_URL/_SCOPE` zostają jako ustawienia workbencha (3a: HTTP po publicznym hostname); listy wołających market-data i telegram-gateway dostają tożsamość workbencha; `STRATEGY_MCP_URL` znika (zegar teams szuka `pending_setups` po nazwie w każdym źródle, także lokalnym)
-- [ ] 2.8 Bramka etapu 2: pięć aplikacji, alerty trzech pętli zielone przez dobę, suma working setów w tabeli; docs: CLAUDE.md tabela modułów i porty (8070, 8080, 8090 stają się niczyje), `docs/architecture.md` diagram
+- [x] 2.8 Bramka etapu 2: pięć aplikacji, alerty trzech pętli zielone przez dobę, suma working setów w tabeli; docs: CLAUDE.md tabela modułów i porty (8070, 8080, 8090 stają się niczyje), `docs/architecture.md` diagram — pięć aplikacji od 5 września ~11:35 UTC, metryki trzech pętli z danymi, working set 357–375 MB w design.md; doba obserwacji skrócona decyzją operatora
 
 ## 3. market-data do gospodarza, i godzina na B2
 
