@@ -42,6 +42,9 @@ _KEPT_PRICE_TYPE = "bid"
 
 Emit = Callable[[dict], Awaitable[None]]
 Tokens = Callable[[], Awaitable[tuple[str, str]]]
+# Waits for a slot in the provider's request budget. A subscribe frame counts against the same
+# 10 req/s as a REST call: twenty rooms reconnecting together answered `error.too-many.requests`.
+Pace = Callable[[], Awaitable[None]]
 
 
 class SilentFeed(Exception):
@@ -76,12 +79,14 @@ class Upstream:
         resolution: Resolution,
         tokens: Tokens,
         emit: Emit,
+        pace: Pace | None = None,
     ) -> None:
         self._url = stream_url
         self._epic = epic
         self._resolution = resolution
         self._tokens = tokens
         self._emit = emit
+        self._pace = pace
         self._task: asyncio.Task | None = None
         self._stopping = False
         self._silence_tolerance = SILENCE_TOLERANCE_SECONDS
@@ -160,6 +165,7 @@ class Upstream:
                 deadline = loop.time() + self._silence_tolerance
 
     async def _subscribe(self, ws, cst: str, token: str) -> None:
+        await self._take_a_slot()
         await ws.send(
             json.dumps(
                 {
@@ -175,6 +181,7 @@ class Upstream:
                 }
             )
         )
+        await self._take_a_slot()
         await ws.send(
             json.dumps(
                 {
@@ -186,6 +193,10 @@ class Upstream:
                 }
             )
         )
+
+    async def _take_a_slot(self) -> None:
+        if self._pace is not None:
+            await self._pace()
 
     async def _ping_forever(self, ws, cst: str, token: str) -> None:
         while True:
