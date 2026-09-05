@@ -608,11 +608,15 @@ then in progress, while `US100`, `GOLD` and `EURUSD` were `CLOSED` with nothing 
 UTC. Index, forex and commodity CFDs are 23/5 here; the crypto ones trade the weekend as well. Only
 the daily break around 21:00 is common to both.
 
-**A frozen series is not evidence of a closed market.** That same Saturday morning `BTCUSD` served
-nothing between 04:59 and at least 06:04 UTC, quote included — an hour-plus provider outage, on an
-instrument that `marketStatus` would have called `TRADEABLE` throughout. It was read at the time as
-the weekend. Ask the gateway what the market's status is before concluding anything from a series
-that stopped moving; that is the same distinction `collection_state` refuses to guess at.
+**A frozen series is not evidence of a closed market, and a scheduled break is not an outage.** That
+same Saturday morning `BTCUSD` served nothing between 04:59 and at least 06:04 UTC, quote included,
+and was read at the time as an hour-plus provider outage. It was the instrument's own calendar:
+measured 5 September 2026 from `GET /api/v1/markets/BTCUSD`, `openingHours` names a Saturday break
+**05:00–07:00 UTC** beside the daily 21:00–21:05 one, for crypto only. Outside those windows a
+weekend `BTCUSD` feed is still sparse — quotes arrive in bursts with holes of half a minute to over two,
+which the gateway's silence watchdog reads as a dead session and reconnects. Ask the gateway what the
+market's status and hours are before concluding anything from a series that stopped moving; that is
+the same distinction `collection_state` refuses to guess at.
 
 ## Telemetry
 
