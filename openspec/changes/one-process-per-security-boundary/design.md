@@ -47,8 +47,11 @@ zlecenia; 20 sierpnia policzono, że to 220 linii netto i zły kierunek błędu.
 Core to dzisiejsze `app-tradingcenter-agent`: jego tożsamość siedzi już na każdej liście
 `TOOL_CALLER_APPLICATION_IDS`, w roli Postgresa dla `agent` i `teams`, w kliencie terminala. Każda
 inna tożsamość oznaczałaby przenosiny wszystkich list naraz zamiast po jednej. Nazwa modułu
-(`modules/workbench` czy `modules/core`) jest otwarta — patrz Open Questions — i nie blokuje
-etapów 1–2, bo zmiana nazwy katalogu to jeden commit bez zmiany zachowania.
+została rozstrzygnięta 5 września 2026, przed etapem 3: **`modules/workbench` zostaje**. Tak nazywa
+się proces w każdym dokumencie, w `dev.py`, w CI (`checks.yml` uruchamia `terminal` na każdą zmianę
+pod `modules/workbench/`) i w pamięci operatora; `core` opisywałoby to samo, a rename to koszt w
+pięciu przewodnikach i w każdym linku bez zmiany zachowania. Od 3.2 tabela modułów mówi o
+workbenchu jako o gospodarzu archiwum, nie o market-data jako o module.
 
 ### Pod-aplikacje montowane pod przedrostkiem, nie routery z przedrostkiem
 
@@ -176,8 +179,5 @@ tagu. Własność schematu jest przenoszona tym samym skryptem w obie strony.
 
 ## Open Questions
 
-- Nazwa katalogu gospodarza: `modules/workbench` (jak App Service został `agent`) czy
-  `modules/core`. Nie blokuje etapów 1–2; rozstrzygnąć przed etapem 3, gdy market-data przestaje
-  być osobnym słowem w tabeli modułów.
 - Czy pocket kiedykolwiek zawoła `/mcp` pakietów bezpośrednio. Jeśli nie, montaż `/mcp` na
   zewnątrz można zdjąć w etapie 5; jeśli tak, zostaje. Nie zmienia żadnego zadania.
