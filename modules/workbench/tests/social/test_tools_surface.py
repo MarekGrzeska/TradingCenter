@@ -7,10 +7,11 @@ import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from builders import TRUTH_SOCIAL, raw_post
 
 from social_data import store
 from social_data.tools._shared import EXCERPT_CHARS
+
+from .builders import TRUTH_SOCIAL, raw_post
 
 EXPECTED_TOOLS = {"recent_posts", "posts_in_window", "read_post", "social_archive_status"}
 

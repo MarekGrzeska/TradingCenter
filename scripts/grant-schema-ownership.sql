@@ -24,7 +24,7 @@
 --                           modules became the workbench;
 --   with dbname=polymarket, role=app-tradingcenter-agent;  -- the workbench serves the archive
 --   with dbname=strategy,   role=app-tradingcenter-strategy;
---   with dbname=social,     role=app-tradingcenter-social-data;
+--   with dbname=social,     role=app-tradingcenter-agent;  -- the workbench serves the post archive too
 --   and with dbname=telegram, role=app-tradingcenter-telegram-gateway.
 --
 -- The seven databases are `agent`, `market_data`, `teams`, `polymarket`, `strategy`,

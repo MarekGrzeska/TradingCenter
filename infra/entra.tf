@@ -98,14 +98,7 @@ resource "azuread_application_pre_authorized" "workbench_terminal" {
   permission_ids       = [module.workbench_easy_auth.scope_id]
 }
 
-
-# It stands ready rather than in use for the reason the first three did: a `resource_access.id` must
-# be concrete at plan time, so the terminal's registration cannot name a scope this same apply creates.
-resource "azuread_application_pre_authorized" "social_data_terminal" {
-  application_id       = module.social_data_easy_auth.application_id
-  authorized_client_id = azuread_application.terminal.client_id
-  permission_ids       = [module.social_data_easy_auth.scope_id]
-}
+# No pre-authorization for either archive: both are served by the workbench, whose scope the one above covers.
 
 # The sixth. The strategy platform shipped for machine callers, so its registration announced no delegated scope at all
 # — the terminal was on its caller list and still met a 401, because there was nothing for a browser to ask for.
@@ -145,8 +138,8 @@ resource "azuread_application" "pocket" {
   }
 
 
-  # One API: the workbench, which serves the conversation and — since `one-process-per-security-boundary` — the
-  # prediction-market archive under `/polymarket`, so one token reaches both.
+  # One API: the workbench, which serves the conversation and — since `one-process-per-security-boundary` — both
+  # archives, under `/polymarket` and `/social`, so one token reaches all three.
   required_resource_access {
     resource_app_id = module.workbench_easy_auth.client_id
 
@@ -161,13 +154,6 @@ resource "azuread_service_principal" "pocket" {
   client_id = azuread_application.pocket.client_id
 }
 
-
-# The post archive's, for the same reason: a phone asked to consent mid-glance is a phone put back in a pocket.
-resource "azuread_application_pre_authorized" "social_data_pocket" {
-  application_id       = module.social_data_easy_auth.application_id
-  authorized_client_id = azuread_application.pocket.client_id
-  permission_ids       = [module.social_data_easy_auth.scope_id]
-}
 
 # The conversation's, for the same reason and on the same day: the agent tab acquires this one silently, which is
 # exactly what a pre-authorization is for — without it the operator meets a consent prompt on a phone, mid-question.

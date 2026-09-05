@@ -148,22 +148,6 @@ SERVICES: tuple[Service, ...] = (
         ),
     ),
     Service(
-        name="social-data",
-        module="social-data",
-        port=8090,
-        command=("uv", "run", "uvicorn", "social_data.app:app", "--reload", "--port", "8090"),
-        log_prefix="social  ",
-        colour=BRIGHT_CYAN,
-        health_path="/health",
-        why=(
-            "Independent of everything above it — its upstream is a public feed, and it "
-            "collects on its own loop whether or not anybody asks. Before the workbench "
-            "for the reason polymarket-data is: the tool list is read on the first turn "
-            "that wants one, and a server still coming up means a turn answered without "
-            "those tools rather than an error anyone would notice."
-        ),
-    ),
-    Service(
         name="strategy",
         module="strategy",
         port=8080,
@@ -193,8 +177,8 @@ SERVICES: tuple[Service, ...] = (
             "Independent of everything above it — its upstream is Telegram, and it sends "
             "only when somebody asks. Before the workbench for the reason every tool server "
             "is: the tool list is read on the first turn that wants one. Its other two "
-            "callers, social-data and strategy, do not wait on it at all — without a "
-            "gateway to reach they collect and decide as usual, and simply say nothing."
+            "callers, the workbench's post archive and strategy, do not wait on it at all — "
+            "without a gateway to reach they collect and decide as usual, and simply say nothing."
         ),
     ),
     Service(
@@ -209,8 +193,8 @@ SERVICES: tuple[Service, ...] = (
             "Last among the back ends: nothing else calls it, so nothing waits on it. The "
             "conversation and the teams catalogue are one process here — 8050 has belonged "
             "to nobody since `agent-and-teams-one-workbench`, and 8070 to nobody since "
-            "`one-process-per-security-boundary` folded polymarket-data into this process. "
-            "It calls five tool servers now, "
+            "`one-process-per-security-boundary` folded polymarket-data into this process, "
+            "8090 since it folded social-data in too. It calls four tool servers now, "
             "and each tool list is read on the first turn that wants one, so a server "
             "still coming up means a turn answered without those tools rather than an "
             "error anyone would notice."
@@ -243,7 +227,7 @@ SERVICES: tuple[Service, ...] = (
         health_path=None,
         why=(
             "After the terminal and for its reason, with three upstreams rather than six: it "
-            "reads polymarket-data, social-data and the workbench. Bound to loopback like everything else "
+            "reads the workbench alone, which serves both archives it shows. Bound to loopback like everything else "
             "here — a phone on the same Wi-Fi needs `pnpm dev --host` in the module, which "
             "publishes the dev server to the network and is nobody's default."
         ),
@@ -251,14 +235,14 @@ SERVICES: tuple[Service, ...] = (
     ),
 )
 
-# Every migration chain and which module owns it; `workbench` appears twice because it owns two databases.
+# Every migration chain and which module owns it; `workbench` appears four times because it owns four databases.
 # Redundant with each module's startup migration, and kept because it fails readably rather than under a lock.
 MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
     ("market-data", None),
     ("workbench", "alembic-agent.ini"),
     ("workbench", "alembic-teams.ini"),
     ("workbench", "alembic-polymarket.ini"),
-    ("social-data", None),
+    ("workbench", "alembic-social.ini"),
     ("strategy", None),
     ("telegram-gateway", None),
 )
@@ -311,9 +295,6 @@ REQUIRED_ENV: tuple[tuple[str, str], ...] = (
         "trading-mcp",
         "copy .env.example and set CAPITAL_GATEWAY_API_KEY to the gateway's own GATEWAY_API_KEY",
     ),
-    # A key is optional here and its absence is a supported state: without OPENAI_API_KEY the module
-    # collects posts and leaves every reading empty, which /state says out loud.
-    ("social-data", "copy .env.example; the defaults match compose.yaml, and the model key is optional"),
     ("strategy", "copy .env.example; the defaults match compose.yaml"),
     # The three account-session lines are meant to stay empty: without them the module sends and
     # refuses to create bots, which is a configuration it supports rather than a missing step.
@@ -474,15 +455,6 @@ ADVISORIES: tuple[tuple[str, str, str, str], ...] = (
     ),
     (
         "workbench",
-        "SOCIAL_MCP_URL",
-        (
-            "the agent cannot say what was posted, and a team assigning those tools "
-            "refuses to run"
-        ),
-        "8090",
-    ),
-    (
-        "workbench",
         "TELEGRAM_MCP_URL",
         (
             "the agent cannot send a notification, and a team assigning those tools "
@@ -520,8 +492,15 @@ RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
         ),
     ),
     (
+        "SOCIAL_MCP_URL",
+        (
+            "the post archive is a package of this process since the same change; its tools "
+            "need no address, and SOCIAL_DATABASE_URL is the line this file needs instead"
+        ),
+    ),
+    (
         "DATABASE_URL",
-        "the workbench owns three databases: AGENT_, TEAMS_ and POLYMARKET_DATABASE_URL",
+        "the workbench owns four databases: AGENT_, TEAMS_, POLYMARKET_ and SOCIAL_DATABASE_URL",
     ),
     (
         "OPENAI_API_KEY",
@@ -926,6 +905,7 @@ def ready_lines(*, start_front_ends: bool) -> list[str]:
         f"  trading-mcp health  http://{LOOPBACK}:8060/health",
         f"  Workbench docs      http://{LOOPBACK}:8030/docs",
         f"  Polymarket docs     http://{LOOPBACK}:8030/polymarket/docs",
+        f"  Social docs         http://{LOOPBACK}:8030/social/docs",
         (
             "  Database            market_data, agent, teams, polymarket, social, strategy, "
             "telegram @ localhost:55432 "

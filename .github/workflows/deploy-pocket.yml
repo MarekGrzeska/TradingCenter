@@ -99,7 +99,7 @@ jobs:
       - run: pnpm build
         env:
           VITE_POLYMARKET_HTTP: https://app-tradingcenter-agent.azurewebsites.net/polymarket
-          VITE_SOCIAL_HTTP: https://app-tradingcenter-social-data.azurewebsites.net
+          VITE_SOCIAL_HTTP: https://app-tradingcenter-agent.azurewebsites.net/social
           # The conversation, which is the only way this app reaches a tool. The host keeps the `-agent`
           # spelling because the App Service does: a name here is an identity, not a label.
           VITE_WORKBENCH_HTTP: https://app-tradingcenter-agent.azurewebsites.net
@@ -113,7 +113,7 @@ jobs:
           # **One scope per back end**: a token minted for one module is not sent to another. Left unset, the
           # agent tab says it has no audience rather than presenting the archive's and meeting a 401.
           VITE_ENTRA_SCOPE_WORKBENCH: api://tradingcenter-agent/access_as_user
-          VITE_ENTRA_SCOPE_SOCIAL: api://tradingcenter-social-data/access_as_user
+          VITE_ENTRA_SCOPE_SOCIAL: api://tradingcenter-agent/access_as_user
 
       - uses: Azure/static-web-apps-deploy@v1
         with:

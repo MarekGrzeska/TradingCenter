@@ -84,12 +84,6 @@ class Settings(BaseSettings):
     # worst case still has to read here as "slow", not as this module's own timeout firing first.
     trading_mcp_request_timeout_seconds: float = 35.0
 
-    # The fourth, same shape and independence. Its ceiling is market-mcp's number for market-mcp's reason:
-    # every one of its tools reads this system's own database and reaches nothing outward.
-    social_mcp_url: str | None = None
-    social_mcp_scope: str | None = None
-    social_mcp_request_timeout_seconds: float = 15.0
-
     # The fifth, and the only one whose tool acts outside this system. Its ceiling is trading-mcp's number
     # for trading-mcp's reason: a timeout on this side of a message already delivered is a notification
     # sent twice, or one reported as failed after it arrived.
@@ -99,7 +93,7 @@ class Settings(BaseSettings):
 
     # The sixth, and the one the clock reads: `pending_setups` is the number a trigger compares against its
     # threshold, over the same session a woken team then reads the decision from. One database, no upstream —
-    # social-mcp's ceiling.
+    # market-mcp's ceiling.
     strategy_mcp_url: str | None = None
     strategy_mcp_scope: str | None = None
     strategy_mcp_request_timeout_seconds: float = 15.0
@@ -135,8 +129,6 @@ class Settings(BaseSettings):
         "market_mcp_scope",
         "trading_mcp_url",
         "trading_mcp_scope",
-        "social_mcp_url",
-        "social_mcp_scope",
         "telegram_mcp_url",
         "telegram_mcp_scope",
         "strategy_mcp_url",
@@ -191,9 +183,6 @@ class Settings(BaseSettings):
         )
         self.trading_mcp_url = self._coherent_tool_server_url(
             url=self.trading_mcp_url, scope=self.trading_mcp_scope, env_prefix="TRADING_MCP"
-        )
-        self.social_mcp_url = self._coherent_tool_server_url(
-            url=self.social_mcp_url, scope=self.social_mcp_scope, env_prefix="SOCIAL_MCP"
         )
         self.telegram_mcp_url = self._coherent_tool_server_url(
             url=self.telegram_mcp_url, scope=self.telegram_mcp_scope, env_prefix="TELEGRAM_MCP"

@@ -7,12 +7,13 @@ import asyncio
 from datetime import UTC, date, datetime, timedelta
 
 import pytest
-from builders import TRUTH_SOCIAL, raw_post
-from fakes import FakeSource
 from tc_runtime.liveness import LoopHeartbeat
 
 from social_data import store
 from social_data.ingest import Ingest, dates_touched
+
+from .builders import TRUTH_SOCIAL, raw_post
+from .fakes import FakeSource
 
 pytestmark = pytest.mark.db
 

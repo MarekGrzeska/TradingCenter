@@ -9,17 +9,19 @@ of the same kind as a candle. This module keeps that series. It does not alert o
 not translate anything and does not judge whether an event matters — that is the
 workbench's work, done on this module's data.
 
-```bash
-uv run alembic upgrade head
-uv run uvicorn polymarket_data.app:app --reload --port 8070
-uv run pytest        # unit; anything needing a database skips without Docker
-uv run pytest -m db  # against a throwaway PostgreSQL (testcontainers)
-uv run ruff check .
-uv run pyright
-```
+**A package of the workbench since `one-process-per-security-boundary`**, served whole under
+`/polymarket` of that process — its REST contract, its `/mcp`, its caller record — with its own
+database and its own migration chain (`alembic-polymarket.ini`, lock key 8070, the port it used to
+have). Its nine tools reach the conversation and the teams as functions, so there is no
+`POLYMARKET_MCP_URL` anywhere; what is the archive's alone is read under `POLYMARKET_` in the
+workbench's `.env`.
 
-Port **8070**. It was listed in `CLAUDE.md` among the ports belonging to nobody until this
-module claimed it; a `.env` pointing at 8040 or 8050 still reads as a server that is off.
+```bash
+# from modules/workbench
+uv run alembic -c alembic-polymarket.ini upgrade head  # the process does this itself at startup
+uv run uvicorn workbench.app:app --reload --port 8030   # the archive answers under /polymarket
+uv run pytest tests/polymarket                           # `db` tests skip without Docker
+```
 
 ## What it collects, and what it refuses to
 

@@ -31,13 +31,11 @@ GOOD_ENV: dict[str, str] = {
         "MARKET_MCP_URL=http://127.0.0.1:8020\n"
         "TRADING_MCP_URL=http://127.0.0.1:8060\n"
         "POLYMARKET_DATABASE_URL=postgresql://polymarket:pw@127.0.0.1:55432/polymarket\n"
-        "SOCIAL_MCP_URL=http://127.0.0.1:8090\n"
+        "SOCIAL_DATABASE_URL=postgresql://social:pw@127.0.0.1:55432/social\n"
         "TELEGRAM_MCP_URL=http://127.0.0.1:8100\n"
         "STRATEGY_MCP_URL=http://127.0.0.1:8080\n"
     ),
     "trading-mcp": "CAPITAL_GATEWAY_API_KEY=shared-secret\n",
-    # Nor here: the model key is optional, and without it the module collects and reads nothing.
-    "social-data": "DATABASE_URL=postgresql://social:pw@127.0.0.1:55432/social\n",
     "strategy": "DATABASE_URL=postgresql://strategy:pw@127.0.0.1:55432/strategy\n",
     # Nor here, and deliberately: the account session that creates bots is three lines meant
     # to stay empty, and without them the module sends and refuses to create.
@@ -157,7 +155,6 @@ class TestRefusals:
             "market-data",
             "workbench",
             "trading-mcp",
-            "social-data",
             # Listed for market-data's reason rather than trading-mcp's: no secret of its
             # own, but `DATABASE_URL` has no default, so the process exits at start.
             "strategy",
@@ -244,7 +241,6 @@ class TestStartOrder:
             "capital-gateway",
             "market-data",
             "trading-mcp",
-            "social-data",
             "strategy",
             "telegram-gateway",
             "workbench",
@@ -258,7 +254,6 @@ class TestStartOrder:
             "market-data": 8020,
             "workbench": 8030,
             "trading-mcp": 8060,
-            "social-data": 8090,
             "strategy": 8080,
             "telegram-gateway": 8100,
             "terminal": 5173,
@@ -266,9 +261,9 @@ class TestStartOrder:
         }
 
     def test_the_ports_that_stopped_being_anybodys_are_not_listened_on(self) -> None:
-        """8040 went with market-mcp, 8050 with teams-mcp and 8070 with polymarket-data into the workbench; a
-        `.env` still naming any of them is a tool server that reads as down."""
-        assert {8040, 8050, 8070}.isdisjoint({service.port for service in SERVICES})
+        """8040 went with market-mcp, 8050 with teams-mcp, 8070 with polymarket-data and 8090 with social-data
+        into the workbench; a `.env` still naming any of them is a tool server that reads as down."""
+        assert {8040, 8050, 8070, 8090}.isdisjoint({service.port for service in SERVICES})
 
     def test_every_back_end_is_waited_for(self) -> None:
         """A service started and not waited for is what `dev.ps1` once did to teams-mcp."""

@@ -153,20 +153,21 @@ class TestOneFileAtATime:
         assert decisions["workbench"]
         assert decisions["terminal"]
 
-    def test_the_archives_contract_reaches_both_screens(self) -> None:
-        """The prediction-market archive is a package of the workbench, so its `contract.py` and `openapi.py`
-        run the workbench, the terminal (the workbench whole does) and the pocket, which reads only those two."""
-        decisions = decide(["modules/workbench/polymarket_data/contract.py"])
+    @pytest.mark.parametrize("package", ["polymarket_data", "social_data"])
+    def test_an_archives_contract_reaches_both_screens(self, package: str) -> None:
+        """Both archives are packages of the workbench, so each one's `contract.py` and `openapi.py` run the
+        workbench, the terminal (the workbench whole does) and the pocket, which reads only those two."""
+        decisions = decide([f"modules/workbench/{package}/contract.py"])
         assert decisions["workbench"]
         assert decisions["terminal"]
         assert decisions["pocket"]
-
-        shaping = decide(["modules/workbench/polymarket_data/openapi.py"])
+        shaping = decide([f"modules/workbench/{package}/openapi.py"])
         assert shaping["pocket"]
 
-    def test_the_rest_of_the_archive_leaves_the_pocket_alone(self) -> None:
-        """The other half of the pairing: the archive's own work is not the phone screen's."""
-        decisions = decide(["modules/workbench/polymarket_data/ingest.py"])
+    @pytest.mark.parametrize("package", ["polymarket_data", "social_data"])
+    def test_the_rest_of_an_archive_leaves_the_pocket_alone(self, package: str) -> None:
+        """The other half of the pairing: an archive's own work is not the phone screen's."""
+        decisions = decide([f"modules/workbench/{package}/ingest.py"])
         assert decisions["workbench"]
         assert not decisions["pocket"]
 

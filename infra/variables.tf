@@ -186,10 +186,10 @@ variable "telegram_account_session_configured" {
 
 variable "telegram_alert_destination" {
   description = <<-EOT
-    The destination name `social-data` and `strategy` address when they notify the operator,
+    The destination name the workbench's post archive and `strategy` address when they notify the operator,
     bound in `telegram-gateway` by the operator once — never a chat id.
 
-    Empty is the default and a working configuration: neither module is given a gateway
+    Empty is the default and a working configuration: neither caller is given a gateway
     address, so both collect and decide exactly as before and say nothing. It is also the
     rollback lever design.md names — clear this, apply, and the callers restart silent.
 

@@ -34,10 +34,8 @@ class ToolServerRegistry:
                 # The one whose writes land on the account. No operator identity: the account is one and
                 # shared, and trading-mcp reads no such header.
                 ToolServer(settings, prefix="trading_mcp", can_move_the_account=True),
-                # No polymarket server: the prediction-market archive is a package of this process since
-                # `one-process-per-security-boundary`, and its tools arrive through `local_sources`.
-                # The post archive. Nothing on that surface writes at all.
-                ToolServer(settings, prefix="social_mcp"),
+                # No polymarket and no social server: both archives are packages of this process since
+                # `one-process-per-security-boundary`, and their tools arrive through `local_sources`.
                 # The door to Telegram. Its send tool is the only thing on any of these surfaces whose
                 # effect is visible outside this system — and it moves no account, so not that flag.
                 ToolServer(settings, prefix="telegram_mcp"),

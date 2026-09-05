@@ -26,7 +26,6 @@ jobs:
       capital-gateway: ${{ steps.filter.outputs.capital-gateway }}
       market-data: ${{ steps.filter.outputs.market-data }}
       trading-mcp: ${{ steps.filter.outputs.trading-mcp }}
-      social-data: ${{ steps.filter.outputs.social-data }}
       strategy: ${{ steps.filter.outputs.strategy }}
       workbench: ${{ steps.filter.outputs.workbench }}
       terminal: ${{ steps.filter.outputs.terminal }}
@@ -83,18 +82,15 @@ jobs:
           # One module where there were three. It takes `tc-mcp-kit` as well as the
           # other two, because the team tools moved into it with their schema slimmer.
           PATTERNS[workbench]="^modules/workbench/|$tc_runtime|$tc_openai|$tc_mcp_kit"
-          # The terminal is filtered on four other modules because its `contract:check` is the check for those seams.
+          # The terminal is filtered on three other modules because its `contract:check` is the check for those seams.
           # The workbench whole, since its schema is built from routes and from models those files import.
-          PATTERNS[terminal]='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/workbench/|^modules/social-data/social_data/(contract|openapi)\.py$|^modules/strategy/strategy/(contract|openapi|rule)\.py$'
+          PATTERNS[terminal]='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/workbench/|^modules/strategy/strategy/(contract|openapi|rule)\.py$'
           # market-data takes `tc-mcp-kit` since the tool surface moved in — the slimmer keeps eleven tools under their
           # ceiling. trading-mcp watches the gateway's *whole* directory: its snapshot is built from routes and DTOs both.
           # The second front end, filtered on the one module it reads: it keeps its own generated copy of that
           # schema, so `contract:check` there is the check for this seam exactly as it is for the terminal.
-          PATTERNS[pocket]='^modules/pocket/|^modules/workbench/polymarket_data/(contract|openapi)\.py$|^modules/social-data/social_data/(contract|openapi)\.py$|^modules/workbench/agent/'
+          PATTERNS[pocket]='^modules/pocket/|^modules/workbench/(polymarket_data|social_data)/(contract|openapi)\.py$|^modules/workbench/agent/'
           PATTERNS[trading-mcp]="^modules/trading-mcp/|^modules/capital-gateway/|$tc_mcp_kit"
-          # The same two packages, for the same two reasons. Its upstream is a public feed rather than a module
-          # here, so there is no second directory in this pattern.
-          PATTERNS[social-data]="^modules/social-data/|$tc_runtime|$tc_mcp_kit"
           # Both packages since the tool surface landed. No pairing with another module's job: its
           # upstream is Telegram rather than anything here.
           PATTERNS[telegram-gateway]="^modules/telegram-gateway/|$tc_runtime|$tc_mcp_kit"
@@ -214,25 +210,6 @@ jobs:
       - run: uv run pyright
       # Nothing here reaches capital.com or a running gateway: every test doubles the upstream, which is the only
       # place the demo-only guard can be exercised without an account to refuse.
-      - run: uv run pytest -q
-
-  social-data:
-    name: social-data
-    needs: changes
-    if: needs.changes.outputs.social-data == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: modules/social-data
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-      - run: uv run ruff check .
-      - run: uv run pyright
-      # Same split as the archive above: the `db` tests run here, the `live` ones stay behind --run-live
-      # because they read a public feed nobody in this repository operates.
       - run: uv run pytest -q
 
   # The door to Telegram. No `contract:check` pairing: nothing generates types from its document,
@@ -355,7 +332,7 @@ jobs:
       - run: pnpm test
 
   # The phone screen. Same shape as the terminal's job and for the same reason: its wire types are generated from
-  # the archive's Python inside the workbench, so the check needs both toolchains and a stale contract fails before the suite runs.
+  # both archives' Python inside the workbench, so the check needs both toolchains and a stale contract fails before the suite runs.
   pocket:
     name: pocket
     needs: changes

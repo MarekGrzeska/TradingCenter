@@ -1,5 +1,6 @@
 """The one place this process reads its environment. What stays doubled carries a prefix and is doubled on purpose:
-two schemas, two OpenAI keys so the experiments bill on their own line, and two catalogues."""
+two schemas, two OpenAI keys so the experiments bill on their own line, and two catalogues. The two archives that
+joined this process read what is theirs alone under a prefix of their own, `POLYMARKET_` and `SOCIAL_`."""
 
 from __future__ import annotations
 
@@ -9,6 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from agent.config import ModelCatalogueEntry as AgentModelCatalogueEntry
 from agent.config import Settings as AgentSettings
 from polymarket_data.config import Settings as PolymarketSettings
+from social_data.config import Settings as SocialSettings
 from teams.config import ModelCatalogueEntry as TeamsModelCatalogueEntry
 from teams.config import Settings as TeamsSettings
 
@@ -51,20 +53,16 @@ class Settings(BaseSettings):
     trading_mcp_scope: str | None = None
     trading_mcp_request_timeout_seconds: float = 35.0
 
-    # The fourth pair, same shape as the three above: unset means neither surface can say what was posted.
-    # Its tools read one database and reach nothing outward, so the ceiling is the archive's, not the provider's.
-    social_mcp_url: str | None = None
-    social_mcp_scope: str | None = None
-    social_mcp_request_timeout_seconds: float = 15.0
+    # No `SOCIAL_MCP_*` either: the post archive is a package of this process too, since the same change.
 
-    # The fifth pair, and the one whose tools do something the operator can see on their phone. Its ceiling is
+    # The third pair, and the one whose tools do something the operator can see on their phone. Its ceiling is
     # trading-mcp's: a timeout here is a notification delivered and reported as failed, or sent again.
     telegram_mcp_url: str | None = None
     telegram_mcp_scope: str | None = None
     telegram_mcp_request_timeout_seconds: float = 35.0
 
-    # The sixth pair, and the one a trigger reads: `pending_setups` on the strategy platform is the number a team
-    # wakes on, travelling the same road as every other reading. Its tools read one database, so social-data's ceiling.
+    # The fourth pair, and the one a trigger reads: `pending_setups` on the strategy platform is the number a team
+    # wakes on, travelling the same road as every other reading. Its tools read one database, so market-data's ceiling.
     strategy_mcp_url: str | None = None
     strategy_mcp_scope: str | None = None
     strategy_mcp_request_timeout_seconds: float = 15.0
@@ -79,14 +77,24 @@ class Settings(BaseSettings):
 
     require_authenticated_principal: bool = False
 
-    # The prediction-market archive is a package of this process (`one-process-per-security-boundary`): its own
-    # database under its own name, and the two caller lists its route record reads. Everything else it needs is
-    # read under `POLYMARKET_` by `for_polymarket`, or is the one setting the whole process shares.
+    # The prediction-market archive and the post archive are packages of this process
+    # (`one-process-per-security-boundary`): each its own database under its own name, and the two caller lists
+    # both route records read. Everything else each needs is read under `POLYMARKET_` or `SOCIAL_` by
+    # `for_polymarket` and `for_social`, or is the one setting the whole process shares.
     polymarket_database_url: str
-    # Who may reach `/polymarket/mcp` from outside — nobody today, since the conversation calls those tools in this
-    # process — and which browsers reach `/polymarket` over REST.
+    social_database_url: str
+    # Who may reach `/polymarket/mcp` and `/social/mcp` from outside — nobody today, since the conversation calls
+    # those tools in this process — and which browsers reach `/polymarket` and `/social` over REST.
     tool_caller_application_ids: str = ""
     rest_caller_application_ids: str = ""
+
+    # The door out of the post archive: where telegram-gateway answers over REST, and the destination the operator
+    # bound there. All three or none — the archive's own settings refuse every partial form — and none is a working
+    # configuration in which posts are collected and nobody is told. Unprefixed, because the strategy platform will
+    # read the same three when it joins this process, and one door has one address.
+    telegram_gateway_url: str | None = None
+    telegram_gateway_scope: str | None = None
+    alert_destination: str | None = None
 
     @field_validator("database_pool_size")
     @classmethod
@@ -99,6 +107,7 @@ class Settings(BaseSettings):
         "agent_database_url",
         "teams_database_url",
         "polymarket_database_url",
+        "social_database_url",
         "agent_openai_api_key",
         "teams_openai_api_key",
     )
@@ -116,12 +125,13 @@ class Settings(BaseSettings):
         "market_mcp_scope",
         "trading_mcp_url",
         "trading_mcp_scope",
-        "social_mcp_url",
-        "social_mcp_scope",
         "telegram_mcp_url",
         "telegram_mcp_scope",
         "strategy_mcp_url",
         "strategy_mcp_scope",
+        "telegram_gateway_url",
+        "telegram_gateway_scope",
+        "alert_destination",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -152,9 +162,6 @@ class Settings(BaseSettings):
             trading_mcp_url=self.trading_mcp_url,
             trading_mcp_scope=self.trading_mcp_scope,
             trading_mcp_request_timeout_seconds=self.trading_mcp_request_timeout_seconds,
-            social_mcp_url=self.social_mcp_url,
-            social_mcp_scope=self.social_mcp_scope,
-            social_mcp_request_timeout_seconds=self.social_mcp_request_timeout_seconds,
             telegram_mcp_url=self.telegram_mcp_url,
             telegram_mcp_scope=self.telegram_mcp_scope,
             telegram_mcp_request_timeout_seconds=self.telegram_mcp_request_timeout_seconds,
@@ -181,9 +188,6 @@ class Settings(BaseSettings):
             trading_mcp_url=self.trading_mcp_url,
             trading_mcp_scope=self.trading_mcp_scope,
             trading_mcp_request_timeout_seconds=self.trading_mcp_request_timeout_seconds,
-            social_mcp_url=self.social_mcp_url,
-            social_mcp_scope=self.social_mcp_scope,
-            social_mcp_request_timeout_seconds=self.social_mcp_request_timeout_seconds,
             telegram_mcp_url=self.telegram_mcp_url,
             telegram_mcp_scope=self.telegram_mcp_scope,
             telegram_mcp_request_timeout_seconds=self.telegram_mcp_request_timeout_seconds,
@@ -212,4 +216,24 @@ class Settings(BaseSettings):
             require_authenticated_principal=self.require_authenticated_principal,
             tool_caller_application_ids=self.tool_caller_application_ids,
             rest_caller_application_ids=self.rest_caller_application_ids,
+        )
+
+    def for_social(self) -> SocialSettings:
+        """The post archive's own settings, the same way: shared things by hand, its own under `SOCIAL_`. The
+        gateway trio is the process's, passed through, so the archive's validators still refuse a partial one."""
+        return SocialSettings(
+            _env_prefix="SOCIAL_",  # pyright: ignore[reportCallIssue]
+            _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
+            database_url=self.social_database_url,
+            database_user=self.database_user,
+            azure_client_id=self.azure_client_id,
+            azure_client_secret=self.azure_client_secret,
+            azure_tenant_id=self.azure_tenant_id,
+            migration_lock_wait_seconds=self.migration_lock_wait_seconds,
+            require_authenticated_principal=self.require_authenticated_principal,
+            tool_caller_application_ids=self.tool_caller_application_ids,
+            rest_caller_application_ids=self.rest_caller_application_ids,
+            telegram_gateway_url=self.telegram_gateway_url,
+            telegram_gateway_scope=self.telegram_gateway_scope,
+            alert_destination=self.alert_destination,
         )

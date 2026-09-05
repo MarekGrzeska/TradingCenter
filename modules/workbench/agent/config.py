@@ -86,12 +86,6 @@ class Settings(BaseSettings):
     # of an order that had already been sent — the one failure shape this must never produce silently.
     trading_mcp_request_timeout_seconds: float = 35.0
 
-    # The fourth: unset, the module runs and cannot say what was posted. Its tools read one database and
-    # reach nothing outward while the operator waits, so the ceiling is market-mcp's rather than the other two's.
-    social_mcp_url: str | None = None
-    social_mcp_scope: str | None = None
-    social_mcp_request_timeout_seconds: float = 15.0
-
     # The fifth, and the first whose tool does something outside this system. Its ceiling is trading-mcp's
     # number for trading-mcp's reason: a timeout on this side of a message that was already delivered is a
     # notification the operator gets twice, or one this module reports as failed after it arrived.
@@ -100,7 +94,7 @@ class Settings(BaseSettings):
     telegram_mcp_request_timeout_seconds: float = 35.0
 
     # The sixth: what a strategy decided, and how many setups it is standing on. Reads one database and reaches
-    # nothing outward, so social-mcp's ceiling — and here for the reason the other five are, one setting per process.
+    # nothing outward, so market-mcp's ceiling — and here for the reason the other four are, one setting per process.
     strategy_mcp_url: str | None = None
     strategy_mcp_scope: str | None = None
     strategy_mcp_request_timeout_seconds: float = 15.0
@@ -122,8 +116,6 @@ class Settings(BaseSettings):
         "market_mcp_scope",
         "trading_mcp_url",
         "trading_mcp_scope",
-        "social_mcp_url",
-        "social_mcp_scope",
         "telegram_mcp_url",
         "telegram_mcp_scope",
         "strategy_mcp_url",
@@ -178,9 +170,6 @@ class Settings(BaseSettings):
         )
         self.trading_mcp_url = _checked_server(
             "TRADING_MCP", self.trading_mcp_url, self.trading_mcp_scope
-        )
-        self.social_mcp_url = _checked_server(
-            "SOCIAL_MCP", self.social_mcp_url, self.social_mcp_scope
         )
         self.telegram_mcp_url = _checked_server(
             "TELEGRAM_MCP", self.telegram_mcp_url, self.telegram_mcp_scope

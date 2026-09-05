@@ -19,7 +19,7 @@
 - [x] 2.3 Terminal i pocket dla 2.1: `VITE_POLYMARKET_HTTP` → adres workbencha + `/polymarket`, scope polymarket → scope workbencha; `contract:generate`, `contract:check` zielone
 - [x] 2.4 CI/deploy dla 2.1: job `polymarket-data` i `deploy-polymarket-data.yml` znikają; `changes` w `checks.yml` widzi nowy pakiet jako workbench
 - [ ] 2.5 Bramka 2.1: doba z zielonym alertem pętli na nowej metryce; working set workbencha zmierzony i wpisany do tabeli design.md
-- [ ] 2.6 **social-data → `workbench/social_data/`**: to samo co 2.1–2.5, przedrostek `/social`, klucz 8090; `TELEGRAM_GATEWAY_*` social-data staje się ustawieniem workbencha; lista wołających telegram-gateway dostaje tożsamość workbencha zamiast social-data
+- [x] 2.6 **social-data → `workbench/social_data/`**: to samo co 2.1–2.4, przedrostek `/social`, klucz 8090; `TELEGRAM_GATEWAY_*` social-data staje się ustawieniem workbencha; lista wołających telegram-gateway dostaje tożsamość workbencha zamiast social-data (PR nadbudowany na #246; bramka jak 2.5 — doba obserwacji po apply i merge — osobno)
 - [ ] 2.7 **strategy → `workbench/strategy/`**: to samo, przedrostek `/strategy`, klucz 8080; `MARKET_DATA_URL/_SCOPE` zostają jako ustawienia workbencha (3a: HTTP po publicznym hostname); listy wołających market-data i telegram-gateway dostają tożsamość workbencha; `STRATEGY_MCP_URL` znika
 - [ ] 2.8 Bramka etapu 2: pięć aplikacji, alerty trzech pętli zielone przez dobę, suma working setów w tabeli; docs: CLAUDE.md tabela modułów i porty (8070, 8080, 8090 stają się niczyje), `docs/architecture.md` diagram
 

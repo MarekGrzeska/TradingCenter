@@ -43,7 +43,6 @@ function quietProxyErrors(label: string, target: string): ProxyOptions["configur
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
     const workbench = env.WORKBENCH_PROXY_TARGET || "http://localhost:8030";
-  const social = env.SOCIAL_PROXY_TARGET || "http://localhost:8090";
 
   return {
     plugins: [react()],
@@ -63,12 +62,12 @@ export default defineConfig(({ mode }) => {
           configure: quietProxyErrors("workbench", workbench),
         },
 
-        // The post archive, same shape and same reason as the one above.
+        // The post archive, served by the workbench under /social, same shape and same reason as the one above.
         "/social-api": {
-          target: social,
+          target: workbench,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/social-api/, ""),
-          configure: quietProxyErrors("social-data", social),
+          rewrite: (path) => path.replace(/^\/social-api/, "/social"),
+          configure: quietProxyErrors("workbench", workbench),
         },
 
         // The conversation. Its own address rather than a path under the archive's — a different

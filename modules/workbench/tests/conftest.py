@@ -80,8 +80,8 @@ def _no_developer_env(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv(field.upper(), raising=False)
 
 
-# Two containers rather than two schemas in one, because the two chains own `alembic_version` separately.
-# They live here because the process under test needs both: its lifespan migrates both before it serves.
+# One container per chain rather than schemas in one, because each chain owns its `alembic_version`.
+# They live here because the process under test needs all four: its lifespan migrates each before it serves.
 
 
 @pytest.fixture(scope="session")
@@ -117,6 +117,24 @@ def polymarket_migrated_url(polymarket_postgres_url: str) -> str:
 
     upgrade_to_head(MIGRATIONS, sqlalchemy_url(polymarket_postgres_url))
     return polymarket_postgres_url
+
+
+@pytest.fixture(scope="session")
+def social_postgres_url() -> Iterator[str]:
+    from testcontainers.community.postgres import PostgresContainer
+
+    with PostgresContainer("postgres:17-alpine", driver=None) as pg:
+        yield pg.get_connection_url()
+
+
+@pytest.fixture(scope="session")
+def social_migrated_url(social_postgres_url: str) -> str:
+    from tc_runtime.migrate import upgrade_to_head
+
+    from social_data.runtime import MIGRATIONS
+
+    upgrade_to_head(MIGRATIONS, sqlalchemy_url(social_postgres_url))
+    return social_postgres_url
 
 
 @pytest.fixture(scope="session")
@@ -156,6 +174,7 @@ def workbench_env(
     agent_migrated_url: str,
     teams_migrated_url: str,
     polymarket_migrated_url: str,
+    social_migrated_url: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The smallest environment `workbench.app` will start in: everything the process refuses to start
@@ -163,6 +182,10 @@ def workbench_env(
     monkeypatch.setenv("AGENT_DATABASE_URL", agent_migrated_url)
     monkeypatch.setenv("TEAMS_DATABASE_URL", teams_migrated_url)
     monkeypatch.setenv("POLYMARKET_DATABASE_URL", polymarket_migrated_url)
+    monkeypatch.setenv("SOCIAL_DATABASE_URL", social_migrated_url)
+    # The post archive's first pass runs the moment the process starts; pointed at a closed loopback port it
+    # fails fast and logs, and no test here reaches a public feed.
+    monkeypatch.setenv("SOCIAL_TRUTH_SOCIAL_FEED_URL", "http://127.0.0.1:9/feed")
     monkeypatch.setenv("AGENT_OPENAI_API_KEY", "key")
     monkeypatch.setenv("TEAMS_OPENAI_API_KEY", "another-key")
     monkeypatch.setenv("AGENT_MODELS", WORKBENCH_MODELS)

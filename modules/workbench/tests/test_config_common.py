@@ -132,7 +132,7 @@ def test_a_missing_database_url_names_itself(surface: str) -> None:
 
 
 @pytest.fixture(
-    params=["market_mcp", "trading_mcp", "social_mcp", "telegram_mcp", "strategy_mcp"]
+    params=["market_mcp", "trading_mcp", "telegram_mcp", "strategy_mcp"]
 )
 def server(request: pytest.FixtureRequest) -> str:
     return request.param

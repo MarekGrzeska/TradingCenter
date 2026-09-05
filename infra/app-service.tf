@@ -20,7 +20,6 @@ locals {
     "market-data"      = local.market_data_app_name
     "workbench"        = local.workbench_app_name
     "trading-mcp"      = local.trading_mcp_app_name
-    "social-data"      = local.social_data_app_name
     "strategy"         = local.strategy_app_name
     "telegram-gateway" = local.telegram_gateway_app_name
   }
@@ -33,7 +32,6 @@ locals {
   trading_mcp_app_name = "app-tradingcenter-trading-mcp"
   # Named after the module from the first day, which is the one thing `workbench_app_name` above cannot be — a
   # rename later is a new identity, a new Postgres role and an edit in every module that names the old one.
-  social_data_app_name      = "app-tradingcenter-social-data"
   strategy_app_name         = "app-tradingcenter-strategy"
   telegram_gateway_app_name = "app-tradingcenter-telegram-gateway"
 
@@ -43,7 +41,6 @@ locals {
   market_data_hostname      = "${local.market_data_app_name}.azurewebsites.net"
   workbench_hostname        = "${local.workbench_app_name}.azurewebsites.net"
   trading_mcp_hostname      = "${local.trading_mcp_app_name}.azurewebsites.net"
-  social_data_hostname      = "${local.social_data_app_name}.azurewebsites.net"
   strategy_hostname         = "${local.strategy_app_name}.azurewebsites.net"
   telegram_gateway_hostname = "${local.telegram_gateway_app_name}.azurewebsites.net"
 
@@ -59,13 +56,8 @@ locals {
   # scope: its only caller presents a client-credentials token, and there is nobody to consent on whose behalf.
   trading_mcp_api_uri = "api://tradingcenter-trading-mcp"
 
-  # The same shape for the prediction-market archive, and with a delegated scope too: the workbench reaches it
-  # with a managed identity and the terminal as a person, so its door is asked to recognise both.
-
-  # The post archive's own audience, with a delegated scope for polymarket-data's reason: the workbench reaches it
-  # with a managed identity and both screens reach it as the operator, so its door recognises both.
-  social_data_api_uri   = "api://tradingcenter-social-data"
-  social_data_api_scope = "access_as_user"
+  # No audience of their own for the two archives: both are packages of the workbench since
+  # `one-process-per-security-boundary`, and the workbench's audience is theirs.
 
   # The strategy platform's own audience, without a delegated scope for the reason trading-mcp has none: its
   # callers are backend services presenting client credentials.
@@ -446,103 +438,123 @@ resource "azurerm_linux_web_app" "workbench" {
     }
   }
 
-  app_settings = {
-    # **Two databases, one identity.** No credential in either URL and no AZURE_CLIENT_* triple. One DATABASE_USER for
-    # both, so that role has to exist in *both* databases — the single operator step this merge carries.
-    AGENT_DATABASE_URL = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.agent.name}?sslmode=require"
-    TEAMS_DATABASE_URL = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.teams.name}?sslmode=require"
-    DATABASE_USER      = local.workbench_app_name
+  # Merged, because the gateway trio is the setting whose *absence* is a working configuration: without it the
+  # post archive collects and reads exactly as before and tells nobody, which `/social/state` reports.
+  app_settings = merge(
+    {
+      # **Two databases, one identity.** No credential in either URL and no AZURE_CLIENT_* triple. One DATABASE_USER for
+      # both, so that role has to exist in *both* databases — the single operator step this merge carries.
+      AGENT_DATABASE_URL = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.agent.name}?sslmode=require"
+      TEAMS_DATABASE_URL = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.teams.name}?sslmode=require"
+      DATABASE_USER      = local.workbench_app_name
 
-    # This module's share of the server's 35 connections — four for **each** of this process's two pools, so eight of the server's 35 — a turn holds one connection while the model answers.
-    # The whole budget is one number, checked by `scripts/tests/test_pool_budget.py`.
-    DATABASE_POOL_SIZE = "4"
+      # This module's share of the server's 35 connections — four for **each** of this process's two pools, so eight of the server's 35 — a turn holds one connection while the model answers.
+      # The whole budget is one number, checked by `scripts/tests/test_pool_budget.py`.
+      DATABASE_POOL_SIZE = "4"
 
-    # The one credential no identity can replace: OpenAI is not in Entra. Key Vault references rather than literals, so
-    # neither value enters state or a log — and **two keys still**, so the teams experiments bill on their own line.
-    AGENT_OPENAI_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.openai_api_key})"
-    TEAMS_OPENAI_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.teams_openai_api_key})"
+      # The one credential no identity can replace: OpenAI is not in Entra. Key Vault references rather than literals, so
+      # neither value enters state or a log — and **two keys still**, so the teams experiments bill on their own line.
+      AGENT_OPENAI_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.openai_api_key})"
+      TEAMS_OPENAI_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.teams_openai_api_key})"
 
-    # Two catalogues from two variables. Nothing in this root creates these models; the variables exist so a fourth
-    # entry is one line here. No TEAMS_DEFAULT_MODEL_ID, because every agent in a saved revision names its own model.
-    AGENT_MODELS = jsonencode([
-      for id, m in var.agent_models : {
-        id                 = id
-        model              = m.model
-        display_name       = m.display_name
-        cost_rank          = m.cost_rank
-        input_rate_per_1m  = m.input_rate_per_1m
-        output_rate_per_1m = m.output_rate_per_1m
-      }
-    ])
-    TEAMS_MODELS = jsonencode([
-      for id, m in var.teams_models : {
-        id                 = id
-        model              = m.model
-        display_name       = m.display_name
-        cost_rank          = m.cost_rank
-        input_rate_per_1m  = m.input_rate_per_1m
-        output_rate_per_1m = m.output_rate_per_1m
-      }
-    ])
-    # The cheapest entry — same choice `.env.example` documents: "Domyślny model to
-    # najtańszy (Luna); najdroższy wybiera się świadomie."
-    AGENT_DEFAULT_MODEL_ID = "gpt-5.6-luna"
+      # Two catalogues from two variables. Nothing in this root creates these models; the variables exist so a fourth
+      # entry is one line here. No TEAMS_DEFAULT_MODEL_ID, because every agent in a saved revision names its own model.
+      AGENT_MODELS = jsonencode([
+        for id, m in var.agent_models : {
+          id                 = id
+          model              = m.model
+          display_name       = m.display_name
+          cost_rank          = m.cost_rank
+          input_rate_per_1m  = m.input_rate_per_1m
+          output_rate_per_1m = m.output_rate_per_1m
+        }
+      ])
+      TEAMS_MODELS = jsonencode([
+        for id, m in var.teams_models : {
+          id                 = id
+          model              = m.model
+          display_name       = m.display_name
+          cost_rank          = m.cost_rank
+          input_rate_per_1m  = m.input_rate_per_1m
+          output_rate_per_1m = m.output_rate_per_1m
+        }
+      ])
+      # The cheapest entry — same choice `.env.example` documents: "Domyślny model to
+      # najtańszy (Luna); najdroższy wybiera się świadomie."
+      AGENT_DEFAULT_MODEL_ID = "gpt-5.6-luna"
 
-    # The read tool server, which is **market-data itself** since `market-mcp-into-market-data`; the setting keeps its
-    # name because the address moved, not the relationship. Removing it is the rollback for the whole tool loop.
-    MARKET_MCP_URL   = "https://${local.market_data_hostname}"
-    MARKET_MCP_SCOPE = "${local.market_data_api_uri}/.default"
+      # The read tool server, which is **market-data itself** since `market-mcp-into-market-data`; the setting keeps its
+      # name because the address moved, not the relationship. Removing it is the rollback for the whole tool loop.
+      MARKET_MCP_URL   = "https://${local.market_data_hostname}"
+      MARKET_MCP_SCOPE = "${local.market_data_api_uri}/.default"
 
-    # There is no TEAMS_MCP_URL any more. The tools that build and run teams are a layer in
-    # this process — no address, no scope, no second hop, and nothing to set last.
+      # There is no TEAMS_MCP_URL any more. The tools that build and run teams are a layer in
+      # this process — no address, no scope, no second hop, and nothing to set last.
 
-    # The second tool server — the demo account — under the same both-or-neither rule, and the one with the larger
-    # consequence, since four of its tools write. It works only alongside trading-mcp's own `allowed_applications`.
-    TRADING_MCP_URL   = "https://${local.trading_mcp_hostname}"
-    TRADING_MCP_SCOPE = "${local.trading_mcp_api_uri}/.default"
+      # The second tool server — the demo account — under the same both-or-neither rule, and the one with the larger
+      # consequence, since four of its tools write. It works only alongside trading-mcp's own `allowed_applications`.
+      TRADING_MCP_URL   = "https://${local.trading_mcp_hostname}"
+      TRADING_MCP_SCOPE = "${local.trading_mcp_api_uri}/.default"
 
-    # No POLYMARKET_MCP_URL: the prediction-market archive is a package of this process since
-    # `one-process-per-security-boundary`, served under `/polymarket`. Its database, under its own name, and the
-    # two lists its route record reads. The tool list is empty on purpose — nothing outside this process calls
-    # `/polymarket/mcp`; the conversation calls those tools as functions.
-    POLYMARKET_DATABASE_URL       = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.polymarket.name}?sslmode=require"
-    POLYMARKET_DATABASE_POOL_SIZE = "3"
-    POLYMARKET_GAMMA_BASE_URL     = "https://gamma-api.polymarket.com"
-    POLYMARKET_CLOB_BASE_URL      = "https://clob.polymarket.com"
-    # Measured, not decorative: the provider's edge refuses `Python-urllib/*` with 403 "error code: 1010" on both
-    # surfaces (22 August 2026), and a library default changing on a bump would read as an access refusal.
-    POLYMARKET_PROVIDER_USER_AGENT = "tradingcenter-polymarket-data/0.1 (+https://github.com/MarekGrzeska)"
-    TOOL_CALLER_APPLICATION_IDS    = ""
-    REST_CALLER_APPLICATION_IDS = join(",", [
-      azuread_application.terminal.client_id,
-      azuread_application.pocket.client_id,
-    ])
-    # The fourth, same rule and same rollback — clear this pair and restart, and the conversation runs without
-    # post tools, which is a state its own tests walk.
-    SOCIAL_MCP_URL   = "https://${local.social_data_hostname}"
-    SOCIAL_MCP_SCOPE = "${local.social_data_api_uri}/.default"
+      # No POLYMARKET_MCP_URL: the prediction-market archive is a package of this process since
+      # `one-process-per-security-boundary`, served under `/polymarket`. Its database, under its own name, and the
+      # two lists its route record reads. The tool list is empty on purpose — nothing outside this process calls
+      # `/polymarket/mcp`; the conversation calls those tools as functions.
+      POLYMARKET_DATABASE_URL       = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.polymarket.name}?sslmode=require"
+      POLYMARKET_DATABASE_POOL_SIZE = "3"
+      POLYMARKET_GAMMA_BASE_URL     = "https://gamma-api.polymarket.com"
+      POLYMARKET_CLOB_BASE_URL      = "https://clob.polymarket.com"
+      # Measured, not decorative: the provider's edge refuses `Python-urllib/*` with 403 "error code: 1010" on both
+      # surfaces (22 August 2026), and a library default changing on a bump would read as an access refusal.
+      POLYMARKET_PROVIDER_USER_AGENT = "tradingcenter-polymarket-data/0.1 (+https://github.com/MarekGrzeska)"
+      TOOL_CALLER_APPLICATION_IDS    = ""
+      REST_CALLER_APPLICATION_IDS = join(",", [
+        azuread_application.terminal.client_id,
+        azuread_application.pocket.client_id,
+      ])
+      # No SOCIAL_MCP_URL either: the post archive is the second package of this process, served under `/social`.
+      # Its database under its own name, and what is the archive's alone under `SOCIAL_`; it shares the two caller
+      # lists above with the prediction-market archive, since both route records read the same two.
+      SOCIAL_DATABASE_URL       = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.social.name}?sslmode=require"
+      SOCIAL_DATABASE_POOL_SIZE = "3"
+      # The feed, set here rather than left to the package's default for the reason every other upstream address is:
+      # it is somebody's side project, and the day it moves is a deployment.
+      SOCIAL_TRUTH_SOCIAL_FEED_URL = "https://www.trumpstruth.org/feed"
+      SOCIAL_PROVIDER_USER_AGENT   = "tradingcenter-social-data/0.1 (+https://github.com/MarekGrzeska)"
+      # The conversation's key, the same Key Vault reference as AGENT_OPENAI_API_KEY above — shared rather than a
+      # third secret, so the readings bill on the same line as the chat. Clearing it is the rollback: the archive
+      # then collects and reads nothing, a state its own tests walk. Which model reads a post stays the package's default.
+      SOCIAL_OPENAI_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.openai_api_key})"
 
-    # The fifth, and the one whose tool acts outside this system: it sends a Telegram message. Same both-or-neither
-    # rule and the same rollback — clear the pair and restart, and the conversation notifies nobody.
-    TELEGRAM_MCP_URL   = "https://${local.telegram_gateway_hostname}"
-    TELEGRAM_MCP_SCOPE = "${local.telegram_gateway_api_uri}/.default"
+      # The third tool server, and the one whose tool acts outside this system: it sends a Telegram message. Same both-or-neither
+      # rule and the same rollback — clear the pair and restart, and the conversation notifies nobody.
+      TELEGRAM_MCP_URL   = "https://${local.telegram_gateway_hostname}"
+      TELEGRAM_MCP_SCOPE = "${local.telegram_gateway_api_uri}/.default"
 
-    # The sixth, and the one the teams' clock reads: `pending_setups` is the number a trigger wakes a team on. The
-    # other half of this pairing — the workbench in strategy's `allowed_applications` and TOOL_CALLER_APPLICATION_IDS —
-    # has stood since `the-screen-is-mostly-refusals`; this pair is what was missing. Same rollback: clear and restart.
-    STRATEGY_MCP_URL   = "https://${local.strategy_hostname}"
-    STRATEGY_MCP_SCOPE = "${local.strategy_api_uri}/.default"
+      # The fourth, and the one the teams' clock reads: `pending_setups` is the number a trigger wakes a team on. The
+      # other half of this pairing — the workbench in strategy's `allowed_applications` and TOOL_CALLER_APPLICATION_IDS —
+      # has stood since `the-screen-is-mostly-refusals`; this pair is what was missing. Same rollback: clear and restart.
+      STRATEGY_MCP_URL   = "https://${local.strategy_hostname}"
+      STRATEGY_MCP_SCOPE = "${local.strategy_api_uri}/.default"
 
-    # The teams surface's own clock, in this app's `lifespan` rather than a timer calling in, which would need its own
-    # registration. **The one setting here whose value is a decision**: config.py defaults it on, this states it.
-    SCHEDULER_ENABLED = "true"
+      # The teams surface's own clock, in this app's `lifespan` rather than a timer calling in, which would need its own
+      # registration. **The one setting here whose value is a decision**: config.py defaults it on, this states it.
+      SCHEDULER_ENABLED = "true"
 
-    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.workbench_easy_auth.password
+      MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.workbench_easy_auth.password
 
-    REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
+      REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
 
-    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
-  }
+      APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
+    },
+    # All three or none — the archive's own settings refuse every partial form, because each of them is silence
+    # that reads like a working configuration. Unprefixed: strategy will read the same door when it joins.
+    var.telegram_alert_destination == "" ? {} : {
+      TELEGRAM_GATEWAY_URL   = "https://${local.telegram_gateway_hostname}"
+      TELEGRAM_GATEWAY_SCOPE = "${local.telegram_gateway_api_uri}/.default"
+      ALERT_DESTINATION      = var.telegram_alert_destination
+    }
+  )
 
   lifecycle {
     ignore_changes = [site_config[0].application_stack[0].docker_image_name]
@@ -557,7 +569,6 @@ locals {
     "market-data"      = azurerm_linux_web_app.market_data.identity[0].principal_id
     "workbench"        = azurerm_linux_web_app.workbench.identity[0].principal_id
     "trading-mcp"      = azurerm_linux_web_app.trading_mcp.identity[0].principal_id
-    "social-data"      = azurerm_linux_web_app.social_data.identity[0].principal_id
     "strategy"         = azurerm_linux_web_app.strategy.identity[0].principal_id
     "telegram-gateway" = azurerm_linux_web_app.telegram_gateway.identity[0].principal_id
   }
@@ -722,160 +733,6 @@ output "trading_mcp_hostname" {
 
 
 
-# social-data: the same door as polymarket-data, and one difference behind it — **nothing on either surface writes**.
-# What the record separates is which caller reaches which surface, not what either may change.
-module "social_data_easy_auth" {
-  source = "./modules/easy-auth-app"
-
-  display_name   = "app-tradingcenter-social-data-easyauth"
-  identifier_uri = local.social_data_api_uri
-  redirect_uri   = "https://${local.social_data_hostname}/.auth/login/aad/callback"
-
-  scope = {
-    value                      = local.social_data_api_scope
-    admin_consent_display_name = "Read the post archive"
-    admin_consent_description  = "Allows the app to read collected posts and what a model made of them."
-    user_consent_display_name  = "Read your post archive"
-    user_consent_description   = "Allows the app to read the posts this system has collected for you."
-  }
-}
-
-resource "azurerm_linux_web_app" "social_data" {
-  name                = local.social_data_app_name
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
-  service_plan_id     = azurerm_service_plan.main.id
-  https_only          = true
-
-  # The database through an Entra token fetched at connection time, and the GHCR pull token in Key Vault. The
-  # feed needs no credential, and the model key is a setting rather than an identity.
-  identity {
-    type = "SystemAssigned"
-  }
-
-  site_config {
-    always_on = true
-
-    # **The preflight is answered by the platform, never by the app** — the fifth time this trap has been walked
-    # into. This module MUST NOT add a middleware of its own: two layers double the header.
-    cors {
-      allowed_origins     = [local.terminal_origin, local.pocket_origin]
-      support_credentials = false
-    }
-
-    application_stack {
-      # Placeholder — `deploy-social-data.yml` pushes the real GHCR image; the
-      # lifecycle block below is what stops Terraform reverting it.
-      docker_image_name = "mcr.microsoft.com/appsvc/staticsite:latest"
-
-      docker_registry_url      = local.ghcr_registry_url
-      docker_registry_username = local.ghcr_registry_username
-      docker_registry_password = local.ghcr_registry_password
-    }
-  }
-
-  auth_settings_v2 {
-    auth_enabled           = true
-    require_authentication = true
-    unauthenticated_action = "Return401"
-    default_provider       = "azureactivedirectory"
-
-    # The health route and nothing else — the platform restarts the container off this response and speaks no
-    # Easy Auth, and `deploy_probe.py` reads the same path. It names the module and nothing it has collected.
-    excluded_paths = ["/"]
-
-    active_directory_v2 {
-      client_id                  = module.social_data_easy_auth.client_id
-      tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
-      client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
-
-      allowed_audiences = [
-        local.social_data_api_uri,
-        module.social_data_easy_auth.client_id,
-      ]
-
-      # Three callers, each reaching exactly one surface — the workbench the four tools at `/mcp`, the terminal
-      # and pocket the REST contract. Being on this list is not what separates them; the settings below are.
-      allowed_applications = [
-        data.azuread_service_principal.workbench_managed_identity.client_id,
-        azuread_application.terminal.client_id,
-        azuread_application.pocket.client_id,
-      ]
-    }
-
-    login {
-      token_store_enabled = true
-    }
-  }
-
-  # Merged, because the gateway is the setting whose *absence* is a working configuration: without it this
-  # module collects and reads exactly as before and tells nobody, which `/state` reports.
-  app_settings = merge(
-    {
-      # No credential in the URL and no AZURE_* triple — config.py refuses one when DATABASE_USER is set, and the
-      # identity is ambient. That user is the role `scripts/grant-schema-ownership.sql` creates, named after this app.
-      DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.social.name}?sslmode=require"
-      DATABASE_USER = local.social_data_app_name
-
-      # This module's share of the server's 35 connections — collecting is one pass, and nothing here writes on a request.
-      # The whole budget is one number, checked by `scripts/tests/test_pool_budget.py`.
-      DATABASE_POOL_SIZE = "3"
-
-      # The feed, set here rather than left to the module's default for the reason every other upstream address is:
-      # it is somebody's side project, and the day it moves is a deployment.
-      TRUTH_SOCIAL_FEED_URL = "https://www.trumpstruth.org/feed"
-      PROVIDER_USER_AGENT   = "tradingcenter-social-data/0.1 (+https://github.com/MarekGrzeska)"
-
-      # The conversation's key, read from Key Vault like the workbench reads its two — a reference, never a value in
-      # this file. **Shared rather than a third secret**, so the readings arrive on the same line of the bill as the
-      # chat; splitting them is one more `key_vault_secret_names` entry and one edit here, the day that matters.
-      OPENAI_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.openai_api_key})"
-
-      # Left to config.py's defaults on purpose: which model reads a post is a decision to change by restarting,
-      # not one to redeploy for. Clearing OPENAI_API_KEY is the rollback — the module then collects and reads
-      # nothing, a state its own tests walk.
-
-      MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.social_data_easy_auth.password
-
-      # The module checks the caller's identity itself rather than trusting the block above is switched on.
-      REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
-
-      # Which caller reaches which surface, by the `azp` claim and never by `X-MS-CLIENT-PRINCIPAL-ID`.
-      TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
-      REST_CALLER_APPLICATION_IDS = join(",", [
-        azuread_application.terminal.client_id,
-        azuread_application.pocket.client_id,
-      ])
-
-      APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
-    },
-    # All three or none — config.py refuses every partial form, because each of them is silence that reads
-    # like a working configuration. The threshold is left to config.py's own default.
-    var.telegram_alert_destination == "" ? {} : {
-      TELEGRAM_GATEWAY_URL   = "https://${local.telegram_gateway_hostname}"
-      TELEGRAM_GATEWAY_SCOPE = "${local.telegram_gateway_api_uri}/.default"
-      ALERT_DESTINATION      = var.telegram_alert_destination
-    }
-  )
-
-  lifecycle {
-    ignore_changes = [site_config[0].application_stack[0].docker_image_name]
-  }
-}
-
-output "social_data_hostname" {
-  value = azurerm_linux_web_app.social_data.default_hostname
-}
-
-output "terminal_entra_scope_social" {
-  description = "The scope the terminal and pocket ask for when they want a token for social-data. Carried as a literal by both deploy workflows, like every other scope here."
-  value       = "${local.social_data_api_uri}/${local.social_data_api_scope}"
-}
-
-output "social_data_managed_identity_principal_id" {
-  description = "The operator's one-off Postgres role creation in the `social` database needs this object id (scripts/grant-schema-ownership.sql)."
-  value       = azurerm_linux_web_app.social_data.identity[0].principal_id
-}
 
 
 
@@ -1042,10 +899,6 @@ output "strategy_managed_identity_principal_id" {
 # The eighth app, and the third whose callers are all programs — but the first with no browser among them at all: this
 # module has no screen, because the notification is the screen. **The eighth tenant on one B3 plan** is the thing to
 # watch; `plan_memory` alerts at 92%, and a module here weighs 150-310 MB.
-data "azuread_service_principal" "social_data_managed_identity" {
-  object_id = azurerm_linux_web_app.social_data.identity[0].principal_id
-}
-
 module "telegram_gateway_easy_auth" {
   source = "./modules/easy-auth-app"
 
@@ -1117,11 +970,11 @@ resource "azurerm_linux_web_app" "telegram_gateway" {
         module.telegram_gateway_easy_auth.client_id,
       ]
 
-      # Three callers, and the split between them is not reading from writing — all three send. It is that creating
+      # Three callers, and the split between them is not reading from writing — all of them send. It is that creating
       # a bot and binding a destination are REST alone, which the two settings below are what actually say.
       allowed_applications = [
+        # The workbench twice over: its conversation sends over `/mcp`, and its post archive over REST.
         data.azuread_service_principal.workbench_managed_identity.client_id,
-        data.azuread_service_principal.social_data_managed_identity.client_id,
         data.azuread_service_principal.strategy_managed_identity.client_id,
         # The operator, through `az`. Not a module, and the only one of the four that is a person — the two routes
         # it exists for are the ones a managed identity must never reach: adopting a bot and binding a destination.
@@ -1160,7 +1013,8 @@ resource "azurerm_linux_web_app" "telegram_gateway" {
       # principal-id header, which for a delegated token names the signed-in person.
       TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
       REST_CALLER_APPLICATION_IDS = join(",", [
-        data.azuread_service_principal.social_data_managed_identity.client_id,
+        # The post archive, which is the workbench's identity since `one-process-per-security-boundary`.
+        data.azuread_service_principal.workbench_managed_identity.client_id,
         data.azuread_service_principal.strategy_managed_identity.client_id,
         # Easy Auth admits an application; this is what lets that application reach these routes. Both are needed
         # and neither substitutes for the other — `caller_access.py` refuses on this list alone.
@@ -1189,7 +1043,7 @@ output "telegram_gateway_hostname" {
 }
 
 output "telegram_gateway_scope" {
-  description = "What a caller asks Entra for when it wants a token for the gateway. Carried as a literal by social-data's and strategy's settings, like every other scope here."
+  description = "What a caller asks Entra for when it wants a token for the gateway. Carried as a literal by the workbench's and strategy's settings, like every other scope here."
   value       = "${local.telegram_gateway_api_uri}/.default"
 }
 

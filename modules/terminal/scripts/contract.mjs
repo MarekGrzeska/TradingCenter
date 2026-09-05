@@ -67,7 +67,7 @@ const SOURCES = [
   },
   {
     name: "social-data",
-    moduleDir: resolve(terminal, "..", "social-data"),
+    moduleDir: resolve(terminal, "..", "workbench"),
     pythonModule: "social_data.openapi",
     output: join(terminal, "src", "data", "contract.social.generated.ts"),
     banner: `/**
