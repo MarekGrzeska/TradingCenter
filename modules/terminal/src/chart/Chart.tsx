@@ -191,7 +191,8 @@ export function Chart({
   // The header takes the hook's return whole; what the chart itself needs from it is
   // these five, all of them for drawing rather than for rendering.
   const { indicatorsState, catalogueById, instanceColors, readoutAssignment } = indicators;
-  const { syncIndicatorWindowRef, clearIndicatorWindow } = indicators;
+  const { syncIndicatorWindowRef, holdIndicatorWindow, releaseIndicatorWindow, clearIndicatorWindow } =
+    indicators;
 
   // Declared up here rather than with the rest of the focus refs, because the chart-instance call reads
   // it during render and a ref read during render must already exist.
@@ -335,7 +336,7 @@ export function Chart({
    * Redraw the whole series, keeping the operator on the same candles: `setData` keeps the visible *logical*
    * range, so every bar merged in at the front slides the frame right. Undefined means nothing was drawn yet.
    */
-  const redraw = useCallback((merged: Bar[], previousFirstTime: number | undefined) => {
+  const redraw = useCallback((merged: Bar[], previousFirstTime: number | undefined, syncIndicators = true) => {
     const timeScale = chartRef.current?.timeScale();
     const range = timeScale?.getVisibleLogicalRange() ?? null;
 
@@ -378,9 +379,9 @@ export function Chart({
     }
     };
     reframe();
-    // Structural change to what is drawn — recompute, whatever the frame did.
-    // Not on every live tick: `applyBar`'s hot path never calls `redraw`.
-    syncIndicatorWindowRef.current(true);
+    // Structural change to what is drawn — recompute, whatever the frame did. Not on every live tick:
+    // `applyBar`'s hot path never calls `redraw`. And not per page of older history: the pager says when.
+    if (syncIndicators) syncIndicatorWindowRef.current(true);
   }, [resolution, syncIndicatorWindowRef]);
 
   const applyHistory = useCallback(
@@ -408,7 +409,8 @@ export function Chart({
       const previousFirstTime = barsRef.current[0]?.time;
       const merged = mergeSeries(barsRef.current, bars);
       barsRef.current = merged;
-      redraw(merged, previousFirstTime);
+      holdIndicatorWindow();
+      redraw(merged, previousFirstTime, false);
 
       // Checked here rather than by watching `older.status`: a `"loading"` render is not guaranteed to
       // commit, since React may batch it away with the `"idle"` that follows a fast answer.
@@ -421,7 +423,7 @@ export function Chart({
         if (reached || noProgress) settlePendingFocus(pending);
       }
     },
-    [redraw, settlePendingFocus, pendingFocusRef],
+    [redraw, settlePendingFocus, pendingFocusRef, holdIndicatorWindow],
   );
 
   const applyBar = useCallback((bar: Bar) => {
@@ -467,8 +469,9 @@ export function Chart({
         const pending = pendingFocusRef.current;
         if (pending) settlePendingFocus(pending);
       },
+      settled: releaseIndicatorWindow,
     }),
-    [applyOlder, settlePendingFocus, pendingFocusRef],
+    [applyOlder, settlePendingFocus, pendingFocusRef, releaseIndicatorWindow],
   );
 
   // Changing symbol, resolution *or source* must not leave the previous series on screen. Source matters

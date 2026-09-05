@@ -413,6 +413,40 @@ describe("Chart — older history (terminal-chart spec)", () => {
     expect(source.historyCalls).toHaveLength(1);
   });
 
+  it("reads the indicators once after a run of pages, not once per page", async () => {
+    // One drag to the edge pages up to twenty times, and every page changes what is drawn. Reading the
+    // indicators after each was 42 reads a minute on production, all but the last aborted by the next.
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    source.holdHistory = true;
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ key: "ema", id: "ema", params: { period: 20 }, color: null }],
+    });
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+
+    await act(async () => {
+      stub.latest().pan({ from: -5, to: 30 });
+    });
+    expect(indicators.computeCalls.map((c) => [c.from, c.to])).toEqual([[100, 220]]);
+    // Two candles do not fill the margin, so the pager asks again — and nothing is read in between.
+    await act(async () => {
+      source.releaseHistory(olderPage(2));
+    });
+    expect(source.historyCalls).toHaveLength(2);
+    expect(indicators.computeCalls).toHaveLength(1);
+    await act(async () => {
+      source.releaseHistory(olderPage(60));
+    });
+
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(2));
+    expect(source.historyCalls).toHaveLength(2);
+    expect(indicators.computeCalls[1].from).toBeLessThan(indicators.computeCalls[0].from);
+  });
+
   it("keeps paging when a page is too small to fill the margin", async () => {
     // The bug this replaced: the chart compared logical indices across a series that had just grown at
     // the front, so after a page or two the comparison could not be satisfied and paging stopped.

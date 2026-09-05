@@ -16,6 +16,9 @@ export interface OlderBarsReader {
   /** `MAX_PAGES` ran out before the caller's appetite did. Distinct from `"exhausted"` on purpose:
    *  a run that gave up ends in `"idle"` like any other, leaving whoever waited on that history waiting. */
   stoppedShort?(): void;
+  /** The run is over, however it ended: what `deliver` merged is now the whole of it. The one moment
+   *  to recompute over the series — after every page was 42 indicator reads a minute, all but one aborted. */
+  settled?(): void;
 }
 
 export interface OlderBars {
@@ -160,7 +163,10 @@ export function useOlderBars(
       setError(cause instanceof Error ? cause.message : "could not read older candles");
       setStatus("error");
     } finally {
-      if (generation === generationRef.current) busyRef.current = false;
+      if (generation === generationRef.current) {
+        busyRef.current = false;
+        readerRef.current.settled?.();
+      }
     }
   }, [source, symbol, resolution]);
 
@@ -205,7 +211,10 @@ export function useOlderBars(
         setError(cause instanceof Error ? cause.message : "could not read older candles");
         setStatus("error");
       } finally {
-        if (generation === generationRef.current) busyRef.current = false;
+        if (generation === generationRef.current) {
+        busyRef.current = false;
+        readerRef.current.settled?.();
+      }
       }
     },
     [source, symbol, resolution],
