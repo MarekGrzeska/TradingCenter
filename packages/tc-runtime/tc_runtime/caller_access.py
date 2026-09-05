@@ -114,6 +114,17 @@ class Record:
         return None
 
 
+def path_within(scope: Scope) -> str:
+    """The path as the application it guards sees it. Under a Starlette `Mount` (0.33 and later) `path` stays
+    whole and the prefix goes to `root_path`; a record written for the application alone reads the remainder.
+    Measured on 5 September 2026: every archive route refused with 403 the morning the archives were mounted."""
+    path = scope.get("path", "")
+    root = scope.get("root_path", "")
+    if root and path.startswith(root):
+        return path[len(root):] or "/"
+    return path
+
+
 class CallerAccess:
     """The record, applied in front of the whole application. Holds `app.state` rather than a
     `Settings`: this is built while `create_app()` runs, and the lifespan fills the state later."""
@@ -128,7 +139,7 @@ class CallerAccess:
             await self._app(scope, receive, send)
             return
 
-        path = scope.get("path", "")
+        path = path_within(scope)
         surface = self._record.surface_for(path)
 
         if surface is None:

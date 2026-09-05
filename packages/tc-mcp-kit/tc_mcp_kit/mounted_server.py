@@ -77,7 +77,9 @@ class ToolSurfaceAddress:
         self._app = app
 
     async def __call__(self, scope, receive, send) -> None:
-        if scope["type"] == "http" and scope.get("path") == MOUNT_PATH:
-            with_slash = f"{MOUNT_PATH}/"
+        # `root_path` is the prefix a host mounted this application under, and Starlette leaves it in `path`.
+        root = scope.get("root_path", "") if scope["type"] == "http" else ""
+        if scope["type"] == "http" and scope.get("path") == f"{root}{MOUNT_PATH}":
+            with_slash = f"{root}{MOUNT_PATH}/"
             scope = {**scope, "path": with_slash, "raw_path": with_slash.encode()}
         await self._app(scope, receive, send)
