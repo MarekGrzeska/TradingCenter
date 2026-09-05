@@ -98,15 +98,8 @@ resource "azuread_application_pre_authorized" "workbench_terminal" {
   permission_ids       = [module.workbench_easy_auth.scope_id]
 }
 
-# The fourth, and the first in use on the day it is written: the three above stood ready from August, because the
-# terminal asked for market-data's scope and presented that token everywhere. It asks by name for all four now.
-resource "azuread_application_pre_authorized" "polymarket_data_terminal" {
-  application_id       = module.polymarket_data_easy_auth.application_id
-  authorized_client_id = azuread_application.terminal.client_id
-  permission_ids       = [module.polymarket_data_easy_auth.scope_id]
-}
 
-# The fifth, and it stands ready rather than in use for the reason the first three did: a `resource_access.id` must
+# It stands ready rather than in use for the reason the first three did: a `resource_access.id` must
 # be concrete at plan time, so the terminal's registration cannot name a scope this same apply creates.
 resource "azuread_application_pre_authorized" "social_data_terminal" {
   application_id       = module.social_data_easy_auth.application_id
@@ -151,17 +144,9 @@ resource "azuread_application" "pocket" {
     redirect_uris = ["${local.pocket_origin}/"]
   }
 
-  required_resource_access {
-    resource_app_id = module.polymarket_data_easy_auth.client_id
 
-    resource_access {
-      id   = module.polymarket_data_easy_auth.scope_id
-      type = "Scope"
-    }
-  }
-
-  # The second, and the only other one it will ask for: the conversation. A token minted for the archive is never
-  # sent here, so the agent tab has an audience of its own or goes without — `data/config.ts` refuses to borrow.
+  # One API: the workbench, which serves the conversation and — since `one-process-per-security-boundary` — the
+  # prediction-market archive under `/polymarket`, so one token reaches both.
   required_resource_access {
     resource_app_id = module.workbench_easy_auth.client_id
 
@@ -176,13 +161,6 @@ resource "azuread_service_principal" "pocket" {
   client_id = azuread_application.pocket.client_id
 }
 
-# Consent decided here rather than on a screen, for the terminal's reason: otherwise the operator is asked whether they
-# agree to give their own phone screen access to their own archive — a question with one sensible answer.
-resource "azuread_application_pre_authorized" "polymarket_data_pocket" {
-  application_id       = module.polymarket_data_easy_auth.application_id
-  authorized_client_id = azuread_application.pocket.client_id
-  permission_ids       = [module.polymarket_data_easy_auth.scope_id]
-}
 
 # The post archive's, for the same reason: a phone asked to consent mid-glance is a phone put back in a pocket.
 resource "azuread_application_pre_authorized" "social_data_pocket" {
@@ -207,7 +185,7 @@ output "pocket_entra_client_id" {
 }
 
 output "pocket_origin" {
-  description = "Where the phone screen is served — the redirect URI above, the origin polymarket-data's CORS allows, and what deploy-pocket.yml smoke-checks."
+  description = "Where the phone screen is served — the redirect URI above, the origin the workbench's CORS allows, and what deploy-pocket.yml smoke-checks."
   value       = local.pocket_origin
 }
 

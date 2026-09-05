@@ -102,6 +102,24 @@ def teams_postgres_url() -> Iterator[str]:
 
 
 @pytest.fixture(scope="session")
+def polymarket_postgres_url() -> Iterator[str]:
+    from testcontainers.community.postgres import PostgresContainer
+
+    with PostgresContainer("postgres:17-alpine", driver=None) as pg:
+        yield pg.get_connection_url()
+
+
+@pytest.fixture(scope="session")
+def polymarket_migrated_url(polymarket_postgres_url: str) -> str:
+    from tc_runtime.migrate import upgrade_to_head
+
+    from polymarket_data.runtime import MIGRATIONS
+
+    upgrade_to_head(MIGRATIONS, sqlalchemy_url(polymarket_postgres_url))
+    return polymarket_postgres_url
+
+
+@pytest.fixture(scope="session")
 def agent_migrated_url(agent_postgres_url: str) -> str:
     """The same database with the conversation's migrations applied — through the same function the process
     runs at startup, so the schema under test is the one a deployment actually applies."""
@@ -135,12 +153,16 @@ WORKBENCH_MODELS = (
 
 @pytest.fixture
 def workbench_env(
-    agent_migrated_url: str, teams_migrated_url: str, monkeypatch: pytest.MonkeyPatch
+    agent_migrated_url: str,
+    teams_migrated_url: str,
+    polymarket_migrated_url: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The smallest environment `workbench.app` will start in: everything the process refuses to start
     without and nothing else, so a test adding one is visibly adding it."""
     monkeypatch.setenv("AGENT_DATABASE_URL", agent_migrated_url)
     monkeypatch.setenv("TEAMS_DATABASE_URL", teams_migrated_url)
+    monkeypatch.setenv("POLYMARKET_DATABASE_URL", polymarket_migrated_url)
     monkeypatch.setenv("AGENT_OPENAI_API_KEY", "key")
     monkeypatch.setenv("TEAMS_OPENAI_API_KEY", "another-key")
     monkeypatch.setenv("AGENT_MODELS", WORKBENCH_MODELS)

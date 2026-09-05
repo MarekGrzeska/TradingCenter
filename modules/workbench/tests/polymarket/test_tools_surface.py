@@ -7,11 +7,12 @@ import json
 from datetime import UTC, datetime
 from decimal import Decimal
 
-import fakes
 import pytest
 
 from polymarket_data import parsing, store
 from polymarket_data.models import Sample, Surface
+
+from . import fakes
 
 pytestmark = pytest.mark.db
 

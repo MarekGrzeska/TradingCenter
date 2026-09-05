@@ -1,7 +1,7 @@
 ## 0. Decyzja i pomiar, bez kodu
 
 - [ ] 0.1 Operator potwierdza odwrócenie reguły (proposal.md, „What Changes", pierwszy punkt) — bez tego etapy 2–5 nie ruszają
-- [ ] 0.2 Pomiar sidecara Auth: godzina bez `auth_settings_v2` na `app-tradingcenter-telegram-gateway`, odczyt `AverageMemoryWorkingSet` przed i po, powrót; liczba do design.md („Sidecar Auth mierzy się przed etapem 2")
+- [x] 0.2 Pomiar sidecara Auth (283 → 178 MB, sidecar ≈ 105 MB; design.md): godzina bez `auth_settings_v2` na `app-tradingcenter-telegram-gateway`, odczyt `AverageMemoryWorkingSet` przed i po, powrót; liczba do design.md („Sidecar Auth mierzy się przed etapem 2")
 - [ ] 0.3 Jeśli Auth ≥ 100 MB: ten plan czeka, powstaje osobna propozycja „walidacja JWT w module"; jeśli < 100 MB: dalej
 
 ## 1. Szkielet gospodarza (bez zmian w infrastrukturze)
@@ -14,10 +14,10 @@
 
 ## 2. Trzy pętle tego samego kształtu — jeden PR na moduł, w tej kolejności
 
-- [ ] 2.1 **polymarket-data → `workbench/polymarket_data/`**: pakiet przeniesiony bez zmiany nazw; montaż pod `/polymarket`; `POLYMARKET_DATABASE_URL` i reszta z przedrostkiem tam, gdzie istnieje podwójnie; migracja pod kluczem 8070 i pętla próbkowania w lifespan gospodarza; heartbeat w `/health` gospodarza; źródło narzędzi w procesie w obu rejestrach (te same nazwy, opisy, sufity, odmowy); `POLYMARKET_MCP_URL`/`_SCOPE` znikają z workbencha; `dev.py` mówi o starym pliku `.env`
-- [ ] 2.2 Terraform dla 2.1: `azurerm_linux_web_app.polymarket_data` znika z regułą firewalla, tożsamością, rejestracjami `polymarket_data_terminal`/`_pocket` i dotacją Key Vault; alert `polymarket-data-loop-stopped` wskazuje workbench; **plan czyta `0 to add` na dotacji workbencha**; operator: `grant-schema-ownership.sql` dla `app-tradingcenter-agent` na `polymarket` przed apply
-- [ ] 2.3 Terminal i pocket dla 2.1: `VITE_POLYMARKET_HTTP` → adres workbencha + `/polymarket`, scope polymarket → scope workbencha; `contract:generate`, `contract:check` zielone
-- [ ] 2.4 CI/deploy dla 2.1: job `polymarket-data` i `deploy-polymarket-data.yml` znikają; `changes` w `checks.yml` widzi nowy pakiet jako workbench
+- [x] 2.1 **polymarket-data → `workbench/polymarket_data/`**: pakiet przeniesiony bez zmiany nazw; montaż pod `/polymarket`; `POLYMARKET_DATABASE_URL` i reszta z przedrostkiem tam, gdzie istnieje podwójnie; migracja pod kluczem 8070 i pętla próbkowania w lifespan gospodarza; heartbeat w `/health` gospodarza; źródło narzędzi w procesie w obu rejestrach (te same nazwy, opisy, sufity, odmowy); `POLYMARKET_MCP_URL`/`_SCOPE` znikają z workbencha; `dev.py` mówi o starym pliku `.env`
+- [x] 2.2 Terraform dla 2.1 (napisane; apply operatora przed merge): `azurerm_linux_web_app.polymarket_data` znika z regułą firewalla, tożsamością, rejestracjami `polymarket_data_terminal`/`_pocket` i dotacją Key Vault; alert `polymarket-data-loop-stopped` wskazuje workbench; **plan czyta `0 to add` na dotacji workbencha**; operator: `grant-schema-ownership.sql` dla `app-tradingcenter-agent` na `polymarket` przed apply
+- [x] 2.3 Terminal i pocket dla 2.1: `VITE_POLYMARKET_HTTP` → adres workbencha + `/polymarket`, scope polymarket → scope workbencha; `contract:generate`, `contract:check` zielone
+- [x] 2.4 CI/deploy dla 2.1: job `polymarket-data` i `deploy-polymarket-data.yml` znikają; `changes` w `checks.yml` widzi nowy pakiet jako workbench
 - [ ] 2.5 Bramka 2.1: doba z zielonym alertem pętli na nowej metryce; working set workbencha zmierzony i wpisany do tabeli design.md
 - [ ] 2.6 **social-data → `workbench/social_data/`**: to samo co 2.1–2.5, przedrostek `/social`, klucz 8090; `TELEGRAM_GATEWAY_*` social-data staje się ustawieniem workbencha; lista wołających telegram-gateway dostaje tożsamość workbencha zamiast social-data
 - [ ] 2.7 **strategy → `workbench/strategy/`**: to samo, przedrostek `/strategy`, klucz 8080; `MARKET_DATA_URL/_SCOPE` zostają jako ustawienia workbencha (3a: HTTP po publicznym hostname); listy wołających market-data i telegram-gateway dostają tożsamość workbencha; `STRATEGY_MCP_URL` znika

@@ -153,21 +153,22 @@ class TestOneFileAtATime:
         assert decisions["workbench"]
         assert decisions["terminal"]
 
-    def test_polymarket_datas_contract_reaches_the_terminal(self) -> None:
-        """Its `contract.py` and `openapi.py` rather than the whole module: the second marks every response
-        field required, so it moves the generated types with no edit to the first."""
-        decisions = decide(["modules/polymarket-data/polymarket_data/contract.py"])
-        assert decisions["polymarket-data"]
+    def test_the_archives_contract_reaches_both_screens(self) -> None:
+        """The prediction-market archive is a package of the workbench, so its `contract.py` and `openapi.py`
+        run the workbench, the terminal (the workbench whole does) and the pocket, which reads only those two."""
+        decisions = decide(["modules/workbench/polymarket_data/contract.py"])
+        assert decisions["workbench"]
         assert decisions["terminal"]
+        assert decisions["pocket"]
 
-        shaping = decide(["modules/polymarket-data/polymarket_data/openapi.py"])
-        assert shaping["terminal"]
+        shaping = decide(["modules/workbench/polymarket_data/openapi.py"])
+        assert shaping["pocket"]
 
-    def test_the_rest_of_polymarket_data_leaves_the_terminal_alone(self) -> None:
-        """The other half of the pairing: a module's own work is not the terminal's."""
-        decisions = decide(["modules/polymarket-data/polymarket_data/ingest.py"])
-        assert decisions["polymarket-data"]
-        assert not decisions["terminal"]
+    def test_the_rest_of_the_archive_leaves_the_pocket_alone(self) -> None:
+        """The other half of the pairing: the archive's own work is not the phone screen's."""
+        decisions = decide(["modules/workbench/polymarket_data/ingest.py"])
+        assert decisions["workbench"]
+        assert not decisions["pocket"]
 
     def test_a_package_runs_every_module_that_takes_it(self) -> None:
         """The whole price of sharing source, paid in CI rather than in production."""

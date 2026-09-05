@@ -114,3 +114,10 @@ def teams_settings():
     from workbench.config import Settings
 
     return Settings().for_teams()  # type: ignore[call-arg]
+
+
+def polymarket_settings() -> object:
+    """The prediction-market archive's chain — the third database this process migrates."""
+    from workbench.config import Settings
+
+    return Settings().for_polymarket()  # type: ignore[call-arg]

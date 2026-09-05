@@ -6,11 +6,12 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-import fakes
 import pytest
 
 from polymarket_data import changes, parsing, provider, store
 from polymarket_data.models import Sample, Surface
+
+from . import fakes
 
 pytestmark = pytest.mark.db
 

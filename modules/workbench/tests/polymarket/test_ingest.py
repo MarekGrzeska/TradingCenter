@@ -8,13 +8,14 @@ from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-import fakes
 import pytest
 from tc_runtime.liveness import LoopHeartbeat
 
 from polymarket_data import parsing, provider, store
 from polymarket_data.ingest import Ingest
 from polymarket_data.models import Sample, Surface
+
+from . import fakes
 
 pytestmark = pytest.mark.db
 

@@ -5,11 +5,12 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-import builders
 import pytest
 
 from polymarket_data import store, tracking
 from polymarket_data.models import Sample, Surface
+
+from . import builders
 
 NOON = datetime(2026, 8, 22, 12, 0, tzinfo=UTC)
 

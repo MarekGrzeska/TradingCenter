@@ -148,24 +148,6 @@ SERVICES: tuple[Service, ...] = (
         ),
     ),
     Service(
-        name="polymarket-data",
-        module="polymarket-data",
-        port=8070,
-        command=(
-            "uv", "run", "uvicorn", "polymarket_data.app:app", "--reload", "--port", "8070"
-        ),
-        log_prefix="polymkt ",
-        colour=GREEN,
-        health_path="/health",
-        why=(
-            "Independent of the gateway — its upstream is Polymarket, not capital.com, so "
-            "nothing above it has to be running. Before the workbench for the same reason "
-            "market-data is: the workbench reads its tool list on the first turn that "
-            "wants one, and a server still coming up means a turn answered without those "
-            "tools rather than an error anyone would notice."
-        ),
-    ),
-    Service(
         name="social-data",
         module="social-data",
         port=8090,
@@ -226,8 +208,9 @@ SERVICES: tuple[Service, ...] = (
         why=(
             "Last among the back ends: nothing else calls it, so nothing waits on it. The "
             "conversation and the teams catalogue are one process here — 8050 has belonged "
-            "to nobody since `agent-and-teams-one-workbench`, and 8070 stopped being "
-            "nobody's when polymarket-data claimed it. It calls six tool servers now, "
+            "to nobody since `agent-and-teams-one-workbench`, and 8070 to nobody since "
+            "`one-process-per-security-boundary` folded polymarket-data into this process. "
+            "It calls five tool servers now, "
             "and each tool list is read on the first turn that wants one, so a server "
             "still coming up means a turn answered without those tools rather than an "
             "error anyone would notice."
@@ -274,7 +257,7 @@ MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
     ("market-data", None),
     ("workbench", "alembic-agent.ini"),
     ("workbench", "alembic-teams.ini"),
-    ("polymarket-data", None),
+    ("workbench", "alembic-polymarket.ini"),
     ("social-data", None),
     ("strategy", None),
     ("telegram-gateway", None),
@@ -328,9 +311,6 @@ REQUIRED_ENV: tuple[tuple[str, str], ...] = (
         "trading-mcp",
         "copy .env.example and set CAPITAL_GATEWAY_API_KEY to the gateway's own GATEWAY_API_KEY",
     ),
-    # Nothing to fill in: Polymarket's two surfaces are public, so this module is the one
-    # here whose example file is already a working configuration.
-    ("polymarket-data", "copy .env.example; the defaults match compose.yaml and need no key"),
     # A key is optional here and its absence is a supported state: without OPENAI_API_KEY the module
     # collects posts and leaves every reading empty, which /state says out loud.
     ("social-data", "copy .env.example; the defaults match compose.yaml, and the model key is optional"),
@@ -494,15 +474,6 @@ ADVISORIES: tuple[tuple[str, str, str, str], ...] = (
     ),
     (
         "workbench",
-        "POLYMARKET_MCP_URL",
-        (
-            "the agent cannot say what a prediction market prices an event at, and a "
-            "team assigning those tools refuses to run"
-        ),
-        "8070",
-    ),
-    (
-        "workbench",
         "SOCIAL_MCP_URL",
         (
             "the agent cannot say what was posted, and a team assigning those tools "
@@ -541,8 +512,16 @@ RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
         ),
     ),
     (
+        "POLYMARKET_MCP_URL",
+        (
+            "the prediction-market archive is a package of this process since "
+            "`one-process-per-security-boundary`; its tools need no address, and "
+            "POLYMARKET_DATABASE_URL is the line this file needs instead"
+        ),
+    ),
+    (
         "DATABASE_URL",
-        "the workbench owns two databases: AGENT_DATABASE_URL and TEAMS_DATABASE_URL",
+        "the workbench owns three databases: AGENT_, TEAMS_ and POLYMARKET_DATABASE_URL",
     ),
     (
         "OPENAI_API_KEY",
@@ -946,7 +925,7 @@ def ready_lines(*, start_front_ends: bool) -> list[str]:
         f"  Archive tools       http://{LOOPBACK}:8020/mcp",
         f"  trading-mcp health  http://{LOOPBACK}:8060/health",
         f"  Workbench docs      http://{LOOPBACK}:8030/docs",
-        f"  Polymarket docs     http://{LOOPBACK}:8070/docs",
+        f"  Polymarket docs     http://{LOOPBACK}:8030/polymarket/docs",
         (
             "  Database            market_data, agent, teams, polymarket, social, strategy, "
             "telegram @ localhost:55432 "

@@ -327,9 +327,8 @@ class ToolServerRegistry:
                 "trading-mcp": ToolServer(
                     settings, prefix="trading_mcp", can_move_the_account=True
                 ),
-                # Reads only. Its three writing tools change a watch list, not an
-                # account, so nothing it publishes may read as account-moving here.
-                "polymarket-mcp": ToolServer(settings, prefix="polymarket_mcp"),
+                # No polymarket server: that archive is a package of this process, and the assembly
+                # adds its tools to `local` — no address, no identity, no session.
                 "social-mcp": ToolServer(settings, prefix="social_mcp"),
                 # Sends a notification, and that is all it can do here: creating a bot and binding a
                 # destination are REST-only in that module, out of reach of any team.

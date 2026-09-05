@@ -14,8 +14,6 @@ from tc_runtime.db import asyncpg_dsn, sqlalchemy_url
 from polymarket_data.app import create_app
 from polymarket_data.config import Settings
 
-MODULE_ROOT = Path(__file__).resolve().parent.parent
-
 # Testcontainers' reaper bind-mounts the Docker socket, which Docker Desktop for macOS refuses. Safe
 # to disable here: the container fixture is a context manager, so only a SIGKILL of pytest leaks one.
 os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
@@ -42,55 +40,6 @@ DOCKER_SOCKETS = (
     Path.home() / ".colima/default/docker.sock",
     Path.home() / ".rd/docker.sock",
 )
-
-
-def pytest_addoption(parser: pytest.Parser) -> None:
-    parser.addoption(
-        "--run-live",
-        action="store_true",
-        default=False,
-        help="run tests that read the real Polymarket API over the network",
-    )
-
-
-def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    if not config.getoption("--run-live"):
-        skip_live = pytest.mark.skip(reason="needs --run-live and a reachable Polymarket API")
-        for item in items:
-            if "live" in item.keywords:
-                item.add_marker(skip_live)
-
-    reason = _reason_to_skip_db_tests()
-    if reason is None:
-        return
-    skip = pytest.mark.skip(reason=reason)
-    for item in items:
-        if "db" in item.keywords:
-            item.add_marker(skip)
-
-
-def _reason_to_skip_db_tests() -> str | None:
-    """Why the `db` tests cannot run here, or `None` to let them run. Only a machine with no Docker at
-    all earns a skip: a silent skip where Docker was expected is indistinguishable from a pass."""
-    try:
-        import docker
-    except ImportError:
-        return "the docker package is not installed"
-
-    try:
-        docker.from_env(timeout=DOCKER_PING_TIMEOUT).ping()
-    except Exception as err:  # noqa: BLE001 - any failure here means "not answering"
-        if _docker_is_installed():
-            print(f"\ndocker is installed but not answering ({err}); running `db` tests anyway")
-            return None
-        return "no Docker daemon for the PostgreSQL container"
-    return None
-
-
-def _docker_is_installed() -> bool:
-    return bool(os.environ.get("DOCKER_HOST")) or any(
-        socket.exists() for socket in DOCKER_SOCKETS
-    )
 
 
 @pytest.fixture(scope="session")
@@ -163,8 +112,9 @@ class RecordingIngest:
 async def api(app, pool, settings):
     """The app wired to a real database, with the provider faked. The lifespan is bypassed rather than
     run: it would start the sampler, which would reach a third party over the network."""
-    import fakes
     import httpx
+
+    from . import fakes
 
     app.state.pool = pool
     app.state.settings = settings
@@ -180,7 +130,7 @@ async def api(app, pool, settings):
 async def tool_server(app, pool, settings):
     """The FastMCP server this module publishes, wired to a real database and built from the same
     application `create_app()` builds — a server assembled here would be a ceiling on nothing."""
-    import fakes
+    from . import fakes
 
     app.state.pool = pool
     app.state.settings = settings

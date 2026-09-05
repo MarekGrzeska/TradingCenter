@@ -50,8 +50,7 @@ export default defineConfig(({ mode }) => {
   const archive = env.ARCHIVE_PROXY_TARGET || "http://localhost:8020";
   const workbench = env.WORKBENCH_PROXY_TARGET || "http://localhost:8030";
   const gateway = env.GATEWAY_PROXY_TARGET || "http://localhost:8010";
-  const polymarket = env.POLYMARKET_PROXY_TARGET || "http://localhost:8070";
-  const strategy = env.STRATEGY_PROXY_TARGET || "http://localhost:8080";
+    const strategy = env.STRATEGY_PROXY_TARGET || "http://localhost:8080";
   const social = env.SOCIAL_PROXY_TARGET || "http://localhost:8090";
   const gatewayKey = env.GATEWAY_PROXY_KEY || env.GATEWAY_API_KEY || "";
 
@@ -91,10 +90,10 @@ export default defineConfig(({ mode }) => {
         // The prediction-market archive. No key and no header: a token in production, nothing at all in dev where
         // `REQUIRE_AUTHENTICATED_PRINCIPAL` is off, so there is nothing for this proxy to add.
         "/polymarket-api": {
-          target: polymarket,
+          target: workbench,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/polymarket-api/, ""),
-          configure: quietProxyErrors("polymarket-data", polymarket),
+          rewrite: (path) => path.replace(/^\/polymarket-api/, "/polymarket"),
+          configure: quietProxyErrors("workbench", workbench),
         },
 
         // The post archive, same shape and same reason as the two above.

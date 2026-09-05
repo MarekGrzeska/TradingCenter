@@ -42,8 +42,7 @@ function quietProxyErrors(label: string, target: string): ProxyOptions["configur
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const polymarket = env.POLYMARKET_PROXY_TARGET || "http://localhost:8070";
-  const workbench = env.WORKBENCH_PROXY_TARGET || "http://localhost:8030";
+    const workbench = env.WORKBENCH_PROXY_TARGET || "http://localhost:8030";
   const social = env.SOCIAL_PROXY_TARGET || "http://localhost:8090";
 
   return {
@@ -58,10 +57,10 @@ export default defineConfig(({ mode }) => {
         // No key and no header: polymarket-data takes a token in production and nothing at all in dev,
         // where `REQUIRE_AUTHENTICATED_PRINCIPAL` is off — so there is nothing for this proxy to add.
         "/polymarket-api": {
-          target: polymarket,
+          target: workbench,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/polymarket-api/, ""),
-          configure: quietProxyErrors("polymarket-data", polymarket),
+          rewrite: (path) => path.replace(/^\/polymarket-api/, "/polymarket"),
+          configure: quietProxyErrors("workbench", workbench),
         },
 
         // The post archive, same shape and same reason as the one above.

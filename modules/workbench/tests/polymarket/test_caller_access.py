@@ -25,7 +25,7 @@ def principal_header(application: str) -> dict[str, str]:
 @pytest.fixture
 async def guarded(app, pool, settings):
     """The application with the requirement on, as production runs it."""
-    import fakes
+    from . import fakes
 
     app.state.pool = pool
     app.state.settings = settings.model_copy(
@@ -103,7 +103,7 @@ class TestRefusals:
     async def test_an_empty_record_admits_nobody(self, app, pool, settings) -> None:
         """A fresh deployment has empty lists, and "the list was empty" must never be the
         reading under which everyone is allowed."""
-        import fakes
+        from . import fakes
 
         app.state.pool = pool
         app.state.settings = settings.model_copy(

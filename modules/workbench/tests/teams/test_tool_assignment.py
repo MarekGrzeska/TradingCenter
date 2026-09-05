@@ -215,7 +215,6 @@ async def test_announced_snapshot_says_which_servers_have_no_address() -> None:
 
     assert snapshot.unconfigured == (
         "market-mcp",
-        "polymarket-mcp",
         "social-mcp",
         "strategy-mcp",
         "telegram-mcp",
@@ -301,10 +300,10 @@ async def test_a_name_three_servers_announce_names_all_three() -> None:
     async with (
         serving(build=one_tool) as market_url,
         serving(build=one_tool) as trading_url,
-        serving(build=one_tool) as polymarket_url,
+        serving(build=one_tool) as social_url,
     ):
         registry = _registry(
-            market_url, trading_mcp_url=trading_url, polymarket_mcp_url=polymarket_url
+            market_url, trading_mcp_url=trading_url, social_mcp_url=social_url
         )
         try:
             with pytest.raises(ToolNameCollision) as raised:
@@ -316,7 +315,7 @@ async def test_a_name_three_servers_announce_names_all_three() -> None:
     assert "'get_event'" in message
     assert "market-mcp" in message
     assert "trading-mcp" in message
-    assert "polymarket-mcp" in message
+    assert "social-mcp" in message
 
 
 async def test_tools_from_both_servers_resolve_to_the_server_that_announced_them() -> None:

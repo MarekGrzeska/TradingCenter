@@ -21,6 +21,7 @@ from tc_runtime.db import pool as make_pool
 from tc_runtime.openapi import require_response_fields
 
 import agent.surface
+import polymarket_data.app
 import teams.surface
 from agent.models_catalogue import ModelCatalogue as AgentCatalogue
 from agent.provider import OpenAIProvider as AgentProvider
@@ -36,7 +37,9 @@ from teams.runtime import MIGRATIONS as TEAMS_MIGRATIONS
 from teams.scheduler import Clock
 from teams.tools import ToolServerRegistry as TeamsToolServerRegistry
 
+from .assembly import mount_package
 from .config import Settings
+from .local_tools import ConversationLocalTools, TeamsLocalTools
 from .team_tools import LocalTeamsTools
 
 log = logging.getLogger(__name__)
@@ -47,6 +50,9 @@ async def lifespan(app: FastAPI):
     settings = Settings()  # type: ignore[call-arg]
     conversation_settings = settings.for_conversation()
     teams_settings = settings.for_teams()
+    polymarket_settings = settings.for_polymarket()
+    # The archive's tools, called as functions: the server its own `/mcp` mounts, minus the transport.
+    polymarket_tools = ConversationLocalTools("polymarket-data", polymarket_app.state.mcp_server)
 
     # Constructed, not connected: a session opens on the first turn that wants a tool. Reaching market-data at startup
     # would make this process's health depend on another module's, whose answer is to run without its tools.
@@ -54,7 +60,7 @@ async def lifespan(app: FastAPI):
         app, operator_identity_optional=not settings.require_authenticated_principal
     )
     conversation_tools = ToolServerRegistry.from_settings(
-        conversation_settings, local_sources=[team_tools]
+        conversation_settings, local_sources=[team_tools, polymarket_tools]
     )
 
     async with (
@@ -74,11 +80,17 @@ async def lifespan(app: FastAPI):
             tenant_id=teams_settings.azure_tenant_id,
             max_size=settings.database_pool_size,
         ) as teams_pool,
+        # A mounted application's lifespan is never run, so the archive's pool, migration, sampler and
+        # tool session are entered here, beside this process's own two.
+        polymarket_data.app.serving(polymarket_app, polymarket_settings),
     ):
         # Built here rather than beside the conversation's, because one of its sources is served by this process and
         # reads the teams database directly: announcing needs no pool, calling does, and this is the first point with one.
         teams_tool_servers = TeamsToolServerRegistry.from_settings(
             teams_settings, pool=teams_pool
+        )
+        teams_tool_servers.local["polymarket-data"] = TeamsLocalTools(
+            "polymarket-data", polymarket_app.state.mcp_server
         )
 
         # The `try` opens before the schema checks, not after: `ToolServer.__init__` already holds a credential when a
@@ -206,3 +218,7 @@ async def health() -> dict[str, str]:
 
 agent.surface.include(app)
 teams.surface.include(app)
+
+# The archive whole — its routers, its `/openapi.json`, its `/mcp`, its caller record — under one prefix.
+polymarket_app = polymarket_data.app.create_app()
+mount_package(app, "/polymarket", polymarket_app)
