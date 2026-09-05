@@ -56,6 +56,8 @@ export interface ChartIndicators {
    *  landing — which run outside React, so the function has to be reachable through a ref
    *  that is always the current one. */
   syncIndicatorWindowRef: RefObject<(force?: boolean) => void>;
+  holdIndicatorWindow: () => void;
+  releaseIndicatorWindow: () => void;
   /** What a symbol, resolution or source change owes the indicators: with no window there
    *  are no results, which the layer sync reads as "remove every line". */
   clearIndicatorWindow: () => void;
@@ -100,6 +102,9 @@ export function useChartIndicators({
   // What was last asked for, so a pan inside it costs nothing. State cannot answer this:
   // the range handler runs on every frame the library reports, long before a render.
   const heldIndicatorWindowRef = useRef<BarsRange | null>(null);
+  // While older history is paging in, every page moves the frame and the frame asks for a window. The
+  // run's last page is the one worth reading: 42 reads a minute on production, all but one aborted.
+  const pagingRef = useRef(false);
 
   /** Points the indicator window at what is on screen now, if what is on screen has left
    *  the window already computed. `force` for the structural changes that invalidate an
@@ -110,6 +115,7 @@ export function useChartIndicators({
       const series = barsRef.current;
       const visible = chartRef.current?.timeScale().getVisibleLogicalRange() ?? null;
       const held = heldIndicatorWindowRef.current;
+      if (!force && pagingRef.current) return;
       if (!force && held !== null && windowStillCovers(held, series, visible)) return;
   // A fresh object even for an unchanged window is load-bearing: `useIndicators` watches `range` by
   // reference, and a candle closing must be recomputed over exactly the window already asked for.
@@ -189,7 +195,17 @@ export function useChartIndicators({
       detail: indicatorError ?? failureDigest,
     });
   }, [indicatorError, failureDigest, symbol, resolution]);
+  /** A run of older-history pages has started: no window is read until `releaseIndicatorWindow`. */
+  const holdIndicatorWindow = useCallback(() => {
+    pagingRef.current = true;
+  }, []);
+  /** The run is over: the window over what is drawn now is the one to read. */
+  const releaseIndicatorWindow = useCallback(() => {
+    pagingRef.current = false;
+    syncIndicatorWindowRef.current(true);
+  }, []);
   const clearIndicatorWindow = useCallback(() => {
+    pagingRef.current = false;
     heldIndicatorWindowRef.current = null;
     setBarsRange(null);
   }, []);
@@ -207,6 +223,8 @@ export function useChartIndicators({
     failedIndicators,
     failureDigest,
     syncIndicatorWindowRef,
+    holdIndicatorWindow,
+    releaseIndicatorWindow,
     clearIndicatorWindow,
   };
 }
