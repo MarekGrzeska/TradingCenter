@@ -13,7 +13,7 @@ from websockets.exceptions import ConnectionClosedError
 
 from capital_gateway.dtos import Resolution
 from capital_gateway.stream import upstream as upstream_module
-from capital_gateway.stream.upstream import Tokens, Upstream
+from capital_gateway.stream.upstream import Pace, Tokens, Upstream
 from tests.conftest import until
 
 EPIC = "US100"
@@ -260,6 +260,7 @@ def run_upstream(
     monkeypatch: pytest.MonkeyPatch,
     sockets: list[ScriptedSocket],
     tokens: Tokens | None = None,
+    pace: Pace | None = None,
 ) -> tuple[Upstream, list[dict], Provider]:
     """An `Upstream` wired to scripted sockets, not started yet."""
     monkeypatch.setattr(upstream_module, "RECONNECT_DELAY_SECONDS", 0.0)
@@ -274,7 +275,7 @@ def run_upstream(
     async def default_tokens() -> tuple[str, str]:
         return ("cst-value", "token-value")
 
-    up = Upstream(URL, EPIC, Resolution.MINUTE_5, tokens or default_tokens, emit)
+    up = Upstream(URL, EPIC, Resolution.MINUTE_5, tokens or default_tokens, emit, pace=pace)
     return up, emitted, provider
 
 
@@ -305,6 +306,34 @@ async def test_the_loop_connects_subscribes_and_reports_connected(
         "marketData.subscribe",
     ]
     assert emitted == [{"kind": "status", "state": "connected"}]
+
+
+async def test_each_subscribe_frame_takes_a_slot_in_the_request_budget_first(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Measured 5 September 2026: twenty rooms reconnecting in the same second answered
+    # `error.too-many.requests` — a subscribe frame counts against the same 10 req/s as REST.
+    order: list[str] = []
+
+    async def pace() -> None:
+        order.append("slot")
+
+    up, emitted, provider = run_upstream(monkeypatch, [ScriptedSocket()], pace=pace)
+    socket = provider._queue[0]
+    original_send = socket.send
+
+    async def send(raw: str) -> None:
+        order.append("send")
+        await original_send(raw)
+
+    socket.send = send  # type: ignore[method-assign]
+    up.start()
+    try:
+        await until(lambda: any(e.get("state") == "connected" for e in emitted))
+    finally:
+        await up.stop()
+
+    assert order == ["slot", "send", "slot", "send"]
 
 
 async def test_a_dropped_connection_reconnects_and_resubscribes(

@@ -99,7 +99,7 @@ async def lifespan(app: FastAPI):
 
     hub = Hub(
         lambda epic, resolution, emit: Upstream(
-            settings.capital_stream_url, epic, resolution, tokens, emit
+            settings.capital_stream_url, epic, resolution, tokens, emit, pace=client.pace
         ),
         current_period,
     )

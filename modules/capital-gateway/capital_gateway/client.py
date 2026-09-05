@@ -53,6 +53,11 @@ class CapitalClient:
         # are waiting on.
         return await asyncio.shield(self._login_inflight)
 
+    async def pace(self) -> None:
+        """A slot in the provider's budget for a request this client does not send itself —
+        the stream's subscribe frames, which capital.com counts like any REST call."""
+        await self._gate.acquire()
+
     async def _send(self, method: str, path: str, **kwargs) -> httpx.Response:
         """Every request to capital.com goes through here, and so through the gate.
         A login counts against the budget like any other call."""
