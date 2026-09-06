@@ -18,7 +18,9 @@
 --         user=<entra-admin-upn> sslmode=require" \
 --        -v role=app-tradingcenter-agent -f scripts/grant-schema-ownership.sql
 --
---   ... and again with dbname=market_data, role=app-tradingcenter-market-data;
+--   ... and again with dbname=market_data, role=app-tradingcenter-agent — the workbench serves the candle
+--                           archive since stage 3 of one-process-per-security-boundary, and the role
+--                           app-tradingcenter-market-data that owned it until then hands over here;
 --   with dbname=teams,      role=app-tradingcenter-agent — the *same* role as `agent`,
 --                           because one App Service presents one identity since the two
 --                           modules became the workbench;

@@ -131,18 +131,9 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "developer" {
 }
 
 # One rule per address, read straight off the app's own resource, so a plan-tier change is never a manual firewall edit.
-# First convergence needs two applies: a resource-level `for_each` refuses to plan against "known after apply".
-resource "azurerm_postgresql_flexible_server_firewall_rule" "market_data_outbound" {
-  for_each = toset(azurerm_linux_web_app.market_data.possible_outbound_ip_address_list)
-
-  name             = "AllowMarketDataOutbound-${replace(each.value, ".", "-")}"
-  server_id        = azurerm_postgresql_flexible_server.main.id
-  start_ip_address = each.value
-  end_ip_address   = each.value
-}
-
-# Same two-apply shape as the rule above. One rule set where there were two: the workbench reaches both databases from
-# one app's addresses, and the second set only ever duplicated the first under another name.
+# First convergence needs two applies: a resource-level `for_each` refuses to plan against "known after apply". One
+# rule set for every database the workbench reaches — `market_data` too, since stage 3 of
+# `one-process-per-security-boundary` retired the archive's own set.
 resource "azurerm_postgresql_flexible_server_firewall_rule" "workbench_outbound" {
   for_each = toset(azurerm_linux_web_app.workbench.possible_outbound_ip_address_list)
 

@@ -363,7 +363,7 @@ async def test_record_tool_calls_numbers_positions_within_each_round(pool, db) -
 
 
 class ServerWithNoTools(FakeToolServer):
-    """market-mcp unconfigured or unreachable — `list_tools` answers with nothing rather than raising,
+    """telegram-mcp unconfigured or unreachable — `list_tools` answers with nothing rather than raising,
     which is the whole of "no tool server does not take the agent's speech away"."""
 
     async def list_tools(self, operator_principal: str | None = None):
@@ -371,7 +371,7 @@ class ServerWithNoTools(FakeToolServer):
 
 
 async def test_a_turn_without_tools_runs_the_prompt_that_says_so(pool, db) -> None:
-    # The prompt is picked from what the turn actually has, not from configuration: a market-mcp that was
+    # The prompt is picked from what the turn actually has, not from configuration: a telegram-mcp that was
     # configured and then went down must not leave the model told it has tools it cannot call.
     session_id = await _new_session(db)
     provider = FakeProvider([[TextDelta("no archive today"), UsageReport(1, 1, None, None)]])
@@ -386,7 +386,7 @@ async def test_a_turn_without_tools_runs_the_prompt_that_says_so(pool, db) -> No
     )
 
     revision = await store.latest_prompt_revision(db)
-    # This module's own three tools do not need market-mcp to exist, so they are still offered; the prompt
+    # This module's own three tools do not need telegram-mcp to exist, so they are still offered; the prompt
     # is still the one that says the archive is unreachable.
     assert [tool.name for tool in provider.calls[0]["tools"]] == [
         CHART_TOOL_NAME,

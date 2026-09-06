@@ -43,11 +43,11 @@ def test_a_tool_server_that_is_not_answering_does_not_stop_the_module(
 ) -> None:
     # Nothing listens on this port. The session is opened lazily, so start-up never learns
     # that — which is the whole point: a run needing tools is refused, a module is not.
-    monkeypatch.setenv("MARKET_MCP_URL", f"http://127.0.0.1:{free_port()}")
+    monkeypatch.setenv("TELEGRAM_MCP_URL", f"http://127.0.0.1:{free_port()}")
 
     with TestClient(app) as client:
         assert client.get("/health").status_code == 200
-        assert [server.label for server in app.state.teams.tools.remote()] == ["market-mcp"]
+        assert [server.label for server in app.state.teams.tools.remote()] == ["telegram-mcp"]
 
 
 def test_a_schema_the_image_was_not_built_for_refuses_to_start(

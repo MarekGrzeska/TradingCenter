@@ -86,35 +86,32 @@ def test_a_non_positive_rate_refuses_to_start(field: str) -> None:
 
 
 def test_one_valid_server_and_one_broken_server_is_refused_naming_the_broken_one() -> None:
-    """market-mcp is fine here, and the refusal has to say it is trading-mcp's configuration that is not —
+    """telegram-mcp is fine here, and the refusal has to say it is trading-mcp's configuration that is not —
     an operator fixing the wrong one would still be stuck."""
     with pytest.raises(ValidationError) as err:
         settings(
-            market_mcp_url="http://127.0.0.1:8020",
+            telegram_mcp_url="http://127.0.0.1:8100",
             trading_mcp_url="https://trading-mcp.example.com",
         )
     message = str(err.value)
     assert "TRADING_MCP_SCOPE" in message
-    assert "MARKET_MCP_SCOPE" not in message
+    assert "TELEGRAM_MCP_SCOPE" not in message
 
 
 def test_every_server_configured_independently_is_accepted() -> None:
     resolved = settings(
-        market_mcp_url="http://127.0.0.1:8020",
         trading_mcp_url="https://trading-mcp.example.com",
         trading_mcp_scope="api://some-app/.default",
         telegram_mcp_url="http://127.0.0.1:8100",
     )
-    assert resolved.market_mcp_url == "http://127.0.0.1:8020"
     assert resolved.trading_mcp_url == "https://trading-mcp.example.com"
     assert resolved.telegram_mcp_url == "http://127.0.0.1:8100"
 
 
-def test_two_servers_configured_and_the_third_unset_is_accepted() -> None:
-    """The state a deployment is in between the module going live and the operator's apply: the third
+def test_one_server_configured_and_the_other_unset_is_accepted() -> None:
+    """The state a deployment is in between the module going live and the operator's apply: the other
     address is simply not there yet, and that is a configuration, not a half-finished one."""
     resolved = settings(
-        market_mcp_url="http://127.0.0.1:8020",
         trading_mcp_url="http://127.0.0.1:8060",
     )
     assert resolved.telegram_mcp_url is None

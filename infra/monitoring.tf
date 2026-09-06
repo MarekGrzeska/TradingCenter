@@ -1,5 +1,5 @@
-# Application Insights, workspace-based, since the classic mode is deprecated for new resources. market-data emits
-# `market_data.candle_age_seconds` onto it, which every staleness alert below depends on existing.
+# Application Insights, workspace-based, since the classic mode is deprecated for new resources. The workbench's
+# archive emits `market_data.candle_age_seconds` onto it, which every staleness alert below depends on existing.
 resource "azurerm_log_analytics_workspace" "main" {
   name                = "log-tradingcenter"
   resource_group_name = azurerm_resource_group.main.name
@@ -86,6 +86,8 @@ resource "azurerm_monitor_metric_alert" "database_unreachable" {
 
 # The one question the platform's metrics cannot answer: whether the container is alive. An idle healthy process and a
 # dead one both report zero requests, which is how market-data served no 2xx for nine hours with five alerts standing.
+# The archive is a package of the workbench now, and `/market/ping` is the path outside Easy Auth that answers a
+# constant; the resource keeps its name, because renaming it would recreate the test and its alert.
 resource "azurerm_application_insights_standard_web_test" "market_data_ping" {
   name                    = "webtest-market-data-ping"
   resource_group_name     = azurerm_resource_group.main.name
@@ -100,7 +102,7 @@ resource "azurerm_application_insights_standard_web_test" "market_data_ping" {
   timeout       = 30
 
   request {
-    url = "https://${local.market_data_hostname}/ping"
+    url = "https://${local.workbench_hostname}/market/ping"
   }
 
   validation_rules {
@@ -117,7 +119,7 @@ resource "azurerm_monitor_metric_alert" "market_data_availability" {
     azurerm_application_insights_standard_web_test.market_data_ping.id,
     azurerm_application_insights.main.id,
   ]
-  description = "market-data's /ping availability test is failing from outside."
+  description = "The workbench's /market/ping availability test is failing from outside."
   severity    = 1
   frequency   = "PT5M"
   window_size = "PT15M"

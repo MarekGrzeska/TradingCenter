@@ -156,7 +156,7 @@ async def test_a_tool_with_no_annotation_on_a_reading_server_is_still_not_an_ord
     pool: asyncpg.Pool,
 ) -> None:
     """The other half of that reading, and why the conservatism is gated on the server rather than applied everywhere:
-    market-mcp cannot reach an account, so an unannotated tool of its own is what it looks like."""
+    telegram-mcp cannot reach an account, so an unannotated tool of its own is what it looks like."""
 
     class ReadingServer(WriteServer):
         def __init__(self) -> None:
@@ -167,7 +167,7 @@ async def test_a_tool_with_no_annotation_on_a_reading_server_is_still_not_an_ord
             return [
                 ToolDescriptor(
                     name="place_order",
-                    description="a name market-mcp would never publish, unannotated",
+                    description="a name telegram-mcp would never publish, unannotated",
                     input_schema={},
                     read_only=None,
                 )

@@ -568,5 +568,5 @@ async def test_a_server_announcing_a_memory_name_refuses_the_run(
 
     message = str(raised.value)
     assert "'memory_read'" in message
-    assert "market-mcp" in message
+    assert "telegram-mcp" in message
     assert "team-memory" in message

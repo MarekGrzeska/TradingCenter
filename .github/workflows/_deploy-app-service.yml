@@ -33,13 +33,13 @@ on:
       probe_path:
         description: >-
           Empty for capital-gateway, and not because nothing was chosen: it admits only
-          market-data's and trading-mcp's addresses, so a runner cannot reach it at all and
+          the workbench's and trading-mcp's addresses, so a runner cannot reach it at all and
           the control plane is the only question its deploy can ask.
         required: false
         default: ""
         type: string
       expected_status:
-        description: 200 for a health endpoint; 404 for market-data, whose only excluded path is a WebSocket route.
+        description: 200 for a health endpoint; 404 for a module whose only excluded path is a WebSocket route.
         required: false
         default: 200
         type: number

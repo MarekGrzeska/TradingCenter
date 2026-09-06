@@ -373,7 +373,7 @@ async def test_fire_history_is_owner_scoped_through_its_schedule(db: asyncpg.Con
 
 async def test_fire_history_is_owner_scoped_through_its_trigger(db: asyncpg.Connection) -> None:
     trigger = await _trigger(db)
-    await store.record_fire(db, trigger_id=trigger["id"], outcome="unavailable", reason="market-mcp unreachable")
+    await store.record_fire(db, trigger_id=trigger["id"], outcome="unavailable", reason="telegram-mcp unreachable")
 
     assert len(await store.list_fires_for_trigger(db, trigger_id=trigger["id"], owner_principal=OWNER)) == 1
     assert (

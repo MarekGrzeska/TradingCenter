@@ -24,7 +24,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       capital-gateway: ${{ steps.filter.outputs.capital-gateway }}
-      market-data: ${{ steps.filter.outputs.market-data }}
       trading-mcp: ${{ steps.filter.outputs.trading-mcp }}
       workbench: ${{ steps.filter.outputs.workbench }}
       terminal: ${{ steps.filter.outputs.terminal }}
@@ -77,15 +76,14 @@ jobs:
           declare -A PATTERNS=()
 
           PATTERNS[capital-gateway]='^modules/capital-gateway/'
-          PATTERNS[market-data]="^modules/market-data/|$tc_runtime|$tc_mcp_kit"
-          # One module where there were three. It takes `tc-mcp-kit` as well as the
-          # other two, because the team tools moved into it with their schema slimmer.
+          # One module where there were seven. It takes `tc-mcp-kit` as well as the other two, because the team
+          # tools moved into it with their schema slimmer, and the archive's eleven tools sit under its ceiling.
           PATTERNS[workbench]="^modules/workbench/|$tc_runtime|$tc_openai|$tc_mcp_kit"
-          # The terminal is filtered on two other modules because its `contract:check` is the check for those seams.
-          # The workbench whole, since its schema is built from routes and from models those files import.
-          PATTERNS[terminal]='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/workbench/'
-          # market-data takes `tc-mcp-kit` since the tool surface moved in — the slimmer keeps eleven tools under their
-          # ceiling. trading-mcp watches the gateway's *whole* directory: its snapshot is built from routes and DTOs both.
+          # The terminal is filtered on one other module because its `contract:check` is the check for those seams:
+          # the workbench whole, since six schemas — the archive's among them — are built from routes and from
+          # models those files import.
+          PATTERNS[terminal]='^modules/terminal/|^modules/workbench/'
+          # trading-mcp watches the gateway's *whole* directory: its snapshot is built from routes and DTOs both.
           # The second front end, filtered on the one module it reads: it keeps its own generated copy of that
           # schema, so `contract:check` there is the check for this seam exactly as it is for the terminal.
           PATTERNS[pocket]='^modules/pocket/|^modules/workbench/(polymarket_data|social_data)/(contract|openapi)\.py$|^modules/workbench/agent/'
@@ -163,27 +161,6 @@ jobs:
       # Types, which ruff does not check. Scope and mode are in `[tool.pyright]`; the
       # version is pinned in the same file, so this step answers the same way twice.
       - run: uv run pyright
-      - run: uv run pytest -q
-
-  market-data:
-    name: market-data
-    needs: changes
-    if: needs.changes.outputs.market-data == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: modules/market-data
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-      - run: uv run ruff check .
-      # Types, which ruff does not check. Scope and mode are in `[tool.pyright]`; the
-      # version is pinned in the same file, so this step answers the same way twice.
-      - run: uv run pyright
-      # The `db` tests are gated on Docker rather than on a flag and this runner has it, so a real PostgreSQL
-      # starts and they run — they cover the coverage and rollup logic, which has been wrong twice.
       - run: uv run pytest -q
 
   trading-mcp:

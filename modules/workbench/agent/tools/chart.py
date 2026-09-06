@@ -412,8 +412,8 @@ class ChartTool:
         needs_archive = symbol is not None or resolution is not None or indicators is not None
 
         if needs_archive and (self._tool_server is None or not self._tool_server.configured):
-            # Supported configuration (`MARKET_MCP_URL` unset), and the honest answer is
-            # that the check cannot be made — not a command written blind.
+            # A registry with no archive source is a supported configuration, and the honest
+            # answer is that the check cannot be made — not a command written blind.
             return refuse(
                 "no archive to check this against right now, so the chart was left alone."
             )

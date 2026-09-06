@@ -17,14 +17,12 @@ locals {
   # 2026 the memory alert the SKU decision stands on still said "all four apps" at seven.
   web_app_names = {
     "capital-gateway"  = local.capital_gateway_app_name
-    "market-data"      = local.market_data_app_name
     "workbench"        = local.workbench_app_name
     "trading-mcp"      = local.trading_mcp_app_name
     "telegram-gateway" = local.telegram_gateway_app_name
   }
 
   capital_gateway_app_name = "app-tradingcenter-gateway"
-  market_data_app_name     = "app-tradingcenter-market-data"
   # **Still `-agent`, and that is a decision.** The name of an App Service is an identity here: the system-assigned
   # identity takes it, `DATABASE_USER` *is* that identity, and its application id sits on three lists elsewhere.
   workbench_app_name   = "app-tradingcenter-agent"
@@ -36,25 +34,22 @@ locals {
   # Deterministic App Service hostnames, used ahead of `terraform apply` instead of waiting on the computed
   # `default_hostname`: Azure names of this form are `<name>.azurewebsites.net` with no surprises.
   capital_gateway_hostname  = "${local.capital_gateway_app_name}.azurewebsites.net"
-  market_data_hostname      = "${local.market_data_app_name}.azurewebsites.net"
   workbench_hostname        = "${local.workbench_app_name}.azurewebsites.net"
   trading_mcp_hostname      = "${local.trading_mcp_app_name}.azurewebsites.net"
   telegram_gateway_hostname = "${local.telegram_gateway_app_name}.azurewebsites.net"
 
-  # What `market-data` is called when it is the *resource* a token is asked for: the terminal asks Entra for
-  # `<uri>/<scope>`, and Easy Auth accepts a token whose audience is this.
-  market_data_api_uri   = "api://tradingcenter-market-data"
-  market_data_api_scope = "access_as_user"
+  # No `market_data_api_uri` since stage 3 of `one-process-per-security-boundary`: the candle archive is a package of
+  # the workbench, and the terminal asks for the workbench's scope to reach it — one token for one process.
 
   capital_gateway_api_uri   = "api://tradingcenter-capital-gateway"
   capital_gateway_api_scope = "access_as_user"
 
-  # The same, one level out, for the tool server that writes. Unlike market-data's this pairs with no delegated
+  # The same, one level out, for the tool server that writes. Unlike the workbench's this pairs with no delegated
   # scope: its only caller presents a client-credentials token, and there is nobody to consent on whose behalf.
   trading_mcp_api_uri = "api://tradingcenter-trading-mcp"
 
-  # No audience of their own for the two archives: both are packages of the workbench since
-  # `one-process-per-security-boundary`, and the workbench's audience is theirs.
+  # No audience of their own for the three archives or the strategy platform: all are packages of the workbench
+  # since `one-process-per-security-boundary`, and the workbench's audience is theirs.
 
   # The gateway's own audience. It has no screen — the notification is the screen — so the delegated scope below is
   # not a browser's: it is the operator's `az`, bootstrapping the first bot and the first destination by hand.
@@ -145,7 +140,8 @@ resource "azurerm_linux_web_app" "capital_gateway" {
     # the application decides on every HTTP route and the shared key opens none of them — the two service callers are
     # named here as well as on `allowed_applications` below, and neither list substitutes for the other.
     MODULE_CALLER_APPLICATION_IDS = jsonencode([
-      data.azuread_service_principal.market_data_managed_identity.client_id,
+      # The archive, which is the workbench's identity since it joined that process.
+      data.azuread_service_principal.workbench_managed_identity.client_id,
       data.azuread_service_principal.trading_mcp_managed_identity.client_id,
     ])
     BROWSER_CALLER_APPLICATION_IDS = jsonencode([azuread_application.terminal.client_id])
@@ -182,7 +178,7 @@ resource "azurerm_linux_web_app" "capital_gateway" {
       # point. A managed identity publishes `principal_id`; the client id lives on the service principal it names.
       allowed_applications = [
         azuread_application.terminal.client_id,
-        data.azuread_service_principal.market_data_managed_identity.client_id,
+        data.azuread_service_principal.workbench_managed_identity.client_id,
         data.azuread_service_principal.trading_mcp_managed_identity.client_id,
       ]
     }
@@ -219,28 +215,10 @@ module "capital_gateway_easy_auth" {
   }
 }
 
-# market-data: public, Easy Auth-gated, and the **API** half of a pair whose client half is `terminal` — which is client
-# and which resource is the whole content. The scope id is kept in state: regenerating revokes and re-grants every apply.
-module "market_data_easy_auth" {
-  source = "./modules/easy-auth-app"
-
-  display_name   = "app-tradingcenter-market-data-easyauth"
-  identifier_uri = local.market_data_api_uri
-  redirect_uri   = "https://${local.market_data_hostname}/.auth/login/aad/callback"
-
-  id_token_issuance_enabled = true
-
-  scope = {
-    value                      = local.market_data_api_scope
-    admin_consent_display_name = "Read and manage the candle archive"
-    admin_consent_description  = "Allows the app to reach market-data as the signed-in operator."
-    user_consent_display_name  = "Read and manage your candle archive"
-    user_consent_description   = "Allows the app to reach market-data as you."
-  }
-}
-
-resource "azurerm_linux_web_app" "market_data" {
-  name                = local.market_data_app_name
+# workbench: public, Easy Auth-gated — SWA cannot proxy its stream. **Two surfaces and four packages in one app**
+# with one identity, which is what made keeping the resource name worth more than fixing it.
+resource "azurerm_linux_web_app" "workbench" {
+  name                = local.workbench_app_name
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   service_plan_id     = azurerm_service_plan.main.id
@@ -251,13 +229,15 @@ resource "azurerm_linux_web_app" "market_data" {
   }
 
   site_config {
-    always_on          = true
+    always_on = true
+    # For the candle stream alone: the turn streams over plain HTTP (`fetch` + `ReadableStream`), never an upgrade
+    # (design.md, "Odpowiedź strumieniem: fetch + ReadableStream, nie EventSource"), but `/market/ws/candles` is one.
     websockets_enabled = true
 
     # CORS belongs **here and not in the application**: a preflight carries no credential, and Easy Auth would answer it
-    # 401 before the container saw it. So `market_data` MUST NOT add a middleware — two layers double the header.
+    # 401 before the container saw it. The workbench MUST NOT add one of its own — two layers double the header.
     cors {
-      allowed_origins     = [local.terminal_origin]
+      allowed_origins     = [local.terminal_origin, local.pocket_origin]
       support_credentials = false
     }
 
@@ -278,149 +258,29 @@ resource "azurerm_linux_web_app" "market_data" {
     unauthenticated_action = "Return401"
     default_provider       = "azureactivedirectory"
 
-    # The candle stream and nothing else, since a browser cannot put a header on a handshake. **Exempt from Easy Auth is
-    # not exempt from authentication**: the module guards it with a one-time ticket, and learned to before this existed.
-    excluded_paths = ["/ws/candles", "/ping"]
-
-    active_directory_v2 {
-      client_id                  = module.market_data_easy_auth.client_id
-      tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
-      client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
-
-      # Two audiences for one API: a token asked for by scope name arrives with the `api://` uri, one asked for as
-      # `<client-id>/.default` with the client id. Accepting both means neither spelling is a silent 401 later.
-      allowed_audiences = [
-        local.market_data_api_uri,
-        module.market_data_easy_auth.client_id,
-      ]
-
-      # Which clients may present a token at all — one backend caller, since the conversation and the teams runner are one
-      # process. What keeps it to `/mcp` is TOOL_CALLER_APPLICATION_IDS below; neither substitutes for the other.
-      allowed_applications = [
-        azuread_application.terminal.client_id,
-        # Twice over since `one-process-per-security-boundary`: the conversation reaches `/mcp`, and the
-        # strategy platform inside the same process reads the REST contract.
-        data.azuread_service_principal.workbench_managed_identity.client_id,
-      ]
-    }
-
-    login {
-      token_store_enabled = true
-    }
-  }
-
-  app_settings = {
-    GATEWAY_BASE_URL   = "https://${local.capital_gateway_hostname}"
-    GATEWAY_STREAM_URL = "wss://${local.capital_gateway_hostname}/ws/stream"
-    # What this module presents to the gateway besides the key. Set here rather than left to the module, because the
-    # absence of this setting is what selects local work. The stream is outside the gateway's authenticator anyway.
-    GATEWAY_SCOPE   = "${local.capital_gateway_api_uri}/.default"
-    GATEWAY_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.gateway_api_key})"
-
-    # No credential in the URL and no AZURE_* triple: config.py refuses one, and the identity is ambient here unlike a
-    # developer machine's. `DATABASE_USER` is the Postgres role for it, named after this app so the two cannot drift.
-    DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.prod.name}?sslmode=require"
-    DATABASE_USER = local.market_data_app_name
-
-    # This module's share of the server's 35 connections — the largest share: the only module writing a row per closed candle per pair while serving two surfaces.
-    # The whole budget is one number, checked by `scripts/tests/test_pool_budget.py`.
-    DATABASE_POOL_SIZE = "8"
-
-    # The module migrates inside the lifespan, so the warm-up window must outlast the longest migration. 1800 is the
-    # platform's ceiling, so `migration_lock_wait_seconds` sits at 1500: the module has to give up first and say why.
-    WEBSITES_CONTAINER_START_TIME_LIMIT = "1800"
-
-    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.market_data_easy_auth.password
-
-    # The module refuses to hand out stream tickets to a request Easy Auth did not identify, rather than trusting the
-    # block above: switch it off and this turns an open ticket factory — which is an open stream — into a refusal.
-    REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
-
-    # Which caller reaches which surface past the door: the workbench `/mcp`, the terminal the REST contract. Client ids
-    # only, from the `azp` claim — `X-MS-CLIENT-PRINCIPAL-ID` names the signed-in person, which refused every request.
-    TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
-
-    # Two REST callers, the second a program: the strategy platform — the workbench's identity since it joined that
-    # process — reads the REST contract and deliberately not `/mcp`, which is narrowed for a model and too tight for
-    # a loop reading three hundred bars.
-    REST_CALLER_APPLICATION_IDS = join(",", [
-      azuread_application.terminal.client_id,
-      data.azuread_service_principal.workbench_managed_identity.client_id,
-    ])
-
-    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
-  }
-
-  lifecycle {
-    ignore_changes = [site_config[0].application_stack[0].docker_image_name]
-  }
-}
-
-# workbench: public, Easy Auth-gated, same shape as market-data — SWA cannot proxy its stream. **Two surfaces in one
-# app** with one identity, which is what made keeping the resource name worth more than fixing it.
-resource "azurerm_linux_web_app" "workbench" {
-  name                = local.workbench_app_name
-  resource_group_name = azurerm_resource_group.main.name
-  location            = azurerm_resource_group.main.location
-  service_plan_id     = azurerm_service_plan.main.id
-  https_only          = true
-
-  identity {
-    type = "SystemAssigned"
-  }
-
-  site_config {
-    always_on = true
-    # No `websockets_enabled`: the turn streams over plain HTTP (`fetch` + `ReadableStream`), never an upgrade
-    # (design.md, "Odpowiedź strumieniem: fetch + ReadableStream, nie EventSource").
-
-    # Same reasoning as market-data's own CORS block: the preflight carries no credential and Easy Auth would refuse
-    # it before the container saw it. The workbench MUST NOT add one of its own — two layers double the header.
-    cors {
-      allowed_origins     = [local.terminal_origin, local.pocket_origin]
-      support_credentials = false
-    }
-
-    application_stack {
-      docker_image_name = "mcr.microsoft.com/appsvc/staticsite:latest"
-
-      docker_registry_url      = local.ghcr_registry_url
-      docker_registry_username = local.ghcr_registry_username
-      docker_registry_password = local.ghcr_registry_password
-    }
-  }
-
-  # Return401, not RedirectToLoginPage, for market-data's reason: the terminal reaches this app through `fetch()`,
-  # and a redirect resolves to an HTML login page masquerading as a JSON body.
-  auth_settings_v2 {
-    auth_enabled           = true
-    require_authentication = true
-    unauthenticated_action = "Return401"
-    default_provider       = "azureactivedirectory"
-
-    # The health probe and nothing else: every other path answers 401 before the container is reached, dead or alive
-    # alike. The lifespan does not finish until both migrations do, so answering here proves both databases.
-    excluded_paths = ["/health"]
+    # The health probe, and the archive's two: `/market/ws/candles`, since a browser cannot put a header on a handshake
+    # — **exempt from Easy Auth is not exempt from authentication**, the package guards it with a one-time ticket —
+    # and `/market/ping`, the web test's, which answers a constant. Every other path answers 401 before the container
+    # is reached, dead or alive alike. The lifespan does not finish until all six migrations do, so `/health` proves them.
+    excluded_paths = ["/health", "/market/ws/candles", "/market/ping"]
 
     active_directory_v2 {
       client_id                  = module.workbench_easy_auth.client_id
       tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
       client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
 
-      # Both audiences, deliberately — see the comment on `module.workbench_easy_auth` in entra.tf. A terminal asking
-      # by market-data's scope carries that audience; one asking for this app's own carries this. Either is accepted.
+      # Two spellings of **this** API and nothing else. It carried market-data's until stage 3 of
+      # `one-process-per-security-boundary`, when the terminal stopped asking for a scope that named a process
+      # which no longer exists.
       allowed_audiences = [
         local.workbench_api_uri,
         module.workbench_easy_auth.client_id,
-        local.market_data_api_uri,
-        module.market_data_easy_auth.client_id,
       ]
 
-      # One caller: the terminal, holding the operator's own delegated token. The second — teams-mcp forwarding that
-      # token between processes — went away with the process, and the identity now travels inside this one.
       # Two browsers, and the phone screen is here for one reason: the conversation is how it reaches
       # polymarket-data's tools. It never speaks MCP itself — the workbench holds the model key and the
       # tool servers' addresses, and those servers admit this app's managed identity, not a browser.
+      # Not this app itself: the strategy platform reads the archive inside the process, never through this door.
       allowed_applications = [
         azuread_application.terminal.client_id,
         azuread_application.pocket.client_id,
@@ -477,10 +337,21 @@ resource "azurerm_linux_web_app" "workbench" {
       # najtańszy (Luna); najdroższy wybiera się świadomie."
       AGENT_DEFAULT_MODEL_ID = "gpt-5.6-luna"
 
-      # The read tool server, which is **market-data itself** since `market-mcp-into-market-data`; the setting keeps its
-      # name because the address moved, not the relationship. Removing it is the rollback for the whole tool loop.
-      MARKET_MCP_URL   = "https://${local.market_data_hostname}"
-      MARKET_MCP_SCOPE = "${local.market_data_api_uri}/.default"
+      # No MARKET_MCP_URL: the candle archive is the fourth package of this process, served under `/market`, and its
+      # eleven tools are a local source. Its database under its own name — the largest table this repository has,
+      # and the largest share of the server's connections, the only writer of a row per closed candle per pair.
+      MARKET_DATABASE_URL       = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.prod.name}?sslmode=require"
+      MARKET_DATABASE_POOL_SIZE = "8"
+      # The archive's only upstream, now this process's: the gateway by its hostname, the stream outside its
+      # authenticator, and what this identity presents besides the key. Set here rather than left to the package's
+      # defaults, because the absence of GATEWAY_SCOPE is what selects local work.
+      GATEWAY_BASE_URL   = "https://${local.capital_gateway_hostname}"
+      GATEWAY_STREAM_URL = "wss://${local.capital_gateway_hostname}/ws/stream"
+      GATEWAY_SCOPE      = "${local.capital_gateway_api_uri}/.default"
+      GATEWAY_API_KEY    = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.gateway_api_key})"
+      # The archive migrates inside the lifespan, and an index over the candle table outlasts a start-up. 1800 is the
+      # platform's ceiling, so the package's `migration_lock_wait_seconds` sits at 1500: it gives up first and says why.
+      WEBSITES_CONTAINER_START_TIME_LIMIT = "1800"
 
       # There is no TEAMS_MCP_URL any more. The tools that build and run teams are a layer in
       # this process — no address, no scope, no second hop, and nothing to set last.
@@ -527,12 +398,10 @@ resource "azurerm_linux_web_app" "workbench" {
 
       # No STRATEGY_MCP_URL: the strategy platform is the third package of this process, served under `/strategy`,
       # and `pending_setups` — the number a trigger wakes a team on — is a local source. Its database under its own
-      # name; the archive it reads by public hostname with this app's identity (stage 3a), the same caller lists as
-      # the two archives, and the gateway trio below.
+      # name. No MARKET_DATA_URL either: the archive it reads is a package of this same process, reached through
+      # the archive's own application — no address, no token, no hop through this app's own door.
       STRATEGY_DATABASE_URL       = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.strategy.name}?sslmode=require"
       STRATEGY_DATABASE_POOL_SIZE = "3"
-      MARKET_DATA_URL             = "https://${local.market_data_hostname}"
-      MARKET_DATA_SCOPE           = "${local.market_data_api_uri}/.default"
 
       # The teams surface's own clock, in this app's `lifespan` rather than a timer calling in, which would need its own
       # registration. **The one setting here whose value is a decision**: config.py defaults it on, this states it.
@@ -563,7 +432,6 @@ resource "azurerm_linux_web_app" "workbench" {
 locals {
   web_app_principal_ids = {
     "capital-gateway"  = azurerm_linux_web_app.capital_gateway.identity[0].principal_id
-    "market-data"      = azurerm_linux_web_app.market_data.identity[0].principal_id
     "workbench"        = azurerm_linux_web_app.workbench.identity[0].principal_id
     "trading-mcp"      = azurerm_linux_web_app.trading_mcp.identity[0].principal_id
     "telegram-gateway" = azurerm_linux_web_app.telegram_gateway.identity[0].principal_id
@@ -586,36 +454,24 @@ output "capital_gateway_hostname" {
   value = azurerm_linux_web_app.capital_gateway.default_hostname
 }
 
-output "market_data_hostname" {
-  value = azurerm_linux_web_app.market_data.default_hostname
-}
-
 output "workbench_hostname" {
   value = azurerm_linux_web_app.workbench.default_hostname
 }
 
-output "market_data_managed_identity_principal_id" {
-  description = "Postgres role creation (5.7 / old 4.7) needs this object id."
-  value       = azurerm_linux_web_app.market_data.identity[0].principal_id
-}
-
 output "workbench_managed_identity_principal_id" {
-  description = "The operator's one-off Postgres role creation needs this object id — and needs it in **both** databases now, `agent` and `teams`, because one App Service presents one identity (agent-and-teams-one-workbench/design.md, Migration Plan)."
+  description = "The operator's one-off Postgres role creation needs this object id — in every database this process owns, `market_data` included since stage 3 of one-process-per-security-boundary, because one App Service presents one identity."
   value       = azurerm_linux_web_app.workbench.identity[0].principal_id
 }
 
-# The workbench's own client id, which market-data's `allowed_applications` and TOOL_CALLER_APPLICATION_IDS both name:
-# an App Service identity publishes `principal_id` only, and the `client_id` lives on the service principal it names.
+# The workbench's own client id, which the gateway's `allowed_applications` and MODULE_CALLER_APPLICATION_IDS both
+# name since the archive joined it: an App Service identity publishes `principal_id` only, and the `client_id`
+# lives on the service principal it names.
 data "azuread_service_principal" "workbench_managed_identity" {
   object_id = azurerm_linux_web_app.workbench.identity[0].principal_id
 }
 
-# The two service callers of capital-gateway, for its own `allowed_applications`, looked up for the reason the
+# The other service caller of capital-gateway, for its own `allowed_applications`, looked up for the reason the
 # workbench's is: an App Service identity publishes an object id, and the door needs a client id.
-data "azuread_service_principal" "market_data_managed_identity" {
-  object_id = azurerm_linux_web_app.market_data.identity[0].principal_id
-}
-
 data "azuread_service_principal" "trading_mcp_managed_identity" {
   object_id = azurerm_linux_web_app.trading_mcp.identity[0].principal_id
 }

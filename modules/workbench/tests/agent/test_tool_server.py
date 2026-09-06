@@ -1,4 +1,4 @@
-"""The conversation's MCP client against a real MCP server, since `market-mcp` is not importable from here. Slower than
+"""The conversation's MCP client against a real MCP server, since `telegram-mcp` is not importable from here. Slower than
 the rest of the suite and worth it: the one contract with no committed snapshot is this session, so a mock tests itself."""
 
 from __future__ import annotations
@@ -35,7 +35,7 @@ def settings_for(url: str | None, **overrides) -> Settings:
         openai_api_key="key",
         models=ONE_MODEL,
         default_model_id="gpt-5.6-luna",
-        market_mcp_url=url,
+        telegram_mcp_url=url,
         _env_file=None,  # type: ignore[call-arg]
         **overrides,
     )
@@ -52,7 +52,7 @@ def _stand_in_server(port: int) -> FastMCP:
     @mcp.tool(description="Returns the last price for a symbol, in UTC, bid side.")
     def get_last_price(symbol: str) -> str:
         if symbol != "US100":
-            # The shape market-mcp refuses in: a sentence naming what to change. Raising
+            # The shape telegram-mcp refuses in: a sentence naming what to change. Raising
             # is how a FastMCP tool reports one, and it arrives as isError=True.
             raise ValueError(f"nobody collects {symbol}. Call list_tracked_pairs first.")
         return "US100 last traded at 21000.5 at 2026-08-12T10:00:00Z, 3 minutes ago."
@@ -61,7 +61,7 @@ def _stand_in_server(port: int) -> FastMCP:
     def list_tracked_pairs() -> str:
         return "US100, EURUSD"
 
-    # market-mcp's real `list_tracked_pairs` returns a typed list, not a string. The SDK turns a bare list
+    # telegram-mcp's real `list_tracked_pairs` returns a typed list, not a string. The SDK turns a bare list
     # into one content block *per item*, so a client reading `content` sees N JSON documents back to back.
     @mcp.tool(description="Lists pairs the typed way — the shape that broke the client.")
     def list_pairs_typed() -> list[_PairOut]:
@@ -171,7 +171,7 @@ async def test_a_slow_server_times_out_as_unavailable() -> None:
 
     async with _serving(mcp.streamable_http_app(), port):
         client = ToolServer(
-            settings_for(f"http://127.0.0.1:{port}", market_mcp_request_timeout_seconds=1.0)
+            settings_for(f"http://127.0.0.1:{port}", telegram_mcp_request_timeout_seconds=1.0)
         )
         try:
             outcome = await client.call("sleeps", {})
@@ -194,7 +194,7 @@ async def test_no_configured_server_means_no_tools_and_no_calls() -> None:
     assert outcome.kind is ToolOutcomeKind.UNAVAILABLE
     # The message names which server, because there is more than one now and "the tool
     # server" stopped being unambiguous.
-    assert "market-mcp" in outcome.text
+    assert "telegram-mcp" in outcome.text
     assert "not configured" in outcome.text
 
 
@@ -289,7 +289,7 @@ async def test_an_unreachable_write_is_unknown_rather_than_unavailable() -> None
 
 async def test_a_read_on_the_same_server_is_still_unavailable() -> None:
     """Reading positions is a read even on the server that can write: it changes nothing,
-    so a failed one carries the same "nothing happened" market-mcp's does."""
+    so a failed one carries the same "nothing happened" telegram-mcp's does."""
     client = ToolServer(
         settings_for(None, trading_mcp_url=f"http://127.0.0.1:{_free_port()}"),
         prefix="trading_mcp",
@@ -310,7 +310,7 @@ async def test_a_read_on_the_same_server_is_still_unavailable() -> None:
 
 
 async def test_a_server_that_cannot_move_the_account_never_answers_unknown() -> None:
-    """market-mcp's own client, unchanged: every failure there is still `unavailable`,
+    """telegram-mcp's own client, unchanged: every failure there is still `unavailable`,
     whatever a tool's annotation says."""
     client = ToolServer(settings_for(f"http://127.0.0.1:{_free_port()}"))
     try:

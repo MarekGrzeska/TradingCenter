@@ -393,14 +393,14 @@ def test_a_trigger_with_no_tool_server_configured_is_refused(client: TestClient)
     )
 
     assert response.status_code == 422
-    assert "MARKET_MCP_URL" in response.text
+    assert "TELEGRAM_MCP_URL" in response.text
 
 
 def test_a_trigger_naming_an_unannounced_tool_is_refused(
     client: TestClient, migrated_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with serving_sync(tools=("read_indicators",)) as url:
-        monkeypatch.setenv("MARKET_MCP_URL", url)
+        monkeypatch.setenv("TELEGRAM_MCP_URL", url)
         with TestClient(app) as started:
             team_id, revision_id = _team(started)
             response = started.post(
@@ -417,7 +417,7 @@ def test_a_trigger_naming_an_announced_tool_is_created(
     client: TestClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with serving_sync(tools=("read_indicators",)) as url:
-        monkeypatch.setenv("MARKET_MCP_URL", url)
+        monkeypatch.setenv("TELEGRAM_MCP_URL", url)
         with TestClient(app) as started:
             team_id, revision_id = _team(started)
             response = started.post(
@@ -435,7 +435,7 @@ def test_a_trigger_naming_an_announced_tool_is_created(
 
 def test_updating_a_trigger_changes_its_condition(monkeypatch: pytest.MonkeyPatch) -> None:
     with serving_sync(tools=("read_indicators",)) as url:
-        monkeypatch.setenv("MARKET_MCP_URL", url)
+        monkeypatch.setenv("TELEGRAM_MCP_URL", url)
         with TestClient(app) as started:
             team_id, revision_id = _team(started)
             trigger_id = started.post(
@@ -454,7 +454,7 @@ def test_updating_a_trigger_changes_its_condition(monkeypatch: pytest.MonkeyPatc
 
 def test_disabling_and_re_enabling_a_trigger(monkeypatch: pytest.MonkeyPatch) -> None:
     with serving_sync(tools=("read_indicators",)) as url:
-        monkeypatch.setenv("MARKET_MCP_URL", url)
+        monkeypatch.setenv("TELEGRAM_MCP_URL", url)
         with TestClient(app) as started:
             team_id, revision_id = _team(started)
             trigger_id = started.post(
@@ -475,7 +475,7 @@ def test_a_fire_that_started_nothing_shows_up_in_the_triggers_history(
     migrated_url: str, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     with serving_sync(tools=("read_indicators",)) as url:
-        monkeypatch.setenv("MARKET_MCP_URL", url)
+        monkeypatch.setenv("TELEGRAM_MCP_URL", url)
         with TestClient(app) as started:
             team_id, revision_id = _team(started)
             trigger_id = started.post(
@@ -486,7 +486,7 @@ def test_a_fire_that_started_nothing_shows_up_in_the_triggers_history(
                 migrated_url,
                 trigger_id=trigger_id,
                 outcome="unavailable",
-                reason="market-mcp unreachable",
+                reason="telegram-mcp unreachable",
             )
 
             history = started.get(f"/triggers/{trigger_id}/fires", headers=OWNER)
@@ -524,7 +524,7 @@ def test_a_trigger_over_order_placing_tools_is_written_too(
         serving_sync(tools=("read_indicators",)) as market_url,
         serving_sync(tools=("place_order",)) as trading_url,
     ):
-        monkeypatch.setenv("MARKET_MCP_URL", market_url)
+        monkeypatch.setenv("TELEGRAM_MCP_URL", market_url)
         monkeypatch.setenv("TRADING_MCP_URL", trading_url)
         with TestClient(app) as started:
             team_id, revision_id = _team(started, tools=["place_order"])
@@ -622,7 +622,7 @@ def test_a_deleted_trigger_is_gone_with_its_history(
     """A trigger needs a server that announces its condition's tool, so this one builds its
     own rather than borrowing the shared client."""
     with serving_sync(tools=("read_indicators",)) as url:
-        monkeypatch.setenv("MARKET_MCP_URL", url)
+        monkeypatch.setenv("TELEGRAM_MCP_URL", url)
         with TestClient(app) as started:
             team_id, revision_id = _team(started, tools=["read_indicators"])
             trigger_id = started.post(

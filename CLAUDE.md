@@ -22,8 +22,7 @@ package cannot give it, the change is wrong, not the rule.
 | Where | What |
 |---|---|
 | `modules/capital-gateway` | capital.com: trading, deep history, live stream. Demo only, and the only door to the provider. |
-| `modules/market-data` | the candle archive and its own indicators. Owns the PostgreSQL. Two surfaces: the REST contract, and eleven read-only MCP tools at `/mcp` — reduced for a model, no tool writes. |
-| `modules/workbench` | the operator's conversation with a model, the teams they compose, **two archives and the strategy platform** — one process, five packages that never import each other (`agent`, `teams`, `polymarket_data`, `social_data`, `strategy`), five schemas, two OpenAI keys. The prediction-market archive is served under `/polymarket`: its REST contract, its `/mcp` (two tools **write**, both only *add*; removing an observation is REST-only), and the only door to Polymarket. The post archive under `/social`: what was said, when, and what a model made of it — the door to Truth Social, **nothing on either surface writes**, the reading is stamped with its model and overwritten, never versioned, no backfill. The strategy platform under `/strategy`: a strategy is a catalogue entry — declared facts, parameters, one pure `evaluate` — code in the image **or** an immutable revision the operator wrote; it reads market-data's REST and **never touches an account**: it decides, teams execute. Every package's tools reach the conversation as functions, not over MCP. |
+| `modules/workbench` | the operator's conversation with a model, the teams they compose, **three archives and the strategy platform** — one process, six packages that never import each other (`agent`, `teams`, `polymarket_data`, `social_data`, `strategy`, `market_data`), six schemas, two OpenAI keys. The candle archive under `/market`: its REST contract, eleven read-only MCP tools at `/mcp` (reduced for a model, no tool writes), the one WebSocket this process serves, and the archive's own PostgreSQL — the largest table here. The prediction-market archive under `/polymarket`: its REST contract, its `/mcp` (two tools **write**, both only *add*; removing an observation is REST-only), and the only door to Polymarket. The post archive under `/social`: what was said, when, and what a model made of it — the door to Truth Social, **nothing on either surface writes**, the reading is stamped with its model and overwritten, never versioned, no backfill. The strategy platform under `/strategy`: a strategy is a catalogue entry — declared facts, parameters, one pure `evaluate` — code in the image **or** an immutable revision the operator wrote; it reads the archive inside this process and **never touches an account**: it decides, teams execute. Every package's tools reach the conversation as functions, not over MCP. |
 | `modules/trading-mcp` | MCP tools over the gateway's demo account. Network transport only, one named caller (the workbench). Demo checked against the gateway, not against a setting. |
 | `modules/terminal` | React+TS · the operator's screen. Consumes the others, publishes nothing — a consumer, not a peer. Call it the **terminal**, never a "console" or "dashboard". |
 | `modules/pocket` | React+TS · the archive on a phone, and a chat with the workbench beside it — mobile-first, no MCP of its own. A second consumer, sharing the terminal's generated contract and none of its code. |
@@ -35,7 +34,7 @@ package cannot give it, the change is wrong, not the rule.
 | `openspec/` · `docs/` | specs (the truth) and proposals · architecture and reference, true today. `docs/archive/` is the road, not the state. A new `docs/*.html` copies `docs/style-template.html`. |
 
 **Inside `modules/workbench` the rule has a second form**, because things that were modules
-are packages of one: `agent/`, `teams/`, `polymarket_data/`, `social_data/` and `strategy/` never import each other,
+are packages of one: `agent/`, `teams/`, `polymarket_data/`, `social_data/`, `strategy/` and `market_data/` never import each other,
 `teams_tools/` imports none of them, and `workbench/` — the assembly — is the only place that
 imports all of them, mounting a former module whole under a prefix (`workbench/assembly.py`).
 `tests/test_layering.py` reads the imports and refuses; it is a test, not an understanding. This
@@ -54,8 +53,7 @@ module runs `uv run pytest` · `ruff check .` · `pyright`, the terminal and `po
 | Module | |
 |---|---|
 | `capital-gateway` | `uv run uvicorn capital_gateway.app:app --reload --port 8010` |
-| `market-data` | `uv run alembic upgrade head`, then `uv run uvicorn market_data.app:app --reload --port 8020` |
-| `workbench` | five chains — `uv run alembic -c alembic-agent.ini upgrade head`, then `-c alembic-teams.ini`, `-c alembic-polymarket.ini`, `-c alembic-social.ini`, `-c alembic-strategy.ini` (the process runs all five itself) — then `uv run uvicorn workbench.app:app --reload --port 8030` |
+| `workbench` | six chains — `uv run alembic -c alembic-market.ini upgrade head`, then `-c alembic-agent.ini`, `-c alembic-teams.ini`, `-c alembic-polymarket.ini`, `-c alembic-social.ini`, `-c alembic-strategy.ini` (the process runs all six itself) — then `uv run uvicorn workbench.app:app --reload --port 8030` |
 | `trading-mcp` | `uv run python -m trading_mcp` (8060) · plus `uv run python scripts/contract.py check`, its snapshot of the gateway's OpenAPI |
 | `terminal` | `pnpm dev` (5173) |
 | `pocket` | `pnpm dev` (5174) · the dev scripts start it too; `--host` is what a phone on the same Wi-Fi needs |
@@ -70,12 +68,12 @@ The whole stack: `./scripts/dev.sh` or `./scripts/dev.ps1`, both thin wrappers o
 sits where it does are one table at the top of that file — `uv run python scripts/dev.py
 --explain` prints it, so it is not repeated here.
 
-**Ports are fixed: 8010 gateway, 8020 market-data (REST *and* `/mcp`), 8030 workbench (REST, and each
-package's REST *and* `/mcp` under `/polymarket`, `/social` and `/strategy`), 8060 trading-mcp,
-8100 telegram-gateway (REST *and* `/mcp`), 5173 terminal, 5174 pocket. 8040, 8050, 8070, 8080 and 8090
-are nobody's** — a `.env` still pointing at any of them is a tool server that reads as down. 8070, 8090
-and 8080 were polymarket-data's, social-data's and strategy's until `one-process-per-security-boundary`
-folded the three into the workbench.
+**Ports are fixed: 8010 gateway, 8030 workbench (REST, and each package's REST *and* `/mcp` under
+`/market`, `/polymarket`, `/social` and `/strategy`), 8060 trading-mcp, 8100 telegram-gateway (REST *and*
+`/mcp`), 5173 terminal, 5174 pocket. 8020, 8040, 8050, 8070, 8080 and 8090 are nobody's** — a `.env`
+still pointing at any of them is a tool server that reads as down. 8070, 8090, 8080 and 8020 were
+polymarket-data's, social-data's, strategy's and market-data's until `one-process-per-security-boundary`
+folded the four into the workbench.
 
 ## Things that will bite you
 
@@ -91,7 +89,7 @@ role and database themselves — `docker-entrypoint-initdb.d` only fires on an e
 **The terminal's contract is generated.** After changing `market_data/contract.py`, run
 `pnpm contract:generate` in the terminal — CI's `contract:check` fails on a stale file. The
 five-stop route a new field travels, and why a **new indicator** is not that change and touches
-exactly one file, are in `modules/market-data/README.md`.
+exactly one file, are in `modules/workbench/market_data/README.md`.
 
 **Env files are per-module and gitignored**; copy from `.env.example`, which is the list. Two
 things about them are not in any example file. First, the `workbench` reads one `.env` for two
@@ -99,13 +97,14 @@ surfaces, and a prefix marks the four things doubled on purpose — `AGENT_`/`TE
 `_OPENAI_API_KEY` (two keys so teams experiments bill on their own line), `_MODELS`, and
 `AGENT_DEFAULT_MODEL_ID`, which has no teams twin because every agent in a saved revision names
 its own model. Everything else is one setting for the whole process, read only by
-`workbench/config.py`. Second, three traps, the same mistake at three dates: a file copied
-before `market-mcp-into-market-data` points `MARKET_MCP_URL` at 8040, where nothing listens; one
-copied before `agent-and-teams-one-workbench` carries `TEAMS_MCP_URL`, `POLYMARKET_MCP_URL`, `SOCIAL_MCP_URL` or `STRATEGY_MCP_URL` (read by nothing) and
-carries `DATABASE_URL`, `OPENAI_API_KEY` or `MODELS` unprefixed, which refuses to start rather
-than misbehaving. `dev.py` says all of it at startup.
+`workbench/config.py`; the gateway quartet (`GATEWAY_BASE_URL`, `_STREAM_URL`, `_API_KEY`, `_SCOPE`) is
+the process's too, since the archive inside it is the only thing that reaches the gateway. Second, one trap at
+three dates: a file from before `agent-and-teams-one-workbench` or `one-process-per-security-boundary` carries
+`TEAMS_MCP_URL`, `MARKET_MCP_URL`, `POLYMARKET_MCP_URL`, `SOCIAL_MCP_URL`, `STRATEGY_MCP_URL` or
+`MARKET_DATA_URL` (read by nothing) and carries `DATABASE_URL`, `OPENAI_API_KEY` or `MODELS` unprefixed,
+which refuses to start rather than misbehaving. `dev.py` says all of it at startup.
 
-**The three `*_MCP_URL` settings share one shape: the *absence* of each is a working
+**The two `*_MCP_URL` settings share one shape: the *absence* of each is a working
 configuration**, not a mistake. Without one, the conversation simply has no tools from that
 server — while a team whose agents were *assigned* those tools refuses to run rather than answer
 without them, and that asymmetry is the whole trap. Which server each names, and what its tools
@@ -123,8 +122,8 @@ going down with "a service exited".
 
 **The gateway's door asks for different things in different places, and in production the key
 opens no HTTP route at all.** Locally the shared key is the whole credential. In production, since
-`the-gateway-door-authenticates`, the gateway's Easy Auth requires a validated token: `market-data`
-and `trading-mcp` present tokens of their own managed identities (`GATEWAY_SCOPE`,
+`the-gateway-door-authenticates`, the gateway's Easy Auth requires a validated token: the workbench
+(the archive inside it) and `trading-mcp` present tokens of their own managed identities (`GATEWAY_SCOPE`,
 `CAPITAL_GATEWAY_SCOPE`) beside the key, and the terminal presents the operator's. Since
 `the-key-opens-only-the-stream` the application that token names is what decides — the two modules
 reach everything (`MODULE_CALLER_APPLICATION_IDS`), the terminal the account — and a caller with
@@ -144,16 +143,17 @@ Entra directory write access. `infra/bootstrap/` keeps local state that *is* com
 storage-account keys are in that file and are inert by design (`shared_access_key_enabled =
 false`, verified live). Don't "fix" that by rotating.
 
-**A module's tools arrive at `apply`, not at deploy.** The `workbench` deployed with no
-`MARKET_MCP_URL` starts, runs and answers — without tools, a supported state its own tests walk.
-They appear only after the operator's apply sets that setting **and** puts the workbench's
-managed identity into market-data's `allowed_applications` **and** its
-`TOOL_CALLER_APPLICATION_IDS`, and the app restarts. Neither substitutes for the other: Easy
-Auth authorizes an application, not a route (`market_data/caller_access.py`). The route record
-is empty in a fresh deployment, so **the settings must reach the app before the image that
-enforces them does** — an apply landing after the deploy is an outage in between. Rolling back
-is the same lever: clear the URL, restart. `TRADING_MCP_URL` and trading-mcp's own
-`allowed_applications` are the same pairing for the account.
+**A network tool server arrives at `apply`, not at deploy.** The `workbench` deployed with no
+`TRADING_MCP_URL` starts, runs and answers — without the account's tools, a supported state its own
+tests walk. They appear only after the operator's apply sets that setting **and** puts the workbench's
+managed identity into trading-mcp's `allowed_applications`, and the app restarts. Neither substitutes
+for the other: Easy Auth authorizes an application, not a route (each package's `caller_access.py`).
+A route record is empty in a fresh deployment, so **the settings must reach the app before the image
+that enforces them does** — an apply landing after the deploy is an outage in between. Rolling back is
+the same lever: clear the URL, restart. The archive's tools have no such pairing any more: they are a
+package of the process, and a package reading another's REST does so through the archive's own
+application, named on the ASGI scope as this process (`tc_runtime.caller_access.in_process`) —
+never through the platform's door.
 
 Both lists hold **application** ids, read from the token's `azp`/`appid` claim and never from
 `X-MS-CLIENT-PRINCIPAL-ID`, which names the signed-in *person* for a delegated token — measured
@@ -177,8 +177,7 @@ proves the site is running the right image, not that the process inside came up 
 question, and it reported `Running` over a crash-looping container on 16 August 2026.
 
 Each module satisfies this in its own `lifespan`, under a Postgres advisory lock keyed per module
-(`market_data/db.py` 8020; in the workbench 8030, 8050, 8070, 8090 and 8080 — each the port that
-package used to have) and with the module's own identity, so a table it creates belongs to it. The
+(in the workbench 8020, 8030, 8050, 8070, 8090 and 8080 — each the port that package used to have) and with the module's own identity, so a table it creates belongs to it. The
 reasoning, the uneven lock waits and what `schema_version.py` still means are in
 `openspec/changes/archive/…-modules-migrate-their-own-database`.
 
@@ -259,9 +258,9 @@ repository on 26 August 2026, so a long comment is a regression now, not a lefto
 diff can have broken** — a `changes` job works that out first. `live` tests stay out. Three jobs are
 not a module: `scripts`, `infra` and `openspec`.
 
-Two pairings pull in a job you would not expect, and each is a real check: `market_data/contract.py`
-**or anything under `modules/workbench/`** runs the terminal's job, because `contract:check` over six
-generated contracts is the check for those seams; anything under `capital-gateway` runs
+Two pairings pull in a job you would not expect, and each is a real check: anything under
+`modules/workbench/` runs the terminal's job, because `contract:check` over six generated contracts —
+the archive's among them — is the check for those seams; anything under `capital-gateway` runs
 trading-mcp's, which holds a committed snapshot of the gateway's whole OpenAPI document — the whole
 module, because a document is built from routes as well as models.
 

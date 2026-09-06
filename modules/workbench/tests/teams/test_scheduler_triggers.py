@@ -191,7 +191,7 @@ async def test_a_setup_counted_by_the_strategy_platform_wakes_the_team_once(pool
     and which name the trigger calls. In the process it is a local source; a stand-in server is the same road."""
     box = [0]
     async with serving(build=lambda mcp: _register_pending_setups(mcp, box)) as url:
-        settings = settings_for(None, telegram_mcp_url=url)
+        settings = settings_for(url)
         team_id, revision_id = await _team_and_revision(pool)
         trigger = await _trigger(
             pool,

@@ -65,18 +65,9 @@ class Settings(BaseSettings):
     models: list[ModelCatalogueEntry] = Field(default_factory=list)
     default_model_id: str
 
-    # Unset means no tools, deliberately: the module answers from the model alone. That is also the state
-    # a failed connection degrades to, so the tests walk it.
-    market_mcp_url: str | None = None
-    # api://<market-mcp-app-id>/.default — the scope this module's managed identity
-    # requests a token for. Set only when `market_mcp_url` is not loopback.
-    market_mcp_scope: str | None = None
-    # Per tool call. The operator is watching a panel, and market-mcp's own ceiling is 10s — a little
-    # more here leaves room for its work without turning one slow call into a turn that never ends.
-    market_mcp_request_timeout_seconds: float = 15.0
-
-    # No settings for the teams tools, and their absence is the point: that surface is a layer in this
-    # process, so there is no address, no token and no timeout. It is also the one that cannot be unconfigured.
+    # No `MARKET_MCP_*` since `one-process-per-security-boundary`: the candle archive is a package of this
+    # process, and its eleven tools arrive as a local source the assembly hands in — no address, no token, no
+    # timeout. The same is true of the teams tools, and neither can be unconfigured.
 
     # Unset means what it means for the two above, with the sharpest consequence: the module runs, reads
     # the archive, builds teams, and cannot see a position or send an order.
@@ -107,8 +98,6 @@ class Settings(BaseSettings):
 
     @field_validator(
         "database_user",
-        "market_mcp_url",
-        "market_mcp_scope",
         "trading_mcp_url",
         "trading_mcp_scope",
         "telegram_mcp_url",
@@ -116,7 +105,7 @@ class Settings(BaseSettings):
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
-        # `MARKET_MCP_URL=` left in a .env is the same intent as the line being absent: an empty string
+        # `TRADING_MCP_URL=` left in a .env is the same intent as the line being absent: an empty string
         # is not a value, it is a line someone stopped filling.
         if value is None or not value.strip():
             return None
@@ -158,9 +147,6 @@ class Settings(BaseSettings):
     def _tool_server_modes_are_coherent(self) -> Settings:
         """The third copy of the rule market-data set for its database: name one mode, or none, never
         both. Run once per server, and every message names the one it is about."""
-        self.market_mcp_url = _checked_server(
-            "MARKET_MCP", self.market_mcp_url, self.market_mcp_scope
-        )
         self.trading_mcp_url = _checked_server(
             "TRADING_MCP", self.trading_mcp_url, self.trading_mcp_scope
         )

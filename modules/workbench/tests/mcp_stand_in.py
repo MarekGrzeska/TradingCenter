@@ -15,7 +15,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel
 
-# What market-mcp puts on every one of its tools. The stand-in carries it for the same reason it is a real
+# What telegram-mcp puts on every one of its tools. The stand-in carries it for the same reason it is a real
 # server rather than a mock: a check that reads annotations would otherwise be tested against nothing real.
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True)
 
@@ -39,11 +39,11 @@ def _register(mcp: FastMCP, name: str) -> None:
     how "the server stopped announcing a tool" is reproduced without a second file."""
     if name == "get_last_price":
         # Deliberately unannotated, and the only one here that is: `read_only=None` is a third answer
-        # market-mcp could give, and a test pins that it travels as "unknown" rather than as a guess.
+        # telegram-mcp could give, and a test pins that it travels as "unknown" rather than as a guess.
         @mcp.tool(name=name, description="Returns the last price for a symbol, in UTC, bid side.")
         def get_last_price(symbol: str) -> str:
             if symbol != "US100":
-                # The shape market-mcp refuses in: a sentence naming what to change. Raising is how a
+                # The shape telegram-mcp refuses in: a sentence naming what to change. Raising is how a
                 # FastMCP tool reports one, and it arrives as isError=True.
                 raise ValueError(f"nobody collects {symbol}. Call list_tracked_pairs first.")
             return "US100 last traded at 21000.5 at 2026-08-12T10:00:00Z, 3 minutes ago."

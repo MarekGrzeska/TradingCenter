@@ -295,21 +295,36 @@ longer exist.
    ┌───────────────────────── app-tradingcenter-agent ─────────────────────────┐
    │  workbench/  — the assembly, the only package that imports the others     │
    │  agent  ·  teams  ·  teams_tools                                          │
+   │  market_data      under /market        (capital-gateway, lock key 8020)   │
    │  polymarket_data  under /polymarket    (Polymarket, lock key 8070)        │
    │  social_data      under /social        (Truth Social, lock key 8090)      │
-   │  strategy         under /strategy      (market-data's REST, key 8080)     │
-   │  five databases, one identity, one Easy Auth registration                 │
+   │  strategy         under /strategy      (the archive in-process, key 8080) │
+   │  six databases, one identity, one Easy Auth registration                  │
    └───────────────────────────────────────────────────────────────────────────┘
-        │ /mcp, managed identity              │ REST, the same identity
+        │ /mcp, managed identity              │ REST + key, the same identity
         ▼                                     ▼
-    market-data · trading-mcp            telegram-gateway · market-data
+    trading-mcp                          telegram-gateway · capital-gateway
 ```
+
+**Stage 3, 5 September 2026: the candle archive joined.** `market-data` was the last module with a
+database outside the workbench, and the one every other package read. It is `market_data/` now,
+mounted whole under `/market`: the REST contract, the eleven tools, and `/market/ws/candles` — the
+one WebSocket this process serves, outside Easy Auth and behind the archive's own one-time ticket,
+which is why the App Service has `websockets_enabled` now. The gateway quartet became the process's
+settings, `MARKET_MCP_URL` went the way of the other four, and the terminal asks for the workbench's
+scope where it asked for the archive's. The strategy platform stopped reaching the archive over
+HTTP the same day (3b): it is handed a client over the archive's own application
+(`workbench/archive_client.py`, `httpx.ASGITransport`), and the request names *this process* on the
+ASGI scope — `tc_runtime.caller_access.in_process`, a key no header from the network can set — so
+the archive's route record admits it without an application id, a token, or a hop through the
+platform's door to reach itself. The alternative, the workbench on its own `allowed_applications`,
+is a cycle Terraform refuses to plan.
 
 The rule between packages is the module rule in a second form: none of them imports another,
 and `workbench/` alone imports all of them — `tests/test_layering.py` reads the imports and
 refuses. What is *shared* is the process and its identity: one App Service, one managed
 identity on every caller list, one Easy Auth registration, one `TELEGRAM_GATEWAY_URL` for both
-callers that notify. What is *not* shared is any of the data: five databases, five chains, five
+callers that notify. What is *not* shared is any of the data: six databases, six chains, six
 advisory-lock keys that are the ports the packages used to listen on.
 
 Three things were measured on the way and are worth keeping. The working set of the whole

@@ -132,7 +132,7 @@ def test_a_missing_database_url_names_itself(surface: str) -> None:
 
 
 @pytest.fixture(
-    params=["market_mcp", "trading_mcp", "telegram_mcp"]
+    params=["trading_mcp", "telegram_mcp"]
 )
 def server(request: pytest.FixtureRequest) -> str:
     return request.param
@@ -160,7 +160,7 @@ def test_scope_with_a_loopback_tool_server_is_refused(
     with pytest.raises(ValidationError) as err:
         settings(
             **{
-                f"{server}_url": "http://127.0.0.1:8020",
+                f"{server}_url": "http://127.0.0.1:8100",
                 f"{server}_scope": "api://some-app/.default",
             }
         )
@@ -178,8 +178,8 @@ def test_a_scope_with_no_url_at_all_is_refused(
 def test_loopback_tool_server_without_a_scope_is_accepted(
     settings: Callable[..., Any], server: str
 ) -> None:
-    resolved = settings(**{f"{server}_url": "http://127.0.0.1:8020"})
-    assert getattr(resolved, f"{server}_url") == "http://127.0.0.1:8020"
+    resolved = settings(**{f"{server}_url": "http://127.0.0.1:8100"})
+    assert getattr(resolved, f"{server}_url") == "http://127.0.0.1:8100"
 
 
 def test_remote_tool_server_with_a_scope_is_accepted(

@@ -135,3 +135,10 @@ def strategy_settings() -> object:
     from workbench.config import Settings
 
     return Settings().for_strategy()  # type: ignore[call-arg]
+
+
+def market_settings() -> object:
+    """The candle archive's chain — the sixth, and the one with the largest table."""
+    from workbench.config import Settings
+
+    return Settings().for_market()  # type: ignore[call-arg]

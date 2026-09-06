@@ -1,19 +1,26 @@
-"""The published surface: one FastAPI over both halves of the workbench and the three packages mounted under them,
-assembly only. The lifespan is all-or-nothing, so a process that answers the deploy probe has already brought five
+"""The published surface: one FastAPI over both halves of the workbench and the four packages mounted under them,
+assembly only. The lifespan is all-or-nothing, so a process that answers the deploy probe has already brought six
 databases to this image's revision."""
 
 from __future__ import annotations
 
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from tc_runtime import telemetry
+
+# The candle stream, kept out of the trace: every frame `/market/ws/candles` sends was one dependency row, a
+# quarter-million in two weeks. The instrumentor reads this once, from the environment, so it is here — before
+# `configure` — and not in the package, which does not know its own mount.
+UNTRACED_URLS = "/market/ws/candles"
+os.environ.setdefault("OTEL_PYTHON_FASTAPI_EXCLUDED_URLS", UNTRACED_URLS)
 
 # Above `from fastapi import ...` and not merely before `FastAPI(...)`: the auto-instrumentation patches the class
 # attribute, and the import binds this module's name to the unpatched one. Logging always; Application Insights only
 # with a connection string. Until 5 September 2026 this process configured logging alone, so the loop gauges the two
 # archives register (`liveness.register_metrics`) were never exported and both loop alerts went without data.
-telemetry.configure(quiet=("httpx", "httpcore"))
+telemetry.configure(quiet=("httpx", "httpcore", "urllib3"))
 
 from fastapi import FastAPI
 from tc_runtime import migrate, schema_version
@@ -22,6 +29,7 @@ from tc_runtime.db import pool as make_pool
 from tc_runtime.openapi import require_response_fields
 
 import agent.surface
+import market_data.app
 import polymarket_data.app
 import social_data.app
 import strategy.app
@@ -40,6 +48,7 @@ from teams.runtime import MIGRATIONS as TEAMS_MIGRATIONS
 from teams.scheduler import Clock
 from teams.tools import ToolServerRegistry as TeamsToolServerRegistry
 
+from .archive_client import archive_client
 from .assembly import mount_package
 from .config import Settings
 from .local_tools import ConversationLocalTools, TeamsLocalTools
@@ -56,18 +65,22 @@ async def lifespan(app: FastAPI):
     polymarket_settings = settings.for_polymarket()
     social_settings = settings.for_social()
     strategy_settings = settings.for_strategy()
-    # Each package's tools, called as functions: the server its own `/mcp` mounts, minus the transport.
+    market_settings = settings.for_market()
+    # Each package's tools, called as functions: the server its own `/mcp` mounts, minus the transport. The
+    # archive's eleven were the first tools this process ever called, over the network; they are the last to move in.
     polymarket_tools = ConversationLocalTools("polymarket-data", polymarket_app.state.mcp_server)
     social_tools = ConversationLocalTools("social-data", social_app.state.mcp_server)
     strategy_tools = ConversationLocalTools("strategy", strategy_app.state.mcp_server)
+    market_tools = ConversationLocalTools("market-data", market_app.state.mcp_server)
 
-    # Constructed, not connected: a session opens on the first turn that wants a tool. Reaching market-data at startup
+    # Constructed, not connected: a session opens on the first turn that wants a tool. Reaching trading-mcp at startup
     # would make this process's health depend on another module's, whose answer is to run without its tools.
     team_tools = LocalTeamsTools(
         app, operator_identity_optional=not settings.require_authenticated_principal
     )
     conversation_tools = ToolServerRegistry.from_settings(
-        conversation_settings, local_sources=[team_tools, polymarket_tools, social_tools, strategy_tools]
+        conversation_settings,
+        local_sources=[team_tools, market_tools, polymarket_tools, social_tools, strategy_tools],
     )
 
     async with (
@@ -91,7 +104,13 @@ async def lifespan(app: FastAPI):
         # tool session are entered here, beside this process's own two.
         polymarket_data.app.serving(polymarket_app, polymarket_settings),
         social_data.app.serving(social_app, social_settings),
-        strategy.app.serving(strategy_app, strategy_settings),
+        # The archive before the platform that reads it, and the platform handed the archive's own application
+        # rather than an address: no hop through the platform's authenticator to reach this very process.
+        # The archive's migration may wait on an index over the candle table, and its ingest opens a subscription
+        # per tracked pair the moment it starts.
+        market_data.app.serving(market_app, market_settings),
+        archive_client(market_app) as strategy_archive,
+        strategy.app.serving(strategy_app, strategy_settings, archive_client=strategy_archive),
     ):
         # Built here rather than beside the conversation's, because one of its sources is served by this process and
         # reads the teams database directly: announcing needs no pool, calling does, and this is the first point with one.
@@ -107,6 +126,9 @@ async def lifespan(app: FastAPI):
         # The one the clock reads: `pending_setups` is the number a trigger wakes a team on.
         teams_tool_servers.local["strategy"] = TeamsLocalTools(
             "strategy", strategy_app.state.mcp_server
+        )
+        teams_tool_servers.local["market-data"] = TeamsLocalTools(
+            "market-data", market_app.state.mcp_server
         )
 
         # The `try` opens before the schema checks, not after: `ToolServer.__init__` already holds a credential when a
@@ -202,11 +224,10 @@ app = FastAPI(
         "and transcripts; a team's definition is data, versioned append-only, compiled to "
         "a run rather than written as code. Each model call prices itself at the moment "
         "it is written, against this process's own rate configuration, never recomputed "
-        "later. Read-only tools over the candle archive reach market-data; the tools that "
-        "build and run teams are a layer in this process, and so are the two archives it "
-        "serves under /polymarket and /social — prediction markets, and posts with what a "
-        "model made of them — and the strategy platform under /strategy, which decides and "
-        "never touches an account."
+        "later. The tools that build and run teams are a layer in this process, and so are "
+        "the three archives it serves — the candle archive under /market, prediction markets "
+        "under /polymarket, and posts with what a model made of them under /social — and the "
+        "strategy platform under /strategy, which decides and never touches an account."
     ),
     version="0.1.0",
     lifespan=lifespan,
@@ -245,3 +266,7 @@ social_app = social_data.app.create_app()
 mount_package(app, "/social", social_app)
 strategy_app = strategy.app.create_app()
 mount_package(app, "/strategy", strategy_app)
+# The candle archive, whole: its REST contract, its `/mcp`, and the one WebSocket this process serves —
+# `/market/ws/candles`, outside Easy Auth and behind the archive's own one-time ticket.
+market_app = market_data.app.create_app()
+mount_package(app, "/market", market_app)

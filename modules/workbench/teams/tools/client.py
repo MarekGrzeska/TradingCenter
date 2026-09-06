@@ -87,7 +87,9 @@ class ToolServer:
         self,
         settings: Settings,
         *,
-        prefix: str = "market_mcp",
+        # The default names the server that is only ever reached over the network; the archive, which
+        # this used to name, is a package of the process since `one-process-per-security-boundary`.
+        prefix: str = "telegram_mcp",
         can_move_the_account: bool = False,
     ) -> None:
         self.label = prefix.replace("_", "-")
@@ -323,7 +325,8 @@ class ToolServerRegistry:
 
         return cls(
             {
-                "market-mcp": ToolServer(settings, prefix="market_mcp"),
+                # No market server: the candle archive is a package of this process, and its tools reach
+                # a run through `local` like the two archives' and the strategy platform's.
                 "trading-mcp": ToolServer(
                     settings, prefix="trading_mcp", can_move_the_account=True
                 ),

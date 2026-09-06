@@ -12,8 +12,8 @@ COPY packages/tc-mcp-kit /app/packages/tc-mcp-kit
 COPY modules/workbench/pyproject.toml modules/workbench/uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
-# Four packages, and the layering between them is `tests/test_layering.py`'s rather than this file's: `agent` and
-# `teams` never import each other, and `workbench` is the one place that imports all three.
+# Seven packages, and the layering between them is `tests/test_layering.py`'s rather than this file's: none of them
+# imports another, and `workbench` is the one place that imports all of them.
 COPY modules/workbench/workbench ./workbench
 COPY modules/workbench/agent ./agent
 COPY modules/workbench/teams ./teams
@@ -21,6 +21,7 @@ COPY modules/workbench/teams_tools ./teams_tools
 COPY modules/workbench/polymarket_data ./polymarket_data
 COPY modules/workbench/social_data ./social_data
 COPY modules/workbench/strategy ./strategy
+COPY modules/workbench/market_data ./market_data
 COPY modules/workbench/migrations ./migrations
 RUN uv sync --frozen --no-dev
 
@@ -33,6 +34,6 @@ ENV PATH="/app/modules/workbench/.venv/bin:$PATH"
 # infra/app-service.tf, which sets no WEBSITES_PORT override.
 EXPOSE 80
 
-# Both migration chains run at startup inside the process, each under its own advisory lock. The image ships no
-# `alembic.ini`: `tc_runtime.migrate` builds its Config in memory, and the two ini files exist for running by hand.
+# All six migration chains run at startup inside the process, each under its own advisory lock. The image ships no
+# `alembic.ini`: `tc_runtime.migrate` builds its Config in memory, and the ini files exist for running by hand.
 CMD ["uvicorn", "workbench.app:app", "--host", "0.0.0.0", "--port", "80"]

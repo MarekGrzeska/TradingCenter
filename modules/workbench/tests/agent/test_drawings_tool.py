@@ -36,7 +36,7 @@ A_LEVEL = {"kind": "level", "price": 21500.0, "label": "weekly high"}
 
 
 class FakeToolServer:
-    """Answers the one read `drawings.py` makes, in the shape market-mcp answers it."""
+    """Answers the one read `drawings.py` makes, in the shape telegram-mcp answers it."""
 
     configured = True
 
@@ -47,7 +47,7 @@ class FakeToolServer:
     async def call(self, name: str, arguments: dict) -> ToolOutcome:
         self.seen.append((name, arguments))
         if self._failing:
-            return ToolOutcome(ToolOutcomeKind.UNAVAILABLE, "market-mcp did not answer", 7)
+            return ToolOutcome(ToolOutcomeKind.UNAVAILABLE, "telegram-mcp did not answer", 7)
         if name == "list_tracked_pairs":
             return ToolOutcome(ToolOutcomeKind.OK, json.dumps(PAIRS), 3)
         raise AssertionError(f"the drawing tool asked for an unexpected tool: {name}")

@@ -86,6 +86,17 @@ publicznym hostname działa (etap 3a), ale jest hopem przez platformę do własn
 `_ManagedIdentityAuth`), a `workbench/` wstrzykuje implementację nad `market_data` — pakiety nadal
 się nie importują, składanie zna oba. To jest ten sam ruch, który `teams_tools` wykonał 19 sierpnia.
 
+**Rozstrzygnięte 5 września 2026, w PR-ze 3.2.** Etap 3a okazał się niewykonalny: żeby workbench
+wołał własne `/market` przez publiczny hostname, musiałby stać na własnej liście `allowed_applications`,
+a to cykl między zasobem a jego tożsamością, którego Terraform nie zaplanuje. Wstrzyknięcie poszło
+drogą `teams_tools`: klient `httpx` nad aplikacją archiwum przez `ASGITransport`
+(`workbench/archive_client.py`), z zachowaniem middleware, rekordu tras i handlerów wyjątków — więc
+`archive.py` zostaje klientem REST, tylko transport jest wstrzyknięty. Rekord tras archiwum poznaje
+wywołanie własnego procesu po kluczu na scope ASGI (`tc_runtime.caller_access.in_process`), którego
+żaden nagłówek z sieci nie postawi; test w `tc-runtime` sprawdza, że ten sam klucz jako nagłówek daje
+401. `MARKET_DATA_URL` i `_SCOPE` zniknęły z gospodarza, zostały w `strategy.config` jako droga
+samodzielnego `python -m strategy.backtest`.
+
 ### Wskaźniki w `asyncio.to_thread`, bo pętla zdarzeń jest teraz wspólna
 
 Dziś obliczenie wskaźnika (numpy, TA-Lib, synchronicznie) blokuje tylko market-data. W jednym

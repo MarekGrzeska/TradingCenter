@@ -35,7 +35,7 @@ class WriteServer(ToolServer):
 
     @property
     def configured(self) -> bool:
-        # The base class reads this off MARKET_MCP_URL, which this stub has none of — it
+        # The base class reads this off TELEGRAM_MCP_URL, which this stub has none of — it
         # answers directly instead of opening a session.
         return True
 
