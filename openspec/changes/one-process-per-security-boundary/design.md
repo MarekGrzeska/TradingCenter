@@ -142,6 +142,13 @@ ręce. Terraform dowiaduje się w etapie 5, nie wcześniej — godzina testu to 
 Dwie ostatnie kolumny to dwa założenia o tym, ile z narzutu planu zostaje na maszynie o połowę
 mniejszej. Nikt tego nie zmierzył; godzina z etapu 3 zamienia obie kolumny w jedną liczbę.
 
+Bramka 3 (6 września 2026, po 3.2–3.6 w PR #256): cztery aplikacje na planie B3, `MemoryPercentage` planu
+48–49%, working set workbencha z czterema pakietami 377–409 MB (wobec 357–375 MB z trzema i 1 219 MB, gdy
+cztery były osobnymi aplikacjami). Kolumna „Po etapie 3” zmierzona: sidecary i Python w jednym procesie
+ważą mniej niż tabela zakładała. Jedna lekcja operacyjna: baza zmieniająca właściciela potrzebuje
+`GRANT CONNECT` osobno — skrypt własności daje schemat i obiekty, a workbench bez CONNECT do
+`market_data` restartował się co kwadrans przez dziewięć godzin, zanim to zmierzono.
+
 Pierwsza liczba zmierzona zamiast szacowana (zadanie 1.3, 4 września): obraz workbencha w Dockerze,
 z dwiema pulami do lokalnej bazy, oboma rejestrami narzędzi i schedulerem, po starcie i po dwóch
 minutach: **173 MB** (RSS Pythona 198, anon 164, cache plików 6). W App Service ta sama aplikacja

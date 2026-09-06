@@ -68,6 +68,14 @@
 --   az account get-access-token --resource https://ossrdbms-aad.database.windows.net \
 --      --query accessToken -o tsv
 --
+-- **A database changing hands needs CONNECT as well, and this script does not grant it.** A role
+-- created for a database it will migrate gets CONNECT with `pgaadauth_create_principal_with_oid`'s
+-- default grants on a fresh database; a role taking over a database another role owned does not.
+-- Measured 6 September 2026, the morning `market_data` moved from app-tradingcenter-market-data to
+-- app-tradingcenter-agent: this script reported every object owned and the workbench crash-looped on
+-- "could not connect ... InsufficientPrivilegeError" until, against dbname=market_data:
+--   GRANT CONNECT, TEMPORARY ON DATABASE market_data TO "app-tradingcenter-agent";
+--
 -- **The role has to exist first, and creating it is a step of its own** — this script
 -- grants to a role, it does not make one. `GRANT :"role" TO current_user` on the second
 -- line below is what fails when it is missing, before anything is granted. Found on
