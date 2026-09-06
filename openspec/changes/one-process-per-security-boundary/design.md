@@ -142,6 +142,13 @@ ręce. Terraform dowiaduje się w etapie 5, nie wcześniej — godzina testu to 
 Dwie ostatnie kolumny to dwa założenia o tym, ile z narzutu planu zostaje na maszynie o połowę
 mniejszej. Nikt tego nie zmierzył; godzina z etapu 3 zamienia obie kolumny w jedną liczbę.
 
+**Zmierzone 6 września 2026, 20:45–21:50 UTC, cztery procesy na B2: `MemoryPercentage` planu 79–83%**
+(na B3 tego samego popołudnia 48–50%), zero restartów, wszystkie cztery aplikacje odpowiadały przez całą
+godzinę po 148 sekundach przerwy na zmianę tieru. Suma working setów ≈ 1 070–1 160 MB, czyli narzut planu na
+B2 to ≈ 1,7 GB — między dwoma założeniami tabeli, bliżej niższego. Zastrzeżenie: niedziela, z rynków otwarty
+tylko BTC; tydzień z otwartym rynkiem i backfillami pokaże, czy szczyty przekraczają 85%. Decyzja 3.9: B2
+zostaje, etap 4 pominięty.
+
 Bramka 3 (6 września 2026, po 3.2–3.6 w PR #256): cztery aplikacje na planie B3, `MemoryPercentage` planu
 48–49%, working set workbencha z czterema pakietami 377–409 MB (wobec 357–375 MB z trzema i 1 219 MB, gdy
 cztery były osobnymi aplikacjami). Kolumna „Po etapie 3” zmierzona: sidecary i Python w jednym procesie
