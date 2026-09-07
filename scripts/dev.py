@@ -77,9 +77,8 @@ class Service:
         return None if self.health_path is None else f"{self.url}{self.health_path}"
 
 
-BLUE, MAGENTA, CYAN, YELLOW, GREEN, RED, DIM, RESET = (
+BLUE, CYAN, YELLOW, GREEN, RED, DIM, RESET = (
     "\033[34m",
-    "\033[35m",
     "\033[36m",
     "\033[33m",
     "\033[32m",
@@ -87,18 +86,10 @@ BLUE, MAGENTA, CYAN, YELLOW, GREEN, RED, DIM, RESET = (
     "\033[2m",
     "\033[0m",
 )
-# Bright green went to trading-mcp, the one tool server that is still a process of its own.
+# One colour per service and never two alike: the logs interleave, and colour is how a reader tells them
+# apart. Bright green is trading-mcp's, bright magenta the phone screen's, bright yellow the door to Telegram's.
 BRIGHT_GREEN = "\033[92m"
-# Two services sharing a colour is the one thing
-# this field exists to prevent — the logs interleave, and colour is how a reader tells them apart.
-BRIGHT_BLUE = "\033[94m"
-# And bright magenta to the phone screen, whose log interleaves with the terminal's cyan.
 BRIGHT_MAGENTA = "\033[95m"
-# And bright cyan to the post archive: every other colour here is taken, and two services sharing
-# one is the thing this field exists to prevent.
-BRIGHT_CYAN = "\033[96m"
-# And bright yellow to the door to Telegram. Red is the failure colour and dim is the quiet one,
-# so this is the last ordinary colour left — a tenth back end would need a scheme, not a constant.
 BRIGHT_YELLOW = "\033[93m"
 
 SERVICES: tuple[Service, ...] = (
