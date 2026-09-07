@@ -1,0 +1,407 @@
+<title>Cztery procesy od środka</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  h3.sub {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 26px 0 8px;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Przewodnik po modułach · jeden zamiast pięciu</span>
+    <h1>Cztery procesy od środka</h1>
+    <p class="lede">Osiem procesów 1 września, cztery od 6 września. Ten przewodnik zastępuje pięć osobnych — po jednym na moduł — bo trzy z tych modułów są dziś <b>pakietami jednego procesu</b>, a to, co je dzieliło, było głównie samym podziałem. Czyta się go od mapy w dół; sekcja na proces, jedna wspólna dla dwóch ekranów.</p>
+    <div class="strip">
+      <span>4 procesy · plan <b>B2</b> · 79–83% pamięci</span>
+      <span>2 ekrany: terminal i pocket</span>
+      <span>Python 3.12 · FastAPI · React 19</span>
+      <span>7 września 2026 · dla programisty C#</span>
+    </div>
+  </div>
+</header>
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">8 → 4</div><div class="l">procesów na planie, po <code>one-process-per-security-boundary</code></div></div>
+      <div class="cell"><div class="v">6</div><div class="l">pakietów workbencha, żaden nie importuje sąsiada</div></div>
+      <div class="cell"><div class="v">6</div><div class="l">baz i łańcuchów migracji w jednym procesie</div></div>
+      <div class="cell"><div class="v">1</div><div class="l">proces, który rusza rachunek — trading-mcp</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Mapa</div>
+      <h2>Granica bezpieczeństwa to proces</h2>
+      <p class="intro">Cztery procesy, bo cztery różne reguły zapisu: bramka jest jedynymi drzwiami do dostawcy, trading-mcp jedynym, który rusza rachunek, telegram-gateway jedynym, który sięga do Telegrama, a workbench — wszystkim, co pozostało: rozmowa, zespoły, trzy archiwa i strategia. Dwa ekrany konsumują i nie publikują niczego.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Proces</th><th class="n">Port</th><th>Co robi</th><th>Kto do niego dzwoni</th></tr></thead>
+          <tbody>
+            <tr><td><b>capital-gateway</b></td><td class="n">8010</td><td>handel na demo, głęboka historia, jeden strumień na parę; zero bazy</td><td>workbench (archiwum w środku), trading-mcp, terminal (rachunek)</td></tr>
+            <tr><td><b>workbench</b></td><td class="n">8030</td><td>rozmowa, zespoły, archiwa świec (<code>/market</code>), Polymarketu (<code>/polymarket</code>) i wpisów (<code>/social</code>), strategie (<code>/strategy</code>); sześć baz</td><td>terminal, pocket; sam dzwoni do bramki, trading-mcp i telegram-gateway</td></tr>
+            <tr><td><b>trading-mcp</b></td><td class="n">8060</td><td>dwanaście narzędzi nad rachunkiem demo bramki; demo sprawdzane zanim otworzy port</td><td>tylko workbench — jeden wpis na liście</td></tr>
+            <tr><td><b>telegram-gateway</b></td><td class="n">8100</td><td>jedne drzwi do Telegrama: własne boty, własna baza, niczego nie pamięta</td><td>workbench (archiwum wpisów, strategia, model przez narzędzie)</td></tr>
+            <tr><td><b>terminal</b></td><td class="n">5173</td><td>ekran operatora: dziewięć zakładek, panel czatu obok tras</td><td>nikt — konsument</td></tr>
+            <tr><td><b>pocket</b></td><td class="n">5174</td><td>archiwum Polymarketu na telefonie i czat obok</td><td>nikt — drugi konsument</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 300" role="img" aria-label="Cztery procesy: capital-gateway na górze, pod nim workbench z sześcioma pakietami, obok trading-mcp i telegram-gateway; terminal i pocket czytają workbench, terminal także bramkę">
+            <defs>
+              <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="330" y="16" width="220" height="50" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="440" y="38" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">capital-gateway · 8010</text>
+              <text x="440" y="55" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">jedyne drzwi do capital.com</text>
+
+              <rect x="230" y="120" width="420" height="96" fill="#14306b" stroke="#14306b"></rect>
+              <text x="440" y="143" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">workbench · 8030</text>
+              <text x="440" y="162" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#f2c313">agent · teams · market_data · polymarket_data · social_data · strategy</text>
+              <text x="440" y="180" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#d6dcec">sześć baz · jedna tożsamość · jedna rejestracja Easy Auth</text>
+              <text x="440" y="200" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#d6dcec">workbench/ składa; żaden pakiet nie importuje innego</text>
+
+              <rect x="20" y="130" width="170" height="50" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="105" y="152" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">trading-mcp · 8060</text>
+              <text x="105" y="169" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">jedyna ręka na rachunku</text>
+
+              <rect x="790" y="130" width="170" height="50" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="875" y="152" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">telegram · 8100</text>
+              <text x="875" y="169" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">jedne drzwi do Telegrama</text>
+
+              <rect x="250" y="250" width="160" height="40" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="330" y="275" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">terminal · 5173</text>
+              <rect x="470" y="250" width="160" height="40" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="550" y="275" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">pocket · 5174</text>
+
+              <line x1="440" y1="116" x2="440" y2="70" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="452" y="96" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">REST + WS, klucz + tożsamość</text>
+              <line x1="105" y1="126" x2="330" y2="70" stroke="currentColor" stroke-width="1.2" marker-end="url(#a1)"></line>
+              <line x1="226" y1="160" x2="194" y2="158" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="150" y="196" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">/mcp</text>
+              <line x1="654" y1="160" x2="786" y2="158" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="720" y="150" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">REST + /mcp</text>
+              <line x1="330" y1="246" x2="380" y2="220" stroke="currentColor" stroke-width="1.2" marker-end="url(#a1)"></line>
+              <line x1="550" y1="246" x2="500" y2="220" stroke="currentColor" stroke-width="1.2" marker-end="url(#a1)"></line>
+              <line x1="300" y1="246" x2="340" y2="70" stroke="currentColor" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#a1)"></line>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — cztery procesy, dwa ekrany. Przerywana linia od terminala do bramki to ekran Accounts: jedyny odczyt rachunku z przeglądarki. Model dostaje narzędzia archiwów jako funkcje w procesie, a rachunek i Telegram przez <code>/mcp</code> po sieci.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Reguła nośna</div>
+      <h2>Jeden proces na granicę bezpieczeństwa</h2>
+      <p class="intro">Do 4 września reguła brzmiała „żaden moduł nie importuje innego modułu”, a workbench miał jej „drugą postać”. Od etapu 3 to druga postać jest pierwszą: <span class="hl">wewnątrz procesu pakiety, z których żaden nie importuje sąsiada, i jedno miejsce składania, które importuje wszystkie</span>. Między procesami reguła stara trzyma bez zmian — kontrakt HTTP albo MCP, nigdy pakiet, baza ani tożsamość.</p>
+      <p>W .NET wymusiłby to graf referencji projektów; tu wymusza test. <code>tests/test_layering.py</code> generuje mapę zakazów z listy pakietów, chodzi po AST (importy w ciałach funkcji też się liczą) i ma test pozytywny: składanie <em>musi</em> znać wszystkie, żeby reguły nie dało się spełnić, nie importując niczego. Siódmy pakiet to jeden wpis na liście, nie edycja testu.</p>
+      <p>Co dzieli się między pakietami, a co nie: <strong>proces i tożsamość</strong> — jeden App Service (<code>app-tradingcenter-agent</code>, nazwa jest tożsamością, nie etykietą), jedna tożsamość zarządzana na każdej liście wołających, jedna rejestracja Easy Auth. <strong>Nie dzieli się danych</strong>: sześć baz, sześć łańcuchów Alembika, sześć kluczy rygla doradczego, które są portami, na których pakiety kiedyś nasłuchiwały (8020, 8030, 8050, 8070, 8090, 8080). Powierzchnie o różnych regułach zapisu rozróżnia rekord tras w procesie (<code>caller_access.py</code> każdego pakietu), nie osobne drzwi platformy.</p>
+      <div class="quote">Reguła bez przypadku porażki jest preferencją.</div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · capital-gateway</div>
+      <h2>Okno na dostawcę, nie archiwum</h2>
+      <p class="intro">Trzy zadania: składa, zmienia i zamyka pozycje na rachunku demo; stronicuje historię wstecz ponad limit 1000 świec na zapytanie; utrzymuje jedno wychodzące połączenie WebSocket na parę <code>(symbol, interwał)</code> i rozdziela je subskrybentom. Nie przechowuje niczego poza pięciosekundową notatką o statusie rynku.</p>
+      <p>Cztery warstwy w jednym kierunku: <code>client.py</code> (typowany <code>HttpClient</code>, surowe odpowiedzi, sesja i <code>RateGate</code> w <code>_send()</code>) → <code>mapping.py</code> (czyste funkcje payload → DTO) → <code>adapter.py</code> (orkiestracja, jeden typ błędu <code>GatewayError</code>) → <code>app.py</code> (trasy, middleware, <code>/ws/stream</code>). Obok dwa silniki reguł bez I/O — <code>history.py</code> i <code>stream/forming.py</code> — które dostają współpracowników jako wstrzykiwane funkcje, odpowiednik <code>Func&lt;…, Task&lt;…&gt;&gt;</code> zamiast interfejsu.</p>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Rachunek żywy <span class="tag stop">start odmówiony</span></h3>
+          <p><code>Settings._demo_only</code> wymaga <em>dokładnej</em> równości z adresem demo — host żywy to host demo minus przedrostek, więc test „wygląda na demo” by nie wystarczył. Zła wartość zabija konstrukcję ustawień; sesja żywa nigdy nie istnieje w procesie.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Sesja i klucz <span class="tag stop">nigdy w odpowiedzi</span></h3>
+          <p>Tokeny <code>CST</code> i <code>X-SECURITY-TOKEN</code> nie opuszczają modułu — nie ma ich w odpowiedzi, logu ani ramce błędu; ramki cytują nazwane pola, bo dostawca odbija nieudane żądanie z tokenami w środku. Na 401 klient loguje się raz jeszcze i ponawia dokładnie raz.</p>
+        </div>
+        <div class="fail">
+          <h3>Budżet na rachunek, nie na sesję <span class="tag att">zmierzone</span></h3>
+          <p>10 zapytań na sekundę liczy się na <em>rachunek</em>, z loginem włącznie — dwa uruchomione stosy dławią się nawzajem. Sesje natomiast koegzystują; ostrzeżenie, które stało w CLAUDE.md do 10 sierpnia, nie było zmierzone i było błędne.</p>
+        </div>
+        <div class="fail">
+          <h3>Dwa rodzaje poświadczeń <span class="tag att">różne drzwi</span></h3>
+          <p>Maszyny: wspólny klucz w nagłówku, sprawdzany middleware'em na każdej trasie poza <code>/</code>, a w produkcji do tego token własnej tożsamości. Przeglądarka: principal Easy Auth, claim <em>aplikacji</em> i pięć dokładnych ścieżek — odczyt rachunku tak, zlecenie nigdy. Jedyny wyjątek to <code>/ws/stream</code>: sam klucz, bo autentykator przed upgrade'em WebSocketu go przechwytuje i nie kończy — co 20 sierpnia zabiło każdy strumień na godzinę.</p>
+        </div>
+      </div>
+      <p>Strumień: <code>Hub</code> kluczuje pokoje po parze, jedno połączenie na pokój, ping co cztery minuty pod dziesięciominutowy limit bezczynności. Świeca formująca się jest składana tu, nie u konsumentów — wykres, model i backtest dzielą jedną definicję. Interwały śróddzienne zaokrąglają stempel arytmetycznie; DAY i WEEK biegną za sesją giełdy, więc o granicę pyta się dostawcę albo nie publikuje nic. Klucz jest sprawdzany <strong>przed</strong> <code>accept()</code> (4401), a złe żądanie dostaje 1008 zamiast gniazda, które zaraz umrze.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · workbench</div>
+      <h2>Gospodarz: sześć pakietów, jeden lifespan</h2>
+      <p class="intro">Jeden <code>lifespan</code> w <code>workbench/app.py</code> robi wszystko albo nic: sześć pul, sześć migracji pod osobnymi ryglami, zasilanie i rollupy archiwum świec, pętle próbkowania dwóch pozostałych archiwów, zamknięcie osieroconych przebiegów, zegar harmonogramów. <span class="hl">Proces, który odpowiada na <code>/health</code>, jest dowodem, że wszystkie sześć łańcuchów jest u głowy</span>. Nie ma półstanu, w którym rozmowa działa, a archiwum zgłasza niedostępność.</p>
+      <p>Pakiet, który był modułem, wchodzi cały: własna aplikacja FastAPI zamontowana pod przedrostkiem (<code>workbench/assembly.py</code>), z własnym <code>/openapi.json</code>, własnym <code>/mcp</code>, własnym rekordem wołających. Starlette nie uruchamia lifespanu zamontowanej aplikacji, więc gospodarz sam wypełnia jej <code>app.state</code>. Narzędzia każdego pakietu docierają do rozmowy jako funkcje (<code>workbench/local_tools.py</code>), nie przez sieć — <code>*_MCP_URL</code> archiwów już nie istnieją. Konfiguracja to jeden <code>.env</code> czytany wyłącznie przez <code>workbench/config.py</code>; przedrostek (<code>AGENT_</code>, <code>TEAMS_</code>, <code>MARKET_</code>…) znaczy podwojone celowo — sześć baz, dwa klucze OpenAI, żeby eksperymenty zespołów szły na własną linię faktury.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Pakiet</th><th>Przedrostek · rygiel</th><th>Co trzyma i czego odmawia</th></tr></thead>
+          <tbody>
+            <tr><td><b>workbench/</b></td><td>— · składanie</td><td><code>app.py</code>, <code>assembly.py</code>, <code>config.py</code>, <code>local_tools.py</code> (narzędzia pakietów jako źródło rozmowy), <code>team_tools.py</code> (rejestr FastMCP zespołów jako źródło, principal osoby w <code>carrying()</code>), <code>archive_client.py</code> (klient archiwum świec dla strategii). Jedyny pakiet, który importuje pozostałe.</td></tr>
+            <tr><td><b>agent/</b></td><td>REST · 8030</td><td>rozmowa: LangGraph o dwóch węzłach, sufit ośmiu wywołań narzędzi na turę, prompt w tabeli (seed nigdy nie nadpisuje edycji operatora), koszt liczony raz przy zapisie, dwufazowy ślad wywołań ruszających rachunkiem</td></tr>
+            <tr><td><b>teams/</b></td><td><code>/teams</code> · 8050</td><td>zespół jako dane: <code>TeamDefinition</code> w JSONB (agenci, krawędzie bez cyklu, każdy agent nazywa model), rewizje <strong>tylko INSERT</strong>, przebiegi ze śladem pisanym na bieżąco, limity kosztu sprawdzane przed każdym wywołaniem modelu, cron po warszawsku, wyzwalacze na zboczu warunku</td></tr>
+            <tr><td><b>teams_tools/</b></td><td>funkcje</td><td>narzędzia, którymi model w rozmowie tworzy, rewiduje, uruchamia i harmonogramuje zespoły; <code>revise_team</code> robi read-modify-write z łatki, żeby poprawka jednej roli nie skasowała agenta</td></tr>
+            <tr><td><b>market_data/</b></td><td><code>/market</code> · 8020</td><td>archiwum świec, jedenaście narzędzi tylko-odczyt, <code>/market/ws/candles</code> — jedyny WebSocket tego procesu, poza Easy Auth, za jednorazowym biletem; największa tabela w systemie, rygiel czeka do 1500 s</td></tr>
+            <tr><td><b>polymarket_data/</b></td><td><code>/polymarket</code> · 8070</td><td>archiwum rynków predykcyjnych, jedyne drzwi do Polymarketu; dwa narzędzia <strong>piszą</strong>, oba tylko <em>dodają</em> obserwację — usunięcie jest REST-only</td></tr>
+            <tr><td><b>social_data/</b></td><td><code>/social</code> · 8090</td><td>archiwum wpisów Truth Social i odczyt modelu z nich, stemplowany modelem i nadpisywany, bez wersji i bez backfillu; <strong>nic na żadnej powierzchni nie pisze</strong></td></tr>
+            <tr><td><b>strategy/</b></td><td><code>/strategy</code> · 8080</td><td>katalog strategii: fakty, parametry, jedno czyste <code>evaluate</code> — kod w obrazie albo niezmienna rewizja operatora; czyta archiwum świec <em>w procesie</em> i nigdy nie dotyka rachunku: decyduje, zespoły wykonują</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">Tura rozmowy przeżywa rozłączenie</h3>
+      <p>Wiadomość operatora jest zapisywana <strong>przed</strong> wywołaniem modelu; tura rusza jako zadanie w tle, więc rozłączenie przeglądarki niczego nie przerywa, a <code>POST /stop</code> znajduje ją po id sesji. Wywołanie modelu idzie przez <code>packages/tc-openai</code> — jedyne miejsce, w którym istnieją klasy langchain-openai. Rozmowa podaje <code>Conversation</code>, zespół <code>Briefing</code>; unia typów jest strażnikiem: kto trzyma Briefing, nie ma do czego dopisywać historii. Źródła narzędzi zawodzą <strong>osobno</strong> — brak <code>TRADING_MCP_URL</code> to rozmowa bez narzędzi rachunku, stan wspierany, który czyta się jak błąd modelu („nie widzę pozycji”). Zespół, którego agentom <em>przypisano</em> te narzędzia, odmawia przebiegu zamiast odpowiadać bez nich — i ta asymetria jest całą pułapką.</p>
+
+      <h3 class="sub">Archiwum świec: zebrane bije wyliczone</h3>
+      <p>Świeca wchodzi żywą subskrypcją (zamknięte świece przez <code>commit_candles()</code>: zapis + pokrycie + odświeżenie pochodnych w jednym wejściu) albo chunkiem zlecenia zbierania; obie drogi liczą się do jednego semafora, bo budżet liczy się na rachunek. <code>coverage_ranges</code> zapisuje, co <em>zweryfikowano</em>, więc „brak świecy” ma dwie odpowiedzi — rynek zamknięty albo nikt nie zbierał. Interwały <code>MINUTE_5…HOUR_4</code> są wyliczane z serii minutowej do osobnej tabeli, DAY i WEEK nigdy. Upsert ma regułę autorytetu w <code>WHERE</code>: świeca z historii nie zostanie nadpisana świecą ze strumienia, a formująca się podana do zapisu odrzuca całą partię.</p>
+      <p>Wskaźniki: katalog jest danymi, nie kodem — nowy wskaźnik to wpis w <code>indicators/catalogue/&lt;grupa&gt;.py</code>, dokładnie jeden plik, publikowany przez <code>GET /indicators</code> bez <code>contract:generate</code>. Matematyka w <code>kernel.py</code>: czysty numpy, <code>float64</code>, indeksowanie po świecy; TA-Lib jest wyrocznią w testach i niczym w produkcie. Nowe <em>pole</em> na drucie jedzie za to pięcioma przystankami (model → <code>contract.py</code> → <code>pnpm contract:generate</code> → mapper → typ domeny) i dlatego zmiana pod <code>modules/workbench/</code> odpala w CI job terminala.</p>
+      <p>Jedenaście narzędzi nie oddaje modelowi surowych danych hurtem: <code>get_candles</code> agreguje powyżej 200 świec i odmawia powyżej 2000, mówiąc, o co zapytać; każda pusta odpowiedź mówi, <em>jakim rodzajem pustki</em> jest (niepokryte, wyliczone, formująca się). Cała powierzchnia ma sufit znakowy z testem. Strategia czyta to archiwum bez sieci: klient nad aplikacją archiwum przez <code>httpx.ASGITransport</code>, żądanie nazwane na scope ASGI jako ten proces (<code>tc_runtime.caller_access.in_process</code>) — klucz, którego żaden nagłówek z sieci nie ustawi.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · trading-mcp</div>
+      <h2>Zapis wychodzi raz albo wcale</h2>
+      <p class="intro">Sześć odczytów (pozycje, zlecenia oczekujące, saldo, rachunki, warunki instrumentu, <code>size_for_margin</code>) i sześć zapisów (złożenie, zamknięcie, korekta stopów, anulowanie, przełączenie rachunku, doładowanie demo). Żadnych świec ani cen — rynek to archiwum w workbenchu. Nadal osobny proces, bo to jedyny, który rusza rachunek, z osobną tożsamością na osobnej liście — decyzja zmierzona, opisana w <code>docs/architecture.md</code>, „The order path”.</p>
+      <pre><code><span class="c"># __main__.py — cztery kroki, dwa powody odmowy</span>
+settings = Settings()                          <span class="c"># CAPITAL_GATEWAY_API_KEY bez domyślnej: brak = ValidationError</span>
+gateway = GatewayClient(settings)
+<span class="k">await</span> gateway.ensure_demo_environment()        <span class="c"># nie-demo → NotDemoEnvironment; bramka padła → GatewayUnavailable</span>
+<span class="k">await</span> uvicorn.Server(config).serve()           <span class="c"># dopiero teraz otwiera się port 8060</span></code></pre>
+      <div class="quote">Powtórzone zlecenie to druga pozycja, nie potwierdzenie pierwszej.</div>
+      <p>Bramka nie przyjmuje klucza idempotencji, więc <code>write()</code> nigdy nie ponawia, a <code>get()</code> raz na 5xx. Jedno rozróżnienie niesie całe bezpieczeństwo słowne: <code>GatewayRefused.is_access_failure</code> — 401, 403, 408, 429 i każde 5xx to „awaria dostępu, <span class="hl">skutek na rachunku nieznany, odczytaj pozycje, nie powtarzaj</span>”; 404 i 422 zostają odmową z nazwanym polem. Strażnicy lokalni odrzucają LIMIT bez poziomu i MARKET z poziomem, zanim powstanie żądanie, bo bramka po cichu by je upuściła. Docstring narzędzia jest dokumentacją wysyłaną modelowi w każdej turze — stąd sufit znakowy powierzchni z testem, a <code>mcp</code> przypięte co do wersji, bo slimmer schematów sięga w prywatne pole.</p>
+      <p>Migawka całego OpenAPI bramki leży w <code>contract/</code>; <code>scripts/contract.py check</code> generuje ją na nowo bez bazy i sesji i pada na różnicy. Dlatego każda zmiana w całym module <code>capital-gateway</code> odpala w CI job trading-mcp — dokument budują trasy rozsiane po module, nie ma węższego uczciwego filtra.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · telegram-gateway</div>
+      <h2>Jedne drzwi, żadnej pamięci</h2>
+      <p class="intro">Każdy moduł, który ma coś wartego obudzenia operatora, wysyła to tutaj; model może wysłać przez dwa narzędzia na <code>/mcp</code> (<code>telegram_destinations</code>, <code>send_telegram_message</code>). Własna baza <code>telegram</code>, własne boty. <strong>Nie pamięta, co wysłał</strong> — bez kolejki, ponowień i tabeli wiadomości.</p>
+      <p>Cena jest nazwana, nie ukryta: deduplikacja i retry należą do wołającego. Kształt, który za to płaci, warto kopiować — wołający zapisuje własny znacznik „już powiedziane” <em>po</em> udanej wysyłce; nieudana nie zostawia znacznika, więc następny przebieg próbuje znowu. Archiwum wpisów i strategia sięgają tu po REST przez jedno <code>TELEGRAM_GATEWAY_URL</code>/<code>_SCOPE</code>/<code>ALERT_DESTINATION</code> — wszystkie trzy albo żadne, a żadne to proces, który zbiera i decyduje jak zwykle i nic nie mówi. Był ósmym najemcą planu B3; na B2 jest jednym z czterech, i to jego zwinięcie (etap 4) jest pierwszą dźwignią, gdyby tydzień z otwartym rynkiem pokazał szczyty ponad 85%.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · terminal i pocket</div>
+      <h2>Konsumenci, nie partnerzy</h2>
+      <p class="intro">Terminal: React 19 + TypeScript, Vite, Azure Static Web Apps. Dziewięć zakładek z jednego rejestru w <code>tabs.ts</code> — Graph, Instruments, Data History, Teams, Polymarket, Social, Strategie, Accounts, Agent Settings — i panel czatu zamontowany raz w <code>Shell</code> jako rodzeństwo outletu, nie nakładka. Pocket: to samo archiwum Polymarketu pod kciuk i czat obok; dzieli z terminalem wygenerowany kontrakt i żadnego komponentu.</p>
+      <p>Widoki widzą jedno <code>MarketDataSource</code> i nie dowiadują się, które wywołanie poszło dokąd — kompozycja mieszka w <code>src/data/marketData.ts</code>. Od etapu 3 to dwa adresy: workbench (z przedrostkami <code>/market</code>, <code>/polymarket</code>, <code>/social</code>, <code>/strategy</code>, <code>/teams</code>) i bramka dla ekranu Accounts. Kształty z drutu są snake_case i żyją wyłącznie w plikach-adapterach; reszta mówi camelCase typami domeny, a czas to epoka w sekundach wszędzie poza drutem.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Obszar</th><th>Wybór</th><th>Powód, który gryzie</th></tr></thead>
+          <tbody>
+            <tr><td><b>kontrakt</b></td><td>sześć plików <code>*.generated.ts</code> z OpenAPI, ręczne DTO tylko dla rozmowy</td><td>TypeScript jest wymazywany w runtime — przemianowane pole przyszłoby jako <code>undefined</code>; kontrakt generowany zamienia to w błąd kompilacji, a <code>contract:check</code> biegnie <em>przed</em> testami</td></tr>
+            <tr><td><b>tożsamość</b></td><td>token Entra w kliencie przez MSAL, jeden <code>Identity</code> na audience</td><td>Easy Auth nie wchodzi w grę na różnych hostach; wyciekły token otwiera jeden moduł, nie cztery; WebSocket dostaje jednorazowy bilet w adresie zamiast tokenu</td></tr>
+            <tr><td><b>stan</b></td><td>TanStack Query dla serwera, własne store'y z <code>useSyncExternalStore</code> dla klienta</td><td>bez Reduxa i Contextu; <code>queryClient</code> podawany jawnie, żeby testy renderowały widoki wprost</td></tr>
+            <tr><td><b>wykres</b></td><td>lightweight-charts przypięte, pięć własnych prymitywów canvas</td><td>kanwa czyta tokeny Tailwinda przez <code>getComputedStyle</code>; dubler w testach asertuje, o co komponent prosi bibliotekę, nie piksele</td></tr>
+            <tr><td><b>trzy stany, nie dwa</b></td><td><code>unconfigured / signed-out / signed-in</code>, <code>loading / ready / unreachable</code></td><td>pusta lista ze zdrowego backendu i pusta lista z awarii nie mogą wyglądać tak samo; wskaźnik „unreachable” zlewa martwą sesję z martwym backendem — najpierw przeloguj</td></tr>
+            <tr><td><b>pieniądze</b></td><td>stringi od końca do końca</td><td>terminal renderuje i ma zakaz sumowania</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Uwaga lokalna: corepack pada pod Node 25 — binarki wołać wprost z <code>node_modules/.bin</code>. Brama PR obu ekranów: <code>contract:check</code> → <code>lint</code> → <code>typecheck</code> → <code>test</code>.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Testy</div>
+      <h2>Ile testu wystarczy — zmierzone</h2>
+      <p class="intro">Każdy moduł Pythona: <code>uv run pytest</code> (jednostkowe; wszystko z markerem <code>db</code> pomija się bez Dockera, ale chory demon <em>nie</em> pomija), <code>-m db</code> (jednorazowy PostgreSQL z testcontainers, zmigrowany prawdziwym Alembikiem, <code>TRUNCATE</code> między testami — to biegnie w CI), <code>-m live --run-live</code> (prawdziwa sesja demo, nigdy w CI), a w bramce <code>--run-live-trading</code>, które <em>pisze</em>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Moduł</th><th class="n">Plików testów</th><th>Co trzyma architekturę</th></tr></thead>
+          <tbody>
+            <tr><td><b>capital-gateway</b></td><td class="n">14</td><td>offline na respx; „żadna odpowiedź nie niesie poświadczenia”; fixture czyszczący <code>CAPITAL_*</code>/<code>GATEWAY_*</code> ze środowiska</td></tr>
+            <tr><td><b>workbench</b></td><td class="n">166</td><td><code>test_layering.py</code> (AST sześciu pakietów), <code>test_route_collisions.py</code> (literał wygrywa z <code>{team_id}</code> wyłącznie kolejnością rejestracji), prawdziwy FastMCP na porcie zamiast mocka sesji, jeden test integracji, że strategia widzi świecę, której odmawia się sieci</td></tr>
+            <tr><td><b>trading-mcp</b></td><td class="n">9</td><td>„zapis nigdy nie ponawiany po 5xx ani po timeoutcie”, „401 to awaria dostępu, nie odmowa”, „port nigdy nie został otwarty” przy nie-demo</td></tr>
+            <tr><td><b>telegram-gateway</b></td><td class="n">11</td><td>redakcja tokenów botów, rekord wołających, odmowa startu bez ustawień</td></tr>
+            <tr><td><b>terminal · pocket</b></td><td class="n">obok kodu</td><td><code>Foo.tsx</code> ↔ <code>Foo.test.tsx</code>, bez osobnego drzewa; strażnik „żaden backend nie dostaje prefiksu zajętego przez zakładkę” — spisany fix po tym, jak <code>/archive</code> przesłoniło zakładkę</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Osiem reguł w CLAUDE.md („How much test is enough”) pilnuje, żeby piąta kopia tego samego testu nie powstała: reguła domenowa testowana raz, na najniższej warstwie; nie testuje się cudzych bibliotek ani implementacji; widok CRUD dostaje trzy testy; <code>@pytest.mark.db</code> tylko tam, gdzie test czyta bazę. Żadna z nich nie dotyka miejsc, gdzie chybienie to cicha korupcja, druga pozycja albo wyciek sekretu.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Dla przybysza z C#</div>
+      <h2>Idiomy, które tu pracują</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tutaj</th><th>Najbliższy odpowiednik .NET</th><th>Różnica, która gryzie</th></tr></thead>
+          <tbody>
+            <tr><td><b><code>lifespan</code> z <code>yield</code></b></td><td><code>Program.cs</code> + <code>IHostedService</code></td><td>start i shutdown to jedna funkcja rozcięta yieldem; zależności lądują w <code>app.state</code>, worku bez typu, a trasa bierze je przez <code>Depends()</code> — nie ma kontenera, „rejestracją” jest funkcja-dostawca</td></tr>
+            <tr><td><b>interfejsy strukturalne</b></td><td>nominalne <code>interface</code></td><td><code>LocalTeamsTools</code> „jest” źródłem narzędzi przez pięć metod o tych samych nazwach; <code>typing.Protocol</code> to duck typing sprawdzany tylko statycznie; dublery w testach są strukturalne</td></tr>
+            <tr><td><b>reguła warstw = test</b></td><td>graf referencji projektów</td><td>kompilator niczego nie zabrania — zabrania test parsujący źródła</td></tr>
+            <tr><td><b>pydantic</b></td><td>rekordy + FluentValidation + <code>System.Text.Json</code></td><td>walidacja odpala się przy konstrukcji; <code>model_fields_set</code> rozróżnia „pominięte” od „null” za darmo</td></tr>
+            <tr><td><b>surowy SQL w stałych, migracje ręczne</b></td><td>EF Core</td><td>zero ORM na ścieżce zapytań; SQLAlchemy jest tylko po to, by Alembic jeździł; migracja wypisuje listę interwałów zamiast importować enum, bo import dzisiejszego enuma pozwoliłby przepisać historię</td></tr>
+            <tr><td><b>asyncio</b></td><td><code>async/await</code></td><td>jeden wątek: między await'ami nie trzeba locka i kod z tego korzysta; <code>asyncio.Semaphore</code> to budżet, nie wątki; wskaźnik liczy się w <code>to_thread</code>, żeby pętla nie stała</td></tr>
+            <tr><td><b><code>ContextVar</code></b></td><td><code>AsyncLocal&lt;T&gt;</code> / <code>ClaimsPrincipal</code></td><td>ambientna tożsamość operatora płynie przez <code>carrying(principal)</code>, resetowana nawet gdy narzędzie rzuci</td></tr>
+            <tr><td><b>wyjątki jako odmowy, wyniki jako awarie</b></td><td><code>Result&lt;T&gt;</code> / <code>ProblemDetails</code></td><td>odmowy są rzucane i mapowane na 422; awarie narzędzi <em>nigdy</em> nie rzucają w turę — zepsute narzędzie nie może być zepsutą turą; w MCP <em>tekst</em> komunikatu jest kontraktem</td></tr>
+            <tr><td><b><code>Decimal(str(value))</code></b></td><td><code>decimal</code></td><td><code>Decimal</code> z <code>float</code> zachowuje błąd binarny — wszystko idzie przez <code>str()</code></td></tr>
+            <tr><td><b>middleware = klasa z <code>__call__</code></b></td><td>pipeline ASP.NET Core</td><td>kolejność rejestracji jest <em>odwrotna</em> do wykonania; handshake WebSocketu nie przechodzi przez middleware HTTP wcale</td></tr>
+            <tr><td><b>kolejność importów</b></td><td>—</td><td><code>from X import Y</code> wiąże nazwę do bieżącej wartości; patch Azure Monitor nie dosięgnie nazwy już związanej — dlatego <code>telemetry.configure()</code> przed <code>from fastapi import</code></td></tr>
+            <tr><td><b>typy TS wymazywane</b></td><td>typy nominalne + refleksja</td><td>brak refleksji w runtime — dlatego kontrakt musi być generowany; <code>tsc</code> niczego nie emituje, transpiluje Vite</td></tr>
+            <tr><td><b>useEffect z cleanupem</b></td><td>subskrypcja + <code>IDisposable</code></td><td>StrictMode w dev podwójnie odpala efekty — wygląda jak wyciek gniazd i nim nie jest</td></tr>
+            <tr><td><b>duplikacja z zasady</b></td><td>„DRY zawsze”</td><td>do <code>packages/</code> trafia dopiero to, co <em>zmierzono</em> jako identyczne w ≥ 70% (<code>scripts/measure-duplication.py</code>); każda różnica staje się argumentem, nie gałęzią po wołającym</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Ostatnia rzecz, której nie widać w żadnej tabeli: <strong>komentarze są zapisem projektowym</strong>, ale krótkim — od 26 sierpnia dwie linie to sufit, a powód dłuższy niż dwie linie mieszka w <code>docs/</code> albo w komunikacie commitu. Komentarz, który został, mówi, <em>dlaczego to, a nie oczywista alternatywa</em>, cytuje datę pomiaru albo klauzulę specyfikacji. Czytanie ich jest najszybszą drogą w głąb każdego z tych procesów.</p>
+    </section>
+  </div>
+</main>
+<footer>
+  <div class="inner">
+    <span>Przewodnik po modułach · stan kodu z 7 września 2026 · zastępuje pięć przewodników z 20 sierpnia (w <code>docs/archive/</code>)</span>
+    <span>Źródła: modules/* · README każdego modułu · docs/architecture.md · CLAUDE.md</span>
+  </div>
+</footer>

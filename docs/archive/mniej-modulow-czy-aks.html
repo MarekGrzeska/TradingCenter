@@ -173,10 +173,11 @@
 
 <header class="hero">
   <div class="inner">
-    <span class="kicker">TradingCenter · dwa pomysły na wzrost</span>
+    <span class="kicker">Archiwum · liczby z 1 września, decyzja z 4 września</span>
     <h1>Mniej modułów, czy Kubernetes?</h1>
     <p class="lede">Pięć modułów 20 sierpnia, dziesięć 1 września. Dwa odruchy są naturalne: <b>skleić kilka</b>, żeby było ich mniej, i <b>przenieść całość na AKS</b>, żeby rosło taniej. Ten dokument liczy oba i dochodzi do tego samego wniosku dwiema drogami: <b>rośnie liczba kopii, nie liczba modułów</b> — i żadna z tych dwóch zmian nie odejmuje kopii.</p>
     <div class="strip">
+      <span><b>Nota z 7 września 2026:</b> ten dokument liczył osiem procesów i odrzucił sklejanie; trzy dni później <code>one-process-per-security-boundary</code> zrobiło z ośmiu cztery, bo pamięć przestała być w bród (B3 92% z alertem) i bo sklejane były kopie, nie granice. Stan dzisiejszy: <code>docs/przewodnik-po-modulach.html</code> i <code>docs/architecture.md</code>, „One process per security boundary”.</span>
       <span>TradingCenter / architektura</span>
       <span>1 września 2026 · <b>main @ faa550c</b></span>
       <span>towarzyszy: <b>przeglad-wrzesien-2026.html</b></span>
