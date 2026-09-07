@@ -121,6 +121,15 @@ procesem, i nie wyklucza tego planu — każde zwinięcie zdejmuje obie pary (~2
 zdjęłaby resztę z trzech procesów docelowych (~315 MB). Decyzja o niej to osobna propozycja (0.3); ten plan
 nie czeka na nią, bo jej zysk jest addytywny, nie zamienny.
 
+**Rozstrzygnięte 7 września 2026 (0.3): zapis, nie propozycja — walidacja JWT nie wraca do modułu.** Trzy
+powody. Godzina na B2 z czterema procesami dała 79–83% bez tych ~315 MB, więc liczba, która miała uzasadnić
+propozycję, przestała jej potrzebować. Dźwignią przed nią jest etap 4 (telegram-gateway do gospodarza,
+~230 MB), już napisany w tym planie i pominięty tylko dlatego, że nie był potrzebny. I lekcja z 20 sierpnia:
+walidacja w module to dokładnie to, co `AllowAnonymous` przepuszczał bez sprawdzania — cztery kopie kodu,
+który dziś robi platforma, w czterech procesach, w zamian za pamięć, której nie brakuje. Gdyby tydzień z
+otwartym rynkiem pokazał szczyty ponad 85%, kolejność jest: etap 4, potem B3 z powodem przy `sku_name`, a
+walidacja w module dopiero za obiema.
+
 ### Godzina na B2 po etapie 3, nie przed etapem 2
 
 Przed etapem 2 test niczego nie rozstrzyga (127% B2). Po etapie 3 (cztery procesy) rozstrzyga

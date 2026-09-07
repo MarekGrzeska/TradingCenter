@@ -25,6 +25,7 @@ tego, co stoi przed inną granicą bezpieczeństwa** — zostaje i wyznacza cel.
   ta zmiana czyni ją pierwszą. Warunek „trzecia droga tylko przy jednej tożsamości i jednym
   operatorze" z 20 sierpnia zostaje odwrócony na piśmie: powierzchnie o różnych regułach zapisu
   rozróżnia rekord tras w procesie (`caller_access`), tak jak w market-data od 19 sierpnia.
+  Potwierdzone przez operatora 7 września 2026 (0.1), z etapami 1–3 na produkcji.
 - **Trzy granice bezpieczeństwa, trzy procesy.** `capital-gateway` (jedyne drzwi do dostawcy,
   `/ws/stream` broniony samym kluczem) i `trading-mcp` (jedyny proces, który rusza rachunek, z
   osobną tożsamością na osobnej liście) zostają modułami-procesami bez zmian. Pozostałe moduły —

@@ -1,11 +1,14 @@
 # One Linux App Service Plan and every app in `local.web_app_names`, all running non-stop, so one shared plan beats as
-# many Container Apps. **B3, and each step up was a measurement**: read `plan_memory` (alert at 92%) before changing it.
+# many Container Apps. **B2, and each step in either direction was a measurement**: read `plan_memory` (alert at 92%)
+# before changing it. B3 carried eight processes; `one-process-per-security-boundary` left four, and the hour on B2
+# (6 September 2026, 20:45–21:50 UTC, BTC open) read `MemoryPercentage` 79–83% with no restart — under the 85% the
+# plan set for staying. The change was made live with `az appservice plan update --sku B2` before it was written here.
 resource "azurerm_service_plan" "main" {
   name                = "asp-tradingcenter"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   os_type             = "Linux"
-  sku_name            = "B3"
+  sku_name            = "B2"
 
   # Exactly one worker, on purpose: capital.com counts its 10 req/s per *account*, so a second worker spends one
   # allowance twice and the overflow reaches a caller as missing data. Capacity comes from the rate-limiting design.
@@ -595,8 +598,8 @@ output "trading_mcp_hostname" {
 # --- the door to Telegram --------------------------------------------------------------
 #
 # The eighth app, and the third whose callers are all programs — but the first with no browser among them at all: this
-# module has no screen, because the notification is the screen. **The eighth tenant on one B3 plan** is the thing to
-# watch; `plan_memory` alerts at 92%, and a module here weighs 150-310 MB.
+# module has no screen, because the notification is the screen. It was the eighth tenant on a B3 plan; on the B2 it
+# is one of four, and `plan_memory` (alert at 92%) is still the number to read before adding a fifth.
 module "telegram_gateway_easy_auth" {
   source = "./modules/easy-auth-app"
 

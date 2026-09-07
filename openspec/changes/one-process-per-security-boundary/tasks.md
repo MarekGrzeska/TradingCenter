@@ -1,8 +1,8 @@
 ## 0. Decyzja i pomiar, bez kodu
 
-- [ ] 0.1 Operator potwierdza odwrócenie reguły (proposal.md, „What Changes", pierwszy punkt) — bez tego etapy 2–5 nie ruszają
+- [x] 0.1 Operator potwierdza odwrócenie reguły (proposal.md, „What Changes", pierwszy punkt) — potwierdzone 7 września 2026, po etapach 1–3 na produkcji; etapy 2–3 szły na potwierdzeniu ustnym z 4 września
 - [x] 0.2 Pomiar sidecara Auth (283 → 178 MB, sidecar ≈ 105 MB; design.md): godzina bez `auth_settings_v2` na `app-tradingcenter-telegram-gateway`, odczyt `AverageMemoryWorkingSet` przed i po, powrót; liczba do design.md („Sidecar Auth mierzy się przed etapem 2")
-- [ ] 0.3 Jeśli Auth ≥ 100 MB: ten plan czeka, powstaje osobna propozycja „walidacja JWT w module"; jeśli < 100 MB: dalej
+- [x] 0.3 Jeśli Auth ≥ 100 MB: ten plan czeka, powstaje osobna propozycja „walidacja JWT w module"; jeśli < 100 MB: dalej — 105 MB, na progu; rozstrzygnięte 7 września 2026 jako zapis, nie propozycja (design.md, „Sidecar Auth mierzy się przed etapem 2"): walidacja JWT nie wraca do modułu
 
 ## 1. Szkielet gospodarza (bez zmian w infrastrukturze)
 
@@ -43,7 +43,7 @@
 
 ## 5. Zamknięcie
 
-- [ ] 5.1 Zmiana OpenSpec dla `infra/`: `sku_name = "B2"` z pomiarem obok, jeśli 3.9/4.3 tak powiedziały; w przeciwnym razie komentarz przy `"B3"` z liczbą
+- [x] 5.1 Zmiana OpenSpec dla `infra/`: `sku_name = "B2"` z pomiarem obok, jeśli 3.9/4.3 tak powiedziały; w przeciwnym razie komentarz przy `"B3"` z liczbą — 7 września 2026, w tej zmianie (jej „Infra" obejmuje plan): `app-service.tf` czyta B2 z godziną 3.8 przy sobie; plan Terraforma nie ma nic do zmiany, bo plan był na B2 od 6 września
 - [ ] 5.2 `DROP ROLE` dla tożsamości zwiniętych modułów, po tygodniu bez błędu połączenia w logach
 - [ ] 5.3 Obrazy zwiniętych modułów w GHCR mogą zniknąć; `deploy_gate.py` i mapa `dev.py` bez martwych wpisów
 - [ ] 5.4 Dokumenty: CLAUDE.md (reguła nośna, tabela, porty, „Things that will bite you"), `docs/architecture.md`, `docs/mniej-modulow-czy-aks.html` do `docs/archive/` z notą o zmienionej liczbie, pięć przewodników → jeden
