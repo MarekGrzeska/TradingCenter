@@ -31,7 +31,7 @@
 - [x] 3.4 Brama: `MODULE_CALLER_APPLICATION_IDS` i `allowed_applications` dostają tożsamość gospodarza zamiast market-data; `GATEWAY_*` stają się ustawieniami gospodarza
 - [x] 3.5 Terraform (do apply przez operatora): `azurerm_linux_web_app.market_data` znika jak w 2.2; alerty `candle_age`, `database_unreachable` (scope bazy bez zmian) i web test `/ping` → `/market/ping` wskazują gospodarza; rejestracje `terminal`/`pocket` dla market-data znikają; plan `0 to add` na dotacji
 - [x] 3.6 Terminal (pocket nie czyta archiwum): `VITE_ARCHIVE_HTTP`/`_WS` → gospodarz + `/market`, jeden scope; kontrakty zielone
-- [ ] 3.7 Bramka 3: cztery aplikacje, `candle_age` zielony przez dobę z otwartym rynkiem, working set w tabeli
+- [x] 3.7 Bramka 3: cztery aplikacje na planie od 6 września ~04:20 UTC (apply), workbench serwuje `/market` od ~13:00 UTC — dziewięć godzin przerwy archiwum między apply a naprawą, bo rola gospodarza nie miała CONNECT do `market_data` (skrypt własności tego nie daje; nota w `grant-schema-ownership.sql`); `candle_age` płynie z roli workbencha, luki domknięte (111 wpisów backfillu, brama odpowiada 200 tożsamości workbencha), working set 377–409 MB w design.md; doba z otwartym rynkiem zaczyna się w poniedziałek
 - [ ] 3.8 **Godzina na B2**: spokojna godzina z otwartym rynkiem, `az appservice plan update --sku B2`, `MemoryPercentage` co 5 minut, które aplikacje restartowały, powrót tą samą komendą z `B3`; wynik do design.md jako liczba zamiast dwóch kolumn
 - [ ] 3.9 Decyzja z 3.8: < 85% → etap 5; 85–100% → etap 4; restarty/OOM → B3 zostaje, etap 5 bez SKU, powód przy `sku_name` w `app-service.tf`
 
