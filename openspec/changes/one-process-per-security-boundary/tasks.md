@@ -45,6 +45,6 @@
 
 - [x] 5.1 Zmiana OpenSpec dla `infra/`: `sku_name = "B2"` z pomiarem obok, jeśli 3.9/4.3 tak powiedziały; w przeciwnym razie komentarz przy `"B3"` z liczbą — 7 września 2026, w tej zmianie (jej „Infra" obejmuje plan): `app-service.tf` czyta B2 z godziną 3.8 przy sobie; plan Terraforma nie ma nic do zmiany, bo plan był na B2 od 6 września
 - [ ] 5.2 `DROP ROLE` dla tożsamości zwiniętych modułów, po tygodniu bez błędu połączenia w logach
-- [ ] 5.3 Obrazy zwiniętych modułów w GHCR mogą zniknąć; `deploy_gate.py` i mapa `dev.py` bez martwych wpisów
+- [x] 5.3 Obrazy zwiniętych modułów w GHCR mogą zniknąć; `deploy_gate.py` i mapa `dev.py` bez martwych wpisów — 7 września 2026: `deploy_gate.py` nie ma mapy (czyta pathspecy z workflowu), `dev.py` stracił trzy stałe kolorów po zwiniętych serwisach; obrazy `ghcr.io/marekgrzeska/tradingcenter/{market-data,polymarket-data,social-data,strategy}` (i starsze `market-mcp`, `teams-mcp`) zostają do ręki operatora — token `gh` w CI i lokalnie nie ma `delete:packages`, a `deploy_probe.py` sprawdza obraz po pełnej nazwie, więc stary pakiet niczego nie serwuje; usunięcie: GitHub → Packages → pakiet → Package settings → Delete
 - [ ] 5.4 Dokumenty: CLAUDE.md (reguła nośna, tabela, porty, „Things that will bite you"), `docs/architecture.md`, `docs/mniej-modulow-czy-aks.html` do `docs/archive/` z notą o zmienionej liczbie, pięć przewodników → jeden
 - [ ] 5.5 `review.md` według szablonu: liczby z każdej bramki, co odbiegło od design.md, na którym etapie plan stanął, jeśli stanął
