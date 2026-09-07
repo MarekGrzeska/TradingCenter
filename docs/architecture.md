@@ -2,10 +2,14 @@
 
 ## The shape
 
-One repository, many modules, no shared runtime. A module is a directory under `modules/`
-that runs on its own and publishes a contract. Nothing imports across that boundary at
-runtime; source may be shared at build time through `packages/`, under the conditions in
-"What may be shared, and what may not".
+One repository, four processes, no shared runtime. A module is a directory under `modules/`
+that runs on its own and publishes a contract, and it is a process because it has a rule of
+writing nobody else has: the gateway is the only door to the provider, `trading-mcp` the only
+thing that moves an account, `telegram-gateway` the only door to Telegram, and the `workbench`
+everything else — the conversation, the teams, three archives and the strategy platform, as
+packages of one process. Nothing imports across a process boundary at runtime; source may be
+shared at build time through `packages/`, under the conditions in "What may be shared, and what
+may not".
 
 ```
                   capital.com
@@ -13,115 +17,101 @@ runtime; source may be shared at build time through `packages/`, under the condi
                        │
                        ▼
         ┌──────────────────────────────┐
-        │  capital-gateway             │──────────────────┐
-        │  trade · history · stream    │                  │
-        └──────────────┬───────────────┘                  │ instruments
-                       │ HTTP + WebSocket                 │
-                       ▼                                  │
-        ┌──────────────────────────────┐                  │
-        │  market-data                 │                  │
-        │  archive · coverage · rollups│                  │
-        │  REST  ·  MCP tools at /mcp  │                  │
-        └──────┬───────────────┬───────┘                  │
-     candles,  │               │  the same archive,       │
-     the live  │               │  reduced for a model     │
-     stream    │               │  (MCP, streamable HTTP)  │
-               │  ┌────────────┘                          │
-               │  │                                       │
-               │  │  ┌──────────────────────────────┐     │
-               │  └─▶│  workbench                   │◀─── OpenAI ×2
-               │     │  ┌────────────┬─────────────┐│     │
-               │     │  │conversation│teams        ││     │
-               │     │  │tools · cost│as data · runs││    │
-               │     │  └────────────┴─────────────┘│     │
-               │     │  two schemas · one process   │     │
-               │     └──────────────┬───────────────┘     │
-               │                    │ HTTP, streamed      │
-               ▼                    ▼                     ▼
-                            terminal ◀────────────────────┘
-    charts · grid · search · archive panel · agent panel · teams canvas
+        │  capital-gateway  8010       │◀──────────────────────────┐
+        │  trade · history · stream    │                           │
+        └──────────────┬───────────────┘                           │ REST + key
+                       │ HTTP + WebSocket, key + identity          │ (demo checked
+                       ▼                                           │  before the port)
+  ┌────────────────────────────────────────────────────┐   ┌───────┴────────┐
+  │  workbench  8030  ·  app-tradingcenter-agent       │──▶│  trading-mcp   │
+  │  workbench/ — the assembly, imports all the rest   │   │  8060 · /mcp   │
+  │  agent · teams · teams_tools                       │   └────────────────┘
+  │  market_data      /market      candles · /ws       │   ┌────────────────┐
+  │  polymarket_data  /polymarket  the other archive   │──▶│ telegram-gw    │
+  │  social_data      /social      the post archive    │   │  8100 · REST   │
+  │  strategy         /strategy    reads /market in-   │   │  and /mcp      │
+  │                                process             │   └────────────────┘
+  │  six databases · one identity · one Easy Auth      │◀── OpenAI ×2
+  └───────────┬───────────────────────────┬────────────┘
+              │ REST + WS, the operator's │ REST, the operator's token
+              ▼          token            ▼
+          terminal  5173             pocket  5174
+   nine tabs · agent panel        the archive on a phone · a chat
 ```
 
-`terminal` is a consumer, not a peer: it publishes no contract of its own and nothing
-depends on it. It reads market data through one interface, and that interface now has two
-implementations behind it — candles and the live stream from `market-data`, the instrument
-catalogue from `capital-gateway`, composed into a single instance the views never see
-through. The charts were not rewritten when the archive arrived, which is the whole point
-of having had the interface first. The `workbench` is a third source behind its own
-interfaces — a conversation and its cost, nothing that shares a shape with a candle; and,
-unlike the conversation's, its teams surface publishes a shape the terminal *edits*: a graph
-the operator composes on a canvas and saves as a new revision. One base URL for both, since
-they are one process.
+`terminal` and `pocket` are consumers, not peers: they publish no contract of their own and
+nothing depends on them. The terminal reads market data through one interface with two
+implementations behind it — candles and the live stream from the workbench's `/market`, the
+instrument catalogue and the account from `capital-gateway` — composed into a single instance
+the views never see through. The charts were not rewritten when the archive arrived, nor when
+it changed address on 6 September 2026, which is the whole point of having had the interface
+first. Its other reads are the workbench's own surfaces under their prefixes, one base URL and
+one token audience for all of them since they are one process. The pocket reads the workbench
+alone.
 
-`market-data` sits between the two on purpose. capital.com counts its rate limit against the
-account rather than the process, so a second client anywhere spends the same allowance twice:
-the gateway owns the only door to the provider, and the archive refuses to start if its
-upstream URLs point anywhere else.
+`capital-gateway` stays a process of its own because capital.com counts its rate limit against
+the account rather than the process: a second client anywhere spends the same allowance twice,
+so the gateway owns the only door to the provider and the archive refuses to start if its
+upstream URLs point anywhere else. `trading-mcp` stays one because it is the only thing that
+moves an account, with an identity of its own on a list of its own — "The order path" below has
+the measurement. `telegram-gateway` stays one for now because the plan did not need it folded:
+the hour on B2 read 79–83% with four processes, and stage 4 of `one-process-per-security-boundary`
+is written and skipped, not rejected.
 
-**The archive serves two surfaces, not one.** `market-data` publishes the REST contract the
-terminal reads and, at `/mcp`, eleven read-only MCP tools handing the same archive on in a
-different shape — a chart wants every candle, a model wants a summary, so the read comes
-out reduced rather than proxied. Both are the same process reading the same functions: a
-tool and a route are two consumers of one layer (`market_data/reads.py`), which is what
-stops a decision like "collected beats computed" from being made twice.
+**The candle archive serves two surfaces, not one.** `market_data/` publishes the REST contract
+the terminal reads and, at `/market/mcp`, eleven read-only tools handing the same archive on in a
+different shape — a chart wants every candle, a model wants a summary, so the read comes out
+reduced rather than proxied. Both are the same process reading the same functions: a tool and a
+route are two consumers of one layer (`market_data/reads.py`), which is what stops a decision
+like "collected beats computed" from being made twice. Those tools stood in a module of their own
+until 19 August 2026, and what that module was made of turned out to be mostly the separation
+itself; the archive itself stood in a module of its own until 6 September, and so did the other
+two archives and the strategy platform — "One process per security boundary" below is that
+story, with the numbers.
 
-Those tools stood in a module of their own until 19 August 2026, and what that module was
-made of turned out to be mostly the separation itself: an HTTP client to market-data, a
-committed copy of market-data's schema, a script policing the copy, and an identity to
-present at the door. All of it is gone, and not one tool, ceiling or sentence about
-uncertainty went with it. What did go is the desktop client's stdio door — the tools are
-reachable over the network only now, which is where their two real callers already were.
+A gate in front of an application authorizes the **application**, so admitting a caller for
+eleven read-only tools would admit it to `POST /pairs` and `DELETE /pairs/{symbol}` as well. What
+keeps a caller to its surface is each package's own record of caller against route
+(`caller_access.py`), with a refusal test for every pair that has no business together — and a
+path the record does not name is refused rather than passed. That record is what let the
+packages share one process and one identity without sharing a rule of writing.
 
-The merge moved a question rather than answering it. A gate in front of an application
-authorizes the **application**, so admitting a caller for eleven read-only tools would admit
-it to `POST /pairs` and `DELETE /pairs/{symbol}` as well. What keeps it to
-`/mcp` is the module's own record of caller against surface
-(`market_data/caller_access.py`), with a refusal test for every pair that has no business
-together — and a path the record does not name is refused rather than passed.
-
-The `workbench` reaches OpenAI and the archive's tool surface, and nothing else in this
-diagram. The edge is deliberately narrow: no route to the REST contract, no entitlement to
-one, and no code that would know what to do with a candle. What it has is a tool list it did
-not write, fetched at the start of a session and used as given.
+The conversation reaches OpenAI, the packages' tools as functions in the same process, and two
+tool servers over the network — the account and Telegram. The network edge is the one thing in
+this diagram with no committed copy of its contract anywhere. Every other arrow has one — the
+terminal's six generated contracts, trading-mcp's snapshot of the gateway's document — because
+HTTP does not describe itself at call time. MCP does: the tool names, descriptions and argument
+schemas arrive in the same session that uses them, so there is no second copy to drift and
+nothing to regenerate. The trade is that a tool added on the server's side reaches the model with
+no review on the caller's side, which is safe exactly as long as the server's own specification
+keeps saying what its tools may write.
 
 **The terminal's token stopped being one token on 22 August 2026.** It had asked Entra for
 `market-data`'s scope and presented that to the workbench and the gateway too — the gateway
 accepting that audience as a third one was infrastructure bent to fit the client rather than
-the client taught to ask. The pre-authorizations for asking each back end by name had stood
-in `infra/entra.tf` since August, unused, with a comment saying so. `polymarket-screen-opens-the-archive`
-spent them: one `Identity` per audience off one MSAL session, so a leaked token opens one
-module rather than four, and an audience says which resource it is for again.
-
-That edge is the one thing in this diagram with no committed copy of its contract
-anywhere. Every other arrow has one — the terminal's six generated contracts, trading-mcp's
-snapshot of the gateway's document — because HTTP
-does not describe itself at call time. MCP does: the tool names, descriptions and argument
-schemas arrive in the same session that uses them, so there is no second copy to drift and
-nothing to regenerate. The trade is that a tool added on the archive's side reaches the
-model with no review on the caller's side, which is safe exactly as long as the archive's
-own specification keeps forbidding a tool that writes — and, since the merge, as long as
-the caller record keeps the writing routes out of that caller's reach.
+the client taught to ask. `polymarket-screen-opens-the-archive` spent the pre-authorizations that
+had stood unused in `infra/entra.tf`: one `Identity` per audience off one MSAL session, so a
+leaked token opens one module rather than four. Stage 3 took the count down again from the other
+side: the archive's audience became the workbench's, because the archive became the workbench.
 
 **The two surfaces of the workbench sit beside each other, not one under the other.** Same
-edges out to OpenAI and the archive, a database each, a key each — and no import between
-them. What differs is what they store. One keeps a conversation; the other keeps the
-*definition* of a team — agents, their roles and the dependencies between them — as data in
-a revision that never changes once written, so a run months apart from another can be
-compared against the same definition rather than against a memory of it.
+edges out to OpenAI and the tools, a database each, a key each — and no import between them.
+What differs is what they store. One keeps a conversation; the other keeps the *definition* of a
+team — agents, their roles and the dependencies between them — as data in a revision that never
+changes once written, so a run months apart from another can be compared against the same
+definition rather than against a memory of it. They were two modules until 20 August 2026, and
+what separated them turned out to be mostly the separation: twin tool clients, twin registries,
+twin providers, twin catalogues, twelve settings that existed twice, and a whole third module —
+`teams-mcp` — whose only reason to exist was that the conversation built teams at a neighbour's
+address.
 
-They were two modules until 20 August 2026, and what separated them turned out to be mostly
-the separation: twin tool clients, twin registries, twin providers, twin catalogues, twelve
-settings that existed twice, and a whole third module — `teams-mcp` — whose only reason to
-exist was that the conversation built teams at a neighbour's address. What is left of that
-module is its tools, unchanged in name, description, ceiling and refusal, reaching the teams
-routes through an ASGI transport in the same process. Two network hops became none.
-
-The rule that was "no module imports another module" needs a second form inside the process
-that resulted, and it has one: `agent/` and `teams/` import neither each other nor
-`teams_tools/`, `teams_tools/` imports neither of them, and `workbench/` — the assembly — is
-the only place that may import all three. It is a test that reads the imports
-(`tests/test_layering.py`), not an understanding: the first convenient dependency is written
-in a hurry, and a rule with no failing case is a preference.
+That merge is where the rule this repository is built on changed shape. It read "no module
+imports another module", and the workbench needed a second form of it inside one process. Since
+6 September 2026 the second form is the first: **one process per security boundary; inside it,
+packages of which none imports a neighbour, and one assembly that imports all of them** —
+`workbench/` — held by a test that reads the imports (`tests/test_layering.py`), not by an
+understanding. The first convenient dependency is written in a hurry, and a rule with no failing
+case is a preference. Between processes the old sentence holds unchanged.
 
 ## The prediction-market archive
 
@@ -337,6 +327,16 @@ path *within* its mount, or every route under the prefix is refused — Starlett
 prefix in `path` and puts it in `root_path` (#249); local runs, with the requirement off, never
 show either.
 
+**Gate 3 and the hour on B2, 6 September 2026.** Four App Services on the plan from ~04:20 UTC; the
+workbench served `/market` from ~13:00, after nine hours in which the host's role had ownership of
+`market_data` and no `CONNECT` to it — the ownership script grants schema and objects, and a database
+changing hands needs the grant separately (`scripts/grant-schema-ownership.sql` carries the note).
+With four processes the working set of the workbench was 377–409 MB and the plan read 48–49% on B3.
+The hour on B2 (20:45–21:50 UTC, a Sunday with BTC the only open market): `MemoryPercentage` 79–83%,
+no restart, 148 seconds until all four answered after the tier change. Below the 85% the plan had set,
+so B2 stays, `sku_name` reads it since 5.1, and stage 4 — telegram-gateway into the host — is written
+and skipped. A week with open markets is what the plan's alert at 92% is still watching.
+
 ## The order path
 
 The workbench's teams surface has one more edge than the diagram above draws, and it is
@@ -472,7 +472,9 @@ the next ceiling anyone adds: **a number the operator must not be able to change
 **Nothing is shared at runtime.** A module reaches another only through a published
 contract — HTTP described by OpenAPI, MCP, or typed events. No module imports another
 module's package, reads another module's database, or runs on another module's identity.
-That boundary is the architecture and it does not move.
+That boundary is the architecture and it does not move. What did move, on 6 September 2026,
+is where it sits: between processes, one per rule of writing, with the packages inside a
+process held apart by a test instead ("One process per security boundary").
 
 **Source may be shared at build time, under conditions.** Two modules may depend on a
 package under `packages/`, which is resolved into each module's own lock and compiled

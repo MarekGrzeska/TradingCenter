@@ -11,13 +11,14 @@ A monorepo of **independent** modules. Every module runs standalone — its own 
 dependencies, tests and README — and modules cooperate only through a published contract
 (HTTP/OpenAPI or MCP).
 
-**No module imports another module.** The load-bearing rule: at runtime a module reaches
-another only through a published contract, never through its package, its database or its
-identity. **Source may be shared at build time through `packages/`**, under three conditions
-that `docs/architecture.md` ("What may be shared, and what may not") carries with the
-measurement that put them there. A package is resolved into each module's own lock and baked
-into its own image; nothing is published or versioned. If a change seems to need something a
-package cannot give it, the change is wrong, not the rule.
+**One process per security boundary.** The load-bearing rule, since `one-process-per-security-boundary`
+(6 September 2026): a module is a process because it has a rule of writing nobody else has, and at
+runtime it reaches another only through a published contract, never through its package, its database
+or its identity. Inside a process, packages of which none imports a neighbour, and one assembly that
+imports all of them — held by a test that reads the imports, not by an understanding. **Source may be
+shared at build time through `packages/`**, under three conditions that `docs/architecture.md` ("What
+may be shared, and what may not") carries with the measurement that put them there. If a change seems
+to need something a package cannot give it, the change is wrong, not the rule.
 
 | Where | What |
 |---|---|
@@ -33,13 +34,11 @@ package cannot give it, the change is wrong, not the rule.
 | `infra/` | Terraform · Azure. `infra/bootstrap/` is a separate root with local state. |
 | `openspec/` · `docs/` | specs (the truth) and proposals · architecture and reference, true today. `docs/archive/` is the road, not the state. A new `docs/*.html` copies `docs/style-template.html`. |
 
-**Inside `modules/workbench` the rule has a second form**, because things that were modules
-are packages of one: `agent/`, `teams/`, `polymarket_data/`, `social_data/`, `strategy/` and `market_data/` never import each other,
-`teams_tools/` imports none of them, and `workbench/` — the assembly — is the only place that
-imports all of them, mounting a former module whole under a prefix (`workbench/assembly.py`).
-`tests/test_layering.py` reads the imports and refuses; it is a test, not an understanding. This
-is `one-process-per-security-boundary` in progress: the rule's first form still holds between
-the remaining modules.
+**`modules/workbench` is where the rule's inside shows**: `agent/`, `teams/`, `polymarket_data/`,
+`social_data/`, `strategy/` and `market_data/` never import each other, `teams_tools/` imports none of
+them, and `workbench/` — the assembly — is the only place that imports all of them, mounting a former
+module whole under a prefix (`workbench/assembly.py`). `tests/test_layering.py` generates the map from
+the package list and refuses; a seventh package is one entry there, not an edit of the test.
 
 Why `market-mcp` and `teams-mcp` no longer exist, and why `trading-mcp` still does, is one
 measured decision each — `docs/architecture.md`, "The order path".
@@ -222,8 +221,8 @@ OpenAPI snapshot, the terminal's wire↔domain mappers, the indicator golden fil
 **First decide whether this is an OpenSpec change at all.** Open one when the work will change a
 requirement (`openspec/specs/**`), a contract between modules (`market_data/contract.py`,
 `capital_gateway/dtos.py`, the terminal's generated contract), infrastructure (`infra/**`), or
-**an architectural rule this file calls load-bearing** — today: "no module imports another
-module", and the three conditions under which source may be shared at build time. Otherwise:
+**an architectural rule this file calls load-bearing** — today: "one process per security
+boundary", and the three conditions under which source may be shared at build time. Otherwise:
 branch, tests, pull request. Bug fixes, behaviour-preserving refactors, UI adding no requirement,
 documentation, CI and tooling all take that path. The test is mechanical — name the files the work
 will touch. The fourth category exists because introducing workspace packages reverses the
@@ -267,8 +266,8 @@ module, because a document is built from routes as well as models.
 **There is no branch protection on this repository** — a private repo on the free plan cannot have
 it — so a skipped job blocks nothing.
 
-Ten `deploy-*.yml` workflows deploy **after a green `checks` run of the same commit** (`workflow_run`,
-since 2 September 2026 — before that they raced the checks and won) — eight of ~25 lines calling
+Six `deploy-*.yml` workflows deploy **after a green `checks` run of the same commit** (`workflow_run`,
+since 2 September 2026 — before that they raced the checks and won) — four of ~25 lines calling
 `_deploy-app-service.yml`, which starts with `scripts/deploy_gate.py` (did anything the image bakes in
 change since the last green checks run? not since `HEAD^`, which loses a merge whose checks were
 cancelled) and ends in `scripts/deploy_probe.py`, which asks whether this commit's image is the one
