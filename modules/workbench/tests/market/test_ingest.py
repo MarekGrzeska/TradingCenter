@@ -1081,6 +1081,92 @@ class _PoolSayingTracked:
         return 1
 
 
+class _PoolDownFor(_PoolSayingTracked):
+    """The database of 13 September 2026: refusing connections for a while, then answering again."""
+
+    def __init__(self, refusals: int) -> None:
+        self.refusals = refusals
+
+    async def __aenter__(self):
+        if self.refusals > 0:
+            self.refusals -= 1
+            raise ConnectionRefusedError(111, "Connection refused")
+        return self
+
+
+def _ingest_recording_starts(pool) -> tuple[Ingest, list[tuple[str, Resolution]]]:
+    started: list[tuple[str, Resolution]] = []
+    ingest = Ingest(
+        pool=pool,
+        history=FakeHistory([]),
+        stream_url="ws://gateway.test/ws/stream",
+        default_bars=100,
+    )
+    ingest._start_pair = lambda symbol, resolution: started.append((symbol, resolution))  # type: ignore[method-assign]
+    return ingest, started
+
+
+@pytest.fixture
+def supervisor_clock(monkeypatch):
+    """The supervisor's two waits, shortened so a test runs through several of them."""
+    module = sys.modules[Ingest.__module__]
+    monkeypatch.setattr(module, "REVIVE_DELAY_SECONDS", 0.001)
+    monkeypatch.setattr(module, "RECONCILE_INTERVAL_SECONDS", 0.02)
+    return module
+
+
+async def test_a_revival_outlasts_a_database_that_is_briefly_gone(supervisor_clock) -> None:
+    ingest, started = _ingest_recording_starts(_PoolDownFor(refusals=2))
+
+    await ingest._revive("US100", Resolution.HOUR)
+
+    assert started == [("US100", Resolution.HOUR)], "an unreadable list is not the answer 'untracked'"
+
+
+async def test_a_revival_that_cannot_read_the_list_hands_the_pair_on_instead_of_spinning(
+    supervisor_clock, caplog
+) -> None:
+    ingest, started = _ingest_recording_starts(_PoolDownFor(refusals=1_000))
+
+    with caplog.at_level(logging.WARNING):
+        await asyncio.wait_for(ingest._revive("US100", Resolution.HOUR), timeout=1)
+
+    assert started == []
+    assert any("reconcile" in record.getMessage() for record in caplog.records)
+
+
+@pytest.mark.db
+async def test_a_pair_gone_from_ingest_is_collected_again_with_nobody_asking(
+    pool, supervisor_clock
+) -> None:
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.HOUR, LIMIT)
+
+    ingest = Ingest(
+        pool,
+        FakeHistory([]),
+        "ws://gateway.test/ws/stream",
+        default_bars=100,
+        subscribe_to=_never_ending_feed,
+        sleep=_no_sleep,
+        gateway_api_key="test-gateway-key",
+    )
+    await ingest.start()
+    try:
+        # However it left — a revival that gave up, or something nobody has thought of yet.
+        await ingest._stop_pair(("US100", Resolution.HOUR))
+        assert ingest.running == set()
+
+        for _ in range(100):
+            if ingest.running:
+                break
+            await asyncio.sleep(0.01)
+
+        assert ingest.running == {("US100", Resolution.HOUR)}
+    finally:
+        await ingest.stop()
+
+
 def test_nothing_but_the_store_writes_candles_on_its_own() -> None:
     """`commit_candles` is the only way candles enter the archive. Its other two steps are what a caller
     doing the write by hand forgets, and neither omission fails anything — so this reads the imports."""

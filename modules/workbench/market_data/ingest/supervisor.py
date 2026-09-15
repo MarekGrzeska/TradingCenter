@@ -4,6 +4,7 @@ task per pair, because the provider's ten requests a second are counted against 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from datetime import UTC, datetime
 
@@ -20,6 +21,10 @@ Pair = tuple[str, Resolution]
 # How long a pair waits before being started again after its task died. Longer than a feed
 # reconnect: this path is for a failure that got past `run()`'s own guard.
 REVIVE_DELAY_SECONDS = 30.0
+
+# How often the tasks are matched against the tracked pairs with nobody asking: whatever took a
+# pair out of `_tasks`, this puts it back. Without it `sync()` ran only at startup and on an edit.
+RECONCILE_INTERVAL_SECONDS = 5 * 60.0
 
 
 class Ingest:
@@ -50,6 +55,10 @@ class Ingest:
         # Held so a revival in flight is not garbage-collected mid-sleep, and so
         # `stop()` can cancel one rather than leave it starting a pair after shutdown.
         self._revivals: set[asyncio.Task] = set()
+        self._reconcile: asyncio.Task | None = None
+        # One pass at a time: the timer and an operator's edit both reach `sync`, and two passes
+        # reading the tracked list before either starts a pair would start it twice.
+        self._syncing = asyncio.Lock()
         self.started_at: datetime | None = None
 
     @property
@@ -63,28 +72,52 @@ class Ingest:
         # and it tells a process that just restarted from one failing quietly for hours.
         self.started_at = datetime.now(UTC)
         await self.sync()
+        self._reconcile = asyncio.create_task(self._reconcile_forever(), name="ingest reconcile")
 
     async def sync(self) -> None:
         """Match the running tasks to the tracked pairs, at start and whenever the operator changes
         the list — so adding a pair starts collecting it without a restart."""
-        async with self._pool.acquire() as conn:
-            wanted = {(pair.symbol, pair.resolution) for pair in await read_tracked(conn)}
+        async with self._syncing:
+            async with self._pool.acquire() as conn:
+                wanted = {(pair.symbol, pair.resolution) for pair in await read_tracked(conn)}
 
-        for pair in wanted - self.running:
-            self._start_pair(*pair)
+            # A task that ended on its own — cancelled, or a bug that escaped the loop — is
+            # forgotten first, so this pass reads it as missing and starts it again.
+            for pair, task in list(self._tasks.items()):
+                if task.done():
+                    self._tasks.pop(pair, None)
 
-        for pair in self.running - wanted:
-            await self._stop_pair(pair)
+            for pair in wanted - self.running:
+                self._start_pair(*pair)
 
-        # A task that ended on its own — cancelled, or a bug that escaped the loop — is
-        # forgotten here rather than left in the map looking like it is still collecting.
-        for pair, task in list(self._tasks.items()):
-            if task.done():
-                self._tasks.pop(pair, None)
+            for pair in self.running - wanted:
+                await self._stop_pair(pair)
+
+    async def _reconcile_forever(self) -> None:
+        """Ask again, on a clock nobody has to trigger. Every other path back into `_tasks` runs at
+        the moment of the failure, and that is the moment least likely to work."""
+        while True:
+            await asyncio.sleep(RECONCILE_INTERVAL_SECONDS)
+            try:
+                await self.sync()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                log.exception(
+                    "could not match ingest to the tracked pairs; trying again in %ss",
+                    RECONCILE_INTERVAL_SECONDS,
+                )
 
     async def stop(self) -> None:
         """Stop everything and wait for it, so nothing writes after the process says it
         has shut down."""
+        # First: a reconcile pass landing between the cancellations below would start the pairs
+        # this is stopping, and they would outlive the shutdown.
+        reconcile, self._reconcile = self._reconcile, None
+        if reconcile is not None:
+            reconcile.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await reconcile
         for revival in list(self._revivals):
             revival.cancel()
         self._revivals.clear()
@@ -145,13 +178,33 @@ class Ingest:
     async def _revive(self, symbol: str, resolution: Resolution) -> None:
         """Start a died pair again, after a pause. The pause keeps an immediately recurring failure
         from becoming a spin, and is longer than a feed reconnect for the same reason as above."""
+        delay = REVIVE_DELAY_SECONDS
         try:
-            await asyncio.sleep(REVIVE_DELAY_SECONDS)
-            async with self._pool.acquire() as conn:
-                if not await is_tracked(conn, symbol, resolution):
-                    return
-            if (symbol, resolution) not in self._tasks:
-                self._start_pair(symbol, resolution)
+            while True:
+                await asyncio.sleep(delay)
+                try:
+                    async with self._pool.acquire() as conn:
+                        tracked = await is_tracked(conn, symbol, resolution)
+                except asyncio.CancelledError:
+                    raise
+                except Exception:  # noqa: BLE001 - no failure of this read may mean "untracked"
+                    # A pair dies *because* the database did, so this lands in the same outage.
+                    # Reading that as "untracked" on 13 September 2026 stopped nine pairs for four days.
+                    delay *= 2
+                    if delay > RECONCILE_INTERVAL_SECONDS:
+                        # Handed over rather than dropped: from here the reconcile pass arrives
+                        # sooner than the next attempt would, and it asks the same question.
+                        log.warning(
+                            "could not tell whether %s %s is still tracked; leaving it to the "
+                            "next reconcile pass",
+                            symbol,
+                            resolution.value,
+                        )
+                        return
+                    continue
+                if tracked and (symbol, resolution) not in self._tasks:
+                    self._start_pair(symbol, resolution)
+                return
         except asyncio.CancelledError:
             raise
         except Exception:
