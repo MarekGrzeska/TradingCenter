@@ -13,5 +13,4 @@ modules/terminal/src/data/contract.teams.generated.ts text eol=lf
 modules/*/src/data/*.generated.ts text eol=lf
 
 # Shell scripts run under bash, which fails on a CRLF checkout: every line ends in a stray carriage return.
-': command not found".
 *.sh text eol=lf
