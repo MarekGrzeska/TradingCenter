@@ -12,7 +12,7 @@ from market_data.db import asyncpg_dsn
 from market_data.errors import GatewayUnreachable
 from market_data.gateway import GatewayInstruments
 from market_data.models import Candle, CandleSource, Resolution, TrackedPairState
-from market_data.store import write_candles
+from market_data.store import delete_all_candles, write_candles
 from market_data.tracking import (
     CollectionState,
     LimitReached,
@@ -357,6 +357,23 @@ async def test_the_status_carries_the_candle_count(db: asyncpg.Connection) -> No
     [status] = await read_status(db, now=MOMENT)
 
     assert status.candle_count == 3
+
+
+@pytest.mark.db
+async def test_the_kept_count_follows_what_the_table_actually_holds(db: asyncpg.Connection) -> None:
+    """Kept by triggers, not counted: an upsert onto a stored period and a stream offer the authority
+    rule refuses must add nothing, and a deletion must take its candles back out."""
+    await track(db, "US100", Resolution.MINUTE, LIMIT)
+    periods = [MOMENT - timedelta(minutes=m) for m in range(3)]
+    await write_candles(db, [candle(period_start=p) for p in periods])
+    await write_candles(db, [candle(period_start=p, close=2.0) for p in periods])
+    await write_candles(db, [candle(period_start=p, source=CandleSource.STREAM) for p in periods])
+    [status] = await read_status(db, now=MOMENT)
+    assert status.candle_count == 3
+
+    await delete_all_candles(db, "US100", Resolution.MINUTE)
+    [status] = await read_status(db, now=MOMENT)
+    assert status.candle_count == 0
 
 
 @pytest.mark.db

@@ -643,3 +643,10 @@ production, nothing locally:
   second copy of it.
 
 A pair whose market the gateway reports closed appears in neither gauge.
+
+The read behind them is the same one `GET /pairs` makes, so it has to stay cheap whatever the archive's
+depth. It once grouped a join over every candle to count them: a full scan of `candles` each minute
+with nobody watching, **48 s** at 1,1M rows on the throttled server (23 September 2026), and a large
+part of what spent the database's burst credits. Each bound is now one probe of the primary key
+(**26 ms** on that server), and the count is kept in `candle_counts` by statement-level triggers
+on `candles` (migration `0008`), so a previous image still writing during a deployment is counted too.
