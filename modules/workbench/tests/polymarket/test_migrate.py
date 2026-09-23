@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
 from urllib.parse import urlparse, urlunparse
 
 import asyncpg
@@ -220,5 +221,62 @@ async def test_duplicate_spellings_are_merged_into_the_oldest_before_the_index(
         assert await conn.fetchval("SELECT count(*) FROM tracked_events WHERE group_id = $1", oldest) == 2
         with pytest.raises(asyncpg.UniqueViolationError):
             await conn.execute("INSERT INTO observation_groups (name) VALUES ('CRYPTO')")
+    finally:
+        await conn.close()
+
+
+@pytest.mark.db
+async def test_0007_merges_the_ranges_that_touch_and_keeps_the_gaps(empty_database_url: str) -> None:
+    """Rewrites every range production ever wrote, once, so walked rather than trusted: a gap it closed
+    would read as collected for ever, and backfill would never go back to it."""
+    from alembic import command
+    from tc_runtime.migrate import alembic_config
+
+    config = alembic_config(MIGRATIONS, sqlalchemy_url(empty_database_url))
+    await asyncio.to_thread(command.upgrade, config, "0006")
+
+    conn = await asyncpg.connect(asyncpg_dsn(empty_database_url))
+    try:
+        event_id = await conn.fetchval(
+            "INSERT INTO tracked_events (provider_event_id, slug, title) VALUES ('e', 'e', 'e') RETURNING id"
+        )
+        market_id = await conn.fetchval(
+            "INSERT INTO markets (event_id, provider_market_id, condition_id, question) "
+            "VALUES ($1, 'm', 'm', 'q') RETURNING id",
+            event_id,
+        )
+        first, second = [
+            await conn.fetchval(
+                "INSERT INTO outcomes (market_id, position, name, token_id) "
+                "VALUES ($1, $2, $3, $3) RETURNING id",
+                market_id,
+                position,
+                name,
+            )
+            for position, name in ((0, "Yes"), (1, "No"))
+        ]
+        minute = timedelta(minutes=1)
+        t0 = datetime(2026, 9, 1, tzinfo=UTC)
+        ranges = [
+            (first, t0, t0 + minute),  # touches the next at its end
+            (first, t0 + minute, t0 + 2 * minute),
+            (first, t0 + timedelta(seconds=90), t0 + 3 * minute),  # overlaps
+            (first, t0 + 10 * minute, t0 + 11 * minute),  # after a gap
+            (second, t0, t0 + minute),  # another outcome's, touching nothing of the first's
+        ]
+        await conn.executemany(
+            "INSERT INTO collected_ranges (outcome_id, starts_at, ends_at) VALUES ($1, $2, $3)", ranges
+        )
+
+        await asyncio.to_thread(command.upgrade, config, "head")
+
+        rows = await conn.fetch(
+            "SELECT outcome_id, starts_at, ends_at FROM collected_ranges ORDER BY outcome_id, starts_at"
+        )
+        assert [tuple(row) for row in rows] == [
+            (first, t0, t0 + 3 * minute),
+            (first, t0 + 10 * minute, t0 + 11 * minute),
+            (second, t0, t0 + minute),
+        ]
     finally:
         await conn.close()
