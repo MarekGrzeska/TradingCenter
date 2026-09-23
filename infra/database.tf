@@ -55,6 +55,14 @@ resource "azurerm_postgresql_flexible_server_configuration" "extensions" {
   value     = "PG_STAT_STATEMENTS"
 }
 
+# Azure ships the extension counting nothing: `track` defaults to `none` here, so the view stayed empty after
+# CREATE EXTENSION (23 September 2026). `top`, not `all`: statements the application sends, not the ones inside them.
+resource "azurerm_postgresql_flexible_server_configuration" "statements_tracked" {
+  name      = "pg_stat_statements.track"
+  server_id = azurerm_postgresql_flexible_server.main.id
+  value     = "top"
+}
+
 resource "azurerm_postgresql_flexible_server_active_directory_administrator" "human" {
   server_name         = azurerm_postgresql_flexible_server.main.name
   resource_group_name = azurerm_resource_group.main.name
