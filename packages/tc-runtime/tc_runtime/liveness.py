@@ -18,21 +18,20 @@ from datetime import UTC, datetime
 
 log = logging.getLogger(__name__)
 
-# Reported for a loop that has not finished a pass since the process started. Not zero, which reads
-# as "just ran", and not `None`, which an alert rule cannot compare: a large number is the honest
-# answer to "how long since it last worked", and it resolves itself on the first pass.
-NEVER_RAN = 10**6
-
-
 class LoopHeartbeat:
     """One loop's last completed pass. `beat()` after the work, never before: a pass that raised
     is a pass that did not happen, and the whole point is to notice."""
 
-    def __init__(self, name: str, *, expected_seconds: float) -> None:
+    def __init__(
+        self, name: str, *, expected_seconds: float, started: datetime | None = None
+    ) -> None:
         self.name = name
         # What "late" means for this loop, in its own terms. A sampling pass every minute and a
         # collection every hour are both healthy; one threshold for the two would be wrong twice.
         self.expected_seconds = expected_seconds
+        # Counted from here until the first pass: a process that never manages one still crosses any
+        # threshold, while one restarting does not fire before its first pass is due (23 September 2026).
+        self._started = started or datetime.now(UTC)
         self._last: datetime | None = None
 
     def beat(self, now: datetime | None = None) -> None:
@@ -43,9 +42,8 @@ class LoopHeartbeat:
         return self._last is not None
 
     def age_seconds(self, now: datetime | None = None) -> float:
-        if self._last is None:
-            return float(NEVER_RAN)
-        return max(0.0, ((now or datetime.now(UTC)) - self._last).total_seconds())
+        since = self._last or self._started
+        return max(0.0, ((now or datetime.now(UTC)) - since).total_seconds())
 
     def passes_late(self, now: datetime | None = None) -> float:
         """The age in passes of this loop's own interval, which is the unit an alert can share
@@ -99,7 +97,7 @@ def register_metrics(module: str, heartbeats: Heartbeats) -> None:
         callbacks=[observe],
         description=(
             "How many of its own intervals have passed since each loop last finished a pass. "
-            "1 is one pass late and normal; an alert fires higher up. A loop that has never "
-            f"finished one reports {NEVER_RAN} intervals rather than zero."
+            "1 is one pass late and normal; an alert fires higher up. A loop that has not "
+            "finished one yet counts from when it started."
         ),
     )
