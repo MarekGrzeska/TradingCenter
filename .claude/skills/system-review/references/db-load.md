@@ -90,7 +90,7 @@ is a map, not a verdict.
 2. Cadence: interval × fan-out (per pair, per watch…). Idle: does it run when nobody looks and
    nothing is new?
 3. Predicates against indexes: `scan.json → hotspots.indexes[table]`, then the migration itself
-   (`modules/workbench/migrations/<chain>/versions/`, `modules/telegram-gateway/migrations/versions/`).
+   (`modules/workbench/migrations/<chain>/versions/`).
    A composite index serves a predicate on its leading columns only.
 4. Class C0–C3, and rows touched at today's scale — from tier T2 or T4, or "unknown" plus how to
    measure it.

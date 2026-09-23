@@ -1,24 +1,22 @@
-"""The published surface: FastAPI over the door to Telegram. Only assembly lives here, and the order
-inside the lifespan is what to read twice: the database is migrated before anything is served."""
+"""The published surface: FastAPI over the door to Telegram. Only assembly lives here, and the order inside
+`serving` is what to read twice: the database is migrated before anything is served.
+
+A package of the workbench process since stage 4 of `one-process-per-security-boundary`: the host mounts
+`create_app()` under `/telegram` and enters `serving` from its own lifespan, because a mounted application's
+lifespan is never run. `app` and `lifespan` below are what `python -m telegram_gateway.openapi` and the tests build.
+"""
 
 from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
 
-from tc_runtime import telemetry
-
-# Above `from fastapi import ...` and not merely before `FastAPI(...)`: the auto-instrumentation
-# patches the class attribute, and the import binds this module's name to the unpatched one. Nothing
-# is quietened: `httpx`'s request line carries the bot token, and `redaction.py` exists to redact it.
-telemetry.configure()
-
 from fastapi import FastAPI
 from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
-from . import mcp_app
+from . import mcp_app, redaction
 from .binding import Watcher
 from .bot_api import bot_api
 from .caller_access import RECORD, CallerAccess
@@ -29,10 +27,12 @@ from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 log = logging.getLogger(__name__)
 
 
-
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    settings = Settings()  # type: ignore[call-arg]
+async def serving(app: FastAPI, settings: Settings):
+    """Everything this package needs running, on `app.state`, for as long as the block is open."""
+    # Before the first request to Telegram, whose URL carries the bot token. The standalone module never called
+    # this: on 23 September 2026 Application Insights held 61 027 lines, a month of them, each with a whole token.
+    redaction.install()
     app.state.settings = settings
 
     async with (
@@ -77,6 +77,14 @@ async def lifespan(app: FastAPI):
                 yield
             finally:
                 await watcher.stop()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Standalone: the settings read from this process's environment, then `serving`."""
+    settings = Settings()  # type: ignore[call-arg]
+    async with serving(app, settings):
+        yield
 
 
 def create_app() -> FastAPI:

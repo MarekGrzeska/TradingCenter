@@ -54,6 +54,10 @@ dependencies = [
     "websockets>=13",
     "numpy>=2.0",
     "azure-monitor-opentelemetry>=1.6",
+    # The door to Telegram's one, since it joined this process: MTProto, for the optional half only. Creating a bot
+    # means talking to @BotFather, which only a *user account* may; imported inside the method that uses it, so a
+    # deployment with no account session never loads it.
+    "telethon>=1.44.0",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.

@@ -1,4 +1,4 @@
-"""The module's own tool: what it accepts, what it refuses, and what it leaves behind. The telegram-mcp
+"""The module's own tool: what it accepts, what it refuses, and what it leaves behind. The trading-mcp
 stand-in answers with the same JSON the real server's typed tools serialize."""
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ PAIRS = [
 
 
 class FakeToolServer:
-    """Answers the two reads `chart.py` makes, in the shape telegram-mcp answers them."""
+    """Answers the two reads `chart.py` makes, in the shape trading-mcp answers them."""
 
     configured = True
 
@@ -74,7 +74,7 @@ class FakeToolServer:
     async def call(self, name: str, arguments: dict) -> ToolOutcome:
         self.seen.append((name, arguments))
         if name == self._failing:
-            return ToolOutcome(ToolOutcomeKind.UNAVAILABLE, "telegram-mcp did not answer", 7)
+            return ToolOutcome(ToolOutcomeKind.UNAVAILABLE, "trading-mcp did not answer", 7)
         if name == "list_indicators":
             return ToolOutcome(ToolOutcomeKind.OK, json.dumps(CATALOGUE), 3)
         if name == "list_tracked_pairs":

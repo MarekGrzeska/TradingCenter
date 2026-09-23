@@ -77,14 +77,6 @@ class Settings(BaseSettings):
     # worst case still has to read here as "slow", not as this module's own timeout firing first.
     trading_mcp_request_timeout_seconds: float = 35.0
 
-    # The fifth, and the only one whose tool acts outside this system. Its ceiling is trading-mcp's number
-    # for trading-mcp's reason: a timeout on this side of a message already delivered is a notification
-    # sent twice, or one reported as failed after it arrived.
-    telegram_mcp_url: str | None = None
-    telegram_mcp_scope: str | None = None
-    telegram_mcp_request_timeout_seconds: float = 35.0
-
-
     # A ceiling on the whole run, not on one agent: the thing an operator waits on is the run. A setting
     # rather than a constant, unlike the per-agent round ceiling, which is a safety property.
     run_timeout_seconds: float = 900.0
@@ -114,8 +106,6 @@ class Settings(BaseSettings):
         "database_user",
         "trading_mcp_url",
         "trading_mcp_scope",
-        "telegram_mcp_url",
-        "telegram_mcp_scope",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -163,9 +153,6 @@ class Settings(BaseSettings):
         independently per configured server, so an operator fixing one need not guess which a bare error names."""
         self.trading_mcp_url = self._coherent_tool_server_url(
             url=self.trading_mcp_url, scope=self.trading_mcp_scope, env_prefix="TRADING_MCP"
-        )
-        self.telegram_mcp_url = self._coherent_tool_server_url(
-            url=self.telegram_mcp_url, scope=self.telegram_mcp_scope, env_prefix="TELEGRAM_MCP"
         )
         return self
 

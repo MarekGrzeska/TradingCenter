@@ -7,14 +7,15 @@ manage bots are HTTP routes rather than a shape somebody described.
 
 from __future__ import annotations
 
-import builders
 import httpx
 import pytest
-from fakes import FakeBotApi, RecordingWatcher
 
 from telegram_gateway.bot_api import Delivered
 from telegram_gateway.config import Settings
 from telegram_gateway.errors import RateLimited
+
+from . import builders
+from .fakes import FakeBotApi, RecordingWatcher
 
 pytestmark = pytest.mark.db
 

@@ -12,7 +12,14 @@
 -- role could read every table the administrator had made and could alter none of them.
 -- Once the app role owns what it created, neither is needed for anything it makes later.
 --
--- Usage, from a machine whose IP the server's firewall admits:
+-- Usage, through a temporary firewall rule for this machine's address — there is no standing one
+-- (`production-answers-from-outside`) — deleted in the same session, even when the script fails:
+--
+--   az postgres flexible-server firewall-rule create -g rg-tradingcenter -n psql-tradingcenter \
+--      --rule-name tmp-operator --start-ip-address <ip> --end-ip-address <ip>
+--   ... psql as below ...
+--   az postgres flexible-server firewall-rule delete -g rg-tradingcenter -n psql-tradingcenter \
+--      --rule-name tmp-operator --yes
 --
 --   psql "host=psql-tradingcenter.postgres.database.azure.com port=5432 dbname=agent \
 --         user=<entra-admin-upn> sslmode=require" \
@@ -27,7 +34,9 @@
 --   with dbname=polymarket, role=app-tradingcenter-agent;  -- the workbench serves the archive
 --   with dbname=strategy,   role=app-tradingcenter-agent;  -- the workbench serves the strategy platform
 --   with dbname=social,     role=app-tradingcenter-agent;  -- the workbench serves the post archive too
---   and with dbname=telegram, role=app-tradingcenter-telegram-gateway.
+--   and with dbname=telegram, role=app-tradingcenter-agent — the workbench serves the door to Telegram since
+--                           stage 4 of one-process-per-security-boundary, and app-tradingcenter-telegram-gateway
+--                           hands over here; with the GRANT CONNECT below, since the role is taking a database over.
 --
 -- The seven databases are `agent`, `market_data`, `teams`, `polymarket`, `strategy`,
 -- `social` and `telegram` (infra/database.tf). `tradingcenter` is the *server*, not a database on it, and asking
@@ -96,15 +105,6 @@
 --   docker run --rm -e PGPASSWORD="$TOKEN" -v "$PWD/scripts:/s:ro" postgres:17-alpine \
 --     psql "host=… dbname=polymarket user='<admin upn>' sslmode=require" \
 --     -v role=app-tradingcenter-polymarket-data -f /s/grant-schema-ownership.sql
---
--- The server's firewall admits `var.developer_ip_address` (infra/database.tf), which is
--- one address and is the operator's usual one. From anywhere else, add a rule for the
--- moment and take it away afterwards rather than moving that variable to whichever
--- network they happen to be on:
---   az postgres flexible-server firewall-rule create -g rg-tradingcenter \
---      -n psql-tradingcenter --rule-name TempOperatorGrant \
---      --start-ip-address <ip> --end-ip-address <ip>
---   … and `firewall-rule delete --rule-name TempOperatorGrant --yes` when done.
 --
 -- Idempotent: an object already owned by the role is reassigned to itself.
 

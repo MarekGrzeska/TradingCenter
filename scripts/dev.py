@@ -128,24 +128,6 @@ SERVICES: tuple[Service, ...] = (
         ),
     ),
     Service(
-        name="telegram-gateway",
-        module="telegram-gateway",
-        port=8100,
-        command=(
-            "uv", "run", "uvicorn", "telegram_gateway.app:app", "--reload", "--port", "8100"
-        ),
-        log_prefix="telegram",
-        colour=BRIGHT_YELLOW,
-        health_path="/health",
-        why=(
-            "Independent of everything above it — its upstream is Telegram, and it sends "
-            "only when somebody asks. Before the workbench for the reason every tool server "
-            "is: the tool list is read on the first turn that wants one. Its other two "
-            "callers — the workbench's post archive and strategy platform, one process — do not wait "
-            "on it at all: without a gateway to reach they collect and decide as usual, and say nothing."
-        ),
-    ),
-    Service(
         name="workbench",
         module="workbench",
         port=8030,
@@ -158,12 +140,13 @@ SERVICES: tuple[Service, ...] = (
             "conversation and the teams catalogue are one process here — 8050 has belonged "
             "to nobody since `agent-and-teams-one-workbench`, and 8070 to nobody since "
             "`one-process-per-security-boundary` folded polymarket-data into this process, "
-            "8090 since it folded social-data in, 8080 since strategy, 8020 since market-data. "
+            "8090 since it folded social-data in, 8080 since strategy, 8020 since market-data, "
+            "8100 since telegram-gateway. "
             "The archive inside it opens a subscription per tracked pair the moment it starts, "
-            "so a gateway not listening yet costs it a round of backoff. It calls two tool "
-            "servers over the network now, and each tool list is read on the first turn that "
-            "wants one, so a server still coming up means a turn answered without those tools "
-            "rather than an error anyone would notice."
+            "so a gateway not listening yet costs it a round of backoff. It calls one tool "
+            "server over the network, trading-mcp, and its tool list is read on the first turn "
+            "that wants one, so a server still coming up means a turn answered without those "
+            "tools rather than an error anyone would notice."
         ),
     ),
     Service(
@@ -201,7 +184,7 @@ SERVICES: tuple[Service, ...] = (
     ),
 )
 
-# Every migration chain and which module owns it; `workbench` appears six times because it owns six databases.
+# Every migration chain and which module owns it; `workbench` appears seven times because it owns seven databases.
 # Redundant with each module's startup migration, and kept because it fails readably rather than under a lock.
 MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
     ("workbench", "alembic-market.ini"),
@@ -210,7 +193,7 @@ MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
     ("workbench", "alembic-polymarket.ini"),
     ("workbench", "alembic-social.ini"),
     ("workbench", "alembic-strategy.ini"),
-    ("telegram-gateway", None),
+    ("workbench", "alembic-telegram.ini"),
 )
 
 # Created here if missing rather than through docker-entrypoint-initdb.d, which only runs against
@@ -260,12 +243,6 @@ REQUIRED_ENV: tuple[tuple[str, str], ...] = (
     (
         "trading-mcp",
         "copy .env.example and set CAPITAL_GATEWAY_API_KEY to the gateway's own GATEWAY_API_KEY",
-    ),
-    # The three account-session lines are meant to stay empty: without them the module sends and
-    # refuses to create bots, which is a configuration it supports rather than a missing step.
-    (
-        "telegram-gateway",
-        "copy .env.example; the defaults match compose.yaml, and the account session is optional",
     ),
 )
 
@@ -352,9 +329,18 @@ def _database_host_problems(env: Environment) -> list[str]:
         ("workbench", "MARKET_DATABASE_URL"),
         ("workbench", "AGENT_DATABASE_URL"),
         ("workbench", "TEAMS_DATABASE_URL"),
+        ("workbench", "TELEGRAM_DATABASE_URL"),
     ):
         text = env.read_env(module)
         if text is None:
+            continue
+        if key == "TELEGRAM_DATABASE_URL" and not env_value(text, key):
+            # The one required line a `.env` from before stage 4 cannot have: without it the
+            # workbench refuses to start, and the reason scrolls past in its log.
+            problems.append(
+                f"modules/{module}/.env has no {key} — the door to Telegram is a package of the "
+                "workbench now; add it as .env.example does"
+            )
             continue
         host = database_host(text, key=key)
         if not is_loopback(host):
@@ -414,15 +400,6 @@ ADVISORIES: tuple[tuple[str, str, str, str], ...] = (
         ),
         "8060",
     ),
-    (
-        "workbench",
-        "TELEGRAM_MCP_URL",
-        (
-            "the agent cannot send a notification, and a team assigning those tools "
-            "refuses to run"
-        ),
-        "8100",
-    ),
 )
 
 # Settings that stopped existing, and what a `.env` still carrying them is a sign of. Said rather
@@ -466,8 +443,26 @@ RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
         ),
     ),
     (
+        "TELEGRAM_MCP_URL",
+        (
+            "the door to Telegram is a package of this process since stage 4 of "
+            "`one-process-per-security-boundary`, served under /telegram; its two tools need no "
+            "address, and TELEGRAM_DATABASE_URL is the line this file needs instead"
+        ),
+    ),
+    (
+        "TELEGRAM_GATEWAY_URL",
+        (
+            "the post archive and the strategy platform reach the door to Telegram inside this "
+            "process since the same stage; ALERT_DESTINATION alone says who they tell"
+        ),
+    ),
+    (
         "DATABASE_URL",
-        "the workbench owns six databases: MARKET_, AGENT_, TEAMS_, POLYMARKET_, SOCIAL_ and STRATEGY_DATABASE_URL",
+        (
+            "the workbench owns seven databases: MARKET_, AGENT_, TEAMS_, POLYMARKET_, SOCIAL_, "
+            "STRATEGY_ and TELEGRAM_DATABASE_URL"
+        ),
     ),
     (
         "OPENAI_API_KEY",
@@ -874,6 +869,7 @@ def ready_lines(*, start_front_ends: bool) -> list[str]:
         f"  Polymarket docs     http://{LOOPBACK}:8030/polymarket/docs",
         f"  Social docs         http://{LOOPBACK}:8030/social/docs",
         f"  Strategy docs       http://{LOOPBACK}:8030/strategy/docs",
+        f"  Telegram docs       http://{LOOPBACK}:8030/telegram/docs",
         (
             "  Database            market_data, agent, teams, polymarket, social, strategy, "
             "telegram @ localhost:55432 "

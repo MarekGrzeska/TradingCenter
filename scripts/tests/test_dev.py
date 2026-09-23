@@ -32,13 +32,10 @@ GOOD_ENV: dict[str, str] = {
         "TRADING_MCP_URL=http://127.0.0.1:8060\n"
         "POLYMARKET_DATABASE_URL=postgresql://polymarket:pw@127.0.0.1:55432/polymarket\n"
         "SOCIAL_DATABASE_URL=postgresql://social:pw@127.0.0.1:55432/social\n"
-        "TELEGRAM_MCP_URL=http://127.0.0.1:8100\n"
         "STRATEGY_DATABASE_URL=postgresql://strategy:pw@127.0.0.1:55432/strategy\n"
+        "TELEGRAM_DATABASE_URL=postgresql://telegram:pw@127.0.0.1:55432/telegram\n"
     ),
     "trading-mcp": "CAPITAL_GATEWAY_API_KEY=shared-secret\n",
-    # Nor here, and deliberately: the account session that creates bots is three lines meant
-    # to stay empty, and without them the module sends and refuses to create.
-    "telegram-gateway": "DATABASE_URL=postgresql://telegram:pw@127.0.0.1:55432/telegram\n",
 }
 
 ON_PATH = {"uv", "docker", "pnpm", "npm"}
@@ -112,6 +109,19 @@ class TestRefusals:
         assert any(f"modules/{module}/.env's {key} points at '{remote}'" in p for p in problems)
         assert any("never a remote database" in p for p in problems)
 
+    def test_a_workbench_env_from_before_the_door_moved_in_is_refused(self) -> None:
+        """The one required line an `.env` from before stage 4 cannot have: said here, not scrolled past."""
+        files = dict(GOOD_ENV)
+        files["workbench"] = "".join(
+            line
+            for line in files["workbench"].splitlines(keepends=True)
+            if not line.startswith("TELEGRAM_DATABASE_URL=")
+        )
+
+        problems = preflight(environment(files=files), start_front_ends=True)
+
+        assert any("has no TELEGRAM_DATABASE_URL" in p for p in problems)
+
     def test_a_missing_docker_is_refused(self) -> None:
         problems = preflight(
             environment(on_path=ON_PATH - {"docker"}),
@@ -153,9 +163,6 @@ class TestRefusals:
             "capital-gateway",
             "workbench",
             "trading-mcp",
-            # Listed for the archive's old reason rather than trading-mcp's: no secret of its
-            # own, but `DATABASE_URL` has no default, so the process exits at start.
-            "telegram-gateway",
         }
 
     def test_the_front_end_checks_are_skipped_when_neither_is_started(self) -> None:
@@ -172,7 +179,7 @@ class TestRefusals:
 
     def test_every_problem_is_reported_together(self) -> None:
         """Finding out about the second one after two services are running means killing them."""
-        files = {"telegram-gateway": GOOD_ENV["telegram-gateway"]}
+        files = {"trading-mcp": GOOD_ENV["trading-mcp"]}
 
         problems = preflight(
             environment(files=files, on_path=set(), busy_ports={8010}),
@@ -237,7 +244,6 @@ class TestStartOrder:
         assert [service.name for service in SERVICES] == [
             "capital-gateway",
             "trading-mcp",
-            "telegram-gateway",
             "workbench",
             "terminal",
             "pocket",
@@ -248,16 +254,17 @@ class TestStartOrder:
             "capital-gateway": 8010,
             "workbench": 8030,
             "trading-mcp": 8060,
-            "telegram-gateway": 8100,
             "terminal": 5173,
             "pocket": 5174,
         }
 
     def test_the_ports_that_stopped_being_anybodys_are_not_listened_on(self) -> None:
         """8040 went with market-mcp, 8050 with teams-mcp, 8070 with polymarket-data, 8090 with social-data, 8080
-        with strategy and 8020 with market-data into the workbench; a `.env` still naming any of them is a tool
-        server that reads as down."""
-        assert {8020, 8040, 8050, 8070, 8080, 8090}.isdisjoint({service.port for service in SERVICES})
+        with strategy, 8020 with market-data and 8100 with telegram-gateway into the workbench; a `.env` still naming
+        any of them is a tool server that reads as down."""
+        assert {8020, 8040, 8050, 8070, 8080, 8090, 8100}.isdisjoint(
+            {service.port for service in SERVICES}
+        )
 
     def test_every_back_end_is_waited_for(self) -> None:
         """A service started and not waited for is what `dev.ps1` once did to teams-mcp."""

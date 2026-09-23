@@ -110,6 +110,63 @@ resource "azurerm_application_insights_standard_web_test" "market_data_ping" {
   }
 }
 
+# The same question for the two apps that are not the workbench, on the paths their Easy Auth already exempts and
+# which read nothing (`production-answers-from-outside`). Without them the gateway's death surfaced only through the
+# candle-age alert, and trading-mcp's not at all.
+locals {
+  liveness_tests = {
+    capital-gateway = "https://${local.capital_gateway_hostname}/"
+    trading-mcp     = "https://${local.trading_mcp_hostname}/health"
+  }
+}
+
+resource "azurerm_application_insights_standard_web_test" "liveness" {
+  for_each = local.liveness_tests
+
+  name                    = "webtest-${each.key}-liveness"
+  resource_group_name     = azurerm_resource_group.main.name
+  location                = azurerm_resource_group.main.location
+  application_insights_id = azurerm_application_insights.main.id
+  enabled                 = true
+  retry_enabled           = true
+  geo_locations           = ["emea-nl-ams-azr"]
+  frequency               = 900
+  timeout                 = 30
+
+  request {
+    url = each.value
+  }
+
+  validation_rules {
+    expected_status_code = 200
+  }
+}
+
+resource "azurerm_monitor_metric_alert" "liveness" {
+  for_each = local.liveness_tests
+
+  name                = "alert-${each.key}-availability"
+  resource_group_name = azurerm_resource_group.main.name
+  scopes = [
+    azurerm_application_insights_standard_web_test.liveness[each.key].id,
+    azurerm_application_insights.main.id,
+  ]
+  description = "${each.key} does not answer ${each.value} from outside."
+  severity    = 1
+  frequency   = "PT5M"
+  window_size = "PT15M"
+
+  application_insights_web_test_location_availability_criteria {
+    web_test_id           = azurerm_application_insights_standard_web_test.liveness[each.key].id
+    component_id          = azurerm_application_insights.main.id
+    failed_location_count = 1
+  }
+
+  action {
+    action_group_id = azurerm_monitor_action_group.operator.id
+  }
+}
+
 resource "azurerm_monitor_metric_alert" "market_data_availability" {
   name                = "alert-market-data-availability"
   resource_group_name = azurerm_resource_group.main.name
@@ -143,7 +200,7 @@ resource "azurerm_monitor_metric_alert" "market_data_availability" {
 # pass every minute and a collection every five are both healthy, and one threshold in seconds would be wrong for one
 # of them. Three, matching the candle alert: two is a restart landing badly, three is a loop that stopped.
 locals {
-  # The modules with a loop worth watching, and the metric each one publishes. telegram-gateway is deliberately absent:
+  # The packages with a loop worth watching, and the metric each one publishes. The door to Telegram is deliberately absent:
   # its watcher is a long poll per adopted bot, so a gateway with no bots has no loop, and silence there is a supported
   # state rather than a failure — an alert on it would fire on the day the operator has bound nothing.
   loop_alerts = {

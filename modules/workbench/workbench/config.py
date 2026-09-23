@@ -1,7 +1,7 @@
 """The one place this process reads its environment. What stays doubled carries a prefix and is doubled on purpose:
 two schemas, two OpenAI keys so the experiments bill on their own line, and two catalogues. The four packages that
 joined this process read what is theirs alone under a prefix of their own: `POLYMARKET_`, `SOCIAL_`, `STRATEGY_`,
-`MARKET_` — and the gateway, which only the archive reaches, is the process's, unprefixed."""
+`MARKET_`, `TELEGRAM_` — and the gateway, which only the archive reaches, is the process's, unprefixed."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from social_data.config import Settings as SocialSettings
 from strategy.config import Settings as StrategySettings
 from teams.config import ModelCatalogueEntry as TeamsModelCatalogueEntry
 from teams.config import Settings as TeamsSettings
+from telegram_gateway.config import Settings as TelegramSettings
 
 
 class Settings(BaseSettings):
@@ -54,13 +55,8 @@ class Settings(BaseSettings):
     trading_mcp_scope: str | None = None
     trading_mcp_request_timeout_seconds: float = 35.0
 
-    # No `SOCIAL_MCP_*` either: the post archive is a package of this process too, since the same change.
-
-    # The third pair, and the one whose tools do something the operator can see on their phone. Its ceiling is
-    # trading-mcp's: a timeout here is a notification delivered and reported as failed, or sent again.
-    telegram_mcp_url: str | None = None
-    telegram_mcp_scope: str | None = None
-    telegram_mcp_request_timeout_seconds: float = 35.0
+    # No `SOCIAL_MCP_*` either: the post archive is a package of this process too, since the same change — and no
+    # `TELEGRAM_MCP_*` since stage 4, when the door to Telegram became the last of them.
 
     # No `TEAMS_MCP_*`: the teams tools are a layer in this process now, so a `.env` from before this change carries
     # three settings that are read by nothing.
@@ -95,13 +91,20 @@ class Settings(BaseSettings):
     tool_caller_application_ids: str = ""
     rest_caller_application_ids: str = ""
 
-    # The door out of the post archive: where telegram-gateway answers over REST, and the destination the operator
-    # bound there. All three or none — the archive's own settings refuse every partial form — and none is a working
-    # configuration in which posts are collected and nobody is told. Unprefixed, because the strategy platform reads
-    # the same three, and one door has one address.
-    telegram_gateway_url: str | None = None
-    telegram_gateway_scope: str | None = None
+    # Who the post archive and the strategy platform tell, by the name the operator bound at the door to Telegram.
+    # Unset is a working configuration in which both collect and decide and nobody is told. Unprefixed, because both
+    # read it, and there is one destination.
     alert_destination: str | None = None
+
+    # The door to Telegram, a package of this process since stage 4 of `one-process-per-security-boundary`: its
+    # database — bots, their tokens, and who receives — and the operator's own account session, unprefixed as it
+    # always was. All three or none; none is a gateway that sends and refuses to create bots. Everything else it
+    # reads is its own, under `TELEGRAM_`, and that includes the REST caller list: its bots and destinations answer
+    # the operator's `az` alone, never the browsers the other packages share one list for.
+    telegram_database_url: str
+    telegram_api_id: int | None = None
+    telegram_api_hash: str | None = None
+    telegram_session: str | None = None
 
     @field_validator("database_pool_size")
     @classmethod
@@ -117,6 +120,7 @@ class Settings(BaseSettings):
         "social_database_url",
         "strategy_database_url",
         "market_database_url",
+        "telegram_database_url",
         "gateway_api_key",
         "agent_openai_api_key",
         "teams_openai_api_key",
@@ -133,11 +137,9 @@ class Settings(BaseSettings):
         "database_user",
         "trading_mcp_url",
         "trading_mcp_scope",
-        "telegram_mcp_url",
-        "telegram_mcp_scope",
-        "telegram_gateway_url",
-        "telegram_gateway_scope",
         "alert_destination",
+        "telegram_api_hash",
+        "telegram_session",
         "gateway_scope",
     )
     @classmethod
@@ -147,6 +149,12 @@ class Settings(BaseSettings):
         if value is None or not value.strip():
             return None
         return value.strip()
+
+    @field_validator("telegram_api_id", mode="before")
+    @classmethod
+    def _blank_id_means_unset(cls, value: object) -> object:
+        # Before parsing, because `TELEGRAM_API_ID=` is not an integer and is the example file's own line.
+        return None if isinstance(value, str) and not value.strip() else value
 
     def for_conversation(self) -> AgentSettings:
         """The conversation surface's own settings, with every one of its validators run. Every field is
@@ -166,9 +174,6 @@ class Settings(BaseSettings):
             trading_mcp_url=self.trading_mcp_url,
             trading_mcp_scope=self.trading_mcp_scope,
             trading_mcp_request_timeout_seconds=self.trading_mcp_request_timeout_seconds,
-            telegram_mcp_url=self.telegram_mcp_url,
-            telegram_mcp_scope=self.telegram_mcp_scope,
-            telegram_mcp_request_timeout_seconds=self.telegram_mcp_request_timeout_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
         )
 
@@ -186,9 +191,6 @@ class Settings(BaseSettings):
             trading_mcp_url=self.trading_mcp_url,
             trading_mcp_scope=self.trading_mcp_scope,
             trading_mcp_request_timeout_seconds=self.trading_mcp_request_timeout_seconds,
-            telegram_mcp_url=self.telegram_mcp_url,
-            telegram_mcp_scope=self.telegram_mcp_scope,
-            telegram_mcp_request_timeout_seconds=self.telegram_mcp_request_timeout_seconds,
             run_timeout_seconds=self.run_timeout_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
             scheduler_enabled=self.scheduler_enabled,
@@ -215,7 +217,7 @@ class Settings(BaseSettings):
 
     def for_social(self) -> SocialSettings:
         """The post archive's own settings, the same way: shared things by hand, its own under `SOCIAL_`. The
-        gateway trio is the process's, passed through, so the archive's validators still refuse a partial one."""
+        destination is the process's, passed through; the door itself is a client the host builds."""
         return SocialSettings(
             _env_prefix="SOCIAL_",  # pyright: ignore[reportCallIssue]
             _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
@@ -228,8 +230,6 @@ class Settings(BaseSettings):
             require_authenticated_principal=self.require_authenticated_principal,
             tool_caller_application_ids=self.tool_caller_application_ids,
             rest_caller_application_ids=self.rest_caller_application_ids,
-            telegram_gateway_url=self.telegram_gateway_url,
-            telegram_gateway_scope=self.telegram_gateway_scope,
             alert_destination=self.alert_destination,
         )
 
@@ -248,9 +248,8 @@ class Settings(BaseSettings):
             require_authenticated_principal=self.require_authenticated_principal,
             tool_caller_application_ids=self.tool_caller_application_ids,
             rest_caller_application_ids=self.rest_caller_application_ids,
-            # No archive address: the host hands the platform a client over the archive's own application.
-            telegram_gateway_url=self.telegram_gateway_url,
-            telegram_gateway_scope=self.telegram_gateway_scope,
+            # No archive address and no gateway address: the host hands the platform a client over each one's
+            # own application.
             alert_destination=self.alert_destination,
         )
 
@@ -273,4 +272,24 @@ class Settings(BaseSettings):
             require_authenticated_principal=self.require_authenticated_principal,
             tool_caller_application_ids=self.tool_caller_application_ids,
             rest_caller_application_ids=self.rest_caller_application_ids,
+        )
+
+    def for_telegram(self) -> TelegramSettings:
+        """The door to Telegram's own settings, the same way: shared things by hand, the account session by hand
+        because its names predate the prefix, and the rest — the bot surface, the ceilings, the pool, the REST caller
+        list — under `TELEGRAM_`. The tool list is the process's: nobody outside it calls `/telegram/mcp`."""
+        return TelegramSettings(
+            _env_prefix="TELEGRAM_",  # pyright: ignore[reportCallIssue]
+            _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
+            database_url=self.telegram_database_url,
+            database_user=self.database_user,
+            azure_client_id=self.azure_client_id,
+            azure_client_secret=self.azure_client_secret,
+            azure_tenant_id=self.azure_tenant_id,
+            migration_lock_wait_seconds=self.migration_lock_wait_seconds,
+            require_authenticated_principal=self.require_authenticated_principal,
+            tool_caller_application_ids=self.tool_caller_application_ids,
+            telegram_api_id=self.telegram_api_id,
+            telegram_api_hash=self.telegram_api_hash,
+            telegram_session=self.telegram_session,
         )

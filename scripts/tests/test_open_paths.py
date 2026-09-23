@@ -11,7 +11,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 APP_SERVICE = REPO_ROOT / "infra" / "app-service.tf"
 
-# `resource "azurerm_linux_web_app" "telegram_gateway"` → modules/telegram-gateway/telegram_gateway/
+# `resource "azurerm_linux_web_app" "trading_mcp"` → modules/trading-mcp/trading_mcp/
 RESOURCE = re.compile(r'^resource\s+"azurerm_linux_web_app"\s+"([a-z_]+)"\s*\{', re.MULTILINE)
 EXCLUDED = re.compile(r"^\s*excluded_paths\s*=\s*\[([^\]]*)\]", re.MULTILINE)
 OPEN_PATHS = re.compile(r"^OPEN_PATHS\s*=\s*frozenset\(\{([^}]*)\}\)", re.MULTILINE)
@@ -30,6 +30,7 @@ PACKAGES_UNDER = {
         "/polymarket": "polymarket_data",
         "/social": "social_data",
         "/strategy": "strategy",
+        "/telegram": "telegram_gateway",
     }
 }
 HOST_OWN_PATHS = {"workbench": {"/health"}}
@@ -73,15 +74,15 @@ def _open_paths(resource_name: str) -> set[str] | None:
 def test_the_apps_are_found_at_all() -> None:
     """A regex that matched nothing would make every test below pass by looking away."""
     names = [name for name, _ in _web_apps()]
-    assert len(names) >= 4, names
-    assert "workbench" in names and "telegram_gateway" in names
+    assert len(names) >= 3, names
+    assert "workbench" in names and "trading_mcp" in names
 
 
 def test_the_modules_that_keep_this_record_still_keep_it() -> None:
     """Stated positively, so the check cannot be satisfied by the record disappearing: if a module stopped
     keeping an `OPEN_PATHS`, the parametrised test below would skip it in silence."""
     keeping = {name for name, _ in _web_apps() if _open_paths(name) is not None}
-    assert {"workbench", "telegram_gateway"} <= keeping
+    assert "workbench" in keeping
 
 
 @pytest.mark.parametrize("resource_name,excluded", _web_apps(), ids=lambda value: str(value))

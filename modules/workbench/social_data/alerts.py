@@ -17,17 +17,11 @@ import logging
 from datetime import UTC, datetime
 
 import httpx
-from azure.identity.aio import DefaultAzureCredential
-from tc_mcp_kit.outbound_identity import ManagedIdentityAuth
 
 from . import store
 from .models import Post
 
 log = logging.getLogger(__name__)
-
-# Connect stays short: a gateway that is not listening should be reported now. Read is generous
-# because the request is a message on its way to Telegram, not a database read.
-DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=35.0, write=10.0, pool=5.0)
 
 # How many posts one pass may announce. A day that produces forty alerts is a day the operator
 # stops reading them, and the rest are still there on the next pass.
@@ -48,29 +42,20 @@ class GatewayUnreachable(Exception):
 
 
 
-def http_client(
-    scope: str | None = None, timeout: httpx.Timeout = DEFAULT_TIMEOUT
-) -> httpx.AsyncClient:
-    """A client for the gateway, presenting this module's identity where it has one. Left out —
-    local work, and every test — nothing is presented, which the gateway supports on loopback."""
-    auth = ManagedIdentityAuth(
-        DefaultAzureCredential(), scope, send_without_token="the gateway will refuse this request"
-    ) if scope else None
-    return httpx.AsyncClient(timeout=timeout, auth=auth)
-
-
 class Gateway:
     """The one route this module calls on telegram-gateway. It does not read the gateway's other
-    routes: creating a bot and binding a destination are the operator's, through their own screen."""
+    routes: creating a bot and binding a destination are the operator's, through their own screen.
 
-    def __init__(self, base_url: str, client: httpx.AsyncClient) -> None:
-        self._base_url = base_url.rstrip("/")
+    The client is the host's, over the gateway's application in this process, so the gateway's refusals
+    and its caller record read here exactly as they did over HTTP."""
+
+    def __init__(self, client: httpx.AsyncClient) -> None:
         self._client = client
 
     async def send(self, *, destination: str, text: str) -> None:
         try:
             response = await self._client.post(
-                f"{self._base_url}/messages", json={"destination": destination, "text": text}
+                "/messages", json={"destination": destination, "text": text}
             )
         except httpx.RequestError as err:
             raise GatewayUnreachable(f"the gateway did not answer: {err}") from err
@@ -161,22 +146,19 @@ class Alerts:
         return sent
 
 
-def build(pool, settings) -> Alerts | None:
+def build(pool, settings, gateway: httpx.AsyncClient | None) -> Alerts | None:
     """The alerting this deployment is configured for, or `None`.
 
     `None` is a supported state, and the reason it is a return value rather than a refusal is the
-    one `enrichment.build` gives: without a gateway the module collects and reads normally and says
-    nothing, which `/state` reports rather than leaving anybody to guess at.
+    one `enrichment.build` gives: without a destination the module collects and reads normally and
+    says nothing, which `/state` reports rather than leaving anybody to guess at.
     """
-    if not settings.alerts_configured:
-        log.info("no telegram gateway is configured — posts will be collected and nobody told")
+    if settings.alert_destination is None or gateway is None:
+        log.info("no telegram destination is configured — posts will be collected and nobody told")
         return None
     return Alerts(
         pool,
-        Gateway(
-            settings.telegram_gateway_url,
-            http_client(settings.telegram_gateway_scope),
-        ),
+        Gateway(gateway),
         destination=settings.alert_destination,
         min_score=settings.alert_min_impact_score,
     )

@@ -10,18 +10,6 @@ variable "postgres_version" {
   default     = "17"
 }
 
-variable "developer_ip_address" {
-  description = <<-EOT
-    The operator's own outbound IP, admitted to the database firewall for the
-    operator-run tools that reach production directly: alembic migrations against
-    market_data and DBeaver (docs/dbeaver-azure-connection.html). Local development
-    does not use it — that runs on the compose.yaml container
-    (openspec/changes/local-dev-database-in-docker). Changes when the ISP reassigns
-    an address.
-  EOT
-  type        = string
-}
-
 variable "postgres_admin_object_id" {
   description = "Entra object id of the human administrator for the Postgres server."
   type        = string
@@ -169,13 +157,13 @@ variable "operator_object_id" {
 
 variable "telegram_account_session_configured" {
   description = <<-EOT
-    Whether the three Telegram account secrets hold values, and so whether `telegram-gateway`
-    is given the settings that let it create bots.
+    Whether the three Telegram account secrets hold values, and so whether the workbench's door
+    to Telegram is given the settings that let it create bots.
 
     False is a working configuration and the default: without the session the module sends
     normally and refuses to create bots, naming what is missing. It is a variable rather than
     a permanent setting because an app setting pointing at an empty Key Vault secret does not
-    fail — App Service leaves the reference in place as its own literal text, and the module
+    fail — App Service leaves the reference in place as its own literal text, and the workbench
     then refuses to start over a capability it is meant to work without.
 
     Set the three secrets first (`az keyvault secret set --name telegram-api-id ...`), then
@@ -188,10 +176,10 @@ variable "telegram_account_session_configured" {
 variable "telegram_alert_destination" {
   description = <<-EOT
     The destination name the workbench's post archive and strategy platform address when they notify the operator,
-    bound in `telegram-gateway` by the operator once — never a chat id.
+    bound at `/telegram` by the operator once — never a chat id.
 
-    Empty is the default and a working configuration: neither caller is given a gateway
-    address, so both collect and decide exactly as before and say nothing. It is also the
+    Empty is the default and a working configuration: neither caller is given a destination,
+    so both collect and decide exactly as before and say nothing. It is also the
     rollback lever design.md names — clear this, apply, and the callers restart silent.
 
     Setting it before the destination exists in the gateway is not an outage: the sends are

@@ -177,21 +177,18 @@ class TestOneFileAtATime:
         decisions = decide(["packages/tc-runtime/tc_runtime/db.py"])
         assert decisions["packages"]
         assert decisions["workbench"]
-        assert decisions["telegram-gateway"]
 
     def test_tc_openai_reaches_only_its_consumer(self) -> None:
         """Two consumers became one when they became one module; the property this holds is the other half,
         that a package's edit must not run a module which does not take it."""
         decisions = decide(["packages/tc-openai/tc_openai/provider.py"])
         assert decisions["workbench"]
-        assert not decisions["telegram-gateway"]
         assert not decisions["trading-mcp"]
 
     def test_tc_mcp_kit_reaches_everything_that_speaks_mcp(self) -> None:
-        """trading-mcp, the workbench and telegram-gateway — two of them hold a database, which is why the old
-        reason for this package existing apart from `tc-runtime` had to be rewritten twice."""
+        """trading-mcp and the workbench — one of them holds a database, which is why the old reason for this
+        package existing apart from `tc-runtime` had to be rewritten twice."""
         decisions = decide(["packages/tc-mcp-kit/tc_mcp_kit/network_identity.py"])
-        assert decisions["telegram-gateway"]
         assert decisions["trading-mcp"]
         assert decisions["workbench"]
         assert not decisions["capital-gateway"]

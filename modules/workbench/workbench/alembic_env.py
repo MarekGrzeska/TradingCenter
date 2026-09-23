@@ -142,3 +142,10 @@ def market_settings() -> object:
     from workbench.config import Settings
 
     return Settings().for_market()  # type: ignore[call-arg]
+
+
+def telegram_settings() -> object:
+    """The door to Telegram's chain — the seventh, and the one that holds bot tokens."""
+    from workbench.config import Settings
+
+    return Settings().for_telegram()  # type: ignore[call-arg]

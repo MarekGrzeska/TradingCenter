@@ -16,9 +16,8 @@ from collections.abc import Sequence
 # upload, and that line is telemetry, uploaded, logged. 165 entries in fifteen quiet minutes.
 ALWAYS_QUIET = ("azure",)
 
-# Deliberately *not* a default. `httpx` at INFO is noise in four modules and evidence in the fifth:
-# telegram-gateway's redaction filter exists to take the bot token out of exactly that line, and a
-# package that silenced it would have removed the thing under test. Each module names its own.
+# Deliberately *not* a default: each module names its own. The workbench quiets `httpx`, whose request line would
+# carry a Telegram bot token; the door to Telegram installs its own redaction filter besides (`redaction.py`).
 
 
 def configure(*, quiet: Sequence[str] = ()) -> None:

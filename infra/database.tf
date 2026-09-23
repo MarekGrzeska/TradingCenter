@@ -47,6 +47,14 @@ resource "azurerm_postgresql_flexible_server_configuration" "require_tls" {
   value     = "ON"
 }
 
+# Allowed, not created: `CREATE EXTENSION pg_stat_statements` in `postgres` is the operator's, once, since no app role
+# may create one. The library is preloaded already; without this a review attributes load to tables, never to queries.
+resource "azurerm_postgresql_flexible_server_configuration" "extensions" {
+  name      = "azure.extensions"
+  server_id = azurerm_postgresql_flexible_server.main.id
+  value     = "PG_STAT_STATEMENTS"
+}
+
 resource "azurerm_postgresql_flexible_server_active_directory_administrator" "human" {
   server_name         = azurerm_postgresql_flexible_server.main.name
   resource_group_name = azurerm_resource_group.main.name
@@ -109,8 +117,8 @@ resource "azurerm_postgresql_flexible_server_database" "strategy" {
 }
 
 # A seventh, and the reasoning has still not changed. It holds bots, destinations and a long-poll cursor — never a
-# message. Same one-off grant before the first deploy migrates, or the module starts and refuses on a table it
-# cannot alter.
+# message. The workbench's since stage 4 of `one-process-per-security-boundary`: ownership moves to its role once,
+# with `GRANT CONNECT`, before the image that migrates it starts — or the process refuses on a table it cannot alter.
 resource "azurerm_postgresql_flexible_server_database" "telegram" {
   name      = "telegram"
   server_id = azurerm_postgresql_flexible_server.main.id
@@ -121,14 +129,9 @@ resource "azurerm_postgresql_flexible_server_database" "telegram" {
 # `market_data_dev` used to sit beside it, for the one morning that arrangement lasted. Applying its removal DROPS it:
 # dev data is disposable, but the operator should know that is what the plan's `destroy` means.
 
-# The App Service plan's own outbound addresses join this rule once the plan exists — read off the resource rather than
-# typed, because they change with the SKU. Only the developer's address is known up front.
-resource "azurerm_postgresql_flexible_server_firewall_rule" "developer" {
-  name             = "AllowDeveloper"
-  server_id        = azurerm_postgresql_flexible_server.main.id
-  start_ip_address = var.developer_ip_address
-  end_ip_address   = var.developer_ip_address
-}
+# No standing rule for a person (`production-answers-from-outside`): the one that stood here admitted an address the
+# operator no longer had. Reaching production is a temporary rule for the current address, deleted in the same session
+# (`scripts/grant-schema-ownership.sql` shows how).
 
 # One rule per address, read straight off the app's own resource, so a plan-tier change is never a manual firewall edit.
 # First convergence needs two applies: a resource-level `for_each` refuses to plan against "known after apply". One
@@ -138,19 +141,6 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "workbench_outbound"
   for_each = toset(azurerm_linux_web_app.workbench.possible_outbound_ip_address_list)
 
   name             = "AllowAgentOutbound-${replace(each.value, ".", "-")}"
-  server_id        = azurerm_postgresql_flexible_server.main.id
-  start_ip_address = each.value
-  end_ip_address   = each.value
-}
-
-
-
-# The sixth, same shape and same first convergence: `terraform apply
-# -target=azurerm_linux_web_app.telegram_gateway` once, then the normal unrestricted apply.
-resource "azurerm_postgresql_flexible_server_firewall_rule" "telegram_gateway_outbound" {
-  for_each = toset(azurerm_linux_web_app.telegram_gateway.possible_outbound_ip_address_list)
-
-  name             = "AllowTelegramGatewayOutbound-${replace(each.value, ".", "-")}"
   server_id        = azurerm_postgresql_flexible_server.main.id
   start_ip_address = each.value
   end_ip_address   = each.value

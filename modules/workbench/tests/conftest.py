@@ -81,7 +81,7 @@ def _no_developer_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 # One container per chain rather than schemas in one, because each chain owns its `alembic_version`.
-# They live here because the process under test needs all five: its lifespan migrates each before it serves.
+# They live here because the process under test needs all seven: its lifespan migrates each before it serves.
 
 
 @pytest.fixture(scope="session")
@@ -174,6 +174,24 @@ def market_migrated_url(market_postgres_url: str) -> str:
 
 
 @pytest.fixture(scope="session")
+def telegram_postgres_url() -> Iterator[str]:
+    from testcontainers.community.postgres import PostgresContainer
+
+    with PostgresContainer("postgres:17-alpine", driver=None) as pg:
+        yield pg.get_connection_url()
+
+
+@pytest.fixture(scope="session")
+def telegram_migrated_url(telegram_postgres_url: str) -> str:
+    from tc_runtime.migrate import upgrade_to_head
+
+    from telegram_gateway.runtime import MIGRATIONS
+
+    upgrade_to_head(MIGRATIONS, sqlalchemy_url(telegram_postgres_url))
+    return telegram_postgres_url
+
+
+@pytest.fixture(scope="session")
 def agent_migrated_url(agent_postgres_url: str) -> str:
     """The same database with the conversation's migrations applied — through the same function the process
     runs at startup, so the schema under test is the one a deployment actually applies."""
@@ -213,6 +231,7 @@ def workbench_env(
     social_migrated_url: str,
     strategy_migrated_url: str,
     market_migrated_url: str,
+    telegram_migrated_url: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The smallest environment `workbench.app` will start in: everything the process refuses to start
@@ -223,6 +242,10 @@ def workbench_env(
     monkeypatch.setenv("SOCIAL_DATABASE_URL", social_migrated_url)
     monkeypatch.setenv("STRATEGY_DATABASE_URL", strategy_migrated_url)
     monkeypatch.setenv("MARKET_DATABASE_URL", market_migrated_url)
+    monkeypatch.setenv("TELEGRAM_DATABASE_URL", telegram_migrated_url)
+    # No bot is bound in a fresh database, so nothing polls; a closed loopback port all the same, so no test
+    # here could reach Telegram if one were.
+    monkeypatch.setenv("TELEGRAM_BOT_API_BASE_URL", "http://127.0.0.1:9")
     # The archive's only upstream. A closed loopback port: with no tracked pair nothing subscribes, and a
     # test that tracks one meets a refused connection rather than a gateway.
     monkeypatch.setenv("GATEWAY_BASE_URL", "http://127.0.0.1:9")

@@ -10,18 +10,19 @@ reason to exist was that the conversation built teams at a neighbour's address. 
 is the same behaviour with one process, one image and one App Service under it
 (`openspec/changes/agent-and-teams-one-workbench`).
 
-## The eight packages, and the rule between them
+## The nine packages, and the rule between them
 
 | Package | What |
 |---|---|
 | `agent/` | the conversation: sessions, transcripts, streamed turns, the chart and drawing tools it owns, and every model call priced at the moment it happens |
 | `teams/` | teams as **data** — a graph the operator composes, versioned append-only, its runs, their cost, and the clock that fires a schedule |
 | `teams_tools/` | the MCP tools that build and run a team by talking, reaching the teams routes in this same process |
-| `market_data/` | the candle archive, under `/market`: what the gateway saw and does not keep, its indicators, the candle stream, and eleven read-only tools — its own README beside it |
-| `polymarket_data/` | the prediction-market archive, under `/polymarket` |
-| `social_data/` | the post archive, under `/social` |
-| `strategy/` | the strategy platform, under `/strategy`, reading the candle archive through its own application rather than over the network (`workbench/archive_client.py`) |
-| `workbench/` | the assembly: one settings read, one FastAPI, one lifespan |
+| `market_data/` | the candle archive, under `/market`: what the gateway saw and does not keep, its indicators, the candle stream (the one WebSocket this process serves), the largest table here, and eleven read-only tools — its own README beside it |
+| `polymarket_data/` | the prediction-market archive, under `/polymarket`, and the only door to Polymarket. Five of its tools **write** — the watch list and its groups, never a sample; removing an observation is REST-only |
+| `social_data/` | the post archive, under `/social`: what was said, when, and what a model made of it. The door to Truth Social; **nothing on either surface writes**; a reading is stamped with its model and overwritten, never versioned; no backfill |
+| `strategy/` | the strategy platform, under `/strategy`: a strategy is a catalogue entry — declared facts, parameters, one pure `evaluate` — code in the image or an immutable revision the operator wrote. It reads the candle archive through its own application (`workbench/archive_client.py`) and **never touches an account**: it decides, teams execute |
+| `telegram_gateway/` | the one door to Telegram, under `/telegram`: two tools (send, and who can be sent to), and bots and destinations that only the operator's `az` reaches. It remembers nothing it sent — its own README beside it |
+| `workbench/` | the assembly: one settings read, one FastAPI, one lifespan, and `root_access.py`, the caller record of the routes no package owns |
 
 **No package imports another; `workbench/` may import all of them and is the only place that may.** That is
 the second form of "no module imports another module", and it is a test rather than an
@@ -41,28 +42,30 @@ Everything else is one setting for the whole process — `workbench/config.py` i
 code that reads the environment, and both surfaces' own `Settings` are built from it by
 argument, with every validator they had.
 
-## Two tool servers on a network, and six sources that are not
+## One tool server on a network, and seven sources that are not
 
 The model can ask **market-data** for candles, coverage, indicators and levels mid-answer,
 read *and move* the demo account through **trading-mcp** — positions, balance and working
 orders on the reading side, orders sent, closed, amended and cancelled on the other — and
 ask the **prediction-market archive** what a market prices an event at, of its archive or of
 the provider live, the **post archive** what was said and what a model made of it, and the
-**strategy platform** what it decided and how many setups it stands on. At most
-eight calls per turn, a number in the code rather than a setting. Each network server is
-configured and fails on its own: one being absent or unreachable costs the model that server's
-tools and nothing else.
+**strategy platform** what it decided and how many setups it stands on, and send the operator a
+**Telegram** message. At most eight calls per turn, a number in the code rather than a setting.
+trading-mcp is configured and fails on its own: absent or unreachable, it costs the model its tools
+and nothing else.
 
-The three archives and the strategy platform are not servers any more. Since
+The three archives, the strategy platform and the door to Telegram are not servers any more. Since
 `one-process-per-security-boundary` each is a package of this process, mounted whole under
-`/market`, `/polymarket`, `/social` and `/strategy`, and its tools reach both registries as functions
+`/market`, `/polymarket`, `/social`, `/strategy` and `/telegram`, and its tools reach both registries as functions
 (`workbench/local_tools.py`) — same names, descriptions, ceilings and refusals, no address, no
 identity, no session. Five of the prediction-market archive's twelve tools write, and what they
 write is a watch list and its groups, not an account; nothing on the post archive's four or the platform's
 writes at all. Nothing this system does on Polymarket touches money.
 
-The third pair — `TELEGRAM_MCP_URL` — is the same shape as the first two. The platform's local
-source is the one the teams' clock reads: `pending_setups` on the
+The post archive and the strategy platform reach the door to Telegram the way the platform reaches the
+candle archive: its own application through `httpx.ASGITransport`, as this process
+(`workbench/telegram_client.py`) — `ALERT_DESTINATION` says who is told, and unset is silence that works.
+The platform's local source is the one the teams' clock reads: `pending_setups` on the
 strategy platform is a number a trigger compares against its threshold, and it travels the
 same road as every other reading rather than a client of its own, so the woken team reads the
 very decision that woke it.
