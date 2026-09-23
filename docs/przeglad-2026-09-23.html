@@ -1,0 +1,1869 @@
+<title>Przegląd systemu 23 IX 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">TradingCenter · przegląd systemu</span>
+    <h1>Jedno pytanie robi 97% ruchu bazy</h1>
+    <p class="lede">Kredyty B1ms skończyły się 16 września przez dwa zapytania, których koszt rósł z historią; po #263 i #264 baza pracuje na 15–17% przy limicie około 20%. Prawie cały ten ruch to <b>jedna linia z 8 sierpnia</b>: pętla ingestu pyta bazę, czy para jest nadal śledzona, po każdym komunikacie ze strumienia.</p>
+    <div class="strip">
+      <span>23 września 2026 · main @ <b>71893f2</b></span>
+      <span>poprzedni: 2 września (P1–P9 wykonane)</span>
+      <span>zakres <b>full</b> · 7 agentów</span>
+      <span><b>23</b> ustalenia, <b>19</b> zweryfikowanych</span>
+      <span>dowody <b>T1–T4</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">97%</div><div class="l">transakcji całego serwera pochodzi z jednej linii — <code>ingest/live.py:123</code></div></div>
+      <div class="cell"><div class="v">15–17%</div><div class="l">CPU bazy w tle po poprawkach; limit bazowy B1ms to około 20%</div></div>
+      <div class="cell"><div class="v">2,93&nbsp;GB</div><div class="l"><code>price_samples</code> bez retencji; baza polymarket rośnie o około 63&nbsp;MB na dobę</div></div>
+      <div class="cell"><div class="v">28</div><div class="l">znaków zapasu w CLAUDE.md (2 września: 1&nbsp;171)</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Werdykt</div>
+      <h2>Baza nie potrzebuje większego serwera, tylko jednej poprawki</h2>
+      <p class="intro">Po #263 i #264 baza wróciła do stanu sprzed incydentu: 15–17% jednego vCore, czyli zapas na poziomie ledwie trzech punktów procentowych. W dziesięciominutowym pomiarze produkcji 14&nbsp;258 z 14&nbsp;665 transakcji na minutę przyszło z <code>market_data</code>, a za nimi stoi <span class="hl">pętla ingestu, która po każdym komunikacie ze strumienia pyta, czy para jest nadal śledzona</span> — około 118 razy na sekundę, całą dobę, także gdy nikt nie patrzy.</p>
+      <p>To jest P1 i poprawka na godziny. Drugą rzeczą, która rośnie bez granic, jest archiwum Polymarket: 3,79&nbsp;GB, z czego 2,93&nbsp;GB to próbki bez żadnej retencji, podwójnie indeksowane. Trzecia leży poza bazą: CLAUDE.md ma 28 znaków zapasu, a pamięć planu B2 w szczytach sięga 89–90% — w przedziale, który własna reguła planu wiąże z wchłonięciem telegram-gateway do workbencha.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Obszar</th><th>Ocena</th><th>Dlaczego</th><th>Trend</th></tr></thead>
+          <tbody>
+            <tr><td><b>Baza — ruch w tle</b></td><td><span class="tag stop">stop</span></td><td>97% transakcji z jednej linii; tło 15–17% przy limicie ~20%</td><td>lepiej po #263/#264, ale bez zapasu</td></tr>
+            <tr><td><b>Archiwum świec</b></td><td><span class="tag att">uwaga</span></td><td>poza P1 zdrowe; historia zadań to N+1 co 10&nbsp;s przy otwartej karcie</td><td>nowe</td></tr>
+            <tr><td><b>Archiwa Polymarket i social</b></td><td><span class="tag att">uwaga</span></td><td>2,93&nbsp;GB próbek bez retencji, zdublowany indeks, metadane nadpisywane co minutę; social zdrowe</td><td>nowe</td></tr>
+            <tr><td><b>Decyzje — strategy, teams</b></td><td><span class="tag ok">ok</span></td><td>pętle tanie; limity kosztów i listy przebiegów rosną z historią, dziś małe</td><td>nowe</td></tr>
+            <tr><td><b>Rozmowa i montaż</b></td><td><span class="tag ok">ok</span></td><td>odczyty na indeksach; sześć migracji startowych po kolei</td><td>nowe</td></tr>
+            <tr><td><b>Brzegi i infrastruktura</b></td><td><span class="tag att">uwaga</span></td><td>pamięć planu 89–90% w szczytach; trzy z czterech aplikacji bez sondy</td><td>gorzej (6 IX: 79–83%)</td></tr>
+            <tr><td><b>Ekrany</b></td><td><span class="tag att">uwaga</span></td><td>polling C0–C2 poza <code>/jobs</code> i <code>/decisions</code>; pocket nie pauzuje ukrytej karty</td><td>nowe</td></tr>
+            <tr><td><b>Proces i kontekst dla LLM</b></td><td><span class="tag att">uwaga</span></td><td>CLAUDE.md na granicy pułapu; pół linii prozy na każdą linię kodu</td><td>gorzej (1&nbsp;171 → 28 znaków)</td></tr>
+            <tr><td><b>Higiena</b></td><td><span class="tag att">uwaga</span></td><td>4 martwe katalogi modułów (3 z <code>.env</code>), 105 zmergowanych gałęzi, worktree z <code>.venv</code> wewnątrz repo</td><td>nowe</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Od poprzedniego przeglądu</div>
+      <h2>To nie jedna duża zmiana zjadła bazę</h2>
+      <p class="intro">Średnie CPU bazy trzymało się 16–17% od 23 sierpnia; 8 września przekroczyło limit i kredyty topniały coraz szybciej, aż do zera 16 września. Wykres poniżej pokazuje kształt, który rozpoznaje ten przegląd: <strong>stałe tło plus zapytania tańsze na pustej bazie niż na pełnej</strong>.</p>
+      <p>Stałe tło to sprawdzenie <code>still_tracked()</code> po każdym komunikacie — w kodzie od pierwszego commita ingestu (<code>c5bb01f</code>, 8 sierpnia), rosnące z liczbą śledzonych par, dziś 29. Na nie nałożyły się dwa zapytania rosnące z danymi: status par liczący wszystkie świece (#264) i scalanie zakresów Polymarket czytające ich 5,2&nbsp;mln (#263). Poprzedni przegląd, z 2 września, mierzył kopie kodu i nie patrzył na koszt zapytań w czasie — sześć dni później średnia przebiła limit.</p>
+      <figure>
+        <div class="scroll">
+<svg viewBox="0 0 980 372" role="img" aria-label="Kredyty CPU bazy spadały od 8 września i skończyły się 16 września; średnie CPU trzymało się około 16–17% do 7 września, przekroczyło limit około 20% od 8 września, było dławione do 23 września, a po poprawkach #263 i #264 wróciło do około 16%">
+<g font-family="Karla, sans-serif">
+<text x="76" y="26" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.1em" fill="currentColor" opacity="0.65">KREDYTY CPU — ZAPAS NA PRZEKROCZENIE LIMITU</text>
+<text x="76" y="196" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.1em" fill="currentColor" opacity="0.65">ŚREDNIE CPU W CIĄGU DOBY — % JEDNEGO VCORE</text>
+<line x1="76" x2="952" y1="150.0" y2="150.0" stroke="currentColor" stroke-width="1" opacity="0.35"/>
+<text x="66" y="153.5" text-anchor="end" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">0</text>
+<line x1="76" x2="952" y1="116.9" y2="116.9" stroke="currentColor" stroke-width="1" opacity="0.12"/>
+<text x="66" y="120.4" text-anchor="end" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">100</text>
+<line x1="76" x2="952" y1="83.8" y2="83.8" stroke="currentColor" stroke-width="1" opacity="0.12"/>
+<text x="66" y="87.2" text-anchor="end" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">200</text>
+<line x1="76" x2="952" y1="50.6" y2="50.6" stroke="currentColor" stroke-width="1" opacity="0.12"/>
+<text x="66" y="54.1" text-anchor="end" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">300</text>
+<line x1="76" x2="952" y1="320.0" y2="320.0" stroke="currentColor" stroke-width="1" opacity="0.35"/>
+<text x="66" y="323.5" text-anchor="end" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">0%</text>
+<line x1="76" x2="952" y1="267.0" y2="267.0" stroke="currentColor" stroke-width="1" opacity="0.12"/>
+<text x="66" y="270.5" text-anchor="end" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">50%</text>
+<line x1="76" x2="952" y1="214.0" y2="214.0" stroke="currentColor" stroke-width="1" opacity="0.12"/>
+<text x="66" y="217.5" text-anchor="end" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">100%</text>
+<line x1="76" x2="952" y1="298.8" y2="298.8" stroke="#b8322a" stroke-width="1.4" stroke-dasharray="5 4"/>
+<text x="66" y="302.3" text-anchor="end" font-size="10" font-family="Roboto Mono, monospace" fill="#b8322a">20%</text>
+<text x="104.3" y="292.8" font-size="10" font-family="Roboto Mono, monospace" fill="#b8322a">limit bazowy B1ms ≈ 20%</text>
+<line x1="528.1" x2="528.1" y1="40" y2="320" stroke="currentColor" stroke-width="1" stroke-dasharray="2 3" opacity="0.7"/>
+<text x="523.1" y="142" text-anchor="end" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor">8 IX · średnia ponad limit</text>
+<line x1="754.2" x2="754.2" y1="40" y2="320" stroke="#b8322a" stroke-width="1" stroke-dasharray="2 3" opacity="0.7"/>
+<text x="759.2" y="52" text-anchor="start" font-size="10" font-family="Roboto Mono, monospace" fill="#b8322a">16 IX · kredyty 0</text>
+<rect x="824.0" y="202" width="124" height="18" fill="#f2c313"/>
+<text x="886.0" y="215" text-anchor="middle" font-size="10" font-weight="700" font-family="Roboto Mono, monospace" fill="#14306b">23 IX · #263 + #264</text>
+<path d="M76.0,48.3 L104.3,49.0 L132.5,49.3 L160.8,50.0 L189.0,50.3 L217.3,51.0 L245.5,51.3 L273.8,52.6 L302.1,62.6 L330.3,55.6 L358.6,54.6 L386.8,54.9 L415.1,54.9 L443.4,54.6 L471.6,54.6 L499.9,54.9 L528.1,57.9 L556.4,64.2 L584.6,74.8 L612.9,85.7 L641.2,89.7 L669.4,100.3 L697.7,111.2 L725.9,126.2 L754.2,147.7 L782.5,149.7 L810.7,149.7 L839.0,149.7 L867.2,149.7 L895.5,149.7 L923.7,149.7 L952.0,148.0" fill="none" stroke="#14306b" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M76.0,303.1 L104.3,302.4 L132.5,302.4 L160.8,303.1 L189.0,301.4 L217.3,302.4 L245.5,302.8 L273.8,299.8 L302.1,298.6 L330.3,301.8 L358.6,301.7 L386.8,300.1 L415.1,301.7 L443.4,303.7 L471.6,300.6 L499.9,299.3 L528.1,298.1 L556.4,296.9 L584.6,296.3 L612.9,297.4 L641.2,297.5 L669.4,296.8 L697.7,297.1 L725.9,294.2 L754.2,260.5 L782.5,238.6 L810.7,247.3 L839.0,250.8 L867.2,238.3 L895.5,233.0 L923.7,247.0 L952.0,302.9" fill="none" stroke="#14306b" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="76.0" cy="48.3" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>23 VIII: kredyty 307, CPU 15,9%</title></circle>
+<circle cx="76.0" cy="303.1" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>23 VIII: kredyty 307, CPU 15,9%</title></circle>
+<circle cx="104.3" cy="49.0" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>24 VIII: kredyty 305, CPU 16,6%</title></circle>
+<circle cx="104.3" cy="302.4" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>24 VIII: kredyty 305, CPU 16,6%</title></circle>
+<circle cx="132.5" cy="49.3" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>25 VIII: kredyty 304, CPU 16,6%</title></circle>
+<circle cx="132.5" cy="302.4" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>25 VIII: kredyty 304, CPU 16,6%</title></circle>
+<circle cx="160.8" cy="50.0" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>26 VIII: kredyty 302, CPU 15,9%</title></circle>
+<circle cx="160.8" cy="303.1" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>26 VIII: kredyty 302, CPU 15,9%</title></circle>
+<circle cx="189.0" cy="50.3" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>27 VIII: kredyty 301, CPU 17,5%</title></circle>
+<circle cx="189.0" cy="301.4" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>27 VIII: kredyty 301, CPU 17,5%</title></circle>
+<circle cx="217.3" cy="51.0" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>28 VIII: kredyty 299, CPU 16,6%</title></circle>
+<circle cx="217.3" cy="302.4" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>28 VIII: kredyty 299, CPU 16,6%</title></circle>
+<circle cx="245.5" cy="51.3" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>29 VIII: kredyty 298, CPU 16,2%</title></circle>
+<circle cx="245.5" cy="302.8" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>29 VIII: kredyty 298, CPU 16,2%</title></circle>
+<circle cx="273.8" cy="52.6" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>30 VIII: kredyty 294, CPU 19,1%</title></circle>
+<circle cx="273.8" cy="299.8" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>30 VIII: kredyty 294, CPU 19,1%</title></circle>
+<circle cx="302.1" cy="62.6" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>31 VIII: kredyty 264, CPU 20,2%</title></circle>
+<circle cx="302.1" cy="298.6" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>31 VIII: kredyty 264, CPU 20,2%</title></circle>
+<circle cx="330.3" cy="55.6" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>1 IX: kredyty 285, CPU 17,2%</title></circle>
+<circle cx="330.3" cy="301.8" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>1 IX: kredyty 285, CPU 17,2%</title></circle>
+<circle cx="358.6" cy="54.6" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>2 IX: kredyty 288, CPU 17,3%</title></circle>
+<circle cx="358.6" cy="301.7" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>2 IX: kredyty 288, CPU 17,3%</title></circle>
+<circle cx="386.8" cy="54.9" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>3 IX: kredyty 287, CPU 18,8%</title></circle>
+<circle cx="386.8" cy="300.1" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>3 IX: kredyty 287, CPU 18,8%</title></circle>
+<circle cx="415.1" cy="54.9" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>4 IX: kredyty 287, CPU 17,3%</title></circle>
+<circle cx="415.1" cy="301.7" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>4 IX: kredyty 287, CPU 17,3%</title></circle>
+<circle cx="443.4" cy="54.6" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>5 IX: kredyty 288, CPU 15,4%</title></circle>
+<circle cx="443.4" cy="303.7" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>5 IX: kredyty 288, CPU 15,4%</title></circle>
+<circle cx="471.6" cy="54.6" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>6 IX: kredyty 288, CPU 18,3%</title></circle>
+<circle cx="471.6" cy="300.6" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>6 IX: kredyty 288, CPU 18,3%</title></circle>
+<circle cx="499.9" cy="54.9" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>7 IX: kredyty 287, CPU 19,5%</title></circle>
+<circle cx="499.9" cy="299.3" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>7 IX: kredyty 287, CPU 19,5%</title></circle>
+<circle cx="528.1" cy="57.9" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>8 IX: kredyty 278, CPU 20,7%</title></circle>
+<circle cx="528.1" cy="298.1" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>8 IX: kredyty 278, CPU 20,7%</title></circle>
+<circle cx="556.4" cy="64.2" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>9 IX: kredyty 259, CPU 21,8%</title></circle>
+<circle cx="556.4" cy="296.9" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>9 IX: kredyty 259, CPU 21,8%</title></circle>
+<circle cx="584.6" cy="74.8" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>10 IX: kredyty 227, CPU 22,4%</title></circle>
+<circle cx="584.6" cy="296.3" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>10 IX: kredyty 227, CPU 22,4%</title></circle>
+<circle cx="612.9" cy="85.7" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>11 IX: kredyty 194, CPU 21,3%</title></circle>
+<circle cx="612.9" cy="297.4" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>11 IX: kredyty 194, CPU 21,3%</title></circle>
+<circle cx="641.2" cy="89.7" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>12 IX: kredyty 182, CPU 21,2%</title></circle>
+<circle cx="641.2" cy="297.5" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>12 IX: kredyty 182, CPU 21,2%</title></circle>
+<circle cx="669.4" cy="100.3" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>13 IX: kredyty 150, CPU 21,9%</title></circle>
+<circle cx="669.4" cy="296.8" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>13 IX: kredyty 150, CPU 21,9%</title></circle>
+<circle cx="697.7" cy="111.2" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>14 IX: kredyty 117, CPU 21,6%</title></circle>
+<circle cx="697.7" cy="297.1" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>14 IX: kredyty 117, CPU 21,6%</title></circle>
+<circle cx="725.9" cy="126.2" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>15 IX: kredyty 72, CPU 24,3%</title></circle>
+<circle cx="725.9" cy="294.2" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>15 IX: kredyty 72, CPU 24,3%</title></circle>
+<circle cx="754.2" cy="147.7" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>16 IX: kredyty 7, CPU 56,1%</title></circle>
+<circle cx="754.2" cy="260.5" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>16 IX: kredyty 7, CPU 56,1%</title></circle>
+<circle cx="782.5" cy="149.7" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>17 IX: kredyty 1, CPU 76,8%</title></circle>
+<circle cx="782.5" cy="238.6" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>17 IX: kredyty 1, CPU 76,8%</title></circle>
+<circle cx="810.7" cy="149.7" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>18 IX: kredyty 1, CPU 68,6%</title></circle>
+<circle cx="810.7" cy="247.3" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>18 IX: kredyty 1, CPU 68,6%</title></circle>
+<circle cx="839.0" cy="149.7" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>19 IX: kredyty 1, CPU 65,3%</title></circle>
+<circle cx="839.0" cy="250.8" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>19 IX: kredyty 1, CPU 65,3%</title></circle>
+<circle cx="867.2" cy="149.7" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>20 IX: kredyty 1, CPU 77,1%</title></circle>
+<circle cx="867.2" cy="238.3" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>20 IX: kredyty 1, CPU 77,1%</title></circle>
+<circle cx="895.5" cy="149.7" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>21 IX: kredyty 1, CPU 82,1%</title></circle>
+<circle cx="895.5" cy="233.0" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>21 IX: kredyty 1, CPU 82,1%</title></circle>
+<circle cx="923.7" cy="149.7" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>22 IX: kredyty 1, CPU 68,9%</title></circle>
+<circle cx="923.7" cy="247.0" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>22 IX: kredyty 1, CPU 68,9%</title></circle>
+<circle cx="952.0" cy="148.0" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>23 IX: kredyty 6, CPU 16,1% (10–13 UTC, po poprawkach)</title></circle>
+<circle cx="952.0" cy="302.9" r="4" fill="#14306b" stroke="#ffffff" stroke-width="2"><title>23 IX: kredyty 6, CPU 16,1% (10–13 UTC, po poprawkach)</title></circle>
+<text x="76.0" y="340" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">23 VIII</text>
+<text x="273.8" y="340" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">30 VIII</text>
+<text x="471.6" y="340" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">6 IX</text>
+<text x="669.4" y="340" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">13 IX</text>
+<text x="867.2" y="340" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">20 IX</text>
+<text x="952.0" y="340" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">23 IX*</text>
+</g></svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — kredyty CPU i średnie CPU bazy dzień po dniu (Azure Monitor). Dwa panele, bo to dwie skale; ostatni punkt to 23 września, 10–13 UTC, po wdrożeniu #263 i #264. Tło, na którym wszystko się rozegrało — około 16% — jest widoczne od pierwszego dnia wykresu.</figcaption>
+      </figure>
+      <details>
+        <summary>Dane dzienne z rysunku</summary>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Dzień</th><th class="n">Kredyty (średnio)</th><th class="n">CPU, % (średnio)</th></tr></thead>
+            <tbody>
+<tr><td>23 VIII</td><td class="n">307</td><td class="n">15,9</td></tr>
+<tr><td>24 VIII</td><td class="n">305</td><td class="n">16,6</td></tr>
+<tr><td>25 VIII</td><td class="n">304</td><td class="n">16,6</td></tr>
+<tr><td>26 VIII</td><td class="n">302</td><td class="n">15,9</td></tr>
+<tr><td>27 VIII</td><td class="n">301</td><td class="n">17,5</td></tr>
+<tr><td>28 VIII</td><td class="n">299</td><td class="n">16,6</td></tr>
+<tr><td>29 VIII</td><td class="n">298</td><td class="n">16,2</td></tr>
+<tr><td>30 VIII</td><td class="n">294</td><td class="n">19,1</td></tr>
+<tr><td>31 VIII</td><td class="n">264</td><td class="n">20,2</td></tr>
+<tr><td>1 IX</td><td class="n">285</td><td class="n">17,2</td></tr>
+<tr><td>2 IX</td><td class="n">288</td><td class="n">17,3</td></tr>
+<tr><td>3 IX</td><td class="n">287</td><td class="n">18,8</td></tr>
+<tr><td>4 IX</td><td class="n">287</td><td class="n">17,3</td></tr>
+<tr><td>5 IX</td><td class="n">288</td><td class="n">15,4</td></tr>
+<tr><td>6 IX</td><td class="n">288</td><td class="n">18,3</td></tr>
+<tr><td>7 IX</td><td class="n">287</td><td class="n">19,5</td></tr>
+<tr><td>8 IX</td><td class="n">278</td><td class="n">20,7</td></tr>
+<tr><td>9 IX</td><td class="n">259</td><td class="n">21,8</td></tr>
+<tr><td>10 IX</td><td class="n">227</td><td class="n">22,4</td></tr>
+<tr><td>11 IX</td><td class="n">194</td><td class="n">21,3</td></tr>
+<tr><td>12 IX</td><td class="n">182</td><td class="n">21,2</td></tr>
+<tr><td>13 IX</td><td class="n">150</td><td class="n">21,9</td></tr>
+<tr><td>14 IX</td><td class="n">117</td><td class="n">21,6</td></tr>
+<tr><td>15 IX</td><td class="n">72</td><td class="n">24,3</td></tr>
+<tr><td>16 IX</td><td class="n">7</td><td class="n">56,1</td></tr>
+<tr><td>17 IX</td><td class="n">1</td><td class="n">76,8</td></tr>
+<tr><td>18 IX</td><td class="n">1</td><td class="n">68,6</td></tr>
+<tr><td>19 IX</td><td class="n">1</td><td class="n">65,3</td></tr>
+<tr><td>20 IX</td><td class="n">1</td><td class="n">77,1</td></tr>
+<tr><td>21 IX</td><td class="n">1</td><td class="n">82,1</td></tr>
+<tr><td>22 IX</td><td class="n">1</td><td class="n">68,9</td></tr>
+<tr><td>23 IX*</td><td class="n">6</td><td class="n">16,1</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </details>
+      <p style="margin-top:22px">Pozycje otwarte po poprzednim przeglądzie:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Z przeglądu 2 IX</th><th>Stan</th><th>Dowód</th></tr></thead>
+          <tbody>
+            <tr><td>Stoper od zatrzymania pętli do alertu (zadanie 6.2 <code>a-stopped-loop-wakes-somebody</code>)</td><td><span class="tag att">otwarte</span></td><td>zmiana nadal aktywna tylko dla tego zadania</td></tr>
+            <tr><td>Rotacja sekretów z pliku planu w historii gita (19 VIII)</td><td><span class="tag stop">otwarte</span></td><td>żaden commit od 2 IX o rotacji; <code>docs/rotacja-poswiadczen.html</code> bez zmian od 9 VIII</td></tr>
+            <tr><td><code>the-screen-is-mostly-refusals</code> — dwa niezbudowane widoki</td><td><span class="tag att">otwarte</span></td><td>zadania 4.3 i 4.5; ostatni commit 22 VIII</td></tr>
+            <tr><td>Dokładna data końca darmowej bazy</td><td><span class="tag att">otwarte</span></td><td><code>infra/database.tf</code> nadal „nie później niż 9 VIII 2027”</td></tr>
+            <tr><td>Przewodnik po czterech najnowszych modułach</td><td><span class="tag ok">zrobione</span></td><td><code>docs/przewodnik-po-modulach.html</code> (7 IX)</td></tr>
+            <tr><td>Zapas w CLAUDE.md</td><td><span class="tag stop">cofnięte</span></td><td>1&nbsp;171 → 28 znaków</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:22px">Duże zmiany od <code>64b8cac</code> (26 commitów na <code>main</code>; kod produkcyjny +2&nbsp;815 / −803 linii po odjęciu przeniesień):</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Zmiana</th><th class="n">Prod ±</th><th>Werdykt</th></tr></thead>
+          <tbody>
+            <tr><td><b>4 pakiety wchodzą do workbencha</b> <code>1a4f94f</code> <code>7c841fb</code> <code>0d6e0a4</code> <code>478b125</code></td><td class="n">+774 / −557</td><td>Zapłaciły się: cztery App Service mniej, archiwum czytane w procesie. Decyzję o B2 zmierzono jednak w godzinie po restarcie — patrz §04.</td></tr>
+            <tr><td><b>#263</b> zakresy Polymarket się scalają · <b>#264</b> status par z indeksów</td><td class="n">+65 / −21</td><td>Zapłaciły się: CPU z 70–90% do 15–17%. Nie posprzątały 5,2&nbsp;mln starych zakresów (848&nbsp;MB).</td></tr>
+            <tr><td><b>#262</b> ingest wraca po chwilowej awarii bazy</td><td class="n">+73 / −20</td><td>Zapłaciła się; koszt tylko na ścieżce błędu.</td></tr>
+            <tr><td><b>#265</b> grupy Polymarket i tylko GPT-6</td><td class="n">+971 / −139</td><td>Zapłaciła się, bez nowego pollingu; dwie niezależne zmiany w jednym PR.</td></tr>
+            <tr><td><b>#266</b> ten skill</td><td class="n">+736</td><td>Narzędzie przeglądu, bez testów; poprawki z pierwszego przebiegu w §09.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Baza danych</div>
+      <h2>Co baza robi, gdy nikt nie patrzy</h2>
+      <p class="intro">Budżet: B1ms, jeden vCore, limit bazowy około 20%, 32&nbsp;GB dysku (dziś 26%). Tabela obejmuje każdą pętlę, gauge i polling ekranu; liczby na minutę pochodzą z dwóch odczytów statystyk produkcji w odstępie 617&nbsp;s (23 IX, 13:46–13:56 UTC).</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Wyzwalacz</th><th>Co ile</th><th>Co czyta / pisze</th><th>Klasa</th><th>Bez użytkownika?</th><th>Werdykt</th></tr></thead>
+          <tbody>
+            <tr><td><b>Ingest: <code>still_tracked()</code> po każdym komunikacie</b></td><td>≈118/s (29 par × ≈4/s)</td><td><code>tracked_pairs</code> + reset połączenia puli = 238 transakcji/s</td><td>C0 × kadencja</td><td>tak</td><td><span class="tag stop">P1</span></td></tr>
+            <tr><td>Sampler Polymarket: <code>upsert_event</code></td><td>60&nbsp;s × 12 wydarzeń</td><td>nadpisuje wszystkie <code>markets</code> i <code>outcomes</code>: ≈355 aktualizacji/min</td><td>C2</td><td>tak</td><td><span class="tag att">P2</span></td></tr>
+            <tr><td>Sampler Polymarket: próbki i zakresy</td><td>60&nbsp;s</td><td>217 wstawień <code>price_samples</code>/min + 217 wstawień i 217 usunięć zakresów</td><td>C1</td><td>tak</td><td><span class="tag att">P2 · P3</span></td></tr>
+            <tr><td>Gauge wieku świec</td><td>60&nbsp;s</td><td><code>_SELECT_STATUS</code>: dwie sondy klucza głównego × 29 par</td><td>C2</td><td>tak</td><td><span class="tag ok">ok (#264)</span></td></tr>
+            <tr><td>Runner zadań, bezczynny</td><td>5&nbsp;s × worker</td><td>częściowy indeks <code>state='pending'</code>, 0 wierszy</td><td>C0</td><td>tak</td><td><span class="tag ok">ok</span></td></tr>
+            <tr><td>Rekoncyliacja ingestu · pętla strategii · zegar zespołów · kolektor social</td><td>300&nbsp;s · 60&nbsp;s · 15&nbsp;s · 300&nbsp;s</td><td>lista par · ostatni słupek przez <code>candles_pkey</code> · częściowe indeksy terminów · zapis zbiorowy</td><td>C0–C2</td><td>tak</td><td><span class="tag ok">ok</span></td></tr>
+            <tr><td>Watcher bota Telegram</td><td>≈30&nbsp;s na bota</td><td>dwa odczyty klucza głównego w każdym cyklu</td><td>C0</td><td>tak</td><td><span class="tag ok">ok</span></td></tr>
+            <tr><td>Terminal: zdrowie źródeł · instrumenty · Polymarket · social</td><td>15 · 15 · 30 · 60&nbsp;s</td><td><code>SELECT 1</code> · status par · snapshot · posty z limitem</td><td>C0–C2</td><td>karta widoczna</td><td><span class="tag ok">ok</span></td></tr>
+            <tr><td>Terminal: historia zadań</td><td>10&nbsp;s</td><td>każde zadanie w historii, po dwa zapytania na zadanie (N+1)</td><td>C3</td><td>karta widoczna, też na drugim monitorze</td><td><span class="tag att">P4</span></td></tr>
+            <tr><td>Terminal: decyzje strategii</td><td>60&nbsp;s</td><td>skan i sort całej tabeli <code>decisions</code>, brak indeksu</td><td>C3, dziś mały</td><td>karta widoczna</td><td><span class="tag att">P4</span></td></tr>
+            <tr><td>Pocket: Polymarket · social</td><td>60 · 120&nbsp;s</td><td>snapshot · posty</td><td>C1–C2</td><td>Polymarket nie pauzuje ukrytej karty</td><td><span class="tag att">P4</span></td></tr>
+            <tr><td>Start przebiegu zespołu: limit kosztu i zleceń</td><td>przy każdym uruchomieniu</td><td>cała historia przebiegów zespołu, filtr daty dopiero po złączeniu</td><td>C3, dziś mały</td><td>tak, z harmonogramu</td><td><span class="tag att">P5</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="quote">Baza liczy dziś głównie odpowiedzi na pytanie, na które odpowiedź się nie zmienia.</div>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Pytanie po każdym ticku <span class="tag stop">high · zweryfikowane T1 + T4</span></h3>
+          <p><code>modules/workbench/market_data/ingest/live.py:123</code> — <code>if not await self.still_tracked(): return</code> po każdym komunikacie strumienia, także po aktualizacji świecy, która się jeszcze tworzy; <code>supervisor.py:128–130</code> bierze na to połączenie z puli. Pula z <code>tc_runtime.db</code> resetuje połączenie przy oddaniu, więc jedno sprawdzenie to dwie transakcje. Zmierzone: 7&nbsp;098 skanów <code>tracked_pairs</code>/min i 14&nbsp;258 commitów/min w <code>market_data</code> — 97% ruchu całego serwera. Poprawka: pytać najwyżej raz na N sekund na parę albo wcale, bo <code>_stop_pair</code> i rekoncyliacja co 5&nbsp;min już zatrzymują parę odśledzoną.</p>
+        </div>
+        <div class="fail">
+          <h3><code>price_samples</code> ma dwa takie same indeksy <span class="tag att">high · zweryfikowane T1</span></h3>
+          <p><code>migrations/polymarket/versions/0001_the_archive.py:105</code> — <code>PRIMARY KEY (outcome_id, observed_at)</code>, a linia 120 dokłada <code>price_samples_outcome_time_idx</code> na tych samych kolumnach w tej samej kolejności. Każde z 217 wstawień na minutę i każdy backfill utrzymuje oba; tabela ma 2,93&nbsp;GB. Poprawka: migracja usuwająca drugi indeks.</p>
+        </div>
+        <div class="fail">
+          <h3>Archiwum Polymarket rośnie bez granicy <span class="tag att">high · zweryfikowane T1 + T4</span></h3>
+          <p>21,07&nbsp;mln próbek, +≈312 tys. na dobę, a baza polymarket +≈63&nbsp;MB na dobę; nic ich nie usuwa ani nie zagęszcza. Backfill nowego wydarzenia bierze domyślnie 90 dni z rozdzielczością 1&nbsp;min (<code>polymarket_data/config.py:71</code>, <code>provider.py:174</code>), bez limitu wolumenu — to najpewniej skoki dysku z 31 VIII i 3–4 IX. Teraz: niższy domyślny zasięg lub rzadsza rozdzielczość dla starszych dni. Potem: polityka retencji, jako zmiana OpenSpec.</p>
+        </div>
+        <div class="fail">
+          <h3>Metadane nadpisywane co minutę <span class="tag att">medium · zweryfikowane T1 + T4</span></h3>
+          <p><code>polymarket_data/store.py:146–222</code>, wołane z <code>ingest.py:185</code> w każdym ticku: <code>ON CONFLICT … DO UPDATE</code> bez warunku <code>IS DISTINCT FROM</code> przepisuje każdy rynek i wynik, nawet niezmieniony. Zmierzone: 237 aktualizacji <code>outcomes</code> i 119 <code>markets</code> na minutę; na 268 żywych wierszy <code>outcomes</code> przypada 119 martwych krotek. Poprawka: warunek na zmianę albo odświeżanie metadanych raz na godzinę.</p>
+        </div>
+        <div class="fail">
+          <h3>5,2&nbsp;mln starych zakresów zostało <span class="tag att">medium · zweryfikowane T4</span></h3>
+          <p>#263 scala zakresy nowych ticków, ale <code>collected_ranges</code> nadal trzyma 5&nbsp;225&nbsp;906 wierszy (848&nbsp;MB) sprzed poprawki. Jednorazowa migracja scalająca je na wynik; odzyskanie miejsca na dysku wymaga <code>VACUUM FULL</code> w oknie serwisowym i jest opcjonalne.</p>
+        </div>
+        <div class="fail">
+          <h3>Odczyty, które rosną z historią, za pollingiem i zegarem <span class="tag att">medium · zweryfikowane T1 / T2</span></h3>
+          <p>Historia zadań: <code>market_data/jobs/store.py:233–247</code> woła <code>read_job</code> w pętli po każdym zadaniu, co 10&nbsp;s. Decyzje: <code>strategy/store.py:434–441</code> sortuje całą tabelę co 60&nbsp;s — <code>EXPLAIN</code> na bazie dev pokazuje <code>Seq Scan</code> i <code>Sort</code>. Zespoły: <code>teams/store/usage.py:60–66</code> i <code>trades.py:35–41</code> łączą całą historię przebiegów przed filtrem daty; <code>runs.py:38–45</code> i <code>recurring.py:73–80</code> nie mają <code>LIMIT</code>. Dziś wszystko to jest małe; to ten sam kształt co #263 i #264, tyle że wcześniej na krzywej.</p>
+        </div>
+      </div>
+      <p style="margin-top:18px">Dowody: T1 kod, wszędzie; T2 <code>EXPLAIN</code> na bazie dev, u agentów C, D, E, F; T3 metryki Azure — 45 dni bazy, 14 dni planu, doba aplikacji; T4 dwa odczyty <code>pg_stat_database</code> i <code>pg_stat_user_tables</code> ze wszystkich ośmiu baz, za zgodą operatora, przez tymczasową regułę firewalla usuniętą w tej samej sesji.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Architektura</div>
+      <h2>Cztery procesy, z których jeden stracił powód</h2>
+      <p class="intro">Wchłonięcie czterech modułów do workbencha zapłaciło się: mniej aplikacji, mniej tożsamości, archiwum czytane w procesie. Z czterech procesów, które zostały, trzy mają granicę, o którą warto dbać. Czwarty ją miał — dopóki plan miał zapas pamięci.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Aplikacja</th><th class="n">Pamięć, średnio</th><th class="n">CPU, s/dobę</th><th class="n">Żądania/dobę</th><th>Granica, której pilnuje</th></tr></thead>
+          <tbody>
+            <tr><td><b>workbench</b></td><td class="n">598&nbsp;MB</td><td class="n">12&nbsp;065</td><td class="n">2&nbsp;946</td><td>wszystko poza rachunkiem, dostawcą i Telegramem</td></tr>
+            <tr><td><b>capital-gateway</b></td><td class="n">467&nbsp;MB</td><td class="n">7&nbsp;813</td><td class="n">907</td><td>jedyne drzwi do dostawcy, budżet 10&nbsp;req/s liczony na rachunek</td></tr>
+            <tr><td><b>telegram-gateway</b></td><td class="n">230&nbsp;MB</td><td class="n">371</td><td class="n">291</td><td>jedyne drzwi do Telegrama — reguła zapisu, ale bez pieniędzy</td></tr>
+            <tr><td><b>trading-mcp</b></td><td class="n">167&nbsp;MB</td><td class="n">247</td><td class="n">291</td><td>jedyny zapis na rachunek, strażnik demo — chroniony</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="fails" style="margin-top:14px">
+        <div class="fail">
+          <h3>Plan B2 w przedziale etapu 4 <span class="tag att">high · zweryfikowane T3</span></h3>
+          <p>Reguła zadania 3.9 zmiany <code>one-process-per-security-boundary</code>: „&lt; 85% → B2 zostaje, etap 4 pominięty; 85–100% → etap 4”. Pomiar z 6 IX (79–83%) zrobiono w godzinie po restarcie; stan ustalony to średnio 77%, szczyty 89–90%. Working sety nie cieką, tylko po restarcie startują niżej: gateway stoi na 420–480&nbsp;MB, workbench na 520–600&nbsp;MB. Wchłonięcie telegram-gateway (≈230&nbsp;MB) jest napisane w zadaniach 4.1–4.3 i zdejmuje też App Service, rejestrację Easy Auth, job CI i workflow deployu.</p>
+        </div>
+        <div class="fail">
+          <h3>Trzy aplikacje bez sondy <span class="tag att">medium · zweryfikowane T1</span></h3>
+          <p><code>infra/monitoring.tf:91–136</code> ma jeden web test — <code>/market/ping</code> workbencha — a żadna aplikacja nie ma <code>health_check_path</code>. Śmierć bramy wyjdzie pośrednio przez alert wieku świec; śmierć telegram-gateway nie wyjdzie wcale, a to kanał, którym idą alerty social i strategy.</p>
+        </div>
+      </div>
+      <div class="table-wrap" style="margin-top:14px">
+        <table>
+          <thead><tr><th>Mniejsze</th><th>Gdzie</th><th>Stan</th></tr></thead>
+          <tbody>
+            <tr><td>telegram-gateway trzyma połączenie z bazą przez całe wysłanie do Telegrama (do 65&nbsp;s, pula 4)</td><td><code>telegram_gateway/sending.py:49–59</code></td><td>zweryfikowane T1</td></tr>
+            <tr><td>Sześć łańcuchów migracji wchodzi po kolei; najdłuższy (świece) blokuje pozostałe, sonda deployu czeka 180&nbsp;s</td><td><code>workbench/workbench/app.py:100–116</code></td><td>zweryfikowane T1</td></tr>
+            <tr><td><code>GET /candles</code> i <code>/coverage</code> bez górnej granicy okna, w odróżnieniu od narzędzi MCP i wskaźników</td><td><code>market_data/store.py:66–67</code></td><td>prawdopodobne; zmiana kontraktu</td></tr>
+            <tr><td><code>max_connections</code> opisany jako 35; zmierzone 50</td><td><code>workbench/config.py:38</code>, <code>scripts/tests/test_pool_budget.py</code></td><td>zweryfikowane T1</td></tr>
+            <tr><td>Stała reguła firewalla <code>AllowDeveloper</code> wskazuje nieaktualny adres operatora</td><td><code>infra/database.tf:126–130</code></td><td>zweryfikowane T3</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Prostota i praca z LLM</div>
+      <h2>Kontekst na granicy, proza szybsza od kodu</h2>
+      <p class="intro">Model, który zmienia ten kod, płaci za CLAUDE.md w każdej sesji — około 5&nbsp;700 tokenów — a plik ma 28 znaków zapasu do własnego testu pułapu. Następna edycja, jakakolwiek, zapali CI.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Stałe pytanie</th><th>Liczba dziś</th></tr></thead>
+          <tbody>
+            <tr><td>Kontekst ładowany w każdej sesji</td><td>CLAUDE.md 22&nbsp;972 / 23&nbsp;000 znaków (≈5&nbsp;743 tokeny)</td></tr>
+            <tr><td>Ruchome części</td><td>4 App Service + 2 Static Web Apps · 1 serwer, 7 baz aplikacji, 7 łańcuchów migracji · 10 workflow, 11 jobów CI · 58 bloków Terraform + 4 moduły · 112 kluczy w <code>.env.example</code> (workbench 60)</td></tr>
+            <tr><td>Kod i testy</td><td>73&nbsp;018 linii produkcyjnych, 67&nbsp;470 testów, 11&nbsp;956 generowanych; kopie: 29 par, ≈901 linii (2 IX: 949)</td></tr>
+            <tr><td>Ceremonia w ostatnich 30 dniach</td><td>53 merge'e, 11 zarchiwizowanych zmian; +16&nbsp;647 linii kodu, +4&nbsp;635 linii OpenSpec, +3&nbsp;265 linii <code>docs/</code> — 0,47 linii prozy na linię kodu</td></tr>
+            <tr><td>Proza w repozytorium</td><td><code>docs/</code> 7&nbsp;604 linie + 14&nbsp;783 w archiwum · OpenSpec 40&nbsp;583 linie (94 specyfikacje, 76 zarchiwizowanych zmian, 3 aktywne)</td></tr>
+            <tr><td>Resztki</td><td>4 katalogi modułów sprzed przeprowadzki (3 z <code>.env</code>) · 11 worktree, 2 wewnątrz repo, jeden z 92&nbsp;MB <code>.venv</code> · 117 gałęzi, 105 zmergowanych</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="table-wrap" style="margin-top:14px">
+        <table>
+          <thead><tr><th>Ustalenie</th><th>Dowód</th><th>Waga</th></tr></thead>
+          <tbody>
+            <tr><td><b>CLAUDE.md na granicy pułapu</b> — procedury powinny iść do skilli, historia do <code>docs/</code></td><td><code>scripts/tests/test_guide_ceiling.py:18</code></td><td><span class="tag stop">high</span></td></tr>
+            <tr><td><b>Martwe katalogi z sekretami</b> — <code>modules/market-data</code>, <code>polymarket-data</code>, <code>strategy</code> trzymają <code>.env</code>; <code>social-data</code> pusty</td><td>skan: 0 śledzonych plików</td><td><span class="tag att">medium</span></td></tr>
+            <tr><td><b>Worktree w repo</b> — <code>.claude/worktrees/docs-style-samples</code> z 92&nbsp;MB <code>.venv</code>, który przeszukują Glob i indeksery</td><td>7&nbsp;453 pliki</td><td><span class="tag att">medium</span></td></tr>
+            <tr><td><b>Zmiany stoją</b> — <code>one-process-…</code> czeka dziesięć dni na <code>DROP ROLE</code> (5.2); <code>the-screen-is-mostly-refusals</code> nietknięta od 32 dni</td><td><code>tasks.md:47</code>; <code>tasks.md:24,27</code></td><td><span class="tag att">medium</span></td></tr>
+            <tr><td><b>Testy implementacji</b> wbrew regule 3 — cztery asercje na <code>inspect.getsource</code>/<code>signature</code>, jedna na ścieżce fail-closed</td><td><code>trading-mcp/tests/test_transport.py:20,25</code> i dwie inne</td><td><span class="tag att">medium</span></td></tr>
+            <tr><td>Drobne długi: <code>opsx/*</code> dubluje <code>openspec-*</code> (12 plików, ≈1&nbsp;600 linii); próg „wysokiego wpływu” skopiowany między terminalem a pocketem; <code>strategy/store.py</code> ma 794 linie</td><td><code>.claude/commands/opsx/</code>; <code>social/impact.ts</code> ×2</td><td><span class="tag ok">low</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Czego nie ruszać</div>
+      <h2>Co działa i ma test, który tego broni</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Co</th><th>Dlaczego zostaje</th></tr></thead>
+          <tbody>
+            <tr><td>Strażnik demo w <code>trading-mcp</code></td><td>pyta bramę o typ rachunku przed otwarciem portu; nic tu nie da się wycelować w prawdziwe pieniądze ustawieniem</td></tr>
+            <tr><td>Dostęp fail-closed, tożsamość z <code>azp</code>/<code>appid</code></td><td>test na każdą parę wołający–trasa; ścieżka, której zapis nie nazywa, jest odmówiona</td></tr>
+            <tr><td>Migracje w <code>lifespan</code> pod blokadą doradczą</td><td>merge zostawia produkcję działającą bez kroku operatora</td></tr>
+            <tr><td>Kontrakty generowane i <code>contract:check</code></td><td>dryf jest czerwony w PR, nie cichy na produkcji</td></tr>
+            <tr><td>Test warstw workbencha</td><td>siódmy pakiet to jeden wpis; sprawdzone, że dokładanie pakietu kosztuje ~6 plików mechanicznie</td></tr>
+            <tr><td>Deploy po zielonych checkach, sonda procesu</td><td>ten PR przeszedł przez to dziś: <code>changes</code> zielone, moduły pominięte, deploy nic nie zbudował</td></tr>
+            <tr><td>Liczniki <code>candle_counts</code> z #264</td><td>test pokrywa także konflikt, który niczego nie zapisuje</td></tr>
+            <tr><td>Bliźniaki <code>agent</code>↔<code>teams</code> (auth, provider, runtime)</td><td>różnią się jednym słowem lub liczbą; wyciągnięcie do pakietu kosztowałoby więcej niż ≈120 linii kopii</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Propozycje</div>
+      <h2>Dziesięć ruchów, każdy z liczbą na wyjściu</h2>
+      <p class="intro">Każdy wiersz jest pisany tak, żeby „rób P1” było pełnym poleceniem. Kolumna OpenSpec stosuje test z CLAUDE.md: wymaganie, kontrakt między modułami, infrastruktura albo reguła nośna.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Propozycja i pliki</th><th>Koszt · ryzyko</th><th>OpenSpec</th><th>Po czym poznamy</th></tr></thead>
+          <tbody>
+            <tr><td><b>P1</b></td><td><b>Ingest przestaje pytać po każdym ticku.</b> Sprawdzenie <code>still_tracked</code> najwyżej raz na 30–60&nbsp;s na parę, albo wcale — zatrzymanie należy do <code>_stop_pair</code> i rekoncyliacji.<br><span style="font-size:13px;color:var(--ink-3)"><code>market_data/ingest/live.py</code>, <code>supervisor.py</code>, test ingestu</span></td><td>S · niskie: odśledzona para strumieniuje do 60&nbsp;s dłużej</td><td>nie</td><td><code>market_data</code> ≤ 500 commitów/min (dziś 14&nbsp;258); CPU bazy średnio ≤ 10% przez dobę; kredyty rosną do zapasu</td></tr>
+            <tr><td><b>P2</b></td><td><b>Polymarket pisze tylko to, co się zmieniło.</b> Migracja usuwająca <code>price_samples_outcome_time_idx</code>; <code>IS DISTINCT FROM</code> w <code>upsert_event</code> albo metadane raz na godzinę.<br><span style="font-size:13px;color:var(--ink-3)">nowa migracja polymarket, <code>polymarket_data/store.py</code>, <code>ingest.py</code></span></td><td>S · niskie</td><td>nie</td><td>aktualizacje <code>outcomes</code>+<code>markets</code> ≤ 10/min (dziś ≈355); jeden indeks mniej</td></tr>
+            <tr><td><b>P3</b></td><td><b>Stare zakresy i nowy backfill.</b> Migracja scalająca 5,2&nbsp;mln starych zakresów; backfill domyślnie 30 dni albo rzadsza rozdzielczość dla starszych dni.<br><span style="font-size:13px;color:var(--ink-3)">migracja polymarket, <code>polymarket_data/config.py</code>, <code>provider.py</code></span></td><td>S–M · średnie: migracja na dużej tabeli, pod blokadą startową</td><td>nie</td><td><code>collected_ranges</code> z 5,2&nbsp;mln do tysięcy wierszy; przyrost bazy na dobę zmierzony przed i po</td></tr>
+            <tr><td><b>P4</b></td><td><b>Ekrany czytają tylko to, co pokazują.</b> <code>/jobs</code> jednym zapytaniem z <code>LIMIT</code>, <code>/deletions</code> z <code>LIMIT</code>; indeks <code>decisions (as_of DESC, id DESC)</code>; w pockecie warunek widoczności karty.<br><span style="font-size:13px;color:var(--ink-3)"><code>market_data/jobs/store.py</code>, <code>deletion.py</code>, migracja strategy, <code>pocket/src/polymarket/useArchive.ts</code></span></td><td>S–M · niskie</td><td>nie</td><td><code>/jobs</code> = 2 zapytania niezależnie od historii; <code>EXPLAIN</code> decyzji na indeksie; ukryta karta = 0 żądań</td></tr>
+            <tr><td><b>P5</b></td><td><b>Zespoły ograniczone datą i limitem.</b> <code>r.created_at &gt;= $3 - interval '1 hour'</code> w sumach kosztu i zleceń; <code>LIMIT</code> w listach przebiegów i odpaleń.<br><span style="font-size:13px;color:var(--ink-3)"><code>teams/store/usage.py</code>, <code>trades.py</code>, <code>runs.py</code>, <code>recurring.py</code></span></td><td>S · limity kosztów są chronione — arytmetyka bez zmian, tylko plan zapytania</td><td>nie</td><td><code>EXPLAIN</code> pokazuje <code>Index Cond</code> na dacie</td></tr>
+            <tr><td><b>P6</b></td><td><b>Etap 4: telegram-gateway do workbencha.</b> Najpierw godzina potwierdzenia (4.3), potem napisane już 4.1–4.2; przy okazji połączenie oddawane przed wysłaniem do Telegrama.<br><span style="font-size:13px;color:var(--ink-3)">zgodnie z <code>one-process-per-security-boundary</code>, zadania 4.x</span></td><td>M · średnie: przeprowadzka procesu, piąty raz tym samym wzorem</td><td>tak (już napisane)</td><td>3 App Service; szczyty pamięci planu &lt; 85% przez tydzień z otwartym rynkiem</td></tr>
+            <tr><td><b>P7</b></td><td><b>CLAUDE.md oddaje procedury skillom.</b> Historia do <code>docs/</code>, procedury do skilli z P10, pułapki zostają.<br><span style="font-size:13px;color:var(--ink-3)"><code>CLAUDE.md</code></span></td><td>S–M · niskie</td><td>nie</td><td>≥ 3&nbsp;000 znaków zapasu</td></tr>
+            <tr><td><b>P8</b></td><td><b>Porządek.</b> Usunąć cztery martwe katalogi modułów (operator sprawdza <code>.env</code>), przenieść lub wyczyścić zagnieżdżony worktree, usunąć 105 zmergowanych gałęzi; <code>DROP ROLE</code> z 5.2 i archiwizacja zmiany; decyzja o <code>the-screen-is-mostly-refusals</code>; 35 → 50; testy <code>inspect</code> na behawioralne.<br><span style="font-size:13px;color:var(--ink-3)">dysk operatora, <code>openspec/changes/</code>, <code>config.py</code>, <code>test_pool_budget.py</code>, 3 pliki testów</span></td><td>S · niskie</td><td>nie</td><td>0 martwych katalogów; ≤ 15 gałęzi; 1 aktywna zmiana</td></tr>
+            <tr><td><b>P9</b></td><td><b>Oczy na produkcji.</b> Web testy dla bramy, <code>trading-mcp</code> i telegram-gateway; bez stałej reguły <code>AllowDeveloper</code>; <code>pg_stat_statements</code> włączone, żeby następny przegląd przypisał obciążenie bez reguły firewalla.<br><span style="font-size:13px;color:var(--ink-3)"><code>infra/monitoring.tf</code>, <code>database.tf</code></span></td><td>S · niskie</td><td>tak (infra)</td><td>4 web testy; firewall tylko dla adresów aplikacji; <code>pg_stat_statements</code> odpowiada</td></tr>
+            <tr><td><b>P10</b></td><td><b>Cztery skille z §09:</b> <code>db-cost-check</code>, <code>prod-health</code>, <code>deploy-watch</code>, <code>contract-sync</code>.<br><span style="font-size:13px;color:var(--ink-3)"><code>.claude/skills/</code></span></td><td>M · niskie</td><td>nie</td><td>każdy użyty raz naprawdę; akapity w CLAUDE.md zastąpione wskaźnikiem</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Plan</div>
+      <h2>Najpierw baza, potem pamięć, potem kontekst</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Faza</th><th>Co</th><th>Wyjście — liczba</th></tr></thead>
+          <tbody>
+            <tr><td><b>0 · szybkie</b><br>dzień–dwa, bez OpenSpec</td><td>P1, P2, P4, P8</td><td>CPU bazy średnio ≤ 10% przez dobę; <code>market_data</code> ≤ 500 commitów/min; zero martwych katalogów</td></tr>
+            <tr><td><b>1 · baza</b><br>tydzień</td><td>P3, P5; po tygodniu ponowny pomiar T3 i T4</td><td>kredyty na poziomie zapasu przez 7 dni; przyrost bazy polymarket na dobę znany i niższy</td></tr>
+            <tr><td><b>2 · upraszczanie</b></td><td>P6, P7, P9; propozycja retencji <code>price_samples</code> w OpenSpec</td><td>3 App Service; szczyty pamięci &lt; 85%; CLAUDE.md ≥ 3&nbsp;000 znaków zapasu</td></tr>
+            <tr><td><b>3 · skille</b></td><td>P10</td><td>cztery skille, każdy z jednym prawdziwym przebiegiem</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Kolejność wynika z ceny, nie z bólu: P1 to kilka linii, a zdejmuje większość ruchu bazy; zanim rozmawia się o planie, pamięci czy retencji, trzeba zobaczyć, ile zostanie po nim. Następny przegląd zaczyna od sprawdzenia tych liczb — rejestr jest na końcu tego pliku.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Skille</div>
+      <h2>Procedury tam, gdzie kosztują dopiero przy użyciu</h2>
+      <p class="intro">Dziś: sześć skilli <code>openspec-*</code>, sześć poleceń <code>opsx/*</code> o tych samych czasownikach (użycie nieznane) i <code>system-review</code>, którego pierwszym wynikiem jest ten dokument. Każdy skill kosztuje w sesji tylko swój opis; akapit w CLAUDE.md kosztuje zawsze.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Nazwa</th><th>Rodzaj</th><th>Kiedy się uruchamia</th><th>Co robi</th><th>Co zdejmuje z CLAUDE.md</th><th>Priorytet</th><th>Koszt</th></tr></thead>
+          <tbody>
+            <tr><td><b><code>db-cost-check</code></b></td><td>praca</td><td>przed zapytaniem, pętlą, gauge'em lub pollingiem</td><td>klasa C0–C3, <code>EXPLAIN</code> na bazie dev, zapisana kadencja — pierwsza soczewka przeglądu jako nawyk</td><td>— (zapobiega kolejnemu #264)</td><td>1</td><td>M</td></tr>
+            <tr><td><b><code>prod-health</code></b></td><td>operacje</td><td>„produkcja milczy”, „coś zwolniło”</td><td>stan aplikacji, pamięć planu, kredyty bazy, alerty pętli; <code>pg_stat_*</code> tylko za zgodą, z regułą firewalla usuwaną na końcu</td><td>kroki z <code>kiedy-produkcja-milczy.html</code></td><td>1</td><td>M</td></tr>
+            <tr><td><b><code>deploy-watch</code></b></td><td>deploy</td><td>po merge do <code>main</code></td><td>checks → <code>deploy-*.yml</code> → <code>deploy_probe.py</code>; nieudany start → powrót obrazu przez <code>az</code> (~40&nbsp;s) przed diagnozą; pułapki <code>az</code> w Git Bash</td><td>akapit o sondzie i kolejności ustawień</td><td>1</td><td>S</td></tr>
+            <tr><td><b><code>contract-sync</code></b></td><td>testy</td><td>po zmianie <code>contract.py</code> lub <code>openapi.py</code></td><td>generuje wszystkie kontrakty obu ekranów, rozpoznaje artefakt CRLF na Windows, uruchamia <code>contract:check</code></td><td>„The terminal's contract is generated”</td><td>1</td><td>S</td></tr>
+            <tr><td><code>test-changed</code></td><td>testy</td><td>przed PR</td><td>lokalnie to, co zrobiłby job <code>changes</code>; <code>-m db</code> tylko przy działającym Dockerze, nigdy live</td><td>część „Commands”</td><td>2</td><td>S</td></tr>
+            <tr><td><code>new-migration</code></td><td>praca</td><td>nowa tabela lub kolumna</td><td>właściwy z siedmiu łańcuchów, własność, reguły dla dużych tabel, test <code>-m db</code></td><td>skraca „Migrations are never the operator's job”</td><td>2</td><td>M</td></tr>
+            <tr><td><code>archive-field</code></td><td>praca</td><td>nowe pole w archiwum świec</td><td>pięć przystanków do obu ekranów z <code>market_data/README.md</code></td><td>zdanie o pięciu przystankach</td><td>2</td><td>S</td></tr>
+            <tr><td><code>infra-plan</code></td><td>operacje</td><td>przed <code>apply</code></td><td><code>terraform plan</code>, odmowa <code>azuread_*</code>, pułapka „ustawienia przed obrazem”</td><td>część „Terraform apply is the operator's job”</td><td>2</td><td>S</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px"><strong>Lekcje z pierwszego przebiegu tego skilla</strong>, wpisane z powrotem do niego: siedmiu agentów na Opusie wyczerpało limit sesji po kilku minutach, więc przegląd poszedł na Sonnecie z weryfikacją ustaleń <em>high</em> przez prowadzącego; w Git Bash <code>az … -o tsv</code> niesie <code>\r</code>, a identyfikator zasobu zaczynający się od <code>/subscriptions/</code> trzeba chronić przez <code>MSYS_NO_PATHCONV=1</code>; i najważniejsze — agent obszaru świec nie zauważył ścieżki z P1, a dwa odczyty T4 wskazały ją w dziesięć minut. Pomiar produkcji jest więc krokiem domyślnym, nie opcją.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">10 · Czego nie proponuję</div>
+      <h2>Odrzucone, z powodem</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Czego</th><th>Dlaczego nie</th></tr></thead>
+          <tbody>
+            <tr><td>Większej bazy (B2s) ani planu (B3)</td><td>97% ruchu bazy to jedno zbędne pytanie; najpierw P1 i pomiar. Plan: najpierw P6, które zdejmuje ≈230&nbsp;MB.</td></tr>
+            <tr><td>Wchłonięcia <code>trading-mcp</code></td><td>granica pieniędzy: zapis na rachunek, własna tożsamość, strażnik demo; pomiar z 20 VIII nadal stoi.</td></tr>
+            <tr><td>Przepisania pollingu na WebSockety</td><td>po P4 każdy polling to C0–C2; WebSocket jest tam, gdzie się zwraca — przy świecach.</td></tr>
+            <tr><td>Retencji świec</td><td>1,1&nbsp;mln wierszy, 247&nbsp;MB — to jest cel archiwum, nie jego koszt.</td></tr>
+            <tr><td>Wspólnego pakietu dla bliźniaków <code>agent</code>↔<code>teams</code></td><td>różnica to słowo albo liczba; pakiet byłby większy niż kopia.</td></tr>
+            <tr><td>Porzucenia OpenSpec</td><td>chroni kontrakty, infrastrukturę i reguły nośne; poprawki z P1–P5 i P8 i tak idą poza nim.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Przegląd systemu · 23 września 2026 · main @ 71893f2 · poprzednik: docs/archive/przeglad-wrzesien-2026.html</span>
+    <span>Tryb jasny — jedyny</span>
+  </div>
+</footer>
+<script type="application/json" id="review-ledger">
+{
+ "schema": 1,
+ "date": "2026-09-23",
+ "commit": "71893f2",
+ "scope": "full",
+ "previous": "docs/archive/przeglad-wrzesien-2026.html",
+ "run": {
+  "agents": 7,
+  "agent_model": "sonnet (the first attempt on opus hit the session limit within minutes)",
+  "agent_tokens": 1649679,
+  "minutes": 45,
+  "tiers": [
+   "T1",
+   "T2",
+   "T3",
+   "T4"
+  ],
+  "t4": "2026-09-23 13:46:21Z and 13:56:38Z; temporary firewall rule created and deleted in the session"
+ },
+ "standing": {
+  "idle_c3_on_timer": 0,
+  "hot_path_transactions_per_s": 238,
+  "db_cpu_avg_percent_after_fixes": "15-17",
+  "unbounded_tables": [
+   "price_samples",
+   "collected_ranges (legacy)",
+   "decisions",
+   "teams.runs",
+   "teams.usage",
+   "teams.trades",
+   "agent.messages",
+   "agent.usage",
+   "collection_jobs"
+  ],
+  "context_tokens_per_session": 5743,
+  "claude_md_headroom_chars": 28,
+  "moving_parts": {
+   "app_services": 4,
+   "static_web_apps": 2,
+   "db_servers": 1,
+   "app_databases": 7,
+   "migration_chains": 7,
+   "workflows": 10,
+   "checks_jobs": 11,
+   "tf_resource_blocks": 58,
+   "env_example_keys": 112
+  },
+  "prose_per_code_line_30d": 0.47,
+  "leftovers": {
+   "module_dirs": 4,
+   "with_env": 3,
+   "nested_worktrees": 2,
+   "merged_branches": 105
+  }
+ },
+ "metrics": {
+  "code_totals": {
+   "prod": 73018,
+   "test": 67470,
+   "generated": 11956,
+   "migration": 4316
+  },
+  "code": {
+   ".claude": {
+    "prod": 736
+   },
+   "capital-gateway": {
+    "prod": 2486,
+    "test": 4422
+   },
+   "pocket": {
+    "prod": 3594,
+    "test": 1116,
+    "generated": 2792
+   },
+   "scripts": {
+    "prod": 1459,
+    "test": 1728
+   },
+   "tc-mcp-kit": {
+    "prod": 305,
+    "test": 391
+   },
+   "tc-openai": {
+    "prod": 246,
+    "test": 307
+   },
+   "tc-runtime": {
+    "prod": 836,
+    "test": 530
+   },
+   "telegram-gateway": {
+    "migration": 212,
+    "prod": 2352,
+    "test": 1985
+   },
+   "terminal": {
+    "test": 17157,
+    "prod": 24918,
+    "generated": 9164
+   },
+   "trading-mcp": {
+    "prod": 911,
+    "test": 1593
+   },
+   "workbench/agent": {
+    "prod": 4684,
+    "migration": 1828,
+    "test": 6229
+   },
+   "workbench/market_data": {
+    "prod": 10589,
+    "migration": 681,
+    "test": 12643
+   },
+   "workbench/polymarket_data": {
+    "migration": 323,
+    "prod": 3733,
+    "test": 2985
+   },
+   "workbench/social_data": {
+    "migration": 152,
+    "prod": 2307,
+    "test": 1659
+   },
+   "workbench/strategy": {
+    "migration": 311,
+    "prod": 5426,
+    "test": 4280
+   },
+   "workbench/teams": {
+    "migration": 809,
+    "prod": 6358,
+    "test": 7983
+   },
+   "workbench/teams_tools": {
+    "prod": 1052,
+    "test": 1369
+   },
+   "workbench/workbench": {
+    "test": 1093,
+    "prod": 1026
+   }
+  },
+  "largest_prod_files": [
+   {
+    "path": "scripts/dev.py",
+    "lines": 941
+   },
+   {
+    "path": "modules/terminal/src/teams/teamsApi.ts",
+    "lines": 850
+   },
+   {
+    "path": "modules/workbench/strategy/store.py",
+    "lines": 794
+   },
+   {
+    "path": "modules/workbench/teams/contract.py",
+    "lines": 787
+   },
+   {
+    "path": "modules/terminal/src/agent/agentChatStore.ts",
+    "lines": 744
+   },
+   {
+    "path": ".claude/skills/system-review/scripts/scan.py",
+    "lines": 736
+   },
+   {
+    "path": "modules/workbench/polymarket_data/store.py",
+    "lines": 735
+   },
+   {
+    "path": "modules/workbench/market_data/tools/indicators.py",
+    "lines": 706
+   },
+   {
+    "path": "modules/terminal/src/agent/AgentChat.tsx",
+    "lines": 652
+   },
+   {
+    "path": "modules/workbench/market_data/contract.py",
+    "lines": 639
+   },
+   {
+    "path": "modules/terminal/src/strategy/DefinitionDialog.tsx",
+    "lines": 628
+   },
+   {
+    "path": "modules/terminal/src/chart/Chart.tsx",
+    "lines": 604
+   },
+   {
+    "path": "modules/workbench/agent/tools/drawings.py",
+    "lines": 596
+   },
+   {
+    "path": "modules/terminal/src/teams/SchedulesPanel.tsx",
+    "lines": 588
+   },
+   {
+    "path": "modules/terminal/src/data/archive.ts",
+    "lines": 575
+   }
+  ],
+  "guide": {
+   "chars": 22972,
+   "approx_tokens": 5743
+  },
+  "prose_lines": {
+   "docs": 7604,
+   "docs_archive": 14783,
+   "openspec_specs": 14512,
+   "openspec_active_changes": 977,
+   "openspec_archive": 25094,
+   "readmes": 2766
+  },
+  "openspec": {
+   "specs": 94,
+   "active_changes": [
+    "a-stopped-loop-wakes-somebody",
+    "one-process-per-security-boundary",
+    "the-screen-is-mostly-refusals"
+   ],
+   "archived_changes": 76
+  },
+  "settings": {
+   "capital-gateway": {
+    "set": 11,
+    "commented_out": 0
+   },
+   "pocket": {
+    "set": 3,
+    "commented_out": 0
+   },
+   "telegram-gateway": {
+    "set": 15,
+    "commented_out": 0
+   },
+   "terminal": {
+    "set": 17,
+    "commented_out": 0
+   },
+   "trading-mcp": {
+    "set": 6,
+    "commented_out": 0
+   },
+   "workbench": {
+    "set": 60,
+    "commented_out": 0
+   }
+  },
+  "infra": {
+   "resource_blocks": 58,
+   "module_calls": 4,
+   "by_type": {
+    "azurerm_postgresql_flexible_server_database": 7,
+    "azuread_application_federated_identity_credential": 6,
+    "azurerm_linux_web_app": 4,
+    "azuread_application": 4,
+    "azuread_service_principal": 4,
+    "azuread_application_pre_authorized": 4,
+    "azurerm_role_assignment": 4,
+    "azurerm_monitor_metric_alert": 4,
+    "azurerm_postgresql_flexible_server_firewall_rule": 3,
+    "azurerm_key_vault_access_policy": 2,
+    "azurerm_static_web_app": 2,
+    "azurerm_service_plan": 1,
+    "azurerm_postgresql_flexible_server": 1,
+    "azurerm_postgresql_flexible_server_configuration": 1,
+    "azurerm_postgresql_flexible_server_active_directory_administrator": 1,
+    "azuread_app_role_assignment": 1,
+    "random_string": 1,
+    "azurerm_key_vault": 1,
+    "azurerm_resource_group": 1,
+    "random_uuid": 1,
+    "azuread_application_password": 1,
+    "azurerm_log_analytics_workspace": 1,
+    "azurerm_application_insights": 1,
+    "azurerm_monitor_action_group": 1,
+    "azurerm_application_insights_standard_web_test": 1
+   }
+  },
+  "ci": {
+   "workflows": [
+    "_deploy-app-service.yml",
+    "checks.yml",
+    "deploy-gateway.yml",
+    "deploy-pocket.yml",
+    "deploy-telegram-gateway.yml",
+    "deploy-terminal.yml",
+    "deploy-trading-mcp.yml",
+    "deploy-workbench.yml",
+    "terraform-apply.yml",
+    "terraform.yml"
+   ],
+   "checks_jobs": [
+    "changes",
+    "capital-gateway",
+    "trading-mcp",
+    "telegram-gateway",
+    "packages",
+    "workbench",
+    "terminal",
+    "pocket",
+    "scripts",
+    "infra",
+    "openspec"
+   ]
+  },
+  "migration_revisions": {
+   "telegram-gateway": 1,
+   "workbench/agent": 14,
+   "workbench/market_data": 8,
+   "workbench/polymarket_data": 5,
+   "workbench/social_data": 2,
+   "workbench/strategy": 4,
+   "workbench/teams": 8
+  },
+  "claude": {
+   "skills": [
+    "openspec-apply-change",
+    "openspec-archive-change",
+    "openspec-explore",
+    "openspec-propose",
+    "openspec-sync-specs",
+    "openspec-update-change",
+    "system-review"
+   ],
+   "commands": [
+    "opsx/apply.md",
+    "opsx/archive.md",
+    "opsx/explore.md",
+    "opsx/propose.md",
+    "opsx/sync.md",
+    "opsx/update.md"
+   ]
+  },
+  "hygiene": {
+   "leftover_module_dirs": [
+    {
+     "path": "modules/market-data",
+     "has_env_file": true
+    },
+    {
+     "path": "modules/polymarket-data",
+     "has_env_file": true
+    },
+    {
+     "path": "modules/social-data",
+     "has_env_file": false
+    },
+    {
+     "path": "modules/strategy",
+     "has_env_file": true
+    }
+   ],
+   "worktrees": [
+    {
+     "path": "C:/Marek/Dev gielda/TradingCenter",
+     "branch": "main",
+     "inside_repo": false
+    },
+    {
+     "path": "C:/Marek/Dev gielda/TradingCenter-mcp",
+     "branch": "fix/market-mcp-range-tools-refuse-themselves",
+     "inside_repo": false
+    },
+    {
+     "path": "C:/Marek/Dev gielda/TradingCenter-perf",
+     "branch": "docs/plan-status-iteration-4",
+     "inside_repo": false
+    },
+    {
+     "path": "C:/Marek/Dev gielda/TradingCenter-schedule-ui",
+     "branch": "feat/schedule-ui-and-run-now",
+     "inside_repo": false
+    },
+    {
+     "path": "C:/Marek/Dev gielda/TradingCenter-teams-docs",
+     "branch": "docs/teams-module-overview",
+     "inside_repo": false
+    },
+    {
+     "path": "C:/Marek/Dev gielda/TradingCenter-teams-infra",
+     "branch": "feat/teams-08-cost",
+     "inside_repo": false
+    },
+    {
+     "path": "C:/Marek/Dev gielda/TradingCenter-teams-phase2",
+     "branch": "feat/teams-terminal-trading",
+     "inside_repo": false
+    },
+    {
+     "path": "C:/Marek/Dev gielda/TradingCenter-teams-phase3",
+     "branch": "feat/teams-p3-config-and-infra",
+     "inside_repo": false
+    },
+    {
+     "path": "C:/Marek/Dev gielda/TradingCenter-terminal",
+     "branch": "docs/plan-iteration-3-status",
+     "inside_repo": false
+    },
+    {
+     "path": "C:/Marek/Dev gielda/TradingCenter/.claude/worktrees/docs-style-samples",
+     "branch": "docs/style-system",
+     "inside_repo": true
+    },
+    {
+     "path": "C:/Marek/Dev gielda/TradingCenter/.claude/worktrees/multi-agent-teams-research",
+     "branch": "worktree-multi-agent-teams-research",
+     "inside_repo": true
+    }
+   ],
+   "branches": 117,
+   "branches_older_than_30_days": 109,
+   "branches_merged_into_main": 105
+  }
+ },
+ "db_budget": [
+  {
+   "id": "loop:market_data.ingest.still_tracked",
+   "cadence": "~118/s",
+   "reads": "tracked_pairs + pool reset",
+   "class": "C0 x cadence",
+   "idle": true,
+   "verdict": "stop"
+  },
+  {
+   "id": "loop:polymarket.sampler.upsert_event",
+   "cadence_s": 60,
+   "reads": "markets, outcomes rewritten (~355 upd/min)",
+   "class": "C2",
+   "idle": true,
+   "verdict": "att"
+  },
+  {
+   "id": "loop:polymarket.sampler.samples",
+   "cadence_s": 60,
+   "reads": "price_samples +217/min, collected_ranges +217/-217 per min",
+   "class": "C1",
+   "idle": true,
+   "verdict": "att"
+  },
+  {
+   "id": "gauge:market_data.candle_age",
+   "cadence_s": 60,
+   "reads": "_SELECT_STATUS, PK probes x 29",
+   "class": "C2",
+   "idle": true,
+   "verdict": "ok"
+  },
+  {
+   "id": "loop:market_data.jobs.idle_poll",
+   "cadence_s": 5,
+   "reads": "partial index, 0 rows",
+   "class": "C0",
+   "idle": true,
+   "verdict": "ok"
+  },
+  {
+   "id": "loop:market_data.ingest.reconcile",
+   "cadence_s": 300,
+   "reads": "tracked list",
+   "class": "C1",
+   "idle": true,
+   "verdict": "ok"
+  },
+  {
+   "id": "loop:strategy.evaluation",
+   "cadence_s": 60,
+   "reads": "last closed bar via candles_pkey",
+   "class": "C2",
+   "idle": true,
+   "verdict": "ok"
+  },
+  {
+   "id": "loop:teams.scheduler",
+   "cadence_s": 15,
+   "reads": "due schedules/triggers, partial indexes",
+   "class": "C0",
+   "idle": true,
+   "verdict": "ok"
+  },
+  {
+   "id": "loop:social.collector",
+   "cadence_s": 300,
+   "reads": "set-based insert",
+   "class": "C1",
+   "idle": true,
+   "verdict": "ok"
+  },
+  {
+   "id": "loop:telegram.binding_watcher",
+   "cadence_s": 30,
+   "reads": "2 PK reads per bot",
+   "class": "C0",
+   "idle": true,
+   "verdict": "ok"
+  },
+  {
+   "id": "poll:terminal.jobs",
+   "cadence_s": 10,
+   "reads": "N+1 over every job",
+   "class": "C3",
+   "idle": false,
+   "verdict": "att"
+  },
+  {
+   "id": "poll:terminal.decisions",
+   "cadence_s": 60,
+   "reads": "seq scan + sort",
+   "class": "C3",
+   "idle": false,
+   "verdict": "att"
+  },
+  {
+   "id": "poll:terminal.health_pairs_polymarket_social",
+   "cadence_s": "15/15/30/60",
+   "reads": "SELECT 1, status, snapshot, posts",
+   "class": "C0-C2",
+   "idle": false,
+   "verdict": "ok"
+  },
+  {
+   "id": "poll:pocket.polymarket",
+   "cadence_s": 60,
+   "reads": "snapshot; runs while hidden",
+   "class": "C2",
+   "idle": false,
+   "verdict": "att"
+  },
+  {
+   "id": "event:teams.run_start.limits",
+   "cadence": "per fire",
+   "reads": "whole run history joined",
+   "class": "C3 (small)",
+   "idle": true,
+   "verdict": "att"
+  }
+ ],
+ "findings": [
+  {
+   "id": "F-20260923-01",
+   "area": "A",
+   "lens": "db-load",
+   "severity": "high",
+   "title": "Ingest pyta o śledzenie pary po każdym komunikacie strumienia",
+   "evidence": [
+    "modules/workbench/market_data/ingest/live.py:123",
+    "modules/workbench/market_data/ingest/supervisor.py:128",
+    "T4: tracked_pairs 7098 seq scans/min; market_data 14258 commits/min of 14665 on the server"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1",
+    "T4"
+   ],
+   "fix": "sprawdzać najwyżej raz na 30–60 s na parę albo wcale",
+   "plan": "P1",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-02",
+   "area": "B",
+   "lens": "db-load",
+   "severity": "medium",
+   "title": "upsert_event nadpisuje niezmienione rynki i wyniki w każdym ticku",
+   "evidence": [
+    "modules/workbench/polymarket_data/store.py:146",
+    "modules/workbench/polymarket_data/ingest.py:185",
+    "T4: outcomes 237 upd/min, markets 119 upd/min"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1",
+    "T4"
+   ],
+   "fix": "IS DISTINCT FROM albo metadane raz na godzinę",
+   "plan": "P2",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-03",
+   "area": "B",
+   "lens": "db-load",
+   "severity": "high",
+   "title": "price_samples ma dwa identyczne indeksy",
+   "evidence": [
+    "modules/workbench/migrations/polymarket/versions/0001_the_archive.py:105",
+    "modules/workbench/migrations/polymarket/versions/0001_the_archive.py:120"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1"
+   ],
+   "fix": "migracja usuwająca price_samples_outcome_time_idx",
+   "plan": "P2",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-04",
+   "area": "B",
+   "lens": "db-load",
+   "severity": "high",
+   "title": "price_samples bez retencji; backfill 90 dni po 1 min bez limitu wolumenu",
+   "evidence": [
+    "modules/workbench/polymarket_data/config.py:71",
+    "modules/workbench/polymarket_data/provider.py:174",
+    "T4: 21.07 M rows, 2934.5 MB, +217 rows/min; polymarket database +~63 MB/day"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1",
+    "T4"
+   ],
+   "fix": "teraz: niższy zasięg lub rozdzielczość backfillu; potem: retencja (OpenSpec)",
+   "plan": "P3",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-05",
+   "area": "B",
+   "lens": "db-load",
+   "severity": "medium",
+   "title": "Po #263 zostało 5,2 mln starych zakresów (848 MB)",
+   "evidence": [
+    "T4: collected_ranges n_live_tup 5225906, 847.6 MB"
+   ],
+   "verified": true,
+   "tiers": [
+    "T4"
+   ],
+   "fix": "jednorazowa migracja scalająca; VACUUM FULL opcjonalnie",
+   "plan": "P3",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-06",
+   "area": "A",
+   "lens": "db-load",
+   "severity": "medium",
+   "title": "/jobs to N+1 po całej historii zadań co 10 s",
+   "evidence": [
+    "modules/workbench/market_data/jobs/store.py:233",
+    "modules/terminal/src/history/useJobHistory.ts:7"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1"
+   ],
+   "fix": "jedno zapytanie zbiorowe z LIMIT; LIMIT w /deletions",
+   "plan": "P4",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-07",
+   "area": "C",
+   "lens": "db-load",
+   "severity": "medium",
+   "title": "/decisions sortuje całą tabelę co 60 s, bez indeksu",
+   "evidence": [
+    "modules/workbench/strategy/store.py:434",
+    "modules/terminal/src/strategy/StrategyView.tsx:26"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1",
+    "T2"
+   ],
+   "fix": "indeks decisions (as_of DESC, id DESC)",
+   "plan": "P4",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-08",
+   "area": "C",
+   "lens": "db-load",
+   "severity": "medium",
+   "title": "Limity kosztu i zleceń oraz listy zespołów łączą całą historię przebiegów",
+   "evidence": [
+    "modules/workbench/teams/store/usage.py:60",
+    "modules/workbench/teams/store/trades.py:35",
+    "modules/workbench/teams/store/runs.py:38",
+    "modules/workbench/teams/store/recurring.py:73"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1"
+   ],
+   "fix": "warunek daty na runs.created_at, LIMIT w listach",
+   "plan": "P5",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-09",
+   "area": "F",
+   "lens": "db-load",
+   "severity": "low",
+   "title": "Pocket polluje Polymarket także przy ukrytej karcie",
+   "evidence": [
+    "modules/pocket/src/polymarket/useArchive.ts:91"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1"
+   ],
+   "fix": "warunek document.visibilityState jak w usePosts.ts",
+   "plan": "P4",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-10",
+   "area": "E",
+   "lens": "db-load",
+   "severity": "medium",
+   "title": "telegram-gateway trzyma połączenie z bazą przez całe wysłanie do Telegrama",
+   "evidence": [
+    "modules/telegram-gateway/telegram_gateway/sending.py:49"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1"
+   ],
+   "fix": "oddać połączenie przed wywołaniem API",
+   "plan": "P6",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-11",
+   "area": "E",
+   "lens": "db-load",
+   "severity": "low",
+   "title": "Watcher bota czyta offset i token w każdym cyklu",
+   "evidence": [
+    "modules/telegram-gateway/telegram_gateway/binding.py:181"
+   ],
+   "verified": false,
+   "tiers": [
+    "T1"
+   ],
+   "fix": "trzymać w pamięci zadania",
+   "plan": "P6",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-12",
+   "area": "A",
+   "lens": "reliability",
+   "severity": "medium",
+   "title": "GET /candles i /coverage bez górnej granicy okna",
+   "evidence": [
+    "modules/workbench/market_data/store.py:66"
+   ],
+   "verified": false,
+   "tiers": [
+    "T1"
+   ],
+   "fix": "ten sam sufit co trasa wskaźników (zmiana kontraktu)",
+   "plan": null,
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-13",
+   "area": "E",
+   "lens": "cost",
+   "severity": "high",
+   "title": "Pamięć planu B2 w przedziale etapu 4: średnio 77%, szczyty 89–90%",
+   "evidence": [
+    "openspec/changes/one-process-per-security-boundary/tasks.md:36",
+    "T3: MemoryPercentage 14 days; working sets gateway 420–480 MB, workbench 520–600 MB"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1",
+    "T3"
+   ],
+   "fix": "etap 4: telegram-gateway do workbencha",
+   "plan": "P6",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-14",
+   "area": "E",
+   "lens": "reliability",
+   "severity": "medium",
+   "title": "Brak sondy dla bramy, trading-mcp i telegram-gateway",
+   "evidence": [
+    "infra/monitoring.tf:91"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1"
+   ],
+   "fix": "web testy i alerty jak market_data_ping",
+   "plan": "P9",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-15",
+   "area": "D",
+   "lens": "reliability",
+   "severity": "low",
+   "title": "Sześć łańcuchów migracji wchodzi przy starcie po kolei",
+   "evidence": [
+    "modules/workbench/workbench/app.py:100",
+    "scripts/deploy_probe.py:32"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1"
+   ],
+   "fix": "start współbieżny",
+   "plan": null,
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-16",
+   "area": "G",
+   "lens": "hygiene",
+   "severity": "low",
+   "title": "Stała reguła firewalla AllowDeveloper wskazuje nieaktualny adres",
+   "evidence": [
+    "infra/database.tf:126"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1",
+    "T3"
+   ],
+   "fix": "usunąć regułę; dostęp operatora przez regułę tymczasową",
+   "plan": "P9",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-17",
+   "area": "D",
+   "lens": "hygiene",
+   "severity": "low",
+   "title": "max_connections opisany jako 35; zmierzone 50",
+   "evidence": [
+    "modules/workbench/workbench/config.py:38",
+    "scripts/tests/test_pool_budget.py"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1"
+   ],
+   "fix": "poprawić liczbę w obu miejscach",
+   "plan": "P8",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-18",
+   "area": "G",
+   "lens": "llm-dx",
+   "severity": "high",
+   "title": "CLAUDE.md ma 28 znaków zapasu do pułapu",
+   "evidence": [
+    "scripts/tests/test_guide_ceiling.py:18",
+    "CLAUDE.md: 22972 chars"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1"
+   ],
+   "fix": "procedury do skilli, historia do docs/",
+   "plan": "P7",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-19",
+   "area": "G",
+   "lens": "hygiene",
+   "severity": "medium",
+   "title": "Martwe katalogi modułów z .env, worktree z .venv w repo, 105 zmergowanych gałęzi",
+   "evidence": [
+    "modules/market-data",
+    "modules/polymarket-data",
+    "modules/strategy",
+    "modules/social-data",
+    ".claude/worktrees/docs-style-samples"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1"
+   ],
+   "fix": "usunąć; przenieść worktree obok repo",
+   "plan": "P8",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-20",
+   "area": "G",
+   "lens": "hygiene",
+   "severity": "medium",
+   "title": "Zmiany OpenSpec stoją: DROP ROLE (5.2) i the-screen-is-mostly-refusals",
+   "evidence": [
+    "openspec/changes/one-process-per-security-boundary/tasks.md:47",
+    "openspec/changes/the-screen-is-mostly-refusals/tasks.md:24"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1"
+   ],
+   "fix": "wykonać 5.2 i zarchiwizować; drugą dokończyć albo odłożyć z powodem",
+   "plan": "P8",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-21",
+   "area": "G",
+   "lens": "llm-dx",
+   "severity": "medium",
+   "title": "Cztery testy na inspect.getsource/signature wbrew regule 3",
+   "evidence": [
+    "modules/trading-mcp/tests/test_transport.py:20",
+    "modules/workbench/tests/agent/test_prompt_seed.py:115",
+    "packages/tc-mcp-kit/tests/test_network_identity.py:67"
+   ],
+   "verified": true,
+   "tiers": [
+    "T1"
+   ],
+   "fix": "zastąpić testami zachowania, bez utraty pokrycia fail-closed",
+   "plan": "P8",
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-22",
+   "area": "G",
+   "lens": "llm-dx",
+   "severity": "low",
+   "title": "opsx/* dubluje openspec-*; próg wpływu skopiowany między ekranami; strategy/store.py 794 linie",
+   "evidence": [
+    ".claude/commands/opsx/",
+    "modules/terminal/src/social/impact.ts",
+    "modules/pocket/src/social/impact.ts"
+   ],
+   "verified": false,
+   "tiers": [
+    "T1"
+   ],
+   "fix": "zostawić jedną powierzchnię; test zgodności progu; podział store",
+   "plan": null,
+   "status": "open",
+   "since": "2026-09-23"
+  },
+  {
+   "id": "F-20260923-23",
+   "area": "G",
+   "lens": "security",
+   "severity": "medium",
+   "title": "Rotacja sekretów z pliku planu w historii gita (19 VIII) bez śladu",
+   "evidence": [
+    "docs/rotacja-poswiadczen.html"
+   ],
+   "verified": false,
+   "tiers": [
+    "T1"
+   ],
+   "fix": "rotacja przez operatora według runbooka i wpis, że zrobiona",
+   "plan": null,
+   "status": "open",
+   "since": "2026-09-23"
+  }
+ ],
+ "plan": [
+  {
+   "id": "P1",
+   "phase": 0,
+   "effort": "S",
+   "openspec": false,
+   "findings": [
+    "F-20260923-01"
+   ],
+   "title": "Ingest przestaje pytać po każdym ticku",
+   "files": [
+    "modules/workbench/market_data/ingest/live.py",
+    "modules/workbench/market_data/ingest/supervisor.py"
+   ],
+   "exit": "market_data ≤ 500 commitów/min; CPU bazy ≤ 10% średnio przez dobę",
+   "status": "open"
+  },
+  {
+   "id": "P2",
+   "phase": 0,
+   "effort": "S",
+   "openspec": false,
+   "findings": [
+    "F-20260923-02",
+    "F-20260923-03"
+   ],
+   "title": "Polymarket pisze tylko to, co się zmieniło",
+   "files": [
+    "modules/workbench/migrations/polymarket/versions/",
+    "modules/workbench/polymarket_data/store.py"
+   ],
+   "exit": "outcomes+markets ≤ 10 aktualizacji/min; jeden indeks mniej",
+   "status": "open"
+  },
+  {
+   "id": "P3",
+   "phase": 1,
+   "effort": "M",
+   "openspec": false,
+   "findings": [
+    "F-20260923-04",
+    "F-20260923-05"
+   ],
+   "title": "Stare zakresy i nowy backfill",
+   "files": [
+    "modules/workbench/migrations/polymarket/versions/",
+    "modules/workbench/polymarket_data/config.py"
+   ],
+   "exit": "collected_ranges z 5,2 mln do tysięcy; przyrost bazy na dobę zmierzony przed i po",
+   "status": "open"
+  },
+  {
+   "id": "P4",
+   "phase": 0,
+   "effort": "M",
+   "openspec": false,
+   "findings": [
+    "F-20260923-06",
+    "F-20260923-07",
+    "F-20260923-09"
+   ],
+   "title": "Ekrany czytają tylko to, co pokazują",
+   "files": [
+    "modules/workbench/market_data/jobs/store.py",
+    "modules/workbench/market_data/deletion.py",
+    "modules/workbench/migrations/strategy/versions/",
+    "modules/pocket/src/polymarket/useArchive.ts"
+   ],
+   "exit": "/jobs = 2 zapytania; EXPLAIN decyzji na indeksie; ukryta karta = 0 żądań",
+   "status": "open"
+  },
+  {
+   "id": "P5",
+   "phase": 1,
+   "effort": "S",
+   "openspec": false,
+   "findings": [
+    "F-20260923-08"
+   ],
+   "title": "Zespoły ograniczone datą i limitem",
+   "files": [
+    "modules/workbench/teams/store/usage.py",
+    "modules/workbench/teams/store/trades.py",
+    "modules/workbench/teams/store/runs.py",
+    "modules/workbench/teams/store/recurring.py"
+   ],
+   "exit": "EXPLAIN z Index Cond na dacie",
+   "status": "open"
+  },
+  {
+   "id": "P6",
+   "phase": 2,
+   "effort": "M",
+   "openspec": true,
+   "findings": [
+    "F-20260923-13",
+    "F-20260923-10",
+    "F-20260923-11"
+   ],
+   "title": "Etap 4: telegram-gateway do workbencha",
+   "files": [
+    "openspec/changes/one-process-per-security-boundary/tasks.md (4.1–4.3)"
+   ],
+   "exit": "3 App Service; szczyty pamięci planu < 85% przez tydzień",
+   "status": "open"
+  },
+  {
+   "id": "P7",
+   "phase": 2,
+   "effort": "M",
+   "openspec": false,
+   "findings": [
+    "F-20260923-18"
+   ],
+   "title": "CLAUDE.md oddaje procedury skillom",
+   "files": [
+    "CLAUDE.md"
+   ],
+   "exit": "≥ 3000 znaków zapasu",
+   "status": "open"
+  },
+  {
+   "id": "P8",
+   "phase": 0,
+   "effort": "S",
+   "openspec": false,
+   "findings": [
+    "F-20260923-17",
+    "F-20260923-19",
+    "F-20260923-20",
+    "F-20260923-21"
+   ],
+   "title": "Porządek",
+   "files": [
+    "dysk operatora",
+    "openspec/changes/",
+    "scripts/tests/test_pool_budget.py"
+   ],
+   "exit": "0 martwych katalogów; ≤ 15 gałęzi; 1 aktywna zmiana",
+   "status": "open"
+  },
+  {
+   "id": "P9",
+   "phase": 2,
+   "effort": "S",
+   "openspec": true,
+   "findings": [
+    "F-20260923-14",
+    "F-20260923-16"
+   ],
+   "title": "Oczy na produkcji: sondy, firewall, pg_stat_statements",
+   "files": [
+    "infra/monitoring.tf",
+    "infra/database.tf"
+   ],
+   "exit": "4 web testy; firewall tylko dla aplikacji; pg_stat_statements odpowiada",
+   "status": "open"
+  },
+  {
+   "id": "P10",
+   "phase": 3,
+   "effort": "M",
+   "openspec": false,
+   "findings": [],
+   "title": "Skille: db-cost-check, prod-health, deploy-watch, contract-sync",
+   "files": [
+    ".claude/skills/"
+   ],
+   "exit": "każdy użyty raz naprawdę",
+   "status": "open"
+  }
+ ],
+ "previous_items": [
+  {
+   "item": "stoper pętli (6.2 a-stopped-loop-wakes-somebody)",
+   "status": "open"
+  },
+  {
+   "item": "rotacja sekretów z historii gita (19 VIII)",
+   "status": "open"
+  },
+  {
+   "item": "the-screen-is-mostly-refusals, dwa widoki",
+   "status": "open"
+  },
+  {
+   "item": "data końca darmowej bazy",
+   "status": "open"
+  },
+  {
+   "item": "przewodnik po najnowszych modułach",
+   "status": "done",
+   "evidence": "docs/przewodnik-po-modulach.html"
+  },
+  {
+   "item": "zapas CLAUDE.md",
+   "status": "regressed",
+   "evidence": "1171 -> 28"
+  }
+ ],
+ "skills": [
+  {
+   "name": "system-review",
+   "kind": "meta",
+   "status": "built",
+   "path": ".claude/skills/system-review"
+  },
+  {
+   "name": "db-cost-check",
+   "kind": "work",
+   "status": "proposed",
+   "priority": 1
+  },
+  {
+   "name": "prod-health",
+   "kind": "operations",
+   "status": "proposed",
+   "priority": 1
+  },
+  {
+   "name": "deploy-watch",
+   "kind": "deploy",
+   "status": "proposed",
+   "priority": 1
+  },
+  {
+   "name": "contract-sync",
+   "kind": "tests",
+   "status": "proposed",
+   "priority": 1
+  },
+  {
+   "name": "test-changed",
+   "kind": "tests",
+   "status": "proposed",
+   "priority": 2
+  },
+  {
+   "name": "new-migration",
+   "kind": "work",
+   "status": "proposed",
+   "priority": 2
+  },
+  {
+   "name": "archive-field",
+   "kind": "work",
+   "status": "proposed",
+   "priority": 2
+  },
+  {
+   "name": "infra-plan",
+   "kind": "operations",
+   "status": "proposed",
+   "priority": 2
+  }
+ ],
+ "false_findings": [],
+ "notes": [
+  "C-1 (teams limits) downgraded high -> medium: the shape holds, today's tables are small",
+  "agent A missed F-20260923-01; T4 found it"
+ ]
+}
+</script>
