@@ -131,9 +131,7 @@ def test_a_missing_database_url_names_itself(surface: str) -> None:
 # the third and fourth servers added later would each have been that copy. Each surface's own test_config keeps what is genuinely its own.
 
 
-@pytest.fixture(
-    params=["trading_mcp", "telegram_mcp"]
-)
+@pytest.fixture(params=["trading_mcp"])
 def server(request: pytest.FixtureRequest) -> str:
     return request.param
 

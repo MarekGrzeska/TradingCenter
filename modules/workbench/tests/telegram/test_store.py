@@ -5,11 +5,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-import builders
 import pytest
 
 from telegram_gateway import store
 from telegram_gateway.models import Bot, DestinationState
+
+from . import builders
 
 NOON = datetime(2026, 8, 31, 12, 0, tzinfo=UTC)
 

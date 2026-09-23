@@ -23,6 +23,7 @@ os.environ.setdefault("OTEL_PYTHON_FASTAPI_EXCLUDED_URLS", UNTRACED_URLS)
 telemetry.configure(quiet=("httpx", "httpcore", "urllib3"))
 
 from fastapi import FastAPI
+from starlette.routing import Mount
 from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
@@ -34,6 +35,7 @@ import polymarket_data.app
 import social_data.app
 import strategy.app
 import teams.surface
+import telegram_gateway.app
 from agent import store as agent_store
 from agent.models_catalogue import ModelCatalogue as AgentCatalogue
 from agent.provider import OpenAIProvider as AgentProvider
@@ -54,7 +56,9 @@ from .archive_client import archive_client
 from .assembly import mount_package
 from .config import Settings
 from .local_tools import ConversationLocalTools, TeamsLocalTools
+from .root_access import RootCallers
 from .team_tools import LocalTeamsTools
+from .telegram_client import telegram_client
 
 log = logging.getLogger(__name__)
 
@@ -68,12 +72,14 @@ async def lifespan(app: FastAPI):
     social_settings = settings.for_social()
     strategy_settings = settings.for_strategy()
     market_settings = settings.for_market()
+    telegram_settings = settings.for_telegram()
     # Each package's tools, called as functions: the server its own `/mcp` mounts, minus the transport. The
     # archive's eleven were the first tools this process ever called, over the network; they are the last to move in.
     polymarket_tools = ConversationLocalTools("polymarket-data", polymarket_app.state.mcp_server)
     social_tools = ConversationLocalTools("social-data", social_app.state.mcp_server)
     strategy_tools = ConversationLocalTools("strategy", strategy_app.state.mcp_server)
     market_tools = ConversationLocalTools("market-data", market_app.state.mcp_server)
+    telegram_tools = ConversationLocalTools("telegram-gateway", telegram_app.state.mcp_server)
 
     # Constructed, not connected: a session opens on the first turn that wants a tool. Reaching trading-mcp at startup
     # would make this process's health depend on another module's, whose answer is to run without its tools.
@@ -82,7 +88,14 @@ async def lifespan(app: FastAPI):
     )
     conversation_tools = ToolServerRegistry.from_settings(
         conversation_settings,
-        local_sources=[team_tools, market_tools, polymarket_tools, social_tools, strategy_tools],
+        local_sources=[
+            team_tools,
+            market_tools,
+            polymarket_tools,
+            social_tools,
+            strategy_tools,
+            telegram_tools,
+        ],
     )
 
     async with (
@@ -103,16 +116,25 @@ async def lifespan(app: FastAPI):
             max_size=settings.database_pool_size,
         ) as teams_pool,
         # A mounted application's lifespan is never run, so each package's pool, migration, loop and
-        # tool session are entered here, beside this process's own two.
+        # tool session are entered here, beside this process's own two. The door to Telegram first: the post
+        # archive's first pass may already have something to say.
+        telegram_gateway.app.serving(telegram_app, telegram_settings),
+        telegram_client(telegram_app, "the post archive") as social_telegram,
+        telegram_client(telegram_app, "the strategy platform") as strategy_telegram,
         polymarket_data.app.serving(polymarket_app, polymarket_settings),
-        social_data.app.serving(social_app, social_settings),
+        social_data.app.serving(social_app, social_settings, telegram=social_telegram),
         # The archive before the platform that reads it, and the platform handed the archive's own application
         # rather than an address: no hop through the platform's authenticator to reach this very process.
         # The archive's migration may wait on an index over the candle table, and its ingest opens a subscription
         # per tracked pair the moment it starts.
         market_data.app.serving(market_app, market_settings),
         archive_client(market_app) as strategy_archive,
-        strategy.app.serving(strategy_app, strategy_settings, archive_client=strategy_archive),
+        strategy.app.serving(
+            strategy_app,
+            strategy_settings,
+            archive_client=strategy_archive,
+            telegram=strategy_telegram,
+        ),
     ):
         # Built here rather than beside the conversation's, because one of its sources is served by this process and
         # reads the teams database directly: announcing needs no pool, calling does, and this is the first point with one.
@@ -131,6 +153,9 @@ async def lifespan(app: FastAPI):
         )
         teams_tool_servers.local["market-data"] = TeamsLocalTools(
             "market-data", market_app.state.mcp_server
+        )
+        teams_tool_servers.local["telegram-gateway"] = TeamsLocalTools(
+            "telegram-gateway", telegram_app.state.mcp_server
         )
 
         # The `try` opens before the schema checks, not after: `ToolServer.__init__` already holds a credential when a
@@ -246,8 +271,9 @@ app = FastAPI(
         "it is written, against this process's own rate configuration, never recomputed "
         "later. The tools that build and run teams are a layer in this process, and so are "
         "the three archives it serves — the candle archive under /market, prediction markets "
-        "under /polymarket, and posts with what a model made of them under /social — and the "
-        "strategy platform under /strategy, which decides and never touches an account."
+        "under /polymarket, and posts with what a model made of them under /social — the "
+        "strategy platform under /strategy, which decides and never touches an account, and "
+        "the one door to Telegram under /telegram."
     ),
     version="0.1.0",
     lifespan=lifespan,
@@ -290,3 +316,13 @@ mount_package(app, "/strategy", strategy_app)
 # `/market/ws/candles`, outside Easy Auth and behind the archive's own one-time ticket.
 market_app = market_data.app.create_app()
 mount_package(app, "/market", market_app)
+# The door to Telegram, whole: sending, its two tools, and the bots and destinations only the operator's `az` reaches.
+telegram_app = telegram_gateway.app.create_app()
+mount_package(app, "/telegram", telegram_app)
+
+# After every mount, so the prefixes it lets through to each package's own record are all of them.
+app.add_middleware(
+    RootCallers,
+    state=app.state,
+    package_prefixes=frozenset(route.path for route in app.routes if isinstance(route, Mount)),
+)

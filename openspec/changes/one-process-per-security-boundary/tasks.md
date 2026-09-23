@@ -37,9 +37,9 @@
 
 ## 4. Warunkowo: telegram-gateway do gospodarza
 
-- [ ] 4.1 Tylko po 3.9 „85–100%": pakiet pod `/telegram`, klucz 8100, boty i pula bez zmian; `TELEGRAM_MCP_URL` znika; `TELEGRAM_GATEWAY_*` z 2.6/2.7 stają się wywołaniem w procesie przez wstrzyknięty protokół `Notifier`
-- [ ] 4.2 Terraform i CI jak w 2.2/2.4; `telegram_gateway_cli` (rejestracja CLI) zostaje, bo to nie tożsamość aplikacji
-- [ ] 4.3 Druga godzina na B2, ten sam protokół co 3.8; decyzja jak w 3.9 bez dalszego etapu 4
+- [x] 4.1 Tylko po 3.9 „85–100%": pakiet pod `/telegram`, klucz 8100, boty i pula bez zmian; `TELEGRAM_MCP_URL` znika; `TELEGRAM_GATEWAY_*` z 2.6/2.7 stają się wywołaniem w procesie przez wstrzyknięty protokół `Notifier` — 23 września 2026, decyzją operatora na granicy (4.3). Odstępstwo: zamiast protokołu `Notifier` droga z 3b — klient HTTP po `ASGITransport` do zamontowanej aplikacji, jako ten proces (`workbench/telegram_client.py`), więc klienci social i strategy zostali bez zmian poza wstrzyknięciem; z ich ustawień zniknęły `TELEGRAM_GATEWAY_URL/_SCOPE`, zostaje `ALERT_DESTINATION`. Nowe: CLI operatora wchodzi przez Easy Auth workbencha, a trasy korzenia dostały własny rekord wołających (`workbench/root_access.py`), który je odrzuca; lista REST telegrama to tylko CLI (`TELEGRAM_REST_CALLER_APPLICATION_IDS`). Przy okazji: moduł nigdy nie instalował filtra redakcji — App Insights trzymał 61 027 linii z tokenem bota; `serving` instaluje go teraz, a gospodarz wycisza `httpx`
+- [x] 4.2 Terraform i CI jak w 2.2/2.4; `telegram_gateway_cli` (rejestracja CLI) zostaje, bo to nie tożsamość aplikacji — 23 września 2026: App Service, rejestracja Easy Auth, reguły firewalla, dotacja Key Vault, job CI i `deploy-telegram-gateway.yml` znikają; preautoryzacja CLI przenosi się na rejestrację workbencha (`workbench_cli`), a CLI trafia do `allowed_applications` workbencha; ustawienia konta Telegrama i `ALERT_DESTINATION` przechodzą na workbench. Apply operatora (dotyka `azuread_*`) i `grant-schema-ownership.sql` + `GRANT CONNECT` na `telegram` przed merge
+- [x] 4.3 Druga godzina na B2, ten sam protokół co 3.8; decyzja jak w 3.9 bez dalszego etapu 4 — zastąpiona odczytem z metryk, 23 września 2026: plan na B2 od 6 września; szczyty 9–14 IX 78–84%, 15–21 IX 86–90% (tydzień wyczerpanych kredytów bazy), po naprawie bazy ≤ 84% i 85% tylko w godzinach deployów. Na granicy reguły operator zdecydował: etap 4. Godzina po nim jest bramką — `MemoryPercentage` przez tydzień z otwartym rynkiem, cel < 85%
 
 ## 5. Zamknięcie
 

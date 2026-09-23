@@ -10,6 +10,7 @@ from teams.tools import (
     ToolAccessError,
     ToolNameCollision,
     ToolNoLongerAnnounced,
+    ToolServer,
     ToolServerRegistry,
     ToolServerUnavailable,
     announced_snapshot,
@@ -31,6 +32,16 @@ def team(*agents: AgentDefinition, edges: list[TeamEdge] | None = None) -> TeamD
 
 def _registry(url: str | None, **overrides) -> ToolServerRegistry:
     return ToolServerRegistry.from_settings(settings_for(url, **overrides))
+
+
+def _two_servers(first_url: str, second_url: str) -> ToolServerRegistry:
+    """trading-mcp and a second server on a network. Production has one since the door to Telegram moved in; the
+    rules below are about two sources of one name, and a second network server is the plainest way to have two."""
+    registry = _registry(first_url)
+    second = ToolServer(settings_for(second_url))
+    second.label = "second-mcp"
+    registry.servers["second-mcp"] = second
+    return registry
 
 
 async def test_an_agent_gets_the_tools_the_definition_named_and_no_others() -> None:
@@ -137,7 +148,7 @@ async def test_a_team_that_assigns_tools_is_refused_when_no_server_is_configured
 
     message = str(raised.value)
     assert "'get_last_price'" in message
-    assert "telegram-mcp" in message and "trading-mcp" in message
+    assert "trading-mcp" in message
     assert "not configured" in message
 
 
@@ -195,7 +206,7 @@ async def test_announced_snapshot_names_the_servers_own_tools() -> None:
         snapshot = await announced_snapshot(settings_for(url))
 
     assert {"get_last_price", "read_indicators"} <= set(snapshot.by_name)
-    assert snapshot.by_name["get_last_price"] == ["telegram-mcp"]
+    assert snapshot.by_name["get_last_price"] == ["trading-mcp"]
     assert snapshot.unreachable == []
 
 
@@ -213,10 +224,7 @@ async def test_announced_snapshot_says_which_servers_have_no_address() -> None:
     # announcing something. The narrower claim the `None` used to make is this field.
     snapshot = await announced_snapshot(settings_for(None))
 
-    assert snapshot.unconfigured == (
-        "telegram-mcp",
-        "trading-mcp",
-    )
+    assert snapshot.unconfigured == ("trading-mcp",)
     assert snapshot.configured_servers == ()
     assert snapshot.unreachable == []
 
@@ -225,8 +233,8 @@ async def test_announced_snapshot_names_an_unreachable_configured_server() -> No
     snapshot = await announced_snapshot(settings_for(f"http://127.0.0.1:{free_port()}"))
 
     assert set(snapshot.by_name) == set(MEMORY_TOOL_NAMES)
-    assert snapshot.unreachable == ["telegram-mcp"]
-    assert snapshot.configured_servers == ("telegram-mcp",)
+    assert snapshot.unreachable == ["trading-mcp"]
+    assert snapshot.configured_servers == ("trading-mcp",)
 
 
 async def test_an_unknown_agent_key_is_a_programming_error() -> None:
@@ -250,7 +258,7 @@ async def test_an_unreachable_second_server_does_not_stop_a_team_that_never_need
     definition = team(agent("reader", ["get_last_price"]))
 
     async with serving(tools=("get_last_price",)) as market_url:
-        registry = _registry(market_url, trading_mcp_url=f"http://127.0.0.1:{free_port()}")
+        registry = _two_servers(market_url, f"http://127.0.0.1:{free_port()}")
         try:
             plan = await plan_tools(definition, registry)
         finally:
@@ -270,7 +278,7 @@ async def test_a_name_two_servers_both_announce_refuses_the_run_naming_both() ->
             return "unused"
 
     async with serving(build=one_tool) as market_url, serving(build=one_tool) as trading_url:
-        registry = _registry(market_url, trading_mcp_url=trading_url)
+        registry = _two_servers(market_url, trading_url)
         try:
             with pytest.raises(ToolNameCollision) as raised:
                 await plan_tools(definition, registry)
@@ -279,8 +287,8 @@ async def test_a_name_two_servers_both_announce_refuses_the_run_naming_both() ->
 
     message = str(raised.value)
     assert "'place_order'" in message
-    assert "telegram-mcp" in message
     assert "trading-mcp" in message
+    assert "second-mcp" in message
     assert isinstance(raised.value, ToolAccessError)
 
 
@@ -295,10 +303,10 @@ async def test_a_name_two_servers_announce_names_both() -> None:
             return "unused"
 
     async with (
-        serving(build=one_tool) as telegram_url,
+        serving(build=one_tool) as first_url,
         serving(build=one_tool) as trading_url,
     ):
-        registry = _registry(telegram_url, trading_mcp_url=trading_url)
+        registry = _two_servers(first_url, trading_url)
         try:
             with pytest.raises(ToolNameCollision) as raised:
                 await plan_tools(definition, registry)
@@ -307,8 +315,8 @@ async def test_a_name_two_servers_announce_names_both() -> None:
 
     message = str(raised.value)
     assert "'get_event'" in message
-    assert "telegram-mcp" in message
     assert "trading-mcp" in message
+    assert "second-mcp" in message
 
 
 async def test_tools_from_both_servers_resolve_to_the_server_that_announced_them() -> None:
@@ -323,14 +331,14 @@ async def test_tools_from_both_servers_resolve_to_the_server_that_announced_them
         serving(tools=("read_indicators",)) as market_url,
         serving(build=write_tool) as trading_url,
     ):
-        registry = _registry(market_url, trading_mcp_url=trading_url)
+        registry = _two_servers(market_url, trading_url)
         try:
             plan = await plan_tools(definition, registry)
             names = [tool.name for tool in plan.for_agent("trader")]
             assert names == ["read_indicators", "place_order"]
 
             # Dispatch reaches the right server: read_indicators only exists on
-            # the telegram-mcp stand-in and place_order only on the trading-mcp one.
+            # the trading-mcp stand-in and place_order only on the second one.
             from teams.tools import ToolOutcomeKind
 
             first = await plan.call(

@@ -5,11 +5,12 @@ from __future__ import annotations
 
 import json
 
-import builders
 import pytest
-from fakes import FakeBotApi
 
 from telegram_gateway.bot_api import Delivered
+
+from . import builders
+from .fakes import FakeBotApi
 
 EXPECTED_TOOLS = {"telegram_destinations", "send_telegram_message"}
 

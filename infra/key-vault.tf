@@ -51,7 +51,7 @@ locals {
 
     # The operator's own Telegram account, which is the only identity allowed to talk to the bot that creates bots.
     # Three secrets rather than one blob so each is rotated on its own, and the session string is the one that is a
-    # standing credential to a personal account — `telegram-gateway`'s own README says what it can and cannot do.
+    # standing credential to a personal account — `modules/workbench/telegram_gateway/README.md` says what it can and cannot do.
     telegram_api_id   = "telegram-api-id"
     telegram_api_hash = "telegram-api-hash"
     telegram_session  = "telegram-session"

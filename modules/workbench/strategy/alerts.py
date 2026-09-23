@@ -21,18 +21,11 @@ import logging
 from datetime import UTC, datetime
 
 import httpx
-from azure.identity.aio import DefaultAzureCredential
-from tc_mcp_kit.outbound_identity import ManagedIdentityAuth
 
 from .spec import Decision
 from .store import RecordedDecision
 
 log = logging.getLogger(__name__)
-
-# Connect stays short: a gateway that is not listening should be reported now. Read is generous
-# because the request is a message on its way to Telegram, not a database read.
-DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=35.0, write=10.0, pool=5.0)
-
 
 class GatewayRefused(Exception):
     """The gateway answered, and the answer was a refusal. Never read as "delivered"."""
@@ -43,28 +36,17 @@ class GatewayUnreachable(Exception):
 
 
 
-def http_client(
-    scope: str | None = None, timeout: httpx.Timeout = DEFAULT_TIMEOUT
-) -> httpx.AsyncClient:
-    """A client for the gateway, presenting this module's identity where it has one."""
-    auth = ManagedIdentityAuth(
-        DefaultAzureCredential(), scope, send_without_token="the gateway will refuse this request"
-    ) if scope else None
-    return httpx.AsyncClient(timeout=timeout, auth=auth)
-
-
 class Gateway:
     """The one route this module calls on telegram-gateway. Sending is all it does there — this
     platform decides and never touches an account, and it does not manage the gateway either."""
 
-    def __init__(self, base_url: str, client: httpx.AsyncClient) -> None:
-        self._base_url = base_url.rstrip("/")
+    def __init__(self, client: httpx.AsyncClient) -> None:
         self._client = client
 
     async def send(self, *, destination: str, text: str) -> None:
         try:
             response = await self._client.post(
-                f"{self._base_url}/messages", json={"destination": destination, "text": text}
+                "/messages", json={"destination": destination, "text": text}
             )
         except httpx.RequestError as err:
             raise GatewayUnreachable(f"the gateway did not answer: {err}") from err
@@ -154,16 +136,13 @@ class Alerts:
         return True
 
 
-def build(settings) -> Alerts | None:
+def build(settings, gateway: httpx.AsyncClient | None) -> Alerts | None:
     """The alerting this deployment is configured for, or `None`.
 
-    `None` is a supported state: without a gateway the platform evaluates and records exactly as it
-    did, and says nothing. That is also the rollback — clear the address and restart.
+    `None` is a supported state: without a destination the platform evaluates and records exactly as it
+    did, and says nothing. That is also the rollback — clear the destination and restart.
     """
-    if not settings.alerts_configured:
-        log.info("no telegram gateway is configured — decisions will be recorded and nobody told")
+    if settings.alert_destination is None or gateway is None:
+        log.info("no telegram destination is configured — decisions will be recorded and nobody told")
         return None
-    return Alerts(
-        Gateway(settings.telegram_gateway_url, http_client(settings.telegram_gateway_scope)),
-        destination=settings.alert_destination,
-    )
+    return Alerts(Gateway(gateway), destination=settings.alert_destination)

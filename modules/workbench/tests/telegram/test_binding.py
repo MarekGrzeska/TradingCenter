@@ -5,12 +5,12 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-import builders
-import fakes
 import pytest
 
 from telegram_gateway import binding, store
 from telegram_gateway.models import DestinationState
+
+from . import builders, fakes
 
 pytestmark = pytest.mark.db
 

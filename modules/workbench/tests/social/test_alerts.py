@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import httpx
 import pytest
 
 from social_data import alerts, store
@@ -215,11 +216,20 @@ class TestTheMessageSpeaksPolish:
 
 
 class TestBuild:
-    def test_no_gateway_configured_is_a_supported_state(self, pool, settings) -> None:
-        assert alerts.build(pool, settings) is None
+    def test_no_destination_is_a_supported_state(self, pool, settings) -> None:
+        assert alerts.build(pool, settings, httpx.AsyncClient()) is None
+
+    def test_a_destination_without_the_door_tells_nobody(self, pool, settings) -> None:
+        """Standalone, with no host to hand the door in: the destination alone reaches nothing."""
+        configured = settings.model_copy(update={"alert_destination": "operator"})
+        assert alerts.build(pool, configured, None) is None
+
+    def test_a_destination_and_the_door_are_built(self, pool, settings) -> None:
+        configured = settings.model_copy(update={"alert_destination": "operator"})
+        assert alerts.build(pool, configured, httpx.AsyncClient()) is not None
 
     async def test_collection_is_untouched_where_there_is_no_gateway(self, pool) -> None:
-        """The rollback lever, and a supported state rather than a fault: clear the address, and the
+        """The rollback lever, and a supported state rather than a fault: clear the destination, and the
         archive collects exactly as it did and says nothing."""
         source = FakeSource([raw_post("collected", minutes_ago=5)])
         collecting = Ingest(pool, [source], interval_seconds=300, window_hours=24, announce=None)
@@ -234,20 +244,8 @@ class TestBuild:
                 await conn.fetchval("SELECT notified_at FROM posts WHERE id = $1", stored.id)
             ) is None
 
-    def test_a_configured_gateway_is_built(self, pool, settings) -> None:
-        configured = settings.model_copy(
-            update={
-                "telegram_gateway_url": "http://127.0.0.1:8100",
-                "alert_destination": "operator",
-            }
-        )
-        assert alerts.build(pool, configured) is not None
-
 
 class TestConfiguration:
-    """Each partial form of the gateway settings is silence that reads like a working
-    configuration, which is why every one of them is a refusal to start."""
-
     def _settings(self, settings, **overrides):
         from social_data.config import Settings
 
@@ -258,25 +256,6 @@ class TestConfiguration:
             },
             _env_file=None,
         )
-
-    def test_a_destination_with_no_gateway_is_refused(self, settings) -> None:
-        with pytest.raises(ValueError) as err:
-            self._settings(settings, alert_destination="operator")
-        assert "TELEGRAM_GATEWAY_URL" in str(err.value)
-
-    def test_a_gateway_with_no_destination_is_refused(self, settings) -> None:
-        with pytest.raises(ValueError) as err:
-            self._settings(settings, telegram_gateway_url="http://127.0.0.1:8100")
-        assert "ALERT_DESTINATION" in str(err.value)
-
-    def test_a_gateway_off_this_machine_without_a_scope_is_refused(self, settings) -> None:
-        with pytest.raises(ValueError) as err:
-            self._settings(
-                settings,
-                telegram_gateway_url="https://gateway.example.com",
-                alert_destination="operator",
-            )
-        assert "TELEGRAM_GATEWAY_SCOPE" in str(err.value)
 
     def test_a_threshold_outside_the_reading_range_is_refused(self, settings) -> None:
         with pytest.raises(ValueError) as err:

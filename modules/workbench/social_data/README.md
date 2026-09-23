@@ -11,8 +11,8 @@ time. This module keeps them. It decides nothing and alerts on nothing.
 `/social` of that process — its REST contract, its `/mcp`, its caller record — with its own database
 and its own migration chain (`alembic-social.ini`, lock key 8090, the port it used to have). Its four
 tools reach the conversation and the teams as functions, so there is no `SOCIAL_MCP_URL` anywhere. What
-is the archive's alone is read under `SOCIAL_` in the workbench's `.env`; the door to Telegram
-(`TELEGRAM_GATEWAY_URL` / `_SCOPE` / `ALERT_DESTINATION`) is the process's, unprefixed.
+is the archive's alone is read under `SOCIAL_` in the workbench's `.env`; who it tells
+(`ALERT_DESTINATION`) is the process's, unprefixed, and the door to Telegram is a client the host hands in.
 
 ```bash
 # from modules/workbench

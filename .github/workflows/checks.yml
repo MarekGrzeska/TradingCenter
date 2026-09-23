@@ -30,7 +30,6 @@ jobs:
       pocket: ${{ steps.filter.outputs.pocket }}
       openspec: ${{ steps.filter.outputs.openspec }}
       packages: ${{ steps.filter.outputs.packages }}
-      telegram-gateway: ${{ steps.filter.outputs.telegram-gateway }}
       scripts: ${{ steps.filter.outputs.scripts }}
       infra: ${{ steps.filter.outputs.infra }}
       # The diff's package names intersected with the directory: the diff alone lists a package this PR deletes,
@@ -76,7 +75,7 @@ jobs:
           declare -A PATTERNS=()
 
           PATTERNS[capital-gateway]='^modules/capital-gateway/'
-          # One module where there were seven. It takes `tc-mcp-kit` as well as the other two, because the team
+          # One module where there were eight. It takes `tc-mcp-kit` as well as the other two, because the team
           # tools moved into it with their schema slimmer, and the archive's eleven tools sit under its ceiling.
           PATTERNS[workbench]="^modules/workbench/|$tc_runtime|$tc_openai|$tc_mcp_kit"
           # The terminal is filtered on one other module because its `contract:check` is the check for those seams:
@@ -88,9 +87,6 @@ jobs:
           # schema, so `contract:check` there is the check for this seam exactly as it is for the terminal.
           PATTERNS[pocket]='^modules/pocket/|^modules/workbench/(polymarket_data|social_data)/(contract|openapi)\.py$|^modules/workbench/agent/'
           PATTERNS[trading-mcp]="^modules/trading-mcp/|^modules/capital-gateway/|$tc_mcp_kit"
-          # Both packages since the tool surface landed. No pairing with another module's job: its
-          # upstream is Telegram rather than anything here.
-          PATTERNS[telegram-gateway]="^modules/telegram-gateway/|$tc_runtime|$tc_mcp_kit"
           # The archive-shape check, plus the script that is the shape. There used to be a third pairing above —
           # teams-mcp's snapshot of the teams document — gone with the module that kept it.
           PATTERNS[openspec]='^openspec/|^scripts/trim-openspec-archive\.sh$'
@@ -183,27 +179,6 @@ jobs:
       - run: uv run pyright
       # Nothing here reaches capital.com or a running gateway: every test doubles the upstream, which is the only
       # place the demo-only guard can be exercised without an account to refuse.
-      - run: uv run pytest -q
-
-  # The door to Telegram. No `contract:check` pairing: nothing generates types from its document,
-  # because it has no screen — the notification is its screen.
-  telegram-gateway:
-    name: telegram-gateway
-    needs: changes
-    if: needs.changes.outputs.telegram-gateway == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: modules/telegram-gateway
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-      - run: uv run ruff check .
-      - run: uv run pyright
-      # The `db` tests run here; the `live` ones stay behind --run-live, because they would talk to the
-      # real Telegram as the operator's own account.
       - run: uv run pytest -q
 
   packages:

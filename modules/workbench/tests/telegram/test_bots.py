@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import logging
 
-import builders
-import fakes
 import pytest
 
 from telegram_gateway import bots, creator, store
@@ -14,6 +12,8 @@ from telegram_gateway.errors import (
     CreatorBotUnreadable,
     TooManyBots,
 )
+
+from . import builders, fakes
 
 TOKEN = "778899:AAHveryveryverysecretveryverysecre1"
 

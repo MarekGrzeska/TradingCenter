@@ -2,12 +2,11 @@
 
 ## The shape
 
-One repository, four processes, no shared runtime. A module is a directory under `modules/`
+One repository, three processes, no shared runtime. A module is a directory under `modules/`
 that runs on its own and publishes a contract, and it is a process because it has a rule of
 writing nobody else has: the gateway is the only door to the provider, `trading-mcp` the only
-thing that moves an account, `telegram-gateway` the only door to Telegram, and the `workbench`
-everything else — the conversation, the teams, three archives and the strategy platform, as
-packages of one process. Nothing imports across a process boundary at runtime; source may be
+thing that moves an account, and the `workbench` everything else — the conversation, the teams,
+three archives, the strategy platform and the door to Telegram, as packages of one process. Nothing imports across a process boundary at runtime; source may be
 shared at build time through `packages/`, under the conditions in "What may be shared, and what
 may not".
 
@@ -26,12 +25,13 @@ may not".
   │  workbench  8030  ·  app-tradingcenter-agent       │──▶│  trading-mcp   │
   │  workbench/ — the assembly, imports all the rest   │   │  8060 · /mcp   │
   │  agent · teams · teams_tools                       │   └────────────────┘
-  │  market_data      /market      candles · /ws       │   ┌────────────────┐
-  │  polymarket_data  /polymarket  the other archive   │──▶│ telegram-gw    │
-  │  social_data      /social      the post archive    │   │  8100 · REST   │
-  │  strategy         /strategy    reads /market in-   │   │  and /mcp      │
-  │                                process             │   └────────────────┘
-  │  six databases · one identity · one Easy Auth      │◀── OpenAI ×2
+  │  market_data      /market      candles · /ws       │
+  │  polymarket_data  /polymarket  the other archive   │──▶ Telegram
+  │  social_data      /social      the post archive    │
+  │  strategy         /strategy    reads /market in-   │
+  │                                process             │
+  │  telegram_gateway /telegram    the door out        │
+  │  seven databases · one identity · one Easy Auth    │◀── OpenAI ×2
   └───────────┬───────────────────────────┬────────────┘
               │ REST + WS, the operator's │ REST, the operator's token
               ▼          token            ▼
@@ -54,9 +54,8 @@ the account rather than the process: a second client anywhere spends the same al
 so the gateway owns the only door to the provider and the archive refuses to start if its
 upstream URLs point anywhere else. `trading-mcp` stays one because it is the only thing that
 moves an account, with an identity of its own on a list of its own — "The order path" below has
-the measurement. `telegram-gateway` stays one for now because the plan did not need it folded:
-the hour on B2 read 79–83% with four processes, and stage 4 of `one-process-per-security-boundary`
-is written and skipped, not rejected.
+the measurement. The door to Telegram was a process too, until the plan's memory said it had to
+fold (stage 4, below).
 
 **The candle archive serves two surfaces, not one.** `market_data/` publishes the REST contract
 the terminal reads and, at `/market/mcp`, eleven read-only tools handing the same archive on in a
@@ -76,8 +75,8 @@ keeps a caller to its surface is each package's own record of caller against rou
 path the record does not name is refused rather than passed. That record is what let the
 packages share one process and one identity without sharing a rule of writing.
 
-The conversation reaches OpenAI, the packages' tools as functions in the same process, and two
-tool servers over the network — the account and Telegram. The network edge is the one thing in
+The conversation reaches OpenAI, the packages' tools as functions in the same process, and one
+tool server over the network — the account. The network edge is the one thing in
 this diagram with no committed copy of its contract anywhere. Every other arrow has one — the
 terminal's six generated contracts, trading-mcp's snapshot of the gateway's document — because
 HTTP does not describe itself at call time. MCP does: the tool names, descriptions and argument
@@ -219,10 +218,10 @@ that begins at a known moment is worth more than one beginning wherever the firs
 
 ## The door out
 
-`telegram-gateway` arrived on 31 August 2026 and is the first module here whose effect is
+`telegram-gateway` arrived on 31 August 2026 as a module, and is the first thing here whose effect is
 **outside** this system. Everything before it collects, decides or shows; this one makes a phone
-buzz. Its shape is the familiar one — one module, its own database, a REST contract and MCP tools
-at `/mcp` — and what is unfamiliar is who calls it and how.
+buzz. Since stage 4 it is `telegram_gateway/`, a package under `/telegram` — the drawing below is its
+callers before that, and the only change is that every arrow into it is in-process now but the operator's.
 
 ```
    workbench            social-data          strategy
@@ -293,7 +292,7 @@ longer exist.
    └───────────────────────────────────────────────────────────────────────────┘
         │ /mcp, managed identity              │ REST + key, the same identity
         ▼                                     ▼
-    trading-mcp                          telegram-gateway · capital-gateway
+    trading-mcp                          capital-gateway
 ```
 
 **Stage 3, 5 September 2026: the candle archive joined.** `market-data` was the last module with a
@@ -313,8 +312,8 @@ is a cycle Terraform refuses to plan.
 The rule between packages is the module rule in a second form: none of them imports another,
 and `workbench/` alone imports all of them — `tests/test_layering.py` reads the imports and
 refuses. What is *shared* is the process and its identity: one App Service, one managed
-identity on every caller list, one Easy Auth registration, one `TELEGRAM_GATEWAY_URL` for both
-callers that notify. What is *not* shared is any of the data: six databases, six chains, six
+identity on every caller list, one Easy Auth registration, one door to Telegram for both callers
+that notify. What is *not* shared is any of the data: seven databases, seven chains, seven
 advisory-lock keys that are the ports the packages used to listen on.
 
 Three things were measured on the way and are worth keeping. The working set of the whole
@@ -334,8 +333,21 @@ changing hands needs the grant separately (`scripts/grant-schema-ownership.sql` 
 With four processes the working set of the workbench was 377–409 MB and the plan read 48–49% on B3.
 The hour on B2 (20:45–21:50 UTC, a Sunday with BTC the only open market): `MemoryPercentage` 79–83%,
 no restart, 148 seconds until all four answered after the tier change. Below the 85% the plan had set,
-so B2 stays, `sku_name` reads it since 5.1, and stage 4 — telegram-gateway into the host — is written
+so B2 stays, `sku_name` reads it since 5.1, and stage 4 — telegram-gateway into the host — was written
 and skipped. A week with open markets is what the plan's alert at 92% is still watching.
+
+**Stage 4, 23 September 2026: the door to Telegram joined.** The week that followed read steady peaks of
+86–90% — but it was also the week the database ran out of CPU credits, and queued requests weigh on
+memory. After the database was fixed the peaks sat at 84%, touching 85% only while a deploy ran two
+containers side by side. On that borderline the operator chose to fold: one App Service, one Easy Auth
+registration, one identity and ~230 MB fewer. The post archive and the strategy platform reach
+`POST /telegram/messages` the way the platform reaches the archive (`workbench/telegram_client.py`), and
+the operator's `az` — the one caller that is a person — is admitted to the whole workbench by Easy
+Auth and answered by `/telegram`'s bots and destinations alone: the root routes keep a caller record
+of their own since that day (`workbench/root_access.py`). Folding also found a leak: the standalone
+module never installed its own redaction filter, and `httpx` had logged 61 027 request lines with a
+whole bot token to Application Insights. The package installs it in `serving`, and the host quiets
+`httpx` besides.
 
 ## The order path
 

@@ -37,9 +37,8 @@ class ToolServerRegistry:
                 ToolServer(settings, prefix="trading_mcp", can_move_the_account=True),
                 # No polymarket and no social server: both archives are packages of this process since
                 # `one-process-per-security-boundary`, and their tools arrive through `local_sources`.
-                # The door to Telegram. Its send tool is the only thing on any of these surfaces whose
-                # effect is visible outside this system — and it moves no account, so not that flag.
-                ToolServer(settings, prefix="telegram_mcp"),
+                # No Telegram server: the door to Telegram is a package of this process since stage 4, and its
+                # two tools — one of them the only effect visible outside this system — arrive through `local_sources`.
                 # No strategy server either: the platform is the third package of this process, and its
                 # read-only tools arrive through `local_sources` like the two archives'.
                 *(local_sources or []),

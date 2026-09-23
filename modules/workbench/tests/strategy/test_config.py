@@ -91,34 +91,11 @@ class TestCallerLists:
         assert settings.rest_caller_ids == frozenset()
 
 
-class TestTheGateway:
-    """Each partial form is silence that reads like a working configuration, so each is refused at
-    startup rather than at the first decision worth telling somebody about."""
+class TestTheDestination:
+    """The door to Telegram is a package of this process; who is told is the one setting left here."""
 
-    def test_all_three_absent_is_a_working_configuration(self) -> None:
+    def test_no_destination_is_a_working_configuration(self) -> None:
         assert build().alerts_configured is False
 
-    def test_a_destination_with_no_gateway_is_refused(self) -> None:
-        with pytest.raises(ValidationError) as refused:
-            build(alert_destination="operator")
-        assert "TELEGRAM_GATEWAY_URL" in str(refused.value)
-
-    def test_a_gateway_with_no_destination_is_refused(self) -> None:
-        with pytest.raises(ValidationError) as refused:
-            build(telegram_gateway_url="http://127.0.0.1:8100")
-        assert "ALERT_DESTINATION" in str(refused.value)
-
-    def test_a_gateway_off_this_machine_without_a_scope_is_refused(self) -> None:
-        with pytest.raises(ValidationError) as refused:
-            build(
-                telegram_gateway_url="https://gateway.example.com",
-                alert_destination="operator",
-            )
-        assert "TELEGRAM_GATEWAY_SCOPE" in str(refused.value)
-
-    def test_a_configured_gateway_is_whole(self) -> None:
-        settings = build(
-            telegram_gateway_url="http://127.0.0.1:8100/", alert_destination="operator"
-        )
-        assert settings.alerts_configured is True
-        assert settings.telegram_gateway_url == "http://127.0.0.1:8100"
+    def test_a_destination_is_what_turns_telling_on(self) -> None:
+        assert build(alert_destination="operator").alerts_configured is True

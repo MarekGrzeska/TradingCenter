@@ -6,8 +6,6 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime, timedelta
 
-import builders
-import fakes
 import httpx
 import pytest
 import respx
@@ -24,6 +22,8 @@ from telegram_gateway.errors import (
     TelegramUnreachable,
 )
 from telegram_gateway.models import DestinationState
+
+from . import builders, fakes
 
 NOON = datetime(2026, 8, 31, 12, 0, tzinfo=UTC)
 CEILING = 4096
@@ -147,7 +147,9 @@ class TestTheTokenNeverReachesALog:
 
     @pytest.fixture(autouse=True)
     def _redacting(self, caplog):
-        with caplog.at_level(logging.DEBUG):
+        # `httpx` by name: the workbench quiets it to WARNING on import, and the filter is for the day someone
+        # turns it back up — a quiet logger would pass these tests by emitting nothing.
+        with caplog.at_level(logging.DEBUG), caplog.at_level(logging.DEBUG, logger="httpx"):
             redaction.install()
             yield
 

@@ -12,7 +12,7 @@ COPY packages/tc-mcp-kit /app/packages/tc-mcp-kit
 COPY modules/workbench/pyproject.toml modules/workbench/uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
-# Seven packages, and the layering between them is `tests/test_layering.py`'s rather than this file's: none of them
+# Eight packages, and the layering between them is `tests/test_layering.py`'s rather than this file's: none of them
 # imports another, and `workbench` is the one place that imports all of them.
 COPY modules/workbench/workbench ./workbench
 COPY modules/workbench/agent ./agent
@@ -22,6 +22,7 @@ COPY modules/workbench/polymarket_data ./polymarket_data
 COPY modules/workbench/social_data ./social_data
 COPY modules/workbench/strategy ./strategy
 COPY modules/workbench/market_data ./market_data
+COPY modules/workbench/telegram_gateway ./telegram_gateway
 COPY modules/workbench/migrations ./migrations
 RUN uv sync --frozen --no-dev
 

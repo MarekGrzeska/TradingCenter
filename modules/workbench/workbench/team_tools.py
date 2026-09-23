@@ -10,6 +10,7 @@ from typing import Any
 
 from mcp.server.fastmcp.exceptions import ToolError
 from starlette.types import ASGIApp
+from tc_runtime.caller_access import in_process
 
 from agent.tools import ToolDescriptor, ToolOutcome, ToolOutcomeKind
 from teams_tools.client import TeamsClient
@@ -27,7 +28,11 @@ class LocalTeamsTools:
 
     def __init__(self, app: ASGIApp, *, operator_identity_optional: bool) -> None:
         say_whose_name_the_tools_act_in(operator_identity_optional)
-        self._client = TeamsClient(app, operator_identity_optional=operator_identity_optional)
+        # As this process: the root's own caller record (`root_access.py`) admits no application it cannot name.
+        self._client = TeamsClient(
+            in_process(app, "the conversation's team tools"),
+            operator_identity_optional=operator_identity_optional,
+        )
         self._mcp = build_server(self._client)
         self._tools: list[ToolDescriptor] | None = None
 

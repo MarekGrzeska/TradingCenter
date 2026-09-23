@@ -53,11 +53,9 @@ class Settings(BaseSettings):
     # Waking more often than the bar closes costs one cheap query that finds nothing new.
     evaluation_interval_seconds: int = 60
 
-    # The door to Telegram, and the setting whose *absence* is a working configuration: without it
-    # the platform evaluates and records exactly as before and says nothing. The three go together —
-    # the gateway addresses by a name the operator bound, never by a chat id.
-    telegram_gateway_url: str | None = None
-    telegram_gateway_scope: str | None = None
+    # Who is told, by the name the operator bound at the door to Telegram — a package of this same process, so
+    # there is no address to set. Its *absence* is a working configuration: the platform evaluates and records
+    # exactly as before and says nothing.
     alert_destination: str | None = None
 
     # Whether a platform authenticator stands in front. The module MUST NOT assume the layer in front is
@@ -81,7 +79,7 @@ class Settings(BaseSettings):
     def alerts_configured(self) -> bool:
         """Whether this deployment can tell the operator anything. Asked at runtime rather than
         refused at startup: silence is a state this module supports."""
-        return bool(self.telegram_gateway_url and self.alert_destination)
+        return self.alert_destination is not None
 
     @field_validator("database_pool_size")
     @classmethod
@@ -113,7 +111,7 @@ class Settings(BaseSettings):
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()
 
-    @field_validator("database_user", "telegram_gateway_scope", "alert_destination")
+    @field_validator("database_user", "alert_destination")
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
         # `DATABASE_USER=` left in a .env is the same intent as the line being absent —
@@ -122,56 +120,12 @@ class Settings(BaseSettings):
             return None
         return value.strip()
 
-    @field_validator("telegram_gateway_url")
-    @classmethod
-    def _a_usable_gateway(cls, value: str | None) -> str | None:
-        if value is None or not value.strip():
-            return None
-        parsed = urlparse(value)
-        if not parsed.hostname or parsed.scheme not in {"http", "https"}:
-            raise ValueError(f"TELEGRAM_GATEWAY_URL is not a usable http(s) URL: {value!r}")
-        return value.rstrip("/")
-
     @field_validator("evaluation_interval_seconds")
     @classmethod
     def _positive(cls, value: int, info: ValidationInfo) -> int:
         if value < 1:
             raise ValueError(f"{str(info.field_name).upper()} must be at least 1; got {value}")
         return value
-
-    @model_validator(mode="after")
-    def _the_gateway_is_whole_or_absent(self) -> Settings:
-        """An address, a destination, and — off this machine — a scope. Each partial form is silence
-        that reads like a working configuration, which is why each is refused at startup."""
-        if self.telegram_gateway_url is None:
-            if self.telegram_gateway_scope or self.alert_destination:
-                raise ValueError(
-                    "TELEGRAM_GATEWAY_SCOPE or ALERT_DESTINATION is set without "
-                    "TELEGRAM_GATEWAY_URL — there is no gateway for either to describe. All three "
-                    "absent is supported: the platform decides and says nothing."
-                )
-            return self
-
-        if not self.alert_destination:
-            raise ValueError(
-                "TELEGRAM_GATEWAY_URL is set without ALERT_DESTINATION — the gateway addresses by "
-                "the name the operator bound, and a message with no destination has nowhere to go."
-            )
-
-        host = (urlparse(self.telegram_gateway_url).hostname or "").lower()
-        loopback = host == "localhost" or host.startswith("127.") or host == "::1"
-        if loopback and self.telegram_gateway_scope:
-            raise ValueError(
-                "TELEGRAM_GATEWAY_SCOPE is set for a gateway on this machine's loopback, where "
-                "there is no directory to ask for a token."
-            )
-        if not loopback and not self.telegram_gateway_scope:
-            raise ValueError(
-                "TELEGRAM_GATEWAY_URL points off this machine and TELEGRAM_GATEWAY_SCOPE is not "
-                "set — the gateway is behind Easy Auth, which refuses a request carrying no token "
-                "before the module sees it."
-            )
-        return self
 
     @model_validator(mode="after")
     def _connection_mode_is_coherent(self) -> Settings:

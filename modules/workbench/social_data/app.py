@@ -30,8 +30,9 @@ log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def serving(app: FastAPI, settings: Settings):
-    """Everything this package needs running, on `app.state`, for as long as the block is open."""
+async def serving(app: FastAPI, settings: Settings, telegram: httpx.AsyncClient | None = None):
+    """Everything this package needs running, on `app.state`, for as long as the block is open. `telegram` is
+    the host's client over the door to Telegram; without it nobody is told, whatever the destination says."""
     app.state.settings = settings
 
     async with (
@@ -70,9 +71,9 @@ async def serving(app: FastAPI, settings: Settings):
         enricher = enrichment.build(pool, settings)
         app.state.enrichment = enricher
 
-        # `None` without a gateway, and the module runs anyway: collecting without telling anybody
+        # `None` without a destination, and the module runs anyway: collecting without telling anybody
         # is a supported state, which `/state` names rather than leaving the screen to guess at.
-        announcer = alerts.build(pool, settings)
+        announcer = alerts.build(pool, settings, telegram)
         app.state.alerts = announcer
 
         # After the migration and not before it: a pass started earlier would write into a schema

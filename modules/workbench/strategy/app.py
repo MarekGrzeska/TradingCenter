@@ -39,10 +39,16 @@ log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def serving(app: FastAPI, settings: Settings, archive_client: httpx.AsyncClient | None = None):
+async def serving(
+    app: FastAPI,
+    settings: Settings,
+    archive_client: httpx.AsyncClient | None = None,
+    telegram: httpx.AsyncClient | None = None,
+):
     """Everything this package needs running, on `app.state`, for as long as the block is open. `archive_client`
     is how the host hands the archive in when both are packages of one process (stage 3b of
-    `one-process-per-security-boundary`); left out, the platform reaches it over HTTP at `market_data_url`."""
+    `one-process-per-security-boundary`); left out, the platform reaches it over HTTP at `market_data_url`.
+    `telegram` is the host's client over the door to Telegram; without it nobody is told."""
     # Constructed, not connected: reaching the archive at startup would make this process's health
     # depend on another module's, and there is nothing useful to do with the answer then.
     own_client = archive_client is None
@@ -78,7 +84,7 @@ async def serving(app: FastAPI, settings: Settings, archive_client: httpx.AsyncC
         # watches starts and serves the same way — zero is supported, not degraded.
         # `None` without a gateway, and the platform runs the same either way: deciding is its job,
         # and saying so is something it does when there is somewhere to say it.
-        app.state.alerts = alerts.build(settings)
+        app.state.alerts = alerts.build(settings, telegram)
 
         # One heartbeat per loop, on the state so `/health` can answer with it and so the metric's
         # callback can read it without awaiting. "evaluate" is what the alert's `loop` dimension says.

@@ -87,9 +87,9 @@ class ToolServer:
         self,
         settings: Settings,
         *,
-        # The default names the server that is only ever reached over the network; the archive, which
-        # this used to name, is a package of the process since `one-process-per-security-boundary`.
-        prefix: str = "telegram_mcp",
+        # The default names the one server still reached over the network: everything else is a package of
+        # the process since `one-process-per-security-boundary`, the door to Telegram last of all.
+        prefix: str = "trading_mcp",
         can_move_the_account: bool = False,
     ) -> None:
         self.label = prefix.replace("_", "-")
@@ -332,9 +332,8 @@ class ToolServerRegistry:
                 ),
                 # No polymarket and no social server: both archives are packages of this process, and the
                 # assembly adds their tools to `local` — no address, no identity, no session.
-                # Sends a notification, and that is all it can do here: creating a bot and binding a
-                # destination are REST-only in that module, out of reach of any team.
-                "telegram-mcp": ToolServer(settings, prefix="telegram_mcp"),
+                # No Telegram server: the door to Telegram is a package of this process since stage 4, and the
+                # assembly adds its two tools to `local` — sending, and seeing who there is to send to.
                 # No strategy server: the platform is a package of this process, and `pending_setups` — the
                 # number a trigger wakes a team on — is announced by a local source the assembly adds.
             },

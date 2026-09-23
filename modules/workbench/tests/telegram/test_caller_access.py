@@ -9,9 +9,10 @@ import json
 
 import httpx
 import pytest
-from fakes import FakeBotApi, RecordingWatcher
 
 from telegram_gateway.caller_access import OPEN_PATHS, REST_PATHS, Surface, surface_for
+
+from .fakes import FakeBotApi, RecordingWatcher
 
 WORKBENCH = "11111111-1111-1111-1111-111111111111"
 OPERATOR_TOOLING = "22222222-2222-2222-2222-222222222222"

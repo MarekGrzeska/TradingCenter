@@ -36,7 +36,7 @@ def _env(workbench_env: None, db: asyncpg.Connection, migrated_url: str, monkeyp
 @pytest.fixture
 def announcing(_env: None, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     with serving_sync(("get_last_price", "read_indicators")) as url:
-        monkeypatch.setenv("TELEGRAM_MCP_URL", url)
+        monkeypatch.setenv("TRADING_MCP_URL", url)
         with TestClient(app) as started:
             yield started
 
@@ -53,14 +53,10 @@ def test_what_the_server_announces_is_what_the_route_publishes(announcing: TestC
     assert set(by_name["get_last_price"]) == {"name", "description", "read_only"}
 
 
-def test_tools_from_both_servers_are_published_with_write_marked(
+def test_a_servers_tools_are_published_with_write_marked(
     _env: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    with (
-        serving_sync(("get_last_price",)) as market_url,
-        serving_sync(("place_order",)) as trading_url,
-    ):
-        monkeypatch.setenv("TELEGRAM_MCP_URL", market_url)
+    with serving_sync(("get_last_price", "place_order")) as trading_url:
         monkeypatch.setenv("TRADING_MCP_URL", trading_url)
         with TestClient(app) as client:
             published = client.get("/tools").json()
@@ -95,7 +91,7 @@ def test_the_memory_tools_are_published_with_the_write_one_marked(_env: None) ->
 def test_a_configured_server_that_cannot_be_asked_is_an_outage_not_an_empty_list(
     _env: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("TELEGRAM_MCP_URL", f"http://127.0.0.1:{free_port()}")
+    monkeypatch.setenv("TRADING_MCP_URL", f"http://127.0.0.1:{free_port()}")
 
     with TestClient(app) as client:
         response = client.get("/tools")

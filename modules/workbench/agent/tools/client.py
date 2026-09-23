@@ -90,9 +90,9 @@ class ToolServer:
         self,
         settings: Settings,
         *,
-        # The default names the server that is only ever reached over the network; the archive, which
-        # this used to name, is a package of the process since `one-process-per-security-boundary`.
-        prefix: str = "telegram_mcp",
+        # The default names the one server still reached over the network: everything else is a package of
+        # the process since `one-process-per-security-boundary`, the door to Telegram last of all.
+        prefix: str = "trading_mcp",
         can_move_the_account: bool = False,
     ) -> None:
         self.label = prefix.replace("_", "-")

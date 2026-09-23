@@ -153,16 +153,17 @@ output "pocket_origin" {
 }
 
 
-# --- the operator, as the one caller of telegram-gateway that is a person ---------------
+# --- the operator, as the one caller of the door to Telegram that is a person ------------
 
-# The seventh pre-authorization and the only one whose client is not something in this repository. `telegram-gateway`
-# has no screen — the notification is its screen — so the operator's client is `az`, and the two routes this exists
-# for are the two a managed identity must never reach: adopting a bot and binding a destination.
+# The only pre-authorization whose client is not something in this repository. The door to Telegram has no screen — the
+# notification is its screen — so the operator's client is `az`, and the routes this exists for are the two a managed
+# identity must never reach: adopting a bot and binding a destination. On the workbench's registration since stage 4 of
+# `one-process-per-security-boundary`, when `/telegram` became a package of that process.
 #
-# Without it `az account get-access-token --resource api://tradingcenter-telegram-gateway` meets a consent prompt
-# that a command line cannot answer.
-resource "azuread_application_pre_authorized" "telegram_gateway_cli" {
-  application_id       = module.telegram_gateway_easy_auth.application_id
+# Without it `az account get-access-token --resource api://tradingcenter-agent` meets a consent prompt that a command
+# line cannot answer.
+resource "azuread_application_pre_authorized" "workbench_cli" {
+  application_id       = module.workbench_easy_auth.application_id
   authorized_client_id = local.azure_cli_client_id
-  permission_ids       = [module.telegram_gateway_easy_auth.scope_id]
+  permission_ids       = [module.workbench_easy_auth.scope_id]
 }

@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-PACKAGE_ROOT = Path(__file__).resolve().parent.parent / "telegram_gateway"
+PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "telegram_gateway"
 
 # The account session's one door. Everything about MTProto lives behind this module, and `bots.py`
 # is the only caller because creating and deleting are the only things it is for.
