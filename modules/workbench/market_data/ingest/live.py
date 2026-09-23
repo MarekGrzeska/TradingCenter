@@ -119,9 +119,8 @@ class PairIngest:
                         message.message,
                     )
                     await self._close_gap()
-
-                if not await self.still_tracked():
-                    return
+                # No `still_tracked()` here: per message it was 97% of the server's transactions
+                # (23 September 2026). An untracked pair is cancelled by `Ingest.sync`, on edit and every 5 min.
 
     async def _deliver(self, candle) -> None:
         """Hand a candle on, forming or not. Only a closed one is stored; a sink takes both, and does
