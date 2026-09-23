@@ -140,8 +140,9 @@ the second. The names come from `infra/`; re-read them there if these fail.
 firewall rule for this machine's IP, snapshots `pg_stat_database` and `pg_stat_user_tables` in
 every database ten minutes apart, deletes the rule on any exit, and prints per-minute deltas — which
 database commits, which table is scanned, what grows. Confirm afterwards that no `tmp-` rule is
-left. `pg_stat_statements` is preloaded but not created (`azure.extensions` is empty); enabling it
-is an infrastructure change, so it is a proposal, never a step of the review.
+left. Statement-level evidence comes from `pg_stat_statements`, enabled on 23 September 2026
+(`production-answers-from-outside`, `track = top`): `.claude/skills/prod-health/scripts/top-statements.sh`,
+under the same yes, names the statements behind the tables T4 points at.
 
 ## Calibration: the September incidents
 

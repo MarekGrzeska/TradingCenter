@@ -512,7 +512,7 @@
 
 <div class="move">
   <strong>Co zrobić, gdy któryś się zapali</strong>
-  Najpierw <code>/health</code> tego modułu — niesie wiek każdej pętli i jej oczekiwany interwał, więc od razu widać, czy stanęła jedna, czy proces wstał i nie zdążył ukończyć ani jednego przebiegu (wtedy wiek jest ogromny, bo <code>NEVER_RAN</code>, i to jest odpowiedź, nie usterka metryki). Potem log: przebieg, który rzucił wyjątkiem, jest tam zapisany i <em>nie</em> odnotowuje bicia — to jest cała różnica między „pętla się budzi" a „pętla pracuje". Restart kontenera jest ostatnim ruchem, nie pierwszym: pętla, która stanęła bez wyjątku, zostawia ślad tylko dopóki proces żyje.
+  Najpierw <code>/health</code> tego modułu — niesie wiek każdej pętli i jej oczekiwany interwał, więc od razu widać, czy stanęła jedna, czy proces wstał i nie zdążył ukończyć ani jednego przebiegu (wtedy <code>ran</code> jest fałszem, a wiek liczy się od startu pętli — do 23 września 2026 był stałą 10⁶ sekund i każdy restart odpalał alert). Potem log: przebieg, który rzucił wyjątkiem, jest tam zapisany i <em>nie</em> odnotowuje bicia — to jest cała różnica między „pętla się budzi" a „pętla pracuje". Restart kontenera jest ostatnim ruchem, nie pierwszym: pętla, która stanęła bez wyjątku, zostawia ślad tylko dopóki proces żyje.
 </div>
 
 <p>Czego ten alert nie mówi: że pętla robi coś <em>sensownego</em>. Przebieg, który poszedł do końca i nic nie znalazł, jest ukończonym przebiegiem — i tak ma być, bo cichy dzień jest stanem wspieranym. Na „zbiera, ale zbiera nic" odpowiadają <code>/state</code> i ekrany, nie ten alert.</p>

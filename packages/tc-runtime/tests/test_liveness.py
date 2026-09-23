@@ -5,18 +5,19 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
-from tc_runtime.liveness import NEVER_RAN, Heartbeats, LoopHeartbeat
+from tc_runtime.liveness import Heartbeats, LoopHeartbeat
 
 START = datetime(2026, 9, 2, 12, 0, tzinfo=UTC)
 
 
-def test_a_loop_that_has_never_finished_a_pass_reads_as_far_behind() -> None:
-    """Not zero, which an alert reads as "just ran" — a process that comes up and never manages a
-    pass is exactly the failure this exists for, and it must fire rather than look healthy."""
-    heartbeat = LoopHeartbeat("collect", expected_seconds=60)
+def test_a_loop_that_never_finishes_a_pass_falls_behind_from_its_start() -> None:
+    """A process that comes up and never manages a pass is the failure this exists for, so it must
+    cross the alert's three intervals — but only once three have passed. A constant "never ran" fired
+    the alert on every restart whose first export came before the first pass (23 September 2026)."""
+    heartbeat = LoopHeartbeat("collect", expected_seconds=60, started=START)
     assert not heartbeat.has_run
-    assert heartbeat.age_seconds(START) == NEVER_RAN
-    assert heartbeat.passes_late(START) > 1
+    assert heartbeat.passes_late(START + timedelta(seconds=30)) == 0.5
+    assert heartbeat.passes_late(START + timedelta(minutes=4)) > 3
 
 
 def test_a_pass_resets_the_age() -> None:

@@ -40,6 +40,12 @@ CLAUDE.md drop; a proposal that drops nothing has to justify itself some other w
 - Small: `SKILL.md` under about 200 lines, details in `references/`.
 - Proven by one real run before anyone relies on it.
 
+## Built
+
+`db-cost-check`, `contract-sync`, `deploy-watch`, `prod-health` — 23 September 2026 (P10 of that review),
+each with one real run: prod-health's first board found the loop alert firing on restarts, contract-sync's
+first run found its own CRLF blind spot. The next review marks each `used` or not from the evidence.
+
 ## Seed list — evaluate on every run, don't copy
 
 **Work**
