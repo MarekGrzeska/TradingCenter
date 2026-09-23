@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
@@ -73,6 +74,28 @@ class TestStructure:
         ) == 1
         [loaded] = await store.load_events(db, provider_event_id="e-1")
         assert len(loaded.markets) == 2
+
+    @pytest.mark.db
+    async def test_a_refresh_rewrites_only_what_the_provider_changed(self, db) -> None:
+        """The sampler refreshes every event every minute; rewriting unchanged rows was ≈355 updates
+        a minute, each leaving a dead tuple behind."""
+        kept = builders.binary_market("Will it?", provider_market_id="m-kept")
+        renamed = builders.binary_market("Before?", provider_market_id="m-renamed")
+        await store.upsert_event(db, builders.event(markets=(kept, renamed), provider_event_id="e-1"))
+        versions = "SELECT provider_market_id, xmin::text FROM markets ORDER BY 1"
+        outcome_versions = "SELECT token_id, xmin::text FROM outcomes ORDER BY 1"
+        markets_before = dict(await db.fetch(versions))
+        outcomes_before = await db.fetch(outcome_versions)
+
+        after = replace(renamed, question="After?")
+        await store.upsert_event(db, builders.event(markets=(kept, after), provider_event_id="e-1"))
+
+        markets_after = dict(await db.fetch(versions))
+        assert markets_after["m-kept"] == markets_before["m-kept"]
+        assert markets_after["m-renamed"] != markets_before["m-renamed"]
+        assert await db.fetch(outcome_versions) == outcomes_before
+        [loaded] = await store.load_events(db, provider_event_id="e-1")
+        assert [market.question for market in loaded.markets] == ["Will it?", "After?"]
 
     @pytest.mark.db
     async def test_resolution_stops_sampling_and_keeps_the_history(self, db) -> None:
