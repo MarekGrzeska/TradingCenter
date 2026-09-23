@@ -146,9 +146,10 @@ operatorowi wraz z jej przyczyną. Widok MUST NOT przedstawiać odmowy jako nied
 
 ### Requirement: Grupy obserwacji są operatora
 
-Operator MUST móc tworzyć grupy obserwacji, przypisywać do nich wydarzenia i je kasować. Grupy
-MUST być wyłącznie sposobem porządkowania listy: skasowanie grupy MUST NOT zakończyć żadnej
-obserwacji ani usunąć żadnej zebranej próbki.
+Operator MUST móc tworzyć grupy obserwacji, przemianowywać je, przypisywać do nich wydarzenia,
+przenosić wydarzenia między nimi i grupy kasować — także kasować grupę, przenosząc najpierw jej
+wydarzenia do innej. Grupy MUST być wyłącznie sposobem porządkowania listy: skasowanie grupy MUST
+NOT zakończyć żadnej obserwacji ani usunąć żadnej zebranej próbki.
 
 Widok MUST umożliwiać ograniczenie listy do jednej grupy.
 
@@ -157,6 +158,16 @@ Widok MUST umożliwiać ograniczenie listy do jednej grupy.
 - **WHEN** operator kasuje grupę obserwacji
 - **THEN** wydarzenia z tej grupy pozostają obserwowane
 - **AND** ich zebrana historia pozostaje nienaruszona
+
+#### Scenario: Scalenie duplikatu
+
+- **WHEN** operator kasuje grupę, wybierając inną jako miejsce dla jej wydarzeń
+- **THEN** wydarzenia trafiają do wybranej grupy i pozostają obserwowane
+
+#### Scenario: Przemianowanie grupy
+
+- **WHEN** operator przemianowuje wybraną grupę
+- **THEN** jej wydarzenia pozostają w niej pod nową nazwą
 
 #### Scenario: Ograniczenie listy do grupy
 
@@ -269,3 +280,4 @@ o zatrzymanym zbieraniu, zanim cokolwiek rozwinie.
 
 - **WHEN** operator rozwija wydarzenie
 - **THEN** widok pokazuje jego rynki wraz ze wszystkimi wynikami i ich prawdopodobieństwami
+

@@ -58,7 +58,8 @@ variable "agent_models" {
     Rates are per 1,000,000 tokens, the unit OpenAI's pricing page quotes — copied across
     without arithmetic in either direction, and published to the terminal in that same
     unit. They move faster than this module does (design.md, "Cennik jest konfiguracją"):
-    the defaults below are illustrative, read from public pricing in August 2026; check
+    the defaults below are OpenAI's standard rates for GPT-6 on 23 September 2026 — a prompt above 272K
+    input tokens is billed higher, which these rates do not model; check
     OpenAI's own pricing page before trusting them at deploy time, the same caution
     `modules/workbench/.env.example` carries.
   EOT
@@ -70,26 +71,26 @@ variable "agent_models" {
     output_rate_per_1m = string
   }))
   default = {
-    "gpt-5.6-luna" = {
-      model              = "gpt-5.6-luna"
-      display_name       = "Luna"
+    "gpt-6-luna" = {
+      model              = "gpt-6-luna"
+      display_name       = "GPT-6 Luna"
       cost_rank          = 1
-      input_rate_per_1m  = "0.2"
-      output_rate_per_1m = "1.2"
+      input_rate_per_1m  = "0.1"
+      output_rate_per_1m = "0.5"
     }
-    "gpt-5.6-terra" = {
-      model              = "gpt-5.6-terra"
-      display_name       = "Terra"
+    "gpt-6-sol" = {
+      model              = "gpt-6-sol"
+      display_name       = "GPT-6 Sol"
       cost_rank          = 2
       input_rate_per_1m  = "2"
-      output_rate_per_1m = "12"
+      output_rate_per_1m = "10"
     }
-    "gpt-5.6-sol" = {
-      model              = "gpt-5.6-sol"
-      display_name       = "Sol"
+    "gpt-6-astra" = {
+      model              = "gpt-6-astra"
+      display_name       = "GPT-6 Astra"
       cost_rank          = 3
-      input_rate_per_1m  = "5"
-      output_rate_per_1m = "30"
+      input_rate_per_1m  = "10"
+      output_rate_per_1m = "50"
     }
   }
 }
@@ -108,8 +109,8 @@ variable "teams_models" {
     something OpenAI serves. A name from memory fails at the first call, not at `apply`.
 
     Rates are per 1,000,000 tokens, the unit OpenAI's pricing page quotes. The defaults
-    below are the ones `modules/workbench/.env.example` carries, read from public pricing in
-    August 2026; check the pricing page before trusting them at deploy time.
+    below are the ones `modules/workbench/.env.example` carries, OpenAI's standard GPT-6 rates on
+    23 September 2026; check the pricing page before trusting them at deploy time.
 
     Unlike `agent`, there is no default model id to pair with this: every agent in a saved
     team revision MUST name its own model, so there is nothing to fall back to
@@ -123,26 +124,26 @@ variable "teams_models" {
     output_rate_per_1m = string
   }))
   default = {
-    "gpt-5.6-luna" = {
-      model              = "gpt-5.6-luna"
-      display_name       = "Luna"
+    "gpt-6-luna" = {
+      model              = "gpt-6-luna"
+      display_name       = "GPT-6 Luna"
       cost_rank          = 1
-      input_rate_per_1m  = "0.2"
-      output_rate_per_1m = "1.2"
+      input_rate_per_1m  = "0.1"
+      output_rate_per_1m = "0.5"
     }
-    "gpt-5.6-terra" = {
-      model              = "gpt-5.6-terra"
-      display_name       = "Terra"
+    "gpt-6-sol" = {
+      model              = "gpt-6-sol"
+      display_name       = "GPT-6 Sol"
       cost_rank          = 2
       input_rate_per_1m  = "2"
-      output_rate_per_1m = "12"
+      output_rate_per_1m = "10"
     }
-    "gpt-5.6-sol" = {
-      model              = "gpt-5.6-sol"
-      display_name       = "Sol"
+    "gpt-6-astra" = {
+      model              = "gpt-6-astra"
+      display_name       = "GPT-6 Astra"
       cost_rank          = 3
-      input_rate_per_1m  = "5"
-      output_rate_per_1m = "30"
+      input_rate_per_1m  = "10"
+      output_rate_per_1m = "50"
     }
   }
 }

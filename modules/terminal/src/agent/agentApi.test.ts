@@ -21,7 +21,7 @@ describe("agentApi.listModels", () => {
       http.get(`${HTTP_BASE}/models`, () =>
         HttpResponse.json([
           {
-            id: "gpt-5.6-luna",
+            id: "gpt-6-luna",
             display_name: "Luna",
             cost_rank: 1,
             input_rate_per_1m: "0.2",
@@ -34,7 +34,7 @@ describe("agentApi.listModels", () => {
     const models = await api().listModels(new AbortController().signal);
     expect(models).toEqual([
       {
-        id: "gpt-5.6-luna",
+        id: "gpt-6-luna",
         displayName: "Luna",
         costRank: 1,
         inputRatePer1M: "0.2",
@@ -54,7 +54,7 @@ describe("agentApi.createSession", () => {
           {
             id: 7,
             title: null,
-            current_model_id: "gpt-5.6-luna",
+            current_model_id: "gpt-6-luna",
             created_at: "2026-08-11T10:00:00Z",
             last_active_at: "2026-08-11T10:00:00Z",
           },
@@ -63,12 +63,12 @@ describe("agentApi.createSession", () => {
       }),
     );
 
-    const session = await api().createSession("gpt-5.6-luna", new AbortController().signal);
-    expect(body).toEqual({ model_id: "gpt-5.6-luna" });
+    const session = await api().createSession("gpt-6-luna", new AbortController().signal);
+    expect(body).toEqual({ model_id: "gpt-6-luna" });
     expect(session).toEqual({
       id: 7,
       title: null,
-      currentModelId: "gpt-5.6-luna",
+      currentModelId: "gpt-6-luna",
       createdAt: 1786442400,
       lastActiveAt: 1786442400,
     });
@@ -96,16 +96,16 @@ describe("agentApi.setSessionModel", () => {
         return HttpResponse.json({
           id: 7,
           title: "why is BTC flat",
-          current_model_id: "gpt-5.6-sol",
+          current_model_id: "gpt-6-sol",
           created_at: "2026-08-11T10:00:00Z",
           last_active_at: "2026-08-11T10:05:00Z",
         });
       }),
     );
 
-    const session = await api().setSessionModel(7, "gpt-5.6-sol", new AbortController().signal);
-    expect(body).toEqual({ model_id: "gpt-5.6-sol" });
-    expect(session.currentModelId).toBe("gpt-5.6-sol");
+    const session = await api().setSessionModel(7, "gpt-6-sol", new AbortController().signal);
+    expect(body).toEqual({ model_id: "gpt-6-sol" });
+    expect(session.currentModelId).toBe("gpt-6-sol");
   });
 });
 
@@ -138,7 +138,7 @@ describe("agentApi.getMessages", () => {
             id: 2,
             role: "agent",
             content: "consolidating near",
-            model_id: "gpt-5.6-luna",
+            model_id: "gpt-6-luna",
             prompt_version: "v1",
             incomplete: true,
             created_at: "2026-08-11T10:00:05Z",
@@ -166,7 +166,7 @@ describe("agentApi.getMessages", () => {
         id: 2,
         role: "agent",
         content: "consolidating near",
-        modelId: "gpt-5.6-luna",
+        modelId: "gpt-6-luna",
         promptVersion: "v1",
         incomplete: true,
         stopped: false,
@@ -184,7 +184,7 @@ describe("agentApi.getMessages", () => {
             id: 2,
             role: "agent",
             content: "half an ",
-            model_id: "gpt-5.6-luna",
+            model_id: "gpt-6-luna",
             prompt_version: "v1",
             incomplete: true,
             stopped: true,
@@ -208,7 +208,7 @@ describe("agentApi.getMessages", () => {
             id: 2,
             role: "agent",
             content: "US100 is at 29698.2",
-            model_id: "gpt-5.6-luna",
+            model_id: "gpt-6-luna",
             prompt_version: "v3",
             incomplete: false,
             created_at: "2026-08-11T10:00:05Z",
@@ -386,7 +386,7 @@ describe("agentApi.usage", () => {
         return HttpResponse.json({
           total_cost: "1.2345",
           by_model: [
-            { key: "gpt-5.6-luna", input_tokens: 3000, output_tokens: 700, cost: "0.0026", unknown_count: 0 },
+            { key: "gpt-6-luna", input_tokens: 3000, output_tokens: 700, cost: "0.0026", unknown_count: 0 },
           ],
           by_session: [],
           by_day: [],
@@ -404,7 +404,7 @@ describe("agentApi.usage", () => {
     expect(summary).toEqual({
       totalCost: "1.2345",
       byModel: [
-        { key: "gpt-5.6-luna", inputTokens: 3000, outputTokens: 700, cost: "0.0026", unknownCount: 0 },
+        { key: "gpt-6-luna", inputTokens: 3000, outputTokens: 700, cost: "0.0026", unknownCount: 0 },
       ],
       bySession: [],
       byDay: [],

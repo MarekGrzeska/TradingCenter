@@ -6,12 +6,19 @@ import { useArchive } from "./useArchive";
 import { EventCard } from "./EventCard";
 import { TrackEventSheet } from "./TrackEventSheet";
 import { RemoveEventSheet } from "./RemoveEventSheet";
+import { GroupsSheet } from "./GroupsSheet";
+import { MoveEventSheet } from "./MoveEventSheet";
 import { Button } from "../ui/Button";
 import { PULL_THRESHOLD } from "../ui/pull";
 import { usePullToRefresh } from "../ui/usePullToRefresh";
 import styles from "./PolymarketScreen.module.css";
 
-type Sheet = { kind: "track" } | { kind: "remove"; event: TrackedEvent } | null;
+type Sheet =
+  | { kind: "track" }
+  | { kind: "remove"; event: TrackedEvent }
+  | { kind: "move"; event: TrackedEvent }
+  | { kind: "groups" }
+  | null;
 
 /** `null` means the windows for that event are on their way. An absent key means nobody has opened
  *  the card, which is a different thing and reads as a different row. */
@@ -28,7 +35,8 @@ export function PolymarketScreen({ api }: { api: PolymarketApi }) {
   const scroller = useRef<HTMLDivElement>(null);
   const pull = usePullToRefresh(scroller, refresh);
 
-  const keys = useMemo(() => groupKeys(events, groups), [events, groups]);
+  const groupNames = useMemo(() => groups.map((group) => group.name), [groups]);
+  const keys = useMemo(() => groupKeys(events, groupNames), [events, groupNames]);
   const visible = useMemo(() => sections(events, enabled), [events, enabled]);
 
   useEffect(() => saveFilters(enabled), [enabled]);
@@ -67,6 +75,12 @@ export function PolymarketScreen({ api }: { api: PolymarketApi }) {
 
   const closeSheet = () => setSheet(null);
 
+  const changed = (message: string) => {
+    closeSheet();
+    setNotice(message);
+    refresh();
+  };
+
   const freshness = refreshing
     ? "reading…"
     : lastReadAt === null
@@ -78,9 +92,14 @@ export function PolymarketScreen({ api }: { api: PolymarketApi }) {
       <header className={styles.header}>
         <div className={styles.headerTop}>
           <h1 className={styles.heading}>Polymarket</h1>
-          <Button tone="primary" onClick={() => setSheet({ kind: "track" })}>
-            Track event
-          </Button>
+          <div className={styles.headerActions}>
+            {groups.length === 0 ? null : (
+              <Button onClick={() => setSheet({ kind: "groups" })}>Groups</Button>
+            )}
+            <Button tone="primary" onClick={() => setSheet({ kind: "track" })}>
+              Track event
+            </Button>
+          </div>
         </div>
         {/* The freshness line *is* the refresh control. A button that only refreshed would duplicate
             the poll and the pull gesture; this one says what the poll last managed, which is the part
@@ -154,6 +173,7 @@ export function PolymarketScreen({ api }: { api: PolymarketApi }) {
                     expanded={expanded.includes(event.providerEventId)}
                     changes={changes[event.providerEventId] ?? null}
                     onToggle={() => toggle(event.providerEventId)}
+                    onMove={() => setSheet({ kind: "move", event })}
                     onRemove={() => setSheet({ kind: "remove", event })}
                     now={now}
                   />
@@ -167,7 +187,7 @@ export function PolymarketScreen({ api }: { api: PolymarketApi }) {
       {sheet?.kind === "track" ? (
         <TrackEventSheet
           api={api}
-          groups={groups}
+          groups={groupNames}
           onClose={closeSheet}
           onTracked={(title, alreadyTracked) => {
             closeSheet();
@@ -179,6 +199,20 @@ export function PolymarketScreen({ api }: { api: PolymarketApi }) {
             refresh();
           }}
         />
+      ) : null}
+
+      {sheet?.kind === "move" ? (
+        <MoveEventSheet
+          api={api}
+          event={sheet.event}
+          groups={groups}
+          onClose={closeSheet}
+          onMoved={changed}
+        />
+      ) : null}
+
+      {sheet?.kind === "groups" ? (
+        <GroupsSheet api={api} groups={groups} onClose={closeSheet} onChanged={changed} />
       ) : null}
 
       {sheet?.kind === "remove" ? (

@@ -81,10 +81,10 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         async with ctx.pool.acquire() as conn:
             group_id = None
             if group:
-                match = [g for g in await store.list_groups(conn) if g.name == group]
-                if not match:
+                found = await store.find_group(conn, group)
+                if found is None:
                     return []
-                group_id = match[0].id
+                group_id = found.id
             events = await views.tracked_events(
                 conn,
                 interval_seconds=ctx.settings.sample_interval_seconds,

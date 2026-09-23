@@ -4,6 +4,7 @@ should never be an UPDATE against it: a revision edited under a finished run tur
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 
 import asyncpg
 from tc_runtime.db import Conn, fetch_one
@@ -170,3 +171,29 @@ async def archive_team(conn: Conn, *, team_id: int, owner_principal: str) -> boo
     them stay exactly where they were — see `_ARCHIVE_TEAM`."""
     row = await conn.fetchrow(_ARCHIVE_TEAM, team_id, owner_principal)
     return row is not None
+
+
+async def move_revisions_to_successors(conn: Conn, successors: Mapping[str, str]) -> int:
+    """Every agent naming a retired model, moved to its successor — in place, the one edit a revision's blob takes,
+    because a new revision would leave the schedules pinned to the old one refusing to start. `usage` keeps what ran."""
+    if not successors:
+        return 0
+    result = await conn.execute(
+        """
+        UPDATE team_revisions r SET definition = jsonb_set(r.definition, '{agents}', (
+            SELECT jsonb_agg(
+                CASE WHEN jsonb_typeof(agent) = 'object' AND $1::jsonb ? (agent->>'model_id')
+                     THEN jsonb_set(agent, '{model_id}', $1::jsonb->(agent->>'model_id'))
+                     ELSE agent END
+                ORDER BY position)
+            FROM jsonb_array_elements(r.definition->'agents') WITH ORDINALITY AS a(agent, position)
+        ))
+        WHERE jsonb_typeof(r.definition->'agents') = 'array'
+          AND EXISTS (
+            SELECT 1 FROM jsonb_array_elements(r.definition->'agents') AS a(agent)
+            WHERE jsonb_typeof(agent) = 'object' AND $1::jsonb ? (agent->>'model_id')
+          )
+        """,
+        json.dumps(dict(successors)),
+    )
+    return int(result.split()[-1])

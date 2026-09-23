@@ -1,5 +1,5 @@
 """What this module announces on its tool surface: its name, its instructions, and which tools go on
-it. Three of them write, which is why the instructions say so — the mounting itself is
+it. Some of them write, which is why the instructions say so — the mounting itself is
 `tc_mcp_kit.mounted_server`, identical here to four other modules' and no longer written out."""
 
 from __future__ import annotations
@@ -33,11 +33,11 @@ __all__ = [
 INSTRUCTIONS = (
     "Prediction-market data from Polymarket: search its public database, choose what to "
     "collect, and read what has been collected. Prices are probabilities on 0..1, never "
-    "percentages. Two tools change the list of what is collected — track_event and "
-    "create_group — and both of them only add to it: nothing here removes an observation, "
-    "deletes collected history or touches an account, and this system trades nothing on "
-    "Polymarket. Removing an observation takes its whole history with it and is an "
-    "operator's action in the terminal."
+    "percentages. track_event adds to the list of what is collected; the group tools sort "
+    "it, and list_groups is read before a group is named, so one category keeps one name. "
+    "Nothing here removes an observation, deletes collected history or touches an account, "
+    "and this system trades nothing on Polymarket. Removing an observation takes its whole "
+    "history with it and is an operator's action in the terminal."
 )
 
 

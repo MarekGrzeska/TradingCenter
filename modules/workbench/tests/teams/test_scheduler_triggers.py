@@ -26,7 +26,7 @@ from .scripted_provider import ScriptedProvider, breaks, says
 pytestmark = pytest.mark.db
 
 OWNER = "operator-1"
-MODEL_ID = "gpt-5.6-luna"
+MODEL_ID = "gpt-6-luna"
 PAST = datetime.now(UTC) - timedelta(minutes=1)
 
 

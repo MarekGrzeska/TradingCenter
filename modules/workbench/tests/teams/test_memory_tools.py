@@ -38,7 +38,7 @@ STRANGER = "operator-2"
 
 def an_agent(key: str, *, tools: list[str] | None = None) -> AgentDefinition:
     return AgentDefinition(
-        key=key, role=key, prompt=f"be the {key}", model_id="gpt-5.6-luna", tools=tools or []
+        key=key, role=key, prompt=f"be the {key}", model_id="gpt-6-luna", tools=tools or []
     )
 
 

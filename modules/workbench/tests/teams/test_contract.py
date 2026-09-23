@@ -28,7 +28,7 @@ def _agent(key: str, **overrides) -> dict:
         "key": key,
         "role": "Analityk",
         "prompt": "Przeanalizuj wykres.",
-        "model_id": "gpt-5.6-luna",
+        "model_id": "gpt-6-luna",
         **overrides,
     }
 
@@ -179,7 +179,7 @@ def test_team_revision_out_parses_jsonb_text() -> None:
         "team_id": 1,
         "version": 1,
         "definition": '{"agents": [{"key": "solo", "role": "Analityk", '
-        '"prompt": "Patrz.", "model_id": "gpt-5.6-luna"}]}',
+        '"prompt": "Patrz.", "model_id": "gpt-6-luna"}]}',
         "created_at": _now(),
     }
     out = TeamRevisionOut.from_row(row)
@@ -222,7 +222,7 @@ def test_usage_out_stringifies_cost() -> None:
             "id": 1,
             "run_id": 1,
             "run_step_id": 1,
-            "model_id": "gpt-5.6-luna",
+            "model_id": "gpt-6-luna",
             "input_tokens": 100,
             "output_tokens": 50,
             "cached_tokens": None,
@@ -241,7 +241,7 @@ def test_usage_out_keeps_a_missing_cost_as_none_not_zero() -> None:
             "id": 1,
             "run_id": 1,
             "run_step_id": 1,
-            "model_id": "gpt-5.6-luna",
+            "model_id": "gpt-6-luna",
             "input_tokens": None,
             "output_tokens": None,
             "cached_tokens": None,

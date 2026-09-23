@@ -7,8 +7,14 @@ odpowiada, co wolno mu zmienić — i czego nie ma w nim nigdy.
 ### Requirement: Zestaw zmienia wyłącznie listę obserwacji
 
 Zestaw MUST zawierać narzędzia czytające publiczną bazę dostawcy i własne archiwum oraz narzędzia
-zmieniające **wyłącznie listę obserwacji**: objęcie wydarzenia obserwacją i utworzenie grupy.
-Żadne inne narzędzie zmieniające stan MUST NOT być publikowane.
+zmieniające **wyłącznie listę obserwacji i jej grupy**: objęcie wydarzenia obserwacją, utworzenie,
+przemianowanie i skasowanie grupy oraz przeniesienie obserwowanego wydarzenia do innej grupy albo
+poza wszystkie. Żadne inne narzędzie zmieniające stan MUST NOT być publikowane.
+
+Grupa jest wyłącznie sposobem porządkowania listy i nie wisi na niej żadna zebrana dana, dlatego
+narzędzie MAY grupę skasować — ale skasowanie grupy MUST NOT kończyć żadnej obserwacji ani usuwać
+żadnej próbki: wydarzenia wracają bez grupy albo trafiają najpierw do grupy wskazanej przez model.
+Narzędzie kasujące grupę MUST być jedynym w zestawie oznaczonym jako destrukcyjne.
 
 W szczególności żadne narzędzie MUST NOT kasować zebranej historii, MUST NOT usuwać obserwacji,
 MUST NOT zmieniać konfiguracji modułu i MUST NOT sięgać po cokolwiek związanego z rachunkiem,
@@ -22,8 +28,8 @@ zdanie wyżej zabrania. Model, który uderzy w sufit obserwacji, MUST dostać od
 operatora, a MUST NOT robić sobie miejsca kosztem obserwacji, której nie zakładał.
 
 Odstępstwo od reguły „zestaw wyłącznie czyta", którą trzyma `market-data-tools`, jest tu świadome
-i ograniczone: tam zapisem byłoby mutowanie archiwum świec, tu zapisem jest dopisanie do listy
-obserwacji — dokładnie to, co operator klika w terminalu. Ograniczenie MUST być sprawdzane testem,
+i ograniczone: tam zapisem byłoby mutowanie archiwum świec, tu zapisem jest lista obserwacji i jej
+porządek — dokładnie to, co operator klika w terminalu. Ograniczenie MUST być sprawdzane testem,
 a nie pilnowane przy review: narzędzia stoją w tym samym procesie co zapis, więc kasujące
 wywołanie jest o jeden import stąd.
 
@@ -32,7 +38,13 @@ wywołanie jest o jeden import stąd.
 - **WHEN** klient MCP prosi o listę narzędzi
 - **THEN** na liście MUST NOT być narzędzia kasującego historię, usuwającego obserwację,
   zmieniającego konfigurację ani dotykającego rachunku
-- **AND** jedyne narzędzia zmieniające stan dopisują do listy obserwacji albo tworzą grupę
+- **AND** jedyne narzędzia zmieniające stan dopisują do listy obserwacji albo zmieniają jej grupy
+
+#### Scenario: Model kasuje grupę
+
+- **WHEN** model kasuje grupę, do której przypisane są wydarzenia
+- **THEN** wydarzenia pozostają obserwowane wraz z całą zebraną historią
+- **AND** trafiają do grupy wskazanej przez model albo zostają bez grupy
 
 #### Scenario: Model prosi o skasowanie danych
 
@@ -49,7 +61,7 @@ wywołanie jest o jeden import stąd.
 
 #### Scenario: Narzędzie sięga poza listę obserwacji
 
-- **WHEN** kod narzędzia wywołuje operację zmieniającą stan inny niż dopisanie obserwacji i grup
+- **WHEN** kod narzędzia wywołuje operację zmieniającą stan inny niż lista obserwacji i jej grupy
 - **THEN** MUST to wywrócić testy modułu, zanim zmiana zostanie wdrożona
 
 ### Requirement: Zestaw domyka drogę od pytania do obserwacji
@@ -154,3 +166,34 @@ oddaje.
 
 - **WHEN** narzędzie oddaje odpowiedź, której ogłoszony schemat nie opisuje
 - **THEN** MUST to wywrócić testy modułu, a nie ujawnić się dopiero przy realnym wywołaniu
+
+### Requirement: Narzędzie pyta, zanim utworzy grupę podobną do istniejącej
+
+Zestaw MUST pozwalać modelowi odczytać istniejące grupy, zanim nazwie nową. Nazwa różniąca się od
+istniejącej wyłącznie wielkością liter albo białymi znakami MUST wskazywać tę istniejącą grupę, a
+MUST NOT tworzyć drugiej.
+
+Nazwa, która istniejącej grupy nie wskazuje, ale ją **przypomina**, MUST być odmową niosącą listę
+podobnych grup — i dotyczy to zarówno tworzenia grupy, jak i objęcia obserwacją z nową grupą.
+Model MAY taką grupę utworzyć, jawnie potwierdzając, że chodzi o inną kategorię. Reguła jest
+tylko narzędzia: operator w terminalu wpisuje nazwę świadomie i kontrakt REST jej nie stosuje.
+
+Model zostawiony sam sobie tworzył tę samą kategorię w kilku pisowniach, a sprzątał operator.
+
+#### Scenario: Ta sama nazwa w innej pisowni
+
+- **WHEN** model tworzy grupę „ crypto ", a istnieje grupa „Crypto"
+- **THEN** odpowiedź wskazuje istniejącą grupę „Crypto" i mówi, że niczego nie utworzono
+
+#### Scenario: Nazwa podobna do istniejącej
+
+- **WHEN** model tworzy grupę „tariff", a istnieje grupa „Tariffs"
+- **THEN** odpowiedź jest odmową niosącą „Tariffs" jako podobną grupę
+- **AND** grupa „tariff" powstaje dopiero, gdy model potwierdzi, że chodzi o inną kategorię
+
+#### Scenario: Objęcie obserwacją z podobną grupą
+
+- **WHEN** model obejmuje wydarzenie obserwacją z grupą przypominającą istniejącą
+- **THEN** odpowiedź jest odmową niosącą podobne grupy
+- **AND** obserwacja nie powstaje
+

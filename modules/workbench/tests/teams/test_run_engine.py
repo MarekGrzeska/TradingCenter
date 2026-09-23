@@ -26,7 +26,7 @@ OWNER = "operator-1"
 
 def an_agent(key: str, *, tools: list[str] | None = None) -> AgentDefinition:
     return AgentDefinition(
-        key=key, role=key, prompt=f"be the {key}", model_id="gpt-5.6-luna", tools=tools or []
+        key=key, role=key, prompt=f"be the {key}", model_id="gpt-6-luna", tools=tools or []
     )
 
 
@@ -112,7 +112,7 @@ async def test_a_finished_run_carries_every_agents_work(pool: asyncpg.Pool) -> N
     # One usage row per model call, priced at write time (specs/teams-usage).
     assert len(usage) == 2
     assert all(row["cost"] is not None for row in usage)
-    assert all(row["model_id"] == "gpt-5.6-luna" for row in usage)
+    assert all(row["model_id"] == "gpt-6-luna" for row in usage)
 
 
 async def test_the_judge_is_briefed_with_what_the_scout_said(pool: asyncpg.Pool) -> None:

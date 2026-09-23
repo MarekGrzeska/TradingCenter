@@ -7,6 +7,7 @@ import type { Group, PolymarketApi } from "./polymarketApi";
 /**
  * The operator's own categories: a group narrows the list and is not a property of the market, so deleting one
  * ends no observation — said out loud, because a delete button standing near data reads as one for that data.
+ * Deleting into another group is how two spellings of one category become one.
  */
 export function GroupBar({
   client,
@@ -23,7 +24,10 @@ export function GroupBar({
 }) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
+  const [renaming, setRenaming] = useState<Group | null>(null);
+  const [newName, setNewName] = useState("");
   const [deleting, setDeleting] = useState<Group | null>(null);
+  const [moveTo, setMoveTo] = useState("");
 
   const active = groups.find((entry) => entry.id === selected) ?? null;
 
@@ -56,9 +60,21 @@ export function GroupBar({
         New group
       </Button>
       {active !== null && (
-        <Button size="2xs" tone="quiet" onClick={() => setDeleting(active)}>
-          Delete “{active.name}”
-        </Button>
+        <>
+          <Button
+            size="2xs"
+            tone="quiet"
+            onClick={() => {
+              setNewName(active.name);
+              setRenaming(active);
+            }}
+          >
+            Rename “{active.name}”
+          </Button>
+          <Button size="2xs" tone="quiet" onClick={() => setDeleting(active)}>
+            Delete “{active.name}”
+          </Button>
+        </>
       )}
 
       {creating && (
@@ -99,6 +115,32 @@ export function GroupBar({
         </ConfirmDialog>
       )}
 
+      {renaming !== null && (
+        <ConfirmDialog
+          title={`Rename the group “${renaming.name}”`}
+          confirmLabel="Rename"
+          busyLabel="Renaming…"
+          confirmDisabled={newName.trim() === "" || newName.trim() === renaming.name}
+          fallbackError="the group could not be renamed"
+          onConfirm={async () => {
+            await client.renameGroup(renaming.id, newName.trim(), new AbortController().signal);
+            onChanged();
+            setRenaming(null);
+          }}
+          onClose={() => setRenaming(null)}
+        >
+          <label className="flex flex-col gap-1 text-xs">
+            <span className="text-ink-secondary">New name</span>
+            <input
+              className="rounded border border-border bg-sunken px-2 py-1 text-ink"
+              value={newName}
+              autoFocus
+              onChange={(e) => setNewName(e.target.value)}
+            />
+          </label>
+        </ConfirmDialog>
+      )}
+
       {deleting !== null && (
         <ConfirmDialog
           title={`Delete the group “${deleting.name}”`}
@@ -107,23 +149,56 @@ export function GroupBar({
           tone="danger"
           fallbackError="the group could not be deleted"
           onConfirm={async () => {
-            await client.deleteGroup(deleting.id, new AbortController().signal);
-            onSelect(null);
+            const target = groups.find((entry) => String(entry.id) === moveTo);
+            // A target gone since the list was read would turn a merge into a plain delete without a word.
+            if (moveTo !== "" && target === undefined) {
+              throw new Error("the group chosen for its events is gone — choose again");
+            }
+            await client.deleteGroup(deleting.id, new AbortController().signal, target?.id);
+            onSelect(target?.id ?? null);
             onChanged();
             showToast({
               key: `polymarket-group-deleted-${deleting.id}`,
               title: `Group “${deleting.name}” deleted`,
-              detail: "Its events are still tracked and their history is untouched.",
+              detail:
+                target === undefined
+                  ? "Its events are still tracked and their history is untouched."
+                  : `Its events are in “${target.name}” now, still tracked, history untouched.`,
             });
+            setMoveTo("");
             setDeleting(null);
           }}
-          onClose={() => setDeleting(null)}
+          onClose={() => {
+            setMoveTo("");
+            setDeleting(null);
+          }}
         >
-          <p className="text-xs text-ink-secondary">
-            The {deleting.eventCount} event(s) in it{" "}
-            <strong className="text-ink">stay tracked</strong>, and none of their collected
-            history is removed. Only the grouping goes.
-          </p>
+          <div className="flex flex-col gap-2 text-xs">
+            <p className="text-ink-secondary">
+              The {deleting.eventCount} event(s) in it{" "}
+              <strong className="text-ink">stay tracked</strong>, and none of their collected
+              history is removed. Only the grouping goes.
+            </p>
+            {deleting.eventCount > 0 && (
+              <label className="flex flex-col gap-1">
+                <span className="text-ink-secondary">Move its events to</span>
+                <select
+                  className="rounded border border-border bg-sunken px-2 py-1 text-ink"
+                  value={moveTo}
+                  onChange={(e) => setMoveTo(e.target.value)}
+                >
+                  <option value="">no group</option>
+                  {groups
+                    .filter((entry) => entry.id !== deleting.id)
+                    .map((entry) => (
+                      <option key={entry.id} value={entry.id}>
+                        {entry.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            )}
+          </div>
         </ConfirmDialog>
       )}
     </nav>

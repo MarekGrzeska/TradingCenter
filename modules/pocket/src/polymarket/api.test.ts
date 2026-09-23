@@ -114,3 +114,17 @@ describe("removing an observation", () => {
     );
   });
 });
+
+describe("tidying groups", () => {
+  it("merges a group by naming where its events go", async () => {
+    const fetching = answering(204, null);
+    vi.stubGlobal("fetch", fetching);
+
+    await createPolymarketApi("/api").deleteGroup(4, new AbortController().signal, 3);
+
+    expect(fetching).toHaveBeenCalledWith(
+      "/api/groups/4?move_events_to=3",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
+});

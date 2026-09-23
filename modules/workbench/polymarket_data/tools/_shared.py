@@ -8,15 +8,19 @@ from datetime import UTC, datetime
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
-# The six tools that only answer questions. A structural claim an MCP client can act on,
-# not a convention this module merely follows.
+# The tools that only answer questions. A structural claim an MCP client can act on, not a convention
+# this module merely follows.
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True)
 
-# The three that change the list of observations — and nothing else. `destructiveHint` is false and
-# that is exact: nothing in this set can lose data, because the one operation that can is not here.
+# The ones that change the list of observations or how it is grouped — and nothing else. `destructiveHint`
+# is false and exact: none of them can lose collected data, because the one operation that can is not here.
 CHANGES_OBSERVATIONS = ToolAnnotations(
     readOnlyHint=False, destructiveHint=False, idempotentHint=True
 )
+
+# delete_group, alone: the group itself is gone for good, though every event in it stays observed with its
+# history. Destructive by the letter of the hint, and a client that asks before those asks here.
+REMOVES_A_GROUP = ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=True)
 
 # Every price this surface returns is a probability on 0..1. Repeated in each field's description
 # rather than said once: 0,62 misread as 62 is wrong by two orders of magnitude without one error.

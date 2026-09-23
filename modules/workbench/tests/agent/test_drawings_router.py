@@ -16,10 +16,10 @@ pytestmark = pytest.mark.db
 _ENV = {
     "AGENT_OPENAI_API_KEY": "key",
     "AGENT_MODELS": (
-        '[{"id":"gpt-5.6-luna","model":"luna-prod","display_name":"Luna",'
+        '[{"id":"gpt-6-luna","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
     ),
-    "AGENT_DEFAULT_MODEL_ID": "gpt-5.6-luna",
+    "AGENT_DEFAULT_MODEL_ID": "gpt-6-luna",
 }
 
 
@@ -31,7 +31,7 @@ def _env(workbench_env: None, migrated_url: str, db, monkeypatch: pytest.MonkeyP
 
 
 async def _draw(db, symbol="US100", **kwargs):
-    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-5.6-luna")
+    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-6-luna")
     geometry = kwargs.pop("geometry", None) or ChartLevel(price=21500.0, label="weekly high")
     [written] = await store.add_drawings(
         db, session_id=session.id, symbol=symbol, geometries=[geometry]

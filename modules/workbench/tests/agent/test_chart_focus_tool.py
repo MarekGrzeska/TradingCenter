@@ -15,7 +15,7 @@ pytestmark = pytest.mark.db
 
 
 async def _session(db):
-    return await store.create_session(db, owner_principal="op-1", model_id="gpt-5.6-luna")
+    return await store.create_session(db, owner_principal="op-1", model_id="gpt-6-luna")
 
 
 def _tool(pool) -> ChartTool:

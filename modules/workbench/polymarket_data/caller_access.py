@@ -1,4 +1,4 @@
-"""Which caller may reach which surface. The boundary is not `market-data`'s, and the difference is the point: three
+"""Which caller may reach which surface. The boundary is not `market-data`'s, and the difference is the point: some
 tools here write by design, so what the record protects is deleting collected history, the one act nobody can undo."""
 
 from __future__ import annotations

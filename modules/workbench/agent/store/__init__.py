@@ -24,6 +24,7 @@ from .sessions import (
     derive_title,
     get_session,
     list_sessions,
+    move_sessions_to_successors,
     set_session_model,
     set_session_title,
 )
@@ -68,6 +69,7 @@ __all__ = [
     "list_drawings",
     "list_sessions",
     "lock_drawing",
+    "move_sessions_to_successors",
     "record_chart_command",
     "record_tool_calls",
     "record_usage",

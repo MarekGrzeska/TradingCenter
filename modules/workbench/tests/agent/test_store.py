@@ -20,7 +20,7 @@ def test_derive_title_collapses_whitespace_and_truncates() -> None:
 
 async def test_a_session_with_no_messages_is_not_listed(db) -> None:
     # specs/agent-chat, "Pusta sesja nie zaśmieca historii"
-    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-5.6-luna")
+    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-6-luna")
     listed = await store.list_sessions(db, owner_principal="op-1")
     assert listed == []
 
@@ -32,13 +32,13 @@ async def test_a_session_with_no_messages_is_not_listed(db) -> None:
 
 async def test_message_order_is_stable_and_repeatable(db) -> None:
     # specs/agent-chat, "Transkrypt zachowuje kolejność i autorstwo"
-    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-5.6-luna")
+    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-6-luna")
     await store.append_operator_message(db, session_id=session.id, content="first")
     await store.append_agent_message(
         db,
         session_id=session.id,
         content="second",
-        model_id="gpt-5.6-luna",
+        model_id="gpt-6-luna",
         prompt_version="v1",
         incomplete=False,
     )
@@ -52,7 +52,7 @@ async def test_message_order_is_stable_and_repeatable(db) -> None:
 
 async def test_operator_message_survives_a_failed_model_call(db) -> None:
     # specs/agent-chat, "Wypowiedź operatora MUST być zapisana zanim moduł zawoła model"
-    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-5.6-luna")
+    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-6-luna")
     await store.append_operator_message(db, session_id=session.id, content="hello")
     # No agent message is ever appended — this simulates the model call failing before
     # any reply exists — and the operator's turn must still be there.
@@ -64,7 +64,7 @@ async def test_operator_message_survives_a_failed_model_call(db) -> None:
 async def test_a_foreign_session_reads_as_missing(db) -> None:
     # specs/agent-browser-access, "Odmowa dostępu do cudzej sesji MUST być
     # nieodróżnialna od odpowiedzi o sesji nieistniejącej"
-    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-5.6-luna")
+    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-6-luna")
     assert await store.get_session(db, session_id=session.id, owner_principal="op-2") is None
     assert await store.get_session(db, session_id=999_999, owner_principal="op-1") is None
     assert (await store.get_session(db, session_id=session.id, owner_principal="op-1")) is not None
@@ -72,40 +72,40 @@ async def test_a_foreign_session_reads_as_missing(db) -> None:
 
 async def test_changing_model_does_not_rewrite_earlier_messages(db) -> None:
     # specs/agent-models, "Model jest wyborem sesji, a nie instalacji"
-    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-5.6-luna")
+    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-6-luna")
     await store.append_operator_message(db, session_id=session.id, content="hello")
     early_reply = await store.append_agent_message(
         db,
         session_id=session.id,
         content="answer on luna",
-        model_id="gpt-5.6-luna",
+        model_id="gpt-6-luna",
         prompt_version="v1",
         incomplete=False,
     )
     await store.set_session_model(
-        db, session_id=session.id, owner_principal="op-1", model_id="gpt-5.6-sol"
+        db, session_id=session.id, owner_principal="op-1", model_id="gpt-6-sol"
     )
     later_reply = await store.append_agent_message(
         db,
         session_id=session.id,
         content="answer on sol",
-        model_id="gpt-5.6-sol",
+        model_id="gpt-6-sol",
         prompt_version="v1",
         incomplete=False,
     )
-    assert early_reply.model_id == "gpt-5.6-luna"
-    assert later_reply.model_id == "gpt-5.6-sol"
+    assert early_reply.model_id == "gpt-6-luna"
+    assert later_reply.model_id == "gpt-6-sol"
 
 
 async def test_an_incomplete_reply_is_marked(db) -> None:
     # specs/agent-chat, "Model przerywa w połowie"
-    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-5.6-luna")
+    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-6-luna")
     await store.append_operator_message(db, session_id=session.id, content="hello")
     reply = await store.append_agent_message(
         db,
         session_id=session.id,
         content="cut off mid",
-        model_id="gpt-5.6-luna",
+        model_id="gpt-6-luna",
         prompt_version="v1",
         incomplete=True,
     )
@@ -116,13 +116,13 @@ async def test_an_incomplete_reply_is_marked(db) -> None:
 async def test_a_stopped_reply_is_marked_apart_from_a_broken_one(db) -> None:
     """Read back from the transcript, not only from the return value, because that is where a later reader
     looks."""
-    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-5.6-luna")
+    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-6-luna")
     await store.append_operator_message(db, session_id=session.id, content="hello")
     await store.append_agent_message(
         db,
         session_id=session.id,
         content="the model broke here",
-        model_id="gpt-5.6-luna",
+        model_id="gpt-6-luna",
         prompt_version="v1",
         incomplete=True,
     )
@@ -130,7 +130,7 @@ async def test_a_stopped_reply_is_marked_apart_from_a_broken_one(db) -> None:
         db,
         session_id=session.id,
         content="the operator stopped here",
-        model_id="gpt-5.6-luna",
+        model_id="gpt-6-luna",
         prompt_version="v1",
         incomplete=True,
         stopped=True,
@@ -145,13 +145,13 @@ async def test_a_stopped_reply_is_marked_apart_from_a_broken_one(db) -> None:
 
 
 async def test_usage_cost_is_computed_from_the_rates_given(db) -> None:
-    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-5.6-luna")
+    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-6-luna")
     await store.append_operator_message(db, session_id=session.id, content="hello")
     reply = await store.append_agent_message(
         db,
         session_id=session.id,
         content="hi",
-        model_id="gpt-5.6-luna",
+        model_id="gpt-6-luna",
         prompt_version="v1",
         incomplete=False,
     )
@@ -159,7 +159,7 @@ async def test_usage_cost_is_computed_from_the_rates_given(db) -> None:
         db,
         session_id=session.id,
         message_id=reply.id,
-        model_id="gpt-5.6-luna",
+        model_id="gpt-6-luna",
         input_tokens=1000,
         output_tokens=500,
         cached_tokens=None,
@@ -172,13 +172,13 @@ async def test_usage_cost_is_computed_from_the_rates_given(db) -> None:
 
 async def test_usage_with_unknown_tokens_has_no_cost(db) -> None:
     # specs/agent-usage, "Zużycia, którego dostawca nie podał, MUST NOT być zgadywane"
-    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-5.6-luna")
+    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-6-luna")
     await store.append_operator_message(db, session_id=session.id, content="hello")
     reply = await store.append_agent_message(
         db,
         session_id=session.id,
         content="hi",
-        model_id="gpt-5.6-luna",
+        model_id="gpt-6-luna",
         prompt_version="v1",
         incomplete=False,
     )
@@ -186,7 +186,7 @@ async def test_usage_with_unknown_tokens_has_no_cost(db) -> None:
         db,
         session_id=session.id,
         message_id=reply.id,
-        model_id="gpt-5.6-luna",
+        model_id="gpt-6-luna",
         input_tokens=None,
         output_tokens=None,
         cached_tokens=None,
@@ -196,3 +196,22 @@ async def test_usage_with_unknown_tokens_has_no_cost(db) -> None:
     )
     assert usage.cost is None
     assert usage.input_tokens is None
+
+
+async def test_a_session_on_a_retired_model_moves_and_its_past_replies_do_not(db) -> None:
+    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-5.6-luna")
+    await store.append_agent_message(
+        db,
+        session_id=session.id,
+        content="an earlier answer",
+        model_id="gpt-5.6-luna",
+        prompt_version="v1",
+        incomplete=False,
+    )
+
+    moved = await store.move_sessions_to_successors(db, {"gpt-5.6-luna": "gpt-6-luna"})
+
+    again = await store.get_session(db, session_id=session.id, owner_principal="op-1")
+    [reply] = await store.get_messages(db, session_id=session.id)
+    assert (moved, again.current_model_id if again else None) == (1, "gpt-6-luna")
+    assert reply.model_id == "gpt-5.6-luna"

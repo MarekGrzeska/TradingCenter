@@ -158,3 +158,28 @@ async def test_a_stranger_cannot_retire_a_team(db: asyncpg.Connection) -> None:
 
     assert await store.archive_team(db, team_id=team["id"], owner_principal=STRANGER) is False
     assert await store.get_team(db, team_id=team["id"], owner_principal=OWNER) is not None
+
+
+async def test_agents_on_a_retired_model_move_to_its_successor_in_place(
+    db: asyncpg.Connection,
+) -> None:
+    """The one edit a revision takes: a pinned schedule keeps its revision, so the model moves inside it.
+    Only the named model moves, and nothing else in the definition does."""
+    team, revision = await _team(db)
+    await store.save_revision(
+        db,
+        team_id=team["id"],
+        owner_principal=OWNER,
+        definition=TeamDefinition(
+            agents=[AgentDefinition(key="scout", role="scout", prompt="p", model_id="sol")],
+        ),
+    )
+
+    moved = await store.move_revisions_to_successors(db, {"luna": "gpt-6-luna"})
+
+    row = await store.get_revision_by_id(db, revision_id=revision["id"], owner_principal=OWNER)
+    assert row is not None
+    first = TeamRevisionOut.from_row(row).definition
+    assert moved == 1
+    assert [agent.model_id for agent in first.agents] == ["gpt-6-luna", "gpt-6-luna"]
+    assert first.edges == _definition().edges

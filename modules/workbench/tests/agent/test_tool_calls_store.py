@@ -26,7 +26,7 @@ from .test_graph import PRICE_TOOL, FakeProvider, FakeToolServer
 pytestmark = pytest.mark.db
 
 LUNA = ModelCatalogueEntry(
-    id="gpt-5.6-luna",
+    id="gpt-6-luna",
     model="luna-prod",
     display_name="Luna",
     cost_rank=1,

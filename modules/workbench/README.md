@@ -57,8 +57,8 @@ The three archives and the strategy platform are not servers any more. Since
 `one-process-per-security-boundary` each is a package of this process, mounted whole under
 `/market`, `/polymarket`, `/social` and `/strategy`, and its tools reach both registries as functions
 (`workbench/local_tools.py`) — same names, descriptions, ceilings and refusals, no address, no
-identity, no session. Two of the prediction-market archive's nine tools write, and what they
-write is a watch list, not an account; nothing on the post archive's four or the platform's
+identity, no session. Five of the prediction-market archive's twelve tools write, and what they
+write is a watch list and its groups, not an account; nothing on the post archive's four or the platform's
 writes at all. Nothing this system does on Polymarket touches money.
 
 The third pair — `TELEGRAM_MCP_URL` — is the same shape as the first two. The platform's local

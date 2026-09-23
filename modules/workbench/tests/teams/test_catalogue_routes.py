@@ -13,7 +13,7 @@ from workbench.app import app
 
 pytestmark = pytest.mark.db
 
-MODEL_ID = "gpt-5.6-luna"
+MODEL_ID = "gpt-6-luna"
 
 _ENV = {
     "TEAMS_OPENAI_API_KEY": "key",

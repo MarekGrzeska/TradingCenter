@@ -5,11 +5,11 @@ import { AgentScreen } from "./AgentScreen";
 import type { AgentApi, AgentMessage, AgentStreamEvent } from "./agentApi";
 import { ArchiveError } from "../data/http";
 
-const SESSION = { id: 7, title: "About the fed", currentModelId: "gpt-5", lastActiveAt: new Date() };
+const SESSION = { id: 7, title: "About the fed", currentModelId: "gpt-6-luna", lastActiveAt: new Date() };
 const OLDER = {
   id: 3,
   title: "Silver in March",
-  currentModelId: "gpt-5",
+  currentModelId: "gpt-6-luna",
   lastActiveAt: new Date("2026-08-20T10:00:00Z"),
 };
 
@@ -31,7 +31,7 @@ function reply(content: string, toolCalls: AgentMessage["toolCalls"] = []): Agen
 
 function anApi(overrides: Partial<AgentApi> = {}): AgentApi {
   return {
-    listModels: vi.fn(async () => [{ id: "gpt-5", displayName: "GPT-5", costRank: 1 }]),
+    listModels: vi.fn(async () => [{ id: "gpt-6-luna", displayName: "GPT-6 Luna", costRank: 1 }]),
     listSessions: vi.fn(async () => [SESSION]),
     createSession: vi.fn(async () => SESSION),
     setModel: vi.fn(async () => SESSION),

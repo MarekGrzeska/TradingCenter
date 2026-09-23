@@ -432,7 +432,7 @@ class TestDeletion:
 class TestGroups:
     @pytest.mark.db
     async def test_deleting_a_group_keeps_its_observations_and_their_data(self, db) -> None:
-        group = await store.create_group(db, "tariffs")
+        group, _ = await store.create_group(db, "tariffs")
         assert group.id is not None
         event_id = await store.upsert_event(db, builders.event(), group_id=group.id)
         [yes_id, _] = await outcome_ids(db, event_id)
@@ -449,14 +449,40 @@ class TestGroups:
         assert await db.fetchval("SELECT count(*) FROM price_samples") == 1
 
     @pytest.mark.db
-    async def test_creating_the_same_group_twice_is_not_an_error(self, db) -> None:
-        """A model that asks again after a restart should not have to know whether it asked
-        before."""
-        first = await store.create_group(db, "tariffs")
-        again = await store.create_group(db, "tariffs")
+    async def test_one_group_answers_to_every_spelling_of_its_name(self, db) -> None:
+        """A model that asks again after a restart, or in another case, should not have to know
+        whether somebody asked before."""
+        first, created = await store.create_group(db, "Tariffs")
+        again, created_again = await store.create_group(db, "  tariffs ")
 
-        assert first.id == again.id
+        assert (first.id, created, created_again) == (again.id, True, False)
+        assert again.name == "Tariffs"
+        assert (await store.find_group(db, "TARIFFS")) is not None
         assert len(await store.list_groups(db)) == 1
+
+    @pytest.mark.db
+    async def test_a_rename_onto_another_groups_name_is_refused(self, db) -> None:
+        crypto, _ = await store.create_group(db, "crypto")
+        macro, _ = await store.create_group(db, "macro")
+        assert crypto.id is not None and macro.id is not None
+
+        renamed = await store.rename_group(db, crypto.id, "Crypto")
+        with pytest.raises(store.GroupNameTaken):
+            await store.rename_group(db, macro.id, "CRYPTO")
+
+        assert renamed is not None and renamed.name == "Crypto"
+
+    @pytest.mark.db
+    async def test_deleting_a_group_into_another_merges_them(self, db) -> None:
+        duplicate, _ = await store.create_group(db, "Cryptocurrency")
+        keeper, _ = await store.create_group(db, "Crypto")
+        assert duplicate.id is not None and keeper.id is not None
+        event_id = await store.upsert_event(db, builders.event(), group_id=duplicate.id)
+
+        assert await store.delete_group(db, duplicate.id, move_to=keeper.id)
+
+        [group] = await store.list_groups(db)
+        assert (group.name, group.event_ids) == ("Crypto", (event_id,))
 
 
 class TestTheCeiling:

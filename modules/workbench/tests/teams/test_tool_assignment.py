@@ -21,7 +21,7 @@ from .mcp_stand_in import free_port, serving, settings_for
 
 def agent(key: str, tools: list[str]) -> AgentDefinition:
     return AgentDefinition(
-        key=key, role=f"{key} role", prompt="do the thing", model_id="gpt-5.6-luna", tools=tools
+        key=key, role=f"{key} role", prompt="do the thing", model_id="gpt-6-luna", tools=tools
     )
 
 

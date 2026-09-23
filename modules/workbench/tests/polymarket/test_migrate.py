@@ -189,3 +189,36 @@ async def test_0003_takes_the_stopped_observations_and_leaves_the_rest(
         ) == 0
     finally:
         await conn.close()
+
+
+@pytest.mark.db
+async def test_duplicate_spellings_are_merged_into_the_oldest_before_the_index(
+    empty_database_url: str,
+) -> None:
+    """`0005` rewrites rows it did not write — production held groups models had made twice — so the merge
+    is walked rather than trusted: the events move to the oldest spelling, and nothing is lost."""
+    from alembic import command
+    from tc_runtime.migrate import alembic_config
+
+    config = alembic_config(MIGRATIONS, sqlalchemy_url(empty_database_url))
+    await asyncio.to_thread(command.upgrade, config, "0004")
+
+    conn = await asyncpg.connect(asyncpg_dsn(empty_database_url))
+    try:
+        oldest = await conn.fetchval("INSERT INTO observation_groups (name) VALUES ('Crypto') RETURNING id")
+        twin = await conn.fetchval("INSERT INTO observation_groups (name) VALUES (E' crypto\t') RETURNING id")
+        await conn.execute(
+            "INSERT INTO tracked_events (provider_event_id, slug, title, group_id) "
+            "VALUES ('e-1', 'e-1', 'one', $1), ('e-2', 'e-2', 'two', $2)",
+            oldest,
+            twin,
+        )
+
+        await asyncio.to_thread(command.upgrade, config, "head")
+
+        assert await conn.fetch("SELECT id, name FROM observation_groups") == [(oldest, "Crypto")]
+        assert await conn.fetchval("SELECT count(*) FROM tracked_events WHERE group_id = $1", oldest) == 2
+        with pytest.raises(asyncpg.UniqueViolationError):
+            await conn.execute("INSERT INTO observation_groups (name) VALUES ('CRYPTO')")
+    finally:
+        await conn.close()

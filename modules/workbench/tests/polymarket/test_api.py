@@ -334,7 +334,39 @@ class TestGroups:
         assert first.json()["id"] == again.json()["id"]
 
     async def test_an_empty_name_is_refused_by_the_contract(self, api) -> None:
-        assert (await api.post("/groups", json={"name": ""})).status_code == 422
+        assert (await api.post("/groups", json={"name": "  "})).status_code == 422
+
+    async def test_a_group_is_renamed(self, api) -> None:
+        group_id = (await api.post("/groups", json={"name": "tarifs"})).json()["id"]
+
+        renamed = await api.patch(f"/groups/{group_id}", json={"name": "Tariffs"})
+
+        assert renamed.status_code == 200
+        assert renamed.json()["name"] == "Tariffs"
+
+    async def test_renaming_onto_another_groups_name_is_a_409(self, api) -> None:
+        await api.post("/groups", json={"name": "macro"})
+        group_id = (await api.post("/groups", json={"name": "rates"})).json()["id"]
+
+        response = await api.patch(f"/groups/{group_id}", json={"name": "Macro"})
+
+        assert response.status_code == 409
+        assert "macro" in response.json()["detail"]
+
+    async def test_deleting_a_group_can_move_its_events_first(self, api, pool) -> None:
+        event_id = await observe(pool, fakes.event_payload())
+        duplicate = (await api.post("/groups", json={"name": "Cryptocurrency"})).json()
+        keeper = (await api.post("/groups", json={"name": "Crypto"})).json()
+        await api.put(f"/events/{event_id}/group", json={"group_id": duplicate["id"]})
+
+        response = await api.delete(
+            f"/groups/{duplicate['id']}", params={"move_events_to": keeper["id"]}
+        )
+
+        assert response.status_code == 204
+        assert [(g["name"], g["event_count"]) for g in (await api.get("/groups")).json()] == [
+            ("Crypto", 1)
+        ]
 
 
 class TestCollectionState:

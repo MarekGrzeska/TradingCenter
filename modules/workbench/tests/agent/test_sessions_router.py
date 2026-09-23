@@ -20,10 +20,10 @@ pytestmark = pytest.mark.db
 _ENV = {
     "AGENT_OPENAI_API_KEY": "key",
     "AGENT_MODELS": (
-        '[{"id":"gpt-5.6-luna","model":"luna-prod","display_name":"Luna",'
+        '[{"id":"gpt-6-luna","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
     ),
-    "AGENT_DEFAULT_MODEL_ID": "gpt-5.6-luna",
+    "AGENT_DEFAULT_MODEL_ID": "gpt-6-luna",
 }
 
 
@@ -84,7 +84,7 @@ def test_create_session_defaults_to_the_configured_default_model() -> None:
     with TestClient(app) as client:
         response = client.post("/sessions", json={})
     assert response.status_code == 201
-    assert response.json()["current_model_id"] == "gpt-5.6-luna"
+    assert response.json()["current_model_id"] == "gpt-6-luna"
 
 
 def test_creating_a_session_with_an_unknown_model_is_refused() -> None:
@@ -142,9 +142,9 @@ def test_first_message_titles_the_session() -> None:
 def test_changing_the_model_is_reflected_on_the_session() -> None:
     with TestClient(app) as client:
         session_id = client.post("/sessions", json={}).json()["id"]
-        response = client.patch(f"/sessions/{session_id}", json={"model_id": "gpt-5.6-luna"})
+        response = client.patch(f"/sessions/{session_id}", json={"model_id": "gpt-6-luna"})
     assert response.status_code == 200
-    assert response.json()["current_model_id"] == "gpt-5.6-luna"
+    assert response.json()["current_model_id"] == "gpt-6-luna"
 
 
 def test_changing_to_an_unknown_model_is_refused() -> None:
@@ -202,10 +202,10 @@ def test_model_and_title_can_change_in_one_request() -> None:
     with TestClient(app) as client:
         session_id = client.post("/sessions", json={}).json()["id"]
         response = client.patch(
-            f"/sessions/{session_id}", json={"model_id": "gpt-5.6-luna", "title": "both"}
+            f"/sessions/{session_id}", json={"model_id": "gpt-6-luna", "title": "both"}
         )
     assert response.status_code == 200
-    assert response.json()["current_model_id"] == "gpt-5.6-luna"
+    assert response.json()["current_model_id"] == "gpt-6-luna"
     assert response.json()["title"] == "both"
 
 

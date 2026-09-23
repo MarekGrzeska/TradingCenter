@@ -13,10 +13,10 @@ pytestmark = pytest.mark.db
 _ENV = {
     "AGENT_OPENAI_API_KEY": "key",
     "AGENT_MODELS": (
-        '[{"id":"gpt-5.6-luna","model":"luna-prod","display_name":"Luna",'
+        '[{"id":"gpt-6-luna","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
     ),
-    "AGENT_DEFAULT_MODEL_ID": "gpt-5.6-luna",
+    "AGENT_DEFAULT_MODEL_ID": "gpt-6-luna",
 }
 
 
@@ -53,7 +53,7 @@ def test_usage_reflects_a_completed_turn() -> None:
     body = response.json()
     # 1000 input tokens @ 0.001/1k + 500 output tokens @ 0.006/1k = 0.001 + 0.003
     assert Decimal(body["total_cost"]) == Decimal("0.001") + Decimal("0.003")
-    assert body["by_model"][0]["key"] == "gpt-5.6-luna"
+    assert body["by_model"][0]["key"] == "gpt-6-luna"
     assert body["by_session"][0]["key"] == str(session_id)
     assert len(body["by_day"]) == 1
 

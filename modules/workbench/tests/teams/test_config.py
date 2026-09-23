@@ -10,7 +10,7 @@ from teams.config import Settings
 
 ONE_MODEL = [
     {
-        "id": "gpt-5.6-luna",
+        "id": "gpt-6-luna",
         "model": "luna-prod",
         "display_name": "Luna",
         "cost_rank": 1,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import type { PolymarketApi, TrackedEvent } from "./api";
+import type { Group, PolymarketApi, TrackedEvent } from "./api";
 
 /** How often the screen re-reads. The archive samples once a minute, so asking more often costs a
  *  phone's battery to redraw the same numbers.
@@ -17,8 +17,8 @@ export type ArchiveStatus = "loading" | "ready" | "error";
 
 export interface ArchiveState {
   events: TrackedEvent[];
-  /** Group names the archive knows, including ones nothing is filed under yet. */
-  groups: string[];
+  /** Every group the archive knows, including ones nothing is filed under yet. */
+  groups: Group[];
   status: ArchiveStatus;
   /** The last failure, kept beside the data rather than instead of it: a poll that fails should say
    *  so without blanking prices the operator was reading a second ago. */
@@ -40,7 +40,7 @@ function messageOf(cause: unknown): string {
 
 export function useArchive(api: PolymarketApi, pollMs: number = POLL_MS): ArchiveState {
   const [events, setEvents] = useState<TrackedEvent[]>([]);
-  const [groups, setGroups] = useState<string[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [status, setStatus] = useState<ArchiveStatus>("loading");
   const [error, setError] = useState<string | null>(null);
   const [lastReadAt, setLastReadAt] = useState<Date | null>(null);
@@ -70,7 +70,7 @@ export function useArchive(api: PolymarketApi, pollMs: number = POLL_MS): Archiv
         ]);
         if (cancelled) return;
         setEvents(nextEvents);
-        setGroups(nextGroups.map((group) => group.name));
+        setGroups(nextGroups);
         setStatus("ready");
         setError(null);
         const answered = new Date();

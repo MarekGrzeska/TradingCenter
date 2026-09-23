@@ -22,7 +22,7 @@ def test_a_definition_with_no_trading_limits_is_valid() -> None:
                 key="trader",
                 role="the trader",
                 prompt="trade",
-                model_id="gpt-5.6-luna",
+                model_id="gpt-6-luna",
                 tools=["place_order"],
             )
         ]
