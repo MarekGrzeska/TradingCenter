@@ -38,6 +38,13 @@ forbidden map from its package list, so a ninth package is one entry there. Why 
 `teams-mcp` and five other modules no longer exist, and why `trading-mcp` still does:
 `docs/architecture.md`, "The order path".
 
+## Skills
+
+Procedures live in `.claude/skills/`, paid for only when used: **`db-cost-check`** before anything
+touches the database on a timer or per event · **`contract-sync`** after a contract changes ·
+**`deploy-watch`** after a merge · **`prod-health`** when production is silent or slow ·
+**`system-review`** every few weeks. `openspec-*` for changes.
+
 ## Commands
 
 From the module directory; nothing at the repo root builds or tests everything. Every Python
@@ -73,11 +80,10 @@ at startup, by `dev.py` and `config.py` both. Production uses an Entra identity 
 "restore" dev on the Azure server; that was reversed the day it was made. The dev scripts create
 each logical database and role themselves — `docker-entrypoint-initdb.d` only fires on an empty volume.
 
-**The terminal's contract is generated.** After changing `market_data/contract.py`, run
-`pnpm contract:generate` in the terminal — CI's `contract:check` fails on a stale file. The route a
-new field travels, and why a **new indicator** touches exactly one file:
-`modules/workbench/market_data/README.md`. On Windows, `M` in `git status` with an empty diff is
-CRLF, not drift.
+**Contracts are committed copies** — the terminal's and the pocket's generated TypeScript, and
+trading-mcp's snapshot of the gateway's OpenAPI; CI fails on a stale one. After touching a
+`contract.py`, an `openapi.py` or a gateway route, run the `contract-sync` skill. Why a **new
+indicator** is not a contract change: `modules/workbench/market_data/README.md`.
 
 **Env files are per-module and gitignored**; copy from `.env.example`, which is the list. The
 workbench reads one `.env` and a prefix marks what is doubled on purpose — `AGENT_`/`TEAMS_DATABASE_URL`,
@@ -220,11 +226,9 @@ committed snapshot of the gateway's whole OpenAPI document.
 **There is no branch protection on this repository** — a skipped job blocks nothing.
 
 The `deploy-*.yml` workflows deploy **after a green `checks` run of the same commit**
-(`workflow_run`); the App Service ones call `_deploy-app-service.yml`, which starts with
-`scripts/deploy_gate.py` (did anything the image bakes in change since the last green checks run?)
-and ends in `scripts/deploy_probe.py` (is this commit's image the one serving, *and* did the process
-inside come up?). The front ends deploy to Static Web Apps. `workflow_dispatch` is the door around
-the gate. **No App Service carries an address restriction** — each door is its own authentication.
+(`workflow_run`), gated by `scripts/deploy_gate.py` and ending in `scripts/deploy_probe.py`; after a
+merge, the `deploy-watch` skill follows it and rolls a failed start back before anything else.
+`workflow_dispatch` is the door around the gate. **No App Service carries an address restriction** — each door is its own authentication.
 `terraform.yml` plans on infra PRs; `terraform-apply.yml` is a manual dispatch that refuses any plan
 touching `azuread_*`, since CI holds `Application.Read.All` and not write.
 
