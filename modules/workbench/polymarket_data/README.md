@@ -119,6 +119,15 @@ on `pool.acquire()`, which has no deadline. Three statements now cover an event 
 `SAMPLER_DB_CONCURRENCY` caps collection's share of the pool, and a read that still finds nothing
 free is refused with a 503 after five seconds rather than left to the platform's 230 s idle cut.
 
+**The ticks never merged, and the cap was the whole pool.** A tick covered the one interval before it,
+but the loop sleeps a whole interval *after* a pass, so consecutive ticks never touched. By 23 September
+2026 that was **5,4M ranges, ~21 000 per outcome**, and the merge read all of them on
+`(outcome_id, starts_at)` — **47 s** for one event. The server ran out of burst credits on 16
+September, and with `SAMPLER_DB_CONCURRENCY` equal to the pool size every read got the 503 above. A
+tick now covers the time since its event's previous tick (at most ten intervals), ranges are found by
+`(outcome_id, ends_at)`, a reader asks for the first start and last end instead of every range, and the
+sampler's share must be below the pool.
+
 **The database is one burstable core.** `B_Standard_B1ms`, shared by every module's database. The
 two fixes above matter more here than they would on a larger server: sustained CPU exhausts the
 burst credits, and what is then slow is every module at once, not this one.

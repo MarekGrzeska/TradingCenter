@@ -55,7 +55,7 @@ async def history(
                 status.HTTP_404_NOT_FOUND, detail=f"no outcome with id {outcome_id}"
             )
         series = await store.history(conn, outcome_id, since=start, until=end)
-        collected = await store.collected_ranges(conn, outcome_id)
+        collected_from, collected_to = await store.collected_span(conn, outcome_id)
 
     return HistoryOut(
         outcome_id=outcome_id,
@@ -67,8 +67,8 @@ async def history(
             )
             for sample in series
         ],
-        collected_from=collected[0].starts_at if collected else None,
-        collected_to=collected[-1].ends_at if collected else None,
+        collected_from=collected_from,
+        collected_to=collected_to,
     )
 
 

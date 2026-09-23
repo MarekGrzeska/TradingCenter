@@ -166,7 +166,7 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
                     "do_first": "get_event lists the outcome ids of a tracked event",
                 }
             series = await store.history(conn, outcome_id, since=since, until=until)
-            collected = await store.collected_ranges(conn, outcome_id)
+            collected_from, _ = await store.collected_span(conn, outcome_id)
 
         priced = [
             HistoryPoint(at=sample.observed_at, price=float(sample.midpoint))
@@ -184,7 +184,7 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
             outcome_id=outcome_id,
             points=priced,
             truncated=truncated,
-            collected_from=collected[0].starts_at if collected else None,
+            collected_from=collected_from,
         )
 
     @mcp.tool(annotations=READ_ONLY)

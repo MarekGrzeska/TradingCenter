@@ -58,9 +58,9 @@ class Settings(BaseSettings):
     # this multiplied by the tracked-event ceiling is the whole steady-state traffic.
     sample_interval_seconds: int = 60
 
-    # Collection's share of the connection pool, which holds ten. A tick gathers every event at once, so
-    # without a ceiling the sampler took every connection and a read queued behind it with no deadline.
-    sampler_db_concurrency: int = 3
+    # Collection's share of the pool, and always less than all of it: at 3 of 3 the sampler held every
+    # connection while the database was slow, and every read got a 503 (23 September 2026).
+    sampler_db_concurrency: int = 2
 
     # The provider caps one price-history request at 15 days, measured — and on the interval rather
     # than the point count, so a coarser fidelity buys no width. A setting because the provider may move it.
@@ -124,6 +124,16 @@ class Settings(BaseSettings):
         if value is None or not value.strip():
             return None
         return value.strip()
+
+    @model_validator(mode="after")
+    def _reads_keep_a_connection(self) -> Settings:
+        if self.sampler_db_concurrency >= self.database_pool_size:
+            raise ValueError(
+                f"SAMPLER_DB_CONCURRENCY ({self.sampler_db_concurrency}) must be below "
+                f"DATABASE_POOL_SIZE ({self.database_pool_size}): a sampler holding every "
+                "connection leaves every read waiting for one."
+            )
+        return self
 
     @model_validator(mode="after")
     def _connection_mode_is_coherent(self) -> Settings:

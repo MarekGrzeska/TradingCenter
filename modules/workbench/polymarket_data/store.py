@@ -458,6 +458,17 @@ async def collected_ranges(conn: Conn, outcome_id: int) -> list[CollectedRange]:
     return [CollectedRange(starts_at=row["starts_at"], ends_at=row["ends_at"]) for row in rows]
 
 
+async def collected_span(conn: Conn, outcome_id: int) -> tuple[datetime | None, datetime | None]:
+    """The first start and the last end, which is all a reader shows. Fetching every range to take
+    two of them was 35 000 rows per history read for an outcome whose ticks had never merged."""
+    row = await conn.fetchrow(
+        "SELECT min(starts_at) AS first, max(ends_at) AS last FROM collected_ranges "
+        "WHERE outcome_id = $1",
+        outcome_id,
+    )
+    return (row["first"], row["last"]) if row else (None, None)
+
+
 async def is_collected(conn: Conn, outcome_id: int, moment: datetime) -> bool:
     """Whether the absence of a sample at this moment means "nobody traded" or "we were not
     looking". Without this record the two are the same absence."""
