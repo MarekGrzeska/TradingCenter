@@ -66,9 +66,9 @@ class Settings(BaseSettings):
     # than the point count, so a coarser fidelity buys no width. A setting because the provider may move it.
     history_window_days: int = 15
 
-    # How far back a newly tracked event reaches on its first fill. Divided by the window
-    # above, this is a request count: 90 days is six requests per outcome.
-    default_backfill_days: int = 90
+    # How far back a newly tracked event reaches on its first fill. Divided by the window above, this is
+    # a request count. 30, not 90: every day is ~1 440 rows per outcome that nothing ever removes.
+    default_backfill_days: int = 30
 
     # The ceiling counts *events*, not markets, and that is only affordable because one request covers
     # an event however many markets it holds — one measured at 128 on 22 August 2026.
