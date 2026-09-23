@@ -91,6 +91,12 @@ class TestBudgets:
         with pytest.raises(ValidationError, match="must be at least 1"):
             build(**{field: 0})
 
+    def test_the_sampler_never_takes_the_whole_pool(self):
+        # At 3 of 3 a slow database left no connection for a read, and every screen got a 503.
+        with pytest.raises(ValidationError, match="must be below DATABASE_POOL_SIZE"):
+            build(database_pool_size=3, sampler_db_concurrency=3)
+        assert build().sampler_db_concurrency < build().database_pool_size
+
     def test_history_window_defaults_to_the_measured_provider_cap(self):
         # 15 days passes and 16 does not — measured, and on the time interval rather than
         # the point count. A default that guessed higher would fail every backfill.

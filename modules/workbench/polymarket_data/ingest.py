@@ -29,6 +29,11 @@ NOTHING_OLDER_SLACK = timedelta(hours=12)
 # together was the 655 MB peak measured on 4 September 2026, against ~290 MB at rest.
 BACKFILL_OUTCOMES_AT_ONCE = 4
 
+# How far back a tick may claim, counted in sampling intervals. A tick covers the time since this event's
+# previous tick, because covering only one interval never touched the last one once the loop slept after
+# a pass. A longer silence was a stall, and claiming it would hide a real gap.
+TICK_CONTINUITY_PASSES = 10
+
 
 def _now() -> datetime:
     return datetime.now(UTC)
@@ -54,6 +59,8 @@ class Ingest:
         # caller with no loop has nothing to report.
         self._heartbeat = heartbeat
         self._interval = interval_seconds
+        # In memory on purpose: a restart is a gap, and `close_gaps` is what answers it.
+        self._last_tick: dict[int, datetime] = {}
         self._window = timedelta(days=window_days)
         self._default_depth = timedelta(days=default_backfill_days)
         self._connections = asyncio.Semaphore(db_concurrency)
@@ -124,7 +131,8 @@ class Ingest:
             except asyncio.CancelledError:
                 raise
             except Exception:
-                # One bad round is not the end of collection.
+                # One bad round is not the end of collection, but it is a gap the next tick must not cover.
+                self._last_tick.clear()
                 log.exception("a sampling round failed")
             else:
                 # After the pass and only after it: a round that raised is a round that did not
@@ -176,6 +184,7 @@ class Ingest:
             try:
                 await store.upsert_event(conn, parsing.event_from(payload))
             except parsing.ProviderPayloadUnusable as err:
+                self._last_tick.pop(event_id, None)
                 await store.note_sampling_failed(conn, event_id, str(err))
                 return 0
 
@@ -192,16 +201,29 @@ class Ingest:
                 if token in tokens and (midpoint is not None or last_trade is not None)
             ]
             written = await store.record_samples(conn, samples)
-            # A tick is also a collected window — the interval it stands for, not the instant it
-            # happened at. Recorded as a point, two ticks never touched and nothing ever merged.
-            covered_from = observed_at - timedelta(seconds=self._interval)
             await store.record_collected_many(
-                conn, [sample.outcome_id for sample in samples], covered_from, observed_at
+                conn,
+                [sample.outcome_id for sample in samples],
+                self._covered_from(event_id, observed_at),
+                observed_at,
             )
             await store.note_sampled(conn, event_id)
+        self._last_tick[event_id] = observed_at
         return written
 
+    def _covered_from(self, event_id: int, observed_at: datetime) -> datetime:
+        """Where this tick's collected window starts: this event's previous tick when the loop was
+        continuous, so the two ranges touch and merge, and one interval back otherwise."""
+        one_interval = observed_at - timedelta(seconds=self._interval)
+        previous = self._last_tick.get(event_id)
+        if previous is None:
+            return one_interval
+        if observed_at - previous > timedelta(seconds=self._interval * TICK_CONTINUITY_PASSES):
+            return one_interval
+        return min(previous, one_interval)
+
     async def _note_failure(self, event_id: int, reason: str) -> None:
+        self._last_tick.pop(event_id, None)
         log.warning("sampling event %s failed: %s", event_id, reason)
         async with self._connection() as conn:
             await store.note_sampling_failed(conn, event_id, reason)

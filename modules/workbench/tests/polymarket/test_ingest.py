@@ -11,8 +11,9 @@ from decimal import Decimal
 import pytest
 from tc_runtime.liveness import LoopHeartbeat
 
+from polymarket_data import ingest as ingest_module
 from polymarket_data import parsing, provider, store
-from polymarket_data.ingest import Ingest
+from polymarket_data.ingest import TICK_CONTINUITY_PASSES, Ingest
 from polymarket_data.models import Sample, Surface
 
 from . import fakes
@@ -165,6 +166,42 @@ class TestATickIsAWindowNotAnInstant:
             ranges = await store.collected_ranges(conn, outcomes[0][0])
 
         assert len(ranges) == 1, "two ticks, one range — they touch"
+
+    async def test_ticks_spaced_as_the_loop_spaces_them_still_merge(self, pool, monkeypatch) -> None:
+        """The loop sleeps a whole interval *after* a pass, so ticks are always more than one interval
+        apart. Covering one interval never touched: 21 000 ranges per outcome in production by 23 September."""
+        payload = fakes.event_payload(markets=(fakes.market_payload("m-1", prices=("0.6", "0.4")),))
+        event_id = await track(pool, payload)
+        sampler = ingest(pool, fakes.FakeProvider({"e-1": payload}), interval_seconds=60)
+        start = _now()
+
+        for late_by in (0, 75, 150, 420):
+            monkeypatch.setattr(ingest_module, "_now", lambda at=start + timedelta(seconds=late_by): at)
+            await sampler.tick()
+
+        async with pool.acquire() as conn:
+            outcomes = await store.outcomes_of_event(conn, event_id)
+            ranges = await store.collected_ranges(conn, outcomes[0][0])
+        assert len(ranges) == 1
+        assert ranges[0].starts_at == start - timedelta(seconds=60)
+
+    async def test_a_stall_longer_than_the_continuity_bound_stays_a_gap(
+        self, pool, monkeypatch
+    ) -> None:
+        payload = fakes.event_payload(markets=(fakes.market_payload("m-1", prices=("0.6", "0.4")),))
+        event_id = await track(pool, payload)
+        sampler = ingest(pool, fakes.FakeProvider({"e-1": payload}), interval_seconds=60)
+        start = _now()
+        stall = timedelta(seconds=60 * TICK_CONTINUITY_PASSES + 1)
+
+        for at in (start, start + stall):
+            monkeypatch.setattr(ingest_module, "_now", lambda at=at: at)
+            await sampler.tick()
+
+        async with pool.acquire() as conn:
+            outcomes = await store.outcomes_of_event(conn, event_id)
+            ranges = await store.collected_ranges(conn, outcomes[0][0])
+        assert len(ranges) == 2, "a stall is not claimed as collected"
 
 
 class TestBackfill:

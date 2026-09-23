@@ -72,7 +72,7 @@ describe("OutcomeHistory", () => {
 
   it("says when the range reaches back past everything that was ever collected", async () => {
     const read = vi.fn<PolymarketApi["history"]>(async () =>
-      history({ collectedFrom: new Date("2026-08-19T12:00:00Z"), points: [] }),
+      history({ collectedFrom: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), points: [] }),
     );
     render(<OutcomeHistory client={fakeApi(read)} event={EVENT} />);
 
