@@ -19,7 +19,7 @@ _AGENT = {
     "role": "scout",
     "prompt": "read the market",
     "guidance": "",
-    "model_id": "gpt-5.6-luna",
+    "model_id": "gpt-6-luna",
     "tools": [],
 }
 

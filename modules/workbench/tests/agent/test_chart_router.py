@@ -14,10 +14,10 @@ pytestmark = pytest.mark.db
 _ENV = {
     "AGENT_OPENAI_API_KEY": "key",
     "AGENT_MODELS": (
-        '[{"id":"gpt-5.6-luna","model":"luna-prod","display_name":"Luna",'
+        '[{"id":"gpt-6-luna","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
     ),
-    "AGENT_DEFAULT_MODEL_ID": "gpt-5.6-luna",
+    "AGENT_DEFAULT_MODEL_ID": "gpt-6-luna",
 }
 
 
@@ -29,7 +29,7 @@ def _env(workbench_env: None, migrated_url: str, db, monkeypatch: pytest.MonkeyP
 
 
 async def _command(db, **overrides):
-    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-5.6-luna")
+    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-6-luna")
     return await store.record_chart_command(
         db,
         session_id=session.id,
@@ -101,7 +101,7 @@ async def test_nothing_newer_than_the_cursor_answers_with_nothing(db) -> None:
 
 
 async def test_a_consumer_coming_back_gets_everything_it_missed_as_one(db) -> None:
-    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-5.6-luna")
+    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-6-luna")
     first = await store.record_chart_command(
         db,
         session_id=session.id,

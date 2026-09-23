@@ -32,7 +32,7 @@ def a_trader(key: str = "trader", *, tools: list[str] | None = None) -> AgentDef
         key=key,
         role=key,
         prompt=f"be the {key}",
-        model_id="gpt-5.6-luna",
+        model_id="gpt-6-luna",
         tools=tools if tools is not None else ["place_order"],
     )
 
@@ -335,7 +335,7 @@ async def test_a_revision_saved_before_trading_limits_existed_still_runs(
                             "role": "trader",
                             "prompt": "be the trader",
                             "guidance": "",
-                            "model_id": "gpt-5.6-luna",
+                            "model_id": "gpt-6-luna",
                             "tools": ["place_order"],
                         }
                     ],

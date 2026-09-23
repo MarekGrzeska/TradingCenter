@@ -6,47 +6,114 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime
 
+import asyncpg
 from tc_runtime.db import Conn, fetch_one
 
+from . import group_names
 from .models import CollectedRange, Event, Group, Market, Outcome, Sample, Surface
 
 
-async def create_group(conn: Conn, name: str) -> Group:
-    """Idempotent on the name: asking twice for the same category is not an error, and a
-    model that asks again after a restart should not have to know whether it asked before."""
+def _name_key(expr: str) -> str:
+    """The expression migration 0005's unique index is built on, which `ON CONFLICT` finds only by repeating it
+    exactly. `group_names.key` is its Python twin: whitespace runs collapsed, trimmed, lower-cased."""
+    return f"lower(btrim(regexp_replace({expr}, '[[:space:]]+', ' ', 'g')))"
+
+
+_GROUPS = """
+    SELECT g.id, g.name,
+           COALESCE(array_agg(e.id) FILTER (WHERE e.id IS NOT NULL), '{{}}') AS event_ids
+    FROM observation_groups g
+    LEFT JOIN tracked_events e ON e.group_id = g.id
+    {where}
+    GROUP BY g.id, g.name
+    ORDER BY g.name
+"""
+
+
+class GroupNameTaken(ValueError):
+    """Another group already answers to this name, spelled however — renaming onto it would make one category two
+    groups again. Merging is `delete_group(move_to=)`."""
+
+    def __init__(self, existing: Group) -> None:
+        super().__init__(f"a group named {existing.name!r} already exists")
+        self.existing = existing
+
+
+class NoSuchGroup(LookupError):
+    pass
+
+
+def _group(row: asyncpg.Record) -> Group:
+    return Group(id=row["id"], name=row["name"], event_ids=tuple(row["event_ids"]))
+
+
+async def create_group(conn: Conn, name: str) -> tuple[Group, bool]:
+    """The group of this name in any spelling, created when none answers to it; the flag says it was made now.
+    `xmax = 0` is PostgreSQL's own "inserted, not conflicted", read in the same statement rather than raced."""
     row = await fetch_one(
         conn,
-        """
+        f"""
         INSERT INTO observation_groups (name) VALUES ($1)
-        ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-        RETURNING id, name
+        ON CONFLICT (({_name_key('name')})) DO UPDATE SET name = observation_groups.name
+        RETURNING id, name, (xmax = 0) AS created
         """,
-        name,
+        group_names.clean(name),
     )
-    return Group(id=row["id"], name=row["name"])
+    return Group(id=row["id"], name=row["name"]), row["created"]
+
+
+async def find_group(conn: Conn, name: str) -> Group | None:
+    row = await conn.fetchrow(
+        _GROUPS.format(where=f"WHERE {_name_key('g.name')} = {_name_key('$1')}"), name
+    )
+    return None if row is None else _group(row)
 
 
 async def list_groups(conn: Conn) -> list[Group]:
-    rows = await conn.fetch(
-        """
-        SELECT g.id, g.name,
-               COALESCE(array_agg(e.id) FILTER (WHERE e.id IS NOT NULL), '{}') AS event_ids
-        FROM observation_groups g
-        LEFT JOIN tracked_events e ON e.group_id = g.id
-        GROUP BY g.id, g.name
-        ORDER BY g.name
-        """
-    )
-    return [
-        Group(id=row["id"], name=row["name"], event_ids=tuple(row["event_ids"])) for row in rows
-    ]
+    return [_group(row) for row in await conn.fetch(_GROUPS.format(where=""))]
 
 
-async def delete_group(conn: Conn, group_id: int) -> bool:
-    """The events keep their observation and every sample — `group_id` is `ON DELETE SET
-    NULL`, so they come back ungrouped rather than untracked."""
-    result = await conn.execute("DELETE FROM observation_groups WHERE id = $1", group_id)
-    return result.endswith(" 1")
+async def rename_group(conn: Conn, group_id: int, name: str) -> Group | None:
+    """`None` when there is no such group. Another spelling of its own name is allowed — the one way to correct
+    "crypto" to "Crypto"."""
+    cleaned = group_names.clean(name)
+    taken = await find_group(conn, cleaned)
+    if taken is not None and taken.id != group_id:
+        raise GroupNameTaken(taken)
+    try:
+        row = await conn.fetchrow(
+            "UPDATE observation_groups SET name = $2 WHERE id = $1 RETURNING id, name",
+            group_id,
+            cleaned,
+        )
+    except asyncpg.UniqueViolationError:
+        # A rename racing a create of the same name: the index decides, and the loser is told who won.
+        taken = await find_group(conn, cleaned)
+        if taken is None:
+            raise
+        raise GroupNameTaken(taken) from None
+    return None if row is None else Group(id=row["id"], name=row["name"])
+
+
+async def delete_group(conn: Conn, group_id: int, *, move_to: int | None = None) -> bool:
+    """The events keep their observation and every sample: `ON DELETE SET NULL` leaves them ungrouped, or they land
+    in `move_to` first. The row lock holds off a concurrent assignment, which would otherwise fall into the gap."""
+    if move_to == group_id:
+        raise ValueError("a group cannot take in its own events on the way out")
+    async with conn.transaction():
+        locked = await conn.fetchval(
+            "SELECT 1 FROM observation_groups WHERE id = $1 FOR UPDATE", group_id
+        )
+        if locked is None:
+            return False
+        if move_to is not None:
+            if await conn.fetchval("SELECT 1 FROM observation_groups WHERE id = $1", move_to) is None:
+                raise NoSuchGroup(move_to)
+            await conn.execute(
+                "UPDATE tracked_events SET group_id = $2 WHERE group_id = $1", group_id, move_to
+            )
+        await conn.execute("DELETE FROM observation_groups WHERE id = $1", group_id)
+    return True
 
 
 async def assign_group(conn: Conn, event_id: int, group_id: int | None) -> bool:
@@ -55,6 +122,12 @@ async def assign_group(conn: Conn, event_id: int, group_id: int | None) -> bool:
     )
     return result.endswith(" 1")
 
+
+async def tracked_event_ref(conn: Conn, provider_event_id: str) -> asyncpg.Record | None:
+    """An observation's id and title without its markets — one event holds up to 128 of them."""
+    return await conn.fetchrow(
+        "SELECT id, title FROM tracked_events WHERE provider_event_id = $1", provider_event_id
+    )
 
 
 async def upsert_event(

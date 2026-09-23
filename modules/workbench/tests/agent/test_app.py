@@ -14,12 +14,12 @@ pytestmark = pytest.mark.db
 _ENV = {
     "AGENT_OPENAI_API_KEY": "key",
     "AGENT_MODELS": (
-        '[{"id":"gpt-5.6-sol","model":"sol-prod","display_name":"Sol",'
+        '[{"id":"gpt-6-sol","model":"sol-prod","display_name":"Sol",'
         '"cost_rank":3,"input_rate_per_1m":"5","output_rate_per_1m":"30"},'
-        '{"id":"gpt-5.6-luna","model":"luna-prod","display_name":"Luna",'
+        '{"id":"gpt-6-luna","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
     ),
-    "AGENT_DEFAULT_MODEL_ID": "gpt-5.6-luna",
+    "AGENT_DEFAULT_MODEL_ID": "gpt-6-luna",
 }
 
 
@@ -60,7 +60,7 @@ def test_get_models_is_enough_to_build_a_wybierak() -> None:
         response = client.get("/models")
     assert response.status_code == 200
     body = response.json()
-    assert [m["id"] for m in body] == ["gpt-5.6-luna", "gpt-5.6-sol"]
+    assert [m["id"] for m in body] == ["gpt-6-luna", "gpt-6-sol"]
     assert body[0]["display_name"] == "Luna"
     assert body[0]["input_rate_per_1m"] == "1"
     assert "model" not in body[0]

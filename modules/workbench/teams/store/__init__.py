@@ -11,6 +11,7 @@ from .catalogue import (
     get_revision_by_id,
     get_team,
     list_teams,
+    move_revisions_to_successors,
     save_revision,
 )
 from .fires import (
@@ -123,6 +124,7 @@ __all__ = [
     "list_teams",
     "list_triggers_for_team",
     "mark_run_running",
+    "move_revisions_to_successors",
     "record_fire",
     "record_tool_call",
     "record_trade",

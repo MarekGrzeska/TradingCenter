@@ -3,6 +3,9 @@ on every read here, which makes a removed session answer like a missing one thro
 
 from __future__ import annotations
 
+import json
+from collections.abc import Mapping
+
 import asyncpg
 from tc_runtime.db import Conn, fetch_one
 
@@ -111,3 +114,17 @@ async def delete_session(conn: Conn, *, session_id: int, owner_principal: str) -
     stamped, not deleted: `usage` references it, and removing a rozmowa must not remove what it cost."""
     row = await conn.fetchrow(_SOFT_DELETE_SESSION, session_id, owner_principal)
     return row is not None
+
+
+async def move_sessions_to_successors(conn: Conn, successors: Mapping[str, str]) -> int:
+    """Sessions whose next reply names a retired model, moved to its successor. Past replies keep the model they
+    were written with — that is in `messages` and `usage`, and this does not touch them."""
+    if not successors:
+        return 0
+    result = await conn.execute(
+        "UPDATE sessions SET current_model_id = $1::jsonb->>current_model_id "
+        "WHERE current_model_id = ANY($2::text[])",
+        json.dumps(dict(successors)),
+        list(successors),
+    )
+    return int(result.split()[-1])

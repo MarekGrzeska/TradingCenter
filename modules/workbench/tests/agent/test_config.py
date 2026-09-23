@@ -10,7 +10,7 @@ from agent.config import Settings
 
 ONE_MODEL = [
     {
-        "id": "gpt-5.6-luna",
+        "id": "gpt-6-luna",
         "model": "luna-prod",
         "display_name": "Luna",
         "cost_rank": 1,
@@ -24,7 +24,7 @@ REQUIRED = {
     "database_user": "agent",
     "openai_api_key": "key",
     "models": ONE_MODEL,
-    "default_model_id": "gpt-5.6-luna",
+    "default_model_id": "gpt-6-luna",
 }
 
 
@@ -34,7 +34,7 @@ def settings(**overrides) -> Settings:
 
 
 def test_a_complete_configuration_names_its_default_model() -> None:
-    assert settings().default_model_id == "gpt-5.6-luna"
+    assert settings().default_model_id == "gpt-6-luna"
 
 
 
@@ -60,7 +60,7 @@ def test_the_api_key_is_stripped() -> None:
 
 def test_an_empty_catalogue_refuses_to_start() -> None:
     with pytest.raises(ValidationError) as err:
-        settings(models=[], default_model_id="gpt-5.6-luna")
+        settings(models=[], default_model_id="gpt-6-luna")
     assert "MODELS" in str(err.value)
 
 
@@ -72,7 +72,7 @@ def test_duplicate_model_ids_refuse_to_start() -> None:
 
 def test_default_model_outside_the_catalogue_refuses_to_start() -> None:
     with pytest.raises(ValidationError) as err:
-        settings(default_model_id="gpt-5.6-sol")
+        settings(default_model_id="gpt-6-sol")
     assert "DEFAULT_MODEL_ID" in str(err.value)
 
 

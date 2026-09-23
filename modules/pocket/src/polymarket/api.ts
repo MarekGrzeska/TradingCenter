@@ -112,9 +112,14 @@ function mapEvent(raw: Schemas["TrackedEventOut"]): TrackedEvent {
   };
 }
 
+function mapGroup(raw: Schemas["GroupOut"]): Group {
+  return { id: raw.id, name: raw.name, eventCount: raw.event_count };
+}
+
 /**
  * 403 is a refusal of the caller, not a sign-in problem: the gate authorizes an application. 409 is the
- * tracking ceiling, 502 the provider rather than the archive — the one status here worth retrying.
+ * tracking ceiling or a group name already taken, 502 the provider rather than the archive — the one
+ * status here worth retrying.
  */
 const STATUS_KINDS = {
   403: "refused",
@@ -134,6 +139,13 @@ export interface PolymarketApi {
   /** The observation and everything collected for it, in one act — **the only way an event leaves the
    *  list**. The archive also offers a history-only delete; this client does not, so nobody finds it. */
   removeEvent(providerEventId: string, signal: AbortSignal): Promise<void>;
+  /** Refused when another group already answers to the name, in any spelling — merging is
+   *  `deleteGroup` with `moveEventsTo`. */
+  renameGroup(groupId: number, name: string, signal: AbortSignal): Promise<Group>;
+  /** The events stay tracked with their history: ungrouped, or in `moveEventsTo` first. */
+  deleteGroup(groupId: number, signal: AbortSignal, moveEventsTo?: number): Promise<void>;
+  /** `null` takes the event out of every group without ending its observation. */
+  assignGroup(eventId: number, groupId: number | null, signal: AbortSignal): Promise<void>;
 }
 
 export function createPolymarketApi(
@@ -150,7 +162,7 @@ export function createPolymarketApi(
 
     async listGroups(signal) {
       const raw = await http.json<Schemas["GroupOut"][]>(`${base}/groups`, { signal });
-      return raw.map((group) => ({ id: group.id, name: group.name, eventCount: group.event_count }));
+      return raw.map(mapGroup);
     },
 
     async changes(providerEventId, signal) {
@@ -177,6 +189,26 @@ export function createPolymarketApi(
         body,
       });
       return { event: mapEvent(raw.event), alreadyTracked: raw.already_tracked };
+    },
+
+    async renameGroup(groupId, name, signal) {
+      const body: Schemas["GroupRequest"] = { name };
+      const raw = await http.json<Schemas["GroupOut"]>(`${base}/groups/${groupId}`, {
+        signal,
+        method: "PATCH",
+        body,
+      });
+      return mapGroup(raw);
+    },
+
+    async deleteGroup(groupId, signal, moveEventsTo) {
+      const query = moveEventsTo === undefined ? "" : `?move_events_to=${moveEventsTo}`;
+      await http.send(`${base}/groups/${groupId}${query}`, { signal, method: "DELETE" });
+    },
+
+    async assignGroup(eventId, groupId, signal) {
+      const body: Schemas["AssignRequest"] = { group_id: groupId };
+      await http.send(`${base}/events/${eventId}/group`, { signal, method: "PUT", body });
     },
 
     async removeEvent(providerEventId, signal) {

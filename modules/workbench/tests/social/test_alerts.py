@@ -180,7 +180,7 @@ class TestTheMessageSpeaksPolish:
         post = a_post(
             content="The United States is striking Iranian targets.",
             translated_content="Stany Zjednoczone atakują irańskie cele.",
-            translated_model="gpt-5.6-luna",
+            translated_model="gpt-6-luna",
             translated_at=datetime.now(UTC),
         )
 

@@ -28,7 +28,7 @@ ONE_CALL = Decimal("0.00022")
 
 
 def an_agent(key: str) -> AgentDefinition:
-    return AgentDefinition(key=key, role=key, prompt=f"be the {key}", model_id="gpt-5.6-luna")
+    return AgentDefinition(key=key, role=key, prompt=f"be the {key}", model_id="gpt-6-luna")
 
 
 async def _run(
@@ -141,7 +141,7 @@ async def test_a_price_change_does_not_move_what_earlier_rows_cost(pool: asyncpg
             conn,
             run_id=run_id,
             run_step_id=step_id,
-            model_id="gpt-5.6-luna",
+            model_id="gpt-6-luna",
             input_tokens=100,
             output_tokens=20,
             cached_tokens=None,

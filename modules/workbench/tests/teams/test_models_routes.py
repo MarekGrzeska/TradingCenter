@@ -17,8 +17,8 @@ from workbench.app import app
 
 pytestmark = pytest.mark.db
 
-CHEAP = "gpt-5.6-mini"
-DEAR = "gpt-5.6-luna"
+CHEAP = "gpt-6-mini"
+DEAR = "gpt-6-luna"
 
 # Two entries, and the dearer one first in the list — `cost_rank`, not list order, is
 # what the published catalogue is sorted by (specs/teams-models).

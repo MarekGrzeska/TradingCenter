@@ -14,7 +14,7 @@ async def _reply_with_usage(
     conn,
     *,
     owner: str = "op-1",
-    model_id: str = "gpt-5.6-luna",
+    model_id: str = "gpt-6-luna",
     input_tokens: int | None,
     output_tokens: int | None,
     input_rate: Decimal = Decimal(1),
@@ -46,18 +46,18 @@ async def _reply_with_usage(
 
 
 async def test_usage_by_model_sums_known_and_counts_unknown(db) -> None:
-    await _reply_with_usage(db, model_id="gpt-5.6-luna", input_tokens=1000, output_tokens=500)
-    await _reply_with_usage(db, model_id="gpt-5.6-luna", input_tokens=None, output_tokens=None)
-    await _reply_with_usage(db, model_id="gpt-5.6-sol", input_tokens=200, output_tokens=100)
+    await _reply_with_usage(db, model_id="gpt-6-luna", input_tokens=1000, output_tokens=500)
+    await _reply_with_usage(db, model_id="gpt-6-luna", input_tokens=None, output_tokens=None)
+    await _reply_with_usage(db, model_id="gpt-6-sol", input_tokens=200, output_tokens=100)
 
     by_model = {a.key: a for a in await store.usage_by_model(
         db, owner_principal="op-1", since=None, until=None
     )}
 
-    assert by_model["gpt-5.6-luna"].input_tokens == 1000
-    assert by_model["gpt-5.6-luna"].unknown_count == 1
-    assert by_model["gpt-5.6-sol"].input_tokens == 200
-    assert by_model["gpt-5.6-sol"].unknown_count == 0
+    assert by_model["gpt-6-luna"].input_tokens == 1000
+    assert by_model["gpt-6-luna"].unknown_count == 1
+    assert by_model["gpt-6-sol"].input_tokens == 200
+    assert by_model["gpt-6-sol"].unknown_count == 0
 
 
 async def test_usage_by_session_is_one_row_per_session(db) -> None:

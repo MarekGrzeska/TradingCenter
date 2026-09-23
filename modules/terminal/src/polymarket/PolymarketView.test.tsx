@@ -75,6 +75,7 @@ function fakeApi(overrides: Partial<PolymarketApi> = {}): PolymarketApi {
     removeEvent: async () => {},
     listGroups: async () => [] as Group[],
     createGroup: async () => ({ id: 1, name: "macro", eventCount: 0 }),
+    renameGroup: async () => ({ id: 1, name: "macro", eventCount: 0 }),
     deleteGroup: async () => {},
     assignGroup: async () => {},
   };
@@ -467,5 +468,48 @@ describe("the group filter", () => {
 
     const nav = await screen.findByRole("navigation");
     expect(within(nav).getByRole("button", { name: "all" })).toBeInTheDocument();
+  });
+
+  it("renames the selected group", async () => {
+    const renameGroup = vi.fn(async () => ({ id: 3, name: "Macro", eventCount: 1 }));
+    render(
+      <PolymarketView
+        api={fakeApi({
+          listGroups: async () => [{ id: 3, name: "macro", eventCount: 1 }],
+          renameGroup,
+        })}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: /macro \(1\)/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Rename/ }));
+    const field = screen.getByLabelText("New name");
+    await userEvent.clear(field);
+    await userEvent.type(field, "Macro");
+    await userEvent.click(screen.getByRole("button", { name: "Rename" }));
+
+    await waitFor(() => expect(renameGroup).toHaveBeenCalledWith(3, "Macro", expect.anything()));
+  });
+
+  it("merges a duplicate by deleting it into the group that stays", async () => {
+    const deleteGroup = vi.fn(async () => {});
+    render(
+      <PolymarketView
+        api={fakeApi({
+          listGroups: async () => [
+            { id: 3, name: "crypto", eventCount: 2 },
+            { id: 4, name: "Cryptocurrency", eventCount: 1 },
+          ],
+          deleteGroup,
+        })}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: /Cryptocurrency/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Delete/ }));
+    await userEvent.selectOptions(screen.getByLabelText("Move its events to"), "crypto");
+    await userEvent.click(screen.getByRole("button", { name: "Delete group" }));
+
+    await waitFor(() => expect(deleteGroup).toHaveBeenCalledWith(4, expect.anything(), 3));
   });
 });

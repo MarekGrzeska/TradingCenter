@@ -25,6 +25,11 @@
   gap: 0.5rem;
 }
 
+.headerActions {
+  display: flex;
+  gap: 0.5rem;
+}
+
 .heading {
   margin: 0;
   font-size: 1.15rem;

@@ -165,8 +165,8 @@ outside is the gateway, and that is the property that keeps the candle archive's
 answerable; hanging a second provider off it would cost exactly that.
 
 The two surfaces divide the same way the archive's do, and the division is sharper here
-because **three of the nine tools write**. What they write is the list of observations — the
-same thing an operator clicks — so the rule `market-data-tools` states outright ("the set
+because **five of the twelve tools write**. What they write is the list of observations and how
+it is grouped — the same thing an operator clicks — so the rule `market-data-tools` states outright ("the set
 only reads") is deliberately not inherited, and is named in the specification rather than
 left to be discovered in the code. The line that *is* hard sits elsewhere and is the one the
 caller record enforces: **no tool deletes collected history.** That is a REST route, and the

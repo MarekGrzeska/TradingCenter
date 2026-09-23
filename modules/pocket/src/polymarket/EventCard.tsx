@@ -19,11 +19,20 @@ export interface EventCardProps {
   /** This event's windows, or `null` while they are still being read. */
   changes: Map<number, OutcomeChanges> | null;
   onToggle: () => void;
+  onMove: () => void;
   onRemove: () => void;
   now: Date;
 }
 
-export function EventCard({ event, expanded, changes, onToggle, onRemove, now }: EventCardProps) {
+export function EventCard({
+  event,
+  expanded,
+  changes,
+  onToggle,
+  onMove,
+  onRemove,
+  now,
+}: EventCardProps) {
   const listId = useId();
   const headline = headlineMarket(event);
   const headlineOutcome = headline === undefined ? undefined : leadingOutcome(headline);
@@ -96,6 +105,9 @@ export function EventCard({ event, expanded, changes, onToggle, onRemove, now }:
             <a className={styles.link} href={event.url} target="_blank" rel="noreferrer noopener">
               Open on polymarket.com
             </a>
+            <button type="button" className={styles.move} onClick={onMove}>
+              Move to group
+            </button>
             <button type="button" className={styles.remove} onClick={onRemove}>
               Remove
             </button>

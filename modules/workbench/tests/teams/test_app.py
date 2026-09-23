@@ -16,7 +16,7 @@ pytestmark = pytest.mark.db
 _ENV = {
     "TEAMS_OPENAI_API_KEY": "key",
     "TEAMS_MODELS": (
-        '[{"id":"gpt-5.6-luna","model":"luna-prod","display_name":"Luna",'
+        '[{"id":"gpt-6-luna","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
     ),
 }

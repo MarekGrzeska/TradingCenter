@@ -1,7 +1,7 @@
 # polymarket-data
 
 The prediction-market archive. One door to Polymarket, one database, two surfaces in one
-process: the REST contract the terminal reads, and nine tools at `/mcp` the workbench
+process: the REST contract the terminal reads, and twelve tools at `/mcp` the workbench
 reads.
 
 A market's price for an outcome is a probability, and a probability over time is a series
@@ -12,7 +12,7 @@ workbench's work, done on this module's data.
 **A package of the workbench since `one-process-per-security-boundary`**, served whole under
 `/polymarket` of that process — its REST contract, its `/mcp`, its caller record — with its own
 database and its own migration chain (`alembic-polymarket.ini`, lock key 8070, the port it used to
-have). Its nine tools reach the conversation and the teams as functions, so there is no
+have). Its twelve tools reach the conversation and the teams as functions, so there is no
 `POLYMARKET_MCP_URL` anywhere; what is the archive's alone is read under `POLYMARKET_` in the
 workbench's `.env`.
 
@@ -38,19 +38,27 @@ sample collected for it, in one indivisible act on the REST contract. Stopping t
 and keeping the samples used to be a separate act; it produced a row that neither collected
 nor left the list, and it is gone with the state it made.
 
-## Eight tools, two of which write
+## Twelve tools, five of which write
 
-Six read: search the provider's public database live, browse by tag, list what is tracked,
-open one event, read an outcome's history, read its changes over a window. Two change the
-**list of observations** — track an event and create a group — and both of them only add to
-it.
+Seven read: search the provider's public database live, browse by tag, list what is tracked,
+open one event, read an outcome's history, read its changes over a window, list the groups.
+Five change the **list of observations** or how it is grouped — track an event, and create,
+rename, move an event into and delete a group. A group holds no data: deleting one leaves its
+events observed, ungrouped or moved into another group first, which is how two spellings of
+one category become one.
+
+**One category, one name.** Models left alone made "Crypto", "crypto" and "Cryptocurrency".
+The database now treats case and spacing as no part of a name (migration 0005 merged what was
+already there), and the tools go further: a new name that merely *reads like* an existing one
+(`group_names.similar`) is refused with the lookalikes, unless the model confirms it means a
+different category. `track_event` asks the same question before filing under a new group.
 
 That is a deliberate departure from `market-data`, whose specification says outright that
 its tool set only reads, and it is named here rather than smuggled into the code. The rule
 there is about the candle archive: a tool that wrote would be a tool that mutated it. Here
 the writing tools change the same list an operator clicks in the terminal, and the hard
 line is drawn somewhere else instead — **no tool deletes collected history**, and none of
-the eight touches money, because this system trades nothing on Polymarket. Since the only
+the twelve touches money, because this system trades nothing on Polymarket. Since the only
 way off the observation list takes that history with it, a tool for it would be a tool that
 deletes history; that is why `untrack_event` is not here any more.
 

@@ -13,7 +13,7 @@ from teams.runner import AgentFailed, compile_team
 
 
 def an_agent(key: str) -> AgentDefinition:
-    return AgentDefinition(key=key, role=key, prompt=f"be the {key}", model_id="gpt-5.6-luna")
+    return AgentDefinition(key=key, role=key, prompt=f"be the {key}", model_id="gpt-6-luna")
 
 
 def a_team(keys: list[str], edges: list[tuple[str, str]]) -> TeamDefinition:

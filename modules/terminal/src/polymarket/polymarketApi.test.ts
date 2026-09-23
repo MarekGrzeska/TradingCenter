@@ -357,6 +357,28 @@ describe("groups", () => {
     await expect(api().assignGroup(1, null, signal())).resolves.toBeUndefined();
   });
 
+  it("renames with PATCH and merges by naming where the events go", async () => {
+    let renamed: unknown;
+    let deleted = "";
+    server.use(
+      http.patch(`${HTTP_BASE}/groups/3`, async ({ request }) => {
+        renamed = await request.json();
+        return HttpResponse.json({ id: 3, name: "Crypto", event_count: 2 });
+      }),
+      http.delete(`${HTTP_BASE}/groups/4`, ({ request }) => {
+        deleted = new URL(request.url).search;
+        return new Response(null, { status: 204 });
+      }),
+    );
+
+    const group = await api().renameGroup(3, "Crypto", signal());
+    await api().deleteGroup(4, signal(), 3);
+
+    expect(renamed).toEqual({ name: "Crypto" });
+    expect(group).toEqual({ id: 3, name: "Crypto", eventCount: 2 });
+    expect(deleted).toBe("?move_events_to=3");
+  });
+
   it("sends a null group id to take an event out of every group", async () => {
     let body: unknown;
     server.use(

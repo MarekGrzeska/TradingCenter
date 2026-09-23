@@ -15,8 +15,8 @@ from .waiting import wait_for_status
 
 pytestmark = pytest.mark.db
 
-MODEL_ID = "gpt-5.6-luna"
-DEAR_MODEL_ID = "gpt-5.6-sol"
+MODEL_ID = "gpt-6-luna"
+DEAR_MODEL_ID = "gpt-6-sol"
 
 _ENV = {
     "TEAMS_OPENAI_API_KEY": "key",

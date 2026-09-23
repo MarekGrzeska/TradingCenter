@@ -18,8 +18,8 @@ runs the other way too: a chart slot only offers instruments the archive already
 collects, because a chart of a pair nobody collects has nothing to draw.
 
 **The Polymarket tab is where prediction markets are watched**, and the only place in this
-system that can remove what was collected for one. Nine tools reach that module and three
-of them write, but what they write is the watch list — no tool deletes a sample. That makes
+system that can remove what was collected for one. Twelve tools reach that module and five
+of them write, but what they write is the watch list and its groups — no tool deletes a sample. That makes
 this tab the capability's only door, and the irreversibility is sharper than the archive's:
 Polymarket does not give back the history of a market that has resolved.
 

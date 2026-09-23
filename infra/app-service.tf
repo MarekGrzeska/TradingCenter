@@ -338,7 +338,7 @@ resource "azurerm_linux_web_app" "workbench" {
       ])
       # The cheapest entry — same choice `.env.example` documents: "Domyślny model to
       # najtańszy (Luna); najdroższy wybiera się świadomie."
-      AGENT_DEFAULT_MODEL_ID = "gpt-5.6-luna"
+      AGENT_DEFAULT_MODEL_ID = "gpt-6-luna"
 
       # No MARKET_MCP_URL: the candle archive is the fourth package of this process, served under `/market`, and its
       # eleven tools are a local source. Its database under its own name — the largest table this repository has,

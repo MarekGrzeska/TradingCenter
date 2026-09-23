@@ -14,7 +14,7 @@ pytestmark = pytest.mark.db
 
 
 async def _session(db, owner: str = "op-1"):
-    return await store.create_session(db, owner_principal=owner, model_id="gpt-5.6-luna")
+    return await store.create_session(db, owner_principal=owner, model_id="gpt-6-luna")
 
 
 async def test_sequence_rises_across_sessions(db) -> None:

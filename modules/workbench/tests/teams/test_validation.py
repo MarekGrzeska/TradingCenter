@@ -15,10 +15,10 @@ from teams.validation import (
     check_trigger_tool,
 )
 
-MODELS = ("gpt-5.6-luna", "gpt-5.6-mini")
+MODELS = ("gpt-6-luna", "gpt-6-mini")
 
 
-def _agent(key: str, *, model_id: str = "gpt-5.6-luna", tools: list[str] | None = None) -> AgentDefinition:
+def _agent(key: str, *, model_id: str = "gpt-6-luna", tools: list[str] | None = None) -> AgentDefinition:
     return AgentDefinition(
         key=key,
         role=f"the {key}",

@@ -198,9 +198,9 @@ def teams_migrated_url(teams_postgres_url: str) -> str:
 # The catalogue every test that starts the process needs one of. Two entries so a test can
 # assert on ordering, cheapest first.
 WORKBENCH_MODELS = (
-    '[{"id":"gpt-5.6-sol","model":"sol-prod","display_name":"Sol",'
+    '[{"id":"gpt-6-sol","model":"sol-prod","display_name":"Sol",'
     '"cost_rank":3,"input_rate_per_1m":"5","output_rate_per_1m":"30"},'
-    '{"id":"gpt-5.6-luna","model":"luna-prod","display_name":"Luna",'
+    '{"id":"gpt-6-luna","model":"luna-prod","display_name":"Luna",'
     '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
 )
 
@@ -235,4 +235,5 @@ def workbench_env(
     monkeypatch.setenv("TEAMS_OPENAI_API_KEY", "another-key")
     monkeypatch.setenv("AGENT_MODELS", WORKBENCH_MODELS)
     monkeypatch.setenv("TEAMS_MODELS", WORKBENCH_MODELS)
-    monkeypatch.setenv("AGENT_DEFAULT_MODEL_ID", "gpt-5.6-luna")
+    monkeypatch.setenv("AGENT_DEFAULT_MODEL_ID", "gpt-6-luna")
+

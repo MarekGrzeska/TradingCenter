@@ -24,7 +24,7 @@ from .scripted_provider import ScriptedProvider, asks_for_tool, breaks, says
 pytestmark = pytest.mark.db
 
 OWNER = "operator-1"
-MODEL_ID = "gpt-5.6-luna"
+MODEL_ID = "gpt-6-luna"
 
 CRON = "*/5 * * * *"
 

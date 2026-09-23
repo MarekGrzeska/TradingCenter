@@ -19,7 +19,7 @@ from ..mcp_stand_in import serving_app as _serving
 
 ONE_MODEL = [
     {
-        "id": "gpt-5.6-luna",
+        "id": "gpt-6-luna",
         "model": "luna-prod",
         "display_name": "Luna",
         "cost_rank": 1,
@@ -34,7 +34,7 @@ def settings_for(url: str | None, **overrides) -> Settings:
         database_url="postgresql://localhost:5432/agent",
         openai_api_key="key",
         models=ONE_MODEL,
-        default_model_id="gpt-5.6-luna",
+        default_model_id="gpt-6-luna",
         telegram_mcp_url=url,
         _env_file=None,  # type: ignore[call-arg]
         **overrides,

@@ -170,7 +170,8 @@ export interface paths {
         put?: never;
         /**
          * Create Group
-         * @description Idempotent on the name: asking twice for the same category is not an error.
+         * @description Idempotent on the name in any case or spacing: asking twice for the same category answers the one that
+         *     exists, and "Crypto" is the group "crypto" already is.
          */
         post: operations["create_group_groups_post"];
         delete?: never;
@@ -191,12 +192,17 @@ export interface paths {
         post?: never;
         /**
          * Delete Group
-         * @description The events keep their observation and every sample — they come back ungrouped.
+         * @description The events keep their observation and every sample — they come back ungrouped, or in `move_events_to`.
          */
         delete: operations["delete_group_groups__group_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Rename Group
+         * @description 409 when another group already answers to the name: two groups of one name is the duplicate this
+         *     contract refuses. Merging them is deleting one with `move_events_to` the other.
+         */
+        patch: operations["rename_group_groups__group_id__patch"];
         trace?: never;
     };
     "/health": {
@@ -966,7 +972,10 @@ export interface operations {
     };
     delete_group_groups__group_id__delete: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description a group to move this one's events into first; absent, they come back ungrouped */
+                move_events_to?: number | null;
+            };
             header?: never;
             path: {
                 group_id: number;
@@ -984,6 +993,59 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    rename_group_groups__group_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                group_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GroupRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GroupOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

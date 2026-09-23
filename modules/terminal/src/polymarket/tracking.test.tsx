@@ -56,6 +56,7 @@ function fakeApi(overrides: Partial<PolymarketApi> = {}): PolymarketApi {
     removeEvent: async () => {},
     listGroups: async () => [MACRO],
     createGroup: async () => ({ id: 9, name: "elections", eventCount: 0 }),
+    renameGroup: async () => ({ id: 9, name: "elections", eventCount: 0 }),
     deleteGroup: async () => {},
     assignGroup: async () => {},
   };

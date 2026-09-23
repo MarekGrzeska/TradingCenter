@@ -88,16 +88,18 @@ async def track_event(request: Request, body: TrackRequest) -> TrackResult:
         ) from err
 
     async with deps.connection(request.app.state.pool) as conn:
-        group_id = None
-        if body.group:
-            group_id = (await store.create_group(conn, body.group)).id
         try:
-            event_id, already = await tracking.track(
-                conn,
-                event,
-                max_tracked_events=settings.max_tracked_events,
-                group_id=group_id,
-            )
+            # One transaction, so a refusal at the ceiling leaves no empty group behind.
+            async with conn.transaction():
+                group_id = None
+                if body.group and body.group.strip():
+                    group_id = (await store.create_group(conn, body.group))[0].id
+                event_id, already = await tracking.track(
+                    conn,
+                    event,
+                    max_tracked_events=settings.max_tracked_events,
+                    group_id=group_id,
+                )
         except tracking.LimitReached as err:
             raise HTTPException(status.HTTP_409_CONFLICT, detail=str(err)) from err
 

@@ -34,6 +34,7 @@ import polymarket_data.app
 import social_data.app
 import strategy.app
 import teams.surface
+from agent import store as agent_store
 from agent.models_catalogue import ModelCatalogue as AgentCatalogue
 from agent.provider import OpenAIProvider as AgentProvider
 from agent.runtime import MIGRATION_LOCK_KEY as AGENT_LOCK_KEY
@@ -48,6 +49,7 @@ from teams.runtime import MIGRATIONS as TEAMS_MIGRATIONS
 from teams.scheduler import Clock
 from teams.tools import ToolServerRegistry as TeamsToolServerRegistry
 
+from . import model_successors
 from .archive_client import archive_client
 from .assembly import mount_package
 from .config import Settings
@@ -164,20 +166,38 @@ async def lifespan(app: FastAPI):
                     orphans,
                 )
 
+            # Built once, from settings already refused if a model carried no rate or a duplicate id, so nothing
+            # downstream re-checks either.
+            agent_catalogue = AgentCatalogue.from_settings(conversation_settings)
+            teams_catalogue = TeamsCatalogue.from_settings(teams_settings)
+            async with conversation_pool.acquire() as conn:
+                moved_sessions = await agent_store.move_sessions_to_successors(
+                    conn,
+                    model_successors.applicable({entry.id for entry in agent_catalogue.entries()}),
+                )
+            async with teams_pool.acquire() as conn:
+                moved_revisions = await teams_store.move_revisions_to_successors(
+                    conn, model_successors.applicable(teams_catalogue.ids())
+                )
+            if moved_sessions or moved_revisions:
+                log.warning(
+                    "moved %d session(s) and %d team revision(s) off retired models to their successors",
+                    moved_sessions,
+                    moved_revisions,
+                )
+
             app.state.settings = settings
             app.state.agent = agent.surface.State(
                 settings=conversation_settings,
                 pool=conversation_pool,
-                catalogue=AgentCatalogue.from_settings(conversation_settings),
+                catalogue=agent_catalogue,
                 provider=AgentProvider(conversation_settings),
                 tool_server=conversation_tools,
             )
             app.state.teams = teams.surface.State(
                 settings=teams_settings,
                 pool=teams_pool,
-                # Built once, from settings already refused if a model carried no rate or a duplicate id, so nothing
-                # downstream re-checks either.
-                catalogue=TeamsCatalogue.from_settings(teams_settings),
+                catalogue=teams_catalogue,
                 provider=TeamsProvider(teams_settings),
                 tools=teams_tool_servers,
                 runs=RunRegistry(),

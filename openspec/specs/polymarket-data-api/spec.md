@@ -4,11 +4,16 @@
 Kontrakt REST, którym terminal rozmawia z modułem: co jest obserwowane, jak to zmienić, jakie są
 ceny, jak wyglądała historia i jak zmieniła się w oknach — oraz to, że kasowanie danych jest tutaj.
 ## Requirements
-
 ### Requirement: Grupy są zarządzalne przez kontrakt
 
-Kontrakt MUST pozwalać utworzyć grupę, odczytać grupy, przypisać do grupy wydarzenie i grupę
-skasować. Skasowanie grupy MUST NOT kasować obserwacji ani danych.
+Kontrakt MUST pozwalać utworzyć grupę, odczytać grupy, przemianować grupę, przypisać do grupy
+wydarzenie i grupę skasować. Skasowanie grupy MUST NOT kasować obserwacji ani danych; MAY
+najpierw przenieść jej wydarzenia do wskazanej innej grupy, i to jednym aktem — tak dwie grupy
+jednej kategorii stają się jedną.
+
+Nazwa grupy MUST być jedna niezależnie od wielkości liter i białych znaków. Utworzenie grupy nazwą
+istniejącej w innej pisowni MUST zwrócić istniejącą; przemianowanie na nazwę, którą nosi inna
+grupa, MUST być odmową wskazującą tamtą grupę.
 
 #### Scenario: Utworzenie grupy i przypisanie
 
@@ -19,6 +24,18 @@ skasować. Skasowanie grupy MUST NOT kasować obserwacji ani danych.
 
 - **WHEN** operator kasuje grupę, do której przypisane są wydarzenia
 - **THEN** wydarzenia pozostają obserwowane, bez grupy
+
+#### Scenario: Scalenie dwóch grup
+
+- **WHEN** operator kasuje grupę, wskazując inną jako miejsce dla jej wydarzeń
+- **THEN** wydarzenia pozostają obserwowane w grupie wskazanej
+- **AND** skasowana grupa znika z odczytu grup
+
+#### Scenario: Przemianowanie na zajętą nazwę
+
+- **WHEN** operator przemianowuje grupę na nazwę, którą w dowolnej pisowni nosi inna grupa
+- **THEN** kontrakt odmawia, wskazując tamtą grupę
+- **AND** żadna grupa nie zmienia nazwy
 
 ### Requirement: Ceny obserwowanych rynków są odczytywalne migawką i historią
 
@@ -159,3 +176,4 @@ jedynym producentem było żądanie istniejące po to, żeby je wytwarzać.
 
 - **WHEN** operator usuwa obserwację wydarzenia, którego moduł nie obserwuje
 - **THEN** odpowiedź nazywa to wprost, zamiast zgłaszać awarię
+

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PolymarketScreen } from "./PolymarketScreen";
 import type { PolymarketApi } from "./api";
@@ -13,6 +13,9 @@ function anApi(overrides: Partial<PolymarketApi> = {}): PolymarketApi {
     changes: vi.fn(async () => []),
     trackEvent: vi.fn(async () => ({ event: anEvent(), alreadyTracked: false })),
     removeEvent: vi.fn(async () => {}),
+    renameGroup: vi.fn(async (id: number, name: string) => ({ id, name, eventCount: 0 })),
+    deleteGroup: vi.fn(async () => {}),
+    assignGroup: vi.fn(async () => {}),
     ...overrides,
   };
 }
@@ -75,6 +78,62 @@ describe("the observation screen", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("already observing 40 events");
     // Still open, and still holding what was typed: a refusal the operator can act on is not a
     // reason to make them start again.
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+});
+
+describe("tidying groups", () => {
+  const GROUPS = [
+    { id: 3, name: "Crypto", eventCount: 2 },
+    { id: 4, name: "crypto currency", eventCount: 1 },
+  ];
+
+  it("moves an event into another group", async () => {
+    const api = anApi({ listGroups: vi.fn(async () => GROUPS) });
+
+    render(<PolymarketScreen api={api} />);
+    await userEvent.click(await screen.findByRole("button", { name: /will it happen/i }));
+    await userEvent.click(screen.getByRole("button", { name: "Move to group" }));
+    await userEvent.selectOptions(screen.getByLabelText("Group"), "Crypto");
+    await userEvent.click(screen.getByRole("button", { name: "Move" }));
+
+    expect(api.assignGroup).toHaveBeenCalledWith(100, 3, expect.anything());
+    expect(await screen.findByRole("status")).toHaveTextContent("is in “Crypto” now");
+  });
+
+  it("merges a duplicate by deleting it into the group that stays", async () => {
+    const api = anApi({ listGroups: vi.fn(async () => GROUPS) });
+
+    render(<PolymarketScreen api={api} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Groups" }));
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: /crypto currency/ }),
+    );
+    await userEvent.selectOptions(screen.getByLabelText("Move its events to"), "Crypto");
+    await userEvent.click(screen.getByRole("button", { name: "Delete group" }));
+
+    expect(api.deleteGroup).toHaveBeenCalledWith(4, expect.anything(), 3);
+  });
+
+  it("keeps the sheet open with the archive's reason when a rename is refused", async () => {
+    const api = anApi({
+      listGroups: vi.fn(async () => GROUPS),
+      renameGroup: vi.fn(async () => {
+        throw new ArchiveError("refused", "a group named 'Crypto' already exists");
+      }),
+    });
+
+    render(<PolymarketScreen api={api} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Groups" }));
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: /crypto currency/ }),
+    );
+    const field = screen.getByLabelText("Name");
+    await userEvent.clear(field);
+    await userEvent.type(field, "crypto");
+    await userEvent.click(screen.getByRole("button", { name: "Rename" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("already exists");
     expect(screen.getByRole("dialog")).toBeInTheDocument();
   });
 });

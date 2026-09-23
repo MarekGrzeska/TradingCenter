@@ -22,7 +22,7 @@ def an_agent(**overrides) -> AgentDefinition:
         "key": "reader",
         "role": "reader",
         "prompt": "read the market",
-        "model_id": "gpt-5.6-luna",
+        "model_id": "gpt-6-luna",
         "tools": [],
     }
     return AgentDefinition(**{**fields, **overrides})

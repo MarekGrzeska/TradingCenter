@@ -1,5 +1,5 @@
-"""What the tool surface announces, what it costs to announce it, and the boundary that makes three
-writing tools acceptable in a module whose neighbour publishes none."""
+"""What the tool surface announces, what it costs to announce it, and the boundary that makes its writing
+tools acceptable in a module whose neighbour publishes none."""
 
 from __future__ import annotations
 
@@ -23,17 +23,25 @@ READ_TOOLS = {
     "get_event",
     "get_price_history",
     "get_price_changes",
+    "list_groups",
 }
 
-# The two that change the list of observations — and the whole list of what this surface may change.
-# `untrack_event` went when the only way off the list started taking the collected history with it.
-OBSERVATION_TOOLS = {"track_event", "create_group"}
+# The ones that change the list of observations or its grouping — and the whole list of what this surface
+# may change. `untrack_event` went when the only way off the list started taking the collected history with it.
+OBSERVATION_TOOLS = {
+    "track_event",
+    "create_group",
+    "rename_group",
+    "move_event_to_group",
+    "delete_group",
+}
 
 EXPECTED_TOOLS = READ_TOOLS | OBSERVATION_TOOLS
 
 # Characters of the serialized `list_tools()`, read by a client before every turn — and this is the third
-# such surface in the system. Measured 13 811 on 22 August 2026 for nine tools; the headroom is 12%.
-SURFACE_CEILING_CHARS = 15_500
+# such surface in the system. Measured 13 811 on 22 August 2026 for eight tools, and 16 266 on 23 September
+# 2026 once the four group tools joined — raised on purpose then, to the same 12% of headroom.
+SURFACE_CEILING_CHARS = 18_250
 
 
 async def test_the_expected_tools_and_no_others(tool_server) -> None:
@@ -41,11 +49,11 @@ async def test_the_expected_tools_and_no_others(tool_server) -> None:
     assert {tool.name for tool in tools} == EXPECTED_TOOLS
 
 
-async def test_only_the_two_observation_tools_are_declared_as_changing_anything(
+async def test_only_the_observation_tools_are_declared_as_changing_anything(
     tool_server,
 ) -> None:
     """The annotation is a structural claim an MCP client can act on, so it has to be exact. This module
-    departs from `market-data` in one direction only: the observation list, and both tools *add*."""
+    departs from `market-data` in one direction only: the observation list and how it is grouped."""
     tools = await tool_server.list_tools()
     writing = {
         tool.name
@@ -55,11 +63,15 @@ async def test_only_the_two_observation_tools_are_declared_as_changing_anything(
     assert writing == OBSERVATION_TOOLS
 
 
-async def test_nothing_on_this_surface_is_declared_destructive(tool_server) -> None:
-    """Exact rather than optimistic: starting an observation adds, ending one keeps every sample, and
-    creating a group is idempotent. The one operation that loses data is not on this surface."""
-    for tool in await tool_server.list_tools():
-        assert tool.annotations is None or tool.annotations.destructiveHint is False
+async def test_only_deleting_a_group_is_declared_destructive(tool_server) -> None:
+    """Exact rather than optimistic: a deleted group is gone for good, though every event in it stays
+    observed. The one operation that loses collected data is not on this surface at all."""
+    destructive = {
+        tool.name
+        for tool in await tool_server.list_tools()
+        if tool.annotations is not None and tool.annotations.destructiveHint is not False
+    }
+    assert destructive == {"delete_group"}
 
 
 async def test_no_tool_can_remove_a_single_collected_price(tool_server, pool) -> None:
@@ -92,8 +104,12 @@ async def test_no_tool_can_remove_a_single_collected_price(tool_server, pool) ->
         "get_event": {"event_id": "e-1"},
         "get_price_history": {"outcome_id": outcomes[0][0]},
         "get_price_changes": {"event_id": "e-1"},
-        "track_event": {"reference": "an-event"},
-        "create_group": {"name": "anything"},
+        "track_event": {"reference": "an-event", "group": "anything"},
+        "list_groups": {},
+        "create_group": {"name": "other", "confirm_new": True},
+        "rename_group": {"group": "other", "new_name": "renamed"},
+        "move_event_to_group": {"event_id": "e-1", "group": "renamed"},
+        "delete_group": {"group": "renamed", "move_events_to": "anything"},
     }
     assert set(calls) == EXPECTED_TOOLS, "every published tool has to be exercised here"
     for name, arguments in calls.items():

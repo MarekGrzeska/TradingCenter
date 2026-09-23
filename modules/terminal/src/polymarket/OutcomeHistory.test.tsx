@@ -56,6 +56,7 @@ function fakeApi(read: PolymarketApi["history"]): PolymarketApi {
     removeEvent: async () => {},
     listGroups: async () => [],
     createGroup: async () => ({ id: 1, name: "g", eventCount: 0 }),
+    renameGroup: async () => ({ id: 1, name: "g", eventCount: 0 }),
     deleteGroup: async () => {},
     assignGroup: async () => {},
   };

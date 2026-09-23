@@ -67,7 +67,7 @@ describe("AgentCostView", () => {
         summaryFixture({
           totalCost: "3.4500",
           byModel: [
-            { key: "gpt-5.6-luna", inputTokens: 12_345, outputTokens: 6_789, cost: "1.2300", unknownCount: 0 },
+            { key: "gpt-6-luna", inputTokens: 12_345, outputTokens: 6_789, cost: "1.2300", unknownCount: 0 },
           ],
           bySession: [],
           byDay: [
@@ -78,7 +78,7 @@ describe("AgentCostView", () => {
     render(<AgentCostView api={api} />);
 
     await screen.findByText("$3.4500");
-    expect(screen.getByText("gpt-5.6-luna")).toBeInTheDocument();
+    expect(screen.getByText("gpt-6-luna")).toBeInTheDocument();
     expect(screen.getByText("12,345")).toBeInTheDocument();
     expect(screen.getByText("6,789")).toBeInTheDocument();
     // Cost is rendered as the module's own string with a `$` prefix — nothing here

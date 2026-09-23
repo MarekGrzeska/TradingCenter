@@ -256,7 +256,10 @@ export interface PolymarketApi {
   removeEvent(providerEventId: string, signal: AbortSignal): Promise<void>;
   listGroups(signal: AbortSignal): Promise<Group[]>;
   createGroup(name: string, signal: AbortSignal): Promise<Group>;
-  deleteGroup(groupId: number, signal: AbortSignal): Promise<void>;
+  /** Refused (409) when another group already answers to the name — merging is `deleteGroup` with `moveEventsTo`. */
+  renameGroup(groupId: number, name: string, signal: AbortSignal): Promise<Group>;
+  /** The events stay tracked: they come back ungrouped, or land in `moveEventsTo` first. */
+  deleteGroup(groupId: number, signal: AbortSignal, moveEventsTo?: number): Promise<void>;
   /** `null` takes the event out of every group without ending its observation. */
   assignGroup(eventId: number, groupId: number | null, signal: AbortSignal): Promise<void>;
 }
@@ -350,10 +353,21 @@ export function createPolymarketApi(
       return mapGroup(raw);
     },
 
+    async renameGroup(groupId, name, signal) {
+      const body: Schemas["GroupRequest"] = { name };
+      const raw = await http.json<Schemas["GroupOut"]>(`${httpBase}/groups/${groupId}`, {
+        signal,
+        method: "PATCH",
+        body,
+      });
+      return mapGroup(raw);
+    },
+
     // `send`, not `json`: both answer 204 with no body, and `Response.json()` on an empty body throws a
     // SyntaxError that would surface as a broken screen rather than as the success it is.
-    async deleteGroup(groupId, signal) {
-      await http.send(`${httpBase}/groups/${groupId}`, { signal, method: "DELETE" });
+    async deleteGroup(groupId, signal, moveEventsTo) {
+      const query = moveEventsTo === undefined ? "" : `?move_events_to=${moveEventsTo}`;
+      await http.send(`${httpBase}/groups/${groupId}${query}`, { signal, method: "DELETE" });
     },
 
     async assignGroup(eventId, groupId, signal) {
