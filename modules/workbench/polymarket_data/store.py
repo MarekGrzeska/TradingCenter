@@ -136,8 +136,9 @@ async def upsert_event(
     """The event with its whole structure, in one transaction — all of it or none. Markets and outcomes
     are upserted rather than replaced: replacing them would cascade away the history being refreshed.
 
-    Three statements whatever the event's size, not one per row. A measured event of 128 markets took 385
-    round trips a minute here, each holding the pooled connection a read was queued behind.
+    Four statements whatever the event's size, not one per row. A measured event of 128 markets took 385
+    round trips a minute here, each holding the pooled connection a read was queued behind. A row the
+    provider did not change is not rewritten: every minute it was ≈355 updates, each a dead tuple.
     """
     async with conn.transaction():
         row = await fetch_one(
@@ -164,7 +165,7 @@ async def upsert_event(
         # Last of each duplicate wins, and the order the provider sent them is kept. Two rows with one
         # conflict target in a single statement is an error, not a last-write-wins, so this is required.
         markets = list({market.provider_market_id: market for market in event.markets}.values())
-        market_rows = await conn.fetch(
+        await conn.execute(
             """
             INSERT INTO markets (
                 event_id, provider_market_id, condition_id, question,
@@ -187,7 +188,13 @@ async def upsert_event(
                 closed = EXCLUDED.closed,
                 resolved_outcome = EXCLUDED.resolved_outcome,
                 updated_at = now()
-            RETURNING id, provider_market_id
+            WHERE (
+                markets.event_id, markets.condition_id, markets.question, markets.group_item_title,
+                markets.neg_risk, markets.closed, markets.resolved_outcome
+            ) IS DISTINCT FROM (
+                EXCLUDED.event_id, EXCLUDED.condition_id, EXCLUDED.question, EXCLUDED.group_item_title,
+                EXCLUDED.neg_risk, EXCLUDED.closed, EXCLUDED.resolved_outcome
+            )
             """,
             event_id,
             [market.provider_market_id for market in markets],
@@ -197,6 +204,11 @@ async def upsert_event(
             [market.neg_risk for market in markets],
             [market.closed for market in markets],
             [market.resolved_outcome for market in markets],
+        )
+        # Read back rather than `RETURNING`: a row the `WHERE` above left alone returns nothing.
+        market_rows = await conn.fetch(
+            "SELECT id, provider_market_id FROM markets WHERE provider_market_id = ANY($1::text[])",
+            [market.provider_market_id for market in markets],
         )
         market_ids = {row["provider_market_id"]: row["id"] for row in market_rows}
 
@@ -215,6 +227,8 @@ async def upsert_event(
                 market_id = EXCLUDED.market_id,
                 position = EXCLUDED.position,
                 name = EXCLUDED.name
+            WHERE (outcomes.market_id, outcomes.position, outcomes.name)
+                IS DISTINCT FROM (EXCLUDED.market_id, EXCLUDED.position, EXCLUDED.name)
             """,
             [market_id for market_id, _ in outcomes.values()],
             [outcome.position for _, outcome in outcomes.values()],

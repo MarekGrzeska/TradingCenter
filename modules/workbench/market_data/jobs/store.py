@@ -60,13 +60,23 @@ _SELECT_CHUNKS_FOR_JOB = """
 
 # Every job with at least one chunk on the requested pair, or every job when neither filter is
 # given. Newest first, matching how an operator reads a list.
-_SELECT_MATCHING_JOB_IDS = """
-    SELECT DISTINCT j.id, j.created_at
+_SELECT_MATCHING_JOBS = """
+    SELECT j.id, j.created_at, j.requested_from, j.attempt
       FROM collection_jobs j
-      JOIN collection_job_chunks c ON c.job_id = j.id
-     WHERE ($1::text IS NULL OR c.symbol = $1)
-       AND ($2::text IS NULL OR c.resolution = $2)
-     ORDER BY j.created_at DESC
+     WHERE EXISTS (
+           SELECT 1 FROM collection_job_chunks c
+            WHERE c.job_id = j.id
+              AND ($1::text IS NULL OR c.symbol = $1)
+              AND ($2::text IS NULL OR c.resolution = $2))
+     ORDER BY j.created_at DESC, j.id DESC
+"""
+
+_SELECT_CHUNKS_FOR_JOBS = """
+    SELECT id, job_id, symbol, resolution, chunk_start, chunk_end, state, attempt,
+           candles_written, requests, failure, started_at, finished_at
+      FROM collection_job_chunks
+     WHERE job_id = ANY($1::bigint[])
+     ORDER BY id
 """
 
 _CLAIM_PENDING_CHUNK = """
@@ -230,14 +240,21 @@ async def list_jobs(
 ) -> list[JobPairView]:
     """Every job, narrowed to one row per pair it touched, newest first. A filtered-in job's row still
     carries only that pair's chunks; `read_job` is what shows a job whole."""
-    ids = await conn.fetch(
-        _SELECT_MATCHING_JOB_IDS, symbol, resolution.value if resolution else None
-    )
+    # Two statements whatever the history holds: one read per job, every 10 s the history tab is open,
+    # grew with every job ever run.
+    rows = await conn.fetch(_SELECT_MATCHING_JOBS, symbol, resolution.value if resolution else None)
+    chunks: dict[int, list[Chunk]] = {row["id"]: [] for row in rows}
+    for chunk_row in await conn.fetch(_SELECT_CHUNKS_FOR_JOBS, list(chunks)):
+        chunks[chunk_row["job_id"]].append(_chunk(chunk_row))
     views: list[JobPairView] = []
-    for row in ids:
-        job = await read_job(conn, row["id"])
-        if job is None:
-            continue
+    for row in rows:
+        job = Job(
+            id=row["id"],
+            created_at=row["created_at"],
+            requested_from=row["requested_from"],
+            attempt=row["attempt"],
+            chunks=chunks[row["id"]],
+        )
         for view in narrow_to_pairs(job):
             if symbol is not None and view.symbol != symbol:
                 continue

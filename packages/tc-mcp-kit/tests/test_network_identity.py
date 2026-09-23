@@ -3,13 +3,12 @@ the three servers it used to be reached through."""
 
 from __future__ import annotations
 
-import inspect
 import logging
 
 from starlette.testclient import TestClient
-from starlette.types import Receive, Scope, Send
+from starlette.types import Message, Receive, Scope, Send
 
-from tc_mcp_kit.network_identity import RequireCallerIdentity
+from tc_mcp_kit.network_identity import PRINCIPAL_ID_HEADER, RequireCallerIdentity
 
 
 async def _reached(scope: Scope, receive: Receive, send: Send) -> None:
@@ -61,7 +60,25 @@ def test_refusal_is_logged_without_leaking_the_request_body(caplog) -> None:
     assert "secret-method" not in joined
 
 
-def test_the_wrapper_is_raw_asgi_not_a_buffering_middleware() -> None:
-    # BaseHTTPMiddleware buffers a response body in some Starlette versions, which
-    # would break the streaming transport (streamable-http) it wraps.
-    assert "BaseHTTPMiddleware" not in inspect.getsource(RequireCallerIdentity)
+async def test_a_streamed_chunk_reaches_the_client_before_the_next_is_sent() -> None:
+    """BaseHTTPMiddleware buffers a response body in some Starlette versions, which would break the
+    streaming transport (streamable-http) this wraps."""
+    delivered: list[Message] = []
+    seen_before_second: list[bytes] = []
+
+    async def streaming(scope: Scope, receive: Receive, send: Send) -> None:
+        await send({"type": "http.response.start", "status": 200, "headers": []})
+        await send({"type": "http.response.body", "body": b"first", "more_body": True})
+        seen_before_second.extend(message.get("body", b"") for message in delivered)
+        await send({"type": "http.response.body", "body": b"second"})
+
+    async def receive() -> Message:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    async def send(message: Message) -> None:
+        delivered.append(message)
+
+    scope = {"type": "http", "path": "/mcp", "headers": [(PRINCIPAL_ID_HEADER, b"principal-123")]}
+    await RequireCallerIdentity(streaming, require_authenticated_principal=True)(scope, receive, send)
+
+    assert b"first" in seen_before_second

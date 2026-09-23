@@ -35,7 +35,7 @@ class Settings(BaseSettings):
 
     # Four for *each* of this process's two pools, so this module's share of the server is eight: a
     # turn holds one connection while the model is answering, and the model is the slow part. Seven
-    # databases share one `B_Standard_B1ms` whose `max_connections` is 35 —
+    # databases share one `B_Standard_B1ms` whose `max_connections` is 50 —
     # `scripts/tests/test_pool_budget.py` counts this one twice and refuses a total above 30.
     database_pool_size: int = 4
 

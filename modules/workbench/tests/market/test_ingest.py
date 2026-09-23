@@ -731,6 +731,38 @@ async def test_quotes_and_status_do_not_become_candles(pool) -> None:
 
 
 @pytest.mark.db
+async def test_the_tracked_question_is_not_asked_per_message(pool) -> None:
+    """Asked after every candle update it was 97% of the server's transactions: the cost of this
+    question has to stay with the connection, not with the feed's rate."""
+    await _tracked(pool)
+    asked = 0
+
+    async def still_tracked() -> bool:
+        nonlocal asked
+        asked += 1
+        return asked == 1
+
+    updates = [
+        CandleUpdate(candle=minute_candle(0, source=CandleSource.STREAM, forming=True))
+        for _ in range(50)
+    ]
+    await PairIngest(
+        pool=pool,
+        history=FakeHistory([]),
+        stream_url="ws://gateway.test/ws/stream",
+        symbol="US100",
+        resolution=Resolution.MINUTE,
+        default_bars=100,
+        still_tracked=still_tracked,
+        gateway_api_key="test-gateway-key",
+        subscribe_to=fake_feed(updates),
+        sleep=_no_sleep,
+    ).run()
+
+    assert asked == 2  # once before subscribing, once after the feed ended
+
+
+@pytest.mark.db
 async def test_a_dropped_feed_is_resumed_while_the_pair_is_tracked(pool) -> None:
     """7.2."""
     await _tracked(pool)

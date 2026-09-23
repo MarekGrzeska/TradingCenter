@@ -51,7 +51,7 @@ class Settings(BaseSettings):
 
     # Eight — the largest share, because this is the only module writing a row per closed candle
     # per pair while serving two surfaces. Seven databases share one `B_Standard_B1ms` whose
-    # `max_connections` is 35: `scripts/tests/test_pool_budget.py` refuses a total above 30.
+    # `max_connections` is 50: `scripts/tests/test_pool_budget.py` refuses a total above 30.
     database_pool_size: int = 8
 
     # One backfill at a time by default: a deep read is dozens of back-to-back requests through the

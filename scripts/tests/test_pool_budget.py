@@ -1,4 +1,4 @@
-"""Seven logical databases share one `B_Standard_B1ms` whose `max_connections` is 35, and every module
+"""Seven logical databases share one `B_Standard_B1ms` whose `max_connections` is 50, and every module
 sizes its own pool. That makes the numbers one budget nobody was adding up: before this test they came
 to 64 on paper, held together only by `min_size=1` and a quiet day.
 
@@ -17,9 +17,9 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent.parent
 APP_SERVICE = REPO_ROOT / "infra" / "app-service.tf"
 
 # The server's own ceiling, and what is left for everything that is not an application pool: the
-# operator's `psql`, a migration holding its own connection, the platform's own probes. A total at 35
-# is a total that fails on the first day two of them coincide.
-MAX_CONNECTIONS = 35
+# operator's `psql`, a migration holding its own connection, the platform's own probes. Measured on
+# production on 16 September 2026; this said 35 until then, and the budget did not move with it.
+MAX_CONNECTIONS = 50
 BUDGET = 30
 
 # module directory -> (config path, Terraform's resource name, how many pools that one setting sizes).

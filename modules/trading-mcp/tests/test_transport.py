@@ -3,7 +3,7 @@ sieciowy" — there is no `stdio` choice to make, unlike market-mcp's `__main__.
 
 from __future__ import annotations
 
-import inspect
+import sys
 
 import httpx
 import pytest
@@ -16,15 +16,19 @@ from trading_mcp.errors import GatewayUnavailable, NotDemoEnvironment
 BASE = "http://127.0.0.1:8010"
 
 
-def test_the_entrypoint_takes_no_transport_argument() -> None:
-    signature = inspect.signature(entrypoint.main)
-    assert not signature.parameters
+def test_asking_for_stdio_still_serves_over_the_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    served = False
 
+    async def _serve() -> None:
+        nonlocal served
+        served = True
 
-def test_the_entrypoint_never_runs_the_stdio_transport() -> None:
-    source = inspect.getsource(entrypoint)
-    assert "run_stdio_async" not in source
-    assert "argparse" not in source
+    monkeypatch.setattr(entrypoint, "_serve", _serve)
+    monkeypatch.setattr(sys, "argv", ["trading_mcp", "--transport", "stdio"])
+
+    entrypoint.main()
+
+    assert served
 
 
 @respx.mock

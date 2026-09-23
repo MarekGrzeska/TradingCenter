@@ -102,14 +102,19 @@ ledger, and narrows step 1 — `db`: agents A, B, C, F · `arch` or `dx`: D, E, 
    (`infra/database.tf`), plan SKU (`infra/app-service.tf`), pool sizes
    (`scripts/tests/test_pool_budget.py`). The server's real `max_connections` is 50 (measured
    16 September 2026); that test assumes 35.
-5. **Production signals**, if available — `references/db-load.md`, "Evidence". The report says
-   which tiers you had.
+5. **Production signals.** When `az account show` works, T3 is a minute's work — take it. Ask the
+   operator for T4 now, before the agents start: it costs ten minutes of wall time, runs in the
+   background while they read (`scripts/t4.sh`), and on 23 September 2026 it found in ten minutes
+   the statement seven agents missed. `references/db-load.md`, "Evidence"; the report says which
+   tiers you had.
 
 ### 1 · Fan out — seven agents in one message
 
-Launch them together with the Agent tool (`general-purpose`), each with the common part and its
-own brief from `references/agent-briefs.md`, plus: the `scan.json` path and its `area` keys, the
-previous ledger's open items for the area, and the big changes whose `areas` touch it.
+Launch them together with the Agent tool (`general-purpose`, `model: sonnet`), each with the common
+part and its own brief from `references/agent-briefs.md`, plus: the `scan.json` path and its `area`
+keys, the previous ledger's open items for the area, the big changes whose `areas` touch it, and
+the production numbers you already have. Seven agents on Opus exhausted the session limit within
+minutes on 23 September 2026; the verification in step 2 is where the stronger model earns its keep.
 
 | Agent | Area | `area` keys in scan.json |
 |---|---|---|
@@ -133,6 +138,8 @@ September review found three of its own claims false after acting on them. So:
 - open the cited lines of every `high` finding and of every claim of class C3 yourself;
 - for a database claim, find the index in the migration (`scan.json → hotspots.indexes`) and, if
   the dev database is up, `EXPLAIN` the statement;
+- for the tables T4 shows hottest, find every call site of every statement touching them — a cheap
+  check inside a per-message loop looks harmless from the statement alone;
 - drop or downgrade what does not hold. The ledger says `verified: true` only for what you checked.
 
 ### 3 · Judge and plan
@@ -179,3 +186,4 @@ Do not start on the plan; the operator chooses what comes first.
 | `references/report.md` | step 4 |
 | `references/skills-catalogue.md` | agent G; section 09 of the report |
 | `scripts/scan.py` | step 0.2 — read-only; `--help` lists the options |
+| `scripts/t4.sh` | step 0.5 — only on the operator's yes; start it in the background |

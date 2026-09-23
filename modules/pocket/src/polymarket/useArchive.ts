@@ -5,8 +5,8 @@ import type { Group, PolymarketApi, TrackedEvent } from "./api";
  *  phone's battery to redraw the same numbers.
  *
  *  **It is not a guarantee.** A backgrounded tab is throttled by every mobile browser and suspended
- *  outright by Safari, which is why the read on `visibilitychange` below is the one that matters and
- *  why the screen says out loud how old its answer is. */
+ *  outright by Safari, which is why the read on `visibilitychange` below is the one that matters, why
+ *  a hidden screen does not poll at all, and why the screen says out loud how old its answer is. */
 export const POLL_MS = 60_000;
 
 /** How often the displayed ages move. Independent of the poll: "4 min ago" has to keep counting while
@@ -88,7 +88,9 @@ export function useArchive(api: PolymarketApi, pollMs: number = POLL_MS): Archiv
     };
 
     void load(true);
-    const interval = window.setInterval(() => void load(false), pollMs);
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void load(false);
+    }, pollMs);
 
     // A phone spends most of its time with the screen off, and every mobile browser throttles or
     // suspends a background tab: this, not the interval, is what makes the screen current again.

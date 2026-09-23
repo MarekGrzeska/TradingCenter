@@ -78,6 +78,10 @@ is a map, not a verdict.
    migration here uses `CONCURRENTLY` today, so flag any new one that touches a big table.
 10. **Retention.** For every growing table: is there a bound — a window, a rollup, a delete? No
     bound means every C3 gets slower forever and the 32 GB fills.
+11. **Per-event work on a stream.** A C0 statement on every message of a feed is C0 × the feed's
+    rate, plus a pool acquire and the reset asyncpg runs on release — two transactions per check.
+    `still_tracked()` after every candle update was 118 checks a second and 97% of the server's
+    transactions (23 September 2026). Grep every loop over `async for message` for a `conn` inside it.
 
 ## Classifying one statement
 
@@ -114,24 +118,30 @@ Dev holds less data than production, so a small table may honestly plan as a seq
 `SET enable_seqscan = off;` before the `EXPLAIN` shows whether an index *could* serve the predicate.
 No `EXPLAIN ANALYZE` on `candles` or another big table, and no writes.
 
-**T3 — production metrics, read-only**, when `az account show` succeeds:
+**T3 — production metrics, read-only**, when `az account show` succeeds. In Git Bash on Windows,
+`-o tsv` ends lines with `\r` and an ID starting with `/subscriptions/` is rewritten into a Windows
+path — hence the first line and the `tr`:
 
 ```
-SRV=$(az postgres flexible-server show -g rg-tradingcenter -n psql-tradingcenter --query id -o tsv)
-az monitor metrics list --resource "$SRV" --metrics cpu_credits_remaining cpu_percent active_connections storage_percent --interval PT1H --offset 14d --aggregation Minimum Average Maximum -o table
-PLAN=$(az appservice plan show -g rg-tradingcenter -n asp-tradingcenter --query id -o tsv)
-az monitor metrics list --resource "$PLAN" --metrics CpuPercentage MemoryPercentage --interval PT1H --offset 14d --aggregation Average Maximum -o table
+export MSYS_NO_PATHCONV=1
+SRV=$(az postgres flexible-server show -g rg-tradingcenter -n psql-tradingcenter --query id -o tsv | tr -d '\r')
+az monitor metrics list --resource "$SRV" --metrics cpu_credits_remaining cpu_percent active_connections storage_percent --interval P1D --offset 45d --aggregation Minimum Average Maximum -o table
+PLAN=$(az appservice plan show -g rg-tradingcenter -n asp-tradingcenter --query id -o tsv | tr -d '\r')
+az monitor metrics list --resource "$PLAN" --metrics CpuPercentage MemoryPercentage --interval PT12H --offset 14d --aggregation Average Maximum -o table
 ```
 
 Credits falling day over day mean sustained load above the baseline; flat near the ceiling is
-healthy. The names come from `infra/`; re-read them there if these fail.
+healthy. Per-app `MemoryWorkingSet` (`az webapp show … --query id`) tells a leak from a baseline:
+a working set that climbs between restarts is the first; one that returns to the same level is
+the second. The names come from `infra/`; re-read them there if these fail.
 
-**T4 — production statistics, only on the operator's explicit yes in this conversation.** It needs
-a temporary firewall rule for the operator's current IP and an Entra token; remove the rule before
-the session ends. `pg_stat_user_tables` (`seq_scan`, `seq_tup_read`, `n_live_tup`) shows which
-tables are scanned whole; `pg_stat_activity` shows what runs now. `pg_stat_statements` is preloaded
-but not created (`azure.extensions` is empty) — enabling it is an infrastructure change, so it is a
-proposal, never a step of the review.
+**T4 — production statistics, only on the operator's explicit yes in this conversation.**
+`bash .claude/skills/system-review/scripts/t4.sh <scratchpad>/t4 10`, in the background: it opens a
+firewall rule for this machine's IP, snapshots `pg_stat_database` and `pg_stat_user_tables` in
+every database ten minutes apart, deletes the rule on any exit, and prints per-minute deltas — which
+database commits, which table is scanned, what grows. Confirm afterwards that no `tmp-` rule is
+left. `pg_stat_statements` is preloaded but not created (`azure.extensions` is empty); enabling it
+is an infrastructure change, so it is a proposal, never a step of the review.
 
 ## Calibration: the September incidents
 
@@ -150,6 +160,12 @@ Both were measured on production on 23 September 2026, a week after the credits 
   index on `(outcome_id, ends_at)`, history reads asking for `min`/`max` instead of every range, and
   the sampler's share of the pool below its size. The old test ran two ticks back to back, which
   the loop never does.
+
+- **P1 of the first review · the check after every candle update.** Found by T4, not by reading:
+  `tracked_pairs` scanned 7,098 times a minute and `market_data` committing 14,258 transactions a
+  minute — 97% of the server — from `ingest/live.py:123`, in the code since the first ingest commit.
+  Its cost grew with the number of tracked pairs, not with history, so it was the steady ~16%
+  background under both incidents rather than one of them.
 
 Two lessons carry to every run. The symptom — 503s, slow screens, every database at once — came
 days after the cause and far from it, so look for the *shape*, not the symptom. And a test that

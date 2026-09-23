@@ -95,6 +95,6 @@ class TestTheCeilings:
             settings(**{field: 0})
 
     def test_the_pool_is_smaller_than_the_default(self) -> None:
-        """Seven logical databases share one burstable server whose `max_connections` is 35. A
+        """Seven logical databases share one burstable server whose `max_connections` is 50. A
         seventh pool of ten would be the change that makes every module's read wait."""
         assert settings().database_pool_size < 10
