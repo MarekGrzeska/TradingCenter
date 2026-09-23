@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     migration_lock_wait_seconds: float = 300.0
 
     # Three: the sampling loop is one query per pass, and both surfaces read. Seven databases share
-    # one `B_Standard_B1ms` whose `max_connections` is 35 — `scripts/tests/test_pool_budget.py`
+    # one `B_Standard_B1ms` whose `max_connections` is 50 — `scripts/tests/test_pool_budget.py`
     # adds every module's number up and refuses a total above 30.
     database_pool_size: int = 3
 

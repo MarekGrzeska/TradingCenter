@@ -110,9 +110,15 @@ async def test_the_operators_next_version_is_the_one_the_next_seed_would_use(
 
 def test_the_helper_a_migration_calls_runs_the_statement_under_test() -> None:
     """`seed_prompt` must execute `_SEED` — the text every test above runs."""
-    import inspect
+    executed: list[object] = []
 
-    assert "_SEED" in inspect.getsource(seed_prompt)
+    class Connection:
+        def execute(self, statement, parameters):
+            executed.append(statement)
+            return type("Result", (), {"rowcount": 1})()
+
+    assert seed_prompt(Connection(), version="v1", with_tools="a", without_tools="b")
+    assert executed == [_SEED]
 
     sql = " ".join(str(_SEED).split())
     assert "WHERE NOT EXISTS (SELECT 1 FROM prompt_revisions)" in sql

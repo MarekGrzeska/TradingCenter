@@ -46,7 +46,7 @@ class Settings(BaseSettings):
     migration_lock_wait_seconds: float = 300.0
 
     # Three, for polymarket-data's reason: collecting is one pass, and nothing here writes on a
-    # request. Seven databases share one `B_Standard_B1ms` whose `max_connections` is 35 —
+    # request. Seven databases share one `B_Standard_B1ms` whose `max_connections` is 50 —
     # `scripts/tests/test_pool_budget.py` refuses a total above 30.
     database_pool_size: int = 3
 

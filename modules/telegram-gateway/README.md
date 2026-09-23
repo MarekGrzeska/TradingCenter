@@ -88,7 +88,7 @@ that accepts *content* from the internet. Long-polling needs none.
 `.env.example` is the list. `DATABASE_USER` unset selects local mode and narrows the module to
 loopback; set, it names the Postgres role and the credential becomes an Entra token fetched per
 connection. `DATABASE_POOL_SIZE` is 4 rather than the usual 10 on purpose: seven logical databases
-share one `B_Standard_B1ms` whose `max_connections` is 35, and this module's work is one HTTP call
+share one `B_Standard_B1ms` whose `max_connections` is 50, and this module's work is one HTTP call
 per message rather than a query per row of a screen.
 
 ## Deploying it the first time

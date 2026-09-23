@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     migration_lock_wait_seconds: float = 300.0
 
     # Four: this module's work is one HTTP call per message, not a query per row. Seven logical
-    # databases share one `B_Standard_B1ms` whose `max_connections` is 35, so every module's number
+    # databases share one `B_Standard_B1ms` whose `max_connections` is 50, so every module's number
     # here is one budget — `scripts/tests/test_pool_budget.py` refuses a total above 30.
     database_pool_size: int = 4
 
