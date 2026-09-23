@@ -32,7 +32,6 @@ env:
   ARM_USE_OIDC: true
   # The same five values terraform.yml passes, for the same reason: `terraform.tfvars` is
   # per-operator and gitignored, and none of these five is a credential.
-  TF_VAR_developer_ip_address: ${{ vars.TF_VAR_DEVELOPER_IP_ADDRESS }}
   TF_VAR_operator_email: ${{ vars.TF_VAR_OPERATOR_EMAIL }}
   TF_VAR_operator_object_id: ${{ vars.TF_VAR_OPERATOR_OBJECT_ID }}
   TF_VAR_postgres_admin_object_id: ${{ vars.TF_VAR_POSTGRES_ADMIN_OBJECT_ID }}

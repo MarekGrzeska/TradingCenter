@@ -28,7 +28,6 @@ env:
   ARM_USE_OIDC: true
   # `infra/terraform.tfvars` is gitignored on purpose — per-operator, not per-project. CI is not a person and needs
   # the same five values; none is a secret, being an IP, three Entra ids and a notification address.
-  TF_VAR_developer_ip_address: ${{ vars.TF_VAR_DEVELOPER_IP_ADDRESS }}
   TF_VAR_operator_email: ${{ vars.TF_VAR_OPERATOR_EMAIL }}
   TF_VAR_operator_object_id: ${{ vars.TF_VAR_OPERATOR_OBJECT_ID }}
   TF_VAR_postgres_admin_object_id: ${{ vars.TF_VAR_POSTGRES_ADMIN_OBJECT_ID }}

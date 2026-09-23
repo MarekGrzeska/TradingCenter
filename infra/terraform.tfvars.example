@@ -3,7 +3,6 @@
 
 # curl ifconfig.me — refresh this when your ISP reassigns you an address; see
 # docs/dbeaver-azure-connection.html, "Zanim zadzwonisz, że nie działa".
-developer_ip_address = "203.0.113.10"
 
 # az ad signed-in-user show --query "{id:id, upn:userPrincipalName}"
 postgres_admin_object_id = "00000000-0000-0000-0000-000000000000"
