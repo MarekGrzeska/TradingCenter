@@ -17,8 +17,8 @@ GUIDE = REPO_ROOT / "CLAUDE.md"
 # two different ways does not fit in a table row.
 GUIDE_CEILING_CHARS = 23_000
 
-# 22 438 characters on 31 August 2026; the headroom is deliberate, and is enough for a new trap
-# but not for the essays to come back.
+# 17 500 characters on 23 September 2026, after history went to docs/ and commit messages; the headroom is
+# deliberate, and is enough for a new trap but not for the essays to come back.
 
 
 def guide() -> str:
