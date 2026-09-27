@@ -49,8 +49,10 @@ async def history(
     start = since or end - DEFAULT_HISTORY_SPAN
 
     async with deps.connection(request.app.state.pool) as conn:
-        exists = await conn.fetchval("SELECT 1 FROM outcomes WHERE id = $1", outcome_id)
-        if not exists:
+        outcome = await conn.fetchrow(
+            "SELECT thinned_through FROM outcomes WHERE id = $1", outcome_id
+        )
+        if outcome is None:
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND, detail=f"no outcome with id {outcome_id}"
             )
@@ -69,6 +71,7 @@ async def history(
         ],
         collected_from=collected_from,
         collected_to=collected_to,
+        hourly_until=outcome["thinned_through"],
     )
 
 

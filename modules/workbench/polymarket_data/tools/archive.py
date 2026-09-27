@@ -72,6 +72,11 @@ class HistoryOut(BaseModel):
         description="the earliest moment this outcome was actually collected for. A gap "
         "after this moment means nobody traded; a gap before it means nobody was looking",
     )
+    hourly_until: datetime | None = Field(
+        default=None,
+        description="before this moment only one sample an hour is kept, so a gap there "
+        "shorter than an hour says nothing about trading",
+    )
 
 
 def register(mcp: FastMCP, ctx: ToolContext) -> None:
@@ -159,8 +164,10 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         until = datetime.now(UTC)
         since = until - timedelta(hours=max(1, hours))
         async with ctx.pool.acquire() as conn:
-            exists = await conn.fetchval("SELECT 1 FROM outcomes WHERE id = $1", outcome_id)
-            if not exists:
+            outcome = await conn.fetchrow(
+                "SELECT thinned_through FROM outcomes WHERE id = $1", outcome_id
+            )
+            if outcome is None:
                 return {
                     "refused": f"there is no outcome with id {outcome_id}",
                     "do_first": "get_event lists the outcome ids of a tracked event",
@@ -185,6 +192,7 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
             points=priced,
             truncated=truncated,
             collected_from=collected_from,
+            hourly_until=outcome["thinned_through"],
         )
 
     @mcp.tool(annotations=READ_ONLY)
