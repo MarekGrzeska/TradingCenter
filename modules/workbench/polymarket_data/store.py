@@ -641,6 +641,84 @@ async def delete_history(conn: Conn, event_id: int) -> tuple[int, int]:
 
 
 
+async def outcomes_to_thin(conn: Conn, cutoff: datetime) -> list[tuple[int, datetime | None]]:
+    """`(outcome_id, thinned_through)` for every outcome whose boundary is behind `cutoff`, resolved
+    ones included: a settled market's minute samples are the oldest there are."""
+    rows = await conn.fetch(
+        """
+        SELECT id, thinned_through FROM outcomes
+        WHERE thinned_through IS NULL OR thinned_through < $1
+        ORDER BY id
+        """,
+        cutoff,
+    )
+    return [(row["id"], row["thinned_through"]) for row in rows]
+
+
+async def oldest_sample_at(conn: Conn, outcome_id: int) -> datetime | None:
+    return await conn.fetchval(
+        "SELECT min(observed_at) FROM price_samples WHERE outcome_id = $1", outcome_id
+    )
+
+
+async def thin_samples(conn: Conn, outcome_id: int, start: datetime, end: datetime) -> int:
+    """Keeps the last sample of every UTC hour in `[start, end)` and deletes the rest. The last and not
+    an average: what stays is a price somebody actually quoted, at the moment it was quoted."""
+    return int(
+        await conn.fetchval(
+            """
+            WITH ranked AS (
+                SELECT observed_at,
+                       row_number() OVER (PARTITION BY date_trunc('hour', observed_at, 'UTC')
+                                          ORDER BY observed_at DESC) AS rank
+                FROM price_samples
+                WHERE outcome_id = $1 AND observed_at >= $2 AND observed_at < $3
+            ),
+            gone AS (
+                DELETE FROM price_samples p
+                USING ranked r
+                WHERE r.rank > 1 AND p.outcome_id = $1 AND p.observed_at = r.observed_at
+                RETURNING 1
+            )
+            SELECT count(*) FROM gone
+            """,
+            outcome_id,
+            start,
+            end,
+        )
+        or 0
+    )
+
+
+async def note_thinned(
+    conn: Conn, outcome_id: int, through: datetime, *, was: datetime | None
+) -> None:
+    """Moves the boundary only if nobody moved it since the pass read it: a backfill that pulled it back
+    meanwhile wrote minute samples this pass has not seen."""
+    await conn.execute(
+        """
+        UPDATE outcomes SET thinned_through = $2
+        WHERE id = $1 AND thinned_through IS NOT DISTINCT FROM $3
+        """,
+        outcome_id,
+        through,
+        was,
+    )
+
+
+async def unthin_from(conn: Conn, outcome_id: int, moment: datetime) -> None:
+    """A backfill wrote minute samples behind the boundary: it moves back to that hour, so the read stops
+    calling them hourly and the next pass thins them again. Only ever back."""
+    await conn.execute(
+        """
+        UPDATE outcomes SET thinned_through = date_trunc('hour', $2::timestamptz, 'UTC')
+        WHERE id = $1 AND thinned_through > $2
+        """,
+        outcome_id,
+        moment,
+    )
+
+
 async def sampleable_events(conn: Conn) -> list[tuple[int, str]]:
     """`(event_id, provider_event_id)` for every event still worth a request. The unit is the event
     because the request is: one read prices every outcome of every market it holds."""

@@ -369,6 +369,11 @@ export interface components {
             collected_from: string | null;
             /** Collected To */
             collected_to: string | null;
+            /**
+             * Hourly Until
+             * @description before this moment the archive keeps one sample an hour — samples older than 30 days are thinned — so a minute without a point there is not a quiet market
+             */
+            hourly_until: string | null;
             /** Outcome Id */
             outcome_id: number;
             /** Points */
