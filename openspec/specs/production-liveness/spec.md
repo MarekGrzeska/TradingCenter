@@ -1,4 +1,10 @@
-## ADDED Requirements
+# production-liveness Specification
+
+## Purpose
+Co produkcja mówi o sobie na zewnątrz i kto może do niej zajrzeć: test dostępności każdej aplikacji
+spoza Azure, drzwi bazy bez stałej reguły dla człowieka i obciążenie bazy przypisywalne do zapytań.
+
+## Requirements
 
 ### Requirement: Każda aplikacja jest sprawdzana z zewnątrz
 
