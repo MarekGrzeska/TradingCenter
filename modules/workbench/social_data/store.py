@@ -121,11 +121,13 @@ async def post_by_external_id(conn: Conn, source: str, external_id: str) -> Post
 
 
 async def posts_awaiting_translation(conn: Conn, *, since: datetime, limit: int) -> list[Post]:
+    """Unread posts inside the window. A post with no text (an image or a video) is never one: a
+    model given nothing answers nothing, and that failure came back every pass for a whole day."""
     rows = await conn.fetch(
         f"""
         SELECT {_POST_COLUMNS}
         FROM posts
-        WHERE translated_content IS NULL AND published_at >= $1
+        WHERE translated_content IS NULL AND published_at >= $1 AND content <> ''
         ORDER BY published_at DESC
         LIMIT $2
         """,
@@ -136,11 +138,12 @@ async def posts_awaiting_translation(conn: Conn, *, since: datetime, limit: int)
 
 
 async def posts_awaiting_analysis(conn: Conn, *, since: datetime, limit: int) -> list[Post]:
+    """As `posts_awaiting_translation`: a score for an empty text would be a guess, stamped as a reading."""
     rows = await conn.fetch(
         f"""
         SELECT {_POST_COLUMNS}
         FROM posts
-        WHERE impact_score IS NULL AND published_at >= $1
+        WHERE impact_score IS NULL AND published_at >= $1 AND content <> ''
         ORDER BY published_at DESC
         LIMIT $2
         """,

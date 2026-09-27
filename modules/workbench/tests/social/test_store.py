@@ -142,6 +142,17 @@ async def test_posts_awaiting_a_reading_are_the_unread_ones_inside_the_window(db
     assert await store.posts_awaiting_analysis(db, since=NOON - timedelta(hours=1), limit=10) == []
 
 
+async def test_a_post_without_text_awaits_no_reading(db):
+    await store.insert_new_posts(db, [raw_post("image-only", content=""), raw_post("text")])
+    since = NOON - timedelta(hours=1)
+
+    translating = await store.posts_awaiting_translation(db, since=since, limit=10)
+    analysing = await store.posts_awaiting_analysis(db, since=since, limit=10)
+
+    assert [post.external_id for post in translating] == ["text"]
+    assert [post.external_id for post in analysing] == ["text"]
+
+
 async def test_collection_start_is_written_once_and_a_failure_does_not_move_the_success(db):
     started = datetime.now(UTC) - timedelta(days=2)
     first = await store.begin_collecting(db, TRUTH_SOCIAL, at=started)
