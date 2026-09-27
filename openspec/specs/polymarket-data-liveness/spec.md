@@ -1,14 +1,17 @@
+# polymarket-data-liveness Specification
+
 ## Purpose
 
-Pozwala zauważyć, że pętla zbierania w module `social-data` przestała chodzić — awarię, której nie
+Pozwala zauważyć, że pętla próbkowania w module `polymarket-data` przestała chodzić — awarię, której nie
 widać z zewnątrz, bo proces stoi, trasa dostępności odpowiada, a archiwum po prostu przestaje
 rosnąć.
 
-## ADDED Requirements
+## Requirements
+
 
 ### Requirement: Moduł publikuje wiek ostatniego ukończonego przebiegu pętli
 
-Pętla czyta feed i zapisuje to, czego jeszcze nie ma. Moduł MUST publikować, jak dawno ta pętla ostatnio **ukończyła** przebieg, i MUST
+Pętla pyta providera o każde śledzone zdarzenie i zapisuje próbkę. Moduł MUST publikować, jak dawno ta pętla ostatnio **ukończyła** przebieg, i MUST
 mierzyć to w jej własnych interwałach, a nie w sekundach.
 
 Jednostka jest wymaganiem, nie szczegółem. Próbkowanie co minutę i zbieranie co pięć są oba

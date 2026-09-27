@@ -1,10 +1,13 @@
+# strategy-liveness Specification
+
 ## Purpose
 
 Pozwala zauważyć, że pętla oceniania w module `strategy` przestała chodzić — awarię, której nie
 widać z zewnątrz, bo proces stoi, trasa dostępności odpowiada, a archiwum po prostu przestaje
 rosnąć.
 
-## ADDED Requirements
+## Requirements
+
 
 ### Requirement: Moduł publikuje wiek ostatniego ukończonego przebiegu pętli
 
