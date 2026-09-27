@@ -214,6 +214,10 @@
   background-color: var(--color-panel);
 }
 
+.decision {
+  cursor: pointer;
+}
+
 /* The rare row. A left edge rather than a filled background: a setup has to be findable
    while scrolling past a hundred refusals, and a tinted row would make the refusals look
    like the ones that were suppressed. */

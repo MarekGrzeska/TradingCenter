@@ -5,7 +5,7 @@ import { MarketDataError } from "../data/types";
 import type { Resolution, TrackedPair } from "../data/types";
 import type { ArchiveAdmin } from "../data/source";
 import { StrategyView } from "./StrategyView";
-import type { Decision, Strategy, StrategyApi, Watch } from "./strategyApi";
+import type { BacktestRun, Decision, Strategy, StrategyApi, Watch } from "./strategyApi";
 
 /**
  * **The refusals are the screen**: a strategy worth running says no to most bars, so a tab of setups would be blank on
@@ -290,5 +290,80 @@ describe("starting a watch", () => {
 
     expect(await screen.findByText(/Archiwum nie zbiera żadnego instrumentu/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Zacznij" })).toBeDisabled();
+  });
+});
+
+describe("a decision reads back to what it stood on", () => {
+  const SETUP = decision({
+    action: "trade",
+    reason: null,
+    reasonKind: null,
+    direction: "long",
+    entry: 18250.5,
+    stop: 18180,
+    target: 18400,
+    rr: 2.12,
+  });
+
+  it("opens a setup with its levels, its parameter version and the readings of that bar", async () => {
+    const api = fakeApi({
+      listDecisions: vi.fn().mockResolvedValue([SETUP]),
+      readDecision: vi.fn().mockResolvedValue({ ...SETUP, facts: { atr_14: 41.25 } }),
+      listParameterSets: vi.fn().mockResolvedValue([
+        {
+          id: 5,
+          strategyId: "baseline_ma_cross",
+          version: 3,
+          params: { fast_period: 20 },
+          createdAt: new Date(),
+        },
+      ]),
+    });
+
+    render(<StrategyView api={api} />);
+    await userEvent.click(await screen.findByTestId("decision-row"));
+
+    const levels = await screen.findByTestId("decision-levels");
+    expect(levels).toHaveTextContent("18400");
+    expect(levels).toHaveTextContent("2.12R");
+    expect(await screen.findByText(/wersja 3/)).toBeInTheDocument();
+    expect(screen.getByTestId("decision-facts")).toHaveTextContent("atr_14");
+    expect(api.readDecision).toHaveBeenCalledWith(1, expect.anything());
+  });
+
+  it("says so when the decision cannot be read", async () => {
+    const api = fakeApi({
+      readDecision: vi.fn().mockRejectedValue(new MarketDataError("upstream", "strategy is down")),
+    });
+
+    render(<StrategyView api={api} />);
+    await userEvent.click(await screen.findByTestId("decision-row"));
+
+    expect(await screen.findByText(/strategy is down/)).toBeInTheDocument();
+  });
+});
+
+describe("backtest reports are read, never run", () => {
+  const RUN: BacktestRun = {
+    id: 1,
+    strategyId: "baseline_ma_cross",
+    symbol: "US100",
+    resolution: "HOUR",
+    rangeFrom: new Date("2025-01-01T00:00:00Z"),
+    rangeTo: new Date("2026-01-01T00:00:00Z"),
+    params: { fast_period: 20 },
+    costs: { spread: 1.2 },
+    report: { metrics: { trades: 42, win_rate: 0.45, expectancy_r: 0.125 }, bars: 6000, refusals: {} },
+    ranAt: new Date("2026-09-01T00:00:00Z"),
+  };
+
+  it("shows the metrics with the cost model and the range they were measured on", async () => {
+    render(<StrategyView api={fakeApi({ listBacktests: vi.fn().mockResolvedValue([RUN]) })} />);
+
+    const report = await screen.findByTestId("backtest-report");
+    expect(report).toHaveTextContent("spread=1.2");
+    expect(report).toHaveTextContent("2025-01-01 → 2026-01-01");
+    expect(report).toHaveTextContent("+0.125R");
+    expect(screen.queryByRole("button", { name: /uruchom|backtest/i })).not.toBeInTheDocument();
   });
 });

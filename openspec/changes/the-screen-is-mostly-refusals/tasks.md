@@ -21,11 +21,9 @@
 
 - [x] 4.1 `StrategyView`: katalog wpisów i lista obserwacji z przełącznikiem aktywności
 - [x] 4.2 Lista decyzji z powodem i rodzajem odmowy widocznym bez otwierania szczegółów
-- [ ] 4.3 Szczegóły decyzji: poziomy, stosunek zysku do ryzyka, odczyty i wersja parametrów
-      *(poziomy i R są w wierszu; osobny podgląd odczytów — kolejna zmiana, gdy będzie decyzja do obejrzenia)*
+- [x] 4.3 Szczegóły decyzji: poziomy, stosunek zysku do ryzyka, odczyty i wersja parametrów — 27 września 2026: kliknięcie wiersza otwiera `DecisionDetail` (powód; dla wejścia kierunek, wejście, obrona, cel, R, ocena; zestaw parametrów z wersją i wartościami, rewizja reguły, odczyty tej świecy i cechy setupu)
 - [x] 4.4 Dialog zakładania obserwacji z walidacją zakresów parametrów
-- [ ] 4.5 Raporty backtestu: metryki z modelem kosztów, wersją parametrów i zakresem; bez akcji uruchamiającej
-      *(klient czyta `/backtests`; widok czeka na pierwszy raport — dziś nie ma ani jednego)*
+- [x] 4.5 Raporty backtestu: metryki z modelem kosztów, wersją parametrów i zakresem; bez akcji uruchamiającej — 27 września 2026: `BacktestsPanel` pod decyzjami, zawężany wybraną strategią; pusty stan mówi, że przebieg to komenda (`python -m strategy.backtest --keep`), nie przycisk
 - [x] 4.6 Zakładka w `tabs.ts`
 
 ## 5. Sprawdzenie
