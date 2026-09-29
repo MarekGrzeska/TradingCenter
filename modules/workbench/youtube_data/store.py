@@ -531,7 +531,7 @@ async def analysed_for_alert(conn: Conn, *, limit: int) -> list[ToAnnounce]:
     return [
         ToAnnounce(
             _video(row),
-            row["result"] if isinstance(row["result"], dict) else json.loads(row["result"]),
+            _json(row["result"]),
             row["r_simulated"],
         )
         for row in rows
@@ -550,3 +550,132 @@ async def expire_unannounced(conn: Conn, *, before: datetime) -> int:
         before,
     )
     return int(result.split()[-1])
+
+
+# --- what a screen or a tool reads ----------------------------------------------------------------------------------
+
+
+def _json(value):
+    """A jsonb column as the document it holds: asyncpg hands it back as text unless a codec says otherwise."""
+    return value if isinstance(value, dict) else json.loads(value)
+
+
+@dataclass(frozen=True, slots=True)
+class Film:
+    """A film and its one reading under the film's own profile, when there is one."""
+
+    video: Video
+    reading: dict | None
+    reading_model: str | None
+    analysed_at: datetime | None
+    reading_simulated: bool | None
+
+
+_FILM_SELECT = f"""
+    SELECT {", ".join(f"v.{c.strip()}" for c in _VIDEO_COLUMNS.split(","))},
+           r.result AS r_result, r.model AS r_model, r.analysed_at AS r_at, r.simulated AS r_simulated
+    FROM videos v LEFT JOIN readings r ON r.video_id = v.video_id AND r.profile = v.profile
+"""
+
+
+def _film(row) -> Film:
+    return Film(
+        video=_video(row),
+        reading=None if row["r_result"] is None else _json(row["r_result"]),
+        reading_model=row["r_model"],
+        analysed_at=row["r_at"],
+        reading_simulated=row["r_simulated"],
+    )
+
+
+async def list_films(
+    conn: Conn,
+    *,
+    start: datetime,
+    end: datetime,
+    channel_id: str | None = None,
+    origin: str | None = None,
+    instrument: str | None = None,
+    min_score: int | None = None,
+    state: str | None = None,
+    limit: int,
+) -> list[Film]:
+    """A window of films, newest first, narrowed by whatever was asked. The window is what the index serves; the rest
+    filters inside it, which is why a window is always part of the question."""
+    rows = await conn.fetch(
+        _FILM_SELECT
+        + """
+        WHERE v.published_at >= $1 AND v.published_at <= $2
+          AND ($3::text IS NULL OR v.channel_id = $3)
+          AND ($4::text IS NULL OR v.origins @> ARRAY[$4]::text[])
+          AND ($5::text IS NULL OR r.instruments @> ARRAY[$5]::text[])
+          AND ($6::int IS NULL OR r.impact_score >= $6)
+          AND ($7::text IS NULL OR v.state = $7)
+        ORDER BY v.published_at DESC LIMIT $8
+        """,
+        start,
+        end,
+        channel_id,
+        origin,
+        instrument,
+        min_score,
+        state,
+        limit,
+    )
+    return [_film(row) for row in rows]
+
+
+async def get_film(conn: Conn, video_id: str) -> Film | None:
+    row = await conn.fetchrow(_FILM_SELECT + " WHERE v.video_id = $1", video_id)
+    return None if row is None else _film(row)
+
+
+@dataclass(frozen=True, slots=True)
+class TranscriptPage:
+    text: str
+    total_chars: int
+    language: str
+    provider: str
+    automatic: bool
+    simulated: bool
+
+
+async def transcript_page(conn: Conn, video_id: str, *, offset: int, limit: int) -> TranscriptPage | None:
+    """A slice of a transcript, cut by the database so a page of a hundred kilobytes is not read to be thrown away."""
+    row = await conn.fetchrow(
+        """
+        SELECT substr(content, $2 + 1, $3) AS text, length(content) AS total, language, provider, automatic, simulated
+        FROM transcripts WHERE video_id = $1
+        """,
+        video_id,
+        offset,
+        limit,
+    )
+    if row is None:
+        return None
+    return TranscriptPage(row["text"], row["total"], row["language"], row["provider"], row["automatic"], row["simulated"])
+
+
+@dataclass(frozen=True, slots=True)
+class StateCounts:
+    waiting: dict[str, int]
+    recent: dict[str, int]
+
+
+_QUEUE_STATES = ("discovered", "no_transcript", "transcribed", "analysed")
+
+
+async def state_counts(conn: Conn, *, since: datetime) -> StateCounts:
+    """Films by state, in the two ways that stay cheap however deep the archive gets. What is still waiting is counted
+    exactly, off the partial index that holds only those states; what is finished is counted over a recent window. A
+    count over every film ever kept would grow with the archive and run on every poll of the screen."""
+    waiting = await conn.fetch(
+        "SELECT state, count(*) AS n FROM videos WHERE state = ANY($1::text[]) GROUP BY state", list(_QUEUE_STATES)
+    )
+    recent = await conn.fetch(
+        "SELECT state, count(*) AS n FROM videos WHERE published_at > $1 GROUP BY state", since
+    )
+    return StateCounts(
+        waiting={row["state"]: row["n"] for row in waiting},
+        recent={row["state"]: row["n"] for row in recent},
+    )

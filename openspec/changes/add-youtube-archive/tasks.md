@@ -44,8 +44,8 @@
 
 ## 6. REST i kontrakt
 
-- [ ] 6.1 `contract.py` i routery: filmy (okno, zawężenia, porządek), film, transkrypcja stronami, kanały i tematy (odczyt, dopisanie, pauza, zdjęcie), wskazanie filmu, `/state` (liczby filmów w stanach: okno 7 dni plus stany kolejki z indeksu częściowego, **nigdy** `count(*)` po całej tabeli — `db-cost-check` z 29 września: 1316 stron i 14 ms przy 50 tys. filmów wobec 31 stron w oknie), `/health`
-- [ ] 6.2 Testy: happy path, okno bez sensu, ścieżka spoza zapisu, pola odczytu puste
+- [x] 6.1 `contract.py` i routery: filmy (okno, zawężenia, porządek), film, transkrypcja stronami, kanały i tematy (odczyt, dopisanie, pauza, zdjęcie), wskazanie filmu, `/state` (liczby filmów w stanach: okno 7 dni plus stany kolejki z indeksu częściowego, **nigdy** `count(*)` po całej tabeli — `db-cost-check` z 29 września: 1316 stron i 14 ms przy 50 tys. filmów wobec 31 stron w oknie), `/health`
+- [x] 6.2 Testy: happy path, okno bez sensu, ścieżka spoza zapisu, pola odczytu puste
 
 ## 7. Narzędzia
 
