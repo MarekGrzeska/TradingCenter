@@ -5,11 +5,16 @@ import { Pill } from "../ui/Pill";
 import { usePullToRefresh } from "../ui/usePullToRefresh";
 import type { NewsApi, NewsItem, NewsSource } from "./api";
 import { formatDelay, formatSourceDelay } from "./delay";
+import { directionLabel, sortItems, type SortDirection, type SortKey } from "./sort";
 import { useNews } from "./useNews";
+import { DEFAULT_MINUTES, WINDOWS, windowLabel } from "./window";
 import styles from "./NewsScreen.module.css";
 
-const WINDOWS = [1, 6, 24] as const;
-const DEFAULT_HOURS = 6;
+const SORT_KEYS: { key: SortKey; label: string }[] = [
+  { key: "published", label: "Published" },
+  { key: "seen", label: "Seen" },
+  { key: "waited", label: "Waited" },
+];
 const FILTER_DEBOUNCE_MS = 300;
 
 /** Nothing has a recent successful fetch: an empty list then means the collection, not a quiet hour. */
@@ -26,24 +31,37 @@ function expiry(item: NewsItem, now: Date): string | null {
 }
 
 function NewsCard({ item, now, onKeep }: { item: NewsItem; now: Date; onKeep: (item: NewsItem) => void }) {
+  const [open, setOpen] = useState(false);
   const kept = item.keptAt !== null;
   const note = expiry(item, now);
+  const leadOnly = item.content === "";
   return (
     <article className={styles.card}>
-      <div className={styles.meta}>
-        <span className={styles.publisher}>{item.publisher}</span>
-        <span className={styles.when}>
-          {item.publishedAt === null ? "no publish time" : formatAge(item.publishedAt, now)}
+      <button type="button" className={styles.toggle} aria-expanded={open} onClick={() => setOpen((was) => !was)}>
+        <span className={styles.meta}>
+          <span className={styles.publisher}>{item.publisher}</span>
+          <span className={styles.when}>
+            {item.publishedAt === null ? "no publish time" : formatAge(item.publishedAt, now)}
+          </span>
         </span>
-      </div>
-      <h2 className={styles.title}>{item.title}</h2>
-      {item.summary !== "" && <p className={styles.summary}>{item.summary}</p>}
-      <p className={styles.delay}>Delay {formatDelay(item)}</p>
+        <span className={styles.title}>{item.title}</span>
+        {open ? (
+          <span className={styles.body}>{leadOnly ? item.summary : item.content}</span>
+        ) : (
+          item.summary !== "" && <span className={styles.summary}>{item.summary}</span>
+        )}
+        <span className={styles.delay}>Delay {formatDelay(item)}</span>
+      </button>
+      {open && leadOnly && (
+        <p className={styles.leadOnly}>The feed carries only a lead — the full text is at the source.</p>
+      )}
       <div className={styles.actions}>
-        {item.url !== null && (
+        {open && item.url !== null ? (
           <a className={styles.link} href={item.url} target="_blank" rel="noopener noreferrer">
             Open original
           </a>
+        ) : (
+          <span />
         )}
         <button
           type="button"
@@ -89,7 +107,9 @@ function SourceRow({ source, now }: { source: NewsSource; now: Date }) {
 /** Headlines with the delay they arrived with, on a phone. The sources are one tap away because
  *  "can I trust this list" is asked less often than "what happened". */
 export function NewsScreen({ api, active = true }: { api: NewsApi; active?: boolean }) {
-  const [hours, setHours] = useState<number>(DEFAULT_HOURS);
+  const [minutes, setMinutes] = useState<number>(DEFAULT_MINUTES);
+  const [sortKey, setSortKey] = useState<SortKey>("published");
+  const [direction, setDirection] = useState<SortDirection>("desc");
   const [kept, setKept] = useState(false);
   const [text, setText] = useState("");
   const [q, setQ] = useState("");
@@ -100,14 +120,19 @@ export function NewsScreen({ api, active = true }: { api: NewsApi; active?: bool
     return () => window.clearTimeout(timer);
   }, [text]);
 
-  const view = useMemo(() => ({ hours, q, kept }), [hours, q, kept]);
+  const view = useMemo(() => ({ minutes, q, kept }), [minutes, q, kept]);
   const news = useNews(api, view, active);
   const { list, sources, now } = news;
+
+  const items = useMemo(
+    () => (list === null ? [] : sortItems(list.items, sortKey, direction)),
+    [list, sortKey, direction],
+  );
 
   const scroller = useRef<HTMLDivElement>(null);
   const pull = usePullToRefresh(scroller, news.refresh);
 
-  const windowName = kept ? "kept" : `last ${hours} h`;
+  const windowName = kept ? "kept" : windowLabel(minutes);
   const trouble = sources?.filter((s) => s.status === "failing" || s.status === "stale").length ?? 0;
   const freshness = news.refreshing
     ? "reading…"
@@ -126,16 +151,16 @@ export function NewsScreen({ api, active = true }: { api: NewsApi; active?: bool
         <div className={styles.controls}>
           {WINDOWS.map((option) => (
             <button
-              key={option}
+              key={option.minutes}
               type="button"
-              className={!kept && hours === option ? styles.chipOn : styles.chip}
-              aria-pressed={!kept && hours === option}
+              className={!kept && minutes === option.minutes ? styles.chipOn : styles.chip}
+              aria-pressed={!kept && minutes === option.minutes}
               onClick={() => {
                 setKept(false);
-                setHours(option);
+                setMinutes(option.minutes);
               }}
             >
-              {option} h
+              {option.chip}
             </button>
           ))}
           <button
@@ -153,6 +178,27 @@ export function NewsScreen({ api, active = true }: { api: NewsApi; active?: bool
             onClick={() => setSheet((was) => !was)}
           >
             Sources{trouble > 0 ? ` (${trouble} down)` : ""}
+          </button>
+        </div>
+        <div className={styles.controls} role="group" aria-label="Sort">
+          {SORT_KEYS.map((option) => (
+            <button
+              key={option.key}
+              type="button"
+              className={sortKey === option.key ? styles.chipOn : styles.chip}
+              aria-pressed={sortKey === option.key}
+              onClick={() => setSortKey(option.key)}
+            >
+              {option.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            className={styles.chip}
+            aria-label="Sort direction"
+            onClick={() => setDirection((was) => (was === "desc" ? "asc" : "desc"))}
+          >
+            {directionLabel(sortKey, direction)}
           </button>
         </div>
         <input
@@ -216,7 +262,7 @@ export function NewsScreen({ api, active = true }: { api: NewsApi; active?: bool
           ))}
 
         <div className={styles.list}>
-          {list?.items.map((item) => (
+          {items.map((item) => (
             <NewsCard key={`${item.source}:${item.externalId}`} item={item} now={now} onKeep={news.toggleKeep} />
           ))}
         </div>

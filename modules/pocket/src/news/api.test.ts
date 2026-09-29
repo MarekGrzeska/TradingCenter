@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { components } from "../data/contract.social.generated";
-import { mapItem, mapSource } from "./api";
+import { createNewsApi, mapItem, mapSource } from "./api";
 
 type Item = components["schemas"]["NewsItemOut"];
 type Source = components["schemas"]["NewsSourceOut"];
@@ -11,6 +11,7 @@ const item: Item = {
   publisher: "Reuters",
   title: "Oil jumps",
   summary: "",
+  content: "",
   url: null,
   published_at: "2026-09-29T10:00:00Z",
   first_seen_at: "2026-09-29T10:05:00Z",
@@ -43,6 +44,15 @@ describe("news mappers", () => {
     expect(mapped.publishedAt).toBeNull();
     expect(mapped.delayMinSeconds).toBeNull();
     expect(mapped.delayUnmeasured).toBe("no_publish_time");
+  });
+
+  it("maps the body and sends the window as minutes", async () => {
+    expect(mapItem({ ...item, content: "One.\n\nTwo." }).content).toBe("One.\n\nTwo.");
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ items: [], count: 0, truncated: false })));
+    vi.stubGlobal("fetch", fetchMock);
+    await createNewsApi("http://x").getNews({ minutes: 15, limit: 300 }, new AbortController().signal);
+    vi.unstubAllGlobals();
+    expect(String((fetchMock.mock.calls[0] as unknown[])[0])).toBe("http://x/news?minutes=15&limit=300");
   });
 
   it("maps a source's day", () => {

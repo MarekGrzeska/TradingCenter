@@ -19,6 +19,7 @@ export interface NewsItem {
   publisher: string;
   title: string;
   summary: string;
+  content: string;
   url: string | null;
   publishedAt: Date | null;
   firstSeenAt: Date;
@@ -51,7 +52,7 @@ export interface NewsSource {
 }
 
 export interface NewsQuery {
-  hours?: number;
+  minutes?: number;
   sources?: string[];
   q?: string;
   kept?: boolean;
@@ -73,6 +74,7 @@ export function mapItem(raw: Schemas["NewsItemOut"]): NewsItem {
     publisher: raw.publisher,
     title: raw.title,
     summary: raw.summary,
+    content: raw.content,
     url: raw.url ?? null,
     publishedAt: date(raw.published_at),
     firstSeenAt: new Date(raw.first_seen_at),
@@ -110,7 +112,7 @@ export function createNewsApi(
   return {
     async getNews(query, signal) {
       const params = new URLSearchParams();
-      if (query.hours !== undefined) params.set("hours", String(query.hours));
+      if (query.minutes !== undefined) params.set("minutes", String(query.minutes));
       for (const source of query.sources ?? []) params.append("source", source);
       if (query.q) params.set("q", query.q);
       if (query.kept) params.set("kept", "true");

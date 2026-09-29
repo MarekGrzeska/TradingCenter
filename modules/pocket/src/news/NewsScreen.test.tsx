@@ -12,6 +12,7 @@ function item(overrides: Partial<NewsItem> = {}): NewsItem {
     publisher: "Reuters",
     title: "Oil jumps on supply fears",
     summary: "Brent rose two percent.",
+    content: "Brent rose two percent.\n\nAnalysts point to supply.",
     url: "https://example.com/1",
     publishedAt: new Date(Date.now() - 10 * 60_000),
     firstSeenAt: new Date(Date.now() - 5 * 60_000),
@@ -52,12 +53,12 @@ function api(items: NewsItem[], overrides: Partial<NewsApi> = {}): NewsApi {
 }
 
 describe("NewsScreen", () => {
-  it("opens on the last 6 h with the delay as a range and the count named", async () => {
+  it("opens on the last 4 h with the delay as a range and the count named", async () => {
     render(<NewsScreen api={api([item()])} />);
 
     expect(await screen.findByText("Oil jumps on supply fears")).toBeInTheDocument();
     expect(screen.getByText("Delay 3–5 min")).toBeInTheDocument();
-    expect(screen.getByText(/1 · last 6 h/)).toBeInTheDocument();
+    expect(screen.getByText(/1 · last 4 h/)).toBeInTheDocument();
   });
 
   it("says why there is no delay instead of showing a blank", async () => {
@@ -119,6 +120,60 @@ describe("NewsScreen", () => {
   it("tells a quiet window from a stalled collection", async () => {
     render(<NewsScreen api={api([])} />);
 
-    expect(await screen.findByText("No headlines in the last 6 h.")).toBeInTheDocument();
+    expect(await screen.findByText("No headlines in the last 4 h.")).toBeInTheDocument();
+  });
+
+  it("expands the whole text in place and offers the original only then", async () => {
+    render(<NewsScreen api={api([item()])} />);
+    const toggle = await screen.findByRole("button", { name: /Oil jumps on supply fears/ });
+    expect(screen.queryByRole("link", { name: "Open original" })).not.toBeInTheDocument();
+
+    await userEvent.click(toggle);
+
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(/Analysts point to supply/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open original" })).toHaveAttribute("target", "_blank");
+    expect(screen.queryByText(/carries only a lead/)).not.toBeInTheDocument();
+  });
+
+  it("says the feed carried only a lead when there is no body", async () => {
+    render(<NewsScreen api={api([item({ content: "" })])} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Oil jumps on supply fears/ }));
+
+    expect(screen.getByText(/The feed carries only a lead/)).toBeInTheDocument();
+  });
+
+  it("does not toggle the card when it is kept", async () => {
+    render(<NewsScreen api={api([item()])} />);
+    await screen.findByText("Oil jumps on supply fears");
+
+    await userEvent.click(screen.getByRole("button", { name: "Keep" }));
+
+    expect(screen.getByRole("button", { name: /Oil jumps on supply fears/ })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("asks for minutes and a bigger limit when the window is a week", async () => {
+    const client = api([item()]);
+    render(<NewsScreen api={client} />);
+    await screen.findByText("Oil jumps on supply fears");
+    expect(client.getNews).toHaveBeenLastCalledWith({ minutes: 240, q: undefined, limit: 300 }, expect.anything());
+
+    await userEvent.click(screen.getByRole("button", { name: "7d" }));
+
+    expect(client.getNews).toHaveBeenLastCalledWith({ minutes: 10080, q: undefined, limit: 1000 }, expect.anything());
+    expect(await screen.findByText(/last 7 d/)).toBeInTheDocument();
+  });
+
+  it("reverses the order with the direction toggle", async () => {
+    const older = item({ externalId: "2", title: "Older story", publishedAt: new Date(Date.now() - 60 * 60_000) });
+    render(<NewsScreen api={api([older, item()])} />);
+    await screen.findByText("Older story");
+    const order = () => screen.getAllByRole("button", { name: /story|supply fears/ }).map((b) => b.textContent);
+    expect(order()[0]).toMatch(/Oil jumps/);
+
+    await userEvent.click(screen.getByRole("button", { name: "Sort direction" }));
+
+    expect(order()[0]).toMatch(/Older story/);
   });
 });

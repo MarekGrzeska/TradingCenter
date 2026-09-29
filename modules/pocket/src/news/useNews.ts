@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { NewsApi, NewsItem, NewsList, NewsSource } from "./api";
+import { limitFor } from "./window";
 
 /** Both reads. The feeds are fetched every minute or so, so a phone asking faster only redraws. */
 export const POLL_MS = 60_000;
 const TICK_MS = 30_000;
 
+
 export interface NewsView {
-  hours: number;
+  minutes: number;
   q: string;
   kept: boolean;
 }
@@ -85,10 +87,10 @@ export function useNews(api: NewsApi, view: NewsView, active: boolean, pollMs: n
   const news = usePoll<NewsList>(
     (signal) =>
       api.getNews(
-        view.kept ? { kept: true } : { hours: view.hours, q: view.q || undefined, limit: 200 },
+        view.kept ? { kept: true } : { minutes: view.minutes, q: view.q || undefined, limit: limitFor(view.minutes) },
         signal,
       ),
-    `${view.kept}|${view.hours}|${view.q}`,
+    `${view.kept}|${view.minutes}|${view.q}`,
     active,
     pollMs,
   );
