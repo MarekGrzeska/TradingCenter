@@ -57,6 +57,30 @@ no explanation. It is also the rollback — clear the setting and restart. A dep
 from Key Vault, the same secret the conversation uses, so what a reading costs is not on a line of
 its own yet; a separate secret is one entry and one edit the day that matters.
 
+## The news
+
+Headlines from free RSS feeds, kept apart from the posts (`news_items`, `news_sources`): a post is read by a
+model and may be announced, a headline is neither yet. **Nothing reads them but a screen.**
+
+`news/sources.py` is the whole list — 15 feeds today, Iran and the Middle East first. **Adding one is a line
+there**, reviewed like any change; nothing decides at runtime what is fetched. A short loop
+(`SOCIAL_NEWS_TICK_SECONDS`, 30) fetches whichever feeds have passed their own interval, four at a time,
+conditionally where the feed sends validators. A feed that refuses, times out or changes shape is *that feed's*
+state; the pass completes and the heartbeat `news` beats, under the existing `loop_passes_late` alert.
+
+**The delay has two bounds, and they are different facts.** *Lower*: publication to the feed's previous
+successful fetch — the feed was at least that late, because the headline was not in it then. *Upper*: publication
+to first sight — what the operator waited. What separates them is this archive's own polling. A headline with no
+publish time, one found on a feed's first fetch, or one stamped in the future has **no** delay and says which;
+none is ever zero. `GET /news/sources` gives each feed's median and p90 of both over the last day.
+
+**Retention is 28 days** (`SOCIAL_NEWS_RETENTION_DAYS`), swept hourly by the same loop. `PUT /news/keep`
+`{source, external_id, keep}` exempts a headline; letting it go puts it back under the sweep. The pair is in the
+body because a feed's identifier is usually a URL, and the caller record matches path segments as `[^/]+`.
+
+Al Jazeera is read through its published RSS only: its terms forbid automated collection and its live blog is not
+in the feed, so it is not fetched. Dropping it is deleting one line.
+
 ## Four tools, none of which write
 
 Read the recent posts, read an explicit window, open one post in full, ask what the archive is

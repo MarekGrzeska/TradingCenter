@@ -1,0 +1,318 @@
+<title>Źródła newsów</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Rozpoznanie · przed zmianą OpenSpec</span>
+    <h1>Skąd brać newsy</h1>
+    <p class="lede">Archiwum <code>/social</code> zna dziś jedno konto na jednym portalu. Ten dokument sprawdza, <b>które portale da się czytać za darmo, deterministycznie i bez łamania ich warunków</b> — z naciskiem na konflikt USA–Iran i Al Jazeerę.</p>
+    <div class="strip">
+      <span>TradingCenter / workbench / social_data</span>
+      <span>29 września 2026, ~18:55 UTC</span>
+      <span>pomiar <b>curl</b>, nie deklaracja</span>
+      <span>zaimplementowane: <b>news-arrives-with-its-delay</b> — 15 feedów RSS</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">17</div><div class="l">źródeł sprawdzonych na żywo</div></div>
+      <div class="cell"><div class="v">11</div><div class="l">z działającym, świeżym RSS</div></div>
+      <div class="cell"><div class="v">2–3 min</div><div class="l">najświeższa pozycja (Google News, Tehran Times)</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">portali z relacją na żywo w RSS</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Punkt wyjścia</div>
+      <h2>Co jest dziś</h2>
+      <p class="intro">Pakiet <code>social_data</code> ma jedno źródło: <code>providers/truth_social.py</code>, feed mirrora <code>trumpstruth.org</code>, autor wpisany na sztywno jako <code>realDonaldTrump</code>. Pętla zbiera co 300&nbsp;s okno 24&nbsp;h, model tłumaczy i ocenia wpływ 1–10, powyżej 8 idzie Telegram.</p>
+      <p>Moduł był od początku budowany pod więcej źródeł: <code>source</code> jest w kluczu unikalnym, autor jest kolumną, pobieranie stoi za protokołem w <code>providers/__init__.py</code>. Spec <code>social-data-ingest</code> wymaga, żeby <span class="hl">drugie źródło było dopisaniem pliku, a nie przebudową</span>. Agregator newsów został przy starcie modułu (2.09) nazwany jako świadomie poza zakresem — nie ma dla niego ani specy, ani otwartej zmiany.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Al Jazeera</div>
+      <h2>Szybka, ale zamknięta</h2>
+      <p class="intro">Al Jazeera była priorytetem z powodu relacji na żywo. Sprawdzone: RSS działa i jest świeży, ale <strong>relacji na żywo w nim nie ma</strong>, a regulamin zakazuje dokładnie tego, co trzeba by zrobić, żeby je czytać.</p>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>RSS <code>/xml/rss/all.xml</code> <span class="tag ok">działa</span></h3>
+          <p>200, 25 pozycji z ok. 5 godzin, najnowsza sprzed kilku minut. Tematy USA–Iran są wprost („US-Iran talks in New York: What’s the latest?”, apel IRGC do wyborców w USA). Pola: tytuł, opis, data, kategoria, guid.</p>
+        </div>
+        <div class="fail">
+          <h3>Relacja na żywo <span class="tag att">tylko link</span></h3>
+          <p>Liveblog pojawia się w RSS jako jedna pozycja (<code>/liveblog/2026/9/29/…</code>). Kolejne wpisy relacji do feedu nie trafiają — ich czytanie wymaga parsowania strony.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Regulamin i <code>robots.txt</code> <span class="tag stop">zakaz</span></h3>
+          <p>Treść „do osobistego, niekomercyjnego użytku”. Zabronione bez pisemnej zgody: automatyczny scraping, text/data mining, użycie przy budowie AI/LLM. <code>robots.txt</code> blokuje <code>/api</code> i pojedyncze wpisy relacji (<code>/liveblog/*?update=*</code>), a crawler <code>anthropic-ai</code> ma <code>Disallow: /</code> — dlatego stron relacji nie pobierałem.</p>
+        </div>
+      </div>
+      <div class="quote">Czytanie publikowanego RSS to to, co robi każdy czytnik. Parsowanie relacji to scraping, którego regulamin wprost zabrania.</div>
+      <p>Wniosek: Al Jazeera wchodzi jako <strong>RSS, filtrowany słowami kluczowymi</strong>. Relacja na żywo — nie bez ich zgody. Ocena tytułu modelem to szara strefa: zakaz mówi o budowie AI, nie o klasyfikacji pojedynczego newsa, ale sformułowania są szerokie. To decyzja operatora, nie techniczna.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Portale</div>
+      <h2>Ranking pod USA–Iran</h2>
+      <p>Uszeregowane po przydatności: szybko, za darmo, stabilnie. „Iran” to liczba pozycji z tym słowem w feedzie w chwili pomiaru.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>#</th><th>Źródło</th><th>Dostęp</th><th class="n">Najnowsza</th><th class="n">Iran</th><th>Przeszkody</th><th>Werdykt</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="n">1</td><td><b>Google News RSS</b></td><td><code>rss/search?q=Iran+when:1h</code></td><td class="n">3 min</td><td class="n">47/52</td><td>linki to przekierowania Google; nieoficjalne, bez SLA</td><td><span class="tag ok">RSS · główne</span></td></tr>
+            <tr><td class="n">2</td><td><b>Tehran Times</b></td><td><code>tehrantimes.com/rss</code></td><td class="n">2 min</td><td class="n">22/30</td><td>brak</td><td><span class="tag ok">RSS</span></td></tr>
+            <tr><td class="n">3</td><td><b>Al Jazeera</b></td><td><code>/xml/rss/all.xml</code></td><td class="n">kilka min</td><td class="n">część</td><td>relacja poza RSS; regulamin zakazuje scrapingu</td><td><span class="tag att">RSS, bez relacji</span></td></tr>
+            <tr><td class="n">4</td><td><b>IRNA</b></td><td><code>en.irna.ir/rss</code></td><td class="n">17 min</td><td class="n">21/30</td><td>niestabilne (504, potem 200)</td><td><span class="tag ok">RSS + ponowienie</span></td></tr>
+            <tr><td class="n">5</td><td><b>Times of Israel</b></td><td><code>/feed/</code></td><td class="n">11 min</td><td class="n">3/14</td><td>liveblog za Cloudflare (403)</td><td><span class="tag ok">RSS</span></td></tr>
+            <tr><td class="n">6</td><td><b>Middle East Eye</b></td><td><code>/rss</code></td><td class="n">14 min</td><td class="n">7/20</td><td>zawsze gzip</td><td><span class="tag ok">RSS</span></td></tr>
+            <tr><td class="n">7</td><td><b>Guardian</b></td><td><code>/world/iran/rss</code>, <code>/world/middleeast/rss</code></td><td class="n">33 min</td><td class="n">12/20</td><td>API wymaga własnego klucza (testowy → 401)</td><td><span class="tag ok">RSS · relacje JSON-LD</span></td></tr>
+            <tr><td class="n">8</td><td><b>Iran International</b></td><td><code>/en/feed</code></td><td class="n">76 min</td><td class="n">44/50</td><td>liveblog w RSC Next.js — trudny</td><td><span class="tag ok">RSS</span></td></tr>
+            <tr><td class="n">9</td><td><b>NYT</b></td><td><code>MiddleEast.xml</code>, <code>World.xml</code></td><td class="n">4 min</td><td class="n">10/39</td><td>paywall artykułów; tytuł i lead wystarczą</td><td><span class="tag ok">RSS</span></td></tr>
+            <tr><td class="n">10</td><td><b>Axios</b></td><td><code>api.axios.com/feed/</code></td><td class="n">12 min</td><td class="n">6/100</td><td>1 MB na odczyt</td><td><span class="tag ok">RSS + filtr</span></td></tr>
+            <tr><td class="n">11</td><td><b>BBC</b></td><td><code>world/middle_east/rss.xml</code></td><td class="n">6 h</td><td class="n">8/28</td><td>feed regionu wolny</td><td><span class="tag att">drugorzędne</span></td></tr>
+            <tr><td class="n">12</td><td><b>Telegram t.me/s/</b></td><td>HTML podglądu kanału</td><td class="n">4 min</td><td class="n">—</td><td>treść niezweryfikowana; część kanałów martwa</td><td><span class="tag att">HTML, ostrożnie</span></td></tr>
+            <tr><td class="n">13</td><td><b>Reuters</b></td><td>sitemap działa</td><td class="n">—</td><td class="n">—</td><td><code>robots.txt</code>: automatyczne zbieranie zabronione</td><td><span class="tag att">przez Google News</span></td></tr>
+            <tr><td class="n">14</td><td><b>AP News</b></td><td>brak</td><td class="n">—</td><td class="n">—</td><td>Cloudflare 403</td><td><span class="tag att">przez Google News</span></td></tr>
+            <tr><td class="n">15</td><td><b>CNN</b></td><td>RSS zamrożony od 2022/23</td><td class="n">—</td><td class="n">—</td><td>działa tylko sitemap</td><td><span class="tag att">przez Google News</span></td></tr>
+            <tr class="void"><td class="n">16</td><td>GDELT DOC 2.0</td><td>API darmowe</td><td class="n">—</td><td class="n">—</td><td>429 przy każdej próbie</td><td><span class="tag stop">niepotwierdzone</span></td></tr>
+            <tr class="void"><td class="n">17</td><td>Tasnim</td><td>—</td><td class="n">—</td><td class="n">—</td><td>DNS; „RSS” zwraca HTML</td><td><span class="tag stop">pominąć</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Zweryfikowane pobraniem: statusy, liczby pozycji, wiek najnowszej pozycji, 401 Guardiana, 429 GDELT, JSON-LD relacji Guardiana i CNN, zakaz w <code>robots.txt</code> Reutersa i Al Jazeery. Tylko przeczytane, nie sprawdzone: limity darmowego klucza Guardiana (~1 req/s, 500 dziennie) i 15-minutowy rytm GDELT.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Relacje na żywo</div>
+      <h2>Gdzie da się je czytać uczciwie</h2>
+      <p class="intro">Format relacji jest ustandaryzowany: strona niesie jeden <code>&lt;script type="application/ld+json"&gt;</code> typu <code>LiveBlogPosting</code> z listą <code>liveBlogUpdate</code> — każdy wpis z czasem i treścią.</p>
+      <div class="fails">
+        <div class="fail ok"><h3>Guardian <span class="tag ok">JSON-LD</span></h3><p>Adres relacji z RSS (<code>/live/</code> w linku), wpisy z JSON-LD. Deterministyczne, bez parsowania układu strony.</p></div>
+        <div class="fail ok"><h3>CNN <span class="tag ok">JSON-LD</span></h3><p>Adres relacji z sitemapy (<code>/live-news/</code>), wpisy z JSON-LD.</p></div>
+        <div class="fail stop"><h3>Al Jazeera <span class="tag stop">regulamin</span></h3><p>Technicznie zapewne ten sam kształt, ale czytanie wpisów relacji jest wprost zabronione.</p></div>
+        <div class="fail stop"><h3>Times of Israel <span class="tag stop">Cloudflare</span></h3><p>403 na relacji — obchodzenie ochrony to przeciwieństwo zgody.</p></div>
+        <div class="fail"><h3>Iran International <span class="tag att">trudne</span></h3><p>Relacja strumieniowana przez React Server Components — parser byłby kruchy.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Mechanizm</div>
+      <h2>Źródło jako dane, nie jako kod</h2>
+      <p class="intro">„Coś jak skill, ale deterministyczne” mieści się w tym, co <code>social_data</code> już ma: <strong>trzy rodzaje dostawców</strong> za istniejącym protokołem, a <strong>konkretne portale jako wpisy konfiguracji</strong>. Model nie decyduje, co pobrać — tylko ocenia to, co pętla już zebrała.</p>
+      <pre><code><span class="c"># Wpis źródła: dopisanie portalu to wiersz, nie plik.</span>
+- source: <span class="s">aljazeera</span>
+  kind: <span class="s">rss</span>
+  url: <span class="s">https://www.aljazeera.com/xml/rss/all.xml</span>
+  keywords: [<span class="s">Iran</span>, <span class="s">IRGC</span>, <span class="s">Hormuz</span>, <span class="s">Tehran</span>]
+- source: <span class="s">google_news</span>
+  kind: <span class="s">rss</span>
+  url: <span class="s">https://news.google.com/rss/search?q=Iran+when:1h&amp;hl=en-US&amp;gl=US&amp;ceid=US:en</span>
+- source: <span class="s">guardian_live</span>
+  kind: <span class="s">liveblog_jsonld</span>
+  discover_from: <span class="s">https://www.theguardian.com/world/middleeast/rss</span></code></pre>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Rodzaj dostawcy</th><th>Co robi</th><th>Kogo obsłuży</th></tr></thead>
+          <tbody>
+            <tr><td><b>rss</b></td><td>RSS/Atom, warunkowy GET (ETag, Last-Modified), filtr słów kluczowych przed zapisem</td><td>Al Jazeera, Google News, Tehran Times, IRNA, ToI, MEE, Guardian, Iran Intl, NYT, Axios, BBC</td></tr>
+            <tr><td><b>liveblog_jsonld</b></td><td>znajduje adres relacji w RSS lub sitemapie, czyta wpisy <code>liveBlogUpdate</code>; wpis relacji = post</td><td>Guardian, CNN</td></tr>
+            <tr><td><b>telegram_preview</b></td><td>HTML <code>t.me/s/&lt;kanał&gt;</code>, czas z <code>datetime=</code></td><td>opcjonalnie, później</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Pułapki</div>
+      <h2>Co kosztuje, zanim cokolwiek zbierze</h2>
+      <div class="fails">
+        <div class="fail stop"><h3>Rachunek za model <span class="tag stop">główne ryzyko</span></h3><p>Truth Social to kilkanaście postów na dobę. Google News dla jednego zapytania to ~50 pozycji na godzinę. Bez filtra słów kluczowych i deduplikacji <span class="hl">przed</span> wzbogacaniem rachunek rośnie o rząd wielkości. Spec wymaga już, żeby wzbogacane było tylko bieżące okno — trzeba dołożyć limit per źródło i ocenę samego tytułu z leadem.</p></div>
+        <div class="fail"><h3>Duplikaty <span class="tag att">nowe wymaganie</span></h3><p>Google News powtarza to, co niosą feedy bezpośrednie, pod własnymi adresami. Deduplikacja po znormalizowanym tytule, nie po URL-u — dziś klucz to <code>(source, external_id)</code>, więc to jest zmiana specy, nie tylko kodu.</p></div>
+        <div class="fail"><h3>Alerty <span class="tag att">próg</span></h3><p>Próg 8 skalibrowano na jednego autora. Ten sam news z pięciu portali nie może dać pięciu wiadomości na Telegramie.</p></div>
+        <div class="fail"><h3>Uprzejmość wobec źródeł <span class="tag att">rytm</span></h3><p>3–5 minut z warunkowym GET, własny User-Agent jak przy Truth Social, ponowienie z odstępem dla IRNA. Żadnego obchodzenia Cloudflare.</p></div>
+        <div class="fail ok"><h3>Baza <span class="tag ok">tanio</span></h3><p>Kolektor to zapis zbiorowy co 300 s (C1 w przeglądzie z 23.09). Kilkanaście feedów w tym samym przebiegu nie zmienia klasy; przed wdrożeniem — skill <code>db-cost-check</code>.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Dalej</div>
+      <h2>Kolejność</h2>
+      <p>To jest <strong>zmiana OpenSpec</strong>, nie zwykły PR: zmienia wymagania <code>social-data-ingest</code> (filtr, deduplikacja między źródłami), <code>social-data-alerts</code> (jeden alert na zdarzenie) i prawdopodobnie <code>terminal-social</code> (źródło na karcie, filtr po źródle).</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Krok</th><th>Co</th><th>Decyzja operatora</th></tr></thead>
+          <tbody>
+            <tr><td class="n">1</td><td>Czy Al Jazeera wchodzi jako RSS i czy jej tytuły idą do modelu</td><td><span class="tag att">regulamin</span></td></tr>
+            <tr><td class="n">2</td><td>Lista startowa źródeł i słów kluczowych (propozycja: Google News ×3–4 zapytania, Al Jazeera, Tehran Times, IRNA, ToI, MEE, Guardian)</td><td><span class="tag att">zakres</span></td></tr>
+            <tr><td class="n">3</td><td><code>/opsx:propose</code> — dostawca <code>rss</code> + konfiguracja źródeł + deduplikacja + limit wzbogaceń</td><td>—</td></tr>
+            <tr><td class="n">4</td><td>Druga zmiana: relacje na żywo z JSON-LD (Guardian, CNN)</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Rozpoznanie źródeł newsów · pomiar 29.09.2026 ~18:55 UTC</span>
+    <span>Stan kodu: social_data z jednym dostawcą</span>
+  </div>
+</footer>

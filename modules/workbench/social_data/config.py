@@ -73,6 +73,13 @@ class Settings(BaseSettings):
     # a busy day must cost a bounded amount, and the rest waits for the next pass.
     enrichment_batch_limit: int = 20
 
+    # The news loop wakes this often and fetches whichever feeds have passed their own interval, so a feed's
+    # delay is bounded by its interval plus this — which is why it is seconds and not the posts' minutes.
+    news_tick_seconds: int = 30
+
+    # How long a headline lives unless the operator kept it. News is a stream to pick from, not an archive.
+    news_retention_days: int = 28
+
     # Who is told, by the name the operator bound at the door to Telegram — a package of this same process, so
     # there is no address to set. Its *absence* is a working configuration: the module collects and reads exactly
     # as before and tells nobody, which `/state` reports.
@@ -186,6 +193,8 @@ class Settings(BaseSettings):
         "collect_window_hours",
         "stale_after_ticks",
         "enrichment_batch_limit",
+        "news_tick_seconds",
+        "news_retention_days",
     )
     @classmethod
     def _positive(cls, value: int, info: ValidationInfo) -> int:

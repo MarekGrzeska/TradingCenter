@@ -206,7 +206,9 @@ history here is the post, and nobody reconstructs what a model thought last week
 from last month. The judgement that stays the workbench's is the other one — whether any of it
 changes a position.
 
-**Nothing on either surface writes.** `polymarket-data` publishes writing tools because it has
+**Nothing on the tool surface writes, and on REST one route does: `PUT /news/keep`.** It marks a
+headline to survive the 28-day retention and changes nothing else — the exception is named in
+`social-data-api`, not slipped in. `polymarket-data` publishes writing tools because it has
 a list of observations an operator curates and a model may add to; here the source is collected
 whole and there is nothing to add. The caller record (`social_data/caller_access.py`) still
 splits the two surfaces for the reason it does there: the platform authorizes an application,

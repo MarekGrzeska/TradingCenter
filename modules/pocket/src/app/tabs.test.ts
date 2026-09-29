@@ -33,7 +33,7 @@ describe("the remembered tab", () => {
     expect(loadTab(refusing)).toBe("markets");
   });
 
-  it("offers the three screens this app has", () => {
-    expect([...TABS]).toEqual(["markets", "social", "agent"]);
+  it("offers the four screens this app has", () => {
+    expect([...TABS]).toEqual(["markets", "social", "news", "agent"]);
   });
 });

@@ -122,13 +122,13 @@ async def test_an_archive_that_has_not_collected_for_a_long_time_says_so(api, po
     assert source["consecutive_failures"] == 1
 
 
-async def test_the_contract_publishes_no_route_that_writes(api):
+async def test_the_contract_publishes_no_route_that_writes_but_the_keep_flag(api):
     document = (await api.get("/openapi.json")).json()
 
-    methods = {
-        method.upper()
-        for path in document["paths"].values()
+    writes = {
+        (method.upper(), route)
+        for route, path in document["paths"].items()
         for method in path
-        if method in ("get", "post", "put", "patch", "delete")
+        if method in ("post", "put", "patch", "delete")
     }
-    assert methods == {"GET"}
+    assert writes == {("PUT", "/news/keep")}

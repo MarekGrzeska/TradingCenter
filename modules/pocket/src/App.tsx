@@ -5,6 +5,8 @@ import { AgentScreen } from "./agent/AgentScreen";
 import { archiveBase, postsBase, workbenchBase } from "./data/config";
 import { createPolymarketApi } from "./polymarket/api";
 import { PolymarketScreen } from "./polymarket/PolymarketScreen";
+import { createNewsApi } from "./news/api";
+import { NewsScreen } from "./news/NewsScreen";
 import { createSocialApi } from "./social/api";
 import { PostsScreen } from "./social/PostsScreen";
 import { SignInScreen } from "./SignInScreen";
@@ -31,6 +33,7 @@ export function App({ archive = noIdentity, workbench = noIdentity, posts = noId
   const polymarket = useMemo(() => createPolymarketApi(archiveBase(), archive), [archive]);
   const agent = useMemo(() => createAgentApi(workbenchBase(), workbench), [workbench]);
   const social = useMemo(() => createSocialApi(postsBase(), posts), [posts]);
+  const news = useMemo(() => createNewsApi(postsBase(), posts), [posts]);
 
   // `unconfigured` is the local stack and renders the screens bare — only a deployment that has an
   // identity to lose can be signed out of one.
@@ -47,6 +50,9 @@ export function App({ archive = noIdentity, workbench = noIdentity, posts = noId
       </div>
       <div className={tab === "social" ? styles.pane : styles.hidden}>
         <PostsScreen api={social} />
+      </div>
+      <div className={tab === "news" ? styles.pane : styles.hidden}>
+        <NewsScreen api={news} active={tab === "news"} />
       </div>
       <div className={tab === "agent" ? styles.pane : styles.hidden}>
         <AgentScreen api={agent} />
