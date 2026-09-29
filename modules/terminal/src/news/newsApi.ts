@@ -6,6 +6,7 @@
 import { noIdentity, type Identity } from "../auth/identity";
 import type { components } from "../data/contract.social.generated";
 import { jsonClient, statusMapper } from "../data/http";
+import { limitFor } from "./windows";
 
 type Schemas = components["schemas"];
 
@@ -19,6 +20,8 @@ export interface NewsItem {
   publisher: string;
   title: string;
   summary: string;
+  /** The body where the feed carries more than a lead, paragraphs kept; empty where it does not. */
+  content: string;
   url: string | null;
   publishedAt: Date | null;
   firstSeenAt: Date;
@@ -60,7 +63,7 @@ export interface NewsSource {
 }
 
 export interface NewsQuery {
-  hours: number;
+  minutes: number;
   sources: string[];
   text: string;
   kept: boolean;
@@ -77,6 +80,7 @@ function mapItem(raw: Schemas["NewsItemOut"]): NewsItem {
     publisher: raw.publisher,
     title: raw.title,
     summary: raw.summary,
+    content: raw.content,
     url: raw.url ?? null,
     publishedAt: optionalDate(raw.published_at),
     firstSeenAt: new Date(raw.first_seen_at),
@@ -124,9 +128,9 @@ export function createNewsApi(httpBase: string, identity: Identity = noIdentity)
 
   return {
     async news(query, signal) {
-      const params = new URLSearchParams({ limit: "300" });
+      const params = new URLSearchParams({ limit: String(limitFor(query.minutes)) });
       if (query.kept) params.set("kept", "true");
-      else params.set("hours", String(query.hours));
+      else params.set("minutes", String(query.minutes));
       for (const source of query.sources) params.append("source", source);
       if (query.text.trim() !== "") params.set("q", query.text.trim());
       const raw = await http.json<Schemas["NewsOut"]>(`${httpBase}/news?${params}`, { signal });

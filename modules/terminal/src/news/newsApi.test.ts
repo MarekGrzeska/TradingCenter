@@ -20,6 +20,7 @@ const ITEM = {
   publisher: "Al Jazeera",
   title: "US-Iran talks",
   summary: "",
+  content: "",
   url: "https://www.aljazeera.com/news/2026/9/29/talks",
   published_at: "2026-09-29T15:09:00Z",
   first_seen_at: "2026-09-29T15:14:00Z",
@@ -48,11 +49,12 @@ describe("news", () => {
     );
 
     const page = await createNewsApi(HTTP_BASE).news(
-      { hours: 6, sources: ["aljazeera", "irna"], text: " iran ", kept: false },
+      { minutes: 240, sources: ["aljazeera", "irna"], text: " iran ", kept: false },
       signal(),
     );
 
-    expect(asked.searchParams.get("hours")).toBe("6");
+    expect(asked.searchParams.get("minutes")).toBe("240");
+    expect(asked.searchParams.get("limit")).toBe("300");
     expect(asked.searchParams.getAll("source")).toEqual(["aljazeera", "irna"]);
     expect(asked.searchParams.get("q")).toBe("iran");
     expect(page.truncated).toBe(true);
@@ -65,6 +67,37 @@ describe("news", () => {
     expect(page.items[1]).toMatchObject({ publishedAt: null, delayUnmeasured: "no_publish_time" });
   });
 
+  it("asks for more headlines over a week than over an hour", async () => {
+    const limits: (string | null)[] = [];
+    server.use(
+      http.get(`${HTTP_BASE}/news`, ({ request }) => {
+        limits.push(new URL(request.url).searchParams.get("limit"));
+        return HttpResponse.json({ items: [], count: 0, truncated: false, window_from: null, window_to: null });
+      }),
+    );
+
+    const api = createNewsApi(HTTP_BASE);
+    await api.news({ minutes: 60, sources: [], text: "", kept: false }, signal());
+    await api.news({ minutes: 10080, sources: [], text: "", kept: false }, signal());
+
+    expect(limits).toEqual(["300", "1000"]);
+  });
+
+  it("carries the body through, empty where the feed had only a lead", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/news`, () =>
+        HttpResponse.json({
+          items: [{ ...ITEM, content: "Paragraph one.\n\nParagraph two." }, ITEM],
+          count: 2, truncated: false, window_from: null, window_to: null,
+        }),
+      ),
+    );
+
+    const page = await createNewsApi(HTTP_BASE).news({ minutes: 60, sources: [], text: "", kept: false }, signal());
+
+    expect(page.items.map((i) => i.content)).toEqual(["Paragraph one.\n\nParagraph two.", ""]);
+  });
+
   it("asks for the kept ones without a window", async () => {
     let asked = new URL("http://none");
     server.use(
@@ -74,10 +107,10 @@ describe("news", () => {
       }),
     );
 
-    await createNewsApi(HTTP_BASE).news({ hours: 6, sources: [], text: "", kept: true }, signal());
+    await createNewsApi(HTTP_BASE).news({ minutes: 240, sources: [], text: "", kept: true }, signal());
 
     expect(asked.searchParams.get("kept")).toBe("true");
-    expect(asked.searchParams.has("hours")).toBe(false);
+    expect(asked.searchParams.has("minutes")).toBe(false);
   });
 });
 
