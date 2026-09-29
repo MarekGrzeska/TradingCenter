@@ -38,8 +38,8 @@
 
 ## 6. Dokumentacja i zamknięcie
 
-- [ ] 6.1 `social_data/README.md`: pętla newsów, lista źródeł, jak dołożyć feed, znaczenie granic opóźnienia; `docs/zrodla-newsow.html` wskazuje tę zmianę jako wykonaną
-- [ ] 6.2 Workbench: `uv run pytest` (z `-m db`), `ruff check .`, `pyright`; terminal i pocket: `pnpm test`, `lint`, `typecheck`, `contract:check`
-- [ ] 6.3 `openspec validate news-arrives-with-its-delay --strict`
+- [x] 6.1 `social_data/README.md`: pętla newsów, lista źródeł, jak dołożyć feed, znaczenie granic opóźnienia; `docs/zrodla-newsow.html` wskazuje tę zmianę jako wykonaną
+- [x] 6.2 Workbench: `uv run pytest` (z `-m db`), `ruff check .`, `pyright`; terminal i pocket: `pnpm test`, `lint`, `typecheck`, `contract:check`
+- [x] 6.3 `openspec validate news-arrives-with-its-delay --strict`
 - [ ] 6.4 Po wdrożeniu: `/social/news/sources` wymienia 15 źródeł z udanym pobraniem, `/social/health` niesie heartbeat `news`; odmawiające źródła zapisane w `review.md`
-- [ ] 6.5 `review.md`
+- [x] 6.5 `review.md`
