@@ -4,6 +4,7 @@ import { AgentSettingsView } from "../agent/settings/AgentSettingsView";
 import { CollectionHistoryView } from "../history/CollectionHistoryView";
 import { GridView } from "../grid/GridView";
 import { InstrumentsView } from "../instruments/InstrumentsView";
+import { NewsView } from "../news/NewsView";
 import { PolymarketView } from "../polymarket/PolymarketView";
 import { SocialView } from "../social/SocialView";
 import { StrategyView } from "../strategy/StrategyView";
@@ -32,6 +33,7 @@ export const TABS: TabDefinition[] = [
   { id: "teams", label: "Teams", path: "teams", Component: TeamsView },
   { id: "polymarket", label: "Polymarket", path: "polymarket", Component: PolymarketView },
   { id: "social", label: "Social", path: "social", Component: SocialView },
+  { id: "news", label: "News", path: "news", Component: NewsView },
   { id: "strategy", label: "Strategie", path: "strategy", Component: StrategyView },
   { id: "accounts", label: "Accounts", path: "accounts", Component: AccountsView },
   {

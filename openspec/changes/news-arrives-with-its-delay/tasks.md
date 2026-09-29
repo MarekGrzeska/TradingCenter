@@ -24,11 +24,11 @@
 
 ## 4. Terminal
 
-- [ ] 4.1 `src/news/newsApi.ts`: mapowanie z drutu na domenę (daty, granice, powód), przez `socialIdentity` i `Endpoints.socialHttp`; test mappera
-- [ ] 4.2 `NewsView`: okno (1/6/24 h, domyślnie 6), zawężenie po źródłach i tekście, liczba i obcięcie, karta z zakresem opóźnienia albo powodem, przycisk zachowania z powrotem po odmowie i momentem zniknięcia, widok „zachowane”, odświeżanie co 30 s bez gubienia listy przy błędzie
-- [ ] 4.3 Zestawienie źródeł: stan, ostatnie udane pobranie, mediana i p90 obu granic, wiek najnowszego, liczba; wyróżnienie stojących i odmawiających z powodem; pusta lista odróżnia „brak newsów” od „zbiór stoi”
-- [ ] 4.4 Wpis `news` w `src/app/tabs.ts`
-- [ ] 4.5 Testy widoku: happy path, jeden błąd odświeżenia, jedno źródło odmawiające, zachowanie z odmową kontraktu; formatowanie zakresu opóźnienia jako test jednostkowy funkcji
+- [x] 4.1 `src/news/newsApi.ts`: mapowanie z drutu na domenę (daty, granice, powód), przez `socialIdentity` i `Endpoints.socialHttp`; test mappera
+- [x] 4.2 `NewsView`: okno (1/6/24 h, domyślnie 6), zawężenie po źródłach i tekście, liczba i obcięcie, karta z zakresem opóźnienia albo powodem, przycisk zachowania z powrotem po odmowie i momentem zniknięcia, widok „zachowane”, odświeżanie co 30 s bez gubienia listy przy błędzie
+- [x] 4.3 Zestawienie źródeł: stan, ostatnie udane pobranie, mediana i p90 obu granic, wiek najnowszego, liczba; wyróżnienie stojących i odmawiających z powodem; pusta lista odróżnia „brak newsów” od „zbiór stoi”
+- [x] 4.4 Wpis `news` w `src/app/tabs.ts`
+- [x] 4.5 Testy widoku: happy path, jeden błąd odświeżenia, jedno źródło odmawiające, zachowanie z odmową kontraktu; formatowanie zakresu opóźnienia jako test jednostkowy funkcji
 
 ## 5. Pocket
 
