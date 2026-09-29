@@ -57,6 +57,7 @@ describe("resolveEndpoints", () => {
         VITE_POLYMARKET_HTTP: "/polymarket-api",
         VITE_STRATEGY_HTTP: "/strategy-api",
         VITE_SOCIAL_HTTP: "/social-api",
+        VITE_YOUTUBE_HTTP: "/youtube-api",
       },
       devLoc,
     );
@@ -68,6 +69,7 @@ describe("resolveEndpoints", () => {
       polymarketHttp: "/polymarket-api",
       strategyHttp: "/strategy-api",
       socialHttp: "/social-api",
+      youtubeHttp: "/youtube-api",
     });
   });
 
@@ -81,6 +83,7 @@ describe("resolveEndpoints", () => {
         VITE_POLYMARKET_HTTP: "https://polymarket.example.com",
         VITE_STRATEGY_HTTP: "https://strategy.example.com",
         VITE_SOCIAL_HTTP: "https://social.example.com",
+        VITE_YOUTUBE_HTTP: "https://youtube.example.com",
       },
       { protocol: "https:", host: "terminal.example.com" },
     );
@@ -92,6 +95,7 @@ describe("resolveEndpoints", () => {
       polymarketHttp: "https://polymarket.example.com",
       strategyHttp: "https://strategy.example.com",
       socialHttp: "https://social.example.com",
+      youtubeHttp: "https://youtube.example.com",
     });
   });
 
@@ -104,14 +108,22 @@ describe("resolveEndpoints", () => {
       polymarketHttp: "/polymarket-api",
       strategyHttp: "/strategy-api",
       socialHttp: "/social-api",
+      youtubeHttp: "/youtube-api",
     });
   });
 
   // The archive answered on `/archive`, which is also the Archive tab's route, so reloading returned JSON
   // instead of the app — clicking through worked, which is why nothing here noticed. Compared, not eyeballed.
   it("gives no back end a relative prefix that a tab route already claims", () => {
-    const { archiveHttp, archiveWs, workbenchHttp, gatewayHttp, polymarketHttp, socialHttp } =
-      resolveEndpoints({}, devLoc);
+    const {
+      archiveHttp,
+      archiveWs,
+      workbenchHttp,
+      gatewayHttp,
+      polymarketHttp,
+      socialHttp,
+      youtubeHttp,
+    } = resolveEndpoints({}, devLoc);
     const routes = new Set(TABS.map((tab) => tab.path));
 
     const prefixes = [
@@ -121,6 +133,7 @@ describe("resolveEndpoints", () => {
       gatewayHttp,
       polymarketHttp,
       socialHttp,
+      youtubeHttp,
     ]
       .filter((base) => base.startsWith("/"))
       .map((base) => base.split("/")[1]);
@@ -150,6 +163,7 @@ describe("resolveEntra", () => {
         polymarket: null,
         strategy: null,
         social: null,
+        youtube: null,
       },
     });
   });
@@ -163,6 +177,7 @@ describe("resolveEntra", () => {
         VITE_ENTRA_SCOPE_POLYMARKET: "api://polymarket/access_as_user",
         VITE_ENTRA_SCOPE_STRATEGY: "api://strategy/access_as_user",
         VITE_ENTRA_SCOPE_SOCIAL: "api://social/access_as_user",
+        VITE_ENTRA_SCOPE_YOUTUBE: "api://youtube/access_as_user",
       })?.scopes,
     ).toEqual({
       archive: "api://market-data/access_as_user",
@@ -171,6 +186,7 @@ describe("resolveEntra", () => {
       polymarket: "api://polymarket/access_as_user",
       strategy: "api://strategy/access_as_user",
       social: "api://social/access_as_user",
+      youtube: "api://youtube/access_as_user",
     });
   });
 

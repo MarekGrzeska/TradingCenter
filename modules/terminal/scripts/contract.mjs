@@ -80,6 +80,20 @@ const SOURCES = [
 `,
   },
   {
+    name: "youtube-data",
+    moduleDir: resolve(terminal, "..", "workbench"),
+    pythonModule: "youtube_data.openapi",
+    output: join(terminal, "src", "data", "contract.youtube.generated.ts"),
+    banner: `/**
+ * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
+ *
+ * Printed from the YouTube archive's models by \`python -m youtube_data.openapi\` — a package of the workbench,
+ * served under /youtube when its database is configured. Every reading field is present and null where no model has
+ * read the film, and every film says whether it is simulated.
+ */
+`,
+  },
+  {
     name: "strategy",
     moduleDir: resolve(terminal, "..", "workbench"),
     pythonModule: "strategy.openapi",

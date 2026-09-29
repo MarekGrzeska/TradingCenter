@@ -52,6 +52,9 @@ export interface Endpoints {
   /** `social-data`, for the posts: the archive of what was said and what a model made of it. The
    *  workbench's address plus `/social`, for the reason the prediction-market archive is. */
   socialHttp: string;
+  /** `youtube-data`, for the films: what was said in the videos the operator follows, and what a model made of it. The
+   *  workbench's address plus `/youtube`, when the workbench has the package — it is the one back end that may be absent. */
+  youtubeHttp: string;
   /** `capital-gateway`, for the account. It used to have no address here at all; what changed is that the
    *  gateway recognises an authenticated browser. In dev this is a prefix the dev server proxies. */
   gatewayHttp: string;
@@ -66,6 +69,7 @@ const DEFAULT_GATEWAY_HTTP = "/gateway-api";
 const DEFAULT_POLYMARKET_HTTP = "/polymarket-api";
 const DEFAULT_STRATEGY_HTTP = "/strategy-api";
 const DEFAULT_SOCIAL_HTTP = "/social-api";
+const DEFAULT_YOUTUBE_HTTP = "/youtube-api";
 
 export interface EnvVars {
   VITE_ARCHIVE_HTTP?: string;
@@ -75,6 +79,7 @@ export interface EnvVars {
   VITE_POLYMARKET_HTTP?: string;
   VITE_STRATEGY_HTTP?: string;
   VITE_SOCIAL_HTTP?: string;
+  VITE_YOUTUBE_HTTP?: string;
   VITE_ENTRA_CLIENT_ID?: string;
   VITE_ENTRA_TENANT_ID?: string;
   VITE_ENTRA_SCOPE?: string;
@@ -83,6 +88,7 @@ export interface EnvVars {
   VITE_ENTRA_SCOPE_POLYMARKET?: string;
   VITE_ENTRA_SCOPE_STRATEGY?: string;
   VITE_ENTRA_SCOPE_SOCIAL?: string;
+  VITE_ENTRA_SCOPE_YOUTUBE?: string;
 }
 
 /** One scope per module, because each accepts a token minted for its **own** audience. `archive` keeps
@@ -94,6 +100,7 @@ export interface ModuleScopes {
   polymarket: string | null;
   strategy: string | null;
   social: string | null;
+  youtube: string | null;
 }
 
 /** Which Entra registration the terminal signs the operator in against, and what it asks
@@ -132,6 +139,7 @@ export function resolveEntra(env: EnvVars = import.meta.env): EntraConfig | null
       polymarket: env.VITE_ENTRA_SCOPE_POLYMARKET?.trim() || null,
       strategy: env.VITE_ENTRA_SCOPE_STRATEGY?.trim() || null,
       social: env.VITE_ENTRA_SCOPE_SOCIAL?.trim() || null,
+      youtube: env.VITE_ENTRA_SCOPE_YOUTUBE?.trim() || null,
     },
   };
 }
@@ -148,5 +156,6 @@ export function resolveEndpoints(
     polymarketHttp: resolveHttpBase(env.VITE_POLYMARKET_HTTP || DEFAULT_POLYMARKET_HTTP),
     strategyHttp: resolveHttpBase(env.VITE_STRATEGY_HTTP || DEFAULT_STRATEGY_HTTP),
     socialHttp: resolveHttpBase(env.VITE_SOCIAL_HTTP || DEFAULT_SOCIAL_HTTP),
+    youtubeHttp: resolveHttpBase(env.VITE_YOUTUBE_HTTP || DEFAULT_YOUTUBE_HTTP),
   };
 }

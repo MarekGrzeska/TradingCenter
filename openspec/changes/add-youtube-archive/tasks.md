@@ -55,9 +55,9 @@
 
 ## 8. Terminal
 
-- [ ] 8.1 `contract-sync`: `contract.youtube.generated.ts`
-- [ ] 8.2 `src/youtube/`: `YoutubeView` z zakładkami Filmy / Kanały / Tematy, szczegół filmu, dialogi dopisania, pasek stanu z symulacją i sufitami
-- [ ] 8.3 Testy widoku: happy path, odmowa kontraktu, nieudane odświeżenie nie czyści listy
+- [x] 8.1 `contract-sync`: `contract.youtube.generated.ts`
+- [x] 8.2 `src/youtube/`: `YoutubeView` z zakładkami Filmy / Kanały / Tematy, szczegół filmu, dialogi dopisania, pasek stanu z symulacją i sufitami
+- [x] 8.3 Testy widoku: happy path, odmowa kontraktu, nieudane odświeżenie nie czyści listy
 
 ## 9. Domknięcie
 
