@@ -1,7 +1,7 @@
 import type { Tab } from "./tabs";
 import styles from "./TabBar.module.css";
 
-const LABELS: Record<Tab, string> = { markets: "Markets", social: "Posts", agent: "Agent" };
+const LABELS: Record<Tab, string> = { markets: "Markets", social: "Posts", news: "News", agent: "Agent" };
 
 /** At the bottom, because that is where a thumb is. A row of tabs at the top of a phone screen is a
  *  reach for every switch, and this app is opened for seconds at a time. */
@@ -42,6 +42,11 @@ export function TabBar({
                   strokeLinejoin="round"
                 />
                 <path d="M7 7.5h6M7 10h4" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+            ) : tab === "news" ? (
+              <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor">
+                <path d="M4 4.5h9v11H5.5a1.5 1.5 0 0 1-1.5-1.5z" strokeWidth="1.6" strokeLinejoin="round" />
+                <path d="M13 8h3v6a1.5 1.5 0 0 1-3 0M6.5 7.5h4M6.5 10h4M6.5 12.5h4" strokeWidth="1.4" strokeLinecap="round" />
               </svg>
             ) : (
               <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor">

@@ -32,9 +32,9 @@
 
 ## 5. Pocket
 
-- [ ] 5.1 `src/news/`: `api.ts`, `useNews.ts` (60 s, ukryty ekran nie odpytuje), `NewsScreen` z listą i arkuszem źródeł, karta z opóźnieniem i przyciskiem zachowania
-- [ ] 5.2 Czwarta zakładka: `tabs.ts`, `LABELS` i ikona w `TabBar.tsx`, panel w `App.tsx`
-- [ ] 5.3 Testy: happy path, błąd odświeżenia, zachowanie z odmową, mapper
+- [x] 5.1 `src/news/`: `api.ts`, `useNews.ts` (60 s, ukryty ekran nie odpytuje), `NewsScreen` z listą i arkuszem źródeł, karta z opóźnieniem i przyciskiem zachowania
+- [x] 5.2 Czwarta zakładka: `tabs.ts`, `LABELS` i ikona w `TabBar.tsx`, panel w `App.tsx`
+- [x] 5.3 Testy: happy path, błąd odświeżenia, zachowanie z odmową, mapper
 
 ## 6. Dokumentacja i zamknięcie
 
