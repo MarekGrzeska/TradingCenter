@@ -17,3 +17,13 @@ def clean(raw: str) -> str:
     turn into a tag nobody stripped.
     """
     return _WHITESPACE.sub("\n", html.unescape(_TAG.sub("", raw))).strip()
+
+
+_BLOCK_END = re.compile(r"</(?:p|div|li|h[1-6]|blockquote)>|<br\s*/?>", re.IGNORECASE)
+_BLANK_LINES = re.compile(r"\n{3,}")
+
+
+def paragraphs(raw: str) -> str:
+    """As `clean`, but a paragraph break in the markup stays one in the text. For an article body: without it
+    three paragraphs read as a wall."""
+    return _BLANK_LINES.sub("\n\n", clean(_BLOCK_END.sub("\n\n", raw)))

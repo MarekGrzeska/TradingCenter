@@ -146,6 +146,10 @@ class NewsItemOut(BaseModel):
     summary: str = Field(
         description="the lead as text, empty where the feed gave none worth showing"
     )
+    content: str = Field(
+        description="the body as text where the feed carries more than a lead, paragraphs kept; empty "
+        "where it does not — the screen then has only `summary` and the link to the source"
+    )
     url: str | None = None
     published_at: datetime | None = Field(
         description="when the feed says it was published; null where it said nothing readable"

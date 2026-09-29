@@ -9,16 +9,21 @@ from email.utils import parsedate_to_datetime
 
 from defusedxml.ElementTree import fromstring
 
-from ..text import clean
+from ..text import clean, paragraphs
 from .models import FeedItem
 
 log = logging.getLogger(__name__)
 
 ATOM = "{http://www.w3.org/2005/Atom}"
 DC = "{http://purl.org/dc/elements/1.1/}"
+CONTENT = "{http://purl.org/rss/1.0/modules/content/}encoded"
 
 # Axios sends ~2 KB of body per item; a headline's lead is what a screen needs, not the article.
 SUMMARY_LIMIT = 1000
+
+# What is kept of an article body. A feed that carries the whole piece is a few KB; this is the ceiling for one
+# that carries a book.
+CONTENT_LIMIT = 50_000
 
 
 class Unreadable(Exception):
@@ -40,13 +45,19 @@ def moment(raw: str | None) -> datetime | None:
     return parsed.astimezone(UTC) if parsed.tzinfo else parsed.replace(tzinfo=UTC)
 
 
-def _summary(raw: str | None, title: str) -> str:
-    text = clean(raw or "")
-    # Google News repeats the headline and the publisher as the description; a lead saying the title
-    # again is noise on every card.
+def _texts(raw: str | None, title: str) -> tuple[str, str]:
+    """The lead and, when the feed carries more than a lead, the body — both as text.
+
+    Google News repeats the headline and the publisher as the description; a lead saying the title again is
+    noise on every card, so neither is kept for it. `content` is empty unless it says more than `summary`: the
+    same words twice would be stored twice for nothing.
+    """
+    text = paragraphs(raw or "")
     if not text or text.startswith(title):
-        return ""
-    return text if len(text) <= SUMMARY_LIMIT else text[: SUMMARY_LIMIT - 1].rstrip() + "…"
+        return "", ""
+    summary = text if len(text) <= SUMMARY_LIMIT else text[: SUMMARY_LIMIT - 1].rstrip() + "…"
+    content = text[:CONTENT_LIMIT] if len(text) > SUMMARY_LIMIT else ""
+    return summary, content
 
 
 def _aggregated_title(title: str, publisher: str) -> str:
@@ -64,11 +75,14 @@ def _rss_item(item, default_publisher: str) -> FeedItem | None:
     publisher = (item.findtext("source") or "").strip() or default_publisher
     if publisher != default_publisher:
         title = _aggregated_title(title, publisher)
+    # `content:encoded` is the body where a feed has it, and the description is the lead where it does not.
+    summary, content = _texts(item.findtext(CONTENT) or item.findtext("description"), title)
     return FeedItem(
         external_id=external_id,
         title=title,
         publisher=publisher,
-        summary=_summary(item.findtext("description"), title),
+        summary=summary,
+        content=content,
         url=link,
         published_at=moment(item.findtext("pubDate") or item.findtext(f"{DC}date")),
     )
@@ -84,12 +98,15 @@ def _atom_entry(entry, default_publisher: str) -> FeedItem | None:
     external_id = (entry.findtext(f"{ATOM}id") or "").strip() or link
     if not title or not external_id:
         return None
-    raw_summary = entry.findtext(f"{ATOM}summary") or entry.findtext(f"{ATOM}content")
+    summary, content = _texts(
+        entry.findtext(f"{ATOM}content") or entry.findtext(f"{ATOM}summary"), title
+    )
     return FeedItem(
         external_id=external_id,
         title=title,
         publisher=default_publisher,
-        summary=_summary(raw_summary, title),
+        summary=summary,
+        content=content,
         url=link,
         published_at=moment(entry.findtext(f"{ATOM}published") or entry.findtext(f"{ATOM}updated")),
     )

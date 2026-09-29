@@ -35,7 +35,8 @@ i jej nie pokaże.
   w pocket. Znacznik zachowania to **pierwsza trasa zapisująca w `/social`**. Wymóg „kontrakt
   wyłącznie czyta” dostaje dokładnie ten jeden wyjątek i nic poza nim.
 - **Poza zakresem:** tłumaczenie, ocena wpływu, alerty na Telegram, narzędzia dla rozmowy,
-  deduplikacja tego samego newsa między źródłami i relacje na żywo (JSON-LD Guardiana i CNN).
+  deduplikacja tego samego newsa między źródłami, relacje na żywo (JSON-LD Guardiana i CNN) i pobieranie stron
+  artykułów po pełny tekst (feed niesie go tylko czasem).
   Wszystko to czeka na osobne zmiany, a schemat żadnej z nich nie blokuje.
 
 ## Capabilities

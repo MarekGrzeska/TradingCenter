@@ -43,3 +43,12 @@
 - [x] 6.3 `openspec validate news-arrives-with-its-delay --strict`
 - [ ] 6.4 Po wdrożeniu: `/social/news/sources` wymienia 15 źródeł z udanym pobraniem, `/social/health` niesie heartbeat `news`; odmawiające źródła zapisane w `review.md`
 - [x] 6.5 `review.md`
+
+## 7. Po pierwszym dniu na produkcji
+
+- [x] 7.1 Times of Israel: własny feed odpowiada 403 z Azure (Cloudflare), więc wpis zastąpiony zapytaniem Google News `site:timesofisrael.com`
+- [x] 7.2 Treść newsa: migracja `0004` (`content`), parser bierze `content:encoded`/Atom `content` z akapitami, kontrakt niesie `content`, testy parsera, magazynu i drutu
+- [x] 7.3 Okna w minutach: `GET /news?minutes=`, test okna 5 i 15 minut
+- [x] 7.4 Terminal: kliknięcie rozwija cały news w miejscu, okna 5 min–7 d (domyślnie 4 h), sortowanie po publikacji / zobaczeniu / oczekiwaniu, „Wszystkie / Żadne / Tylko działające”
+- [ ] 7.5 Pocket: to samo co 7.4
+- [ ] 7.6 Uzupełnić `review.md` o tę zmianę i po wdrożeniu sprawdzić, które feedy niosą treść

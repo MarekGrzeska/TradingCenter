@@ -46,7 +46,14 @@ SOURCES: tuple[NewsSource, ...] = (
     ),
     NewsSource("tehrantimes", "Tehran Times", "https://www.tehrantimes.com/rss"),
     NewsSource("irna", "IRNA", "https://en.irna.ir/rss"),
-    NewsSource("timesofisrael", "Times of Israel", "https://www.timesofisrael.com/feed/"),
+    # Its own feed answers 403 from Azure's addresses (Cloudflare) and works from a home one, so it is not a User-Agent
+    # problem and not one to route around. What Google News carries of it comes with the aggregator's delay.
+    NewsSource(
+        "google-news-timesofisrael",
+        "Google News",
+        _google_news("site:timesofisrael.com+(Iran+OR+Israel+OR+Hormuz+OR+Hezbollah)+when:1d"),
+        GOOGLE_NEWS_INTERVAL_SECONDS,
+    ),
     NewsSource("middleeasteye", "Middle East Eye", "https://www.middleeasteye.net/rss"),
     NewsSource("guardian-iran", "The Guardian", "https://www.theguardian.com/world/iran/rss"),
     NewsSource(

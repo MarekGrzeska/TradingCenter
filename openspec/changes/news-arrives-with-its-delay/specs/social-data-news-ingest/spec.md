@@ -59,9 +59,14 @@ i nie może się przesuwać.
 
 Pakiet MUST NOT filtrować newsów przy zbiorze, ani słowami kluczowymi, ani modelem. Zawężanie jest
 sprawą odczytu. Tytuł i lead MUST być zapisane w języku, w którym podało je źródło, jako czysty
-tekst bez znaczników i z rozwiniętymi encjami. Przy newsie MUST być przechowany adres oryginału
-i nazwa wydawcy. Gdy feed agreguje cudze artykuły, wydawcą jest ten, kto artykuł napisał, a nie
-agregator.
+tekst bez znaczników i z rozwiniętymi encjami. Gdy feed niesie więcej niż lead — pełną treść artykułu
+albo dłuższy fragment — pakiet MUST zapisać ją osobno, jako tekst z zachowanymi akapitami, w granicy
+rozsądnego rozmiaru. Gdy feed niesie sam lead, treść MUST być pusta, a nie powtórzeniem leadu. Przy newsie
+MUST być przechowany adres oryginału i nazwa wydawcy. Gdy feed agreguje cudze artykuły, wydawcą jest
+ten, kto artykuł napisał, a nie agregator.
+
+Pakiet MUST NOT pobierać stron artykułów, żeby dopełnić treść. Zapisane jest to, co feed niesie, a
+pełny tekst spoza feedu wymagałby decyzji o zbieraniu stron, których regulaminy i ochrony bywają różne.
 
 #### Scenario: News spoza tematu
 
@@ -72,6 +77,17 @@ agregator.
 
 - **WHEN** feed wydaje lead ze znacznikami HTML i zakodowanymi encjami
 - **THEN** zapisany lead MUST być czystym tekstem z rozwiniętymi encjami
+
+#### Scenario: Feed niesie całą treść
+
+- **WHEN** feed wydaje pozycję z treścią w kilku akapitach
+- **THEN** zapisana treść MUST zachować podział na akapity
+- **AND** lead MUST być krótszy od treści i MUST NOT być jej kopią
+
+#### Scenario: Feed niesie tylko lead
+
+- **WHEN** feed wydaje pozycję z samym krótkim opisem
+- **THEN** treść MUST być pusta, a lead MUST być zapisany
 
 ### Requirement: Feed, który nie odpowiada, jest odróżniony od feedu bez nowości
 

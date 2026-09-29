@@ -47,6 +47,7 @@ def feed_item(
     title: str = "Iran and the US resume talks",
     publisher: str = "A Publisher",
     summary: str = "",
+    content: str = "",
     url: str | None = "https://example.com/n1",
     published_at: datetime | None = NOON,
 ) -> FeedItem:
@@ -56,6 +57,7 @@ def feed_item(
         title=title,
         publisher=publisher,
         summary=summary,
+        content=content,
         url=url,
         published_at=published_at,
     )

@@ -203,3 +203,18 @@ async def test_a_source_with_nothing_measured_has_empty_figures_and_the_count_of
 
     assert (figures.items, figures.unmeasured) == (1, 1)
     assert figures.lower_median is None and figures.upper_p90 is None
+
+
+async def test_the_body_is_stored_beside_the_lead_and_an_empty_one_stays_empty(db):
+    await collect(
+        db,
+        [
+            feed_item("full", summary="lead", content="the whole piece\n\nin two paragraphs"),
+            feed_item("short", summary="lead"),
+        ],
+    )
+
+    stored = {item.external_id: item for item in await window(db)}
+
+    assert stored["full"].content == "the whole piece\n\nin two paragraphs"
+    assert stored["short"].content == ""

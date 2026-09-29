@@ -7,24 +7,88 @@ newsa i każdego źródła, oraz co ekran mówi, gdy źródło stoi albo odmawia
 
 ### Requirement: Zakładka pokazuje newsy z nazwanego okna
 
-Zakładka MUST pokazywać newsy z wybranego okna, najnowsze na górze, z domyślnym oknem ostatnich
-6 godzin. MUST nazywać okno i liczbę newsów wprost, a gdy kontrakt obciął listę, MUST to
-powiedzieć. Operator MUST móc zawęzić listę do wybranych źródeł i do tekstu.
+Zakładka MUST pokazywać newsy z wybranego okna. Operator MUST móc wybrać okno spośród: 5 minut,
+15 minut, 1 godziny, 4 godzin, 24 godzin i 7 dni; domyślnym oknem jest 4 godziny. Zakładka MUST nazywać
+okno i liczbę newsów wprost, a gdy kontrakt obciął listę, MUST to powiedzieć. Operator MUST móc zawęzić
+listę do wybranych źródeł i do tekstu.
 
 #### Scenario: Otwarcie zakładki
 
 - **WHEN** operator otwiera zakładkę
-- **THEN** widzi newsy z ostatnich 6 godzin, najnowsze na górze, wraz z liczbą i nazwą okna
+- **THEN** widzi newsy z ostatnich 4 godzin wraz z liczbą i nazwą okna
+
+#### Scenario: Zmiana okna
+
+- **WHEN** operator wybiera okno 7 dni
+- **THEN** zakładka MUST zapytać o siedem dni i nazwać okno w nagłówku
 
 #### Scenario: Lista obcięta
 
 - **WHEN** kontrakt odpowiada, że lista jest obcięta
 - **THEN** ekran MUST to powiedzieć, zamiast udawać, że pokazuje całe okno
 
+### Requirement: Kliknięcie otwiera cały news w aplikacji
+
+Kliknięcie w news MUST rozwijać go w miejscu i pokazywać całą treść, jaką archiwum ma: treść, gdy
+feed ją niósł, a w przeciwnym razie lead, z zachowanymi akapitami. Kliknięcie MUST NOT przenosić operatora
+na stronę źródła. Adres oryginału MUST być dostępny jako osobny, jawny odnośnik w rozwiniętej części. Gdy
+archiwum ma sam lead, ekran MUST to powiedzieć, zamiast udawać, że pokazuje cały artykuł. Przycisk
+zachowania MUST działać niezależnie od rozwijania.
+
+#### Scenario: Rozwinięcie newsa z treścią
+
+- **WHEN** operator klika news, który feed niósł z treścią w kilku akapitach
+- **THEN** karta MUST pokazać całą treść w aplikacji, z akapitami
+- **AND** tytuł MUST NOT być odnośnikiem do strony źródła
+
+#### Scenario: News z samym leadem
+
+- **WHEN** operator rozwija news, którego feed niósł tylko z leadem
+- **THEN** karta MUST pokazać ten lead w całości i powiedzieć, że pełny tekst jest u źródła
+
+#### Scenario: Zachowanie nie rozwija
+
+- **WHEN** operator klika przycisk zachowania na zwiniętej karcie
+- **THEN** karta MUST pozostać zwinięta
+
+### Requirement: Newsy dają się sortować po czasie
+
+Operator MUST móc uporządkować listę po czasie publikacji, po momencie pierwszego zobaczenia i po
+czasie oczekiwania (górna granica opóźnienia), w obu kierunkach. News bez zmierzonego opóźnienia MUST
+stać na końcu przy sortowaniu po oczekiwaniu, w obu kierunkach. News bez czasu publikacji MUST być
+umieszczony według momentu pierwszego zobaczenia. Domyślny porządek to publikacja od najnowszej.
+
+#### Scenario: Sortowanie po oczekiwaniu
+
+- **WHEN** operator wybiera sortowanie po oczekiwaniu od najdłuższego
+- **THEN** news, który czekał najdłużej, MUST być pierwszy, a news bez pomiaru ostatni
+
+#### Scenario: Odwrócenie kierunku
+
+- **WHEN** operator odwraca kierunek sortowania
+- **THEN** lista MUST wystąpić w odwrotnym porządku, z newsami bez pomiaru nadal na końcu
+
+### Requirement: Źródła wybiera się jednym kliknięciem
+
+Zakładka MUST domyślnie mieć zaznaczone wszystkie źródła. Operator MUST móc jednym kliknięciem zaznaczyć
+wszystkie, odznaczyć wszystkie i zostawić tylko źródła, które odpowiadają. Źródło, które pojawi się
+w zestawieniu później, MUST być zaznaczone. Gdy nie wybrano żadnego źródła, ekran MUST to powiedzieć
+i MUST NOT pytać kontraktu, bo pusta lista źródeł oznacza tam „wszystkie”.
+
+#### Scenario: Wszystkie i żadne
+
+- **WHEN** operator klika „Żadne”, a potem „Wszystkie”
+- **THEN** po pierwszym kliknięciu ekran MUST powiedzieć, że nie wybrano źródła, a po drugim MUST znów pokazać newsy ze wszystkich
+
+#### Scenario: Tylko działające
+
+- **WHEN** operator klika „Tylko działające”, a jedno źródło odmawia
+- **THEN** źródło odmawiające MUST być odznaczone, a pozostałe zaznaczone
+
 ### Requirement: News pokazuje swoje opóźnienie
 
 Karta newsa MUST pokazywać tytuł i lead w języku źródła, wydawcę, czas publikacji, opóźnienie
-i drogę do oryginału. Opóźnienie MUST być pokazane jako zakres od granicy dolnej do górnej. Gdy go
+i — po rozwinięciu — drogę do oryginału. Opóźnienie MUST być pokazane jako zakres od granicy dolnej do górnej. Gdy go
 nie ma, karta MUST pokazać powód, na przykład „zastany” albo „brak czasu publikacji”. MUST NOT
 pokazywać zera ani pustego miejsca bez wyjaśnienia.
 

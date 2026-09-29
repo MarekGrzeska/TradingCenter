@@ -18,6 +18,7 @@ class FeedItem:
     summary: str = ""
     url: str | None = None
     published_at: datetime | None = None
+    content: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,6 +33,7 @@ class NewsItem:
     first_seen_at: datetime
     previous_fetch_at: datetime | None
     kept_at: datetime | None
+    content: str
 
 
 class Unmeasured(str, Enum):
