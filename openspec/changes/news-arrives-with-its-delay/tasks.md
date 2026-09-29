@@ -1,9 +1,9 @@
 ## 1. Przechowywanie
 
-- [ ] 1.1 Migracja łańcucha `social`: tabele `news_items` (z `kept_at`) i `news_sources` z kluczem i indeksami z design.md (decyzje 1 i 5)
-- [ ] 1.2 `store.py` (albo `news_store.py`): zbiorowy insert newsów `ON CONFLICT DO NOTHING` z `first_seen_at` i `previous_fetch_at`; zapis udanego pobrania i porażki źródła; odczyt okna z zawężeniami, porządkiem i `truncated`; rachunek opóźnień per źródło (`percentile_cont`, tolerancja 120 s); postawienie i zdjęcie `kept_at`; czyszczenie po retencji z pominięciem zachowanych
-- [ ] 1.3 Testy `-m db`: news widziany drugi raz niczego nie zmienia; zastany ma pustą `previous_fetch_at`; granice 3/5 min i 0/1 min ze scenariuszy; czas z przyszłości i brak czasu wypadają ze statystyk; źródło bez pomiarów ma statystyki puste; czyszczenie usuwa stary niezachowany, zostawia zachowany, usuwa stary po zdjęciu znacznika
-- [ ] 1.4 `db-cost-check` dla odczytu okna i rachunku źródeł; EXPLAIN na danych rzędu tygodnia (~25 tys. wierszy)
+- [x] 1.1 Migracja łańcucha `social`: tabele `news_items` (z `kept_at`) i `news_sources` z kluczem i indeksami z design.md (decyzje 1 i 5)
+- [x] 1.2 `store.py` (albo `news_store.py`): zbiorowy insert newsów `ON CONFLICT DO NOTHING` z `first_seen_at` i `previous_fetch_at`; zapis udanego pobrania i porażki źródła; odczyt okna z zawężeniami, porządkiem i `truncated`; rachunek opóźnień per źródło (`percentile_cont`, tolerancja 120 s); postawienie i zdjęcie `kept_at`; czyszczenie po retencji z pominięciem zachowanych
+- [x] 1.3 Testy `-m db`: news widziany drugi raz niczego nie zmienia; zastany ma pustą `previous_fetch_at`; granice 3/5 min i 0/1 min ze scenariuszy; czas z przyszłości i brak czasu wypadają ze statystyk; źródło bez pomiarów ma statystyki puste; czyszczenie usuwa stary niezachowany, zostawia zachowany, usuwa stary po zdjęciu znacznika
+- [x] 1.4 `db-cost-check` dla odczytu okna i rachunku źródeł; EXPLAIN na 100 tys. wierszy (sufit retencji): wszystkie zapytania po indeksach, okno 6 h 19 buforów / 0,26 ms, rachunek źródeł 153 bufory / 1 ms, czyszczenie 3 bufory — klasa C2
 
 ## 2. Pobieranie
 

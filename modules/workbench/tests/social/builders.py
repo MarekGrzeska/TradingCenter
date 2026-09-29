@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from social_data.models import RawPost
+from social_data.news.models import FeedItem
 
 TRUTH_SOCIAL = "truth_social"
 
@@ -37,4 +38,24 @@ def raw_post(
         published_at=published_at,
         url=url,
         is_repost=is_repost,
+    )
+
+
+def feed_item(
+    external_id: str = "n1",
+    *,
+    title: str = "Iran and the US resume talks",
+    publisher: str = "A Publisher",
+    summary: str = "",
+    url: str | None = "https://example.com/n1",
+    published_at: datetime | None = NOON,
+) -> FeedItem:
+    """One headline as a feed hands it over."""
+    return FeedItem(
+        external_id=external_id,
+        title=title,
+        publisher=publisher,
+        summary=summary,
+        url=url,
+        published_at=published_at,
     )
