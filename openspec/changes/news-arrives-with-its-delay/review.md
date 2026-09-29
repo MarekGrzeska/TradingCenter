@@ -18,14 +18,14 @@ Uruchomione na tej gałęzi, nie deklarowane. Docker był potrzebny i został ur
 
 | Co | Wynik |
 |---|---|
-| `modules/workbench`: `uv run pytest -q` (z testami `db` na testcontainers) | **2643 passed, 11 skipped** w 6 min 34 s |
-| `modules/workbench`: `uv run pytest tests/social/test_news_*.py` | **54 testy nowe**, wszystkie zielone |
+| `modules/workbench`: `uv run pytest -q` (z testami `db` na testcontainers) | **2663 passed, 11 skipped** w 6 min 2 s |
+| `modules/workbench`: `uv run pytest tests/social/test_news_*.py` | **74 testy nowe**, wszystkie zielone |
 | `modules/workbench`: `uv run ruff check .` · `uv run pyright` | czysto · 0 błędów |
 | `modules/terminal`: vitest · `tsc -b --noEmit` · `eslint .` · `node scripts/contract.mjs check` | **842 passed (68 plików)** · czysto · czysto · „Every contract is up to date” |
 | `modules/pocket`: vitest · `tsc -b --noEmit` · `eslint .` · `node scripts/contract.mjs check` | **87 passed (17 plików)** · czysto · czysto · „The contract is up to date” |
 | `scripts`: `uv run pytest -q` | **149 passed, 27 skipped** |
 | `openspec validate news-arrives-with-its-delay --strict` | valid |
-| `db-cost-check` (task 1.4): jednorazowy Postgres 17, 100 tys. wierszy `news_items`, 15 źródeł, `--cpus=1 --memory=2g` | wszystkie sześć zapytań idzie po indeksach; okno 6 h **19 buforów / 0,26 ms**, rachunek źródeł (3,6 tys. wierszy z doby) **153 bufory / 1,0 ms**, czyszczenie **3 bufory**; klasa **C2** |
+| `db-cost-check` (task 1.4): jednorazowy Postgres 17, 100 tys. wierszy `news_items`, 15 źródeł, `--cpus=1 --memory=2g` | wszystkie zapytania idą po indeksach; okno 6 h **19 buforów / 0,26 ms**, czyszczenie **3 bufory**; rachunek źródeł po przeniesieniu do SQL (`percentile_cont`, 3,6 tys. wierszy z doby) **194 bufory / 6,3 ms**; klasa **C2** |
 
 `pnpm` nie działa na tej maszynie pod Node 25, więc terminal i pocket były uruchamiane binarkami z
 `node_modules/.bin` i `node scripts/contract.mjs`, czyli tym samym, co skrypty `pnpm` wołają.
@@ -39,9 +39,9 @@ a parser jest testowany na zapisanych dokumentach.
 | Poważne | `social_data/routers/news.py` (pierwsza wersja trasy `keep`) | Para źródło–identyfikator szła w ścieżce jako `{external_id:path}`, a rekord dostępu (`tc_runtime/caller_access.py:92`) dopasowuje każdy `{placeholder}` jako `[^/]+`. Identyfikator z feedu to zwykle URL, więc **„zachowaj” dostawałoby 403 dla większości newsów**, i to po zdaniu wszystkich testów, bo żaden nie użyłby identyfikatora ze slashem. | **FIXED** w `811f011` — para w ciele `PUT /news/keep`; test `test_news_api.py::test_keeping_a_headline_whose_identifier_is_a_url_reaches_it_and_the_kept_list_finds_it` |
 | Średnie | `terminal/src/news/NewsCard.tsx` | Po zdjęciu znacznika ze starego newsa karta pokazywała **datę z przeszłości** („zniknie 1.09”), a spec `terminal-news` każe powiedzieć „przy najbliższym czyszczeniu”. Pocket robił to dobrze; wyszło przy przejściu po scenariuszach. | **FIXED** w `8ae00b0` — `expiryText`; `delay.test.ts::expiryText` |
 | Drobne | `tests/social/test_api.py` | Istniejący test „kontrakt nie publikuje trasy piszącej” kodował starą regułę i czerwieniał na jedynym dozwolonym wyjątku. | **FIXED** w `811f011` — test wymaga dokładnie jednego zapisu, `PUT /news/keep` |
-| Drobne | `news/fetch.py:MAX_DOCUMENT_BYTES` | Rozmiar sprawdzany po pobraniu całego ciała (`response.content`), więc feed serwujący setki MB zająłby pamięć przed odmową. Lista feedów jest stała i sprawdzona w review, największy zmierzony to 212 KB (Axios). | **OPEN, przyjęte** — strumieniowanie dopiero z feedem spoza tej listy |
-| Drobne | `news/feed.py:11` | `from ..providers.truth_social import clean` — pakiet newsów zależy od funkcji pomocniczej dostawcy postów. Test layeringu przechodzi (to ten sam pakiet), ale trzeci użytkownik `clean` to powód, żeby przenieść ją do neutralnego modułu. | **OPEN, przyjęte** |
-| Drobne | `news/views.py:sources_state` | Rachunek źródeł liczy percentyle w Pythonie po wszystkich wierszach doby (3,6 tys. dziś, 1 ms w SQL). Przy dziesięciokrotnie większej liczbie feedów to 36 tys. wierszy na każde odpytanie co 60 s. | **OPEN, przyjęte** — do przeniesienia na `percentile_cont`, gdy feedów przybędzie |
+| Drobne | `news/fetch.py:MAX_DOCUMENT_BYTES` | Rozmiar sprawdzany po pobraniu całego ciała (`response.content`), więc feed serwujący setki MB zająłby pamięć przed odmową. | **FIXED** w `2e0e6da` — `fetch.py` czyta strumieniowo i odmawia po przekroczeniu limitu w trakcie pobierania; `test_news_fetch.py::test_every_way_a_feed_can_fail_is_its_own_kind` (przypadek 6 MB) |
+| Drobne | `news/feed.py:11` | `from ..providers.truth_social import clean` — pakiet newsów zależy od funkcji pomocniczej dostawcy postów. Test layeringu przechodzi (to ten sam pakiet), ale to sprzężenie bez powodu. | **FIXED** w `2e0e6da` — `clean` mieszka w `social_data/text.py`; `test_truth_social.py` dalej ją importuje z dostawcy i przechodzi |
+| Drobne | `news/views.py:sources_state` | Rachunek źródeł liczył percentyle w Pythonie po wszystkich wierszach doby; przy dziesięciokrotnie większej liczbie feedów to 36 tys. wierszy przez sieć co 60 s. | **FIXED** w `2e0e6da` — `store.source_figures` liczy `percentile_cont` w SQL; definicja jest zapisana dwa razy (SQL i `latency.delay`), więc trzyma je razem `test_news_store.py::test_a_sources_day_is_the_same_definition_as_a_headlines_delay` na tych samych nagłówkach, z przypadkami brzegowymi |
 
 ## Spec coverage
 
@@ -73,9 +73,10 @@ a parser jest testowany na zapisanych dokumentach.
 |---|---|
 | Trzy momenty → News z kompletem | `w/test_news_api.py::test_a_headline_reaches_the_wire_with_both_bounds_of_its_delay` |
 | Granice → Feed spóźniony / natychmiastowy | `w/test_news_latency.py::test_a_feed_that_was_late_has_a_lower_bound_above_zero`, `::test_a_feed_that_published_between_our_two_fetches_has_a_lower_bound_of_zero` |
-| Niezmierzalne → Czas z przyszłości / News zastany | `w/test_news_latency.py::test_what_cannot_be_measured_says_why_and_is_never_zero`, `::test_the_figures_leave_the_unmeasured_out_of_every_statistic_but_count_them` |
+| → Różnica granic nie przekracza odstępu między pobraniami | `w/test_news_latency.py::test_the_two_bounds_differ_by_no_more_than_the_gap_between_our_two_fetches` (20 kombinacji) |
+| Niezmierzalne → Czas z przyszłości / News zastany | `w/test_news_latency.py::test_what_cannot_be_measured_says_why_and_is_never_zero`, `w/test_news_store.py::test_a_sources_day_is_the_same_definition_as_a_headlines_delay` (niezmierzalne liczone, poza statystykami) |
 | Rachunek źródła → Porównanie dwóch źródeł | `w/test_news_api.py::test_the_sources_lists_every_declared_feed_including_one_that_never_answered` |
-| → Źródło dopiero dodane | `w/test_news_latency.py::test_a_source_with_nothing_measured_has_empty_figures_not_zeros` |
+| → Źródło dopiero dodane | `w/test_news_store.py::test_a_source_with_nothing_measured_has_empty_figures_and_the_count_of_what_it_could_not` |
 | Stojące źródło → Odmawia od godziny | `w/test_news_status.py::test_a_feed_whose_latest_fetch_failed_is_failing_until_it_has_been_silent_for_six_intervals`, `w/test_news_api.py::test_a_feed_whose_latest_fetch_failed_is_named_failing_with_its_reason` |
 | → Ciche, ale żywe | `w/test_news_status.py::test_a_feed_answering_within_its_intervals_is_ok_even_if_nothing_new_was_published` |
 
@@ -97,7 +98,8 @@ a parser jest testowany na zapisanych dokumentach.
 |---|---|
 | Kontrakt wyłącznie czyta → Klient szuka drogi do wymuszenia zbioru | `w/test_api.py::test_the_contract_publishes_no_route_that_writes_but_the_keep_flag` |
 | → Znacznik nie dotyka treści | `w/test_news_store.py::test_keeping_is_idempotent_and_touches_nothing_else` |
-| Wiek pętli → Pętla chodzi / stanęła / druga pętla nie zasłania | **luka** — patrz Gaps |
+| Wiek pętli → Pętla chodzi / druga pętla nie zasłania | `w/test_news_collector.py::test_serving_runs_both_loops_and_publishes_each_beat_under_its_own_name` (prawdziwy `serving`, `/health` wymienia `collect` i `news`); wiek w interwałach pętli: `packages/tc-runtime/tests/test_liveness.py` |
+| → Pętla stanęła | `packages/tc-runtime/tests/test_liveness.py` (wiek rośnie bez uderzeń); alert `social_data.loop_passes_late` bierze maksimum po wymiarze `loop` (`infra/monitoring.tf`) |
 
 ### terminal-news
 
@@ -108,14 +110,14 @@ a parser jest testowany na zapisanych dokumentach.
 | Opóźnienie na karcie → ze zmierzonym / bez czasu publikacji | `t/delay.test.ts` (`delayText`, wszystkie trzy powody), `t/NewsView.test.tsx::says why a headline has no delay instead of showing a zero` |
 | Przycisk zachowania → Zachowanie / Zmiana nieudana | `t/NewsView.test.tsx::keeps a headline with one click and asks for it by the pair`, `::puts the headline back as it was, and says so, when keeping is refused` |
 | → Zdjęcie znacznika ze starego newsa | `t/delay.test.ts::expiryText` (po poprawce `8ae00b0`) |
-| Zestawienie źródeł → Jedno źródło odmawia | `t/NewsView.test.tsx::flags a refusing source in the table with its reason and its last success` |
+| Zestawienie źródeł → Jedno źródło odmawia (stan, powód, ostatnie pobranie, mediana i p90 obu granic) | `t/NewsView.test.tsx::flags a refusing source in the table with its reason and its last success` |
 | Pusta lista → Wszystkie źródła stoją | `t/NewsView.test.tsx::says collection has stopped rather than letting an empty list speak for it` |
 | Odświeżanie → Odświeżenie nie dochodzi | `t/NewsView.test.tsx::keeps the headlines on screen when a refresh fails` |
 
 ## Gaps
 
-1. **`social-data-liveness` → wszystkie trzy scenariusze pętli newsów** nie mają testu wprost. Nazwanie pętli i wiek w jej własnych interwałach są w `tc_runtime` i tam testowane; nie ma natomiast testu, że `serving` rejestruje *drugą* heartbeat i że `/health` ją wydaje. Pisanie go wymagałoby uruchomienia całego `serving`, czyli sięgnięcia po sieć (kolektor postów odpytuje Truth Social). Zamiast tego pokrywa to zadanie 6.4: `/social/health` ma wymienić `collect` i `news`.
-2. **`social-data-news-latency` → „różnica między granicami nie przekracza odstępu między dwoma pobraniami”** nie ma testu. Wynika wprost z konstrukcji (różnica to `first_seen_at − previous_fetch_at`), a odstęp jest egzekwowany osobnym testem, ale niezmiennik nie jest zapisany jako asercja.
-3. **`terminal-news` → mediana i p90 obu granic w tabeli źródeł** — test tabeli sprawdza stan, powód i moment ostatniego pobrania, ale nie tekst liczb; formatowanie czasu trwania jest testowane osobno (`delay.test.ts`).
-4. **Zadanie 6.4** — weryfikacja po wdrożeniu, czynność po merge. Do zapisania tutaj po pierwszym przebiegu: które z 15 źródeł faktycznie odpowiadają na produkcji (IRNA odpowiadała 504 przy pierwszej próbie, Google News nie podaje znaczników wersji).
-5. **Retencja jest liczona od pierwszego zobaczenia**, nie od publikacji. News zastany przy pierwszym pobraniu feedu żyje więc 28 dni od tej chwili, niezależnie od swojego wieku.
+1. **Zadanie 6.4** — weryfikacja po wdrożeniu, czynność po merge: `/social/news/sources` ma wymienić 15 źródeł z udanym pobraniem, a `/social/health` heartbeat `news`. Do zapisania tutaj po pierwszym przebiegu, które źródła faktycznie odpowiadają na produkcji (IRNA odpowiadała 504 przy pierwszej próbie, Google News nie podaje znaczników wersji).
+
+Trzy luki z pierwszego przejścia (heartbeat `news` w `serving`, niezmiennik różnicy granic, liczby w tabeli źródeł) zostały zamknięte w `2e0e6da` i są w tabelach wyżej.
+
+**Nie mylić z przeoczeniem:** retencja jest liczona od **pierwszego zobaczenia**, nie od publikacji. News zastany przy pierwszym pobraniu feedu żyje więc 28 dni od tej chwili, niezależnie od swojego wieku. To zapisane wprost w `social-data-news-ingest`, a nie luka.
