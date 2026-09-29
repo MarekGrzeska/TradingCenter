@@ -9,7 +9,7 @@ from email.utils import parsedate_to_datetime
 
 from defusedxml.ElementTree import fromstring
 
-from ..providers.truth_social import clean
+from ..text import clean
 from .models import FeedItem
 
 log = logging.getLogger(__name__)

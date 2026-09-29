@@ -3,11 +3,12 @@ retention spares what the operator kept."""
 
 from __future__ import annotations
 
+import statistics
 from datetime import timedelta
 
 import pytest
 
-from social_data.news import store
+from social_data.news import latency, store
 
 from .builders import NOON, feed_item
 
@@ -133,3 +134,72 @@ async def test_a_failure_moves_nothing_forward(db):
     [row] = await store.source_rows(db)
     assert row.last_success_at == NOON
     assert row.last_failure == "refused: HTTP 403"
+
+
+def _interpolated(values, fraction):
+    """The reference `percentile_cont` is held to: linear between the two nearest ranks."""
+    position = (len(values) - 1) * fraction
+    below = int(position)
+    above = min(below + 1, len(values) - 1)
+    return values[below] + (values[above] - values[below]) * (position - below)
+
+
+def _headlines():
+    """One of every kind a feed can produce, as (published, previous_fetch, first_seen)."""
+    m = timedelta(minutes=1)
+    return [
+        (NOON, NOON + 3 * m, NOON + 5 * m),
+        (NOON + 4 * m, NOON + 3 * m, NOON + 5 * m),
+        (NOON, NOON + 1 * m, NOON + 9 * m),
+        (None, NOON, NOON + 5 * m),
+        (NOON, None, NOON + 5 * m),
+        (NOON + 60 * m, NOON, NOON + 5 * m),
+        (NOON + 6 * m, NOON, NOON + 5 * m),
+    ]
+
+
+async def test_a_sources_day_is_the_same_definition_as_a_headlines_delay(db):
+    await store.declare_sources(db, [SOURCE])
+    for n, (published, previous, seen) in enumerate(_headlines()):
+        await store.insert_items(
+            db,
+            SOURCE,
+            [feed_item(str(n), published_at=published)],
+            seen_at=seen,
+            previous_fetch_at=previous,
+        )
+
+    figures = (
+        await store.source_figures(
+            db, NOON - timedelta(days=1), tolerance_seconds=latency.CLOCK_TOLERANCE.total_seconds()
+        )
+    )[SOURCE]
+    delays = [
+        latency.delay(published_at=p, first_seen_at=s, previous_fetch_at=prev)
+        for p, prev, s in _headlines()
+    ]
+    lowers = sorted(d.lower_seconds for d in delays if d.lower_seconds is not None)
+    uppers = sorted(d.upper_seconds for d in delays if d.upper_seconds is not None)
+
+    assert figures.items == len(delays)
+    assert figures.unmeasured == sum(1 for d in delays if d.unmeasured is not None)
+    assert figures.lower_median == pytest.approx(statistics.median(lowers))
+    assert figures.upper_median == pytest.approx(statistics.median(uppers))
+    assert figures.lower_p90 == pytest.approx(_interpolated(lowers, 0.9))
+    assert figures.upper_p90 == pytest.approx(_interpolated(uppers, 0.9))
+
+
+async def test_a_source_with_nothing_measured_has_empty_figures_and_the_count_of_what_it_could_not(
+    db,
+):
+    await store.declare_sources(db, [SOURCE])
+    await store.insert_items(
+        db, SOURCE, [feed_item("a", published_at=None)], seen_at=NOON, previous_fetch_at=NOON
+    )
+
+    figures = (await store.source_figures(db, NOON - timedelta(days=1), tolerance_seconds=120))[
+        SOURCE
+    ]
+
+    assert (figures.items, figures.unmeasured) == (1, 1)
+    assert figures.lower_median is None and figures.upper_p90 is None

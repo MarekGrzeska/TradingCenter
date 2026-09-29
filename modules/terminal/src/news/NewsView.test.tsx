@@ -137,7 +137,11 @@ describe("NewsView", () => {
     const row = screen.getByRole("row", { name: /IRNA/ });
     expect(row).toHaveTextContent("ostatnie pobranie nieudane");
     expect(row).toHaveTextContent("refused: HTTP 403");
-    expect(screen.getByRole("row", { name: /Al Jazeera/ })).toHaveTextContent("działa");
+    const healthy = screen.getByRole("row", { name: /Al Jazeera/ });
+    expect(healthy).toHaveTextContent("działa");
+    // Both bounds as median / p90: how late the feed is, then what the operator waited.
+    expect(healthy).toHaveTextContent("2 min / 3 min");
+    expect(healthy).toHaveTextContent("3 min / 5 min");
   });
 
   it("keeps the headlines on screen when a refresh fails", async () => {

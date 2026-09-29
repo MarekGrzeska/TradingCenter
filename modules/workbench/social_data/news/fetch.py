@@ -50,30 +50,37 @@ class FeedClient:
         headers = {"Accept": "application/rss+xml, application/atom+xml, application/xml;q=0.9"}
         headers.update(self._validators.get(source.id, {}))
         try:
-            response = await self._client.get(source.url, headers=headers)
+            async with self._client.stream("GET", source.url, headers=headers) as response:
+                if response.status_code == 304:
+                    return Fetched(not_modified=True)
+                if response.status_code in _REFUSALS:
+                    raise FetchFailed(Failure.REFUSED, f"HTTP {response.status_code}")
+                if not response.is_success:
+                    raise FetchFailed(Failure.UNREACHABLE, f"HTTP {response.status_code}")
+                # Counted as it arrives: a feed that never ends is refused at the limit, not after it.
+                body = bytearray()
+                async for chunk in response.aiter_bytes():
+                    body.extend(chunk)
+                    if len(body) > MAX_DOCUMENT_BYTES:
+                        raise FetchFailed(
+                            Failure.UNREADABLE,
+                            f"more than {MAX_DOCUMENT_BYTES} bytes is not a feed",
+                        )
+                response_headers = response.headers
         except httpx.HTTPError as err:
             raise FetchFailed(Failure.UNREACHABLE, str(err) or type(err).__name__) from err
 
-        if response.status_code == 304:
-            return Fetched(not_modified=True)
-        if response.status_code in _REFUSALS:
-            raise FetchFailed(Failure.REFUSED, f"HTTP {response.status_code}")
-        if not response.is_success:
-            raise FetchFailed(Failure.UNREACHABLE, f"HTTP {response.status_code}")
-        if len(response.content) > MAX_DOCUMENT_BYTES:
-            raise FetchFailed(Failure.UNREADABLE, f"{len(response.content)} bytes is not a feed")
-
         try:
-            items = items_from(response.content, publisher=source.publisher)
+            items = items_from(bytes(body), publisher=source.publisher)
         except Unreadable as err:
             raise FetchFailed(Failure.UNREADABLE, str(err)) from err
 
         # Kept only after a document was read: validators of an answer that failed would turn the next
         # fetch into a "nothing changed" about a document this archive never had.
         validators = {}
-        if etag := response.headers.get("ETag"):
+        if etag := response_headers.get("ETag"):
             validators["If-None-Match"] = etag
-        if modified := response.headers.get("Last-Modified"):
+        if modified := response_headers.get("Last-Modified"):
             validators["If-Modified-Since"] = modified
         self._validators[source.id] = validators
         return Fetched(items=items)

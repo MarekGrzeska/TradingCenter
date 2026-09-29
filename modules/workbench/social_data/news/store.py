@@ -7,7 +7,7 @@ from datetime import datetime
 
 from tc_runtime.db import Conn
 
-from .models import FeedItem, NewsItem, SourceRow
+from .models import FeedItem, NewsItem, SourceFigures, SourceRow
 
 _ITEM_COLUMNS = """
     source, external_id, publisher, title, summary, url,
@@ -117,22 +117,42 @@ async def source_rows(conn: Conn) -> list[SourceRow]:
     return [SourceRow(**dict(row)) for row in rows]
 
 
-async def seen_since(
-    conn: Conn, since: datetime
-) -> list[tuple[str, datetime | None, datetime, datetime | None]]:
-    """The three moments of every headline first seen since `since` — what a source's figures are made of."""
+async def source_figures(
+    conn: Conn, since: datetime, *, tolerance_seconds: float
+) -> dict[str, SourceFigures]:
+    """Each feed's day, computed where the rows are. The definition of a measured delay is `latency.delay`'s,
+    written out here once more — and held to it by a test that runs both over the same headlines."""
     rows = await conn.fetch(
         """
-        SELECT source, published_at, first_seen_at, previous_fetch_at
-        FROM news_items
-        WHERE first_seen_at >= $1
+        WITH d AS (
+            SELECT source,
+                   published_at IS NOT NULL AND previous_fetch_at IS NOT NULL
+                     AND published_at <= first_seen_at + make_interval(secs => $2) AS measured,
+                   GREATEST(0, extract(epoch FROM first_seen_at - published_at)) AS upper,
+                   LEAST(
+                     GREATEST(0, extract(epoch FROM previous_fetch_at - published_at)),
+                     GREATEST(0, extract(epoch FROM first_seen_at - published_at))
+                   ) AS lower
+            FROM news_items
+            WHERE first_seen_at >= $1
+        )
+        SELECT source,
+               count(*) AS items,
+               count(*) FILTER (WHERE NOT measured) AS unmeasured,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY lower) FILTER (WHERE measured) AS lower_median,
+               percentile_cont(0.9) WITHIN GROUP (ORDER BY lower) FILTER (WHERE measured) AS lower_p90,
+               percentile_cont(0.5) WITHIN GROUP (ORDER BY upper) FILTER (WHERE measured) AS upper_median,
+               percentile_cont(0.9) WITHIN GROUP (ORDER BY upper) FILTER (WHERE measured) AS upper_p90
+        FROM d
+        GROUP BY source
         """,
         since,
+        tolerance_seconds,
     )
-    return [
-        (row["source"], row["published_at"], row["first_seen_at"], row["previous_fetch_at"])
+    return {
+        row["source"]: SourceFigures(**{k: v for k, v in dict(row).items() if k != "source"})
         for row in rows
-    ]
+    }
 
 
 async def items_in_window(

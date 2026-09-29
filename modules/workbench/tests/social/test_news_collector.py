@@ -184,3 +184,32 @@ async def test_the_loop_collects_by_itself_without_anybody_asking(pool):
         await loop.stop()
 
     assert len((await read_all(pool))[0]) == 3
+
+
+async def test_serving_runs_both_loops_and_publishes_each_beat_under_its_own_name(
+    migrated_url, monkeypatch
+):
+    """The one place the second heartbeat is wired: `serving`, with nothing reaching outward."""
+    import httpx as httpx_module
+
+    from social_data import app as social_app
+    from social_data.config import Settings
+
+    from .fakes import FakeSource
+
+    async def already_migrated(_migrations):
+        """The fixture migrated this database; `migrate.run` would read the whole workbench's environment."""
+
+    monkeypatch.setattr(social_app.migrate, "run", already_migrated)
+    monkeypatch.setattr(social_app, "NEWS_SOURCES", ())
+    monkeypatch.setattr(social_app, "TruthSocialFeed", lambda *a, **k: FakeSource())
+    application = social_app.create_app()
+    settings = Settings(database_url=migrated_url, _env_file=None)  # type: ignore[call-arg]
+
+    async with social_app.serving(application, settings):
+        transport = httpx_module.ASGITransport(app=application)
+        async with httpx_module.AsyncClient(transport=transport, base_url="http://tests") as client:
+            health = (await client.get("/health")).json()
+
+    assert set(health["loops"]) == {"collect", "news"}
+    assert health["loops"]["news"]["expected_seconds"] == settings.news_tick_seconds

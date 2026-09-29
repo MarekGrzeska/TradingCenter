@@ -60,3 +60,15 @@ class SourceRow:
     last_failure_at: datetime | None
     last_failure: str | None
     newest_published_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class SourceFigures:
+    """One feed's day. `None` where nothing was measured — never a zero."""
+
+    items: int
+    unmeasured: int
+    lower_median: float | None
+    lower_p90: float | None
+    upper_median: float | None
+    upper_p90: float | None

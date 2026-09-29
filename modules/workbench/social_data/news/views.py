@@ -8,11 +8,12 @@ from tc_runtime.db import Conn
 
 from ..contract import NewsItemOut, NewsOut, NewsSourceOut, NewsSourcesOut
 from . import latency, store
-from .models import NewsItem, SourceRow
+from .models import NewsItem, SourceFigures, SourceRow
 from .sources import SOURCES, NewsSource
 
 FIGURES_WINDOW = timedelta(hours=24)
 STALE_AFTER_INTERVALS = 6
+NO_FIGURES = SourceFigures(0, 0, None, None, None, None)
 
 
 def item_out(item: NewsItem, *, retention: timedelta) -> NewsItemOut:
@@ -82,16 +83,13 @@ async def sources_state(
     conn: Conn, *, now: datetime, tick_seconds: int, retention_days: int
 ) -> NewsSourcesOut:
     rows = {row.source: row for row in await store.source_rows(conn)}
-    delays: dict[str, list[latency.Delay]] = {}
-    for source, published, seen, previous in await store.seen_since(conn, now - FIGURES_WINDOW):
-        delays.setdefault(source, []).append(
-            latency.delay(published_at=published, first_seen_at=seen, previous_fetch_at=previous)
-        )
-
+    day = await store.source_figures(
+        conn, now - FIGURES_WINDOW, tolerance_seconds=latency.CLOCK_TOLERANCE.total_seconds()
+    )
     answered = []
     for source in SOURCES:
         row = rows.get(source.id)
-        figures = latency.figures(delays.get(source.id, ()))
+        figures = day.get(source.id) or NO_FIGURES
         answered.append(
             NewsSourceOut(
                 source=source.id,

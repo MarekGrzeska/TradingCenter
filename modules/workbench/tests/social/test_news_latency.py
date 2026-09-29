@@ -52,26 +52,16 @@ def test_a_publish_time_a_clock_tolerance_ahead_is_still_measured():
     assert delay.upper_seconds == 0
 
 
-def test_the_figures_leave_the_unmeasured_out_of_every_statistic_but_count_them():
-    delays = [
-        measured(NOON, NOON + 1 * MINUTE, NOON + 2 * MINUTE),
-        measured(NOON, NOON + 3 * MINUTE, NOON + 4 * MINUTE),
-        measured(None, NOON, NOON),
-    ]
+@pytest.mark.parametrize("previous_minutes", [0, 1, 2, 4, 5])
+@pytest.mark.parametrize("published_minutes", [-3, 0, 1, 4])
+def test_the_two_bounds_differ_by_no_more_than_the_gap_between_our_two_fetches(
+    previous_minutes, published_minutes
+):
+    """What separates them is this archive's own polling, so it can never exceed the time between fetches."""
+    seen = NOON + 5 * MINUTE
+    previous = NOON + previous_minutes * MINUTE
+    delay = measured(NOON + published_minutes * MINUTE, previous, seen)
 
-    figures = latency.figures(delays)
-
-    assert (figures.items, figures.unmeasured) == (3, 1)
-    assert (figures.lower_median, figures.upper_median) == (120, 180)
-
-
-def test_a_source_with_nothing_measured_has_empty_figures_not_zeros():
-    figures = latency.figures([measured(None, None, NOON)])
-
-    assert figures.lower_median is None and figures.upper_p90 is None
-
-
-def test_a_percentile_interpolates_between_ranks():
-    assert latency.percentile([0, 10], 0.5) == 5
-    assert latency.percentile([1, 2, 3, 4, 5], 0.9) == pytest.approx(4.6)
-    assert latency.percentile([], 0.5) is None
+    if delay.unmeasured is None:
+        assert delay.upper_seconds - delay.lower_seconds <= (seen - previous).total_seconds()
+        assert delay.lower_seconds <= delay.upper_seconds
