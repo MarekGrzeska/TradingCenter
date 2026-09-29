@@ -15,6 +15,7 @@ from .models import SourceState
 def window(
     *,
     hours: int | None = None,
+    minutes: int | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
     default_hours: int,
@@ -25,6 +26,8 @@ def window(
     end = until or (now or datetime.now(UTC))
     if since is not None:
         return since, end
+    if minutes is not None:
+        return end - timedelta(minutes=minutes), end
     return end - timedelta(hours=hours or default_hours), end
 
 

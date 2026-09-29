@@ -14,7 +14,8 @@ function item(overrides: Partial<NewsItem> = {}): NewsItem {
     externalId: "1",
     publisher: "Al Jazeera",
     title: "US-Iran talks in New York",
-    summary: "",
+    summary: "Delegations met.",
+    content: "",
     url: "https://example.com/1",
     publishedAt: new Date("2026-09-29T15:09:00Z"),
     firstSeenAt: new Date("2026-09-29T15:14:00Z"),
@@ -59,7 +60,113 @@ describe("NewsView", () => {
 
     expect(await screen.findByText("US-Iran talks in New York")).toBeInTheDocument();
     expect(screen.getByText(/opóźnienie 3–5 min/)).toBeInTheDocument();
-    expect(screen.getByText(/ostatnie 6 h/)).toBeInTheDocument();
+    expect(screen.getByText(/ostatnie 4 h/)).toBeInTheDocument();
+  });
+
+  it("opens the whole news in place and does not send the operator to the site", async () => {
+    render(
+      <NewsView
+        api={api([item({ content: "First paragraph.\n\nSecond paragraph, further in." })])}
+      />,
+    );
+
+    const toggle = await screen.findByRole("button", { name: /US-Iran talks in New York/ });
+    // The title is not a link: the click is for reading here.
+    expect(screen.queryByRole("link", { name: /US-Iran talks/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Second paragraph, further in/)).not.toBeInTheDocument();
+
+    await userEvent.click(toggle);
+
+    expect(screen.getByText(/Second paragraph, further in/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "otwórz oryginał" })).toHaveAttribute("target", "_blank");
+    expect(screen.queryByText(/tylko zajawkę/)).not.toBeInTheDocument();
+  });
+
+  it("says when the feed carried only a lead, and shows that lead in full", async () => {
+    render(<NewsView api={api([item({ summary: "Just the lead.", content: "" })])} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /US-Iran talks in New York/ }));
+
+    expect(screen.getByText("Just the lead.")).toBeInTheDocument();
+    expect(screen.getByText(/Feed niesie tylko zajawkę/)).toBeInTheDocument();
+  });
+
+  it("does not open the news when the keep button is pressed", async () => {
+    render(<NewsView api={api([item({ content: "Body text." })])} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "zachowaj" }));
+
+    expect(screen.queryByText("Body text.")).not.toBeInTheDocument();
+  });
+
+  it("offers the windows from five minutes to a week and asks for the one chosen", async () => {
+    const client = api([item()]);
+    render(<NewsView api={client} />);
+    await screen.findByText("US-Iran talks in New York");
+
+    for (const label of ["5 min", "15 min", "1 h", "4 h", "24 h", "7 d"]) {
+      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+    }
+    await userEvent.click(screen.getByRole("button", { name: "7 d" }));
+
+    await waitFor(() =>
+      expect(client.news).toHaveBeenLastCalledWith(
+        expect.objectContaining({ minutes: 10080 }),
+        expect.anything(),
+      ),
+    );
+    expect(await screen.findByText(/ostatnie 7 d/)).toBeInTheDocument();
+  });
+
+  it("switches every source off and on with one click, and says so when none is chosen", async () => {
+    const client = api([item()], {}, [source(), source({ source: "irna", publisher: "IRNA" })]);
+    render(<NewsView api={client} />);
+    await screen.findByText("US-Iran talks in New York");
+
+    await userEvent.click(screen.getByRole("button", { name: "Żadne" }));
+
+    expect(await screen.findByText(/Nie wybrano żadnego źródła/)).toBeInTheDocument();
+    const asked = vi.mocked(client.news).mock.calls.length;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // Choosing none is never asked of the server: an empty list of sources means all of them there.
+    expect(vi.mocked(client.news).mock.calls.length).toBe(asked);
+
+    await userEvent.click(screen.getByRole("button", { name: "Wszystkie" }));
+
+    expect(await screen.findByText("US-Iran talks in New York")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^aljazeera/ })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("keeps only the sources that answer with one click", async () => {
+    const client = api([item()], {}, [
+      source(),
+      source({ source: "irna", publisher: "IRNA", status: "failing" }),
+    ]);
+    render(<NewsView api={client} />);
+    await screen.findByText("US-Iran talks in New York");
+
+    await userEvent.click(screen.getByRole("button", { name: "Tylko działające" }));
+
+    expect(screen.getByRole("button", { name: /^aljazeera/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /^irna/ })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("orders by the wait when asked, and flips the direction", async () => {
+    const client = api([
+      item({ externalId: "quick", title: "Quick one", delayMaxSeconds: 30 }),
+      item({ externalId: "slow", title: "Slow one", delayMaxSeconds: 3000 }),
+    ]);
+    render(<NewsView api={client} />);
+    await screen.findByText("Quick one");
+
+    await userEvent.click(screen.getByRole("button", { name: "czekaliśmy" }));
+    const titles = () => screen.getAllByRole("button", { expanded: false }).map((b) => b.textContent ?? "");
+
+    expect(titles()[0]).toMatch(/Slow one/);
+
+    await userEvent.click(screen.getByRole("button", { name: "↓ najdłużej" }));
+
+    expect(titles()[0]).toMatch(/Quick one/);
   });
 
   it("says why a headline has no delay instead of showing a zero", async () => {

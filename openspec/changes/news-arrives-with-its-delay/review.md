@@ -18,11 +18,11 @@ Uruchomione na tej gałęzi, nie deklarowane. Docker był potrzebny i został ur
 
 | Co | Wynik |
 |---|---|
-| `modules/workbench`: `uv run pytest -q` (z testami `db` na testcontainers) | **2663 passed, 11 skipped** w 6 min 2 s |
+| `modules/workbench`: `uv run pytest -q` (z testami `db` na testcontainers) | **2669 passed, 11 skipped** w 6 min 22 s (po dopisaniu treści i okien w minutach) |
 | `modules/workbench`: `uv run pytest tests/social/test_news_*.py` | **74 testy nowe**, wszystkie zielone |
 | `modules/workbench`: `uv run ruff check .` · `uv run pyright` | czysto · 0 błędów |
-| `modules/terminal`: vitest · `tsc -b --noEmit` · `eslint .` · `node scripts/contract.mjs check` | **842 passed (68 plików)** · czysto · czysto · „Every contract is up to date” |
-| `modules/pocket`: vitest · `tsc -b --noEmit` · `eslint .` · `node scripts/contract.mjs check` | **87 passed (17 plików)** · czysto · czysto · „The contract is up to date” |
+| `modules/terminal`: vitest · `tsc -b --noEmit` · `eslint .` · `node scripts/contract.mjs check` | **858 passed (70 plików)** · czysto · czysto · „Every contract is up to date” |
+| `modules/pocket`: vitest · `tsc -b --noEmit` · `eslint .` · `node scripts/contract.mjs check` | **105 passed (19 plików)** · czysto · czysto · „The contract is up to date” |
 | `scripts`: `uv run pytest -q` | **149 passed, 27 skipped** |
 | `openspec validate news-arrives-with-its-delay --strict` | valid |
 | `db-cost-check` (task 1.4): jednorazowy Postgres 17, 100 tys. wierszy `news_items`, 15 źródeł, `--cpus=1 --memory=2g` | wszystkie zapytania idą po indeksach; okno 6 h **19 buforów / 0,26 ms**, czyszczenie **3 bufory**; rachunek źródeł po przeniesieniu do SQL (`percentile_cont`, 3,6 tys. wierszy z doby) **194 bufory / 6,3 ms**; klasa **C2** |
@@ -121,3 +121,39 @@ a parser jest testowany na zapisanych dokumentach.
 Trzy luki z pierwszego przejścia (heartbeat `news` w `serving`, niezmiennik różnicy granic, liczby w tabeli źródeł) zostały zamknięte w `2e0e6da` i są w tabelach wyżej.
 
 **Nie mylić z przeoczeniem:** retencja jest liczona od **pierwszego zobaczenia**, nie od publikacji. News zastany przy pierwszym pobraniu feedu żyje więc 28 dni od tej chwili, niezależnie od swojego wieku. To zapisane wprost w `social-data-news-ingest`, a nie luka.
+
+
+## Addendum: pierwszy dzień na produkcji
+
+Po wdrożeniu operator zgłosił trzy rzeczy, wszystkie w tej samej zmianie (zadania 7.1–7.5, commity `183afc5`, `7e276cc`, `3f408bd`).
+
+| Severity | Where | Finding | Status |
+|---|---|---|---|
+| Średnie | `news/sources.py` `timesofisrael` | Feed odpowiada **403 z adresów Azure** (Cloudflare), a 200 z domowego IP tym samym User-Agentem — więc nie problem tożsamości, tylko blokada, której spec każe nie obchodzić. Źródło stało od pierwszego przebiegu. | **FIXED** w `183afc5` — wpis zastąpiony zapytaniem Google News `site:timesofisrael.com` (Iran, Israel, Hormuz, Hezbollah) |
+| Średnie | `news/feed.py` (`summary` ≤ 1000 znaków) | Operator chce czytać **cały news w aplikacji**, a archiwum trzymało tylko krótki lead i ucinało resztę. Pomiar feedów: pełny artykuł niesie w RSS tylko Axios (~3,2 tys. znaków), Guardian i Middle East Eye ~700, pozostałe 100–300. | **FIXED w tym, co feed niesie** — `183afc5`: kolumna `content`, akapity zachowane. **Reszta pozostaje otwarta** (patrz Gaps) |
+| Drobne | terminal `NewsCard` | Tytuł był odnośnikiem do strony źródła, więc kliknięcie wyrzucało z aplikacji. | **FIXED** w `7e276cc` i `3f408bd` — karta rozwija się w miejscu, oryginał to osobny odnośnik w rozwiniętej części |
+
+### Spec coverage (nowe wymagania i scenariusze)
+
+Skróty jak wyżej; `p/` = `modules/pocket/src/news/`.
+
+| Requirement / Scenario | Proven by |
+|---|---|
+| ingest: Feed niesie całą treść | `w/test_news_feed.py::test_a_feed_that_carries_the_body_keeps_it_with_its_paragraphs_and_a_short_lead_beside_it`, `w/test_news_store.py::test_the_body_is_stored_beside_the_lead_and_an_empty_one_stays_empty` |
+| ingest: Feed niesie tylko lead | `w/test_news_feed.py::test_a_feed_that_carries_only_a_lead_has_no_body_and_not_the_lead_twice`, `::test_an_aggregator_lead_that_only_repeats_the_headline_yields_neither` |
+| api: Okno w minutach | `w/test_news_api.py::test_a_window_in_minutes_reaches_as_far_back_as_asked_and_no_further` |
+| api: News z treścią i bez | `w/test_news_api.py::test_the_body_reaches_the_wire_and_is_empty_not_missing_where_the_feed_had_none` |
+| terminal: Zmiana okna | `t/NewsView.test.tsx::offers the windows from five minutes to a week and asks for the one chosen`, `t/windows.test.ts`, `t/newsApi.test.ts::asks for more headlines over a week than over an hour` |
+| terminal: Rozwinięcie newsa z treścią | `t/NewsView.test.tsx::opens the whole news in place and does not send the operator to the site` |
+| terminal: News z samym leadem | `t/NewsView.test.tsx::says when the feed carried only a lead, and shows that lead in full` |
+| terminal: Zachowanie nie rozwija | `t/NewsView.test.tsx::does not open the news when the keep button is pressed` |
+| terminal: Sortowanie po oczekiwaniu / odwrócenie kierunku | `t/NewsView.test.tsx::orders by the wait when asked, and flips the direction`, `t/sort.test.ts` |
+| terminal: Wszystkie i żadne | `t/NewsView.test.tsx::switches every source off and on with one click, and says so when none is chosen` |
+| terminal: Tylko działające | `t/NewsView.test.tsx::keeps only the sources that answer with one click` |
+| pocket (bez speca, jak reszta ekranu) | `p/NewsScreen.test.tsx` (rozwinięcie, sam lead, zachowanie nie rozwija, żądanie `minutes`), `p/sort.test.ts`, `p/window.test.ts`, `p/api.test.ts` |
+
+### Gaps
+
+1. **Pełny tekst poza tym, co niesie feed.** Dla większości źródeł (BBC, NYT, Al Jazeera, Tehran Times, IRNA, Iran International, Google News) archiwum ma tylko krótki lead, a ekran mówi to wprost. Pełniejszy tekst wymaga pobierania stron artykułów: scraping HTML per portal, paywall (NYT), ochrona Cloudflare (jak Times of Israel) i regulaminy zakazujące tego wprost (Al Jazeera). **Świadomie poza tą zmianą** — to decyzja operatora, nie techniczna; spec `social-data-news-ingest` mówi, że pakiet stron nie pobiera.
+2. **Wymóg „pakiet nie pobiera stron artykułów”** nie ma testu: to brak zachowania, a test na brak wymagałby czytania importów (zakaz reguły 3 z `CLAUDE.md`).
+3. **Zadanie 6.4** — po wdrożeniu: które z 15 źródeł faktycznie odpowiadają i które niosą treść.

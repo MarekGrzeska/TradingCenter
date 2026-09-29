@@ -70,3 +70,26 @@ def test_a_long_lead_is_cut():
 def test_a_document_that_is_not_a_feed_is_unreadable(document):
     with pytest.raises(feed.Unreadable):
         feed.items_from(document, publisher="P")
+
+
+def test_a_feed_that_carries_the_body_keeps_it_with_its_paragraphs_and_a_short_lead_beside_it():
+    full, _ = read("news_content.xml")
+
+    assert len(full.summary) <= feed.SUMMARY_LIMIT
+    assert len(full.content) > feed.SUMMARY_LIMIT
+    assert full.content.count("\n\n") == 4
+    assert full.content.startswith("Paragraph 1 of the article body")
+    assert "<p>" not in full.content
+
+
+def test_a_feed_that_carries_only_a_lead_has_no_body_and_not_the_lead_twice():
+    _, short = read("news_content.xml")
+
+    assert short.summary == "One short paragraph."
+    assert short.content == ""
+
+
+def test_an_aggregator_lead_that_only_repeats_the_headline_yields_neither():
+    [item] = read("news_google.xml", publisher="Google News")
+
+    assert (item.summary, item.content) == ("", "")

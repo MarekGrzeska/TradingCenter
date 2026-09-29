@@ -149,7 +149,7 @@
 }
 
 .title {
-  margin: 0.3rem 0 0;
+  margin: 0;
   color: var(--text-h);
   font-size: 0.95rem;
   font-weight: 600;
@@ -157,7 +157,7 @@
 }
 
 .summary {
-  margin: 0.3rem 0;
+  margin: 0;
   color: var(--text);
   font-size: 0.85rem;
   line-height: 1.4;
@@ -221,4 +221,34 @@
   margin: 0.5rem 0.75rem;
   color: var(--danger);
   font-size: 0.85rem;
+}
+
+.toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.body {
+  color: var(--text);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.leadOnly {
+  margin: 0.3rem 0 0;
+  color: var(--text-muted);
+  font-size: 0.75rem;
 }

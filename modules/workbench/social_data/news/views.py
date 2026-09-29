@@ -28,6 +28,7 @@ def item_out(item: NewsItem, *, retention: timedelta) -> NewsItemOut:
         publisher=item.publisher,
         title=item.title,
         summary=item.summary,
+        content=item.content,
         url=item.url,
         published_at=item.published_at,
         first_seen_at=item.first_seen_at,

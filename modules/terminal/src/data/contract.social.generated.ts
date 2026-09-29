@@ -228,6 +228,11 @@ export interface components {
          */
         NewsItemOut: {
             /**
+             * Content
+             * @description the body as text where the feed carries more than a lead, paragraphs kept; empty where it does not — the screen then has only `summary` and the link to the source
+             */
+            content: string;
+            /**
              * Delay Max Seconds
              * @description the upper bound: how long from publication until this archive saw it
              */
@@ -610,6 +615,8 @@ export interface operations {
     news_news_get: {
         parameters: {
             query?: {
+                /** @description the last N minutes; wins over `hours` */
+                minutes?: number | null;
                 hours?: number | null;
                 since?: string | null;
                 until?: string | null;

@@ -11,7 +11,7 @@ from .models import FeedItem, NewsItem, SourceFigures, SourceRow
 
 _ITEM_COLUMNS = """
     source, external_id, publisher, title, summary, url,
-    published_at, first_seen_at, previous_fetch_at, kept_at
+    published_at, first_seen_at, previous_fetch_at, kept_at, content
 """
 
 # The contract's order: newest by publication, and by first sight where the feed gave no time.
@@ -55,11 +55,12 @@ async def insert_items(
         """
         INSERT INTO news_items (
             source, external_id, publisher, title, summary, url,
-            published_at, first_seen_at, previous_fetch_at
+            published_at, first_seen_at, previous_fetch_at, content
         )
-        SELECT $1, external_id, publisher, title, summary, url, published_at, $2, $3
-        FROM unnest($4::text[], $5::text[], $6::text[], $7::text[], $8::text[], $9::timestamptz[])
-            AS t(external_id, publisher, title, summary, url, published_at)
+        SELECT $1, external_id, publisher, title, summary, url, published_at, $2, $3, content
+        FROM unnest(
+            $4::text[], $5::text[], $6::text[], $7::text[], $8::text[], $9::timestamptz[], $10::text[]
+        ) AS t(external_id, publisher, title, summary, url, published_at, content)
         ON CONFLICT (source, external_id) DO NOTHING
         RETURNING id
         """,
@@ -72,6 +73,7 @@ async def insert_items(
         [item.summary for item in unique],
         [item.url for item in unique],
         [item.published_at for item in unique],
+        [item.content for item in unique],
     )
     return len(rows)
 

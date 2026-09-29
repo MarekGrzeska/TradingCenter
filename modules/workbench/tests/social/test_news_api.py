@@ -159,3 +159,32 @@ async def test_reading_the_news_adds_nothing_to_the_archive(api, pool):
         await api.get(path)
 
     assert await count() == before
+
+
+async def test_a_window_in_minutes_reaches_as_far_back_as_asked_and_no_further(api, pool):
+    await collected(pool, [feed_item("ten", published_at=published(10))])
+
+    narrow = (await api.get("/news", params={"minutes": 5})).json()
+    wide = (await api.get("/news", params={"minutes": 15})).json()
+
+    assert [item["external_id"] for item in narrow["items"]] == []
+    assert [item["external_id"] for item in wide["items"]] == ["ten"]
+
+
+async def test_the_body_reaches_the_wire_and_is_empty_not_missing_where_the_feed_had_none(
+    api, pool
+):
+    await collected(
+        pool,
+        [
+            feed_item("full", published_at=published(5), summary="lead", content="the whole piece"),
+            feed_item("short", published_at=published(6), summary="lead"),
+        ],
+    )
+
+    by_id = {
+        i["external_id"]: i for i in (await api.get("/news", params={"hours": 1})).json()["items"]
+    }
+
+    assert by_id["full"]["content"] == "the whole piece"
+    assert by_id["short"]["content"] == ""

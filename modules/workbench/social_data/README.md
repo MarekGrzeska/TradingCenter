@@ -78,6 +78,12 @@ none is ever zero. `GET /news/sources` gives each feed's median and p90 of both 
 `{source, external_id, keep}` exempts a headline; letting it go puts it back under the sweep. The pair is in the
 body because a feed's identifier is usually a URL, and the caller record matches path segments as `[^/]+`.
 
+**The body is what the feed carries, and no more.** `content` holds the article where a feed sends one (Axios in full, the
+Guardian and Middle East Eye about 700 characters, the rest only a lead) with its paragraphs, and is empty otherwise —
+`summary` stays the short lead. The screens open a headline in place and say when it is only a lead. Fetching article
+pages for more is a separate decision: it is scraping, with paywalls, Cloudflare and terms that forbid it.
+`GET /news?minutes=` asks for windows as short as five minutes.
+
 Al Jazeera is read through its published RSS only: its terms forbid automated collection and its live blog is not
 in the feed, so it is not fetched. Dropping it is deleting one line.
 

@@ -71,7 +71,7 @@ Lista startowa (identyfikator → adres):
 | `google-news-hormuz` | to samo z `q=(Hormuz OR IRGC OR "Iran talks") when:1h` |
 | `tehrantimes` | `tehrantimes.com/rss` |
 | `irna` | `en.irna.ir/rss` |
-| `timesofisrael` | `timesofisrael.com/feed/` |
+| `google-news-timesofisrael` | Google News, `site:timesofisrael.com` z Iranem i regionem (własny feed odpowiada 403 z adresów Azure — Cloudflare — i nie jest do obchodzenia) |
 | `middleeasteye` | `middleeasteye.net/rss` |
 | `guardian-iran` | `theguardian.com/world/iran/rss` |
 | `guardian-middleeast` | `theguardian.com/world/middleeast/rss` |
@@ -150,6 +150,15 @@ identyfikator z feedu to zwykle URL, a rekord dostępu dopasowuje każdy segment
 `PUT` na stan, a nie `POST` i `DELETE`, bo klient wysyła to, co chce widzieć, a powtórzenie po
 zerwanym połączeniu jest bezpieczne. To pierwsza trasa zapisująca w `/social`. Wyjątek jest opisany
 w delcie `social-data-api`, a nie przemycony.
+
+### 5b. Treść: to, co feed niesie, a nie strony artykułów
+
+Pomiar z 29 września: pełny artykuł niesie w RSS tylko Axios (`content:encoded`, ~3,2 tys. znaków); Guardian i
+Middle East Eye ok. 700 znaków, reszta 100–300. `content` (kolumna `NOT NULL DEFAULT ''`, migracja `0004`,
+addytywna) trzyma treść z `content:encoded`/Atom `content` albo dłuższy opis, do 50 tys. znaków, z akapitami; `summary`
+zostaje krótkim leadem. `content` jest puste, gdy nie mówi więcej niż lead. **Pobieranie stron artykułów jest
+poza tą zmianą**: to scraping HTML per portal, z paywallami (NYT), ochroną (Cloudflare, jak Times of Israel)
+i regulaminami zakazującymi go wprost (Al Jazeera).
 
 ### 6. Parser: `defusedxml` i biblioteka standardowa, bez `feedparser`
 

@@ -7,7 +7,7 @@ porządek i obcięcie, oraz jedyna trasa zapisująca w `/social`: znacznik zacho
 
 ### Requirement: Newsy czyta się oknem, z jawnymi zawężeniami
 
-Kontrakt MUST pozwalać pytać o newsy oknem czasu: skrótem „ostatnie N godzin” albo parą od–do.
+Kontrakt MUST pozwalać pytać o newsy oknem czasu: skrótem „ostatnie N minut” (albo godzin) albo parą od–do. Okno MUST dać się wyrazić w minutach, bo najkrótsze oglądane okno to pięć minut.
 Wynik MUST dać się zawęzić do jednego lub kilku źródeł oraz do tekstu, który występuje w tytule
 albo leadzie, bez względu na wielkość liter. Okno, którego koniec jest wcześniejszy niż początek,
 MUST być odmówione z powodem nazywającym błąd.
@@ -16,6 +16,11 @@ MUST być odmówione z powodem nazywającym błąd.
 
 - **WHEN** klient prosi o newsy z ostatnich 6 godzin z dwóch źródeł, zawierające „iran”
 - **THEN** odpowiedź MUST zawierać wyłącznie newsy spełniające wszystkie trzy warunki, także te z „Iran” w leadzie
+
+#### Scenario: Okno w minutach
+
+- **WHEN** klient prosi o newsy z ostatnich 5 minut, a news zobaczono 10 minut temu
+- **THEN** odpowiedź MUST go nie zawierać, a przy oknie 15 minut MUST go zawierać
 
 #### Scenario: Okno bez sensu
 
@@ -35,10 +40,15 @@ zawiera więcej newsów, niż odpowiedź niesie, odpowiedź MUST to powiedzieć.
 
 ### Requirement: Pola czasu i opóźnienia są zawsze obecne
 
-Każdy news w odpowiedzi MUST nieść identyfikator źródła, wydawcę, tytuł, lead, adres oryginału,
+Każdy news w odpowiedzi MUST nieść identyfikator źródła, wydawcę, tytuł, lead, treść (pustą, gdy feed niósł sam lead), adres oryginału,
 trzy momenty, obie granice opóźnienia, powód braku opóźnienia, znacznik zachowania i moment, po
 którym news zniknie. Ten ostatni jest pusty dla newsa zachowanego. Brak wartości MUST być wartością
 pustą, a nie brakiem pola.
+
+#### Scenario: News z treścią i bez
+
+- **WHEN** klient odczytuje news, który feed niósł z pełną treścią, i drugi, który niósł sam lead
+- **THEN** pierwszy MUST mieć niepustą treść, a drugi MUST mieć pole treści obecne i puste
 
 #### Scenario: News bez czasu publikacji
 

@@ -24,6 +24,9 @@ def _retention(request: Request) -> timedelta:
 @router.get("/news", response_model=NewsOut, responses={422: {"model": Problem}})
 async def news(
     request: Request,
+    minutes: int | None = Query(
+        default=None, ge=1, le=60 * 24 * 60, description="the last N minutes; wins over `hours`"
+    ),
     hours: int | None = Query(default=None, ge=1, le=24 * 60),
     since: datetime | None = Query(default=None),
     until: datetime | None = Query(default=None),
@@ -35,7 +38,13 @@ async def news(
     """Headlines newest first — by publication, and by first sight where the feed gave no time."""
     start = end = None
     if not kept:
-        start, end = views.window(hours=hours, since=since, until=until, default_hours=6)
+        start, end = views.window(
+            hours=None if minutes is not None else hours,
+            minutes=minutes,
+            since=since,
+            until=until,
+            default_hours=6,
+        )
         if start >= end:
             raise HTTPException(
                 status.HTTP_422_UNPROCESSABLE_CONTENT,
