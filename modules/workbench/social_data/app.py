@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from datetime import timedelta
 
 import httpx
 from fastapi import FastAPI
@@ -22,6 +23,9 @@ from . import alerts, enrichment, mcp_app
 from .caller_access import RECORD, CallerAccess
 from .config import Settings
 from .ingest import Ingest
+from .news.collector import NewsCollector
+from .news.fetch import FeedClient
+from .news.sources import SOURCES as NEWS_SOURCES
 from .providers.truth_social import TruthSocialFeed
 from .routers import meta, posts
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
@@ -80,7 +84,10 @@ async def serving(app: FastAPI, settings: Settings, telegram: httpx.AsyncClient 
         # it does not know, and a bad write is not undone by a later error response.
         # One heartbeat per loop, on the state so `/health` can answer with it and so the metric's
         # callback can read it without awaiting. "collect" is what the alert's `loop` dimension says.
-        heartbeats = Heartbeats(LoopHeartbeat("collect", expected_seconds=settings.collect_interval_seconds))
+        heartbeats = Heartbeats(
+            LoopHeartbeat("collect", expected_seconds=settings.collect_interval_seconds),
+            LoopHeartbeat("news", expected_seconds=settings.news_tick_seconds),
+        )
         app.state.heartbeats = heartbeats
         liveness.register_metrics("social_data", heartbeats)
 
@@ -96,6 +103,17 @@ async def serving(app: FastAPI, settings: Settings, telegram: httpx.AsyncClient 
         app.state.ingest = ingest
         await ingest.start()
 
+        news_collector = NewsCollector(
+            pool,
+            FeedClient(http),
+            NEWS_SOURCES,
+            tick_seconds=settings.news_tick_seconds,
+            retention=timedelta(days=settings.news_retention_days),
+            heartbeat=heartbeats["news"],
+        )
+        app.state.news = news_collector
+        await news_collector.start()
+
         # The tool surface's session manager: a mounted application's lifespan is never run, so the
         # task group has to be started here or every tool call fails.
         async with mcp_app.tool_surface_session(app):
@@ -103,6 +121,7 @@ async def serving(app: FastAPI, settings: Settings, telegram: httpx.AsyncClient 
             try:
                 yield
             finally:
+                await news_collector.stop()
                 await ingest.stop()
 
 

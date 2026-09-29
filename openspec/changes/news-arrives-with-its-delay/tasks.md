@@ -7,12 +7,12 @@
 
 ## 2. Pobieranie
 
-- [ ] 2.1 `news_sources.py`: rekord źródła i lista startowa z design.md (15 wpisów)
-- [ ] 2.2 Parser RSS 2.0/Atom na `defusedxml`: guid albo link, daty RFC 822/ISO 8601, `<source>` Google News jako wydawca, czysty tekst z rozwiniętymi encjami, lead ≤ 1 000 znaków; testy jednostkowe na próbkach feedów zapisanych w `tests/social/fixtures/`
-- [ ] 2.3 Pobranie jednego źródła: warunkowy GET z `ETag`/`Last-Modified` w pamięci, 304 jako sukces, rozróżnione odmowa / brak odpowiedzi / nieczytelny dokument; własny User-Agent bez żadnego udawania
-- [ ] 2.4 Pętla `news`: takt `SOCIAL_NEWS_TICK_SECONDS` (30), źródła z minionym odstępem, semafor 4, timeout 20 s, porażka źródła nie przerywa przebiegu; czyszczenie raz na godzinę (`SOCIAL_NEWS_RETENTION_DAYS`, 28); heartbeat `news` bije po przebiegu
-- [ ] 2.5 Testy pętli na atrapie HTTP: jedno źródło pada, reszta zapisana; 304 przesuwa `last_success_at`; źródło nie jest pytane przed upływem odstępu; przebieg z wyjątkiem nie bije heartbeatu
-- [ ] 2.6 `app.py` `serving`: druga heartbeat w `Heartbeats`, start i stop pętli newsów obok zbioru postów; ustawienia `SOCIAL_NEWS_*` w `config.py`, `workbench/config.py` i `.env.example`
+- [x] 2.1 `news_sources.py`: rekord źródła i lista startowa z design.md (15 wpisów)
+- [x] 2.2 Parser RSS 2.0/Atom na `defusedxml`: guid albo link, daty RFC 822/ISO 8601, `<source>` Google News jako wydawca, czysty tekst z rozwiniętymi encjami, lead ≤ 1 000 znaków; testy jednostkowe na próbkach feedów zapisanych w `tests/social/fixtures/`
+- [x] 2.3 Pobranie jednego źródła: warunkowy GET z `ETag`/`Last-Modified` w pamięci, 304 jako sukces, rozróżnione odmowa / brak odpowiedzi / nieczytelny dokument; własny User-Agent bez żadnego udawania
+- [x] 2.4 Pętla `news`: takt `SOCIAL_NEWS_TICK_SECONDS` (30), źródła z minionym odstępem, semafor 4, timeout 20 s, porażka źródła nie przerywa przebiegu; czyszczenie raz na godzinę (`SOCIAL_NEWS_RETENTION_DAYS`, 28); heartbeat `news` bije po przebiegu
+- [x] 2.5 Testy pętli na atrapie HTTP: jedno źródło pada, reszta zapisana; 304 przesuwa `last_success_at`; źródło nie jest pytane przed upływem odstępu; przebieg z wyjątkiem nie bije heartbeatu
+- [x] 2.6 `app.py` `serving`: druga heartbeat w `Heartbeats`, start i stop pętli newsów obok zbioru postów; ustawienia `SOCIAL_NEWS_*` w `config.py`, `workbench/config.py` i `.env.example`
 
 ## 3. Kontrakt
 
