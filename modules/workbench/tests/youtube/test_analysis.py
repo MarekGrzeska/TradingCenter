@@ -18,7 +18,7 @@ from youtube_data.analysis import (
 )
 from youtube_data.providers.base import ReadingUnusable
 
-FILM = Film(title="Gold to 3000?", channel_title="Gold Talk", published_on=date(2026, 9, 27), language="en")
+FILM = Film(video_id="v1", title="Gold to 3000?", channel_title="Gold Talk", published_on=date(2026, 9, 27), language="en")
 
 
 def answer(**overrides) -> dict:

@@ -64,6 +64,10 @@ def settings() -> Settings:
     return Settings(
         database_url="postgresql://localhost:5432/test?sslmode=require",
         database_user="test-user",
+        # A deployment's settings, so the real providers: the simulation is refused where DATABASE_USER is set.
+        video_source="rss",
+        transcript_providers="direct",
+        analyser="openai",
         _env_file=None,
     )
 

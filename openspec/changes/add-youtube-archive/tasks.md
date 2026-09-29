@@ -18,18 +18,18 @@
 
 ## 3. Symulacja
 
-- [ ] 3.1 `Clock` wstrzykiwany i `YOUTUBE_SIM_SPEED`
-- [ ] 3.2 Format scenariusza JSON i jego walidacja; `sim/scenarios/default.json` z syntetycznymi transkrypcjami (PL, EN, pusta, z wstrzyknięciem) i przygotowanymi odczytami
-- [ ] 3.3 `sim` VideoSource: filmy w czasie, wyszukiwanie po katalogu, koszt jednostek, rozwiązanie `@uchwytu`
-- [ ] 3.4 `sim` TranscriptProvider: napisy natychmiast / po czasie / nigdy / zadanie asynchroniczne, odsetek blokad z ziarnem, opóźnienie, płatny brak napisów
-- [ ] 3.5 `sim` Analyser: przygotowany odczyt, `unusable`, odczyt neutralny, tokeny = długość / 4
-- [ ] 3.6 Oznaczenie symulacji na filmie, transkrypcji i odczycie; odmowa startu symulacji w trybie produkcyjnym
-- [ ] 3.7 Testy powtarzalności przebiegu dla tego samego scenariusza, ziarna i zegara
+- [x] 3.1 `Clock` wstrzykiwany i `YOUTUBE_SIM_SPEED`
+- [x] 3.2 Format scenariusza JSON i jego walidacja; `sim/scenarios/default.json` z syntetycznymi transkrypcjami (PL, EN, pusta, z wstrzyknięciem) i przygotowanymi odczytami
+- [x] 3.3 `sim` VideoSource: filmy w czasie, wyszukiwanie po katalogu, koszt jednostek, rozwiązanie `@uchwytu`
+- [x] 3.4 `sim` TranscriptProvider: napisy natychmiast / po czasie / nigdy / zadanie asynchroniczne, odsetek blokad z ziarnem, opóźnienie, płatny brak napisów
+- [x] 3.5 `sim` Analyser: przygotowany odczyt, `unusable`, odczyt neutralny, tokeny = długość / 4
+- [x] 3.6 Oznaczenie symulacji na filmie, transkrypcji i odczycie; odmowa startu symulacji w trybie produkcyjnym
+- [x] 3.7 Testy powtarzalności przebiegu dla tego samego scenariusza, ziarna i zegara
 
 ## 4. Lista obserwacji i pętla
 
 - [ ] 4.1 `store.py`: kanały i tematy z sufitem, deduplikacja kanału, pauza, zdjęcie bez kasowania filmów
-- [ ] 4.2 `ingest.py`: przebieg odkryj → transkrybuj → odczytaj → powiadom, limity partii, pominięcia z powodem (short, za długi, trwająca transmisja)
+- [ ] 4.2 `ingest.py`: przebieg odkryj → transkrybuj → odczytaj → powiadom, limity partii, pominięcia z powodem (short, za długi, trwająca transmisja), zapis znacznika `simulated` z wyniku dostawcy
 - [ ] 4.3 Stany filmu, ponowienia w rosnących odstępach, `gave_up`, limit porażek odczytu
 - [ ] 4.4 Zapis `usage` per dostawca, dzienne sufity (jednostki, kredyty, tokeny), stan dostawcy (czynny / zablokowany / sufit)
 - [ ] 4.5 Wiek ostatniego ukończonego przebiegu w interwałach pętli

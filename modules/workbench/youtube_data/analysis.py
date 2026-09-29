@@ -66,8 +66,10 @@ class Analysis:
 
 @dataclass(frozen=True, slots=True)
 class Film:
-    """What the model is told about a film besides its words. Kept small: a title can carry a claim, the rest cannot."""
+    """What the model is told about a film besides its words. Kept small: a title can carry a claim, the rest cannot. The
+    id is for the caller's bookkeeping — a simulated model finds its prepared reading by it — and is not in the message."""
 
+    video_id: str
     title: str
     channel_title: str
     published_on: date

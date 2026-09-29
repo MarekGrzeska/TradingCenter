@@ -40,5 +40,8 @@ def test_an_identity_over_plaintext_is_refused() -> None:
         Settings(
             database_url="postgresql://db.example.com/youtube",
             database_user="workbench",
+            video_source="rss",
+            transcript_providers="direct",
+            analyser="openai",
             _env_file=None,
         )
