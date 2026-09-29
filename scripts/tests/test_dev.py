@@ -489,14 +489,12 @@ class TestTheOptionalYoutubeChain:
 
     def test_an_env_with_the_line_adds_the_eighth(self) -> None:
         files = dict(GOOD_ENV)
-        files["workbench"] += "YOUTUBE_DATABASE_URL=postgresql://youtube:pw@127.0.0.1:55432/youtube
-"
+        files["workbench"] += "YOUTUBE_DATABASE_URL=postgresql://youtube:pw@127.0.0.1:55432/youtube\n"
 
         assert migration_chains(environment(files=files))[-1] == ("workbench", "alembic-youtube.ini")
 
     def test_a_line_left_blank_is_not_the_line(self) -> None:
         files = dict(GOOD_ENV)
-        files["workbench"] += "YOUTUBE_DATABASE_URL=
-"
+        files["workbench"] += "YOUTUBE_DATABASE_URL=\n"
 
         assert ("workbench", "alembic-youtube.ini") not in migration_chains(environment(files=files))
