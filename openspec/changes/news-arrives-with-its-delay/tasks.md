@@ -51,4 +51,4 @@
 - [x] 7.3 Okna w minutach: `GET /news?minutes=`, test okna 5 i 15 minut
 - [x] 7.4 Terminal: kliknięcie rozwija cały news w miejscu, okna 5 min–7 d (domyślnie 4 h), sortowanie po publikacji / zobaczeniu / oczekiwaniu, „Wszystkie / Żadne / Tylko działające”
 - [x] 7.5 Pocket: to samo co 7.4
-- [ ] 7.6 Uzupełnić `review.md` o tę zmianę i po wdrożeniu sprawdzić, które feedy niosą treść
+- [x] 7.6 Uzupełnić `review.md` o tę zmianę (addendum); sprawdzenie, które feedy niosą treść na produkcji, wchodzi do 6.4
