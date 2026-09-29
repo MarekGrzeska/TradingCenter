@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { collectionStalled, delayText, formatDuration, formatRange } from "./delay";
+import { collectionStalled, delayText, expiryText, formatDuration, formatRange } from "./delay";
 
 describe("formatRange", () => {
   it.each([
@@ -44,5 +44,18 @@ describe("collectionStalled", () => {
     expect(collectionStalled([])).toBe(false);
     expect(collectionStalled([{ status: "stale" }, { status: "failing" }, { status: "pending" }])).toBe(true);
     expect(collectionStalled([{ status: "stale" }, { status: "ok" }])).toBe(false);
+  });
+});
+
+describe("expiryText", () => {
+  const now = new Date("2026-09-29T12:00:00Z");
+
+  it("names a date ahead, and the next sweep for one already past", () => {
+    expect(expiryText(new Date("2026-10-27T12:00:00Z"), now)).toMatch(/^zniknie /);
+    expect(expiryText(new Date("2026-09-01T12:00:00Z"), now)).toBe("zniknie przy najbliższym czyszczeniu");
+  });
+
+  it("says nothing for a kept headline, which has no date", () => {
+    expect(expiryText(null, now)).toBeNull();
   });
 });

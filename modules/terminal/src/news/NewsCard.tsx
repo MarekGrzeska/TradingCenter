@@ -1,5 +1,5 @@
 import { formatInstant } from "../ui/formatTime";
-import { delayText } from "./delay";
+import { delayText, expiryText } from "./delay";
 import type { NewsItem } from "./newsApi";
 
 /** One headline: the feed's own words, when it said them, how late that reached us, and whether to keep it. */
@@ -40,8 +40,8 @@ export function NewsCard({
             <span className="tabular-nums" title="opóźnienie: ile spóźnił się feed – ile czekaliśmy">
               opóźnienie {delayText(item)}
             </span>
-            {!kept && item.expiresAt !== null && (
-              <span>zniknie {item.expiresAt.toLocaleDateString("pl-PL")}</span>
+            {!kept && expiryText(item.expiresAt, new Date()) !== null && (
+              <span>{expiryText(item.expiresAt, new Date())}</span>
             )}
           </div>
         </div>

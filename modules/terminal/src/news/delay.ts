@@ -62,3 +62,11 @@ export const STATUS_TEXT: Record<SourceStatus, string> = {
 export function collectionStalled(sources: readonly Pick<NewsSource, "status">[]): boolean {
   return sources.length > 0 && sources.every((source) => source.status !== "ok");
 }
+
+/** When a headline that is not kept goes away. Past its date it is only waiting for the next hourly sweep. */
+export function expiryText(expiresAt: Date | null, now: Date): string | null {
+  if (expiresAt === null) return null;
+  return expiresAt.getTime() <= now.getTime()
+    ? "zniknie przy najbliższym czyszczeniu"
+    : `zniknie ${expiresAt.toLocaleDateString("pl-PL")}`;
+}

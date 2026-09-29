@@ -166,3 +166,21 @@ async def test_a_pass_that_raised_does_not_beat_the_heartbeat(pool, monkeypatch)
     await loop.stop()
 
     assert not heartbeat.has_run
+
+
+async def test_the_loop_collects_by_itself_without_anybody_asking(pool):
+    import asyncio
+
+    clock = Clock()
+    loop = collector(pool, clock, serve, GOOD)
+    loop._tick = 0.01
+    await loop.start()
+    try:
+        for _ in range(100):
+            await asyncio.sleep(0.02)
+            if (await read_all(pool))[0]:
+                break
+    finally:
+        await loop.stop()
+
+    assert len((await read_all(pool))[0]) == 3

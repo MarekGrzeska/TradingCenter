@@ -107,6 +107,39 @@ describe("NewsView", () => {
     expect(screen.getByText(/refused: HTTP 403/)).toBeInTheDocument();
   });
 
+  it("says the list is cut instead of pretending to show the whole window", async () => {
+    const client = api([item()], {
+      news: vi.fn(async () => ({ items: [item()], truncated: true, windowFrom: null })),
+    });
+    render(<NewsView api={client} />);
+
+    expect(await screen.findByText(/Lista jest obcięta/)).toBeInTheDocument();
+  });
+
+  it("flags a refusing source in the table with its reason and its last success", async () => {
+    render(
+      <NewsView
+        api={api([item()], {}, [
+          source(),
+          source({
+            source: "irna",
+            publisher: "IRNA",
+            status: "failing",
+            lastFailure: "refused: HTTP 403",
+            lastSuccessAt: new Date("2026-09-29T14:00:00Z"),
+          }),
+        ])}
+      />,
+    );
+
+    await userEvent.click(await screen.findByRole("button", { name: /Źródła i ich opóźnienia/ }));
+
+    const row = screen.getByRole("row", { name: /IRNA/ });
+    expect(row).toHaveTextContent("ostatnie pobranie nieudane");
+    expect(row).toHaveTextContent("refused: HTTP 403");
+    expect(screen.getByRole("row", { name: /Al Jazeera/ })).toHaveTextContent("działa");
+  });
+
   it("keeps the headlines on screen when a refresh fails", async () => {
     let calls = 0;
     const client = api([], {

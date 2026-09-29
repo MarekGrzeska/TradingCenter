@@ -60,6 +60,19 @@ async def test_every_way_a_feed_can_fail_is_its_own_kind(respond, kind):
     assert failed.value.kind is kind
 
 
+async def test_a_refusal_is_one_request_and_never_a_second_try_as_somebody_else():
+    seen: list[httpx.Request] = []
+
+    def handler(request):
+        seen.append(request)
+        return httpx.Response(403)
+
+    with pytest.raises(FetchFailed):
+        await client_for(handler).fetch(SOURCE)
+
+    assert len(seen) == 1
+
+
 async def test_no_answer_at_all_is_unreachable():
     def handler(request):
         raise httpx.ConnectTimeout("timed out")

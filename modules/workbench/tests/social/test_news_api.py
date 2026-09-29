@@ -50,6 +50,7 @@ async def test_a_headline_reaches_the_wire_with_both_bounds_of_its_delay(api, po
 
     [item] = (await api.get("/news", params={"hours": 6})).json()["items"]
 
+    assert item["first_seen_at"] and item["previous_fetch_at"]
     assert item["delay_min_seconds"] == pytest.approx(7 * 60, abs=2)
     assert item["delay_max_seconds"] == pytest.approx(9 * 60, abs=2)
     assert item["delay_unmeasured"] is None
@@ -144,3 +145,17 @@ async def test_a_feed_whose_latest_fetch_failed_is_named_failing_with_its_reason
     assert failing["status"] == "failing"
     assert failing["last_failure"] == "refused: HTTP 403"
     assert failing["last_success_at"] is not None
+
+
+async def test_reading_the_news_adds_nothing_to_the_archive(api, pool):
+    await collected(pool, [feed_item("a", published_at=published(10))])
+
+    async def count():
+        async with pool.acquire() as conn:
+            return await conn.fetchval("SELECT count(*) FROM news_items")
+
+    before = await count()
+    for path in ("/news", "/news/sources"):
+        await api.get(path)
+
+    assert await count() == before
