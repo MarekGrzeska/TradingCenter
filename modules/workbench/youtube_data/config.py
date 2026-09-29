@@ -12,6 +12,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # offer TLS — a remote database MUST be reached encrypted, not merely offered it.
 _TLS_REQUIRING_SSLMODES = {"require", "verify-ca", "verify-full"}
 
+# What each provider setting may name. The one place a new provider is announced to the configuration.
+KNOWN_VIDEO_SOURCES = ("rss", "data_api")
+KNOWN_TRANSCRIPT_PROVIDERS = ("direct",)
+KNOWN_ANALYSERS = ("openai",)
+
 
 def _identifiers(raw: str) -> frozenset[str]:
     """A comma-separated setting as a set, with blanks and stray spaces dropped."""
@@ -39,6 +44,30 @@ class Settings(BaseSettings):
     # Enabling this package in production is the change that finds the third connection.
     database_pool_size: int = 2
 
+    # Where films are found, where their words come from and who reads them. Each is a name, so replacing a provider is
+    # a line in `.env`; what a name may be is `KNOWN_*` below. `rss` needs nothing and cannot search, measure a film or
+    # resolve an `@handle`; `data_api` does all three on a free key.
+    video_source: str = "rss"
+    data_api_key: str | None = None
+    # A list, first choice first; the next is tried only when the one before did not let us in.
+    transcript_providers: str = "direct"
+    # The languages asked of a transcript, in order of preference.
+    transcript_languages: str = "pl,en"
+
+    # The model. Absent key is a supported state, not a refusal — the package discovers and transcribes, and every
+    # reading stays empty, which `/state` says.
+    analyser: str = "openai"
+    openai_api_key: str | None = None
+    openai_base_url: str | None = None
+    analysis_model: str = "gpt-6-sol"
+    # How much of a transcript one reading is given. An hour of speech is ~55k characters; this is well past the
+    # longest film the loop accepts, so a cut is the exception and is announced to the model when it happens.
+    analysis_max_chars: int = 300_000
+
+    # How this package names itself upstream, and how long it waits for a third party.
+    provider_user_agent: str = "tradingcenter-youtube-data/0.1 (+https://github.com/MarekGrzeska)"
+    provider_timeout_seconds: float = 20.0
+
     # Easy Auth authorizes an application, not a route, and both surfaces stand in one process — so which caller
     # reaches which of them is this package's own record.
     require_authenticated_principal: bool = False
@@ -53,13 +82,75 @@ class Settings(BaseSettings):
     def rest_caller_ids(self) -> frozenset[str]:
         return _identifiers(self.rest_caller_application_ids)
 
-    @field_validator("database_url")
+    @property
+    def transcript_provider_names(self) -> tuple[str, ...]:
+        return tuple(part.strip() for part in self.transcript_providers.split(",") if part.strip())
+
+    @property
+    def languages(self) -> tuple[str, ...]:
+        return tuple(part.strip() for part in self.transcript_languages.split(",") if part.strip())
+
+    @property
+    def model_configured(self) -> bool:
+        return self.analyser == "openai" and bool(self.openai_api_key and self.openai_api_key.strip())
+
+    @field_validator("database_url", "provider_user_agent", "analysis_model")
     @classmethod
     def _not_blank(cls, value: str, info: ValidationInfo) -> str:
         # pydantic already rejects a variable that is absent; this catches the one that is present but empty.
         if not value.strip():
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()
+
+    @field_validator("data_api_key", "openai_api_key", "openai_base_url")
+    @classmethod
+    def _blank_secret_is_absent(cls, value: str | None) -> str | None:
+        # A key line somebody stopped filling means the same as a line that is not there.
+        if value is None or not value.strip():
+            return None
+        return value.strip()
+
+    @field_validator("video_source")
+    @classmethod
+    def _known_source(cls, value: str) -> str:
+        if value not in KNOWN_VIDEO_SOURCES:
+            raise ValueError(f"VIDEO_SOURCE must be one of {', '.join(KNOWN_VIDEO_SOURCES)}; got {value!r}")
+        return value
+
+    @field_validator("analyser")
+    @classmethod
+    def _known_analyser(cls, value: str) -> str:
+        if value not in KNOWN_ANALYSERS:
+            raise ValueError(f"ANALYSER must be one of {', '.join(KNOWN_ANALYSERS)}; got {value!r}")
+        return value
+
+    @field_validator("transcript_providers")
+    @classmethod
+    def _known_transcript_providers(cls, value: str) -> str:
+        names = [part.strip() for part in value.split(",") if part.strip()]
+        if not names:
+            raise ValueError("TRANSCRIPT_PROVIDERS names no provider")
+        unknown = [name for name in names if name not in KNOWN_TRANSCRIPT_PROVIDERS]
+        if unknown:
+            raise ValueError(
+                f"TRANSCRIPT_PROVIDERS names {', '.join(unknown)}; the ones this package has are "
+                f"{', '.join(KNOWN_TRANSCRIPT_PROVIDERS)}"
+            )
+        return value
+
+    @field_validator("analysis_max_chars")
+    @classmethod
+    def _positive(cls, value: int, info: ValidationInfo) -> int:
+        if value < 1:
+            raise ValueError(f"{str(info.field_name).upper()} must be at least 1; got {value}")
+        return value
+
+    @field_validator("provider_timeout_seconds")
+    @classmethod
+    def _positive_seconds(cls, value: float, info: ValidationInfo) -> float:
+        if value <= 0:
+            raise ValueError(f"{str(info.field_name).upper()} must be positive; got {value}")
+        return value
 
     @field_validator("database_user")
     @classmethod
@@ -75,6 +166,14 @@ class Settings(BaseSettings):
         if value < 1:
             raise ValueError(f"DATABASE_POOL_SIZE must be at least 1; got {value}")
         return value
+
+    @model_validator(mode="after")
+    def _a_source_that_needs_a_key_has_one(self) -> Settings:
+        # A wish and not a state: the source was *asked for*, so running without its key would be a silent downgrade to
+        # a source that cannot do what was asked. Absent key for the *model* is the opposite — a supported state.
+        if self.video_source == "data_api" and self.data_api_key is None:
+            raise ValueError("VIDEO_SOURCE=data_api needs DATA_API_KEY — a free YouTube Data API key")
+        return self
 
     @model_validator(mode="after")
     def _connection_mode_is_coherent(self) -> Settings:

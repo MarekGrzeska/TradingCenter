@@ -9,12 +9,12 @@
 
 ## 2. Interfejsy dostawców i adaptery darmowe
 
-- [ ] 2.1 Protokoły `VideoSource`, `TranscriptProvider`, `Analyser` z wynikami `Transcript | NoTranscript | Blocked | Pending(job)`
-- [ ] 2.2 `rss` (kanał po `channel_id`) i `data_api` (uploads playlist, `videos.list` po 50, `search.list`, `forHandle`; klucz w `X-goog-api-key`)
-- [ ] 2.3 `direct` przez `youtube-transcript-api` (zależność w `pyproject.toml`), mapowanie błędów na `NoTranscript` / `Blocked`
-- [ ] 2.4 `openai` analyser: jedno wywołanie bez narzędzi, strict JSON schema, walidacja, profil `market`, prompt „dane, nie polecenie"
-- [ ] 2.5 Łańcuch dostawców z ustawienia; przejście dalej tylko po `Blocked`/błędzie
-- [ ] 2.6 Testy adapterów na zapisanych odpowiedziach (`respx`) i test, że żaden adres wychodzący nie niesie sekretu
+- [x] 2.1 Protokoły `VideoSource`, `TranscriptProvider`, `Analyser` z wynikami `Transcript | NoTranscript | Blocked | Pending(job)`
+- [x] 2.2 `rss` (kanał po `channel_id`) i `data_api` (uploads playlist, `videos.list` po 50, `search.list`, `forHandle`; klucz w `X-goog-api-key`)
+- [x] 2.3 `direct` przez `youtube-transcript-api` (zależność w `pyproject.toml`), mapowanie błędów na `NoTranscript` / `Blocked`
+- [x] 2.4 `openai` analyser: jedno wywołanie bez narzędzi, strict JSON schema, walidacja, profil `market`, prompt „dane, nie polecenie"
+- [x] 2.5 Łańcuch dostawców z ustawienia; przejście dalej tylko po `Blocked`/błędzie
+- [x] 2.6 Testy adapterów na zapisanych odpowiedziach (`respx`) i test, że żaden adres wychodzący nie niesie sekretu
 
 ## 3. Symulacja
 
