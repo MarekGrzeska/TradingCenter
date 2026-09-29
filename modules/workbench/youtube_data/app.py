@@ -10,14 +10,18 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
+import httpx
 from fastapi import FastAPI
-from tc_runtime import migrate, schema_version
+from tc_runtime import liveness, migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
+from tc_runtime.liveness import Heartbeats, LoopHeartbeat
 
 from . import mcp_app
 from .caller_access import RECORD, CallerAccess
 from .config import Settings
+from .ingest import Ingest
+from .providers import build as providers_build
 from .routers import meta
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
@@ -50,11 +54,32 @@ async def serving(app: FastAPI, settings: Settings):
 
         app.state.pool = pool
 
-        # The tool surface's session manager: a mounted application's lifespan is never run, so the task group has to
-        # be started here or every tool call fails.
-        async with mcp_app.tool_surface_session(app):
-            log.info("youtube-data is serving")
-            yield
+        async with httpx.AsyncClient(
+            timeout=httpx.Timeout(settings.provider_timeout_seconds, connect=10.0),
+            headers={"User-Agent": settings.provider_user_agent},
+            follow_redirects=True,
+        ) as http:
+            providers = providers_build.build(settings, http)
+            app.state.providers = providers
+
+            # After the migration and not before it: a pass started earlier would write into a schema it does not know.
+            # One heartbeat for the one loop, on the state so `/health` can answer with it and the metric can read it.
+            heartbeats = Heartbeats(LoopHeartbeat("ingest", expected_seconds=settings.poll_interval_seconds))
+            app.state.heartbeats = heartbeats
+            liveness.register_metrics("youtube_data", heartbeats)
+
+            ingest = Ingest(pool, providers, settings, heartbeat=heartbeats["ingest"])
+            app.state.ingest = ingest
+            await ingest.start()
+
+            # The tool surface's session manager: a mounted application's lifespan is never run, so the task group has
+            # to be started here or every tool call fails.
+            async with mcp_app.tool_surface_session(app):
+                log.info("youtube-data is serving")
+                try:
+                    yield
+                finally:
+                    await ingest.stop()
 
 
 @asynccontextmanager

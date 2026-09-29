@@ -67,8 +67,13 @@ class UnsupportedOperation(SourceError):
 
 class VideoSource(Protocol):
     name: str
+    # What this source is paid in, and what one search costs of it: the loop's daily ceiling is arithmetic over these.
+    unit: str
     supports_search: bool
     supports_handles: bool
+
+    @property
+    def search_cost(self) -> int: ...
 
     async def resolve_channel(self, reference: str) -> ChannelInfo: ...
 
@@ -125,6 +130,7 @@ TranscriptResult = Transcript | NoTranscript | Blocked | Pending
 
 class TranscriptProvider(Protocol):
     name: str
+    unit: str
 
     async def fetch(self, video_id: str, languages: Sequence[str]) -> TranscriptResult: ...
 

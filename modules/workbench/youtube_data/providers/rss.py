@@ -31,6 +31,8 @@ _NS = {
 
 class RssSource:
     name = "rss"
+    unit = "requests"
+    search_cost = 0
     supports_search = False
     supports_handles = False
 

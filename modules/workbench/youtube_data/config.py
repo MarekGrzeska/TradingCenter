@@ -71,6 +71,37 @@ class Settings(BaseSettings):
     sim_scenario: str | None = None
     sim_speed: float = 1.0
 
+    # How often the loop passes, and how much of each step one pass may do. The rest waits for the next pass: a busy
+    # hour must cost a bounded amount, and a step that stalls must not stall the ones after it.
+    poll_interval_seconds: int = 1800
+    discover_batch_limit: int = 50
+    transcribe_batch_limit: int = 10
+    analyse_batch_limit: int = 5
+    announce_batch_limit: int = 10
+
+    # When a film without captions is asked about again, in minutes: an hour, six, a day — automatic captions turn up
+    # hours after upload — and then never. Every ask costs, so the last one is last; four misses is the ceiling.
+    retry_delays_minutes: str = "60,360,1440"
+    # A reading that fails this many times is no longer picked up by itself.
+    reading_max_failures: int = 3
+
+    # A film outside these is not worth a transcript: a short is a slogan, and a five-hour stream is a day of tokens.
+    # Applied only where the source says how long the film is — a feed does not.
+    min_video_seconds: int = 60
+    max_video_seconds: int = 10_800
+
+    # How long the watch list may grow, and what a topic gets when it is added without saying.
+    max_channels: int = 100
+    max_topics: int = 20
+    topic_default_interval_minutes: int = 360
+    topic_default_max_videos: int = 3
+
+    # Each provider's day, in the provider's own unit, counted here rather than trusted to the provider's dashboard.
+    # The source's is the YouTube Data API's 10,000 with room to spare; a topic search costs a hundred of them.
+    daily_source_units: int = 8000
+    daily_transcript_units: int = 500
+    daily_token_limit: int = 2_000_000
+
     # How this package names itself upstream, and how long it waits for a third party.
     provider_user_agent: str = "tradingcenter-youtube-data/0.1 (+https://github.com/MarekGrzeska)"
     provider_timeout_seconds: float = 20.0
@@ -98,6 +129,10 @@ class Settings(BaseSettings):
         return tuple(part.strip() for part in self.transcript_languages.split(",") if part.strip())
 
     @property
+    def retry_delays(self) -> tuple[int, ...]:
+        return tuple(int(part) for part in self.retry_delays_minutes.split(",") if part.strip())
+
+    @property
     def simulating(self) -> bool:
         return self.video_source == "sim" or "sim" in self.transcript_provider_names or self.analyser == "sim"
 
@@ -121,6 +156,14 @@ class Settings(BaseSettings):
         if value is None or not value.strip():
             return None
         return value.strip()
+
+    @field_validator("retry_delays_minutes")
+    @classmethod
+    def _delays_are_minutes(cls, value: str) -> str:
+        parts = [part.strip() for part in value.split(",") if part.strip()]
+        if not all(part.isdigit() and int(part) > 0 for part in parts):
+            raise ValueError(f"RETRY_DELAYS_MINUTES is a comma-separated list of positive whole minutes; got {value!r}")
+        return value
 
     @field_validator("video_source")
     @classmethod
@@ -150,7 +193,24 @@ class Settings(BaseSettings):
             )
         return value
 
-    @field_validator("analysis_max_chars")
+    @field_validator(
+        "analysis_max_chars",
+        "poll_interval_seconds",
+        "discover_batch_limit",
+        "transcribe_batch_limit",
+        "analyse_batch_limit",
+        "announce_batch_limit",
+        "reading_max_failures",
+        "min_video_seconds",
+        "max_video_seconds",
+        "max_channels",
+        "max_topics",
+        "topic_default_interval_minutes",
+        "topic_default_max_videos",
+        "daily_source_units",
+        "daily_transcript_units",
+        "daily_token_limit",
+    )
     @classmethod
     def _positive(cls, value: int, info: ValidationInfo) -> int:
         if value < 1:

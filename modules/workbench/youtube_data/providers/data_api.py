@@ -49,6 +49,9 @@ def duration_seconds(iso: str | None) -> int | None:
 
 class DataApiSource:
     name = "data_api"
+    unit = "api_units"
+    # The search itself and the details call that follows it, which is always made.
+    search_cost = COST_SEARCH + COST_LIST
     supports_search = True
     supports_handles = True
 

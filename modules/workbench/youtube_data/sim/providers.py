@@ -38,11 +38,17 @@ NEUTRAL = Reading(
 
 class SimSource:
     name = "sim"
+    unit = UNIT
     supports_search = True
     supports_handles = True
 
     def __init__(self, world: World) -> None:
         self._world = world
+
+    @property
+    def search_cost(self) -> int:
+        source = self._world.scenario.source
+        return source.search_units + source.details_units
 
     async def _pay(self, units: int) -> None:
         behaviour = self._world.scenario.source
@@ -104,6 +110,7 @@ class SimSource:
 
 class SimTranscripts:
     name = "sim"
+    unit = CREDIT
 
     def __init__(self, world: World) -> None:
         self._world = world

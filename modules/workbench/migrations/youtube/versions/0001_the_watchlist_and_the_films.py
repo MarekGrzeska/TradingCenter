@@ -85,6 +85,9 @@ def upgrade() -> None:
             attempts           integer NOT NULL DEFAULT 0,
             next_attempt_at    timestamptz,
             reading_failures   integer NOT NULL DEFAULT 0,
+            -- A provider that takes a long film answers later, by job: which provider, and which job.
+            job_provider       text,
+            job_id             text,
             simulated          boolean NOT NULL DEFAULT false,
             discovered_at      timestamptz NOT NULL DEFAULT now(),
             notified_at        timestamptz,

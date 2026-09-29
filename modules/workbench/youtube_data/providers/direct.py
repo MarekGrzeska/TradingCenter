@@ -42,6 +42,7 @@ _REFUSED = (RequestBlocked, IpBlocked, PoTokenRequired, YouTubeRequestFailed)
 
 class DirectTranscripts:
     name = "direct"
+    unit = "requests"
 
     def __init__(self, meter: Meter, *, api: YouTubeTranscriptApi | None = None) -> None:
         self._meter = meter

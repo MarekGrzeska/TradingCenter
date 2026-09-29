@@ -28,13 +28,13 @@
 
 ## 4. Lista obserwacji i pętla
 
-- [ ] 4.1 `store.py`: kanały i tematy z sufitem, deduplikacja kanału, pauza, zdjęcie bez kasowania filmów
-- [ ] 4.2 `ingest.py`: przebieg odkryj → transkrybuj → odczytaj → powiadom, limity partii, pominięcia z powodem (short, za długi, trwająca transmisja), zapis znacznika `simulated` z wyniku dostawcy
-- [ ] 4.3 Stany filmu, ponowienia w rosnących odstępach, `gave_up`, limit porażek odczytu
-- [ ] 4.4 Zapis `usage` per dostawca, dzienne sufity (jednostki, kredyty, tokeny), stan dostawcy (czynny / zablokowany / sufit)
-- [ ] 4.5 Wiek ostatniego ukończonego przebiegu w interwałach pętli
-- [ ] 4.6 Testy jednostkowe harmonogramu ponowień i sufitów; testy `-m db` zapytania kolejki (bez `gave_up`) i deduplikacji filmu z kanału i tematu
-- [ ] 4.7 `db-cost-check` dla zapytania kolejki i listy filmów
+- [x] 4.1 `store.py`: kanały i tematy z sufitem, deduplikacja kanału, pauza, zdjęcie bez kasowania filmów
+- [x] 4.2 `ingest.py`: przebieg odkryj → transkrybuj → odczytaj → powiadom, limity partii, pominięcia z powodem (short, za długi, trwająca transmisja), zapis znacznika `simulated` z wyniku dostawcy
+- [x] 4.3 Stany filmu, ponowienia w rosnących odstępach, `gave_up`, limit porażek odczytu
+- [x] 4.4 Zapis `usage` per dostawca, dzienne sufity (jednostki, kredyty, tokeny), stan dostawcy (czynny / zablokowany / sufit)
+- [x] 4.5 Wiek ostatniego ukończonego przebiegu w interwałach pętli
+- [x] 4.6 Testy jednostkowe harmonogramu ponowień i sufitów; testy `-m db` zapytania kolejki (bez `gave_up`) i deduplikacji filmu z kanału i tematu
+- [x] 4.7 `db-cost-check` dla zapytania kolejki i listy filmów
 
 ## 5. Alerty
 
@@ -44,7 +44,7 @@
 
 ## 6. REST i kontrakt
 
-- [ ] 6.1 `contract.py` i routery: filmy (okno, zawężenia, porządek), film, transkrypcja stronami, kanały i tematy (odczyt, dopisanie, pauza, zdjęcie), wskazanie filmu, `/state`, `/health`
+- [ ] 6.1 `contract.py` i routery: filmy (okno, zawężenia, porządek), film, transkrypcja stronami, kanały i tematy (odczyt, dopisanie, pauza, zdjęcie), wskazanie filmu, `/state` (liczby filmów w stanach: okno 7 dni plus stany kolejki z indeksu częściowego, **nigdy** `count(*)` po całej tabeli — `db-cost-check` z 29 września: 1316 stron i 14 ms przy 50 tys. filmów wobec 31 stron w oknie), `/health`
 - [ ] 6.2 Testy: happy path, okno bez sensu, ścieżka spoza zapisu, pola odczytu puste
 
 ## 7. Narzędzia
