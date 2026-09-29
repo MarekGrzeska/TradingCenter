@@ -17,7 +17,7 @@ from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 from tc_runtime.liveness import Heartbeats, LoopHeartbeat
 
-from . import mcp_app
+from . import alerts, mcp_app
 from .caller_access import RECORD, CallerAccess
 from .config import Settings
 from .ingest import Ingest
@@ -29,8 +29,9 @@ log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def serving(app: FastAPI, settings: Settings):
-    """Everything this package needs running, on `app.state`, for as long as the block is open."""
+async def serving(app: FastAPI, settings: Settings, telegram: httpx.AsyncClient | None = None):
+    """Everything this package needs running, on `app.state`, for as long as the block is open. `telegram` is the host's
+    client over the door to Telegram; without it nobody is told, whatever the destination says."""
     app.state.settings = settings
 
     async with make_pool(
@@ -68,7 +69,18 @@ async def serving(app: FastAPI, settings: Settings):
             app.state.heartbeats = heartbeats
             liveness.register_metrics("youtube_data", heartbeats)
 
-            ingest = Ingest(pool, providers, settings, heartbeat=heartbeats["ingest"])
+            # `None` without a destination, and the package runs anyway: reading without telling anybody is a supported
+            # state, which `/state` names rather than leaving the screen to guess at.
+            announcer = alerts.build(pool, settings, telegram)
+            app.state.alerts = announcer
+
+            ingest = Ingest(
+                pool,
+                providers,
+                settings,
+                announce=None if announcer is None else announcer.run,
+                heartbeat=heartbeats["ingest"],
+            )
             app.state.ingest = ingest
             await ingest.start()
 

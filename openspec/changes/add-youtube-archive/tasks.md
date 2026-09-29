@@ -38,9 +38,9 @@
 
 ## 5. Alerty
 
-- [ ] 5.1 Reguły `always` / `threshold` / `never` na kanale i temacie; klient `/telegram` w procesie jak w `social_data/alerts.py`
-- [ ] 5.2 Treść wiadomości w limicie bramy, oznaczenie symulacji, znacznik po udanej wysyłce
-- [ ] 5.3 Testy: brama odmawia, film bez odczytu, adresat nieustawiony
+- [x] 5.1 Reguły `always` / `threshold` / `never` na kanale i temacie; klient `/telegram` w procesie jak w `social_data/alerts.py`
+- [x] 5.2 Treść wiadomości w limicie bramy, oznaczenie symulacji, znacznik po udanej wysyłce
+- [x] 5.3 Testy: brama odmawia, film bez odczytu, adresat nieustawiony
 
 ## 6. REST i kontrakt
 

@@ -146,7 +146,12 @@ async def lifespan(app: FastAPI):
         # Entered only when mounted: with no database configured this is a block that does nothing, and the log line
         # in `_announce_youtube` is what says why.
         (
-            youtube_data.app.serving(youtube_app, youtube_settings)
+            telegram_client(telegram_app, "the YouTube archive")
+            if youtube_app is not None
+            else nullcontext(None)
+        ) as youtube_telegram,
+        (
+            youtube_data.app.serving(youtube_app, youtube_settings, telegram=youtube_telegram)
             if youtube_app is not None and youtube_settings is not None
             else nullcontext()
         ),

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from datetime import timedelta
+
+from youtube_data.alerts import Alerts
 from youtube_data.analysis import Analyser
 from youtube_data.clock import ManualClock
 from youtube_data.config import Settings
@@ -46,6 +49,19 @@ class Rig:
             clock=self.clock,
         )
         self.ingest = Ingest(pool, self.providers, self.settings)
+
+    def announcing_to(self, gateway, *, destination: str = "operator") -> Alerts:
+        """The loop, now told to announce through `gateway`, which is a recording one rather than Telegram."""
+        alerts = Alerts(
+            self.pool,
+            gateway,
+            destination=destination,
+            min_score=self.settings.alert_min_impact_score,
+            batch_limit=self.settings.announce_batch_limit,
+            window=timedelta(hours=self.settings.alert_window_hours),
+        )
+        self.ingest = Ingest(self.pool, self.providers, self.settings, announce=alerts.run)
+        return alerts
 
     async def tick(self) -> None:
         await self.ingest.tick()

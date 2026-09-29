@@ -509,3 +509,44 @@ async def settle_analysed(conn: Conn) -> int:
     `quiet`, so the day an adresat is set does not announce the whole backlog."""
     result = await conn.execute("UPDATE videos SET state = 'quiet' WHERE state = 'analysed'")
     return int(result.split()[-1])
+
+
+@dataclass(frozen=True, slots=True)
+class ToAnnounce:
+    video: Video
+    reading: dict
+    simulated: bool
+
+
+async def analysed_for_alert(conn: Conn, *, limit: int) -> list[ToAnnounce]:
+    rows = await conn.fetch(
+        f"""
+        SELECT {", ".join(f"v.{c.strip()}" for c in _VIDEO_COLUMNS.split(","))}, r.result, r.simulated AS r_simulated
+        FROM videos v JOIN readings r ON r.video_id = v.video_id AND r.profile = v.profile
+        WHERE v.state = 'analysed'
+        ORDER BY r.impact_score DESC, v.published_at DESC LIMIT $1
+        """,
+        limit,
+    )
+    return [
+        ToAnnounce(
+            _video(row),
+            row["result"] if isinstance(row["result"], dict) else json.loads(row["result"]),
+            row["r_simulated"],
+        )
+        for row in rows
+    ]
+
+
+async def expire_unannounced(conn: Conn, *, before: datetime) -> int:
+    """Films that were read and never announced, from before the window, are let go as quiet: a gateway that was down for
+    three days must not announce three days of films the moment it returns."""
+    result = await conn.execute(
+        """
+        UPDATE videos v SET state = 'quiet'
+        WHERE v.state = 'analysed'
+          AND (SELECT max(r.analysed_at) FROM readings r WHERE r.video_id = v.video_id) < $1
+        """,
+        before,
+    )
+    return int(result.split()[-1])

@@ -102,6 +102,16 @@ class Settings(BaseSettings):
     daily_transcript_units: int = 500
     daily_token_limit: int = 2_000_000
 
+    # Who is told, by the name the operator bound at the door to Telegram — a package of this same process, so there is no
+    # address to set. Its *absence* is a working configuration: the package reads exactly as before and tells nobody, which
+    # `/state` reports.
+    alert_destination: str | None = None
+    # How impactful a film must be to be worth a notification under a `threshold` rule. Eight, for the reason the post
+    # archive gives: the operator reads these on a phone, and a channel that speaks daily is one nobody looks at.
+    alert_min_impact_score: int = 8
+    # A film not announced within this long of being read is let go as quiet rather than announced in a heap later.
+    alert_window_hours: int = 48
+
     # How this package names itself upstream, and how long it waits for a third party.
     provider_user_agent: str = "tradingcenter-youtube-data/0.1 (+https://github.com/MarekGrzeska)"
     provider_timeout_seconds: float = 20.0
@@ -129,6 +139,10 @@ class Settings(BaseSettings):
         return tuple(part.strip() for part in self.transcript_languages.split(",") if part.strip())
 
     @property
+    def alerts_configured(self) -> bool:
+        return self.alert_destination is not None
+
+    @property
     def retry_delays(self) -> tuple[int, ...]:
         return tuple(int(part) for part in self.retry_delays_minutes.split(",") if part.strip())
 
@@ -149,7 +163,16 @@ class Settings(BaseSettings):
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()
 
-    @field_validator("data_api_key", "openai_api_key", "openai_base_url")
+    @field_validator("alert_min_impact_score")
+    @classmethod
+    def _within_the_score_range(cls, value: int) -> int:
+        # The reading is 1..10, so a threshold outside it is a channel that is either silent for ever or one that says
+        # everything — both of which look like a working configuration.
+        if not 1 <= value <= 10:
+            raise ValueError(f"ALERT_MIN_IMPACT_SCORE must be between 1 and 10; got {value}")
+        return value
+
+    @field_validator("data_api_key", "openai_api_key", "openai_base_url", "alert_destination")
     @classmethod
     def _blank_secret_is_absent(cls, value: str | None) -> str | None:
         # A key line somebody stopped filling means the same as a line that is not there.
@@ -200,6 +223,7 @@ class Settings(BaseSettings):
         "transcribe_batch_limit",
         "analyse_batch_limit",
         "announce_batch_limit",
+        "alert_window_hours",
         "reading_max_failures",
         "min_video_seconds",
         "max_video_seconds",
