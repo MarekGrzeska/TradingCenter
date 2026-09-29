@@ -49,9 +49,9 @@
 
 ## 7. Narzędzia
 
-- [ ] 7.1 FastMCP: `youtube_archive_status`, `recent_videos`, `read_video`, `read_transcript`, `instrument_sentiment`, `search_youtube`, `follow_channel`, `add_topic`, `set_alert_rule`, `analyse_video`
-- [ ] 7.2 Podpięcie w `workbench/local_tools.py` dla rozmowy i zespołów (tylko gdy pakiet zamontowany)
-- [ ] 7.3 Testy: brak narzędzi usuwających, odmowa po sufcie budżetu, odmowa wyszukiwania przy `rss`, `read_video` bez surowego tekstu
+- [x] 7.1 FastMCP: `youtube_archive_status`, `recent_videos`, `read_video`, `read_transcript`, `instrument_sentiment`, `search_youtube`, `follow_channel`, `add_topic`, `set_alert_rule`, `analyse_video`
+- [x] 7.2 Podpięcie w `workbench/local_tools.py` dla rozmowy i zespołów (tylko gdy pakiet zamontowany)
+- [x] 7.3 Testy: brak narzędzi usuwających, odmowa po sufcie budżetu, odmowa wyszukiwania przy `rss`, `read_video` bez surowego tekstu
 
 ## 8. Terminal
 

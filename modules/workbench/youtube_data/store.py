@@ -679,3 +679,55 @@ async def state_counts(conn: Conn, *, since: datetime) -> StateCounts:
         waiting={row["state"]: row["n"] for row in waiting},
         recent={row["state"]: row["n"] for row in recent},
     )
+
+
+@dataclass(frozen=True, slots=True)
+class InstrumentView:
+    video_id: str
+    title: str
+    channel_title: str
+    published_at: datetime
+    sentiment: str
+    conviction: int
+    horizon: str
+    impact_score: int
+    simulated: bool
+
+
+async def instrument_views(
+    conn: Conn, instrument: str, *, start: datetime, end: datetime, limit: int
+) -> list[InstrumentView]:
+    """Every direction a reading in the window gives an instrument, by name or by ticker. The GIN index on the lifted
+    names finds the readings; the document is opened only for those."""
+    wanted = instrument.strip().lower()
+    rows = await conn.fetch(
+        """
+        SELECT v.video_id, v.title, v.channel_title, v.published_at, r.simulated, r.impact_score,
+               i->>'sentiment' AS sentiment, (i->>'conviction')::int AS conviction, i->>'horizon' AS horizon
+        FROM videos v
+        JOIN readings r ON r.video_id = v.video_id AND r.profile = v.profile
+        CROSS JOIN LATERAL jsonb_array_elements(r.result->'instruments') AS i
+        WHERE v.published_at >= $1 AND v.published_at <= $2
+          AND r.instruments @> ARRAY[$3]::text[]
+          AND (lower(i->>'name') = $3 OR lower(i->>'epic') = $3)
+        ORDER BY v.published_at DESC LIMIT $4
+        """,
+        start,
+        end,
+        wanted,
+        limit,
+    )
+    return [
+        InstrumentView(
+            video_id=row["video_id"],
+            title=row["title"],
+            channel_title=row["channel_title"],
+            published_at=row["published_at"],
+            sentiment=row["sentiment"],
+            conviction=row["conviction"],
+            horizon=row["horizon"],
+            impact_score=row["impact_score"],
+            simulated=row["simulated"],
+        )
+        for row in rows
+    ]
