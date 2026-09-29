@@ -77,7 +77,7 @@ line-length = 100
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
 [tool.pyright]
-include = ["workbench", "agent", "teams", "teams_tools", "polymarket_data", "social_data", "strategy", "market_data", "migrations"]
+include = ["workbench", "agent", "teams", "teams_tools", "polymarket_data", "social_data", "strategy", "market_data", "youtube_data", "migrations"]
 typeCheckingMode = "basic"
 
 [tool.pytest.ini_options]

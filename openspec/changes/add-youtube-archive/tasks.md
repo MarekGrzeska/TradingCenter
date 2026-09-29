@@ -1,11 +1,11 @@
 ## 1. Szkielet pakietu
 
-- [ ] 1.1 `youtube_data/` z `config.py` (prefiks `YOUTUBE_`, walidacja bazy jak w `social_data/config.py`), `runtime.py` (klucz `8110`), `app.py`, `openapi.py`
-- [ ] 1.2 `alembic-youtube.ini` i migracja tabel `channels`, `topics`, `videos`, `transcripts`, `readings`, `usage` z indeksem `(state, next_attempt_at)`
-- [ ] 1.3 `caller_access.py` z `OPEN_PATHS`, literalnym `REST_PATHS`, `TOOLS_PREFIX`
-- [ ] 1.4 Montaż warunkowy w `workbench/app.py` (brak `YOUTUBE_DATABASE_URL` = brak montażu, brak narzędzi, wpis w logu startu); wpis w `tests/test_layering.py`
-- [ ] 1.5 `scripts/dev.py`: `youtube` w `LOGICAL_DATABASES` i na liście łańcuchów; blok `YOUTUBE_*` w `.env.example`
-- [ ] 1.6 Testy: start bez ustawienia, start z bazą nieosiągalną (odmowa z nazwą bazy), migracja pod blokadą (`-m db`)
+- [x] 1.1 `youtube_data/` z `config.py` (prefiks `YOUTUBE_`, walidacja bazy jak w `social_data/config.py`), `runtime.py` (klucz `8110`), `app.py`, `openapi.py`
+- [x] 1.2 `alembic-youtube.ini` i migracja tabel `channels`, `topics`, `videos`, `transcripts`, `readings`, `usage` i `provider_state` (moment ostatniej blokady dostawcy) z częściowym indeksem kolejki `(state, next_attempt_at)`
+- [x] 1.3 `caller_access.py` z `OPEN_PATHS`, literalnym `REST_PATHS`, `TOOLS_PREFIX`
+- [x] 1.4 Montaż warunkowy w `workbench/app.py` (brak `YOUTUBE_DATABASE_URL` = brak montażu, brak narzędzi, wpis w logu startu); wpis w `tests/test_layering.py`
+- [x] 1.5 `scripts/dev.py`: `youtube` w `LOGICAL_DATABASES` i na liście łańcuchów; blok `YOUTUBE_*` w `.env.example`
+- [x] 1.6 Testy: start bez ustawienia, start z bazą nieosiągalną (odmowa z nazwą bazy), migracja pod blokadą (`-m db`)
 
 ## 2. Interfejsy dostawców i adaptery darmowe
 

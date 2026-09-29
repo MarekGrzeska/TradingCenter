@@ -21,6 +21,7 @@ PACKAGES = (
     "strategy",
     "market_data",
     "telegram_gateway",
+    "youtube_data",
 )
 ASSEMBLY = "workbench"
 FORBIDDEN = {package: (set(PACKAGES) - {package}) | {ASSEMBLY} for package in PACKAGES}
