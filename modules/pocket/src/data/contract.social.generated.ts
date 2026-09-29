@@ -50,6 +50,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/news": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * News
+         * @description Headlines newest first — by publication, and by first sight where the feed gave no time.
+         */
+        get: operations["news_news_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/news/keep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Keep
+         * @description Keep a headline past retention, or let it go again. Idempotent both ways.
+         */
+        put: operations["keep_news_keep_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/news/sources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * News Sources
+         * @description Every declared feed, including one that has never answered, with its last day of delays.
+         */
+        get: operations["news_sources_news_sources_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ping": {
         parameters: {
             query?: never;
@@ -148,6 +208,170 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * KeepIn
+         * @description Which headline, and whether to keep it. In the body rather than the path: a feed's identifier is usually a
+         *     URL, and slashes in a path segment are a route that does not match.
+         */
+        KeepIn: {
+            /** External Id */
+            external_id: string;
+            /** Keep */
+            keep: boolean;
+            /** Source */
+            source: string;
+        };
+        /**
+         * NewsItemOut
+         * @description A headline as the feed gave it, in the feed's language, with the delay it arrived with.
+         */
+        NewsItemOut: {
+            /**
+             * Delay Max Seconds
+             * @description the upper bound: how long from publication until this archive saw it
+             */
+            delay_max_seconds: number | null;
+            /**
+             * Delay Min Seconds
+             * @description the lower bound: how late the feed itself was — its previous fetch did not have it
+             */
+            delay_min_seconds: number | null;
+            /**
+             * Delay Unmeasured
+             * @description why there is no delay; null exactly when both bounds are present
+             */
+            delay_unmeasured: ("no_publish_time" | "found_there" | "publish_time_in_future") | null;
+            /**
+             * Expires At
+             * @description when retention will sweep it; null for a kept headline
+             */
+            expires_at: string | null;
+            /**
+             * External Id
+             * @description the feed's own identifier for the item, or its link
+             */
+            external_id: string;
+            /**
+             * First Seen At
+             * Format: date-time
+             * @description when this archive first saw it, UTC
+             */
+            first_seen_at: string;
+            /**
+             * Kept At
+             * @description when the operator marked it to keep; a kept headline is never swept
+             */
+            kept_at: string | null;
+            /**
+             * Previous Fetch At
+             * @description the feed's last successful fetch before the one that brought this; null for an item found there on the feed's first fetch
+             */
+            previous_fetch_at: string | null;
+            /**
+             * Published At
+             * @description when the feed says it was published; null where it said nothing readable
+             */
+            published_at: string | null;
+            /**
+             * Publisher
+             * @description who wrote it; for an aggregator, the original publisher
+             */
+            publisher: string;
+            /**
+             * Source
+             * @description which declared feed this came from — part of the identity
+             */
+            source: string;
+            /**
+             * Summary
+             * @description the lead as text, empty where the feed gave none worth showing
+             */
+            summary: string;
+            /** Title */
+            title: string;
+            /** Url */
+            url: string | null;
+        };
+        /** NewsOut */
+        NewsOut: {
+            /** Count */
+            count: number;
+            /** Items */
+            items: components["schemas"]["NewsItemOut"][];
+            /**
+             * Truncated
+             * @description the window holds more than this answer carries; the newest are the ones here
+             */
+            truncated: boolean;
+            /**
+             * Window From
+             * @description null when asked for kept headlines only
+             */
+            window_from: string | null;
+            /** Window To */
+            window_to: string | null;
+        };
+        /**
+         * NewsSourceOut
+         * @description One declared feed and its day: is it answering, and how late does what it says reach here.
+         */
+        NewsSourceOut: {
+            /** Delay Max Median Seconds */
+            delay_max_median_seconds: number | null;
+            /** Delay Max P90 Seconds */
+            delay_max_p90_seconds: number | null;
+            /** Delay Min Median Seconds */
+            delay_min_median_seconds: number | null;
+            /** Delay Min P90 Seconds */
+            delay_min_p90_seconds: number | null;
+            /** Interval Seconds */
+            interval_seconds: number;
+            /** Items 24H */
+            items_24h: number;
+            /** Last Attempt At */
+            last_attempt_at: string | null;
+            /**
+             * Last Failure
+             * @description the kind and detail of the last failure
+             */
+            last_failure: string | null;
+            /** Last Failure At */
+            last_failure_at: string | null;
+            /** Last Success At */
+            last_success_at: string | null;
+            /**
+             * Newest Published At
+             * @description the newest publication time in the feed at its last successful fetch
+             */
+            newest_published_at: string | null;
+            /** Publisher */
+            publisher: string;
+            /** Source */
+            source: string;
+            /**
+             * Status
+             * @description pending: not fetched yet; failing: the latest fetch failed; stale: no success for several intervals, or ever
+             * @enum {string}
+             */
+            status: "pending" | "ok" | "failing" | "stale";
+            /** Unmeasured 24H */
+            unmeasured_24h: number;
+            /** Url */
+            url: string;
+        };
+        /** NewsSourcesOut */
+        NewsSourcesOut: {
+            /** Figures Window Hours */
+            figures_window_hours: number;
+            /** Retention Days */
+            retention_days: number;
+            /** Sources */
+            sources: components["schemas"]["NewsSourceOut"][];
+            /** Stale After Intervals */
+            stale_after_intervals: number;
+            /** Tick Seconds */
+            tick_seconds: number;
         };
         /** PostOut */
         PostOut: {
@@ -379,6 +603,106 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    news_news_get: {
+        parameters: {
+            query?: {
+                hours?: number | null;
+                since?: string | null;
+                until?: string | null;
+                source?: string[] | null;
+                q?: string | null;
+                /** @description only the kept headlines, whatever their age */
+                kept?: boolean;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsOut"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    keep_news_keep_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["KeepIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsItemOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    news_sources_news_sources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NewsSourcesOut"];
                 };
             };
         };

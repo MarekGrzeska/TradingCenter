@@ -131,3 +131,95 @@ class StateOut(BaseModel):
     alert_min_impact_score: int = Field(
         description="the reading a post needs before it is worth a notification"
     )
+
+
+DelayUnmeasured = Literal["no_publish_time", "found_there", "publish_time_in_future"]
+
+
+class NewsItemOut(BaseModel):
+    """A headline as the feed gave it, in the feed's language, with the delay it arrived with."""
+
+    source: str = Field(description="which declared feed this came from — part of the identity")
+    external_id: str = Field(description="the feed's own identifier for the item, or its link")
+    publisher: str = Field(description="who wrote it; for an aggregator, the original publisher")
+    title: str
+    summary: str = Field(
+        description="the lead as text, empty where the feed gave none worth showing"
+    )
+    url: str | None = None
+    published_at: datetime | None = Field(
+        description="when the feed says it was published; null where it said nothing readable"
+    )
+    first_seen_at: datetime = Field(description="when this archive first saw it, UTC")
+    previous_fetch_at: datetime | None = Field(
+        description="the feed's last successful fetch before the one that brought this; null for an "
+        "item found there on the feed's first fetch"
+    )
+    delay_min_seconds: float | None = Field(
+        description="the lower bound: how late the feed itself was — its previous fetch did not have it"
+    )
+    delay_max_seconds: float | None = Field(
+        description="the upper bound: how long from publication until this archive saw it"
+    )
+    delay_unmeasured: DelayUnmeasured | None = Field(
+        description="why there is no delay; null exactly when both bounds are present"
+    )
+    kept_at: datetime | None = Field(
+        description="when the operator marked it to keep; a kept headline is never swept"
+    )
+    expires_at: datetime | None = Field(
+        description="when retention will sweep it; null for a kept headline"
+    )
+
+
+class NewsOut(BaseModel):
+    items: list[NewsItemOut]
+    count: int
+    truncated: bool = Field(
+        description="the window holds more than this answer carries; the newest are the ones here"
+    )
+    window_from: datetime | None = Field(description="null when asked for kept headlines only")
+    window_to: datetime | None
+
+
+class NewsSourceOut(BaseModel):
+    """One declared feed and its day: is it answering, and how late does what it says reach here."""
+
+    source: str
+    publisher: str
+    url: str
+    interval_seconds: int
+    status: Literal["pending", "ok", "failing", "stale"] = Field(
+        description="pending: not fetched yet; failing: the latest fetch failed; stale: no success "
+        "for several intervals, or ever"
+    )
+    last_attempt_at: datetime | None
+    last_success_at: datetime | None
+    last_failure_at: datetime | None
+    last_failure: str | None = Field(description="the kind and detail of the last failure")
+    newest_published_at: datetime | None = Field(
+        description="the newest publication time in the feed at its last successful fetch"
+    )
+    items_24h: int
+    unmeasured_24h: int
+    delay_min_median_seconds: float | None
+    delay_min_p90_seconds: float | None
+    delay_max_median_seconds: float | None
+    delay_max_p90_seconds: float | None
+
+
+class NewsSourcesOut(BaseModel):
+    sources: list[NewsSourceOut]
+    figures_window_hours: int
+    tick_seconds: int
+    stale_after_intervals: int
+    retention_days: int
+
+
+class KeepIn(BaseModel):
+    """Which headline, and whether to keep it. In the body rather than the path: a feed's identifier is usually a
+    URL, and slashes in a path segment are a route that does not match."""
+
+    source: str
+    external_id: str
+    keep: bool

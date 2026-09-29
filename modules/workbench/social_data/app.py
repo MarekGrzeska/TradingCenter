@@ -27,7 +27,7 @@ from .news.collector import NewsCollector
 from .news.fetch import FeedClient
 from .news.sources import SOURCES as NEWS_SOURCES
 from .providers.truth_social import TruthSocialFeed
-from .routers import meta, posts
+from .routers import meta, news, posts
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
 log = logging.getLogger(__name__)
@@ -142,6 +142,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(meta.router)
     app.include_router(posts.router)
+    app.include_router(news.router)
 
     server, tool_app = mcp_app.build_mcp_app(app)
     app.state.mcp_server = server

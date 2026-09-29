@@ -16,11 +16,11 @@
 
 ## 3. Kontrakt
 
-- [ ] 3.1 `contract.py`: `NewsItemOut` (z `kept_at`, `expires_at`), `NewsOut` (z `truncated`), `NewsSourceOut`, `NewsSourcesOut`, `KeepIn`; pola zawsze obecne, braki jako `null`, powód braku opóźnienia jako enum
-- [ ] 3.2 `routers/news.py`: `GET /news` (godziny albo od–do, `source` wielokrotny, `q`, `limit`) z odmową okna odwróconego; `GET /news/sources` z każdym zadeklarowanym źródłem; `GET /news?kept=true`; `PUT /news/{source}/{external_id}/keep` idempotentny, 404 dla nieznanej pary
-- [ ] 3.3 Wpisy `/news`, `/news/sources` i `/news/{source}/{external_id}/keep` w `RECORD` w `caller_access.py`, na powierzchni REST
-- [ ] 3.4 Po jednym teście, że stan dociera na drut dla każdej trasy, plus odmowa okna odwróconego, 404 znacznika i test, że znacznik nie zmienia treści newsa
-- [ ] 3.5 `contract-sync`: regeneracja `contract.social.generated.ts` w terminalu i w pocket
+- [x] 3.1 `contract.py`: `NewsItemOut` (z `kept_at`, `expires_at`), `NewsOut` (z `truncated`), `NewsSourceOut`, `NewsSourcesOut`, `KeepIn`; pola zawsze obecne, braki jako `null`, powód braku opóźnienia jako enum
+- [x] 3.2 `routers/news.py`: `GET /news` (godziny albo od–do, `source` wielokrotny, `q`, `limit`) z odmową okna odwróconego; `GET /news/sources` z każdym zadeklarowanym źródłem; `GET /news?kept=true`; `PUT /news/keep` (para w ciele, nie w ścieżce) idempotentny, 404 dla nieznanej pary
+- [x] 3.3 Wpisy `/news`, `/news/sources` i `/news/keep` w `RECORD` w `caller_access.py`, na powierzchni REST
+- [x] 3.4 Po jednym teście, że stan dociera na drut dla każdej trasy, plus odmowa okna odwróconego, 404 znacznika i test, że znacznik nie zmienia treści newsa
+- [x] 3.5 `contract-sync`: regeneracja `contract.social.generated.ts` w terminalu i w pocket
 
 ## 4. Terminal
 

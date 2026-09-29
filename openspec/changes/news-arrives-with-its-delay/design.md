@@ -143,10 +143,12 @@ Odrzucone alternatywy:
 
 Moment zniknięcia w odpowiedzi to `first_seen_at + retencja`, pusty przy `kept_at`.
 
-Trasa to `PUT /news/{source}/{external_id}/keep` z ciałem `{"keep": bool}`. Jest idempotentna
-i zwraca `NewsItemOut`, a 404 z `Problem` dla nieznanej pary. `PUT` na stan, a nie `POST`
-i `DELETE` na zasób `keep`, bo klient wysyła to, co chce widzieć, a powtórzenie po zerwanym
-połączeniu jest bezpieczne. To pierwsza trasa zapisująca w `/social`. Wyjątek jest opisany
+Trasa to `PUT /news/keep` z ciałem `{"source", "external_id", "keep"}`. Jest idempotentna
+i zwraca `NewsItemOut`, a 404 z `Problem` dla nieznanej pary. Para jest w ciele, a nie w ścieżce:
+identyfikator z feedu to zwykle URL, a rekord dostępu dopasowuje każdy segment ścieżki jako
+`[^/]+`, więc news z ukośnikami w identyfikatorze dostałby 403 (wykryte przy implementacji).
+`PUT` na stan, a nie `POST` i `DELETE`, bo klient wysyła to, co chce widzieć, a powtórzenie po
+zerwanym połączeniu jest bezpieczne. To pierwsza trasa zapisująca w `/social`. Wyjątek jest opisany
 w delcie `social-data-api`, a nie przemycony.
 
 ### 6. Parser: `defusedxml` i biblioteka standardowa, bez `feedparser`
@@ -166,7 +168,7 @@ Lead jest przycinany do 1 000 znaków po zdjęciu znaczników, bo Axios wydaje ~
 ### 7. Kontrakt w istniejącej aplikacji `/social`
 
 Nowe trasy to `GET /news` (z `kept=true` dla samych zachowanych, bez okna), `GET /news/sources`
-i `PUT /news/{source}/{external_id}/keep`, wszystkie w tym samym FastAPI. Wynika z tego:
+i `PUT /news/keep`, wszystkie w tym samym FastAPI. Wynika z tego:
 
 - ten sam `contract.social.generated.ts` w terminalu i w pocket,
 - ten sam scope Entra i ta sama trasa proxy,
