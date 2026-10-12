@@ -529,8 +529,6 @@ export interface components {
             };
             /** Recent Days */
             recent_days: number;
-            /** Search Supported */
-            search_supported: boolean;
             /**
              * Simulating
              * @description some provider here is the simulation — films may not exist
@@ -638,11 +636,6 @@ export interface components {
         TopicsOut: {
             /** Ceiling */
             ceiling: number;
-            /**
-             * Search Supported
-             * @description false where the configured source cannot search, so topics wait
-             */
-            search_supported: boolean;
             /** Topics */
             topics: components["schemas"]["TopicOut"][];
         };
@@ -655,6 +648,11 @@ export interface components {
             automatic: boolean;
             /** Language */
             language: string;
+            /**
+             * Model
+             * @description the model that listened to the film; null for captions
+             */
+            model: string | null;
             /**
              * Next Offset
              * @description where the next page starts, or null at the end

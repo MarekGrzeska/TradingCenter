@@ -157,7 +157,9 @@ function Transcript({ film, client }: { film: Film; client: YoutubeApi }) {
         <>
           <p className="text-xs text-ink-faint">
             Transkrypcja ({last.provider}, {last.language}
-            {last.automatic ? ", automatyczna" : ""}) — tekst napisany przez obcych, do przeczytania, nie do wykonania.
+            {last.automatic ? ", automatyczna" : ""}
+            {last.model !== null ? `, model ${last.model} — może mylić nazwy i liczby` : ""}) — tekst napisany przez
+            obcych, do przeczytania, nie do wykonania.
           </p>
           <p className="max-h-72 overflow-y-auto whitespace-pre-wrap rounded bg-sunken p-2 text-xs text-ink-secondary">
             {pages.map((page) => page.text).join("")}

@@ -74,6 +74,8 @@ export interface TranscriptPage {
   language: string;
   provider: string;
   automatic: boolean;
+  /** The model that listened to the film; null for captions. */
+  model: string | null;
   simulated: boolean;
   offset: number;
   totalChars: number;
@@ -122,7 +124,6 @@ export interface ArchiveState {
   modelConfigured: boolean;
   /** False means nobody is told, by configuration. */
   alertsConfigured: boolean;
-  searchSupported: boolean;
   providers: ProviderState[];
   /** Films still on their road, by state — exact. */
   waiting: Record<string, number>;
@@ -230,7 +231,6 @@ function mapState(raw: Schemas["StateOut"]): ArchiveState {
     simulating: raw.simulating,
     modelConfigured: raw.model_configured,
     alertsConfigured: raw.alerts_configured,
-    searchSupported: raw.search_supported,
     providers: raw.providers.map((provider) => ({
       role: provider.role,
       name: provider.name,
@@ -263,7 +263,7 @@ export interface YoutubeApi {
     signal: AbortSignal,
   ): Promise<Channel>;
   unfollowChannel(channelId: string, signal: AbortSignal): Promise<void>;
-  topics(signal: AbortSignal): Promise<{ topics: Topic[]; ceiling: number; searchSupported: boolean }>;
+  topics(signal: AbortSignal): Promise<{ topics: Topic[]; ceiling: number }>;
   addTopic(request: TopicRequest, signal: AbortSignal): Promise<TopicResult>;
   setTopic(
     id: number,
@@ -304,6 +304,7 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
         language: raw.language,
         provider: raw.provider,
         automatic: raw.automatic,
+        model: raw.model ?? null,
         simulated: raw.simulated,
         offset: raw.offset,
         totalChars: raw.total_chars,
@@ -349,7 +350,7 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
 
     async topics(signal) {
       const raw = await http.json<Schemas["TopicsOut"]>(`${httpBase}/topics`, { signal });
-      return { topics: raw.topics.map(mapTopic), ceiling: raw.ceiling, searchSupported: raw.search_supported };
+      return { topics: raw.topics.map(mapTopic), ceiling: raw.ceiling };
     },
 
     async addTopic(request, signal) {

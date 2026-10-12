@@ -43,7 +43,6 @@ function state(overrides: Partial<ArchiveState> = {}): ArchiveState {
     simulating: false,
     modelConfigured: true,
     alertsConfigured: true,
-    searchSupported: true,
     providers: [provider()],
     waiting: {},
     stale: false,
