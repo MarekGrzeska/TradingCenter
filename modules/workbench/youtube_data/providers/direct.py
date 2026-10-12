@@ -39,6 +39,8 @@ _NOTHING_THERE = (
 # We are what is wrong, or YouTube is asking for something we cannot give.
 _REFUSED = (RequestBlocked, IpBlocked, PoTokenRequired, YouTubeRequestFailed)
 
+FETCH_TIMEOUT_SECONDS = 60
+
 
 class DirectTranscripts:
     name = "direct"
@@ -49,9 +51,15 @@ class DirectTranscripts:
         self._api = api or YouTubeTranscriptApi()
 
     async def fetch(self, video_id: str, languages: Sequence[str]) -> TranscriptResult:
-        # The library is synchronous, and a fetch is two requests to a third party.
+        # The library is synchronous, and a fetch is two requests to a third party. It sets no timeout of its own, so one
+        # half-open connection would hold the whole loop; the thread outlives a timeout, the loop does not wait for it.
         try:
-            fetched = await asyncio.to_thread(self._api.fetch, video_id, languages=list(languages))
+            fetched = await asyncio.wait_for(
+                asyncio.to_thread(self._api.fetch, video_id, languages=list(languages)), FETCH_TIMEOUT_SECONDS
+            )
+        except TimeoutError:
+            self._meter.record(self.name, "requests", 1)
+            return Blocked(self.name, f"no answer within {FETCH_TIMEOUT_SECONDS} s")
         except _NOTHING_THERE as err:
             self._meter.record(self.name, "requests", 1)
             return NoTranscript(self.name, type(err).__name__)
@@ -60,6 +68,11 @@ class DirectTranscripts:
             return Blocked(self.name, type(err).__name__)
         except CouldNotRetrieveTranscript as err:
             # The library's own name for "something else went wrong": not evidence about the film.
+            self._meter.record(self.name, "requests", 1)
+            return Blocked(self.name, type(err).__name__)
+        except OSError as err:
+            # `requests` wraps only HTTP errors in the library's own type; a refused connection, a timeout or a broken
+            # TLS handshake arrive as `requests.RequestException`, which is an `OSError`.
             self._meter.record(self.name, "requests", 1)
             return Blocked(self.name, type(err).__name__)
         self._meter.record(self.name, "requests", 1)

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from youtube_data import store, watchlist
+from youtube_data import budget, store, watchlist
+from youtube_data.providers.base import ReadingUnusable
 from youtube_data.providers.build import Providers
 from youtube_data.sim.scenario import Scenario
 
@@ -225,6 +226,52 @@ async def test_a_model_that_answers_badly_for_one_film_does_not_stop_the_others_
     await rig.tick()
     await rig.tick()
     assert (await rig.row("simfilm0012"))["reading_failures"] == 2, "no longer picked up by itself"
+
+
+async def test_a_model_that_cannot_be_reached_spends_none_of_a_films_attempts(pool) -> None:
+    """A key, a quota or a dropped connection says nothing about the film: an hour's outage must not strand it."""
+
+    class Down:
+        model = "down"
+
+        async def read(self, film, transcript, *, profile):
+            raise ConnectionError("the provider is down")
+
+    rig = Rig(pool, analyser=Down(), reading_max_failures=1)
+    await follow_all(rig, GOLD)
+
+    await rig.tick()
+    await rig.tick()
+
+    video = await rig.row("simfilm0001")
+    assert (video["state"], video["reading_failures"]) == ("transcribed", 0)
+
+
+async def test_an_answer_that_is_thrown_away_is_still_counted_against_the_days_tokens(pool) -> None:
+    class Unusable:
+        model = "m"
+
+        async def read(self, film, transcript, *, profile):
+            raise ReadingUnusable("breaks the schema", tokens=500)
+
+    rig = Rig(pool, analyser=Unusable(), analyse_batch_limit=1)
+    await follow_all(rig, GOLD)
+
+    await rig.tick()
+
+    assert await rig.used(budget.ANALYSER, budget.TOKENS) == 500
+
+
+async def test_a_reading_is_stamped_by_the_loops_clock_which_the_alert_window_is_measured_on(pool) -> None:
+    """A simulation running faster than the wall would otherwise let every reading fall out of the window unannounced."""
+    rig = Rig(pool)
+    await follow_all(rig, GOLD)
+
+    await rig.tick()
+
+    async with pool.acquire() as conn:
+        at = await conn.fetchval("SELECT analysed_at FROM readings WHERE video_id = 'simfilm0001'")
+    assert at == rig.clock.now()
 
 
 async def test_without_a_model_films_are_transcribed_and_wait_unread(pool) -> None:

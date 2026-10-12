@@ -33,7 +33,10 @@ class TranscriptChain:
         for provider in self._providers:
             if only is not None and provider.name not in only:
                 continue
-            result = await provider.fetch(video_id, languages)
+            try:
+                result = await provider.fetch(video_id, languages)
+            except Exception as err:  # noqa: BLE001 - a provider that raised is one that did not let us in
+                result = Blocked(provider.name, f"{type(err).__name__}: {err}"[:200])
             if isinstance(result, Blocked):
                 refused = result
                 continue

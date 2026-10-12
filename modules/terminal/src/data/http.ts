@@ -28,6 +28,13 @@ async function parseErrorDetail(response: Response): Promise<string> {
     if (typeof body.detail === "string") {
       return body.detail;
     }
+    // A package's own refusal: `HTTPException(detail=Problem(...).model_dump())` nests the reason one level down.
+    if (body.detail && typeof body.detail === "object" && "detail" in body.detail) {
+      const inner = (body.detail as { detail?: unknown }).detail;
+      if (typeof inner === "string") {
+        return inner;
+      }
+    }
     // FastAPI's own validation-error shape (a 422 from a bad query param) is a
     // list of {loc, msg, type} objects, not a plain string.
     if (Array.isArray(body.detail)) {

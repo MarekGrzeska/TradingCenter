@@ -39,3 +39,16 @@ def test_settings_for_an_absent_package_are_refused_by_name() -> None:
 
     with pytest.raises(ValueError, match="YOUTUBE_DATABASE_URL is not set"):
         Settings.model_construct(youtube_database_url=None).for_youtube()
+
+
+def test_the_browsers_that_read_the_other_archives_are_not_this_packages_callers() -> None:
+    """The process's REST list holds the pocket, which reads; this package's REST writes the watch list and spends
+    provider units, so its callers are its own line, as `/telegram`'s are."""
+    from workbench.config import Settings
+
+    process = Settings.model_construct(
+        youtube_database_url="postgresql://youtube:pw@127.0.0.1:55432/youtube",
+        rest_caller_application_ids="pocket,terminal",
+    )
+
+    assert process.for_youtube().rest_caller_ids == frozenset()

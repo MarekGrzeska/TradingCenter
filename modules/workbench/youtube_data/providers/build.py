@@ -43,7 +43,9 @@ def build(settings: Settings, http: httpx.AsyncClient) -> Providers:
         from ..sim import scenario
         from ..sim.world import World
 
-        clock = SimClock(settings.sim_speed)
+        # Only a simulated source gets the fast clock: a real one would have its daily ceilings reset every hour.
+        if settings.video_source == "sim":
+            clock = SimClock(settings.sim_speed)
         chosen = Path(settings.sim_scenario) if settings.sim_scenario else None
         world = World(scenario.load(chosen), clock, meter)
         log.warning("simulating: films, transcripts or readings in this process are not real")

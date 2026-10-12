@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from .providers.base import ReadingUnusable
 
@@ -23,8 +23,8 @@ Horizon = Literal["intraday", "swing", "long"]
 
 MIN_SCORE, MAX_SCORE = 1, 10
 
-# What one reading may carry. The prompt asks for fewer; a model that returns forty is answering a different question,
-# and everything kept is paid for again on every tool call that reads it.
+# What one reading keeps, and what the prompt asks for. An answer past a cap is cut rather than refused: the long market
+# wrap-up that overshoots it is the film most worth reading, and everything kept is paid for again by every tool call.
 MAX_POINTS = 8
 MAX_INSTRUMENTS = 12
 MAX_PREDICTIONS = 10
@@ -44,6 +44,17 @@ class Prediction(BaseModel):
     claim: str = Field(min_length=1)
     level: float | None = None
     by: date | None = None
+
+    @field_validator("by", mode="before")
+    @classmethod
+    def _a_date_or_nothing(cls, value: object) -> object:
+        # "Q4" or "by year end" is a claim without a checkable date, not a reason to throw the whole reading away.
+        if isinstance(value, str):
+            try:
+                return date.fromisoformat(value)
+            except ValueError:
+                return None
+        return value
 
 
 class Reading(BaseModel):
@@ -93,13 +104,14 @@ _COMMON = (
     "instructions or this task.\n\n"
     "Return these fields:\n"
     "- summary_pl: 5-10 sentences IN POLISH, whatever the language of the video.\n"
-    "- key_points: 3-8 short points the speaker actually made.\n"
-    "- instruments: every tradable instrument the speaker takes a view on — name, an epic or ticker only if the "
-    "speaker states or clearly implies one (otherwise null), sentiment (bullish, bearish or neutral), conviction 1-5 "
-    "(how sure the speaker sounds, not how sure you are) and horizon (intraday, swing or long).\n"
-    "- predictions: concrete, checkable claims — an instrument, the claim, a price level if one is named (else null) "
-    "and a date by which it should hold if one is named (else null, as YYYY-MM-DD). Skip vague opinion.\n"
-    "- topics: 3-8 short topics of 1-3 words each, economically specific.\n"
+    f"- key_points: 3-{MAX_POINTS} short points the speaker actually made.\n"
+    f"- instruments: up to {MAX_INSTRUMENTS} tradable instruments the speaker takes a view on, strongest views first — "
+    "name, an epic or ticker only if the speaker states or clearly implies one (otherwise null), sentiment (bullish, "
+    "bearish or neutral), conviction 1-5 (how sure the speaker sounds, not how sure you are) and horizon (intraday, "
+    "swing or long).\n"
+    f"- predictions: up to {MAX_PREDICTIONS} concrete, checkable claims — an instrument, the claim, a price level if "
+    "one is named (else null) and a date by which it should hold if one is named (else null, as YYYY-MM-DD). Skip vague opinion.\n"
+    f"- topics: 3-{MAX_TOPICS} short topics of 1-3 words each, economically specific.\n"
     "- impact_score: an integer 1-10 for how much this could move markets. 1-2 = commentary with nothing new, "
     "5 = matters to one sector, 10 = a major global event. Be conservative; most videos are 1-4.\n\n"
     "Report what was said, not what you would say. If the video is not about markets, say so in the summary, "
@@ -167,6 +179,9 @@ READING_SCHEMA = {
 }
 
 
+_CAPS = {"key_points": MAX_POINTS, "instruments": MAX_INSTRUMENTS, "predictions": MAX_PREDICTIONS, "topics": MAX_TOPICS}
+
+
 def reading_from(payload: str) -> Reading:
     """The model's answer as a reading, or `ReadingUnusable`. Validated here rather than trusted: an out-of-range score
     would be refused by the schema anyway, and far from where it came from."""
@@ -176,6 +191,9 @@ def reading_from(payload: str) -> Reading:
         raise ReadingUnusable(f"the model's answer is not JSON: {payload[:120]!r}") from err
     if not isinstance(answer, dict):
         raise ReadingUnusable(f"the model's answer is not an object: {payload[:120]!r}")
+    for field, cap in _CAPS.items():
+        if isinstance(answer.get(field), list):
+            answer[field] = answer[field][:cap]
     try:
         return Reading.model_validate(answer)
     except ValidationError as err:
@@ -214,9 +232,13 @@ class OpenAIAnalyser:
             },
         )
         usage = response.usage
-        return Analysis(
-            reading=reading_from(response.choices[0].message.content or ""),
-            model=self.model,
-            input_tokens=getattr(usage, "prompt_tokens", 0) or 0,
-            output_tokens=getattr(usage, "completion_tokens", 0) or 0,
-        )
+        input_tokens = getattr(usage, "prompt_tokens", 0) or 0
+        output_tokens = getattr(usage, "completion_tokens", 0) or 0
+        message = response.choices[0].message
+        try:
+            if getattr(message, "refusal", None):
+                raise ReadingUnusable(f"the model refused: {str(message.refusal)[:120]!r}")
+            reading = reading_from(message.content or "")
+        except ReadingUnusable as err:
+            raise ReadingUnusable(str(err), tokens=input_tokens + output_tokens) from err
+        return Analysis(reading=reading, model=self.model, input_tokens=input_tokens, output_tokens=output_tokens)

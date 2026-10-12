@@ -368,20 +368,28 @@ async def due_for_reading(conn: Conn, *, max_failures: int, limit: int) -> list[
 
 
 async def save_reading(
-    conn: Conn, video_id: str, *, profile: str, reading: Reading, model: str, simulated: bool
+    conn: Conn,
+    video_id: str,
+    *,
+    profile: str,
+    reading: Reading,
+    model: str,
+    simulated: bool,
+    at: datetime | None = None,
 ) -> None:
-    """Overwrites the reading of this film under this profile: the history is the film, not what a model thought of it."""
+    """Overwrites the reading of this film under this profile: the history is the film, not what a model thought of it.
+    `at` is the loop's clock — a simulated one runs faster than the database's, and the alert window is measured on it."""
     instruments = sorted(
         {name.lower() for view in reading.instruments for name in (view.name, view.epic) if name}
     )
     async with conn.transaction():
         await conn.execute(
             """
-            INSERT INTO readings (video_id, profile, result, impact_score, instruments, model, simulated)
-            VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7)
+            INSERT INTO readings (video_id, profile, result, impact_score, instruments, model, simulated, analysed_at)
+            VALUES ($1, $2, $3::jsonb, $4, $5, $6, $7, COALESCE($8, now()))
             ON CONFLICT (video_id, profile) DO UPDATE SET result = EXCLUDED.result,
                 impact_score = EXCLUDED.impact_score, instruments = EXCLUDED.instruments,
-                model = EXCLUDED.model, simulated = EXCLUDED.simulated, analysed_at = now()
+                model = EXCLUDED.model, simulated = EXCLUDED.simulated, analysed_at = EXCLUDED.analysed_at
             """,
             video_id,
             profile,
@@ -390,6 +398,7 @@ async def save_reading(
             instruments,
             model,
             simulated,
+            at,
         )
         await conn.execute("UPDATE videos SET state = 'analysed' WHERE video_id = $1", video_id)
 
@@ -414,11 +423,6 @@ async def set_outcome(conn: Conn, video_id: str, state: str, *, at: datetime | N
         state,
         at if state == NOTIFIED else None,
     )
-
-
-async def count_by_state(conn: Conn) -> dict[str, int]:
-    rows = await conn.fetch("SELECT state, count(*) AS n FROM videos GROUP BY state")
-    return {row["state"]: row["n"] for row in rows}
 
 
 # --- what was spent, and who lets us in -----------------------------------------------------------------------------
@@ -640,8 +644,13 @@ class TranscriptPage:
     simulated: bool
 
 
+# `substr` takes an int4: an offset past it is past the end of any transcript, and must say so rather than overflow.
+_PAST_ANY_TRANSCRIPT = 2**31 - 2
+
+
 async def transcript_page(conn: Conn, video_id: str, *, offset: int, limit: int) -> TranscriptPage | None:
     """A slice of a transcript, cut by the database so a page of a hundred kilobytes is not read to be thrown away."""
+    offset = min(offset, _PAST_ANY_TRANSCRIPT)
     row = await conn.fetchrow(
         """
         SELECT substr(content, $2 + 1, $3) AS text, length(content) AS total, language, provider, automatic, simulated

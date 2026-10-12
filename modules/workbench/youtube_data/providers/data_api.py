@@ -79,7 +79,14 @@ class DataApiSource:
             )
         if response.is_error:
             raise SourceUnavailable(f"the YouTube Data API answered {response.status_code} for {resource}")
-        return response.json()
+        # A proxy's or a captive portal's page arrives as a 200 too.
+        try:
+            body = response.json()
+        except ValueError as err:
+            raise SourceUnavailable(f"the YouTube Data API's answer to {resource} is not JSON") from err
+        if not isinstance(body, dict):
+            raise SourceUnavailable(f"the YouTube Data API's answer to {resource} is not an object")
+        return body
 
     async def resolve_channel(self, reference: str) -> ChannelInfo:
         ref = channel_ref(reference)

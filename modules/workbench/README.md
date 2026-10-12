@@ -57,7 +57,8 @@ and nothing else.
 
 The three archives, the strategy platform and the door to Telegram are not servers any more. Since
 `one-process-per-security-boundary` each is a package of this process, mounted whole under
-`/market`, `/polymarket`, `/social`, `/strategy` and `/telegram`, and its tools reach both registries as functions
+`/market`, `/polymarket`, `/social`, `/strategy` and `/telegram` — and `/youtube`, only when its database is
+configured — and its tools reach both registries as functions
 (`workbench/local_tools.py`) — same names, descriptions, ceilings and refusals, no address, no
 identity, no session. Five of the prediction-market archive's twelve tools write, and what they
 write is a watch list and its groups, not an account; nothing on the post archive's four or the platform's

@@ -59,9 +59,10 @@ export function FilmCard({ film, client }: { film: Film; client: YoutubeApi }) {
           </span>
           {reading !== null && reading.instruments.length > 0 && (
             <span className="mt-1 flex flex-wrap gap-1">
-              {reading.instruments.map((view) => (
+              {reading.instruments.map((view, index) => (
                 <span
-                  key={view.name}
+                  // A model may name one instrument twice, with two horizons.
+                  key={`${view.name}:${view.horizon}:${index}`}
                   className={`rounded px-1.5 py-0.5 text-[11px] ${SENTIMENT_CLASS[view.sentiment]}`}
                   title={`${SENTIMENT_LABEL[view.sentiment]}, pewność mówiącego ${view.conviction}/5, horyzont: ${view.horizon}`}
                 >
@@ -85,8 +86,8 @@ export function FilmCard({ film, client }: { film: Film; client: YoutubeApi }) {
               <p className="whitespace-pre-wrap">{reading.summary}</p>
               {reading.keyPoints.length > 0 && (
                 <ul className="list-disc pl-5 text-ink-secondary">
-                  {reading.keyPoints.map((point) => (
-                    <li key={point}>{point}</li>
+                  {reading.keyPoints.map((point, index) => (
+                    <li key={index}>{point}</li>
                   ))}
                 </ul>
               )}

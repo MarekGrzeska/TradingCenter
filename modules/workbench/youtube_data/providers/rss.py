@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from datetime import datetime
 
 import httpx
-from defusedxml import ElementTree
+from defusedxml import DefusedXmlException, ElementTree
 
 from .base import (
     ChannelInfo,
@@ -52,7 +52,7 @@ class RssSource:
             raise SourceUnavailable(f"the feed for {channel_id} answered {response.status_code}")
         try:
             return ElementTree.fromstring(response.content)
-        except ElementTree.ParseError as err:
+        except (ElementTree.ParseError, DefusedXmlException) as err:
             raise SourceUnavailable(f"the feed for {channel_id} is not a document: {err}") from err
 
     async def resolve_channel(self, reference: str) -> ChannelInfo:
@@ -77,13 +77,17 @@ class RssSource:
             published = entry.findtext("a:published", namespaces=_NS)
             if not video_id or not published:
                 continue
+            try:
+                published_at = datetime.fromisoformat(published)
+            except ValueError:
+                continue
             videos.append(
                 VideoRef(
                     video_id=video_id,
                     channel_id=entry.findtext("yt:channelId", namespaces=_NS) or channel.channel_id,
                     channel_title=channel_title,
                     title=(entry.findtext("a:title", default="", namespaces=_NS) or "").strip(),
-                    published_at=datetime.fromisoformat(published),
+                    published_at=published_at,
                 )
             )
         return videos

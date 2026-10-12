@@ -121,8 +121,8 @@ export function AddTopicDialog({
           {
             phrase: phrase.trim(),
             alertRule: rule,
-            ...(interval.trim() === "" ? {} : { intervalMinutes: Number(interval) }),
-            ...(max.trim() === "" ? {} : { maxVideosPerRun: Number(max) }),
+            ...(interval.trim() === "" ? {} : { intervalMinutes: wholeNumber(interval, "co ile minut") }),
+            ...(max.trim() === "" ? {} : { maxVideosPerRun: wholeNumber(max, "ile filmów") }),
           },
           new AbortController().signal,
         );
@@ -259,4 +259,14 @@ export function RemoveDialog({
       </div>
     </ConfirmDialog>
   );
+}
+
+/** `Number("abc")` is `NaN`, which JSON writes as `null` — and `null` takes the setting's default, so a typo would pass
+ *  as a choice. */
+function wholeNumber(text: string, field: string): number {
+  const value = Number(text.trim());
+  if (!Number.isInteger(value)) {
+    throw new Error(`pole „${field}" musi być liczbą całkowitą`);
+  }
+  return value;
 }

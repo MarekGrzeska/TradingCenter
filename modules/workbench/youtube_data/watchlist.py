@@ -19,6 +19,7 @@ MAX_PHRASE_CHARS = 200
 # A topic that may send forty films to be read every pass is a bill, not a topic.
 MAX_VIDEOS_PER_RUN = 20
 MIN_INTERVAL_MINUTES = 15
+MAX_INTERVAL_MINUTES = 7 * 24 * 60
 
 
 class WatchlistRefused(Exception):
@@ -104,8 +105,10 @@ async def add_topic(
     if max_videos_per_run is None:
         max_videos_per_run = settings.topic_default_max_videos
         defaults.append("max_videos_per_run")
-    if interval_minutes < MIN_INTERVAL_MINUTES:
-        raise WatchlistRefused(f"a topic is searched at most every {MIN_INTERVAL_MINUTES} minutes")
+    if not MIN_INTERVAL_MINUTES <= interval_minutes <= MAX_INTERVAL_MINUTES:
+        raise WatchlistRefused(
+            f"a topic is searched every {MIN_INTERVAL_MINUTES} to {MAX_INTERVAL_MINUTES} minutes (a week)"
+        )
     if not 1 <= max_videos_per_run <= MAX_VIDEOS_PER_RUN:
         raise WatchlistRefused(f"a topic sends between 1 and {MAX_VIDEOS_PER_RUN} films to be read per search")
 

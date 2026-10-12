@@ -79,6 +79,8 @@ async def test_a_window_that_ends_before_it_starts_is_refused_with_the_reason(ap
     assert response.status_code == 422
     assert "ends before it starts" in response.json()["detail"]["detail"]
     assert (await api.get("/videos", params={"state": "sleeping"})).status_code == 422
+    # A bound with no zone beside the aware "now" is a refusal, not a comparison that raises.
+    assert (await api.get("/videos", params={"since": "2099-01-01T00:00:00"})).status_code == 422
 
 
 async def test_a_film_is_read_whole_and_its_transcript_a_page_at_a_time(api, rig) -> None:

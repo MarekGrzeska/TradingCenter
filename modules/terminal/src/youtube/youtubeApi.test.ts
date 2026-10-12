@@ -131,6 +131,7 @@ describe("the watch list", () => {
 
     await expect(createYoutubeApi(BASE).followChannel("@x", "never", signal())).rejects.toMatchObject({
       kind: "refused",
+      message: expect.stringContaining("the watch list holds 100 channels"),
     });
   });
 });

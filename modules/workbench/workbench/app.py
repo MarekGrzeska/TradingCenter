@@ -143,8 +143,8 @@ async def lifespan(app: FastAPI):
             archive_client=strategy_archive,
             telegram=strategy_telegram,
         ),
-        # Entered only when mounted: with no database configured this is a block that does nothing, and the log line
-        # in `_announce_youtube` is what says why.
+        # Entered only when mounted: with no database configured this is a block that does nothing, and the start-up
+        # log line is what says why.
         (
             telegram_client(telegram_app, "the YouTube archive")
             if youtube_app is not None

@@ -42,3 +42,14 @@ def test_without_a_model_the_package_still_has_a_source_and_a_transcript_chain()
     assert providers.analyser is None
     assert providers.source.name == "rss"
     assert providers.transcripts.names == ("direct",)
+
+
+def test_a_faster_clock_is_the_simulated_sources_alone() -> None:
+    """With a real source, a day that turns every hour would reset the ceilings on a quota that turns once a day."""
+    import httpx
+
+    from youtube_data.clock import SystemClock
+
+    mixed = settings(video_source="rss", transcript_providers="direct", analyser="sim", sim_speed=24)
+
+    assert isinstance(build(mixed, httpx.AsyncClient()).clock, SystemClock)

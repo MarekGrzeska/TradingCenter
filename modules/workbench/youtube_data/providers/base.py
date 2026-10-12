@@ -142,7 +142,12 @@ class TranscriptProvider(Protocol):
 
 class ReadingUnusable(Exception):
     """The model answered with something this package will not store. Kept apart from a refusal: either way the film
-    stays unread until the next pass, but only this one is a fact about the model."""
+    stays unread until the next pass, but only this one is a fact about the model. `tokens` is what the answer cost,
+    since a provider bills an answer this package throws away."""
+
+    def __init__(self, message: str, *, tokens: int = 0) -> None:
+        super().__init__(message)
+        self.tokens = tokens
 
 
 # --- what was spent -------------------------------------------------------------------------------------------------

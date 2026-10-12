@@ -54,13 +54,30 @@ def test_a_well_formed_answer_becomes_a_reading() -> None:
         json.dumps(answer(summary_pl="")),
         json.dumps(answer(instruments=[{"name": "Gold", "epic": None, "sentiment": "moon", "conviction": 3, "horizon": "swing"}])),
         json.dumps(answer(instruments=[{"name": "Gold", "epic": None, "sentiment": "bullish", "conviction": 9, "horizon": "swing"}])),
-        json.dumps(answer(predictions=[{"instrument": "Gold", "claim": "x", "level": None, "by": "next week"}])),
         json.dumps({"impact_score": 5}),
     ],
 )
 def test_an_answer_that_breaks_the_schema_is_not_stored(payload: str) -> None:
     with pytest.raises(ReadingUnusable):
         reading_from(payload)
+
+
+def test_a_long_answer_is_cut_to_what_a_reading_keeps_and_a_vague_date_is_no_date() -> None:
+    """The market wrap-up that names thirteen instruments is the film most worth reading; refusing it three times would
+    leave it unread for good."""
+    view = {"name": "Gold", "epic": None, "sentiment": "bullish", "conviction": 3, "horizon": "swing"}
+    reading = reading_from(
+        json.dumps(
+            answer(
+                instruments=[view] * 13,
+                key_points=["p"] * 9,
+                predictions=[{"instrument": "Gold", "claim": "x", "level": None, "by": "Q4"}] * 11,
+            )
+        )
+    )
+
+    assert (len(reading.instruments), len(reading.key_points), len(reading.predictions)) == (12, 8, 10)
+    assert reading.predictions[0].by is None
 
 
 def test_the_provider_schema_asks_for_exactly_what_the_reading_holds() -> None:
@@ -72,15 +89,16 @@ def test_the_provider_schema_asks_for_exactly_what_the_reading_holds() -> None:
 
 
 class FakeClient:
-    def __init__(self, content: str) -> None:
+    def __init__(self, content: str | None, *, refusal: str | None = None) -> None:
         self.calls: list[dict] = []
         self.chat = SimpleNamespace(completions=SimpleNamespace(create=self._create))
         self._content = content
+        self._refusal = refusal
 
     async def _create(self, **kwargs):
         self.calls.append(kwargs)
         return SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(content=self._content))],
+            choices=[SimpleNamespace(message=SimpleNamespace(content=self._content, refusal=self._refusal))],
             usage=SimpleNamespace(prompt_tokens=1200, completion_tokens=300),
         )
 
@@ -116,3 +134,14 @@ async def test_an_unknown_profile_is_refused_before_a_model_is_paid() -> None:
     with pytest.raises(ReadingUnusable, match="profile"):
         await OpenAIAnalyser(client, model="m", max_chars=10).read(FILM, "words", profile="crypto")
     assert client.calls == []
+
+
+@pytest.mark.parametrize(
+    "client", [FakeClient(json.dumps(answer(impact_score=12))), FakeClient(None, refusal="I can't help with that")]
+)
+async def test_an_answer_thrown_away_still_says_what_it_cost(client: FakeClient) -> None:
+    """The provider bills an answer this package refuses; the day's token ceiling must see it."""
+    with pytest.raises(ReadingUnusable) as refused:
+        await OpenAIAnalyser(client, model="m", max_chars=1000).read(FILM, "words", profile="market")
+
+    assert refused.value.tokens == 1500

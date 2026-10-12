@@ -61,7 +61,7 @@
 
 ## 9. Domknięcie
 
-- [ ] 9.1 `youtube_data/README.md` (co pakiet pisze, dostawcy, jak uruchomić symulację) i wiersz w `modules/workbench/README.md`
+- [x] 9.1 `youtube_data/README.md` (co pakiet pisze, dostawcy, jak uruchomić symulację) i wiersz w `modules/workbench/README.md`
 - [ ] 9.2 Przebieg ręczny: `scripts/dev.py` na scenariuszu domyślnym przyspieszonym — film od odkrycia do alertu na testowym bocie, narzędzia w MCP Inspectorze
-- [ ] 9.3 `uv run pytest`, `-m db`, `ruff check .`, `pyright`, terminal `pnpm test` / `lint` / `typecheck` / `contract:check`
-- [ ] 9.4 `review.md`
+- [x] 9.3 `uv run pytest`, `-m db`, `ruff check .`, `pyright`, terminal `pnpm test` / `lint` / `typecheck` / `contract:check`
+- [x] 9.4 `review.md`

@@ -161,7 +161,8 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
             if kind == "channel":
                 updated = await store.update_channel(conn, ref, alert_rule=alert_rule)
             else:
-                updated = await store.update_topic(conn, int(ref), alert_rule=alert_rule) if ref.isdigit() else None
+                topic_id = int(ref) if ref.isascii() and ref.isdigit() and len(ref) < 10 else None
+                updated = None if topic_id is None else await store.update_topic(conn, topic_id, alert_rule=alert_rule)
         if updated is None:
             return refused(
                 f"no {kind} {ref!r} is on the list", "youtube_archive_status lists the channels and topics with their ids"

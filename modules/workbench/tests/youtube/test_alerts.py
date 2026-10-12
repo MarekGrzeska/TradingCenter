@@ -3,6 +3,7 @@ success and only then, because the gateway keeps no history and the marker is bo
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -206,6 +207,22 @@ def test_a_long_summary_is_cut_by_this_package_so_the_gateway_never_has_to_refus
     assert len(text) <= 1200
     assert "…" in text
     assert text.endswith("watch?v=dQw4w9WgXcQ"), "the link is what a cut must not take"
+
+
+def test_a_title_nobody_bounded_is_cut_too_and_the_message_stays_under_the_gateways_ceiling() -> None:
+    item = _item(summary_pl="Krótko.")
+    item = replace(item, video=replace(item.video, title="Złoto " * 2000, channel_title="Kanał " * 500))
+
+    text = alerts.message(item)
+
+    assert len(text) <= alerts.MESSAGE_CHARS
+    assert text.endswith("watch?v=dQw4w9WgXcQ")
+
+
+def test_a_simulated_film_read_by_a_real_model_is_still_announced_as_a_simulation() -> None:
+    item = _item()
+
+    assert "SYMULACJA" in alerts.message(replace(item, video=replace(item.video, simulated=True)))
 
 
 async def test_the_gateway_client_posts_the_destination_and_says_why_it_was_refused() -> None:

@@ -182,7 +182,9 @@ class SimAnalyser:
         video = self._world.video(film.video_id)
         prepared = None if video is None else video.reading
         if prepared == "unusable":
-            raise ReadingUnusable("the simulated model answered with something that breaks the schema")
+            raise ReadingUnusable(
+                "the simulated model answered with something that breaks the schema", tokens=len(transcript) // 4
+            )
         reading = NEUTRAL if prepared is None else Reading.model_validate(prepared)
         return Analysis(
             reading=reading,

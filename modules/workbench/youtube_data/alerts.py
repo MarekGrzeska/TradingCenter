@@ -29,6 +29,8 @@ log = logging.getLogger(__name__)
 MESSAGE_CHARS = 3500
 SUMMARY_CHARS = 900
 MAX_INSTRUMENTS = 6
+# A title, a channel name and an instrument name come from strangers and carry no length of their own.
+LINE_CHARS = 300
 
 ARROWS = {"bullish": "▲", "bearish": "▼", "neutral": "▬"}
 
@@ -77,14 +79,15 @@ def message(item: store.ToAnnounce, *, limit: int = MESSAGE_CHARS) -> str:
     Telegram message would."""
     video, reading = item.video, item.reading
     head = [
-        f"Wpływ {reading['impact_score']}/10 — {video.channel_title}",
-        video.title,
+        _clip(f"Wpływ {reading['impact_score']}/10 — {video.channel_title}", LINE_CHARS),
+        _clip(video.title, LINE_CHARS),
     ]
-    if item.simulated:
+    # Either half may be the simulation's: a real model reading a simulated film is still a film that does not exist.
+    if item.simulated or video.simulated:
         head.insert(0, "[SYMULACJA — ten film nie istnieje]")
 
     views = [
-        f"{view['name']} {ARROWS.get(view['sentiment'], '▬')} ({view['conviction']}/5, {view['horizon']})"
+        f"{_clip(view['name'], 60)} {ARROWS.get(view['sentiment'], '▬')} ({view['conviction']}/5, {view['horizon']})"
         for view in reading["instruments"][:MAX_INSTRUMENTS]
     ]
     tail = []
@@ -97,6 +100,10 @@ def message(item: store.ToAnnounce, *, limit: int = MESSAGE_CHARS) -> str:
     if len(summary) > room:
         summary = summary[: max(room, 0)].rstrip() + "…"
     return "\n".join([*head, "", summary, *tail])
+
+
+def _clip(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
 class Alerts:

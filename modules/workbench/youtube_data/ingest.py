@@ -25,6 +25,7 @@ from .providers.base import (
     NoTranscript,
     Pending,
     QuotaExceeded,
+    ReadingUnusable,
     SourceError,
     Transcript,
     TranscriptResult,
@@ -160,6 +161,7 @@ class Ingest:
                 films = await source.latest_videos(info)
             except QuotaExceeded:
                 log.warning("the %s source says its quota is spent", source.name)
+                left = 0
                 break
             except SourceError as err:
                 # The archive is left as it was; the channel is asked again next pass.
@@ -245,6 +247,10 @@ class Ingest:
         now = self._clock.now()
         chain = self._providers.transcripts
         async with self._pool.acquire() as conn:
+            # Here as well as after discovery: a discovery that raised half way must not send a five-hour film on.
+            await store.skip_unwanted(
+                conn, minimum=self._settings.min_video_seconds, maximum=self._settings.max_video_seconds
+            )
             films = await store.due_for_transcription(conn, now, self._settings.transcribe_batch_limit)
 
         for film in films:
@@ -257,7 +263,8 @@ class Ingest:
             else:
                 result = await chain.fetch(film.video_id, self._settings.languages, only=allowed)
             await self._flush()
-            if await self._settle(film, result, now):
+            # The moment of this answer, not of the pass: a refusal after a success in the same pass must read as later.
+            if await self._settle(film, result, self._clock.now()):
                 break
 
     async def _settle(self, film, result: TranscriptResult, now: datetime) -> bool:
@@ -320,12 +327,17 @@ class Ingest:
                 analysis = await analyser.read(film, item.transcript, profile=video.profile)
             except asyncio.CancelledError:
                 raise
-            except Exception as err:  # noqa: BLE001 - whatever a model provider raises must not stop the batch
-                # A refusal, a rate limit, a dropped connection or an answer the schema rejects: this film stays
-                # unread and the rest of the batch is read.
-                log.warning("reading %s failed: %s", video.video_id, err)
+            except ReadingUnusable as err:
+                # An answer about this film that will not be stored: paid for, and one of the film's attempts.
+                self._providers.meter.record(budget.ANALYSER, budget.TOKENS, err.tokens)
+                log.warning("reading %s is unusable: %s", video.video_id, err)
                 async with self._pool.acquire() as conn:
                     await store.record_reading_failure(conn, video.video_id)
+                continue
+            except Exception as err:  # noqa: BLE001 - whatever a model provider raises must not stop the batch
+                # A key, a quota, a rate limit or a dropped connection says nothing about the film, so it spends none of
+                # the film's attempts — an hour's outage would otherwise strand every film it touched for good.
+                log.warning("reading %s failed: %s", video.video_id, err)
                 continue
             self._providers.meter.record(budget.ANALYSER, budget.TOKENS, analysis.input_tokens + analysis.output_tokens)
             async with self._pool.acquire() as conn:
@@ -335,7 +347,8 @@ class Ingest:
                     profile=video.profile,
                     reading=analysis.reading,
                     model=analysis.model,
-                    simulated=analysis.simulated,
+                    simulated=analysis.simulated or video.simulated,
+                    at=self._clock.now(),
                 )
 
     # --- tell --------------------------------------------------------------------------------------------------------

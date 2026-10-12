@@ -128,3 +128,45 @@ async def test_a_job_is_polled_at_the_provider_that_took_it() -> None:
     assert await chain.fetch("v1", ["en"]) == Pending("paid", "job-1")
     assert await chain.poll("paid", "job-1") == Pending("paid", "job-1")
     assert isinstance(await chain.poll("gone", "job-1"), Blocked)
+
+
+@pytest.mark.parametrize("raised", [ConnectionError("refused"), TimeoutError()])
+async def test_a_way_in_that_breaks_is_blocked_and_counted_not_raised(raised: Exception, monkeypatch) -> None:
+    """`requests` wraps only HTTP errors in the library's type; a dropped connection, or one that never answers, must
+    still read as *blocked* — raised, it would end the whole transcription step and never reach the next provider."""
+    if isinstance(raised, TimeoutError):
+        monkeypatch.setattr("youtube_data.providers.direct.FETCH_TIMEOUT_SECONDS", 0.01)
+
+        class Hangs:
+            def fetch(self, video_id, languages):
+                import time
+
+                time.sleep(0.2)
+
+        api = Hangs()
+    else:
+        api = FakeApi(raised)
+    meter = Meter()
+
+    result = await DirectTranscripts(meter, api=api).fetch("v1", ["pl"])  # type: ignore[arg-type]
+
+    assert isinstance(result, Blocked)
+    assert meter.drain() == {("direct", "requests"): 1}
+
+
+async def test_a_provider_that_raises_is_passed_over_like_one_that_refused() -> None:
+    class Raises:
+        name = "broken"
+        unit = "requests"
+
+        async def fetch(self, video_id, languages):
+            raise RuntimeError("an adapter's own bug")
+
+        async def poll(self, job_id):
+            raise AssertionError("never polled")
+
+    after = DirectTranscripts(Meter(), api=FakeApi(captions("słowa")))
+
+    result = await TranscriptChain([Raises(), after]).fetch("v1", ["pl"])
+
+    assert isinstance(result, Transcript) and result.provider == "direct"

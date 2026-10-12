@@ -325,7 +325,8 @@ class Settings(BaseSettings):
             migration_lock_wait_seconds=self.migration_lock_wait_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
             tool_caller_application_ids=self.tool_caller_application_ids,
-            rest_caller_application_ids=self.rest_caller_application_ids,
+            # Not the process's list, which holds the pocket: this package's REST writes and spends. Read as
+            # YOUTUBE_REST_CALLER_APPLICATION_IDS, like `/telegram`'s.
             alert_destination=self.alert_destination,
         )
 
