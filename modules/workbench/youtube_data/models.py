@@ -5,8 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-# A film's life. `discovered` is also "waiting for a transcript" — a film with a job at a provider is still `discovered`,
-# the job being where the provider will answer. `gave_up` and `skipped` are never picked up again.
+# A film's life. `discovered` is also "waiting for a transcript". `gave_up` and `skipped` are never picked up again.
 DISCOVERED = "discovered"
 NO_TRANSCRIPT = "no_transcript"
 TRANSCRIBED = "transcribed"
@@ -62,6 +61,7 @@ class Video:
     duration_seconds: int | None
     live_status: str
     origins: tuple[str, ...]
+    audio_language: str | None
     profile: str
     alert_rule: str
     state: str
@@ -69,8 +69,6 @@ class Video:
     attempts: int
     next_attempt_at: datetime | None
     reading_failures: int
-    job_provider: str | None
-    job_id: str | None
     simulated: bool
     discovered_at: datetime
     notified_at: datetime | None

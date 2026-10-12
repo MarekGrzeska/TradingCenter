@@ -92,6 +92,7 @@ async def serving(app: FastAPI, settings: Settings, telegram: httpx.AsyncClient 
                     yield
                 finally:
                     await ingest.stop()
+                    await providers.aclose()
 
 
 @asynccontextmanager

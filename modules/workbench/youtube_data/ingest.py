@@ -23,15 +23,14 @@ from .providers.base import (
     Blocked,
     ChannelInfo,
     NoTranscript,
-    Pending,
     QuotaExceeded,
     ReadingUnusable,
     SourceError,
     Transcript,
-    TranscriptResult,
-    UnsupportedOperation,
+    TranscriptRequest,
 )
 from .providers.build import Providers
+from .providers.chain import ChainAnswer, Deferred
 
 log = logging.getLogger(__name__)
 
@@ -180,9 +179,6 @@ class Ingest:
             left = await self._remaining(ceiling)
 
         for topic in topics:
-            if not source.supports_search:
-                log.info("topic %r waits: the %s source cannot search", topic.phrase, source.name)
-                break
             if left < source.search_cost:
                 log.warning("topic %r waits: the %s source's day cannot pay for a search", topic.phrase, source.name)
                 break
@@ -221,8 +217,8 @@ class Ingest:
         while it was still running, and would otherwise wait for ever."""
         try:
             films = await self._providers.source.video_details(video_ids)
-        except (UnsupportedOperation, SourceError):
-            # A feed cannot say, and a source that will not answer is asked again next pass.
+        except SourceError:
+            # A source that will not answer is asked again next pass.
             return
         async with self._pool.acquire() as conn:
             for film in films:
@@ -233,14 +229,23 @@ class Ingest:
 
     # --- transcribe --------------------------------------------------------------------------------------------------
 
-    async def _providers_with_a_day_left(self) -> list[str]:
+    async def _available(self, now: datetime) -> dict[str, int]:
+        """What is left of each provider's day, for the ones worth asking at all: not resting after a refusal younger than
+        the cooldown, and with something left. Read once per film, since every answer spends."""
         await self._flush()
-        left = []
+        cooldown = timedelta(minutes=self._settings.provider_cooldown_minutes)
         async with self._pool.acquire() as conn:
-            for provider in self._providers.transcripts.providers:
-                ceiling = budget.Ceiling(provider.name, provider.unit, self._settings.daily_transcript_units)
-                if await budget.remaining(conn, ceiling, day=self._day()) > 0:
-                    left.append(provider.name)
+            states = await store.provider_states(conn)
+            spent = await store.usage_on(conn, self._day())
+        left: dict[str, int] = {}
+        for provider in self._providers.transcripts.providers:
+            state = states.get(provider.name)
+            if state is not None and state.blocked and state.last_blocked_at and now - state.last_blocked_at < cooldown:
+                continue
+            ceiling = budget.transcript_ceiling(self._settings, provider)
+            remaining = ceiling.limit - spent.get((ceiling.provider, ceiling.unit), 0)
+            if remaining > 0:
+                left[provider.name] = remaining
         return left
 
     async def _transcribe(self) -> None:
@@ -254,23 +259,38 @@ class Ingest:
             films = await store.due_for_transcription(conn, now, self._settings.transcribe_batch_limit)
 
         for film in films:
-            allowed = await self._providers_with_a_day_left()
-            if not allowed:
-                log.warning("every transcript provider's day is spent; transcription waits for tomorrow")
+            left = await self._available(self._clock.now())
+            if not left:
+                log.warning("no transcript provider can be asked now (resting, or its day is spent); transcription waits")
                 break
-            if film.job_id and film.job_provider:
-                result = await chain.poll(film.job_provider, film.job_id)
-            else:
-                result = await chain.fetch(film.video_id, self._settings.languages, only=allowed)
+            request = TranscriptRequest.for_film(
+                film.video_id,
+                duration_seconds=film.duration_seconds,
+                audio_language=film.audio_language,
+                fallback=self._settings.languages,
+            )
+            # Priced before asking: a film the day cannot pay for waits for tomorrow rather than spending what is left.
+            askable = [
+                provider.name
+                for provider in chain.providers
+                if left.get(provider.name, 0) >= max(provider.price(request), 1)
+            ]
+            answer = await chain.fetch(request, only=askable)
             await self._flush()
             # The moment of this answer, not of the pass: a refusal after a success in the same pass must read as later.
-            if await self._settle(film, result, self._clock.now()):
+            if await self._settle(film, answer, self._clock.now()):
                 break
 
-    async def _settle(self, film, result: TranscriptResult, now: datetime) -> bool:
-        """Records what a provider said about a film. True means the pass should stop asking: the provider would not let
-        us in, and the next film would get the same answer at the same price."""
+    async def _settle(self, film, answer: ChainAnswer, now: datetime) -> bool:
+        """Records what the providers said about a film. True means the pass should stop asking: the provider would not
+        let us in, and the next film would get the same answer at the same price."""
+        result = answer.result
         async with self._pool.acquire() as conn:
+            for said in answer.passed:
+                if isinstance(said, Blocked):
+                    await store.note_provider(conn, said.provider, ok=False, at=now, reason=said.reason)
+                else:
+                    await store.note_provider(conn, said.provider, ok=True, at=now)
             if isinstance(result, Transcript):
                 await store.save_transcript(conn, film.video_id, result)
                 await store.note_provider(conn, result.provider, ok=True, at=now)
@@ -285,15 +305,12 @@ class Ingest:
                     give_up=give_up,
                     retry_at=None if give_up else now + timedelta(minutes=delays[misses - 1]),
                 )
-            elif isinstance(result, Pending):
-                await store.note_provider(conn, result.provider, ok=True, at=now)
-                await store.record_job(conn, film.video_id, provider=result.provider, job_id=result.job_id)
-            elif isinstance(result, Blocked):
-                if film.job_id and film.job_provider not in self._providers.transcripts.names:
-                    # The provider that took this job is gone from the configuration: the job is unreachable, and asking
-                    # again from the start is the only way on.
-                    await store.clear_job(conn, film.video_id)
-                    return False
+            elif isinstance(result, Deferred):
+                # Not an attempt: nothing was learnt about the film. Asked again after the first retry delay.
+                await store.postpone(
+                    conn, film.video_id, until=now + timedelta(minutes=self._settings.retry_delays[0])
+                )
+            else:
                 await store.note_provider(conn, result.provider, ok=False, at=now, reason=result.reason)
                 log.warning("transcripts blocked (%s: %s); this pass stops asking", result.provider, result.reason)
                 return True

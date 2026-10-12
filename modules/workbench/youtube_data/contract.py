@@ -126,6 +126,7 @@ class TranscriptPageOut(BaseModel):
     language: str
     provider: str
     automatic: bool
+    model: str | None = Field(default=None, description="the model that listened to the film; null for captions")
     simulated: bool
     offset: int
     total_chars: int
@@ -220,7 +221,6 @@ class TopicOut(BaseModel):
 class TopicsOut(BaseModel):
     topics: list[TopicOut]
     ceiling: int
-    search_supported: bool = Field(description="false where the configured source cannot search, so topics wait")
 
 
 class TopicIn(BaseModel):
@@ -280,7 +280,6 @@ class StateOut(BaseModel):
     simulating: bool = Field(description="some provider here is the simulation — films may not exist")
     model_configured: bool = Field(description="false means no reading is being made, by configuration")
     alerts_configured: bool = Field(description="false means nobody is told, by configuration")
-    search_supported: bool
     channels_active: int
     topics_active: int
     providers: list[ProviderOut]

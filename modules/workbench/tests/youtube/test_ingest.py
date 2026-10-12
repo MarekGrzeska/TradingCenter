@@ -6,7 +6,6 @@ import pytest
 
 from youtube_data import budget, store, watchlist
 from youtube_data.providers.base import ReadingUnusable
-from youtube_data.providers.build import Providers
 from youtube_data.sim.scenario import Scenario
 
 from .harness import CRYPTO, GOLD, MARKETS, Rig
@@ -146,22 +145,71 @@ async def test_a_provider_that_will_not_let_us_in_is_not_a_film_without_captions
     assert await rig.used("sim", "sim_credits") == 0
 
 
-async def test_a_long_film_is_a_job_at_the_provider_and_the_next_pass_only_looks_at_it(pool) -> None:
-    rig = Rig(pool)
+def unheard(video_id: str, **overrides) -> dict:
+    """A film with no captions and something to say — work for the provider that listens alone."""
+    return {"video_id": video_id, "duration_seconds": 600, "captions": {"mode": "never"}, "speech": "words " * 40, **overrides}
+
+
+async def test_a_film_with_no_captions_is_heard_by_the_listener_in_the_same_pass_and_costs_its_length(pool) -> None:
+    rig = Rig(pool, listener=True)
     await follow_all(rig, MARKETS)
-    await rig.tick()
-
-    waiting = await rig.row("simfilm0006")
-    assert waiting["state"] == "discovered" and waiting["job_id"] is not None
-    spent = await rig.used("sim", "sim_credits")
 
     await rig.tick()
-    assert await rig.used("sim", "sim_credits") == spent, "looking at a job is free"
 
-    rig.clock.advance(minutes=31)
+    assert (await rig.states())["simfilm0006"] == "quiet", "an hour with no captions, heard in the same pass"
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT provider, model, automatic FROM transcripts WHERE video_id = 'simfilm0006'")
+    assert dict(row) == {"provider": "sim_gemini", "model": "sim", "automatic": True}
+    assert (await rig.row("simfilm0006"))["attempts"] == 0
+    assert await rig.used("sim_gemini", "sim_video_seconds") == 3600
+
+
+async def test_captions_refused_send_every_film_to_the_listener_and_the_refusing_provider_rests(pool) -> None:
+    """From the cloud captions are refused every time: after the first refusal they are not asked again for hours."""
+    rig = Rig(pool, scenario(captioned("simfilm0001"), captioned("simfilm0002"), transcripts={"block_ratio": 1.0}), listener=True)
+    await follow_all(rig, GOLD)
+
     await rig.tick()
-    assert (await rig.states())["simfilm0006"] == "quiet"
-    assert (await rig.row("simfilm0006"))["job_id"] is None
+
+    assert set((await rig.states()).values()) == {"quiet"}
+    async with pool.acquire() as conn:
+        assert (await store.provider_states(conn))["sim"].blocked, "the refusal is on the screen though the film was read"
+        providers = await conn.fetch("SELECT DISTINCT provider FROM transcripts")
+    assert [row["provider"] for row in providers] == ["sim_gemini"]
+    asked_once = rig.world._fetches["simfilm0001"] + rig.world._fetches["simfilm0002"]
+    assert asked_once == 1, "the second film went straight to the listener"
+
+    rig.clock.advance(hours=7)
+    await follow_all(rig, GOLD)
+    rig.world.scenario.videos.append(rig.world.scenario.videos[0].model_copy(update={"video_id": "simfilm0003"}))
+    rig.world._videos["simfilm0003"] = rig.world.scenario.videos[-1]
+    await rig.tick()
+    assert rig.world._fetches["simfilm0003"] == 1, "after the cooldown the captions provider is asked again"
+
+
+async def test_a_film_dearer_than_what_is_left_of_the_listeners_day_waits_without_spending_an_attempt(pool) -> None:
+    rig = Rig(pool, scenario(unheard("simfilm0001", duration_seconds=1200)), listener=True, gemini_daily_video_seconds=900)
+    await follow_all(rig, GOLD)
+
+    await rig.tick()
+
+    film = await rig.row("simfilm0001")
+    assert (film["state"], film["attempts"]) == ("discovered", 0)
+    assert film["next_attempt_at"] is not None
+    assert await rig.used("sim_gemini", "sim_video_seconds") == 0
+
+
+async def test_a_listener_that_is_rate_limited_leaves_the_film_its_attempts_and_stops_the_pass(pool) -> None:
+    rig = Rig(pool, scenario(unheard("simfilm0001"), unheard("simfilm0002"), listening={"block_ratio": 1.0}), listener=True)
+    await follow_all(rig, GOLD)
+
+    await rig.tick()
+
+    assert set((await rig.states()).values()) == {"discovered"}
+    assert (await rig.row("simfilm0001"))["attempts"] == 0
+    async with pool.acquire() as conn:
+        assert (await store.provider_states(conn))["sim_gemini"].blocked
+    assert await rig.used("sim", "sim_credits") == 1, "the pass stopped after the first film"
 
 
 async def test_a_pass_does_no_more_of_a_step_than_its_limit_and_the_rest_waits(pool) -> None:
@@ -315,38 +363,6 @@ async def test_a_topic_is_searched_when_it_is_due_and_not_before_and_pays_for_th
     rig.clock.advance(minutes=31)
     await rig.tick()
     assert await rig.used("sim", "sim_units") == 2 * searched
-
-
-async def test_a_source_that_cannot_search_leaves_the_topic_waiting_and_the_channels_working(pool) -> None:
-    rig = Rig(pool)
-    rig.providers = Providers(
-        source=_NoSearch(rig.providers.source),  # type: ignore[arg-type]
-        transcripts=rig.providers.transcripts,
-        analyser=rig.providers.analyser,
-        meter=rig.meter,
-        clock=rig.clock,
-    )
-    rig.ingest = type(rig.ingest)(pool, rig.providers, rig.settings)
-    await follow_all(rig, GOLD)
-    await watchlist.add_topic(pool, rig.settings, "gold", added_by="operator")
-
-    await rig.tick()
-
-    assert (await rig.states())["simfilm0001"] == "quiet"
-    async with pool.acquire() as conn:
-        assert (await store.list_topics(conn))[0].last_run_at is None
-
-
-class _NoSearch:
-    """A feed's capabilities over the simulation's films."""
-
-    supports_search = False
-
-    def __init__(self, inner) -> None:
-        self._inner = inner
-
-    def __getattr__(self, name):
-        return getattr(self._inner, name)
 
 
 async def test_a_step_that_breaks_does_not_stop_the_ones_after_it_but_the_pass_is_a_failed_one(pool) -> None:

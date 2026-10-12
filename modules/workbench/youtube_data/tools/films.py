@@ -182,6 +182,7 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
             language=page.language,
             provider=page.provider,
             automatic=page.automatic,
+            model=page.model,
             simulated=page.simulated,
             offset=max(0, offset),
             total_chars=page.total_chars,

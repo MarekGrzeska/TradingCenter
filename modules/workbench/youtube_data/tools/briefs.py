@@ -65,7 +65,6 @@ class StatusBrief(BaseModel):
     simulating: bool
     model_configured: bool
     alerts_configured: bool
-    search_supported: bool
     stale: bool
     loop_age_seconds: float | None
     providers: list[ProviderBrief]
@@ -80,7 +79,6 @@ class StatusBrief(BaseModel):
             simulating=state.simulating,
             model_configured=state.model_configured,
             alerts_configured=state.alerts_configured,
-            search_supported=state.search_supported,
             stale=state.stale,
             loop_age_seconds=None if state.loop is None else state.loop.age_seconds,
             providers=[ProviderBrief.of(provider) for provider in state.providers],

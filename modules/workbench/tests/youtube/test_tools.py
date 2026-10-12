@@ -11,7 +11,6 @@ import pytest
 from youtube_data import store
 from youtube_data.analysis import Reading
 from youtube_data.providers.base import VideoRef
-from youtube_data.providers.build import Providers
 
 from .harness import GOLD, MARKETS, Rig
 
@@ -237,28 +236,12 @@ async def test_a_search_finds_films_and_spends_what_a_search_costs(tools, rig) -
     assert await rig.used("sim", "sim_units") == rig.providers.source.search_cost
 
 
-async def test_a_search_is_refused_where_the_source_cannot_and_where_the_day_is_spent(tools, rig, app) -> None:
+async def test_a_search_is_refused_where_the_day_is_spent(tools, rig) -> None:
     async with rig.pool.acquire() as conn:
         await store.add_usage(conn, {("sim", "sim_units"): 7950}, day=rig.clock.now().date())
     spent = await call(tools, "search_youtube", phrase="gold")
     assert "day cannot pay" in spent["refused"] and "midnight UTC" in spent["do_first"]
     assert await rig.used("sim", "sim_units") == 7950, "a refused search costs nothing"
-
-    class NoSearch:
-        supports_search = False
-
-        def __getattr__(self, name):
-            return getattr(rig.providers.source, name)
-
-    app.state.providers = Providers(
-        source=NoSearch(),  # type: ignore[arg-type]
-        transcripts=rig.providers.transcripts,
-        analyser=rig.providers.analyser,
-        meter=rig.meter,
-        clock=rig.clock,
-    )
-    cannot = await call(tools, "search_youtube", phrase="gold")
-    assert "cannot search" in cannot["refused"] and "data_api" in cannot["do_first"]
 
 
 async def test_a_channel_that_the_agent_followed_shows_up_in_the_films_it_yields(tools, rig) -> None:

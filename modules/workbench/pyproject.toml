@@ -59,6 +59,7 @@ dependencies = [
     # deployment with no account session never loads it.
     "telethon>=1.44.0",
     "youtube-transcript-api>=1.0",
+    "google-genai>=2.29.0",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.
