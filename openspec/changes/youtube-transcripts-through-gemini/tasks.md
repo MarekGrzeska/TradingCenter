@@ -39,8 +39,8 @@
 ## 7. Dokumentacja i weryfikacja
 
 - [x] 7.1 `youtube_data/README.md`, `.env.example`: blok Gemini, łańcuch, odpoczynek; bez `rss`
-- [ ] 7.2 `ruff check .` · `pyright` · `pytest` (z `-m db`) w workbenchu; `pnpm test` · `lint` · `typecheck` · `contract:check` w terminalu; testy `scripts`
-- [ ] 7.3 `review.md`
+- [x] 7.2 `ruff check .` · `pyright` · `pytest` (z `-m db`) w workbenchu; `pnpm test` · `lint` · `typecheck` · `contract:check` w terminalu; testy `scripts`
+- [x] 7.3 `review.md`
 
 ## 8. Operator
 

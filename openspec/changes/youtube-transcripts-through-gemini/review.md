@@ -16,7 +16,7 @@ przeniesione z Agents, gdzie ścieżka Gemini **nigdy się nie wykonała** — n
 | Co | Wynik |
 |---|---|
 | `modules/workbench`: `ruff check .` · `pyright` | czysto · 0 błędów |
-| `modules/workbench`: `pytest -m "not live"` (z `-m db` na testcontainers) | wynik w komunikacie końcowym |
+| `modules/workbench`: `pytest -m "not live"` (z `-m db` na testcontainers) | **2819 passed**, 11 odznaczonych (`live`) |
 | `tests/youtube` osobno | **229 passed** |
 | `modules/terminal`: `pnpm typecheck` · `lint` · `test` · `contract:check` | czysto · czysto · **836 passed** · „Every contract is up to date” |
 | `scripts`: `uv run pytest` | **177 passed, 2 skipped** |
