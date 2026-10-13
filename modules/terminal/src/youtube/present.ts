@@ -67,8 +67,12 @@ export function warnings(state: ArchiveState, now: Date = new Date()): string[] 
     const age = state.loopAgeSeconds === null ? "" : ` (od ${Math.round(state.loopAgeSeconds / 60)} min)`;
     found.push(`Pętla archiwum nie ukończyła przebiegu od dłuższego czasu${age}. Pusta lista nie znaczy, że nic nie opublikowano.`);
   }
+  // A captions provider refused from the cloud every time is not news while another one delivers the words: the usage
+  // line still shows it, and the films are not waiting. The note is for when nobody who could answer is letting us in.
+  const transcripts = state.providers.filter((provider) => provider.role === "transcripts");
+  const someoneDelivers = transcripts.some((provider) => !provider.blocked && !provider.exhausted);
   for (const provider of state.providers) {
-    if (provider.blocked) {
+    if (provider.blocked && !(provider.role === "transcripts" && someoneDelivers)) {
       found.push(
         `Dostawca „${provider.name}" nie wpuszcza nas${provider.blockedReason ? ` (${provider.blockedReason})` : ""}. ` +
           "Filmy czekają — to nie są filmy bez napisów.",

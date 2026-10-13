@@ -81,7 +81,10 @@ class Settings(BaseSettings):
     analyser: str = "sim"
     openai_api_key: str | None = None
     openai_base_url: str | None = None
-    analysis_model: str = "gpt-6-sol"
+    # The cheap one (0.10 / 0.50 USD per million tokens against Sol's 2 / 10): a reading is a summary, a stance per instrument
+    # and a score from one transcript, and a film a day is a handful of cents either way. Sol is the setting to raise if the
+    # readings turn out thin.
+    analysis_model: str = "gpt-6-luna"
     # How much of a transcript one reading is given. An hour of speech is ~55k characters; this is well past the
     # longest film the loop accepts, so a cut is the exception and is announced to the model when it happens.
     analysis_max_chars: int = 300_000

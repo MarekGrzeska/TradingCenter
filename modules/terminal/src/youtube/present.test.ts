@@ -85,6 +85,14 @@ describe("warnings", () => {
     expect(note).toContain("to nie są filmy bez napisów");
   });
 
+  it("stays quiet about a refused captions provider while another one delivers the words", () => {
+    const refused = provider({ name: "direct", blocked: true, blockedReason: "RequestBlocked" });
+    const delivering = provider({ name: "gemini" });
+
+    expect(warnings(state({ providers: [refused, delivering] }))).toEqual([]);
+    expect(warnings(state({ providers: [refused, { ...delivering, blocked: true }] }))).toHaveLength(2);
+  });
+
   it("says a spent day comes back at midnight UTC, and which midnight", () => {
     const [note] = warnings(
       state({ providers: [provider({ exhausted: true, spentToday: 500 })] }),
