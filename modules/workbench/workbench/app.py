@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import logging
 import os
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 
 from tc_runtime import telemetry
 
@@ -36,6 +36,7 @@ import social_data.app
 import strategy.app
 import teams.surface
 import telegram_gateway.app
+import youtube_data.app
 from agent import store as agent_store
 from agent.models_catalogue import ModelCatalogue as AgentCatalogue
 from agent.provider import OpenAIProvider as AgentProvider
@@ -54,7 +55,7 @@ from teams.tools import ToolServerRegistry as TeamsToolServerRegistry
 from . import model_successors
 from .archive_client import archive_client
 from .assembly import mount_package
-from .config import Settings
+from .config import Settings, youtube_enabled
 from .local_tools import ConversationLocalTools, TeamsLocalTools
 from .root_access import RootCallers
 from .team_tools import LocalTeamsTools
@@ -73,6 +74,7 @@ async def lifespan(app: FastAPI):
     strategy_settings = settings.for_strategy()
     market_settings = settings.for_market()
     telegram_settings = settings.for_telegram()
+    youtube_settings = settings.for_youtube() if YOUTUBE_MOUNTED else None
     # Each package's tools, called as functions: the server its own `/mcp` mounts, minus the transport. The
     # archive's eleven were the first tools this process ever called, over the network; they are the last to move in.
     polymarket_tools = ConversationLocalTools("polymarket-data", polymarket_app.state.mcp_server)
@@ -80,6 +82,11 @@ async def lifespan(app: FastAPI):
     strategy_tools = ConversationLocalTools("strategy", strategy_app.state.mcp_server)
     market_tools = ConversationLocalTools("market-data", market_app.state.mcp_server)
     telegram_tools = ConversationLocalTools("telegram-gateway", telegram_app.state.mcp_server)
+    youtube_tools = (
+        None
+        if youtube_app is None
+        else ConversationLocalTools("youtube-data", youtube_app.state.mcp_server)
+    )
 
     # Constructed, not connected: a session opens on the first turn that wants a tool. Reaching trading-mcp at startup
     # would make this process's health depend on another module's, whose answer is to run without its tools.
@@ -95,6 +102,7 @@ async def lifespan(app: FastAPI):
             social_tools,
             strategy_tools,
             telegram_tools,
+            *([] if youtube_tools is None else [youtube_tools]),
         ],
     )
 
@@ -135,6 +143,18 @@ async def lifespan(app: FastAPI):
             archive_client=strategy_archive,
             telegram=strategy_telegram,
         ),
+        # Entered only when mounted: with no database configured this is a block that does nothing, and the start-up
+        # log line is what says why.
+        (
+            telegram_client(telegram_app, "the YouTube archive")
+            if youtube_app is not None
+            else nullcontext(None)
+        ) as youtube_telegram,
+        (
+            youtube_data.app.serving(youtube_app, youtube_settings, telegram=youtube_telegram)
+            if youtube_app is not None and youtube_settings is not None
+            else nullcontext()
+        ),
     ):
         # Built here rather than beside the conversation's, because one of its sources is served by this process and
         # reads the teams database directly: announcing needs no pool, calling does, and this is the first point with one.
@@ -157,6 +177,10 @@ async def lifespan(app: FastAPI):
         teams_tool_servers.local["telegram-gateway"] = TeamsLocalTools(
             "telegram-gateway", telegram_app.state.mcp_server
         )
+        if youtube_app is not None:
+            teams_tool_servers.local["youtube-data"] = TeamsLocalTools(
+                "youtube-data", youtube_app.state.mcp_server
+            )
 
         # The `try` opens before the schema checks, not after: `ToolServer.__init__` already holds a credential when a
         # scope is configured, and a refused start is exactly the path that would otherwise leak it.
@@ -319,6 +343,16 @@ mount_package(app, "/market", market_app)
 # The door to Telegram, whole: sending, its two tools, and the bots and destinations only the operator's `az` reaches.
 telegram_app = telegram_gateway.app.create_app()
 mount_package(app, "/telegram", telegram_app)
+
+# The YouTube archive, whole, and only when its database is configured: absent is a working configuration, and a
+# package mounted without a database would be the half-state `workbench-process` refuses. Decided here, at import,
+# because a mount is the one thing the lifespan cannot add afterwards.
+YOUTUBE_MOUNTED = youtube_enabled()
+youtube_app = youtube_data.app.create_app() if YOUTUBE_MOUNTED else None
+if youtube_app is not None:
+    mount_package(app, "/youtube", youtube_app)
+else:
+    log.info("the YouTube archive is not part of this process: YOUTUBE_DATABASE_URL is not set")
 
 # After every mount, so the prefixes it lets through to each package's own record are all of them.
 app.add_middleware(

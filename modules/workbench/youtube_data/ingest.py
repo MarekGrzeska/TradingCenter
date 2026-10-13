@@ -1,0 +1,363 @@
+"""The loop: discover films, get their words, have a model read them, tell the operator. One pass per interval, four steps in
+that order, each with a limit of its own.
+
+Three things here are decisions rather than mechanics. **A film's state is a row, not a memory of the loop**: a restart
+resumes where the archive says it was, and a film that will never have captions has an end (`gave_up`) instead of a pass a
+day for ever. **Blocked is not a miss**: a provider that refuses us says nothing about the film, so it neither spends an
+attempt nor lets the pass go on asking. And **the day is counted here**, in the provider's own unit, against ceilings that
+are settings — a dashboard that says no says it after the money is gone."""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from collections.abc import Awaitable, Callable
+from datetime import datetime, timedelta
+
+from tc_runtime.liveness import LoopHeartbeat
+
+from . import budget, store
+from .analysis import Film
+from .config import Settings
+from .providers.base import (
+    Blocked,
+    ChannelInfo,
+    NoTranscript,
+    Pending,
+    QuotaExceeded,
+    ReadingUnusable,
+    SourceError,
+    Transcript,
+    TranscriptResult,
+    UnsupportedOperation,
+)
+from .providers.build import Providers
+
+log = logging.getLogger(__name__)
+
+# A topic with no earlier search looks back this far: a day of films is what an operator adding a topic expects to see.
+FIRST_SEARCH_LOOKBACK = timedelta(days=1)
+
+Announce = Callable[[datetime], Awaitable[object]]
+
+
+class Ingest:
+    def __init__(
+        self,
+        pool,
+        providers: Providers,
+        settings: Settings,
+        *,
+        announce: Announce | None = None,
+        heartbeat: LoopHeartbeat | None = None,
+    ) -> None:
+        self._pool = pool
+        self._providers = providers
+        self._settings = settings
+        self._announce = announce
+        # `None` in a test that drives `tick()` itself: what the loop reports is the loop's.
+        self._heartbeat = heartbeat
+        self._clock = providers.clock
+        self._task: asyncio.Task | None = None
+
+    async def start(self) -> None:
+        self._task = asyncio.create_task(self._run(), name="youtube-ingest")
+
+    async def stop(self) -> None:
+        if self._task is None:
+            return
+        self._task.cancel()
+        try:
+            await self._task
+        except asyncio.CancelledError:
+            pass
+        self._task = None
+
+    async def _run(self) -> None:
+        while True:
+            try:
+                await self.tick()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # One bad round is not the end of the archive.
+                log.exception("a round failed")
+            else:
+                # After the pass and only after it: a round that raised did not happen, and a heartbeat beaten
+                # regardless would report a stopped loop as healthy.
+                if self._heartbeat is not None:
+                    self._heartbeat.beat()
+            await asyncio.sleep(self._settings.poll_interval_seconds)
+
+    async def tick(self) -> None:
+        """One pass. A step that fails does not stop the ones after it — a source that will not answer costs the
+        discovery, not the readings of what is already waiting — but the pass is then reported as failed, so the age the
+        heartbeat publishes keeps growing."""
+        errors: list[Exception] = []
+        steps: tuple[tuple[str, Callable[[], Awaitable[None]]], ...] = (
+            ("discover", self._discover),
+            ("transcribe", self._transcribe),
+            ("read", self._read),
+            ("announce", self._tell),
+        )
+        for name, step in steps:
+            try:
+                await step()
+            except asyncio.CancelledError:
+                raise
+            except Exception as err:
+                log.exception("the %s step failed", name)
+                errors.append(err)
+            finally:
+                await self._flush()
+        if errors:
+            raise errors[0]
+
+    # --- the day -----------------------------------------------------------------------------------------------------
+
+    def _day(self):
+        return budget.utc_day(self._clock.now())
+
+    async def _flush(self) -> None:
+        """What the providers were asked for since the last look, written down — even when the call that spent it ended
+        in an exception, which is when it matters."""
+        spent = self._providers.meter.drain()
+        if spent:
+            async with self._pool.acquire() as conn:
+                await store.add_usage(conn, spent, day=self._day())
+
+    async def _remaining(self, ceiling: budget.Ceiling) -> int:
+        await self._flush()
+        async with self._pool.acquire() as conn:
+            return await budget.remaining(conn, ceiling, day=self._day())
+
+    # --- discover ----------------------------------------------------------------------------------------------------
+
+    async def _discover(self) -> None:
+        now = self._clock.now()
+        source = self._providers.source
+        ceiling = budget.Ceiling(source.name, source.unit, self._settings.daily_source_units)
+
+        async with self._pool.acquire() as conn:
+            channels = (await store.list_channels(conn, active_only=True))[: self._settings.discover_batch_limit]
+            topics = [
+                topic
+                for topic in await store.list_topics(conn, active_only=True)
+                if topic.last_run_at is None or now - topic.last_run_at >= timedelta(minutes=topic.interval_minutes)
+            ][: self._settings.discover_batch_limit]
+
+        left = await self._remaining(ceiling)
+        for channel in channels:
+            if left <= 0:
+                log.warning("the %s source's day is spent; discovery waits for tomorrow", source.name)
+                break
+            info = ChannelInfo(
+                channel_id=channel.channel_id,
+                title=channel.title,
+                handle=channel.handle,
+                uploads_playlist_id=channel.uploads_playlist_id,
+            )
+            try:
+                films = await source.latest_videos(info)
+            except QuotaExceeded:
+                log.warning("the %s source says its quota is spent", source.name)
+                left = 0
+                break
+            except SourceError as err:
+                # The archive is left as it was; the channel is asked again next pass.
+                log.warning("channel %s could not be listed: %s", channel.channel_id, err)
+                left = await self._remaining(ceiling)
+                continue
+            async with self._pool.acquire() as conn:
+                await store.upsert_films(
+                    conn,
+                    [
+                        store.Discovery(film, f"channel:{channel.channel_id}", channel.profile, channel.alert_rule)
+                        for film in films
+                    ],
+                )
+                await store.record_discovery(conn, channel.channel_id, at=now)
+            left = await self._remaining(ceiling)
+
+        for topic in topics:
+            if not source.supports_search:
+                log.info("topic %r waits: the %s source cannot search", topic.phrase, source.name)
+                break
+            if left < source.search_cost:
+                log.warning("topic %r waits: the %s source's day cannot pay for a search", topic.phrase, source.name)
+                break
+            try:
+                films = await source.search(
+                    topic.phrase,
+                    language=topic.language,
+                    published_after=topic.last_run_at or now - FIRST_SEARCH_LOOKBACK,
+                    limit=topic.max_videos_per_run,
+                )
+            except QuotaExceeded:
+                log.warning("the %s source says its quota is spent", source.name)
+                break
+            except SourceError as err:
+                log.warning("topic %r could not be searched: %s", topic.phrase, err)
+                left = await self._remaining(ceiling)
+                continue
+            async with self._pool.acquire() as conn:
+                await store.upsert_films(
+                    conn,
+                    [store.Discovery(film, f"topic:{topic.id}", topic.profile, topic.alert_rule) for film in films],
+                )
+                await store.record_topic_run(conn, topic.id, at=now)
+            left = await self._remaining(ceiling)
+
+        async with self._pool.acquire() as conn:
+            await store.skip_unwanted(
+                conn, minimum=self._settings.min_video_seconds, maximum=self._settings.max_video_seconds
+            )
+            live = await store.live_pending(conn, self._settings.discover_batch_limit)
+        if live and left > 0:
+            await self._refresh_live(live)
+
+    async def _refresh_live(self, video_ids: list[str]) -> None:
+        """A stream listed as live is asked about until it is not: it may have dropped out of the channel's latest fifteen
+        while it was still running, and would otherwise wait for ever."""
+        try:
+            films = await self._providers.source.video_details(video_ids)
+        except (UnsupportedOperation, SourceError):
+            # A feed cannot say, and a source that will not answer is asked again next pass.
+            return
+        async with self._pool.acquire() as conn:
+            for film in films:
+                await store.refresh_film(conn, film)
+            await store.skip_unwanted(
+                conn, minimum=self._settings.min_video_seconds, maximum=self._settings.max_video_seconds
+            )
+
+    # --- transcribe --------------------------------------------------------------------------------------------------
+
+    async def _providers_with_a_day_left(self) -> list[str]:
+        await self._flush()
+        left = []
+        async with self._pool.acquire() as conn:
+            for provider in self._providers.transcripts.providers:
+                ceiling = budget.Ceiling(provider.name, provider.unit, self._settings.daily_transcript_units)
+                if await budget.remaining(conn, ceiling, day=self._day()) > 0:
+                    left.append(provider.name)
+        return left
+
+    async def _transcribe(self) -> None:
+        now = self._clock.now()
+        chain = self._providers.transcripts
+        async with self._pool.acquire() as conn:
+            # Here as well as after discovery: a discovery that raised half way must not send a five-hour film on.
+            await store.skip_unwanted(
+                conn, minimum=self._settings.min_video_seconds, maximum=self._settings.max_video_seconds
+            )
+            films = await store.due_for_transcription(conn, now, self._settings.transcribe_batch_limit)
+
+        for film in films:
+            allowed = await self._providers_with_a_day_left()
+            if not allowed:
+                log.warning("every transcript provider's day is spent; transcription waits for tomorrow")
+                break
+            if film.job_id and film.job_provider:
+                result = await chain.poll(film.job_provider, film.job_id)
+            else:
+                result = await chain.fetch(film.video_id, self._settings.languages, only=allowed)
+            await self._flush()
+            # The moment of this answer, not of the pass: a refusal after a success in the same pass must read as later.
+            if await self._settle(film, result, self._clock.now()):
+                break
+
+    async def _settle(self, film, result: TranscriptResult, now: datetime) -> bool:
+        """Records what a provider said about a film. True means the pass should stop asking: the provider would not let
+        us in, and the next film would get the same answer at the same price."""
+        async with self._pool.acquire() as conn:
+            if isinstance(result, Transcript):
+                await store.save_transcript(conn, film.video_id, result)
+                await store.note_provider(conn, result.provider, ok=True, at=now)
+            elif isinstance(result, NoTranscript):
+                await store.note_provider(conn, result.provider, ok=True, at=now)
+                misses = film.attempts + 1
+                delays = self._settings.retry_delays
+                give_up = misses > len(delays)
+                await store.record_no_transcript(
+                    conn,
+                    film.video_id,
+                    give_up=give_up,
+                    retry_at=None if give_up else now + timedelta(minutes=delays[misses - 1]),
+                )
+            elif isinstance(result, Pending):
+                await store.note_provider(conn, result.provider, ok=True, at=now)
+                await store.record_job(conn, film.video_id, provider=result.provider, job_id=result.job_id)
+            elif isinstance(result, Blocked):
+                if film.job_id and film.job_provider not in self._providers.transcripts.names:
+                    # The provider that took this job is gone from the configuration: the job is unreachable, and asking
+                    # again from the start is the only way on.
+                    await store.clear_job(conn, film.video_id)
+                    return False
+                await store.note_provider(conn, result.provider, ok=False, at=now, reason=result.reason)
+                log.warning("transcripts blocked (%s: %s); this pass stops asking", result.provider, result.reason)
+                return True
+        return False
+
+    # --- read --------------------------------------------------------------------------------------------------------
+
+    async def _read(self) -> None:
+        analyser = self._providers.analyser
+        if analyser is None:
+            return
+        ceiling = budget.Ceiling(budget.ANALYSER, budget.TOKENS, self._settings.daily_token_limit)
+        async with self._pool.acquire() as conn:
+            waiting = await store.due_for_reading(
+                conn, max_failures=self._settings.reading_max_failures, limit=self._settings.analyse_batch_limit
+            )
+
+        for item in waiting:
+            if await self._remaining(ceiling) <= 0:
+                log.warning("the day's tokens are spent; readings wait for tomorrow")
+                break
+            video = item.video
+            film = Film(
+                video_id=video.video_id,
+                title=video.title,
+                channel_title=video.channel_title,
+                published_on=video.published_at.date(),
+                language=item.language,
+            )
+            try:
+                analysis = await analyser.read(film, item.transcript, profile=video.profile)
+            except asyncio.CancelledError:
+                raise
+            except ReadingUnusable as err:
+                # An answer about this film that will not be stored: paid for, and one of the film's attempts.
+                self._providers.meter.record(budget.ANALYSER, budget.TOKENS, err.tokens)
+                log.warning("reading %s is unusable: %s", video.video_id, err)
+                async with self._pool.acquire() as conn:
+                    await store.record_reading_failure(conn, video.video_id)
+                continue
+            except Exception as err:  # noqa: BLE001 - whatever a model provider raises must not stop the batch
+                # A key, a quota, a rate limit or a dropped connection says nothing about the film, so it spends none of
+                # the film's attempts — an hour's outage would otherwise strand every film it touched for good.
+                log.warning("reading %s failed: %s", video.video_id, err)
+                continue
+            self._providers.meter.record(budget.ANALYSER, budget.TOKENS, analysis.input_tokens + analysis.output_tokens)
+            async with self._pool.acquire() as conn:
+                await store.save_reading(
+                    conn,
+                    video.video_id,
+                    profile=video.profile,
+                    reading=analysis.reading,
+                    model=analysis.model,
+                    simulated=analysis.simulated or video.simulated,
+                    at=self._clock.now(),
+                )
+
+    # --- tell --------------------------------------------------------------------------------------------------------
+
+    async def _tell(self) -> None:
+        if self._announce is not None:
+            await self._announce(self._clock.now())
+            return
+        # Nobody to tell: a read film ends as quiet rather than waiting for an adresat that may come months later and
+        # find a backlog to announce.
+        async with self._pool.acquire() as conn:
+            await store.settle_analysed(conn)

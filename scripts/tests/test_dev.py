@@ -15,6 +15,7 @@ from dev import (
     database_host,
     env_value,
     is_loopback,
+    migration_chains,
     parse_args,
     preflight,
     services_to_start,
@@ -474,3 +475,26 @@ class TestPortOwner:
         monkeypatch.setattr(dev, "_listening_pid", lambda _: 4312)
         monkeypatch.setattr(dev, "_process_name", lambda _: None)
         assert dev.real_environment().port_owner(8010) == " by a process (pid 4312)"
+
+
+class TestTheOptionalYoutubeChain:
+    """The YouTube archive's chain reads its own database URL, so running it without one would fail on a database
+    nobody asked for — and the stack would stop on a package the operator does not have."""
+
+    def test_an_env_without_the_line_migrates_the_seven_every_workbench_has(self) -> None:
+        chains = migration_chains(environment())
+
+        assert ("workbench", "alembic-youtube.ini") not in chains
+        assert len(chains) == 7
+
+    def test_an_env_with_the_line_adds_the_eighth(self) -> None:
+        files = dict(GOOD_ENV)
+        files["workbench"] += "YOUTUBE_DATABASE_URL=postgresql://youtube:pw@127.0.0.1:55432/youtube\n"
+
+        assert migration_chains(environment(files=files))[-1] == ("workbench", "alembic-youtube.ini")
+
+    def test_a_line_left_blank_is_not_the_line(self) -> None:
+        files = dict(GOOD_ENV)
+        files["workbench"] += "YOUTUBE_DATABASE_URL=\n"
+
+        assert ("workbench", "alembic-youtube.ini") not in migration_chains(environment(files=files))

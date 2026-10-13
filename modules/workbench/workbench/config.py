@@ -17,6 +17,7 @@ from strategy.config import Settings as StrategySettings
 from teams.config import ModelCatalogueEntry as TeamsModelCatalogueEntry
 from teams.config import Settings as TeamsSettings
 from telegram_gateway.config import Settings as TelegramSettings
+from youtube_data.config import Settings as YoutubeSettings
 
 
 class Settings(BaseSettings):
@@ -102,9 +103,20 @@ class Settings(BaseSettings):
     # reads is its own, under `TELEGRAM_`, and that includes the REST caller list: its bots and destinations answer
     # the operator's `az` alone, never the browsers the other packages share one list for.
     telegram_database_url: str
+    # The YouTube archive: the one package whose absence is a working configuration. Unset, the process runs without
+    # it — no routes, no tools, no database — which is what production does until its own change enables it.
+    youtube_database_url: str | None = None
     telegram_api_id: int | None = None
     telegram_api_hash: str | None = None
     telegram_session: str | None = None
+
+    @field_validator("youtube_database_url")
+    @classmethod
+    def _blank_youtube_means_absent(cls, value: str | None) -> str | None:
+        # `YOUTUBE_DATABASE_URL=` left in a .env is the line not being there, not a database named "".
+        if value is None or not value.strip():
+            return None
+        return value.strip()
 
     @field_validator("database_pool_size")
     @classmethod
@@ -293,3 +305,42 @@ class Settings(BaseSettings):
             telegram_api_hash=self.telegram_api_hash,
             telegram_session=self.telegram_session,
         )
+
+    def for_youtube(self) -> YoutubeSettings:
+        """The YouTube archive's own settings, the same way. Only asked for when `youtube_enabled()` said yes, so a
+        missing database here is a caller that skipped the question — refused by name rather than by pydantic."""
+        if self.youtube_database_url is None:
+            raise ValueError(
+                "YOUTUBE_DATABASE_URL is not set, so the YouTube archive is not part of this process — "
+                "there is no settings object to build for it."
+            )
+        return YoutubeSettings(
+            _env_prefix="YOUTUBE_",  # pyright: ignore[reportCallIssue]
+            _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
+            database_url=self.youtube_database_url,
+            database_user=self.database_user,
+            azure_client_id=self.azure_client_id,
+            azure_client_secret=self.azure_client_secret,
+            azure_tenant_id=self.azure_tenant_id,
+            migration_lock_wait_seconds=self.migration_lock_wait_seconds,
+            require_authenticated_principal=self.require_authenticated_principal,
+            tool_caller_application_ids=self.tool_caller_application_ids,
+            # Not the process's list, which holds the pocket: this package's REST writes and spends. Read as
+            # YOUTUBE_REST_CALLER_APPLICATION_IDS, like `/telegram`'s.
+            alert_destination=self.alert_destination,
+        )
+
+
+class _YoutubeSwitch(BaseSettings):
+    """The one setting the assembly reads at import time, alone: whether to mount the YouTube archive is decided before
+    `Settings()` — which refuses to build without the other seven databases — has anywhere to run."""
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    youtube_database_url: str | None = None
+
+
+def youtube_enabled() -> bool:
+    """Whether this process serves the YouTube archive: its database is configured, and nothing else decides it."""
+    configured = _YoutubeSwitch().youtube_database_url
+    return configured is not None and bool(configured.strip())

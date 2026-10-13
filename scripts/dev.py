@@ -196,9 +196,13 @@ MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
     ("workbench", "alembic-telegram.ini"),
 )
 
+# Optional, and so kept out of the tuple above: its chain reads `YOUTUBE_DATABASE_URL`, and an unset one is the package
+# not being part of the process — migrating it would fail on a database nobody asked for.
+YOUTUBE_CHAIN: tuple[str, str] = ("workbench", "alembic-youtube.ini")
+
 # Created here if missing rather than through docker-entrypoint-initdb.d, which only runs against
 # an empty volume and would never fire for a container from before these modules existed.
-LOGICAL_DATABASES = ("agent", "teams", "polymarket", "social", "strategy", "telegram")
+LOGICAL_DATABASES = ("agent", "teams", "polymarket", "social", "strategy", "telegram", "youtube")
 
 
 
@@ -716,6 +720,15 @@ def ensure_databases(names: Iterable[str] = LOGICAL_DATABASES) -> bool:
     return True
 
 
+def migration_chains(env: Environment) -> tuple[tuple[str, str | None], ...]:
+    """Every chain this checkout runs: the seven every workbench has, and the YouTube archive's only when the workbench's
+    `.env` names its database."""
+    workbench_env = env.read_env("workbench") or ""
+    if env_value(workbench_env, "YOUTUBE_DATABASE_URL"):
+        return (*MIGRATION_CHAINS, YOUTUBE_CHAIN)
+    return MIGRATION_CHAINS
+
+
 def apply_migrations(chains: Iterable[tuple[str, str | None]] = MIGRATION_CHAINS) -> bool:
     """Applied every run, not only on a fresh one: a checkout that has just pulled a migration is exactly
     where forgetting this produces an error reading like a bug in the module."""
@@ -896,7 +909,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     for line in advisories(env):
         note(line)
 
-    if not start_database() or not ensure_databases() or not apply_migrations():
+    if not start_database() or not ensure_databases() or not apply_migrations(migration_chains(env)):
         return 1
 
     stack = Stack()

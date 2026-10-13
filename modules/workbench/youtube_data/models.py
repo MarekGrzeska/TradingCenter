@@ -1,0 +1,76 @@
+"""What the archive holds, as this package's own shapes."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+
+# A film's life. `discovered` is also "waiting for a transcript" — a film with a job at a provider is still `discovered`,
+# the job being where the provider will answer. `gave_up` and `skipped` are never picked up again.
+DISCOVERED = "discovered"
+NO_TRANSCRIPT = "no_transcript"
+TRANSCRIBED = "transcribed"
+ANALYSED = "analysed"
+NOTIFIED = "notified"
+QUIET = "quiet"
+GAVE_UP = "gave_up"
+SKIPPED = "skipped"
+
+STATES = (DISCOVERED, NO_TRANSCRIPT, TRANSCRIBED, ANALYSED, NOTIFIED, QUIET, GAVE_UP, SKIPPED)
+
+ALERT_RULES = ("always", "threshold", "never")
+ADDED_BY = ("operator", "agent")
+
+
+@dataclass(frozen=True, slots=True)
+class Channel:
+    channel_id: str
+    title: str
+    handle: str | None
+    uploads_playlist_id: str | None
+    language: str
+    profile: str
+    alert_rule: str
+    active: bool
+    added_by: str
+    added_at: datetime
+    last_discovery_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class Topic:
+    id: int
+    phrase: str
+    language: str
+    interval_minutes: int
+    max_videos_per_run: int
+    profile: str
+    alert_rule: str
+    active: bool
+    added_by: str
+    added_at: datetime
+    last_run_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class Video:
+    video_id: str
+    channel_id: str | None
+    channel_title: str
+    title: str
+    published_at: datetime
+    duration_seconds: int | None
+    live_status: str
+    origins: tuple[str, ...]
+    profile: str
+    alert_rule: str
+    state: str
+    skip_reason: str | None
+    attempts: int
+    next_attempt_at: datetime | None
+    reading_failures: int
+    job_provider: str | None
+    job_id: str | None
+    simulated: bool
+    discovered_at: datetime
+    notified_at: datetime | None

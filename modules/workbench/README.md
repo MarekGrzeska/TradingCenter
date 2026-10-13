@@ -22,6 +22,7 @@ is the same behaviour with one process, one image and one App Service under it
 | `social_data/` | the post archive and the news, under `/social`: what was said, when, and what a model made of it — and headlines from 15 RSS feeds with the delay each arrived with. The door to Truth Social and to those feeds; **nothing on the tool surface writes, and the one REST route that does only marks a headline to keep**; a reading is stamped with its model and overwritten, never versioned; no backfill |
 | `strategy/` | the strategy platform, under `/strategy`: a strategy is a catalogue entry — declared facts, parameters, one pure `evaluate` — code in the image or an immutable revision the operator wrote. It reads the candle archive through its own application (`workbench/archive_client.py`) and **never touches an account**: it decides, teams execute |
 | `telegram_gateway/` | the one door to Telegram, under `/telegram`: two tools (send, and who can be sent to), and bots and destinations that only the operator's `az` reaches. It remembers nothing it sent — its own README beside it |
+| `youtube_data/` | the YouTube archive, under `/youtube`: channels and topics the operator follows, their films, transcripts and what a model made of them. **Optional** — mounted only when `YOUTUBE_DATABASE_URL` is set; absent, the process runs without it |
 | `workbench/` | the assembly: one settings read, one FastAPI, one lifespan, and `root_access.py`, the caller record of the routes no package owns |
 
 **No package imports another; `workbench/` may import all of them and is the only place that may.** That is
@@ -56,7 +57,8 @@ and nothing else.
 
 The three archives, the strategy platform and the door to Telegram are not servers any more. Since
 `one-process-per-security-boundary` each is a package of this process, mounted whole under
-`/market`, `/polymarket`, `/social`, `/strategy` and `/telegram`, and its tools reach both registries as functions
+`/market`, `/polymarket`, `/social`, `/strategy` and `/telegram` — and `/youtube`, only when its database is
+configured — and its tools reach both registries as functions
 (`workbench/local_tools.py`) — same names, descriptions, ceilings and refusals, no address, no
 identity, no session. Five of the prediction-market archive's twelve tools write, and what they
 write is a watch list and its groups, not an account; nothing on the post archive's four or the platform's

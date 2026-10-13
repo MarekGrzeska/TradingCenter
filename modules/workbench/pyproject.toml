@@ -58,6 +58,7 @@ dependencies = [
     # means talking to @BotFather, which only a *user account* may; imported inside the method that uses it, so a
     # deployment with no account session never loads it.
     "telethon>=1.44.0",
+    "youtube-transcript-api>=1.0",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.
@@ -77,7 +78,7 @@ line-length = 100
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
 [tool.pyright]
-include = ["workbench", "agent", "teams", "teams_tools", "polymarket_data", "social_data", "strategy", "market_data", "migrations"]
+include = ["workbench", "agent", "teams", "teams_tools", "polymarket_data", "social_data", "strategy", "market_data", "youtube_data", "migrations"]
 typeCheckingMode = "basic"
 
 [tool.pytest.ini_options]

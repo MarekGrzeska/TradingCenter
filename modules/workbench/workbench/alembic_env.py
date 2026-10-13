@@ -149,3 +149,11 @@ def telegram_settings() -> object:
     from workbench.config import Settings
 
     return Settings().for_telegram()  # type: ignore[call-arg]
+
+
+def youtube_settings() -> object:
+    """The YouTube archive's chain — the eighth, and the only one that is optional: absent from a process whose
+    `YOUTUBE_DATABASE_URL` is not set."""
+    from workbench.config import Settings
+
+    return Settings().for_youtube()  # type: ignore[call-arg]
