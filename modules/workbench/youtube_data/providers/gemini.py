@@ -108,7 +108,6 @@ def _text(response: Any) -> str:
 class GeminiTranscripts:
     name = "gemini"
     unit = VIDEO_SECONDS
-    listens = True
 
     def __init__(
         self,

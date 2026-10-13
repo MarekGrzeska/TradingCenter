@@ -129,7 +129,7 @@ async def state(
 
 def _ceilings(settings: Settings, providers: Providers) -> list[tuple[str, budget.Ceiling]]:
     found = budget.ceilings(settings, providers)
-    roles = ["source", *["transcripts"] * len(providers.transcripts.providers)]
+    roles = ["source", "transcripts"]
     if providers.analyser is not None:
         roles.append("analyser")
     return list(zip(roles, found, strict=True))

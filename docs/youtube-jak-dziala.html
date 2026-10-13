@@ -199,7 +199,7 @@
         </div>
         <div class="fail">
           <h3>3. Spisanie tego, co padło <span class="tag att">najtrudniejszy krok</span></h3>
-          <p>System najpierw bierze <strong>gotowe napisy</strong> z YouTube, w języku, którym film jest nagrany (nigdy tłumaczenie). Gdy napisów nie ma, <strong>model Gemini „słucha” filmu</strong> i go przepisuje. Szczegóły w następnej sekcji.</p>
+          <p><strong>Model Gemini „słucha” filmu</strong> i przepisuje go słowo w słowo. Szczegóły w następnej sekcji.</p>
         </div>
         <div class="fail">
           <h3>4. Ocena <span class="tag ok">model czyta</span></h3>
@@ -214,21 +214,20 @@
 
     <section>
       <div class="eyebrow">03 · Skąd bierze się tekst</div>
-      <h2>Napisy najpierw, Gemini gdy ich brak</h2>
-      <p class="intro">Napisy są darmowe i dokładne. Ale <span class="hl">z serwerów Azure YouTube ich nie wydaje</span> — odmawia każdemu zapytaniu. Dlatego na produkcji prawie każdy film przejdzie przez Gemini.</p>
+      <h2>Gemini słucha każdego filmu</h2>
+      <p class="intro">Tekst filmu zawsze spisuje <strong>model Gemini</strong>: dostaje link do filmu i przepisuje go słowo w słowo, ze znacznikami czasu. Napisów YouTube nie używamy — <span class="hl">z serwerów Azure YouTube ich nie wydaje</span>, więc ta droga i tak by nie działała.</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Sytuacja</th><th>Co robi system</th></tr></thead>
           <tbody>
-            <tr><td><b>Film ma napisy w swoim języku</b></td><td>Bierze je za darmo. Tekst dostaje znaczniki czasu co ok. pół minuty.</td></tr>
-            <tr><td><b>Napisy są tylko w innym języku</b></td><td>Nie bierze ich: to tłumaczenie, a w tłumaczeniu giną nazwy i liczby. Idzie do Gemini.</td></tr>
-            <tr><td><b>Napisów brak</b></td><td>Gemini dostaje link do filmu i przepisuje go słowo w słowo. Dłuższe filmy tnie na kawałki po kwadransie.</td></tr>
-            <tr><td><b>YouTube odmawia (typowo z chmury)</b></td><td>To nie jest „film bez napisów”: system <strong>nie liczy tego jako porażki filmu</strong>, a odmawiającego dostawcę napisów zostawia w spokoju na 6 godzin i od razu idzie do Gemini (a Gemini po odmowie odpoczywa tylko 15 minut).</td></tr>
-            <tr><td><b>Nikt nie ma tekstu</b></td><td>Ponawia po godzinie, po 6 godzinach i po dobie. Po czwartej próbie <strong>rezygnuje</strong> z filmu — każda próba kosztuje, więc ostatnia musi być.</td></tr>
+            <tr><td><b>Zwykły film</b></td><td>Gemini przepisuje go w kilkadziesiąt sekund. Dłuższe filmy tnie na kawałki po kwadransie. Koszt rzędu kilku centów za półgodzinny film.</td></tr>
+            <tr><td><b>Model przeciążony / limit</b></td><td>To nie jest porażka filmu: film <strong>nie traci próby</strong>, a Gemini odpoczywa 15 minut i wraca.</td></tr>
+            <tr><td><b>Nie da się spisać</b> (film prywatny, nic nie mówią, odpowiedź ucięta)</td><td>Ponawia po godzinie, po 6 godzinach i po dobie. Po czwartej próbie <strong>rezygnuje</strong> z filmu — każda próba kosztuje.</td></tr>
+            <tr><td><b>Dzienny limit wyczerpany</b></td><td>Film czeka do jutra, bez utraty prób.</td></tr>
           </tbody>
         </table>
       </div>
-      <p style="margin-top:14px">Tekst od Gemini jest oznaczony nazwą modelu, bo to <strong>zapis zrobiony przez maszynę</strong> — może przekręcić nazwę spółki albo liczbę. Napisy automatyczne YouTube też bywają niedokładne.</p>
+      <p style="margin-top:14px">Tekst jest oznaczony nazwą modelu, bo to <strong>zapis zrobiony przez maszynę</strong> — może przekręcić nazwę spółki albo liczbę.</p>
     </section>
 
     <section>
@@ -320,7 +319,7 @@
       <h2>Co jest, a czego jeszcze nie sprawdzono</h2>
       <div class="fails">
         <div class="fail ok"><h3>Włączone na produkcji <span class="tag ok">od 13.10</span></h3><p>Pakiet działa, ma własną bazę, klucze YouTube i Gemini, a alerty trafiają na Telegram. Lista obserwacji jest jeszcze <strong>pusta</strong> — zacznij od jednego kanału.</p></div>
-        <div class="fail"><h3>Ścieżka Gemini nieprzetestowana naprawdę <span class="tag att">do pomiaru</span></h3><p>Jak dobrze Gemini przepisuje polskie filmy o rynkach (nazwy spółek, liczby), nie wiadomo. Plan to trzy filmy próbne i porównanie z napisami. Do tego czasu traktuj tekst od Gemini jako szkic.</p></div>
+        <div class="fail"><h3>Gemini zmierzony <span class="tag ok">13.10</span></h3><p>Film 29-minutowy po polsku: 79 sekund, ok. 170 tys. tokenów, kilka centów. Jakość nazw i liczb warto ocenić na kilku filmach.</p></div>
         <div class="fail"><h3>Klucz Gemini <span class="tag att">sprawdź plan</span></h3><p>Darmowy plan pozwala Google używać przesłanych treści (tu: publiczne linki do filmów i polecenie). Dla produkcji lepszy płatny.</p></div>
         <div class="fail"><h3>Ostrożność w czytaniu ocen <span class="tag att">to opinia modelu</span></h3><p>Ocena i „co sądzi autor” to <strong>zdanie modelu</strong>, podpisane jego nazwą. System niczego nie weryfikuje z rynkiem; sprawdzanie prognoz względem cen to osobna, jeszcze niezrobiona praca.</p></div>
       </div>

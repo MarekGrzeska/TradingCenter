@@ -59,7 +59,7 @@ def provider(google: Google, meter: Meter | None = None) -> GeminiTranscripts:
 
 
 def request(duration: int | None = 1200, audio: str | None = "pl") -> TranscriptRequest:
-    return TranscriptRequest.for_film("dQw4w9WgXcQ", duration_seconds=duration, audio_language=audio, fallback=("pl",))
+    return TranscriptRequest("dQw4w9WgXcQ", duration, audio)
 
 
 async def test_a_film_is_written_down_from_its_address_and_counted_in_seconds_and_tokens() -> None:

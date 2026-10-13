@@ -42,7 +42,8 @@ def test_an_identity_over_plaintext_is_refused() -> None:
             database_user="workbench",
             video_source="data_api",
             data_api_key="test-key",
-            transcript_providers="direct",
+            transcriber="gemini",
+            gemini_api_key="test-key",
             analyser="openai",
             _env_file=None,
         )

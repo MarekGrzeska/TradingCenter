@@ -14,9 +14,7 @@ from ..analysis import Analyser, OpenAIAnalyser
 from ..clock import Clock, SimClock, SystemClock
 from ..config import Settings
 from .base import Meter, TranscriptProvider, VideoSource
-from .chain import TranscriptChain
 from .data_api import DataApiSource
-from .direct import DirectTranscripts
 
 log = logging.getLogger(__name__)
 
@@ -24,24 +22,23 @@ log = logging.getLogger(__name__)
 @dataclass(frozen=True, slots=True)
 class Providers:
     source: VideoSource
-    transcripts: TranscriptChain
+    transcriber: TranscriptProvider
     analyser: Analyser | None
     meter: Meter
     # The time everything that schedules must read: the wall clock, or the simulation's, which runs faster.
     clock: Clock
 
     async def aclose(self) -> None:
-        for provider in self.transcripts.providers:
-            close = getattr(provider, "aclose", None)
-            if close is not None:
-                await close()
+        close = getattr(self.transcriber, "aclose", None)
+        if close is not None:
+            await close()
 
 
 def build(settings: Settings, http: httpx.AsyncClient) -> Providers:
     meter = Meter()
 
     # One world for every simulated provider, made only when one is chosen: a film the source lists is a film the
-    # transcript providers know about, and all of them read the same clock.
+    # transcriber knows about, and both read the same clock.
     clock: Clock = SystemClock()
     world = None
     if settings.simulating:
@@ -64,31 +61,26 @@ def build(settings: Settings, http: httpx.AsyncClient) -> Providers:
         # The settings refused a start without the key, so it is here.
         source = DataApiSource(http, api_key=settings.data_api_key or "", meter=meter)
 
-    transcripts: list[TranscriptProvider] = []
-    for name in settings.transcript_provider_names:
-        if name == "direct":
-            transcripts.append(DirectTranscripts(meter))
-        elif name == "gemini":
-            from . import gemini
+    transcriber: TranscriptProvider
+    if settings.transcriber == "sim" and world is not None:
+        from ..sim.providers import SimTranscriber
 
-            transcripts.append(
-                gemini.GeminiTranscripts(
-                    # The settings refused a start without the key, so it is here.
-                    api_key=settings.gemini_api_key or "",
-                    model=settings.gemini_model,
-                    piece_seconds=settings.gemini_chunk_minutes * 60,
-                    meter=meter,
-                    timeout_seconds=settings.gemini_timeout_seconds,
-                )
-            )
-        elif name in ("sim", "sim_gemini") and world is not None:
-            from ..sim.providers import SimListener, SimTranscripts
+        transcriber = SimTranscriber(world)
+    else:
+        from . import gemini
 
-            transcripts.append(SimTranscripts(world) if name == "sim" else SimListener(world))
+        transcriber = gemini.GeminiTranscripts(
+            # The settings refused a start without the key, so it is here.
+            api_key=settings.gemini_api_key or "",
+            model=settings.gemini_model,
+            piece_seconds=settings.gemini_chunk_minutes * 60,
+            meter=meter,
+            timeout_seconds=settings.gemini_timeout_seconds,
+        )
 
     return Providers(
         source=source,
-        transcripts=TranscriptChain(transcripts),
+        transcriber=transcriber,
         analyser=_analyser(settings, world),
         meter=meter,
         clock=clock,

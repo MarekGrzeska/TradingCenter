@@ -166,7 +166,7 @@ async def test_the_state_says_what_the_screen_must_know_before_it_says_no_films(
     roles = {(p["role"], p["name"], p["unit"]) for p in body["providers"]}
     assert roles == {
         ("source", "sim", "sim_units"),
-        ("transcripts", "sim", "sim_credits"),
+        ("transcripts", "sim", "sim_video_seconds"),
         ("analyser", "analyser", "tokens"),
     }
     transcripts = next(p for p in body["providers"] if p["role"] == "transcripts")
