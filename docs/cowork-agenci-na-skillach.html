@@ -1,0 +1,632 @@
+<title>TradingCenter na skillach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Ćwiczenie myślowe · Claude Cowork</span>
+    <h1>Gdyby kod był skillem</h1>
+    <p class="lede">Sto pięćdziesiąt tysięcy linii, dziewięćdziesiąt siedem specyfikacji, siedem baz. Ten sam system opisany jako <b>zespół agentów w Cowork z zestawem skilli</b> — i uczciwe rozliczenie, w którym miejscu to się łamie.</p>
+    <div class="strip">
+      <span>TradingCenter / architektura alternatywna</span>
+      <span>28 września 2026 · stan kodu <b>main @ 913fcdc</b></span>
+      <span>środowisko <b>demo</b></span>
+      <span><b>NIE PLAN WDROŻENIA</b> — eksperyment, obok działającego systemu</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">~150k</div><div class="l">linii dziś: 45k Pythona, 40k TypeScriptu, 64k testów</div></div>
+      <div class="cell"><div class="v">68</div><div class="l">narzędzi modelu dziś, w dziewięciu zestawach</div></div>
+      <div class="cell"><div class="v">15</div><div class="l">skilli w pięciu pluginach, w miejsce 97 specyfikacji</div></div>
+      <div class="cell"><div class="v">2</div><div class="l">procesy, których żaden skill nie zastąpi</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Założenie</div>
+      <h2>Kod robi trzy rzeczy, a model umie jedną</h2>
+      <p class="intro">Pytanie ćwiczenia: ile z TradingCenter da się zastąpić agentem, który dostaje folder, kilka konektorów i opisane w markdownie procedury — zamiast procesu w Azure z siedmioma bazami.</p>
+      <p>Uczciwa odpowiedź zaczyna się od rozbioru tego, <strong>czym ten kod jest</strong>. Każda linia w repozytorium robi jedną z trzech rzeczy:</p>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Zegar <span class="tag stop">nie dla modelu</span></h3>
+          <p>Pętle, które chodzą bez nikogo: strumień świec po WebSockecie, próbkowanie Polymarket co 60&nbsp;s, ocena strategii co 60&nbsp;s, zbieranie postów co 5&nbsp;min, zegar zespołów co 15&nbsp;s. Model nie jest zegarem — jest drogim, wolnym i niedeterministycznym sposobem na odliczanie.</p>
+        </div>
+        <div class="fail">
+          <h3>Księga <span class="tag att">skrypt w skillu</span></h3>
+          <p>Rzeczy, które muszą wyjść tak samo dwa razy: 57 wskaźników z plikiem wzorcowym, świeca formująca się odrzucana w całości, interpreter reguł strategii, ślad zlecenia zapisany przed wysłaniem, pamięć zespołu tylko do dopisywania. Skill może nieść skrypt — więc „bez kodu” znaczy tu „bez usługi”, nie „bez Pythona”.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Osąd <span class="tag ok">tu agent wygrywa</span></h3>
+          <p>Tłumaczenie i ocena postu, składanie zespołu, czytanie wykresu, pisanie reguły, raport dla operatora. Tę część kod dziś <em>naśladuje</em>: LangGraph, rewizje, 18 narzędzi do budowania zespołów z czatu, zarządzanie promptem w tabeli — to ręcznie napisany framework agentów.</p>
+        </div>
+      </div>
+      <p style="margin-top:22px">Ćwiczenie ma więc sens tylko w jednej formie: <span class="hl">osąd przenosimy do agentów, księgę do skryptów w skillach, a zegar zostawiamy tam, gdzie jest</span> — albo godzimy się, że go nie ma.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Rozbiór</div>
+      <h2>Pakiet po pakiecie</h2>
+      <p>Liczby to linie Pythona bez testów, liczone po <code>git ls-files</code> w dniu pisania. Werdykt mówi, co z pakietu zostaje w wersji na skillach.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Dziś</th><th class="n">Linie</th><th>Czym jest głównie</th><th>W Cowork</th><th>Werdykt</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>capital-gateway</b></td><td class="n">2 486</td><td>zegar + księga: sesja, 10&nbsp;req/s na rachunek, strumień</td><td>zostaje jak jest; wystawia odczyt jako konektor MCP</td><td><span class="tag stop">zostaje kodem</span></td></tr>
+            <tr><td><b>trading-mcp</b></td><td class="n">821</td><td>księga: strażnik demo, jedyny zapis na rachunek</td><td>zostaje jak jest; jedyny konektor, który pisze — i przejmuje ślad zlecenia</td><td><span class="tag stop">zostaje kodem</span></td></tr>
+            <tr><td><b>agent</b></td><td class="n">4 670</td><td>osąd: rozmowa, sesje, prompt w rewizjach, koszt wywołań</td><td>sam czat Cowork; prompt to <code>CLAUDE.md</code> w git; wykres to artefakt</td><td><span class="tag ok">znika</span></td></tr>
+            <tr><td><b>teams + teams_tools</b></td><td class="n">7 396</td><td>osąd udający infrastrukturę: graf, rewizje, przebiegi, harmonogram, 18 narzędzi</td><td>subagenci + rewizje jako pliki + zaplanowane zadania</td><td><span class="tag ok">znika</span></td></tr>
+            <tr><td><b>market_data</b></td><td class="n">10 605</td><td>zegar (ingest) + księga (wskaźniki 2 903, magazyn)</td><td>skrypt świec w skillu, kernel wskaźników przeniesiony z plikiem wzorcowym; bez strumienia</td><td><span class="tag att">skrypt w skillu</span></td></tr>
+            <tr><td><b>strategy</b></td><td class="n">5 365</td><td>księga (interpreter reguł 816) + zegar (pętla 60&nbsp;s)</td><td>reguła pisana przez model, liczona przez ten sam interpreter; przegląd co godzinę</td><td><span class="tag att">skrypt w skillu</span></td></tr>
+            <tr><td><b>social_data</b></td><td class="n">2 255</td><td>osąd (tłumaczenie, ocena 1–10) + zegar (RSS co 5&nbsp;min)</td><td>skill czyta RSS skryptem, ocenia sam, zapisuje odczyt ze stemplem</td><td><span class="tag ok">skill</span></td></tr>
+            <tr><td><b>polymarket_data</b></td><td class="n">3 747</td><td>zegar (próbki co 60&nbsp;s, backfill) + osąd (grupy)</td><td>lista obserwowanych w YAML, próbka co godzinę skryptem</td><td><span class="tag att">skrypt w skillu</span></td></tr>
+            <tr><td><b>telegram_gateway</b></td><td class="n">2 360</td><td>drzwi na zewnątrz, tokeny, BotFather przez MTProto</td><td>mały konektor: wyślij + adresaci; boty zakłada operator ręcznie</td><td><span class="tag att">konektor</span></td></tr>
+            <tr><td><b>workbench/ + packages/</b></td><td class="n">2 571</td><td>montaż, Easy Auth, rekordy wywołujących, migracje pod blokadą</td><td>jeden operator na jednej maszynie — nie ma czego montować</td><td><span class="tag ok">znika</span></td></tr>
+            <tr><td><b>terminal + pocket</b></td><td class="n">40 542 TS</td><td>ekran: 9 zakładek i 3 ekrany na telefon, na żywo</td><td>artefakty HTML generowane na żądanie; czat z telefonu</td><td><span class="tag att">artefakt</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Kształt</div>
+      <h2>Dyspozytor, sześciu specjalistów, jeden folder</h2>
+      <p class="intro">Jeden agent główny rozmawia z operatorem i deleguje. Każdy subagent ma swoje skille i <strong>własną listę narzędzi</strong> — to jest odpowiednik dzisiejszego <code>ToolPlan</code>, który odmawia narzędzia nieprzypisanego.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 520" role="img" aria-label="Operator rozmawia z Dyspozytorem w Cowork. Zaplanowane zadania uruchamiają Dyspozytora, który czyta i dopisuje stan w folderze i deleguje do sześciu subagentów. Archiwista czyta przez capital-gateway, Lektor i Obserwator sięgają skryptami do publicznych źródeł, tylko Egzekutor ma trading-mcp, Posłaniec wysyła przez konektor Telegram. Trading-mcp idzie do capital-gateway, a ta do capital.com w trybie demo.">
+            <defs>
+              <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+              <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#14306b"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="390" y="8" width="200" height="44" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="490" y="28" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">operator</text>
+              <text x="490" y="44" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">czat Cowork · telefon</text>
+              <line x1="490" y1="54" x2="490" y2="106" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="500" y="76" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">rozmowa</text>
+
+              <rect x="10" y="88" width="960" height="206" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="6 4" opacity="0.7"></rect>
+              <text x="22" y="104" font-size="10" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.1em" fill="currentColor" opacity="0.55">CLAUDE COWORK · PLUGINY TC-* · MASZYNA OPERATORA</text>
+
+              <rect x="30" y="114" width="170" height="52" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="115" y="136" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">zaplanowane zadania</text>
+              <text x="115" y="153" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">zegar: godzina · dzień</text>
+
+              <rect x="390" y="110" width="200" height="56" fill="#14306b" stroke="#14306b" stroke-width="1.4"></rect>
+              <text x="490" y="134" text-anchor="middle" font-size="14.5" font-weight="700" fill="#ffffff">Dyspozytor</text>
+              <text x="490" y="152" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#f2c313">agent główny · 15 skilli</text>
+
+              <rect x="780" y="114" width="170" height="52" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="5 3"></rect>
+              <text x="865" y="136" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">folder tc-cowork/</text>
+              <text x="865" y="153" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">stan: pliki + git</text>
+
+              <line x1="202" y1="140" x2="386" y2="140" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="294" y="132" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">uruchamia</text>
+              <line x1="594" y1="140" x2="776" y2="140" stroke="currentColor" stroke-width="1.4" marker-start="url(#a1)" marker-end="url(#a1)"></line>
+              <text x="685" y="132" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">czyta · dopisuje</text>
+
+              <line x1="490" y1="168" x2="100" y2="206" stroke="currentColor" stroke-width="1.1" opacity="0.6"></line>
+              <line x1="490" y1="168" x2="254" y2="206" stroke="currentColor" stroke-width="1.1" opacity="0.6"></line>
+              <line x1="490" y1="168" x2="408" y2="206" stroke="currentColor" stroke-width="1.1" opacity="0.6"></line>
+              <line x1="490" y1="168" x2="562" y2="206" stroke="currentColor" stroke-width="1.1" opacity="0.6"></line>
+              <line x1="490" y1="168" x2="716" y2="206" stroke="#14306b" stroke-width="1.6"></line>
+              <line x1="490" y1="168" x2="870" y2="206" stroke="currentColor" stroke-width="1.1" opacity="0.6"></line>
+
+              <rect x="30" y="208" width="140" height="54" fill="#ffffff" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="100" y="230" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">Archiwista</text>
+              <text x="100" y="248" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">świece · wskaźniki</text>
+              <rect x="184" y="208" width="140" height="54" fill="#ffffff" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="254" y="230" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">Lektor</text>
+              <text x="254" y="248" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">posty · ocena</text>
+              <rect x="338" y="208" width="140" height="54" fill="#ffffff" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="408" y="230" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">Obserwator</text>
+              <text x="408" y="248" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">polymarket</text>
+              <rect x="492" y="208" width="140" height="54" fill="#ffffff" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="562" y="230" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">Strateg</text>
+              <text x="562" y="248" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">reguły · setupy</text>
+              <rect x="646" y="208" width="140" height="54" fill="#14306b" stroke="#14306b" stroke-width="1.4"></rect>
+              <text x="716" y="230" text-anchor="middle" font-size="13.5" font-weight="700" fill="#ffffff">Egzekutor</text>
+              <text x="716" y="248" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#f2c313">zlecenia · rachunek</text>
+              <rect x="800" y="208" width="140" height="54" fill="#ffffff" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="870" y="230" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">Posłaniec</text>
+              <text x="870" y="248" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">telegram</text>
+
+              <line x1="100" y1="264" x2="112" y2="354" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="120" y="322" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">odczyt MCP</text>
+              <line x1="254" y1="264" x2="300" y2="354" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <line x1="408" y1="264" x2="360" y2="354" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="330" y="322" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">skrypty</text>
+              <line x1="716" y1="264" x2="660" y2="354" stroke="#14306b" stroke-width="1.8" marker-end="url(#a2)"></line>
+              <text x="700" y="322" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#14306b">tylko on</text>
+              <line x1="870" y1="264" x2="875" y2="354" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="884" y="322" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">wyślij</text>
+
+              <rect x="30" y="358" width="180" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="120" y="382" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">capital-gateway</text>
+              <text x="120" y="400" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">zostaje · 10 req/s</text>
+
+              <rect x="240" y="358" width="180" height="56" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="5 3"></rect>
+              <text x="330" y="382" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">RSS · Polymarket</text>
+              <text x="330" y="400" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">publiczne, bez klucza</text>
+
+              <rect x="560" y="358" width="200" height="56" fill="#14306b" stroke="#14306b" stroke-width="1.4"></rect>
+              <text x="660" y="382" text-anchor="middle" font-size="13.5" font-weight="700" fill="#ffffff">trading-mcp</text>
+              <text x="660" y="400" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#f2c313">zostaje · strażnik · ślad</text>
+
+              <rect x="790" y="358" width="170" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="875" y="382" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">telegram-send</text>
+              <text x="875" y="400" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">token poza modelem</text>
+
+              <path d="M 660 416 V 440 H 190 V 420" fill="none" stroke="#14306b" stroke-width="1.6" marker-end="url(#a2)"></path>
+              <text x="425" y="456" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#14306b">REST + klucz · demo sprawdzone przed portem</text>
+              <line x1="100" y1="416" x2="100" y2="462" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+
+              <rect x="30" y="466" width="140" height="44" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="100" y="486" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">capital.com</text>
+              <text x="100" y="502" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">demo</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — przerywana ramka to wszystko, co zastępuje dzisiejszy workbench. Poza nią zostają dwa procesy, które dziś też są osobno — z tego samego powodu: za nimi stoi rachunek.</figcaption>
+      </figure>
+      <p style="margin-top:26px">Klocki Cowork, z których to jest zbudowane, i ich dzisiejsze odpowiedniki:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Klocek Cowork</th><th>Czym jest</th><th>Co zastępuje w TradingCenter</th></tr></thead>
+          <tbody>
+            <tr><td><b>skill</b></td><td>folder z <code>SKILL.md</code> i skryptami, ładowany gdy pasuje opis</td><td>specyfikację wymagania + kod, który ją spełnia; <code>analyze-symbol</code> z <code>/market/mcp</code></td></tr>
+            <tr><td><b>plugin</b></td><td>paczka skilli, komend, konektorów i subagentów</td><td>pakiet workbencha pod prefiksem</td></tr>
+            <tr><td><b>subagent</b></td><td>osobny kontekst, własny model i lista narzędzi</td><td>agent w rewizji zespołu (<code>AgentDefinition</code>) i <code>ToolPlan</code></td></tr>
+            <tr><td><b>konektor MCP</b></td><td>narzędzia z zewnętrznego serwera</td><td><code>trading-mcp</code>, <code>/market/mcp</code>, dwa narzędzia Telegrama</td></tr>
+            <tr><td><b>zaplanowane zadanie</b></td><td>prompt uruchamiany co godzinę, dzień, tydzień — gdy aplikacja jest otwarta</td><td><code>Clock</code> zespołów, pętle archiwów, <code>EvaluationLoop</code></td></tr>
+            <tr><td><b>folder projektu</b></td><td>pliki, do których agent ma dostęp, plus pliki kontekstu</td><td>siedem baz PostgreSQL, <code>prompt_revisions</code></td></tr>
+            <tr><td><b>artefakt</b></td><td>strona HTML zbudowana w rozmowie</td><td>zakładki terminala i ekrany pocketa</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Katalog</div>
+      <h2>Piętnaście skilli w pięciu pluginach</h2>
+      <p class="intro">Każdy wiersz mówi, co robi model, a co skrypt. Podział nie jest estetyczny: <strong>skrypt dostaje wszystko, co ma wyjść tak samo dwa razy</strong>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Plugin · skill</th><th>Kto</th><th>Model robi</th><th>Skrypt robi</th><th>Pisze do</th></tr></thead>
+          <tbody>
+            <tr><td><b>tc-rynek</b> · <code>swiece</code></td><td>Archiwista</td><td>decyduje, czego brakuje</td><td>pobiera historię przez bramkę, stronicując; odrzuca świecę formującą się; aktualizuje pokrycie</td><td><code>archiwum/swiece/</code></td></tr>
+            <tr><td><b>tc-rynek</b> · <code>wskazniki</code></td><td>Archiwista</td><td>wybiera wskaźniki do pytania</td><td>57 wskaźników — przeniesiony <code>kernel.py</code>, <code>ALGORITHM_VERSION</code>, plik wzorcowy</td><td>nic, liczy</td></tr>
+            <tr><td><b>tc-rynek</b> · <code>analiza-instrumentu</code></td><td>Archiwista</td><td>czyta i opisuje: trend, poziomy, zmienność</td><td>redukuje serię do streszczenia (odpowiednik <code>summarize_range</code>)</td><td>odpowiedź</td></tr>
+            <tr><td><b>tc-rynek</b> · <code>wykres</code></td><td>Dyspozytor</td><td>wybiera zakres i rysunki</td><td>buduje artefakt HTML ze świec i <code>rysunki.json</code></td><td><code>raporty/</code></td></tr>
+            <tr><td><b>tc-sygnaly</b> · <code>posty-truth</code></td><td>Lektor</td><td>tłumaczy, ocenia wpływ 1–10, 3–8 tematów</td><td>czyta RSS, sprawdza odpowiedź względem schematu JSON, stempluje modelem i chwilą</td><td><code>archiwum/posty/</code></td></tr>
+            <tr><td><b>tc-sygnaly</b> · <code>polymarket</code></td><td>Obserwator</td><td>dobiera wydarzenia i grupy (dziś: dopasowanie rozmyte)</td><td>próbka Gamma, backfill CLOB w oknach 15-dniowych, limit 50 wydarzeń</td><td><code>archiwum/polymarket/</code></td></tr>
+            <tr><td><b>tc-sygnaly</b> · <code>strategia</code></td><td>Strateg</td><td>pisze i objaśnia regułę; nigdy jej nie liczy</td><td>ten sam interpreter drzewa reguły, bramki: pokrycie i R:R&nbsp;≥&nbsp;1,5</td><td><code>strategie/decyzje/</code></td></tr>
+            <tr><td><b>tc-sygnaly</b> · <code>alarm</code></td><td>Posłaniec</td><td>układa treść</td><td>znacznik „już powiedziane” zapisywany <em>po</em> udanym wysłaniu</td><td>znacznik w pliku źródła</td></tr>
+            <tr><td><b>tc-zespoly</b> · <code>zespol-definiuj</code></td><td>Dyspozytor</td><td>układa agentów, role, zależności, limity</td><td>waliduje graf: klucze, brak cykli (Kahn), każdy agent nazywa model</td><td>nowy plik rewizji</td></tr>
+            <tr><td><b>tc-zespoly</b> · <code>zespol-uruchom</code></td><td>Dyspozytor</td><td>deleguje w kolejności topologicznej, każdemu tylko wyniki poprzedników</td><td>wyznacza kolejność, liczy rundy, zapisuje przebieg</td><td><code>zespoly/&lt;id&gt;/przebiegi/</code></td></tr>
+            <tr><td><b>tc-zespoly</b> · <code>pamiec-zespolu</code></td><td>każdy agent zespołu</td><td>decyduje, co warto zapamiętać</td><td>2000 znaków na wpis, 20 na odczyt, 10 zapisów na przebieg; tylko dopisywanie</td><td><code>pamiec.jsonl</code></td></tr>
+            <tr><td><b>tc-zespoly</b> · <code>harmonogram</code></td><td>Dyspozytor</td><td>tłumaczy „co rano” na zadanie Cowork</td><td>wstępny test wyzwalacza (np. <code>pending_setups &gt; 0</code>) przed pełnym przebiegiem</td><td>zadania Cowork</td></tr>
+            <tr><td><b>tc-egzekucja</b> · <code>rachunek</code></td><td>Egzekutor</td><td>czyta pozycje i saldo</td><td>—</td><td>nic</td></tr>
+            <tr><td><b>tc-egzekucja</b> · <code>zlecenie</code></td><td>Egzekutor</td><td>uzasadnia, wylicza stop i cel</td><td>limity z rewizji: rozmiar, zleceń na przebieg i dzień; wielkość z <code>size_for_margin</code></td><td>rachunek demo</td></tr>
+            <tr><td><b>tc-operator</b> · <code>raport-dnia</code></td><td>Dyspozytor</td><td>pisze, co się zmieniło i co z tego wynika</td><td>zbiera pliki z doby w jeden artefakt</td><td><code>raporty/</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Znikają bez następcy: 18 narzędzi <code>teams_tools</code> (Dyspozytor po prostu edytuje pliki), trzy narzędzia wykresu agenta (artefakt), dwa narzędzia pamięci (skill z dopisywaniem) i całe <code>list_*</code>/<code>read_*</code> nad katalogami — folder jest katalogiem.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Anatomia</div>
+      <h2>Jak wygląda skill, który rusza pieniądze</h2>
+      <p>Szkic <code>tc-egzekucja/skills/zlecenie/SKILL.md</code>. Zwraca uwagę to, czego w nim <strong>nie ma</strong>: kontroli demo i zapisu śladu. Obie żyją w konektorze, bo instrukcję model może pominąć, a proces nie.</p>
+      <pre><code><span class="c">---</span>
+<span class="k">name</span>: zlecenie
+<span class="k">description</span>: <span class="s">Złóż, zmień lub zamknij zlecenie na rachunku demo przez trading-mcp.
+  Użyj, gdy zespół albo operator chce otworzyć pozycję, przesunąć stop,
+  zamknąć pozycję lub anulować zlecenie oczekujące. Nie do czytania
+  rachunku — od tego jest skill rachunek.</span>
+<span class="k">allowed-tools</span>: mcp__trading__place_order, mcp__trading__close_position,
+  mcp__trading__amend_stops, mcp__trading__cancel_working_order,
+  mcp__trading__size_for_margin, Bash(python scripts/limity.py:*)
+<span class="c">---</span>
+
+# Zlecenie
+
+Rachunek jest demo — sprawdza to trading-mcp przy starcie, nie ty.
+Twoja część to limity rewizji i uzasadnienie.
+
+1. Przeczytaj sekcję `limity` z rewizji zespołu, który cię wywołał.
+2. `python scripts/limity.py sprawdz --rewizja &lt;plik&gt; --rozmiar &lt;n&gt;`
+   Odmowa skryptu kończy skill. Nie negocjujesz z nim.
+3. Wielkość liczy `size_for_margin`, nigdy ty.
+4. Wyślij. Ślad zapisuje serwer przed wysłaniem — nie piszesz własnego.
+5. `python scripts/limity.py zalicz ...`, potem raport:
+   deal id, poziom, stop, cel, R:R.
+
+## Czego nie robisz
+- Nie ponawiasz po błędzie ani po przekroczeniu czasu. Wynik `unknown`
+  idzie do operatora, nie do drugiej próby.
+- Nie zmieniasz limitów. Rewizja jest niezmienna; nowa to nowy plik.</code></pre>
+      <p>Zespół to plik, nie wiersz w trzech tabelach. Rewizja jest niezmienna tak samo jak dziś — tylko nośnikiem tej niezmienności jest git, a nie <code>INSERT</code> bez <code>UPDATE</code>:</p>
+      <pre><code><span class="c"># zespoly/fx-intraday/rewizje/003.md</span>
+<span class="c">---</span>
+<span class="k">zespol</span>: fx-intraday
+<span class="k">rewizja</span>: 3
+<span class="k">limity</span>:
+  <span class="k">zlecen_na_przebieg</span>: 1
+  <span class="k">zlecen_na_dzien</span>: 3
+  <span class="k">max_rozmiar</span>: 2.0
+  <span class="k">rund_na_agenta</span>: 6        <span class="c"># dziś ROUND_CEILING w kodzie; tu tylko prośba</span>
+<span class="k">agenci</span>:
+  - <span class="k">klucz</span>: analityk
+    <span class="k">subagent</span>: archiwista
+    <span class="k">model</span>: sonnet
+    <span class="k">skille</span>: [analiza-instrumentu, wskazniki]
+  - <span class="k">klucz</span>: sceptyk
+    <span class="k">subagent</span>: strateg
+    <span class="k">model</span>: opus
+    <span class="k">zalezy_od</span>: [analityk]
+  - <span class="k">klucz</span>: wykonawca
+    <span class="k">subagent</span>: egzekutor
+    <span class="k">model</span>: sonnet
+    <span class="k">zalezy_od</span>: [analityk, sceptyk]
+    <span class="k">skille</span>: [zlecenie, rachunek, pamiec-zespolu]
+<span class="c">---</span>
+## analityk
+Czytasz EURUSD i GBPUSD na H1 i M15. Oddajesz kierunek, poziom
+unieważnienia i jedno zdanie, dlaczego — albo „brak setupu”.</code></pre>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Stan</div>
+      <h2>Siedem baz zamienia się w jeden folder</h2>
+      <p>Folder jest repozytorium git. Każdy przebieg kończy się commitem — to jedyny sposób, żeby „tylko do dopisywania” znaczyło cokolwiek, skoro agent ma prawo zapisu do każdego pliku.</p>
+      <pre><code>tc-cowork/
+├── CLAUDE.md                        <span class="c">← dziś prompt_revisions v4, v5…</span>
+├── archiwum/
+│   ├── swiece/EURUSD/HOUR/2026-09.parquet
+│   ├── swiece/pokrycie.json         <span class="c">← MARKET_CLOSED ≠ NOT_COLLECTED, jak dziś</span>
+│   ├── posty/2026-09-28.jsonl       <span class="c">← post + odczyt: model, chwila, impact, tematy</span>
+│   └── polymarket/obserwowane.yaml, probki/&lt;wydarzenie&gt;.jsonl
+├── strategie/
+│   ├── baseline-ma-cross/rewizje/001.json
+│   └── decyzje/2026-09-28.jsonl
+├── zespoly/&lt;id&gt;/
+│   ├── rewizje/NNN.md               <span class="c">← niezmienne; nowa = nowy plik</span>
+│   ├── przebiegi/&lt;chwila&gt;.md
+│   └── pamiec.jsonl                 <span class="c">← tylko dopisywanie, git pilnuje</span>
+├── slad/zlecenia.jsonl              <span class="c">← kopia; źródło prawdy w trading-mcp</span>
+└── raporty/                         <span class="c">← artefakty: wykresy, raport dnia</span></code></pre>
+      <p>Co tracimy: ograniczenia bazy. Dziś <code>candles</code> ma klucz <code>(symbol, resolution, period_start)</code>, a <code>CHECK</code> w migracji 0008 pilnuje długości notatki. W folderze pilnuje tego wyłącznie skrypt — i tylko wtedy, gdy to on pisze.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Granice</div>
+      <h2>Każda reguła zapisu musi mieć nowego właściciela</h2>
+      <p class="intro">Zasada nośna tego repozytorium — <em>jeden proces na granicę bezpieczeństwa</em> — przekłada się na: <strong>jeden konektor na granicę</strong>. Pytanie przy każdej regule brzmi, kto ją trzyma, gdy nie ma procesu.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Reguła</th><th>Kto trzyma dziś</th><th>Kto trzymałby w Cowork</th><th>Siła</th></tr></thead>
+          <tbody>
+            <tr><td><b>Tylko rachunek demo</b></td><td>trading-mcp pyta bramkę przed otwarciem portu</td><td>bez zmian — konektor to ten sam proces</td><td><span class="tag ok">nietknięta</span></td></tr>
+            <tr><td><b>10 req/s na rachunek</b></td><td><code>RateGate</code> w bramce</td><td>bez zmian, o ile skrypty skilli idą przez bramkę, nigdy wprost do capital.com</td><td><span class="tag ok">nietknięta</span></td></tr>
+            <tr><td><b>Ślad zlecenia przed wysłaniem</b></td><td><code>AccountTrace.begin()</code> w agencie</td><td>trzeba przenieść do trading-mcp — krok w SKILL.md model może pominąć</td><td><span class="tag att">wymaga zmiany</span></td></tr>
+            <tr><td><b>Sekrety poza modelem</b></td><td>Key Vault, filtr redakcji tokenów</td><td>tokeny tylko w konektorach; <code>.env</code> poza folderem Cowork</td><td><span class="tag att">dyscyplina</span></td></tr>
+            <tr><td><b>Agent tylko z przypisanymi narzędziami</b></td><td><code>ToolPlan</code> odmawia</td><td>lista narzędzi subagenta i <code>allowed-tools</code> skilla</td><td><span class="tag att">platforma</span></td></tr>
+            <tr><td><b>Limit kosztu na przebieg i dzień</b></td><td><code>CostGuard</code> przed każdym wywołaniem</td><td>limity subskrypcji; brak ceny pojedynczego przebiegu</td><td><span class="tag att">zgrubnie</span></td></tr>
+            <tr><td><b>Żadne narzędzie nie usuwa historii</b></td><td>rekord wywołujących: <code>DELETE</code> tylko przez REST</td><td>model ma dostęp do plików; <code>rm</code> to jedno polecenie. Git pokaże, nie zatrzyma</td><td><span class="tag stop">słabnie</span></td></tr>
+            <tr><td><b>Sufity rund: 6 w zespole, 8 w rozmowie</b></td><td>stałe w kodzie, celowo nie ustawienia</td><td>zdanie w instrukcji</td><td><span class="tag stop">słabnie</span></td></tr>
+            <tr><td><b>Kto może wołać który adres</b></td><td>Easy Auth + rekord wywołujących w każdym pakiecie + <code>in_process</code></td><td>jeden operator, jedna maszyna — reguła traci przedmiot</td><td><span class="tag ok">znika z sensem</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="quote">Skill mówi modelowi, co ma zrobić. Tylko kod mówi, czego zrobić nie może.</div>
+      <p>To zdanie wyznacza granicę ćwiczenia. Każda reguła w czerwonych wierszach była dziś w kodzie <em>właśnie dlatego</em>, że architektura mówi: „sufit bezpieczeństwa w konfiguracji to zaproszenie, żeby go podnieść”. W instrukcji jest jeszcze bliżej ręki.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Przebiegi</div>
+      <h2>Trzy sytuacje, prześledzone do końca</h2>
+      <div class="fails">
+        <div class="fail">
+          <h3>Post o cłach, 14:07 <span class="tag att">godzina opóźnienia</span></h3>
+          <p>Zadanie „posty” odpala się o 15:00. Lektor wczytuje skill <code>posty-truth</code>, skrypt pobiera RSS i zwraca trzy nowe wpisy. Lektor tłumaczy, ocenia jeden na 9 z tematami <em>cła, Chiny, USDCNH</em>, skrypt waliduje odpowiedź i dopisuje ją ze stemplem. Dyspozytor widzi ≥&nbsp;8 i woła Posłańca; znacznik „już powiedziane” pada dopiero po odpowiedzi Telegrama. Dziś ten sam post dociera w ≤&nbsp;5&nbsp;minut.</p>
+        </div>
+        <div class="fail">
+          <h3>Poranny przegląd, 07:30 <span class="tag ok">naturalne</span></h3>
+          <p>Zadanie dzienne. Archiwista uzupełnia świece z nocy przez bramkę. Strateg uruchamia interpreter dla każdej obserwowanej pary — ten sam, co dziś, na tych samych regułach. Dwa setupy przechodzą bramki. <code>harmonogram</code> widzi, że wyzwalacz zespołu <code>fx-intraday</code> jest spełniony, i Dyspozytor uruchamia zespół: analityk → sceptyk → wykonawca, każdy w osobnym kontekście. Raport dnia jako artefakt, commit folderu.</p>
+        </div>
+        <div class="fail">
+          <h3>„Co mam otwarte i czy to ma jeszcze sens?” <span class="tag ok">lepsze niż dziś</span></h3>
+          <p>Dyspozytor deleguje równolegle: Egzekutor czyta pozycje, Archiwista liczy ATR i poziomy dla każdej, Lektor sprawdza posty z doby o tych instrumentach. Odpowiedź z wykresem w artefakcie. Dziś to jedna tura z limitem 8 wywołań narzędzi w jednym kontekście; tu każdy specjalista ma swój.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Pęknięcia</div>
+      <h2>Gdzie to się łamie</h2>
+      <p>Uszeregowane od najcięższego. Pierwsze dwa nie są do naprawienia skillem — są własnością platformy.</p>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Nie ma czasu rzeczywistego <span class="tag stop">własność platformy</span></h3>
+          <p>Zaplanowane zadania Cowork chodzą co godzinę albo rzadziej i tylko wtedy, gdy aplikacja jest otwarta, a komputer nie śpi. Znika strumień świec, pętla strategii co 60&nbsp;s, próbki Polymarket co 60&nbsp;s. Zespoły intraday z <code>docs/zespoly-intraday.html</code> wypadają z zasięgu w całości. Routines w chmurze nie mają tego ograniczenia, ale nie widzą lokalnego folderu — stan musiałby wyjechać do repozytorium zdalnego.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Dziura w archiwum nie wraca <span class="tag stop">nieodwracalne</span></h3>
+          <p>Uśpiony laptop to pominięty przebieg. Świece dogoni backfill z bramki. Polymarket nie: rozstrzygnięty rynek przestaje odpowiadać, a historia cen sięga tylko tak daleko, jak dostawca pozwala — czego nie zebrano, kiedy miało znaczenie, nie da się zebrać później za żadną cenę.</p>
+        </div>
+        <div class="fail">
+          <h3>Pętla kosztuje tokeny, nie CPU <span class="tag att">przeniesiony problem</span></h3>
+          <p>Dziś przebieg pętli to zapytanie SQL. W Cowork każdy tik to start agenta z kontekstem, skillami i narzędziami — nawet jeśli skrypt po sekundzie powie „nic nowego”. Lekcja z przeglądu 23 września (97% transakcji z jednej linii) przenosi się z kredytów CPU bazy na limit subskrypcji. Rada ta sama: skrypt najpierw, model dopiero gdy skrypt coś znalazł — tyle że tu zadanie i tak startuje model.</p>
+        </div>
+        <div class="fail">
+          <h3>Ekran przestaje żyć <span class="tag att">degradacja</span></h3>
+          <p>34 tys. linii terminala zamienia się w artefakty generowane na żądanie. Siatka wykresów aktualizowana strumieniem, zakładka historii zbierania, konfigurator strategii z węzłami — każde z nich staje się zdjęciem, nie oknem.</p>
+        </div>
+        <div class="fail">
+          <h3>Testy stają się evalami <span class="tag att">inna dyscyplina</span></h3>
+          <p>Deterministyczną część (wskaźniki, interpreter, walidacja grafu) nadal testuje się normalnie. Część osądu nie ma asercji — ma zestaw przypadków i próg zgodności. To inny rodzaj pracy niż 64 tys. linii testów z CI, i <code>skill-creator</code> z evalami jest tu narzędziem, nie <code>pytest</code>.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Zespoły wreszcie są tym, czym chciały być <span class="tag ok">wygrana</span></h3>
+          <p><code>teams</code> + <code>teams_tools</code> + LangGraph + zegar + 18 narzędzi do budowania zespołu z czatu — 7,4 tys. linii, które odtwarzają subagentów, skille i harmonogram. Cowork ma je natywnie. Nowy zespół to plik, nie formularz, migracja i regeneracja kontraktu.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Znika cała maszyneria tożsamości <span class="tag ok">wygrana</span></h3>
+          <p>Easy Auth, rejestracje Entra, rekord wywołujących w każdym pakiecie i w <code>root_access.py</code>, <code>in_process</code>, siedem ról w siedmiu bazach, <code>grant-schema-ownership.sql</code>. Połowa pułapek z <code>CLAUDE.md</code> dotyczy drzwi, które przy jednym operatorze na jednej maszynie nie istnieją.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">10 · Bilans</div>
+      <h2>Ile kodu zostaje</h2>
+      <p>Szacunek, nie pomiar. Zostają: bramka (2,5k), trading-mcp ze śladem (~1k), konektor Telegrama (~0,4k) i skrypty skilli — kernel wskaźników (2,9k), interpreter reguł (0,8k), świece, próbki, walidacja zespołu, limity (~1k razem).</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 900 214" role="img" aria-label="Porównanie linii kodu: Python produkcyjny z 45 tysięcy do około 8,5 tysiąca, TypeScript z 40,5 tysiąca do około 0,5 tysiąca, testy z 64 tysięcy do około 7 tysięcy">
+            <g font-family="Karla, sans-serif">
+              <text x="0" y="38" font-size="14" font-weight="700" fill="currentColor">Python produkcyjny</text>
+              <rect x="200" y="20" width="445" height="16" fill="currentColor" opacity="0.22"></rect>
+              <text x="653" y="33" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">45,2k dziś</text>
+              <rect x="200" y="40" width="84" height="16" fill="#14306b"></rect>
+              <text x="292" y="53" font-size="11" font-weight="700" font-family="Roboto Mono, monospace" fill="#14306b">~8,5k</text>
+
+              <text x="0" y="94" font-size="14" font-weight="700" fill="currentColor">TypeScript ekranów</text>
+              <rect x="200" y="76" width="399" height="16" fill="currentColor" opacity="0.22"></rect>
+              <text x="607" y="89" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">40,5k dziś</text>
+              <rect x="200" y="96" width="5" height="16" fill="#14306b"></rect>
+              <text x="213" y="109" font-size="11" font-weight="700" font-family="Roboto Mono, monospace" fill="#14306b">~0,5k (szablon wykresu)</text>
+
+              <text x="0" y="150" font-size="14" font-weight="700" fill="currentColor">Testy</text>
+              <rect x="200" y="132" width="633" height="16" fill="currentColor" opacity="0.22"></rect>
+              <text x="841" y="145" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">64k</text>
+              <rect x="200" y="152" width="69" height="16" fill="#14306b"></rect>
+              <text x="277" y="165" font-size="11" font-weight="700" font-family="Roboto Mono, monospace" fill="#14306b">~7k + evale skilli</text>
+
+              <rect x="200" y="192" width="12" height="12" fill="currentColor" opacity="0.22"></rect>
+              <text x="218" y="202" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">dziś</text>
+              <rect x="270" y="192" width="12" height="12" fill="#14306b"></rect>
+              <text x="288" y="202" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">wersja na skillach</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 2</b> — kodu ubywa o rząd wielkości. W zamian przybywa ~15 plików <code>SKILL.md</code> i jedno nowe ryzyko: zachowanie, które nie ma testu, tylko opis.</figcaption>
+      </figure>
+      <div class="table-wrap" style="margin-top:26px">
+        <table>
+          <thead><tr><th>Wymiar</th><th>Dziś</th><th>Na skillach</th><th>Werdykt</th></tr></thead>
+          <tbody>
+            <tr><td><b>Reakcja na zdarzenie</b></td><td>sekundy do 5 minut</td><td>do godziny</td><td><span class="tag stop">gorzej</span></td></tr>
+            <tr><td><b>Dostępność</b></td><td>24/7 w Azure</td><td>gdy laptop jest otwarty</td><td><span class="tag stop">gorzej</span></td></tr>
+            <tr><td><b>Nowy zespół, nowa strategia</b></td><td>formularz, rewizja, kontrakt</td><td>plik i jedno zdanie w czacie</td><td><span class="tag ok">lepiej</span></td></tr>
+            <tr><td><b>Pytanie wymagające kilku specjalistów</b></td><td>jeden kontekst, 8 wywołań</td><td>subagenci równolegle</td><td><span class="tag ok">lepiej</span></td></tr>
+            <tr><td><b>Powierzchnia do utrzymania</b></td><td>~150k linii, 97 specyfikacji, 9 workflowów</td><td>~16k linii, 15 skilli</td><td><span class="tag ok">lepiej</span></td></tr>
+            <tr><td><b>Audyt</b></td><td>tabele, <code>usage</code>, ślad</td><td>git + jsonl</td><td><span class="tag att">inaczej</span></td></tr>
+            <tr><td><b>Pewność reguł</b></td><td>kod i test</td><td>kod tam, gdzie pieniądz; opis gdzie indziej</td><td><span class="tag att">słabiej</span></td></tr>
+            <tr><td><b>Koszt stały</b></td><td>B2 + B1ms + dwa klucze OpenAI</td><td>subskrypcja + dwa małe procesy</td><td><span class="tag att">do zmierzenia</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">11 · Plan</div>
+      <h2>Jak to sprawdzić, nie ruszając produkcji</h2>
+      <p class="intro">Każdy etap działa <strong>obok</strong> obecnego systemu, zaczyna od odczytu i ma mierzalny warunek przejścia. Żaden nie wymaga usunięcia linii z repozytorium.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Etap</th><th>Co</th><th>Mierzymy</th><th>Dalej, gdy</th></tr></thead>
+          <tbody>
+            <tr><td><b>E0 · Podłączenie</b></td><td>Cowork jako trzeci konsument istniejących <code>/market/mcp</code>, <code>/social/mcp</code>, <code>/strategy/mcp</code> — lokalnie, na loopbacku. Bez piszących narzędzi Polymarket.</td><td>czy maszyna wirtualna Cowork w ogóle sięga do hosta; jak konektor przechodzi Easy Auth na produkcji</td><td>jest odczyt bez zmian w kodzie</td></tr>
+            <tr><td><b>E1 · Analityka</b></td><td>skille <code>analiza-instrumentu</code>, <code>wykres</code>, <code>raport-dnia</code> nad narzędziami z E0</td><td>20 tych samych pytań do panelu agenta i do Cowork: trafność, koszt, czas</td><td>Cowork nie gorszy w ≥&nbsp;15 z 20</td></tr>
+            <tr><td><b>E2 · Zespół w cieniu</b></td><td>jeden zespół z <code>docs/propozycje-zespolow.html</code> jako subagenci + rewizja w pliku. Egzekutor wypisuje zamiar zamiast zlecenia</td><td>zgodność decyzji z przebiegiem <code>teams</code> na tych samych danych; koszt przebiegu</td><td>zgodność kierunku ≥&nbsp;80% przez dwa tygodnie</td></tr>
+            <tr><td><b>E3 · Sygnały w cieniu</b></td><td>Lektor ocenia posty, porównanie z odczytami zapisanymi przez <code>social_data</code></td><td>zgodność <code>impact_score</code> ±1, zgodność progu 8</td><td>próg zgodny w ≥&nbsp;90%</td></tr>
+            <tr><td><b>E4 · Własna księga</b></td><td>skrypty <code>swiece</code> + <code>wskazniki</code> z przeniesionym kernelem i plikiem wzorcowym</td><td>wynik bit w bit z <code>/market</code> na trzech parach</td><td>zero różnic</td></tr>
+            <tr><td><b>E5 · Egzekucja</b></td><td>dopiero gdy ślad zlecenia jest w trading-mcp — to zmiana OpenSpec (<code>trading-mcp-execution</code>). Tylko demo, jak zawsze</td><td>czy każde zlecenie ma ślad sprzed wysłania, także przy zerwanym przebiegu</td><td>decyzja operatora</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">E0 i E1 kosztują popołudnie i nie zmieniają ani linii. Już one odpowiedzą na pytanie, którego ten dokument rozstrzygnąć nie umie: czy Cowork jako <em>ekran rozmowy</em> jest lepszy od panelu agenta w terminalu.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">12 · Wniosek</div>
+      <h2>Agenci nie zastępują systemu. Zastępują jego środek</h2>
+      <p class="intro">Wynik ćwiczenia nie brzmi „tak” ani „nie”. Codebase rozpada się na dwie części, które chcą różnych rzeczy.</p>
+      <p><strong>Zegar i drzwi do pieniędzy</strong> — bramka, trading-mcp, zbieracze archiwów — chcą procesu, który chodzi bez nikogo i odmawia bez pytania. Ta część to kilkanaście tysięcy linii i powinna nimi zostać.</p>
+      <p><strong>Osąd</strong> — rozmowa, zespoły, ocena postów, pisanie strategii, raportowanie — to dziś ~12 tys. linii Pythona plus spora część terminala, które budują od zera to, co platforma agentowa daje w pudełku. Tu <span class="hl">skill jest nie tylko krótszy, ale i bliższy temu, czym ta część naprawdę jest: opisem, jak myśleć</span>.</p>
+      <p>Najciekawszy realny wariant jest więc hybrydą: mały, zawsze włączony rdzeń w Azure wystawiający odczyt i jeden piszący konektor, a nad nim Cowork w roli, którą dziś pełnią workbench i panel agenta. Plan z sekcji 11 sprawdza dokładnie tę hipotezę — i nie wymaga, żeby ktokolwiek w nią uwierzył przed E1.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>TradingCenter · ćwiczenie myślowe · liczby z main @ 913fcdc, 28 września 2026</span>
+    <span>Założenia o Cowork: stan publiczny z września 2026 — do sprawdzenia w E0</span>
+  </div>
+</footer>
