@@ -188,7 +188,8 @@ export interface paths {
         put?: never;
         /**
          * Analyse
-         * @description Put one film, named by address or id, where the loop will pick it up. Costs what asking the source about it costs.
+         * @description Accept one film, named by address or id, and have it transcribed and read now, in the background — not on the
+         *     loop's next pass. Costs what asking the source about it costs; the answer does not wait for the reading.
          */
         post: operations["analyse_videos_post"];
         delete?: never;

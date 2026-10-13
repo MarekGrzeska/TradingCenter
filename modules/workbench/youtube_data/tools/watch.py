@@ -52,7 +52,10 @@ class Queued(BaseModel):
     video_id: str
     title: str
     created: bool = Field(description="false where the film was already in the archive")
-    note: str = "Queued for the loop: it is transcribed and read on a coming pass, not now. read_video shows where it is."
+    note: str = (
+        "Accepted and being transcribed and read now, in the background: it takes seconds with captions and minutes when "
+        "a model has to listen. read_video shows where it is."
+    )
 
 
 def register(mcp: FastMCP, ctx: ToolContext) -> None:
@@ -166,12 +169,16 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
 
     @mcp.tool(annotations=ADDS)
     async def analyse_video(reference: str) -> Queued | dict:
-        """Put one film, named by its address or id, in the queue to be transcribed and read. Costs what asking the source
-        about it costs — a unit of the day, not a search. Whoever asked is not alerted: they are already looking."""
+        """Have one film, named by its address or id, transcribed and read now, in the background and ahead of the queue.
+        Costs what asking the source about it costs — a unit of the day, not a search — and then what the transcript and
+        the reading cost. Whoever asked is not alerted: they are already looking. Ask read_video a little later."""
         try:
             queued = await watchlist.analyse_film(ctx.pool, ctx.providers, ctx.settings, reference)
         except WatchlistRefused as err:
             return refused(str(err), "search_youtube finds films by phrase, and recent_videos lists what is here")
+        ingest = getattr(ctx.app.state, "ingest", None)  # pyright: ignore[reportAttributeAccessIssue]
+        if queued.process and ingest is not None:
+            ingest.start_now(queued.video_id)
         return Queued(video_id=queued.video_id, title=queued.title, created=queued.created)
 
 

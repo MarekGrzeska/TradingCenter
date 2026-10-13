@@ -112,12 +112,15 @@ async def transcript(
 
 @router.post("/videos", response_model=QueuedOut, responses={422: {"model": Problem}})
 async def analyse(request: Request, body: AnalyseIn) -> QueuedOut:
-    """Put one film, named by address or id, where the loop will pick it up. Costs what asking the source about it costs."""
+    """Accept one film, named by address or id, and have it transcribed and read now, in the background — not on the
+    loop's next pass. Costs what asking the source about it costs; the answer does not wait for the reading."""
     state = request.app.state
     try:
         queued = await watchlist.analyse_film(state.pool, state.providers, state.settings, body.reference)
     except WatchlistRefused as err:
         raise _refuse(str(err)) from err
+    if queued.process and getattr(state, "ingest", None) is not None:
+        state.ingest.start_now(queued.video_id)
     return QueuedOut(video_id=queued.video_id, title=queued.title, created=queued.created)
 
 

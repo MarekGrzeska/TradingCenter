@@ -432,3 +432,55 @@ async def _beat_after(rig: Rig, *, breaks: bool) -> bool:
 async def test_the_loop_reports_a_pass_only_when_it_completed_one(pool) -> None:
     assert await _beat_after(Rig(pool), breaks=False) is True
     assert await _beat_after(Rig(pool), breaks=True) is False
+
+
+# --- a film named by hand is not left to the queue ---------------------------------------------------------------------
+
+
+async def test_a_film_named_by_hand_is_read_at_once_and_the_rest_of_the_queue_is_left_alone(pool) -> None:
+    rig = Rig(pool, scenario(captioned("simfilm0001"), captioned("simfilm0002")))
+    for wanted in ("simfilm0001", "simfilm0002"):
+        await watchlist.analyse_film(pool, rig.providers, rig.settings, wanted)
+
+    await rig.ingest.process_now("simfilm0001")
+
+    assert await rig.states() == {"simfilm0001": "quiet", "simfilm0002": "discovered"}
+
+
+async def test_naming_a_film_again_asks_for_its_words_now_and_not_at_the_date_its_last_miss_set(pool) -> None:
+    late = captioned("simfilm0001", captions={"mode": "after_minutes", "after_minutes": 30, "text": "words " * 40})
+    rig = Rig(pool, scenario(late))
+    await watchlist.analyse_film(pool, rig.providers, rig.settings, "simfilm0001")
+    await rig.ingest.process_now("simfilm0001")  # the captions are not there yet: a miss, asked again in an hour
+    assert (await rig.row("simfilm0001"))["state"] == "no_transcript"
+
+    rig.clock.advance(minutes=35)
+    again = await watchlist.analyse_film(pool, rig.providers, rig.settings, "simfilm0001")
+    await rig.ingest.process_now("simfilm0001")
+
+    assert again.created is False and again.process
+    assert (await rig.row("simfilm0001"))["state"] == "quiet", "not due for another 25 minutes, and asked all the same"
+
+
+async def test_a_film_that_is_already_read_is_not_processed_again(pool) -> None:
+    rig = Rig(pool, scenario(captioned("simfilm0001")))
+    await watchlist.analyse_film(pool, rig.providers, rig.settings, "simfilm0001")
+    await rig.ingest.process_now("simfilm0001")
+    spent = await rig.used("sim", "sim_credits")
+
+    again = await watchlist.analyse_film(pool, rig.providers, rig.settings, "simfilm0001")
+    await rig.ingest.process_now("simfilm0001")
+
+    assert not again.process
+    assert await rig.used("sim", "sim_credits") == spent
+
+
+async def test_a_pass_and_a_film_named_by_hand_do_not_spend_the_same_day_twice(pool) -> None:
+    import asyncio
+
+    rig = Rig(pool, scenario(captioned("simfilm0001")))
+    await watchlist.analyse_film(pool, rig.providers, rig.settings, "simfilm0001")
+
+    await asyncio.gather(rig.tick(), rig.ingest.process_now("simfilm0001"))
+
+    assert await rig.used("sim", "sim_credits") == 1, "one film, asked about once"

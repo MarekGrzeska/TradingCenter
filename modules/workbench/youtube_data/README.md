@@ -59,6 +59,10 @@ One pass every `YOUTUBE_POLL_INTERVAL_SECONDS`, four steps, each with a batch li
    successful send; a film not announced within `ALERT_WINDOW_HOURS` is let go as quiet. Without
    `ALERT_DESTINATION` every read film ends quiet.
 
+A film named by hand (`POST /videos`, `analyse_video`) does not wait for a pass: it is transcribed, read and
+announced at once, in the background, under the same ceilings, prices and rests and under the same lock as the loop, so
+the two never spend one day twice. Naming a film again skips the date of its last miss; a film already read is left alone.
+
 Every provider call is counted in `usage`, and daily ceilings stop the step that would exceed them, not
 the loop: `DAILY_SOURCE_UNITS`, `DAILY_TRANSCRIPT_UNITS` (per captions provider), `GEMINI_DAILY_VIDEO_SECONDS`
 (28 800, the free tier's eight hours; tokens are counted beside it for the bill), `DAILY_TOKEN_LIMIT`. `GET /state`
@@ -102,7 +106,7 @@ start of the process, randomness is seeded, so a run replays.
 
 REST (`contract.py`, generated into the terminal as `contract.youtube.generated.ts`):
 `GET /videos` (window, channel, topic, instrument, score, state) · `GET /videos/{id}` ·
-`GET /videos/{id}/transcript` (pages) · `POST /videos` (queue one film) · `GET|POST /channels` ·
+`GET /videos/{id}/transcript` (pages) · `POST /videos` (one film named by hand: accepted at once, transcribed and read in the background ahead of the queue) · `GET|POST /channels` ·
 `PATCH|DELETE /channels/{id}` · `GET|POST /topics` · `PATCH|DELETE /topics/{id}` · `GET /state` ·
 `GET /health`.
 
