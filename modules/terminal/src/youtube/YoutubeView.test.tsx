@@ -146,7 +146,7 @@ describe("YoutubeView", () => {
 
     render(<YoutubeView api={client} />);
 
-    expect(await screen.findByText(/nie wpuszcza nas \(IpBlocked\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/odmówił \(IpBlocked\)/)).toBeInTheDocument();
     expect(screen.getByText(/Model nie jest skonfigurowany/)).toBeInTheDocument();
     expect(screen.getByText("direct: 3/500 requests")).toBeInTheDocument();
   });

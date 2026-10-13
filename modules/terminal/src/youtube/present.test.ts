@@ -80,9 +80,9 @@ describe("warnings", () => {
   it("names a blocked provider as a fact about us and not about the films", () => {
     const [note] = warnings(state({ providers: [provider({ blocked: true, blockedReason: "IpBlocked" })] }));
 
-    expect(note).toContain("nie wpuszcza nas");
+    expect(note).toContain("odmówił");
     expect(note).toContain("IpBlocked");
-    expect(note).toContain("to nie są filmy bez napisów");
+    expect(note).toContain("zostaje w kolejce");
   });
 
   it("stays quiet about a refused captions provider while another one delivers the words", () => {

@@ -82,10 +82,19 @@ async def state(
     channels = await store.list_channels(conn, active_only=True)
     topics = await store.list_topics(conn, active_only=True)
 
+    rest = timedelta(minutes=settings.transcriber_cooldown_minutes)
     rows: list[ProviderOut] = []
     for role, ceiling in _ceilings(settings, providers):
         used = spent.get((ceiling.provider, ceiling.unit), 0)
         known = blocked.get(ceiling.provider) if role == "transcripts" else None
+        # Blocked means resting *now*: refused, not answered since, and the rest not over. A refusal from hours ago that
+        # no pass has yet had a reason to follow up is not news, and the note it raised said films wait when they do not.
+        resting = bool(
+            known
+            and known.blocked
+            and known.last_blocked_at is not None
+            and moment - known.last_blocked_at < rest
+        )
         rows.append(
             ProviderOut(
                 role=role,  # type: ignore[arg-type]
@@ -94,8 +103,8 @@ async def state(
                 spent_today=used,
                 ceiling=ceiling.limit,
                 exhausted=used >= ceiling.limit,
-                blocked=bool(known and known.blocked),
-                blocked_reason=known.blocked_reason if known and known.blocked else None,
+                blocked=resting,
+                blocked_reason=known.blocked_reason if known and resting else None,
                 last_blocked_at=known.last_blocked_at if known else None,
             )
         )
