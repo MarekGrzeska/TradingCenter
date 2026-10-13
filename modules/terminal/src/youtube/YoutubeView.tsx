@@ -29,7 +29,6 @@ const NO_STATE: ArchiveState = {
   simulating: false,
   modelConfigured: true,
   alertsConfigured: true,
-  searchSupported: true,
   providers: [],
   waiting: {},
   stale: false,

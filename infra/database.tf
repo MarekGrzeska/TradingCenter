@@ -134,6 +134,16 @@ resource "azurerm_postgresql_flexible_server_database" "telegram" {
   charset   = "UTF8"
 }
 
+# An eighth, the YouTube archive's, and the reasoning has still not changed. Created empty by the apply that adds it, and
+# owed `scripts/enable_youtube_prod.py` (which runs `grant-schema-ownership.sql` against it) before the workbench is given
+# `YOUTUBE_DATABASE_URL` — or the package starts, tries to migrate and stops, and with it the whole process.
+resource "azurerm_postgresql_flexible_server_database" "youtube" {
+  name      = "youtube"
+  server_id = azurerm_postgresql_flexible_server.main.id
+  collation = "en_US.utf8"
+  charset   = "UTF8"
+}
+
 # `market_data_dev` used to sit beside it, for the one morning that arrangement lasted. Applying its removal DROPS it:
 # dev data is disposable, but the operator should know that is what the plan's `destroy` means.
 

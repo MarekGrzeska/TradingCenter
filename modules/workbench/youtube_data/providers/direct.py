@@ -6,7 +6,6 @@ captions*: the first is a fact about us, the second about the film, and the loop
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Sequence
 
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import (
@@ -23,7 +22,15 @@ from youtube_transcript_api._errors import (
     YouTubeRequestFailed,
 )
 
-from .base import Blocked, Meter, NoTranscript, Transcript, TranscriptResult
+from .base import (
+    Blocked,
+    Meter,
+    NoTranscript,
+    Transcript,
+    TranscriptRequest,
+    TranscriptResult,
+    stamp,
+)
 
 # The film is what is wrong, not the way in: no captions, or nothing to caption. A retry a day later may still find
 # captions (automatic ones appear hours after upload) — the loop decides that, this only says what was seen.
@@ -41,43 +48,64 @@ _REFUSED = (RequestBlocked, IpBlocked, PoTokenRequired, YouTubeRequestFailed)
 
 FETCH_TIMEOUT_SECONDS = 60
 
+# Captions arrive as a line every few seconds; a paragraph every half minute keeps the times without a line per breath.
+PARAGRAPH_SECONDS = 30.0
+
+
+def paragraphs(snippets: list[tuple[float, str]], window: float = PARAGRAPH_SECONDS) -> str:
+    """`(start, text)` caption lines as paragraphs, each opening with the time of its first line."""
+    out: list[str] = []
+    current: list[str] = []
+    start: float | None = None
+    for at, text in snippets:
+        if start is None:
+            start = at
+        elif at - start >= window and current:
+            out.append(f"{stamp(start)} {' '.join(current)}")
+            current, start = [], at
+        current.append(text)
+    if current and start is not None:
+        out.append(f"{stamp(start)} {' '.join(current)}")
+    return "\n".join(out)
+
 
 class DirectTranscripts:
     name = "direct"
     unit = "requests"
+    listens = False
 
     def __init__(self, meter: Meter, *, api: YouTubeTranscriptApi | None = None) -> None:
         self._meter = meter
         self._api = api or YouTubeTranscriptApi()
 
-    async def fetch(self, video_id: str, languages: Sequence[str]) -> TranscriptResult:
+    def price(self, request: TranscriptRequest) -> int:
+        return 1
+
+    async def fetch(self, request: TranscriptRequest) -> TranscriptResult:
         # The library is synchronous, and a fetch is two requests to a third party. It sets no timeout of its own, so one
         # half-open connection would hold the whole loop; the thread outlives a timeout, the loop does not wait for it.
+        self._meter.record(self.name, self.unit, 1)
         try:
             fetched = await asyncio.wait_for(
-                asyncio.to_thread(self._api.fetch, video_id, languages=list(languages)), FETCH_TIMEOUT_SECONDS
+                asyncio.to_thread(self._api.fetch, request.video_id, languages=list(request.languages)),
+                FETCH_TIMEOUT_SECONDS,
             )
         except TimeoutError:
-            self._meter.record(self.name, "requests", 1)
             return Blocked(self.name, f"no answer within {FETCH_TIMEOUT_SECONDS} s")
         except _NOTHING_THERE as err:
-            self._meter.record(self.name, "requests", 1)
             return NoTranscript(self.name, type(err).__name__)
         except _REFUSED as err:
-            self._meter.record(self.name, "requests", 1)
             return Blocked(self.name, type(err).__name__)
         except CouldNotRetrieveTranscript as err:
             # The library's own name for "something else went wrong": not evidence about the film.
-            self._meter.record(self.name, "requests", 1)
             return Blocked(self.name, type(err).__name__)
         except OSError as err:
             # `requests` wraps only HTTP errors in the library's own type; a refused connection, a timeout or a broken
             # TLS handshake arrive as `requests.RequestException`, which is an `OSError`.
-            self._meter.record(self.name, "requests", 1)
             return Blocked(self.name, type(err).__name__)
-        self._meter.record(self.name, "requests", 1)
 
-        text = " ".join(snippet.text.strip() for snippet in fetched.snippets if snippet.text.strip())
+        lines = [(snippet.start, " ".join(snippet.text.split())) for snippet in fetched.snippets]
+        text = paragraphs([(at, line) for at, line in lines if line])
         if not text:
             return NoTranscript(self.name, "the captions are empty")
         return Transcript(
@@ -86,6 +114,3 @@ class DirectTranscripts:
             automatic=fetched.is_generated,
             provider=self.name,
         )
-
-    async def poll(self, job_id: str) -> TranscriptResult:
-        return Blocked(self.name, "this provider has no jobs to poll")

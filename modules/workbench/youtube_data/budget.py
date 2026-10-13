@@ -11,6 +11,7 @@ from tc_runtime.db import Conn
 
 from . import store
 from .config import Settings
+from .providers.base import TranscriptProvider
 from .providers.build import Providers
 
 # The model is billed in tokens, and the one row for it: every analyser is "the analyser" to the loop.
@@ -25,12 +26,16 @@ class Ceiling:
     limit: int
 
 
+def transcript_ceiling(settings: Settings, provider: TranscriptProvider) -> Ceiling:
+    """A provider that listens is paid in seconds of film and has its own day; every captions provider shares the one
+    setting, each with a day of its own."""
+    limit = settings.gemini_daily_video_seconds if provider.listens else settings.daily_transcript_units
+    return Ceiling(provider.name, provider.unit, limit)
+
+
 def ceilings(settings: Settings, providers: Providers) -> list[Ceiling]:
     found = [Ceiling(providers.source.name, providers.source.unit, settings.daily_source_units)]
-    found += [
-        Ceiling(provider.name, provider.unit, settings.daily_transcript_units)
-        for provider in providers.transcripts.providers
-    ]
+    found += [transcript_ceiling(settings, provider) for provider in providers.transcripts.providers]
     if providers.analyser is not None:
         found.append(Ceiling(ANALYSER, TOKENS, settings.daily_token_limit))
     return found

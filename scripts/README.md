@@ -7,6 +7,10 @@ of their failure mode, which is why they now live in a directory with a `pytest`
 
 `dev.sh` and `dev.ps1` still work; they are wrappers that pass their arguments here.
 
+`enable_youtube_prod.py` is the operator's half of switching the YouTube archive on in production: it hands the
+`youtube` database to the workbench's role and writes the two provider keys to Key Vault from the local `.env`, never
+printing them. A dry run unless `--apply`; the order it belongs in is in its docstring and `infra/variables.tf`.
+
 ```
 uv run pytest         # unit tests — no Docker, no Azure, no network
 uv run ruff check .

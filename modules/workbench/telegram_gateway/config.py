@@ -40,10 +40,10 @@ class Settings(BaseSettings):
     # polymarket-data: no migration here comes close to the length of a start.
     migration_lock_wait_seconds: float = 300.0
 
-    # Four: this module's work is one HTTP call per message, not a query per row. Seven logical
-    # databases share one `B_Standard_B1ms` whose `max_connections` is 50, so every module's number
-    # here is one budget — `scripts/tests/test_pool_budget.py` refuses a total above 30.
-    database_pool_size: int = 4
+    # Three (four until the YouTube archive needed the last connection): this module's work is one HTTP call per
+    # message, not a query per row. The logical databases share one `B_Standard_B1ms` whose `max_connections` is 50, so
+    # every module's number here is one budget — `scripts/tests/test_pool_budget.py` refuses a total above 30.
+    database_pool_size: int = 3
 
     # Creating a bot means talking to Telegram's creator bot, and only a *user account* may. All three
     # together enable it; absent, the module sends normally and refuses to create — a supported state.

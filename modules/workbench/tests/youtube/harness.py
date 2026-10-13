@@ -13,7 +13,7 @@ from youtube_data.providers.base import Meter
 from youtube_data.providers.build import Providers
 from youtube_data.providers.chain import TranscriptChain
 from youtube_data.sim import scenario as scenarios
-from youtube_data.sim.providers import SimAnalyser, SimSource, SimTranscripts
+from youtube_data.sim.providers import SimAnalyser, SimListener, SimSource, SimTranscripts
 from youtube_data.sim.scenario import Scenario
 from youtube_data.sim.world import World
 
@@ -34,6 +34,7 @@ class Rig:
         scenario: Scenario | None = None,
         *,
         analyser: Analyser | None | str = "sim",
+        listener: bool = False,
         **overrides,
     ) -> None:
         self.pool = pool
@@ -43,7 +44,11 @@ class Rig:
         self.settings = settings(**overrides)
         self.providers = Providers(
             source=SimSource(self.world),
-            transcripts=TranscriptChain([SimTranscripts(self.world)]),
+            # Captions alone unless asked: most of what the loop does is the same either way, and a test about films
+            # with no captions is about the listener when it says so.
+            transcripts=TranscriptChain(
+                [SimTranscripts(self.world), *([SimListener(self.world)] if listener else [])]
+            ),
             analyser=SimAnalyser(self.world) if analyser == "sim" else analyser,  # type: ignore[arg-type]
             meter=self.meter,
             clock=self.clock,

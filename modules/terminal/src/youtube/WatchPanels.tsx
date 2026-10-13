@@ -135,10 +135,10 @@ export function ChannelsPanel({ client, onChanged }: { client: YoutubeApi; onCha
 }
 
 export function TopicsPanel({ client, onChanged }: { client: YoutubeApi; onChanged(): void }) {
-  const list = useRead<{ topics: Topic[]; ceiling: number; searchSupported: boolean }>({
+  const list = useRead<{ topics: Topic[]; ceiling: number }>({
     key: ["youtube", "topics"],
     read: (signal) => client.topics(signal),
-    initial: { topics: [], ceiling: 0, searchSupported: true },
+    initial: { topics: [], ceiling: 0 },
     fallbackMessage: "nie udało się wczytać tematów",
     pollMs: POLL_MS,
   });
@@ -167,12 +167,6 @@ export function TopicsPanel({ client, onChanged }: { client: YoutubeApi; onChang
           {list.value.topics.length}/{list.value.ceiling || "—"} tematów
         </span>
       </div>
-      {list.status === "ready" && !list.value.searchSupported && (
-        <p className="text-sm text-warning">
-          Skonfigurowane źródło filmów nie umie szukać (YOUTUBE_VIDEO_SOURCE=data_api to zmienia) — tematy czekają, a
-          kanały działają.
-        </p>
-      )}
       {list.error !== null && <UnreachableNotice onRetry={list.reload}>{list.error}</UnreachableNotice>}
       {failure !== null && <p className="text-sm text-critical">{failure}</p>}
       {list.status === "ready" && list.value.topics.length === 0 && (

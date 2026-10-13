@@ -86,7 +86,8 @@
       "title": "Bitcoin dziś: bez napisów, bo autor ich nie włączył",
       "published_after_start_minutes": 10,
       "duration_seconds": 600,
-      "captions": {"mode": "never"}
+      "captions": {"mode": "never"},
+      "speech": "Dzień dobry, krótko o bitcoinie. Kurs drugi tydzień trzyma się nad średnią z dwustu dni, a napływy do funduszy notowanych wracają po spadkach z poprzedniego miesiąca. Dopóki cena zostaje nad tym poziomem, traktuję spadki jako okazję, nie jako zmianę trendu. Gdyby jednak zamknęła tydzień pod średnią, zmniejszam pozycję o połowę. To mój plan, nie rekomendacja."
     },
     {
       "video_id": "simfilm0006",
@@ -94,10 +95,8 @@
       "title": "One hour on the Fed: everything you need to know",
       "published_after_start_minutes": -60,
       "duration_seconds": 3600,
-      "captions": {
-        "mode": "async", "after_minutes": 30, "language": "en", "automatic": true,
-        "text": "In this long session I will walk through the last four Fed meetings and how the language changed. The first thing to notice is the shift from inflation to the labour market as the main concern. Second, the dots moved lower for next year. Third, the balance sheet is no longer a topic. For markets this means the path of least resistance for rates is down, but the path is bumpy. I would watch payrolls and core services inflation."
-      }
+      "captions": {"mode": "never"},
+      "speech": "In this long session I will walk through the last four Fed meetings and how the language changed. The first thing to notice is the shift from inflation to the labour market as the main concern. Second, the dots moved lower for next year. Third, the balance sheet is no longer a topic. For markets this means the path of least resistance for rates is down, but the path is bumpy. I would watch payrolls and core services inflation."
     },
     {
       "video_id": "simfilm0007",
@@ -175,5 +174,6 @@
     {"phrase_contains": "bitcoin", "videos": ["simfilm0005", "simfilm0007", "simfilm0011"]}
   ],
   "transcripts": {"block_ratio": 0.0, "latency_ms": 0, "native_credits": 1, "miss_credits": 1},
+  "listening": {"block_ratio": 0.0, "latency_ms": 0},
   "source": {"latency_ms": 0, "list_units": 1, "search_units": 100, "details_units": 1}
 }

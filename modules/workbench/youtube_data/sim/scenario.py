@@ -24,10 +24,9 @@ class SimChannel(BaseModel):
 
 class SimCaptions(BaseModel):
     """`immediate`: there when asked. `after_minutes`: absent until that long after publication (automatic captions
-    arrive hours late). `async`: the provider takes the request and answers by job, ready after `after_minutes` from
-    the request. `never`: this film has none."""
+    arrive hours late). `never`: this film has none."""
 
-    mode: Literal["immediate", "after_minutes", "never", "async"] = "never"
+    mode: Literal["immediate", "after_minutes", "never"] = "never"
     after_minutes: int = Field(default=0, ge=0)
     text: str = ""
     language: str = "en"
@@ -43,6 +42,8 @@ class SimVideo(BaseModel):
     # Live until this many minutes after the start; `None` is not live at all.
     live_until_minutes: int | None = None
     captions: SimCaptions = SimCaptions()
+    # What a provider that listens hears; without it, a listener hears what the captions say.
+    speech: str | None = None
     # A prepared reading, the word `unusable` for a model that answers with something the schema refuses, or nothing
     # for the neutral one.
     reading: dict | Literal["unusable"] | None = None
@@ -57,6 +58,14 @@ class SimTranscriptBehaviour(BaseModel):
     # Asking about a film with no captions costs this — a provider that charges for a miss is the one to rehearse with.
     miss_credits: int = 1
     daily_credits: int | None = None
+
+
+class SimListeningBehaviour(BaseModel):
+    """The provider that listens: paid in seconds of film, as Gemini is, with a day of its own."""
+
+    block_ratio: float = Field(default=0.0, ge=0.0, le=1.0)
+    latency_ms: int = Field(default=0, ge=0)
+    daily_video_seconds: int | None = None
 
 
 class SimSourceBehaviour(BaseModel):
@@ -78,6 +87,7 @@ class Scenario(BaseModel):
     videos: list[SimVideo]
     search: list[SearchEntry] = []
     transcripts: SimTranscriptBehaviour = SimTranscriptBehaviour()
+    listening: SimListeningBehaviour = SimListeningBehaviour()
     source: SimSourceBehaviour = SimSourceBehaviour()
 
     @model_validator(mode="after")

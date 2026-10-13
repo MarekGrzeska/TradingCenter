@@ -85,9 +85,6 @@ export function FollowChannelDialog({
             placeholder="@nazwa lub https://www.youtube.com/channel/UC…"
             onChange={(e) => setReference(e.target.value)}
           />
-          <span className="text-ink-faint">
-            Źródło „rss” rozumie tylko adres z UC… — @uchwyt wymaga klucza YouTube Data API.
-          </span>
         </label>
         <RuleSelect value={rule} onChange={setRule} />
       </div>

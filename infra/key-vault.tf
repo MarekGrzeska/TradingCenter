@@ -56,6 +56,12 @@ locals {
     telegram_api_hash = "telegram-api-hash"
     telegram_session  = "telegram-session"
 
+    # The YouTube archive's two keys. The Data API key is free and lists films; the Gemini key listens to the ones with
+    # no captions and is billed — the paid plan, since the free tier lets Google use what it is sent.
+    # `scripts/enable_youtube_prod.py` writes both from the operator's local files without printing them.
+    youtube_data_api_key = "youtube-data-api-key"
+    gemini_api_key       = "gemini-api-key"
+
     # A GitHub token with `read:packages`, the only way App Service can pull from GHCR. The one credential here that
     # expires on a calendar rather than on demand; docs/rotacja-poswiadczen.html is where the renewal is written down.
     ghcr_pull_token = "ghcr-pull-token"

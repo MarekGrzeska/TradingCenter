@@ -12,7 +12,7 @@ from . import budget, store
 from .analysis import PROFILES
 from .config import Settings
 from .models import ADDED_BY, ALERT_RULES, Channel, Topic
-from .providers.base import ChannelInfo, SourceError, UnsupportedOperation, VideoSource
+from .providers.base import ChannelInfo, SourceError, VideoSource
 from .providers.refs import video_id
 
 MAX_PHRASE_CHARS = 200
@@ -181,8 +181,6 @@ async def analyse_film(
 
     try:
         found = await source.video_details([wanted])
-    except UnsupportedOperation as err:
-        raise WatchlistRefused(str(err)) from err
     except SourceError as err:
         raise WatchlistRefused(f"the source could not be asked about {wanted}: {err}") from err
     if not found:

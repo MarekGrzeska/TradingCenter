@@ -145,7 +145,7 @@ async def test_a_topic_says_which_of_its_limits_came_from_the_settings(api) -> N
     assert body["defaults_applied"] == ["interval_minutes", "max_videos_per_run"]
     topic_id = body["topic"]["id"]
     assert (await api.patch(f"/topics/{topic_id}", json={"active": False})).json()["active"] is False
-    assert (await api.get("/topics")).json()["search_supported"] is True
+    assert "search_supported" not in (await api.get("/topics")).json()
     assert (await api.delete(f"/topics/{topic_id}")).status_code == 204
     assert (await api.post("/topics", json={"phrase": " "})).status_code == 422
 
@@ -161,7 +161,7 @@ async def test_the_state_says_what_the_screen_must_know_before_it_says_no_films(
     body = (await api.get("/state")).json()
 
     assert body["simulating"] is True and body["model_configured"] is True
-    assert body["alerts_configured"] is False and body["search_supported"] is True
+    assert body["alerts_configured"] is False
     assert body["channels_active"] == 1
     roles = {(p["role"], p["name"], p["unit"]) for p in body["providers"]}
     assert roles == {

@@ -116,7 +116,6 @@ async def state(
         simulating=settings.simulating,
         model_configured=providers.analyser is not None,
         alerts_configured=alerts_configured,
-        search_supported=providers.source.supports_search,
         channels_active=len(channels),
         topics_active=len(topics),
         providers=rows,

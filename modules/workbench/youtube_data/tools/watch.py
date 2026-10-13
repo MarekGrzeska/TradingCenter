@@ -65,11 +65,6 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         """
         providers, settings = ctx.providers, ctx.settings
         source = providers.source
-        if not source.supports_search:
-            return refused(
-                f"the {source.name} source cannot search",
-                "set YOUTUBE_VIDEO_SOURCE=data_api (a free YouTube Data API key) — or follow a channel instead",
-            )
         ceiling = budget.Ceiling(source.name, source.unit, settings.daily_source_units)
         now = providers.clock.now()
         async with ctx.pool.acquire() as conn:

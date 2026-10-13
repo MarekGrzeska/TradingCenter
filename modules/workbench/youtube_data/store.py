@@ -37,8 +37,8 @@ _TOPIC_COLUMNS = """
 """
 _VIDEO_COLUMNS = """
     video_id, channel_id, channel_title, title, published_at, duration_seconds, live_status, origins,
-    profile, alert_rule, state, skip_reason, attempts, next_attempt_at, reading_failures,
-    job_provider, job_id, simulated, discovered_at, notified_at
+    audio_language, profile, alert_rule, state, skip_reason, attempts, next_attempt_at, reading_failures,
+    simulated, discovered_at, notified_at
 """
 
 
@@ -227,16 +227,18 @@ async def upsert_films(conn: Conn, discoveries: Sequence[Discovery]) -> int:
             """
             INSERT INTO videos (
                 video_id, channel_id, channel_title, title, published_at, duration_seconds, live_status,
-                origins, profile, alert_rule, simulated
+                origins, profile, alert_rule, simulated, audio_language
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, ARRAY[$8]::text[], $9, $10, $11)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, ARRAY[$8]::text[], $9, $10, $11, $12)
             ON CONFLICT (video_id) DO UPDATE SET
                 origins = (SELECT array_agg(DISTINCT o) FROM unnest(videos.origins || EXCLUDED.origins) AS o),
                 duration_seconds = COALESCE(videos.duration_seconds, EXCLUDED.duration_seconds),
+                audio_language = COALESCE(videos.audio_language, EXCLUDED.audio_language),
                 live_status = CASE WHEN videos.state = 'discovered'
                                    THEN EXCLUDED.live_status ELSE videos.live_status END
             WHERE NOT (videos.origins @> EXCLUDED.origins)
                OR (videos.duration_seconds IS NULL AND EXCLUDED.duration_seconds IS NOT NULL)
+               OR (videos.audio_language IS NULL AND EXCLUDED.audio_language IS NOT NULL)
                OR (videos.state = 'discovered' AND videos.live_status <> EXCLUDED.live_status)
             RETURNING (xmax = 0) AS inserted
             """,
@@ -251,6 +253,7 @@ async def upsert_films(conn: Conn, discoveries: Sequence[Discovery]) -> int:
             found.profile,
             found.alert_rule,
             ref.simulated,
+            ref.audio_language,
         )
         new += bool(row and row["inserted"])
     return new
@@ -307,11 +310,11 @@ async def save_transcript(conn: Conn, video_id: str, transcript: Transcript) -> 
     async with conn.transaction():
         await conn.execute(
             """
-            INSERT INTO transcripts (video_id, content, language, provider, automatic, simulated)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO transcripts (video_id, content, language, provider, automatic, simulated, model)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             ON CONFLICT (video_id) DO UPDATE SET content = EXCLUDED.content, language = EXCLUDED.language,
                 provider = EXCLUDED.provider, automatic = EXCLUDED.automatic, simulated = EXCLUDED.simulated,
-                fetched_at = now()
+                model = EXCLUDED.model, fetched_at = now()
             """,
             video_id,
             transcript.text,
@@ -319,10 +322,10 @@ async def save_transcript(conn: Conn, video_id: str, transcript: Transcript) -> 
             transcript.provider,
             transcript.automatic,
             transcript.simulated,
+            transcript.model,
         )
         await conn.execute(
-            "UPDATE videos SET state = 'transcribed', job_provider = NULL, job_id = NULL, "
-            "next_attempt_at = NULL WHERE video_id = $1",
+            "UPDATE videos SET state = 'transcribed', next_attempt_at = NULL WHERE video_id = $1",
             video_id,
         )
 
@@ -330,8 +333,7 @@ async def save_transcript(conn: Conn, video_id: str, transcript: Transcript) -> 
 async def record_no_transcript(conn: Conn, video_id: str, *, give_up: bool, retry_at: datetime | None) -> None:
     await conn.execute(
         """
-        UPDATE videos SET attempts = attempts + 1, job_provider = NULL, job_id = NULL,
-            state = $2, next_attempt_at = $3
+        UPDATE videos SET attempts = attempts + 1, state = $2, next_attempt_at = $3
         WHERE video_id = $1
         """,
         video_id,
@@ -340,10 +342,9 @@ async def record_no_transcript(conn: Conn, video_id: str, *, give_up: bool, retr
     )
 
 
-async def record_job(conn: Conn, video_id: str, *, provider: str, job_id: str) -> None:
-    await conn.execute(
-        "UPDATE videos SET job_provider = $2, job_id = $3 WHERE video_id = $1", video_id, provider, job_id
-    )
+async def postpone(conn: Conn, video_id: str, *, until: datetime) -> None:
+    """Asked again later without spending an attempt: nobody who could answer was asked."""
+    await conn.execute("UPDATE videos SET next_attempt_at = $2 WHERE video_id = $1", video_id, until)
 
 
 @dataclass(frozen=True, slots=True)
@@ -495,17 +496,16 @@ async def refresh_film(conn: Conn, ref: VideoRef) -> None:
     """What a source now says of a film we are still waiting on: a live stream that has ended, a length it lacked."""
     await conn.execute(
         """
-        UPDATE videos SET live_status = $2, duration_seconds = COALESCE(duration_seconds, $3)
+        UPDATE videos SET live_status = $2, duration_seconds = COALESCE(duration_seconds, $3),
+            audio_language = COALESCE(audio_language, $4)
         WHERE video_id = $1 AND state = 'discovered'
         """,
         ref.video_id,
         ref.live_status,
         ref.duration_seconds,
+        ref.audio_language,
     )
 
-
-async def clear_job(conn: Conn, video_id: str) -> None:
-    await conn.execute("UPDATE videos SET job_provider = NULL, job_id = NULL WHERE video_id = $1", video_id)
 
 
 async def settle_analysed(conn: Conn) -> int:
@@ -642,6 +642,7 @@ class TranscriptPage:
     provider: str
     automatic: bool
     simulated: bool
+    model: str | None = None
 
 
 # `substr` takes an int4: an offset past it is past the end of any transcript, and must say so rather than overflow.
@@ -653,7 +654,8 @@ async def transcript_page(conn: Conn, video_id: str, *, offset: int, limit: int)
     offset = min(offset, _PAST_ANY_TRANSCRIPT)
     row = await conn.fetchrow(
         """
-        SELECT substr(content, $2 + 1, $3) AS text, length(content) AS total, language, provider, automatic, simulated
+        SELECT substr(content, $2 + 1, $3) AS text, length(content) AS total, language, provider, automatic, simulated,
+               model
         FROM transcripts WHERE video_id = $1
         """,
         video_id,
@@ -662,7 +664,9 @@ async def transcript_page(conn: Conn, video_id: str, *, offset: int, limit: int)
     )
     if row is None:
         return None
-    return TranscriptPage(row["text"], row["total"], row["language"], row["provider"], row["automatic"], row["simulated"])
+    return TranscriptPage(
+        row["text"], row["total"], row["language"], row["provider"], row["automatic"], row["simulated"], row["model"]
+    )
 
 
 @dataclass(frozen=True, slots=True)

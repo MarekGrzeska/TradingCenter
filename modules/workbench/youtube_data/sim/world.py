@@ -23,8 +23,6 @@ class World:
         self._channels = {channel.channel_id: channel for channel in scenario.channels}
         self._spent: defaultdict[tuple[date, str], int] = defaultdict(int)
         self._fetches: defaultdict[str, int] = defaultdict(int)
-        # job id -> (video id, ready at)
-        self.jobs: dict[str, tuple[str, datetime]] = {}
 
     # --- what exists ------------------------------------------------------------------------------------------------
 
@@ -60,6 +58,7 @@ class World:
             published_at=self.published_at(video),
             duration_seconds=video.duration_seconds,
             live_status=self.live_status(video),
+            audio_language=channel.language or None,
             simulated=True,
         )
 
@@ -80,11 +79,12 @@ class World:
 
     # --- what is random, and repeatably -----------------------------------------------------------------------------
 
-    def roll(self, video_id: str) -> float:
-        """A number in [0, 1) that depends only on the seed, the film and how many times it has been asked about — not on
-        what else happened in between, so the same run refuses the same requests."""
-        self._fetches[video_id] += 1
-        return random.Random(f"{self.scenario.seed}:{video_id}:{self._fetches[video_id]}").random()
+    def roll(self, video_id: str, *, by: str = "") -> float:
+        """A number in [0, 1) that depends only on the seed, the film, who asks (`by`) and how many times they have asked
+        — not on what else happened in between, so the same run refuses the same requests."""
+        key = f"{by}{video_id}"
+        self._fetches[key] += 1
+        return random.Random(f"{self.scenario.seed}:{key}:{self._fetches[key]}").random()
 
     async def lag(self, milliseconds: int) -> None:
         if milliseconds:

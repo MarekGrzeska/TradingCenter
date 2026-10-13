@@ -17,18 +17,22 @@ from youtube_data.providers.base import (
     ChannelNotFound,
     Meter,
     NoTranscript,
-    Pending,
     QuotaExceeded,
     ReadingUnusable,
     Transcript,
+    TranscriptRequest,
 )
 from youtube_data.sim import scenario as scenarios
-from youtube_data.sim.providers import NEUTRAL, SimAnalyser, SimSource, SimTranscripts
+from youtube_data.sim.providers import NEUTRAL, SimAnalyser, SimListener, SimSource, SimTranscripts
 from youtube_data.sim.scenario import Scenario
 from youtube_data.sim.world import World
 
 GOLD = "UCsimGoldPL0000000000000"
 MARKETS = "UCsimMarketsEN0000000000"
+
+
+def ask(video_id: str, *languages: str, duration: int | None = 600) -> TranscriptRequest:
+    return TranscriptRequest(video_id, duration, languages, languages[0] if len(languages) == 1 else None)
 
 
 def world_of(scenario: Scenario | None = None) -> tuple[World, ManualClock, Meter]:
@@ -65,7 +69,8 @@ def test_the_scenario_that_ships_holds_every_kind_of_transcript_the_loop_must_su
     assert any(c.language == "en" and c.text.strip() for c in captions)
     assert any(c.mode == "immediate" and not c.text.strip() for c in captions), "an empty one"
     assert any("zignoruj" in c.text.lower() for c in captions), "one that talks to the model"
-    assert {c.mode for c in captions} == {"immediate", "after_minutes", "never", "async"}
+    assert {c.mode for c in captions} == {"immediate", "after_minutes", "never"}
+    assert any(video.captions.mode == "never" and video.speech for video in default.videos), "one only a listener hears"
     assert any(video.reading == "unusable" for video in default.videos)
 
 
@@ -137,29 +142,38 @@ async def test_captions_that_arrive_hours_late_are_absent_and_charged_until_they
     provider = SimTranscripts(world)
     clock.advance(minutes=10)
 
-    early = await provider.fetch("simfilm0003", ["pl"])
+    early = await provider.fetch(ask("simfilm0003", "pl"))
     clock.advance(hours=2)
-    late = await provider.fetch("simfilm0003", ["pl"])
+    late = await provider.fetch(ask("simfilm0003", "pl"))
 
     assert isinstance(early, NoTranscript) and early.charged
     assert isinstance(late, Transcript) and late.simulated and late.language == "pl"
     assert meter.drain() == {("sim", "sim_credits"): 2}
 
 
-async def test_a_long_film_comes_back_as_a_job_that_is_free_to_look_at() -> None:
+async def test_a_film_with_no_captions_is_heard_by_the_listener_and_paid_for_in_seconds_of_film() -> None:
     world, clock, meter = world_of()
-    provider = SimTranscripts(world)
+    clock.advance(minutes=15)
 
-    job = await provider.fetch("simfilm0006", ["en"])
-    assert isinstance(job, Pending)
-    assert await provider.poll(job.job_id) == Pending("sim", job.job_id)
-    assert meter.drain() == {}
+    heard = await SimListener(world).fetch(ask("simfilm0005", "pl", duration=600))
 
-    clock.advance(minutes=31)
-    done = await provider.poll(job.job_id)
+    assert isinstance(heard, Transcript) and heard.provider == "sim_gemini" and heard.model == "sim"
+    assert heard.text.startswith("[00:00] Dzień dobry, krótko o bitcoinie.")
+    assert meter.drain() == {("sim_gemini", "sim_video_seconds"): 600}
 
-    assert isinstance(done, Transcript)
-    assert meter.drain() == {("sim", "sim_credits"): 1}
+
+async def test_captions_in_another_language_than_the_film_speaks_are_no_transcript() -> None:
+    world, _, _ = world_of()
+
+    assert isinstance(await SimTranscripts(world).fetch(ask("simfilm0001", "en")), NoTranscript)
+
+
+async def test_a_listener_whose_day_is_spent_refuses_rather_than_hearing_nothing() -> None:
+    world, _, _ = world_of(tiny(listening={"daily_video_seconds": 900}))
+    listener = SimListener(world)
+
+    assert isinstance(await listener.fetch(ask("simfilm0001", "en", duration=600)), Transcript)
+    assert isinstance(await listener.fetch(ask("simfilm0001", "en", duration=600)), Blocked)
 
 
 async def test_a_film_with_no_captions_and_one_with_only_silence_are_no_transcript() -> None:
@@ -167,14 +181,14 @@ async def test_a_film_with_no_captions_and_one_with_only_silence_are_no_transcri
     clock.advance(minutes=15)
     provider = SimTranscripts(world)
 
-    assert isinstance(await provider.fetch("simfilm0005", ["pl"]), NoTranscript)
-    assert isinstance(await provider.fetch("simfilm0008", ["pl"]), NoTranscript)
+    assert isinstance(await provider.fetch(ask("simfilm0005", "pl")), NoTranscript)
+    assert isinstance(await provider.fetch(ask("simfilm0008", "pl")), NoTranscript)
 
 
 async def test_a_provider_that_refuses_every_request_charges_nothing_for_it() -> None:
     world, _, meter = world_of(tiny(transcripts={"block_ratio": 1.0}))
 
-    result = await SimTranscripts(world).fetch("simfilm0001", ["en"])
+    result = await SimTranscripts(world).fetch(ask("simfilm0001", "en"))
 
     assert isinstance(result, Blocked)
     assert meter.drain() == {}
@@ -183,7 +197,7 @@ async def test_a_provider_that_refuses_every_request_charges_nothing_for_it() ->
 async def _outcomes(seed: int) -> list[str]:
     world, _, _ = world_of(tiny(seed=seed, transcripts={"block_ratio": 0.5}))
     provider = SimTranscripts(world)
-    return [type(await provider.fetch("simfilm0001", ["en"])).__name__ for _ in range(40)]
+    return [type(await provider.fetch(ask("simfilm0001", "en"))).__name__ for _ in range(40)]
 
 
 async def test_the_same_seed_refuses_the_same_requests_and_about_the_share_asked_for() -> None:
@@ -198,10 +212,10 @@ async def test_a_provider_whose_day_of_credits_is_spent_stops_answering() -> Non
     world, clock, _ = world_of(tiny(transcripts={"daily_credits": 1}))
     provider = SimTranscripts(world)
 
-    assert isinstance(await provider.fetch("simfilm0001", ["en"]), Transcript)
-    assert isinstance(await provider.fetch("simfilm0001", ["en"]), Blocked)
+    assert isinstance(await provider.fetch(ask("simfilm0001", "en")), Transcript)
+    assert isinstance(await provider.fetch(ask("simfilm0001", "en")), Blocked)
     clock.advance(days=1)
-    assert isinstance(await provider.fetch("simfilm0001", ["en"]), Transcript)
+    assert isinstance(await provider.fetch(ask("simfilm0001", "en")), Transcript)
 
 
 # --- the model ------------------------------------------------------------------------------------------------------
@@ -252,8 +266,11 @@ def settings(**overrides) -> Settings:
     ("overrides", "named"),
     [
         ({"video_source": "sim", "transcript_providers": "direct", "analyser": "openai"}, "VIDEO_SOURCE"),
-        ({"video_source": "rss", "transcript_providers": "direct,sim", "analyser": "openai"}, "TRANSCRIPT_PROVIDERS"),
-        ({"video_source": "rss", "transcript_providers": "direct", "analyser": "sim"}, "ANALYSER"),
+        (
+            {"video_source": "data_api", "data_api_key": "k", "transcript_providers": "direct,sim_gemini", "analyser": "openai"},
+            "TRANSCRIPT_PROVIDERS",
+        ),
+        ({"video_source": "data_api", "data_api_key": "k", "transcript_providers": "direct", "analyser": "sim"}, "ANALYSER"),
     ],
 )
 def test_a_simulated_provider_is_refused_where_the_database_is_a_deployments(overrides, named) -> None:
@@ -271,4 +288,4 @@ def test_the_same_choice_is_fine_on_a_workstation_and_is_the_default_there() -> 
     local = settings()
 
     assert local.simulating
-    assert (local.video_source, local.transcript_provider_names, local.analyser) == ("sim", ("sim",), "sim")
+    assert (local.video_source, local.transcript_provider_names, local.analyser) == ("sim", ("sim", "sim_gemini"), "sim")

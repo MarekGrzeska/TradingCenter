@@ -41,16 +41,22 @@ async def test_listing_uploads_is_two_calls_that_cost_two_units(source, meter) -
         json={"items": [{"contentDetails": {"videoId": "v1"}}, {"contentDetails": {"videoId": "v2"}}]}
     )
     details = respx.get(f"{API_URL}/videos").respond(
-        json={"items": [api_video("v1"), api_video("v2", duration="PT30S", snippet={"liveBroadcastContent": "live"})]}
+        json={
+            "items": [
+                api_video("v1", snippet={"defaultAudioLanguage": "en-US"}),
+                api_video("v2", duration="PT30S", snippet={"liveBroadcastContent": "live"}),
+            ]
+        }
     )
 
     from youtube_data.providers.base import ChannelInfo
 
     films = await source.latest_videos(ChannelInfo(channel_id=CHANNEL_ID, title="A Channel"))
 
-    assert [(f.video_id, f.duration_seconds, f.live_status) for f in films] == [
-        ("v1", 750, "none"),
-        ("v2", 30, "live"),
+    # The bare language: automatic captions carry `en`, and asking for `en-US` would miss them.
+    assert [(f.video_id, f.duration_seconds, f.live_status, f.audio_language) for f in films] == [
+        ("v1", 750, "none", "en"),
+        ("v2", 30, "live", None),
     ]
     assert dict(details.calls.last.request.url.params)["id"] == "v1,v2"
     assert meter.drain() == {("data_api", "api_units"): 2}

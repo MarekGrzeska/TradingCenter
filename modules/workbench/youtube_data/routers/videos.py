@@ -101,6 +101,7 @@ async def transcript(
         language=page.language,
         provider=page.provider,
         automatic=page.automatic,
+        model=page.model,
         simulated=page.simulated,
         offset=offset,
         total_chars=page.total_chars,

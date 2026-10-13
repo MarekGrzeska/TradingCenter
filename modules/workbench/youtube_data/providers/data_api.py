@@ -1,6 +1,7 @@
-"""Films from the YouTube Data API v3: a free key, ten thousand units a day, and every answer the feed cannot give — how
-long a film is, whether it is live, a channel by its `@handle`, a search. Listing a channel's uploads is one unit; a
-search is a hundred, which is why topics carry their own limits and the day has a ceiling (`youtube-data-transcripts`).
+"""Films from the YouTube Data API v3 — the one real source: a free key, ten thousand units a day, and every answer the
+loop needs before it pays for a transcript — how long a film is, whether it is live, what language it speaks, a channel
+by its `@handle`, a search. Listing a channel's uploads is one unit; a search is a hundred, which is why topics carry
+their own limits and the day has a ceiling (`youtube-data-transcripts`).
 
 The key travels in a header. The API also accepts `?key=`, and that is the spelling this module never uses: a URL is
 what an HTTP client logs, and the last credential that reached a log that way was a Telegram bot's."""
@@ -52,8 +53,6 @@ class DataApiSource:
     unit = "api_units"
     # The search itself and the details call that follows it, which is always made.
     search_cost = COST_SEARCH + COST_LIST
-    supports_search = True
-    supports_handles = True
 
     def __init__(self, http: httpx.AsyncClient, *, api_key: str, meter: Meter) -> None:
         self._http = http
@@ -166,9 +165,17 @@ class DataApiSource:
                         published_at=datetime.fromisoformat(published),
                         duration_seconds=duration_seconds(item.get("contentDetails", {}).get("duration")),
                         live_status=_live_status(snippet.get("liveBroadcastContent")),
+                        audio_language=audio_language(snippet.get("defaultAudioLanguage")),
                     )
                 )
         return films
+
+
+def audio_language(value: str | None) -> str | None:
+    """`en-US` as `en`: automatic captions carry the bare language, and asking for the regional one would miss them."""
+    if not value or not value.strip():
+        return None
+    return value.strip().split("-")[0].lower()
 
 
 def _live_status(value: str | None) -> str:

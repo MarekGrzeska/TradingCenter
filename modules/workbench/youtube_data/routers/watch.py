@@ -104,7 +104,6 @@ async def topics(request: Request) -> TopicsOut:
     return TopicsOut(
         topics=[TopicOut.of(topic) for topic in found],
         ceiling=state.settings.max_topics,
-        search_supported=state.providers.source.supports_search,
     )
 
 

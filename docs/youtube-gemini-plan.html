@@ -1,0 +1,347 @@
+<title>YouTube i Gemini</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  h3.sub {
+    font-family: var(--head); font-weight: 700; font-size: 21px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 30px 0 10px;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+  ul { margin: 0 0 16px; padding-left: 22px; max-width: 70ch; }
+  li { margin-bottom: 6px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure pre { margin: 0; }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.5;
+  }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Plan · archiwum YouTube</span>
+    <h1>Gemini słucha tam, gdzie napisów nie dostaniemy</h1>
+    <p class="lede">Skill <b>yt-transkrypcje</b> z <code>C:\Marek\Agents</code> ma trzy kroki: znajduje filmy przez YouTube Data API, pobiera darmowe napisy, a <b>gdy ich brak — daje Gemini link do filmu</b>. Ten plan przenosi trzeci krok do <code>youtube_data</code>. Na Azure darmowe napisy są blokowane, więc tam to będzie główna droga.</p>
+    <div class="strip">
+      <span>TradingCenter / youtube_data</span>
+      <span>12 października 2026</span>
+      <span>wzór: <b>Agents/.claude/skills/yt-transkrypcje</b></span>
+      <span>status: <b>propozycja</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">1</div><div class="l">nowy dostawca: <code>gemini</code></div></div>
+      <div class="cell"><div class="v">0</div><div class="l">nowych źródeł filmów — <code>data_api</code> już jest</div></div>
+      <div class="cell"><div class="v">8 h</div><div class="l">filmów dziennie w darmowym planie Gemini</div></div>
+      <div class="cell"><div class="v">~$0,3</div><div class="l">za godzinę filmu na płatnym Flash (szacunek)</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">filmów, które Agents przepisał przez Gemini</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">00 · Werdykt</div>
+      <h2>Połowa już jest, brakuje jednej klasy i dwóch reguł</h2>
+      <p class="intro"><code>youtube_data</code> ma już to samo źródło filmów co Agents (<code>DataApiSource</code>: <code>channels forHandle</code>, playlista uploads, <code>videos.list</code>) i ten sam pierwszy krok transkrypcji (<code>DirectTranscripts</code> na <code>youtube-transcript-api</code>). Brakuje trzeciego kroku: modelu, który <strong>słucha filmu</strong> zamiast czytać napisy.</p>
+      <p>Interfejs <code>TranscriptProvider</code> był projektowany pod taką wymianę — „dostawca to klasa i linia w <code>.env</code>”. Gemini nie mieści się jednak w nim bez dwóch zmian reguł:</p>
+      <ul>
+        <li><strong>Łańcuch przestaje traktować „brak napisów” jako fakt o filmie.</strong> Dziś <code>TranscriptChain</code> przechodzi do następnego dostawcy tylko przy <code>Blocked</code>, bo „brak napisów to ta sama odpowiedź od każdego dostawcy”. Dla dostawcy, który słucha audio, to nieprawda.</li>
+        <li><strong>Dostawca dostaje długość filmu.</strong> Gemini dzieli długie filmy na kawałki, a budżet liczy w sekundach filmu. <code>fetch(video_id, languages)</code> tego nie przenosi.</li>
+      </ul>
+      <p><span class="hl">Ważne zastrzeżenie:</span> w Agents ścieżka Gemini <strong>nigdy się nie uruchomiła</strong>. Wszystkie 10 filmów z <code>state/processed.json</code> poszło przez <code>napisy-auto</code> z domowego IP, a licznik <code>gemini_video_seconds</code> stoi na 0. Kod jest napisany i przemyślany, ale niezmierzony. Dlatego pierwszy krok planu to pomiar, nie implementacja.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">01 · Wzór</div>
+      <h2>Jak to robi yt-transkrypcje</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Krok</th><th>Agents (<code>ytlib/</code>)</th><th>Szczegół, który warto przenieść</th></tr></thead>
+          <tbody>
+            <tr><td><b>Odkrycie</b></td><td><code>youtube.py</code> — Data API v3, klucz w nagłówku <code>x-goog-api-key</code></td><td>Playlista uploads od najnowszych; koniec na stronie z pierwszym starszym filmem, ale reszta strony jeszcze sprawdzana (premiery bywają nie po kolei).</td></tr>
+            <tr><td><b>Odsiew</b></td><td><code>sync.py</code> — <code>upcoming</code>/<code>live</code>/czas 0 → <code>pending</code>; short = ≤180 s i <code>HEAD /shorts/ID</code> = 200</td><td>Nagrany live nie jest shortem nawet przy krótkim czasie. Zapowiedzi wracają same.</td></tr>
+            <tr><td><b>Napisy</b></td><td><code>CaptionsFetcher</code> — ręczne w języku audio → automatyczne → ręczne w dowolnym języku tylko przy nieznanym języku audio</td><td><strong>Nie bierze tłumaczeń.</strong> Język audio z <code>snippet.defaultAudioLanguage</code>. 1,5 s przerwy między zapytaniami. <code>RequestBlocked</code> wyłącza napisy na resztę przebiegu.</td></tr>
+            <tr><td><b>Gemini</b></td><td><code>GeminiTranscriber</code> — <code>FileData(file_uri=youtube URL)</code>, <code>MEDIA_RESOLUTION_LOW</code>, temperatura 0,2</td><td>Filmy dłuższe niż 36 min dzielone na 30-minutowe kawałki (<code>VideoMetadata start/end_offset</code>). Prompt: dosłownie, bez tłumaczenia, <code>[MM:SS]</code> co 20–40 s, mówcy. <code>MAX_TOKENS</code> = błąd, nie ucięty tekst.</td></tr>
+            <tr><td><b>Znaczniki czasu</b></td><td><code>parse_gemini_text</code></td><td>Gemini w kawałkach liczy czas raz od początku kawałka, raz od początku filmu. Rozstrzyga pierwszy znacznik: bliżej 0 → dodaj offset.</td></tr>
+            <tr><td><b>Limity</b></td><td><code>daily_gemini_video_hours: 8</code>; 429 → 3 ponowienia (30 s, ×2), potem Gemini wyłączone do końca przebiegu</td><td>Budżet liczony w <strong>sekundach filmu</strong> przed wywołaniem, nie w tokenach po nim.</td></tr>
+            <tr><td><b>Filtr kanału</b></td><td><code>classify.py</code> — słowa kluczowe → Gemini (JSON: include / skip / uncertain) → przy niepewności + 3 min napisów → <code>needs_review</code></td><td>„Skip tylko przy pozytywnym dowodzie”. Przydatne dla kanałów z wieloma prowadzącymi.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Różnice</div>
+      <h2>Co mamy, czego nie, co zmienić</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Element</th><th>youtube_data dziś</th><th>Zmiana</th><th></th></tr></thead>
+          <tbody>
+            <tr><td><b>Źródło filmów</b></td><td><code>data_api</code> (i <code>rss</code>, <code>sim</code>)</td><td>Bez zmian. Gemini <strong>wymaga</strong> <code>VIDEO_SOURCE=data_api</code>, bo RSS nie zna długości filmu — walidator ustawień odmawia startu przy innym połączeniu.</td><td><span class="tag ok">jest</span></td></tr>
+            <tr><td><b>Napisy</b></td><td><code>direct</code>: <code>api.fetch(id, languages=["pl","en"])</code></td><td>Przenieść wybór ścieżki z Agents: najpierw język audio, tłumaczeń nie brać. Dziś <code>languages=pl,en</code> może zwrócić angielskie napisy polskiego filmu. Do tego paragrafy co ~30 s ze znacznikami czasu.</td><td><span class="tag att">poprawka</span></td></tr>
+            <tr><td><b>Gemini</b></td><td>brak</td><td>Nowa klasa <code>providers/gemini.py</code> — <code>GeminiTranscripts</code>, <code>name="gemini"</code>, <code>unit="video_seconds"</code>; asynchronicznie przez <code>client.aio.models.generate_content</code>.</td><td><span class="tag stop">nowe</span></td></tr>
+            <tr><td><b>Łańcuch</b></td><td>następny dostawca tylko przy <code>Blocked</code></td><td>Dostawca deklaruje <code>listens: bool</code>. <code>NoTranscript</code> od dostawcy napisów przechodzi do następnego, który słucha. Pomijane odmowy z łańcucha też zapisywane w <code>provider_state</code>.</td><td><span class="tag stop">reguła</span></td></tr>
+            <tr><td><b>Interfejs</b></td><td><code>fetch(video_id, languages)</code></td><td><code>fetch(film: FilmToTranscribe, languages)</code> z <code>video_id</code>, <code>duration_seconds</code>, <code>audio_language</code>. Zmiana w trzech dostawcach, symulacji i testach.</td><td><span class="tag att">sygnatura</span></td></tr>
+            <tr><td><b>Budżet</b></td><td>jeden sufit <code>DAILY_TRANSCRIPT_UNITS=500</code> dla każdego dostawcy</td><td>Sufit per dostawca: <code>YOUTUBE_GEMINI_DAILY_VIDEO_SECONDS=28800</code> (8 h). Sprawdzany <strong>przed</strong> wywołaniem: film, który przekroczyłby sufit, czeka do jutra. Tokeny Gemini idą do <code>usage</code> jako druga jednostka (<code>tokens</code>) — do liczenia pieniędzy, nie do sufitu.</td><td><span class="tag att">ustawienie</span></td></tr>
+            <tr><td><b>Język audio</b></td><td>nie zapisywany</td><td><code>DataApiSource.video_details</code> czyta <code>snippet.defaultAudioLanguage</code> do <code>VideoRef</code>; nowa kolumna <code>videos.audio_language</code>.</td><td><span class="tag att">migracja</span></td></tr>
+            <tr><td><b>Treść</b></td><td><code>transcripts.content</code> — płaski tekst</td><td>Zostaje tekstem, ale z liniami <code>[MM:SS]</code> u obu dostawców. Odczyt i narzędzia mogą wtedy wskazać moment filmu (<code>&amp;t=123s</code>). Nowa kolumna <code>transcripts.model</code> (null dla napisów).</td><td><span class="tag att">migracja</span></td></tr>
+            <tr><td><b>Odczyt</b></td><td><code>OpenAIAnalyser</code></td><td>Bez zmian. Gemini tylko przepisuje — archiwum trzyma tekst niezależny od modelu, który go ocenia. Ewentualny <code>ANALYSER=gemini</code> to osobna, późniejsza decyzja.</td><td><span class="tag ok">jest</span></td></tr>
+            <tr><td><b>Shorty</b></td><td><code>MIN_VIDEO_SECONDS=60</code></td><td>Nie przenosić <code>HEAD /shorts/ID</code>: z Azure trafi na ekran zgody albo blokadę. Wystarczy próg długości + wyjątek dla nagranych transmisji.</td><td><span class="tag ok">świadomie nie</span></td></tr>
+            <tr><td><b>Filtr AI kanału</b></td><td>brak (są reguły alertów i tematy)</td><td>Poza tym planem — osobna zmiana, jeśli pojawi się kanał z wieloma prowadzącymi.</td><td><span class="tag ok">później</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Decyzje</div>
+      <h2>Sześć rozstrzygnięć, zanim powstanie kod</h2>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>1. Napisy przed Gemini, wszędzie <span class="tag ok">kolejność</span></h3>
+          <p><code>TRANSCRIPT_PROVIDERS=direct,gemini</code> w dev i na produkcji. Lokalnie napisy są darmowe i dokładniejsze w nazwach własnych. Na Azure <code>direct</code> dostaje <code>Blocked</code> i łańcuch przechodzi dalej. Żeby nie płacić 60 s czekania na każdy film, dostawca oznaczony w <code>provider_state</code> jako blokowany jest pomijany przez <code>PROVIDER_COOLDOWN_MINUTES</code> (np. 360).</p>
+        </div>
+        <div class="fail ok">
+          <h3>2. Brak napisów → Gemini od razu <span class="tag att">koszt vs czas</span></h3>
+          <p>Agents nie czeka na automatyczne napisy, które pojawiają się po kilku godzinach. Dla rynku liczy się czas, więc tak samo: <code>NoTranscript</code> od <code>direct</code> natychmiast idzie do <code>gemini</code>. Opcjonalne pokrętło <code>YOUTUBE_GEMINI_AFTER_MINUTES</code> (domyślnie 0) pozwoli później oszczędzać — Gemini dostaje film dopiero po N minutach od publikacji.</p>
+        </div>
+        <div class="fail ok">
+          <h3>3. Wynik Gemini to transkrypcja <code>automatic</code> z modelem <span class="tag ok">pochodzenie</span></h3>
+          <p><code>provider="gemini"</code>, <code>automatic=true</code>, <code>model=&lt;id&gt;</code>. Odczyt i ekran mają wiedzieć, że tekst wygenerował model (może mylić nazwy własne i liczby). Prompt odczytu dostaje linię o źródle, tak jak Agents ostrzega przy ASR.</p>
+        </div>
+        <div class="fail">
+          <h3>4. 429 to <code>Blocked</code>, nie sen w pętli <span class="tag att">asynchroniczność</span></h3>
+          <p>Agents śpi 30–120 s przy 429. W pętli workbencha to zablokowałoby inne kroki. Jedno ponowienie z krótkim backoffem, potem <code>Blocked("gemini", "rate limited")</code> — przebieg przestaje pytać, kolejny spróbuje. 5xx: tak samo. <code>MAX_TOKENS</code> i pusta odpowiedź to <code>NoTranscript(charged=True)</code> z powodem — fakt o filmie i tym ustawieniu kawałków, z normalnymi ponowieniami.</p>
+        </div>
+        <div class="fail">
+          <h3>5. Klucz to sekret pakietu, nie procesu <span class="tag att">bezpieczeństwo</span></h3>
+          <p><code>YOUTUBE_GEMINI_API_KEY</code> (prefiks pakietu, zgodnie z regułą env workbencha), w Key Vault i w app settings przez Terraform. SDK wysyła klucz nagłówkiem — nigdy w URL, nigdy w logu ani w <code>/state</code>. Zestaw testów sekretów obejmuje nowe pole. <strong>Darmowy plan Gemini pozwala Google używać treści do ulepszania produktów</strong>; na produkcji płatny plan, w dev darmowy jest w porządku.</p>
+        </div>
+        <div class="fail">
+          <h3>6. Model w ustawieniu, nie w kodzie <span class="tag att">cennik się rusza</span></h3>
+          <p><code>YOUTUBE_GEMINI_MODEL</code> (domyślnie tani Flash z free tier), <code>YOUTUBE_GEMINI_CHUNK_MINUTES=30</code>, <code>YOUTUBE_GEMINI_MEDIA_RESOLUTION=low</code>. Ceny z <code>Agents/doc/cennik-gemini.md</code> zmieniają się co kwartał (Flash drożeje ×2 od 2027).</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Plan prac</div>
+      <h2>Pięć kroków, pierwszy bez kodu w repo</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Krok</th><th>Pliki</th><th>Gotowe, gdy</th></tr></thead>
+          <tbody>
+            <tr><td class="n">G0</td><td><b>Pomiar.</b> W Agents <code>transcription.method: gemini</code>, <code>sync --limit 3</code> na filmach, które mają już napisy: polski 20 min, polski 40 min (kawałki), angielski. Porównać z <code>napisy-auto</code>.</td><td>tylko <code>C:\Marek\Agents</code></td><td>Znane: tokeny/min filmu przy <code>LOW</code>, czas odpowiedzi, odsetek błędów, jakość nazw własnych i liczb, zachowanie znaczników czasu w kawałkach. Liczby trafiają do scenariusza symulacji.</td></tr>
+            <tr><td class="n">G1</td><td><b>Interfejs i łańcuch.</b> <code>FilmToTranscribe</code>, <code>listens</code>, przejście przy <code>NoTranscript</code>, cooldown blokowanego dostawcy, zapis odmów z łańcucha.</td><td><code>providers/base.py</code>, <code>chain.py</code>, <code>direct.py</code>, <code>sim/providers.py</code>, <code>ingest.py</code>, testy łańcucha</td><td>Testy: <code>direct</code> NoTranscript → <code>gemini</code> pytany; <code>direct</code> Blocked w cooldownie → niepytany; dwóch dostawców napisów → drugi niepytany przy NoTranscript (stara reguła).</td></tr>
+            <tr><td class="n">G2</td><td><b>Napisy jak w Agents.</b> Wybór ścieżki po języku audio, bez tłumaczeń, paragrafy ze znacznikami czasu. <code>audio_language</code> z Data API.</td><td><code>direct.py</code>, <code>data_api.py</code>, migracja <code>0002</code> (<code>videos.audio_language</code>, <code>transcripts.model</code>), <code>store.py</code></td><td>Polski film z angielskimi napisami ręcznymi dostaje polskie automatyczne. Migracja pod blokadą <code>8110</code>.</td></tr>
+            <tr><td class="n">G3</td><td><b>Dostawca Gemini.</b> Kawałki, prompt, parser <code>[MM:SS]</code> z regułą offsetu, klasyfikacja błędów, licznik sekund i tokenów, sufit dzienny.</td><td><code>providers/gemini.py</code>, <code>build.py</code>, <code>config.py</code> (<code>KNOWN_TRANSCRIPT_PROVIDERS</code>, walidator „gemini wymaga data_api i klucza”), <code>budget.py</code>, <code>pyproject.toml</code> (<code>google-genai</code>), <code>.env.example</code></td><td>Testy na nagranych odpowiedziach (<code>respx</code> — SDK chodzi po <code>httpx</code>): kawałki, offset względny i bezwzględny, 429, <code>MAX_TOKENS</code>, sekret poza logiem. <code>measure-duplication.py</code> bez nowych kopii.</td></tr>
+            <tr><td class="n">G4</td><td><b>Symulacja i ekran.</b> <code>SimTranscripts</code> z flagą „słucha”; scenariusz z filmem <code>captions: never</code>, który i tak dostaje tekst od symulowanego Gemini. <code>/state</code> pokazuje dzienne sekundy Gemini, a karta filmu źródło „Gemini · model”.</td><td><code>sim/scenario.py</code>, <code>sim/scenarios/default.json</code>, <code>contract.py</code>, <code>views.py</code>, terminal <code>src/youtube/</code>; potem skill <code>contract-sync</code></td><td>Przebieg ręczny 9.2 robiony już z Gemini w łańcuchu. <code>contract:check</code> zielony.</td></tr>
+            <tr><td class="n">G5</td><td><b>Produkcja.</b> Sekret w Key Vault, app settings, pomiar z Azure, że <code>direct</code> jest blokowany, a <code>gemini</code> przechodzi.</td><td><code>infra/app-service.tf</code>, <code>infra/key-vault.tf</code></td><td><code>apply</code> operatora <strong>przed</strong> obrazem, który wymaga ustawienia. Wycofanie: <code>TRANSCRIPT_PROVIDERS=direct</code> i restart.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Koszt</div>
+      <h2>Ile to kosztuje — szacunek do potwierdzenia w G0</h2>
+      <p>Gemini przy <code>MEDIA_RESOLUTION_LOW</code> liczy wideo mniej więcej jako ~100 tokenów na sekundę (obraz w niskiej rozdzielczości + audio). Dla godziny filmu daje to ~360 tys. tokenów wejścia i ~15 tys. wyjścia (dosłowny tekst ~55 tys. znaków). <strong>Te liczby to założenie z dokumentacji — G0 je zastąpi.</strong></p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Model (cennik 10.10.2026)</th><th class="n">Wej. / 1M</th><th class="n">Wyj. / 1M</th><th class="n">1 h filmu</th><th class="n">30 filmów × 25 min / dzień</th></tr></thead>
+          <tbody>
+            <tr><td><b>gemini-3.5-flash-lite</b></td><td class="n">$0.30</td><td class="n">$2.50</td><td class="n">~$0.15</td><td class="n">~$1.9</td></tr>
+            <tr><td><b>gemini-3.8-flash</b> (do 31.12)</td><td class="n">$0.75</td><td class="n">$3.75</td><td class="n">~$0.33</td><td class="n">~$4.1</td></tr>
+            <tr><td><b>gemini-3.8-flash</b> (od 2027)</td><td class="n">$1.50</td><td class="n">$7.50</td><td class="n">~$0.65</td><td class="n">~$8.2</td></tr>
+            <tr><td><b>darmowy plan</b></td><td class="n">—</td><td class="n">—</td><td class="n">$0</td><td class="n">sufit 8 h/dzień</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px">Na Azure płaci się za każdy film, bo darmowe napisy nie przechodzą. Przy obecnej liście obserwacji (jeden kanał, ~25 min dziennie) to centy. Rachunek zmieniają dopiero tematy, czyli wyszukiwanie po frazie.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Ryzyka</div>
+      <h2>Co może pójść źle</h2>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Link YouTube w Gemini to funkcja w preview <span class="tag stop">stabilność</span></h3>
+          <p>Forum Google zgłasza niestabilne błędy przy tej ścieżce, a cennik i limity mogą się zmienić. Łagodzi to łańcuch: kolejny dostawca (np. Supadata z <code>docs/supadata-koszty.html</code>) to następna klasa, a <code>Pending</code>/<code>poll</code> już na nią czekają.</p>
+        </div>
+        <div class="fail">
+          <h3>Tekst modelu, nie napisy <span class="tag att">jakość</span></h3>
+          <p>Gemini może przekręcać nazwy spółek, tickery i liczby — dokładnie to, co odczyt rynkowy wyciąga. Kolumna <code>model</code> i linia w prompcie odczytu to minimum; G0 mówi, czy trzeba więcej.</p>
+        </div>
+        <div class="fail">
+          <h3>Tylko filmy publiczne <span class="tag att">zakres</span></h3>
+          <p>Niepubliczne, z ograniczeniem wieku albo usunięte dają błąd 4xx → <code>NoTranscript</code> → ponowienia → <code>gave_up</code>. Bez zmian w cyklu życia.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Regulamin lepiej niż dziś <span class="tag ok">plus</span></h3>
+          <p>Na Azure jedyną alternatywą byłyby proxy rezydencyjne pod <code>youtube-transcript-api</code> (szara strefa) albo płatny pośrednik. Gemini z linkiem to oficjalna funkcja Google.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Droga</div>
+      <h2>Najpierw obecna zmiana, potem osobna</h2>
+      <p class="intro"><code>add-youtube-archive</code> jest gotowa (40/41 zadań), niewypchnięta i nie zmienia produkcji. Doklejenie do niej Gemini przesunęłoby merge o całą pracę G1–G4 i trzymało 16-commitowy dług względem <code>main</code>.</p>
+      <ul>
+        <li><strong>Teraz:</strong> zacommitować poprawki z przeglądu, rebase na <code>origin/main</code>, PR, merge. Pakiet dalej się nie montuje.</li>
+        <li><strong>Potem:</strong> G0 w Agents (godzina pracy, kilka centów).</li>
+        <li><strong>Zmiana OpenSpec <code>add-gemini-transcripts</code></strong> — zmienia wymagania <code>youtube-data-transcripts</code> (reguła łańcucha, dostawca słuchający), <code>youtube-data-ingest</code> (sufit per dostawca, cooldown) i <code>youtube-data-simulation</code>, a dotyka <code>infra/</code>. Wymaga <code>proposal.md</code> i <code>design.md</code> z decyzjami 1–6; delty specyfikacji po polsku, <code>SHALL</code>/<code>MUST</code> literalnie.</li>
+        <li>Przebieg ręczny 9.2 — po G4, od razu z Gemini w łańcuchu.</li>
+      </ul>
+      <div class="quote">Agents pokazał drogę. Zanim zapłacimy za nią na Azure, trzeba ją raz przejść.</div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Plan · youtube_data + Gemini · źródło: C:\Marek\Agents\.claude\skills\yt-transkrypcje</span>
+    <span>Tryb jasny — jedyny</span>
+  </div>
+</footer>
