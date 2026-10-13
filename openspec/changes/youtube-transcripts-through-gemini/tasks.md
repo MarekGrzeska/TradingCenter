@@ -8,7 +8,7 @@
 ## 2. Interfejs i łańcuch
 
 - [x] 2.1 `TranscriptRequest(video_id, duration_seconds, languages, audio_language)`; `fetch(request)`, `price(request)`, `listens` w protokole; `Transcript.model`
-- [x] 2.2 `TranscriptChain.fetch` → `ChainAnswer(result, passed)` z regułą słuchającego i wynikiem `Deferred` (reguły końca: `design.md`, decyzja 2); pętla zapisuje stan każdego minionego dostawcy, a na `Deferred` woła `store.postpone` bez zmiany `attempts`
+- [x] 2.2 `TranscriptChain.fetch` → `ChainAnswer(result, passed)` z regułą słuchającego i wynikiem `Deferred` (reguły końca: `design.md`, decyzja 2); pętla zapisuje stan każdego minionego dostawcy, a na `Deferred` niczego nie zapisuje i idzie dalej
 - [x] 2.3 Cena przed wywołaniem i sufit per dostawca (`budget.transcript_ceiling`: słuchający → `GEMINI_DAILY_VIDEO_SECONDS`, reszta → `DAILY_TRANSCRIPT_UNITS`); odpoczynek zablokowanego (`PROVIDER_COOLDOWN_MINUTES`, z `store.provider_states`); brak dostawcy z czymkolwiek do zapytania zatrzymuje krok
 - [x] 2.4 Testy jednostkowe łańcucha: blokada → dalej (i w `passed`), brak napisów → słuchający z pominięciem kolejnych dostawców napisów, brak napisów bez słuchającego → koniec, słuchający bez tekstu → koniec, słuchający zablokowany po braku napisów → `Blocked`, słuchający pominięty → `Deferred`
 

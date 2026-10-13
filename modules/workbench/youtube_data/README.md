@@ -41,11 +41,11 @@ transcript or a reading.
 One pass every `YOUTUBE_POLL_INTERVAL_SECONDS`, four steps, each with a batch limit:
 
 1. **discover** — the latest films of each active channel, and a search for each topic that is due.
-   Shorts (under `MIN_VIDEO_SECONDS`), films over `MAX_VIDEO_SECONDS` and a stream still live are
+   Shorts (under `MIN_VIDEO_SECONDS`, 180), films over `MAX_VIDEO_SECONDS` and a stream still live are
    `skipped` with a reason, or wait until the stream has ended.
 2. **transcribe** — `discovered` → `transcribed`. Each film is priced by every provider before it is
    asked (a request for captions, the film's seconds for Gemini) and only providers with that much left
-   of their day, and not resting after a refusal (`PROVIDER_COOLDOWN_MINUTES`, 360), are asked. Captions
+   of their day, and not resting after a refusal (`PROVIDER_COOLDOWN_MINUTES`, 360 for captions; `LISTENER_COOLDOWN_MINUTES`, 15, for the one that listens), are asked. Captions
    come first, in the film's own language alone; **no captions goes on to the provider that listens**
    (`gemini`), not to another captions provider. No text from anyone is `no_transcript`, asked again after
    `RETRY_DELAYS_MINUTES` (60, 360, 1440) and then `gave_up`. **Blocked is not a miss**: a provider that
@@ -80,7 +80,7 @@ the refusals it passed on the way.
 | `YOUTUBE_TRANSCRIPT_PROVIDERS` | ordered list: `direct` (`youtube-transcript-api`, captions; works from a home address, refused wholesale from a datacenter) · `gemini` (listens to the film from its address; `YOUTUBE_GEMINI_API_KEY`, needs `data_api`) · `sim` · `sim_gemini`. Production order: `direct,gemini` |
 | `YOUTUBE_ANALYSER` | `sim` · `openai` (`YOUTUBE_OPENAI_API_KEY`, `YOUTUBE_ANALYSIS_MODEL`). No key is a supported state: films wait `transcribed` and `/state` says why |
 
-Gemini writes the transcript down, in pieces of `YOUTUBE_GEMINI_CHUNK_MINUTES` (30), verbatim and in the
+Gemini writes the transcript down, in pieces of `YOUTUBE_GEMINI_CHUNK_MINUTES` (15; `gemini-3.1-flash-lite` by default — measured: a 29-minute film in 79 s, ~170k tokens), verbatim and in the
 film's language, with `[MM:SS]` per paragraph; the model's name is stored on the transcript and shown on the
 card. The reading stays with the analyser. Another provider is one class in `providers/` and one name in
 the list.

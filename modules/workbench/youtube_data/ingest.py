@@ -264,14 +264,17 @@ class Ingest:
         """What is left of each provider's day, for the ones worth asking at all: not resting after a refusal younger than
         the cooldown, and with something left. Read once per film, since every answer spends."""
         await self._flush()
-        cooldown = timedelta(minutes=self._settings.provider_cooldown_minutes)
         async with self._pool.acquire() as conn:
             states = await store.provider_states(conn)
             spent = await store.usage_on(conn, self._day())
         left: dict[str, int] = {}
         for provider in self._providers.transcripts.providers:
             state = states.get(provider.name)
-            if state is not None and state.blocked and state.last_blocked_at and now - state.last_blocked_at < cooldown:
+            minutes = (
+                self._settings.listener_cooldown_minutes if provider.listens else self._settings.provider_cooldown_minutes
+            )
+            rest = timedelta(minutes=minutes)
+            if state is not None and state.blocked and state.last_blocked_at and now - state.last_blocked_at < rest:
                 continue
             ceiling = budget.transcript_ceiling(self._settings, provider)
             remaining = ceiling.limit - spent.get((ceiling.provider, ceiling.unit), 0)
@@ -337,10 +340,10 @@ class Ingest:
                     retry_at=None if give_up else now + timedelta(minutes=delays[misses - 1]),
                 )
             elif isinstance(result, Deferred):
-                # Not an attempt: nothing was learnt about the film. Asked again after the first retry delay.
-                await store.postpone(
-                    conn, film.video_id, until=now + timedelta(minutes=self._settings.retry_delays[0])
-                )
+                # Nothing was learnt about the film, so nothing is written: it stays as it is and the next pass asks again,
+                # as soon as a provider has finished resting or a day has turned. (Writing a date here once made a
+                # fifteen-minute rest an hour.)
+                pass
             else:
                 await store.note_provider(conn, result.provider, ok=False, at=now, reason=result.reason)
                 log.warning("transcripts blocked (%s: %s); this pass stops asking", result.provider, result.reason)

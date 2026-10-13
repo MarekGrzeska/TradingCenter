@@ -348,11 +348,6 @@ async def record_no_transcript(conn: Conn, video_id: str, *, give_up: bool, retr
     )
 
 
-async def postpone(conn: Conn, video_id: str, *, until: datetime) -> None:
-    """Asked again later without spending an attempt: nobody who could answer was asked."""
-    await conn.execute("UPDATE videos SET next_attempt_at = $2 WHERE video_id = $1", video_id, until)
-
-
 @dataclass(frozen=True, slots=True)
 class ToRead:
     video: Video

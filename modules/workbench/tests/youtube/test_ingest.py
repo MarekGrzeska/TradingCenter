@@ -195,7 +195,7 @@ async def test_a_film_dearer_than_what_is_left_of_the_listeners_day_waits_withou
 
     film = await rig.row("simfilm0001")
     assert (film["state"], film["attempts"]) == ("discovered", 0)
-    assert film["next_attempt_at"] is not None
+    assert film["next_attempt_at"] is None, "nothing was learnt about it, so nothing is written"
     assert await rig.used("sim_gemini", "sim_video_seconds") == 0
 
 
@@ -484,3 +484,32 @@ async def test_a_pass_and_a_film_named_by_hand_do_not_spend_the_same_day_twice(p
     await asyncio.gather(rig.tick(), rig.ingest.process_now("simfilm0001"))
 
     assert await rig.used("sim", "sim_credits") == 1, "one film, asked about once"
+
+
+async def test_a_crowded_listener_rests_minutes_while_refused_captions_rest_hours(pool) -> None:
+    """Nine films once waited six hours behind one 503: the provider that listens is back as soon as the model is."""
+    rig = Rig(pool, scenario(unheard("simfilm0001")), listener=True, listener_cooldown_minutes=15)
+    rig.world.scenario.listening.block_ratio = 1.0
+    await follow_all(rig, GOLD)
+
+    await rig.tick()
+    assert (await rig.states())["simfilm0001"] == "discovered", "refused: the model is crowded"
+
+    rig.world.scenario.listening.block_ratio = 0.0
+    rig.clock.advance(minutes=10)
+    await rig.tick()
+    assert (await rig.states())["simfilm0001"] == "discovered", "still resting"
+
+    rig.clock.advance(minutes=10)
+    await rig.tick()
+    assert (await rig.states())["simfilm0001"] == "quiet", "twenty minutes on, the listener is asked again and hears it"
+
+
+async def test_a_short_under_three_minutes_is_skipped_with_the_reason(pool) -> None:
+    rig = Rig(pool, scenario(captioned("simfilm0001", duration_seconds=150)))
+    await follow_all(rig, GOLD)
+
+    await rig.tick()
+
+    row = await rig.row("simfilm0001")
+    assert row["state"] == "skipped" and "floor" in row["skip_reason"]
