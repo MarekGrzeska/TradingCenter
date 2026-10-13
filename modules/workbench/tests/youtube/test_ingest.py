@@ -54,18 +54,17 @@ async def test_a_film_goes_from_discovered_to_read_in_one_pass_and_is_marked_sim
     assert (reading["impact_score"], reading["simulated"], reading["model"]) == (6, True, "sim")
 
 
-async def test_films_that_are_not_worth_a_transcript_are_skipped_with_the_reason_and_a_stream_waits(pool) -> None:
+async def test_films_that_are_not_worth_a_transcript_are_not_kept_at_all_and_a_stream_waits(pool) -> None:
     rig = Rig(pool)
     await follow_all(rig, MARKETS, CRYPTO)
 
     await rig.tick()
+    await rig.tick()  # the source lists them again: they are not stored again
 
     states = await rig.states()
-    assert states["simfilm0009"] == "skipped" and states["simfilm0010"] == "skipped"
-    assert "floor" in (await rig.row("simfilm0009"))["skip_reason"]
+    assert "simfilm0009" not in states and "simfilm0010" not in states, "a Short and a five-hour marathon"
     assert states["simfilm0011"] == "discovered", "a stream still running is not asked about"
     assert await rig.used("sim", "sim_credits") > 0
-    assert (await rig.row("simfilm0009"))["attempts"] == 0
 
 
 async def test_a_stream_is_read_once_it_has_ended(pool) -> None:
@@ -505,11 +504,19 @@ async def test_a_crowded_listener_rests_minutes_while_refused_captions_rest_hour
     assert (await rig.states())["simfilm0001"] == "quiet", "twenty minutes on, the listener is asked again and hears it"
 
 
-async def test_a_short_under_three_minutes_is_skipped_with_the_reason(pool) -> None:
+async def test_a_short_under_three_minutes_is_not_kept(pool) -> None:
     rig = Rig(pool, scenario(captioned("simfilm0001", duration_seconds=150)))
     await follow_all(rig, GOLD)
 
     await rig.tick()
 
-    row = await rig.row("simfilm0001")
-    assert row["state"] == "skipped" and "floor" in row["skip_reason"]
+    assert await rig.states() == {}
+
+
+async def test_naming_a_short_by_hand_is_refused_with_the_reason_and_stores_nothing(pool) -> None:
+    rig = Rig(pool, scenario(captioned("simfilm0001", duration_seconds=150)))
+
+    with pytest.raises(watchlist.WatchlistRefused, match="floor"):
+        await watchlist.analyse_film(pool, rig.providers, rig.settings, "simfilm0001")
+
+    assert await rig.states() == {}

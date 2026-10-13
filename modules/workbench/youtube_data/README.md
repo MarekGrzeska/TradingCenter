@@ -41,8 +41,9 @@ transcript or a reading.
 One pass every `YOUTUBE_POLL_INTERVAL_SECONDS`, four steps, each with a batch limit:
 
 1. **discover** — the latest films of each active channel, and a search for each topic that is due.
-   Shorts (under `MIN_VIDEO_SECONDS`, 180), films over `MAX_VIDEO_SECONDS` and a stream still live are
-   `skipped` with a reason, or wait until the stream has ended.
+   Shorts (under `MIN_VIDEO_SECONDS`, 180) and films over `MAX_VIDEO_SECONDS` are **not kept at all** —
+   never stored when the source lists them, deleted if their length arrives after they were stored, refused with the
+   reason when named by hand. A stream still live waits until it has ended.
 2. **transcribe** — `discovered` → `transcribed`. Each film is priced by every provider before it is
    asked (a request for captions, the film's seconds for Gemini) and only providers with that much left
    of their day, and not resting after a refusal (`PROVIDER_COOLDOWN_MINUTES`, 360 for captions; `LISTENER_COOLDOWN_MINUTES`, 15, for the one that listens), are asked. Captions

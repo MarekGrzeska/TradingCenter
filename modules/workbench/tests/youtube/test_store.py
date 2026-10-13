@@ -82,24 +82,25 @@ async def test_a_length_the_first_sighting_lacked_is_filled_in_and_a_known_one_i
     assert video is not None and video.duration_seconds == 600
 
 
-async def test_only_films_whose_length_is_known_and_out_of_bounds_are_skipped(db) -> None:
-    await store.upsert_films(
-        db,
-        [
-            discovery("short", duration_seconds=30),
-            discovery("long", duration_seconds=20_000),
-            discovery("fine", duration_seconds=600),
-            discovery("unknown"),
-            discovery("live", live_status="live"),
-        ],
-    )
+async def test_only_films_whose_length_is_known_and_out_of_bounds_are_dropped(db) -> None:
+    """A premiere is stored without a length and gets one later; a film already known to be out of bounds is never stored."""
+    films = [
+        discovery("short", duration_seconds=30),
+        discovery("long", duration_seconds=20_000),
+        discovery("fine", duration_seconds=600),
+        discovery("unknown"),
+        discovery("live", live_status="live"),
+    ]
+    assert await store.upsert_films(db, films, bounds=(60, 10_800)) == 3
+    assert {row["video_id"] for row in await db.fetch("SELECT video_id FROM videos")} == {"fine", "unknown", "live"}
 
-    assert await store.skip_unwanted(db, minimum=60, maximum=10_800) == 2
+    await db.execute("UPDATE videos SET duration_seconds = 30 WHERE video_id = 'unknown'")
+    await db.execute("INSERT INTO videos (video_id, title, published_at, origins, state, skip_reason) "
+                     "VALUES ('old', 'x', now(), ARRAY['manual'], 'skipped', 'older version')")
 
-    states = {row["video_id"]: (row["state"], row["skip_reason"]) for row in await db.fetch("SELECT * FROM videos")}
-    assert states["short"][0] == "skipped" and "floor" in states["short"][1]
-    assert states["long"][0] == "skipped" and "limit" in states["long"][1]
-    assert {states[name][0] for name in ("fine", "unknown", "live")} == {"discovered"}
+    assert await store.drop_unwanted(db, minimum=60, maximum=10_800) == 2
+
+    assert {row["video_id"] for row in await db.fetch("SELECT video_id FROM videos")} == {"fine", "live"}
 
 
 async def test_the_queue_holds_what_is_due_and_not_what_is_live_or_finished(db) -> None:

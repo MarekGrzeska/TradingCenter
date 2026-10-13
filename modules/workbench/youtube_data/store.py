@@ -216,13 +216,32 @@ class Discovery:
     alert_rule: str
 
 
-async def upsert_films(conn: Conn, discoveries: Sequence[Discovery]) -> int:
+def unwanted_reason(ref: VideoRef, bounds: tuple[int, int]) -> str | None:
+    """Why a film is not worth a transcript, or `None`. Only a film whose length is known and which is not a live stream
+    can be too short or too long: a feed cannot say, and guessing would drop good films."""
+    minimum, maximum = bounds
+    if ref.live_status != "none" or ref.duration_seconds is None:
+        return None
+    if ref.duration_seconds < minimum:
+        return f"shorter than the {minimum}-second floor"
+    if ref.duration_seconds > maximum:
+        return f"longer than the {maximum // 60}-minute limit"
+    return None
+
+
+async def upsert_films(
+    conn: Conn, discoveries: Sequence[Discovery], *, bounds: tuple[int, int] | None = None
+) -> int:
     """The films this pass had not seen before, inserted. A film already here is updated only if it has something new —
     a second door it came in by, a length it lacked, a live stream that ended — and is left alone otherwise, which is the
-    usual case by a wide margin. Returns how many were new."""
+    usual case by a wide margin. With `bounds` (floor, ceiling in seconds) a film outside them is not stored at all: a
+    row for a Short is clutter in every list and every answer, and a film the source lists again and again would be
+    stored and dropped on every pass. Returns how many were new."""
     new = 0
     for found in discoveries:
         ref = found.ref
+        if bounds is not None and unwanted_reason(ref, bounds) is not None:
+            continue
         row = await conn.fetchrow(
             """
             INSERT INTO videos (
@@ -259,17 +278,17 @@ async def upsert_films(conn: Conn, discoveries: Sequence[Discovery]) -> int:
     return new
 
 
-async def skip_unwanted(conn: Conn, *, minimum: int, maximum: int) -> int:
-    """Films whose length is known and outside the limits leave the queue, saying why. A film whose length is not known
-    is not touched: a feed cannot say, and guessing would skip good films."""
+async def drop_unwanted(conn: Conn, *, minimum: int, maximum: int) -> int:
+    """Films that are not worth a transcript are deleted rather than kept: the ones whose length turned out, after they
+    were stored, to be outside the limits (a premiere gets its length late), and any left in the `skipped` state by an
+    older version. A film the source lists again is not stored again (`upsert_films` with `bounds`). A film whose length
+    is not known is not touched."""
     result = await conn.execute(
         """
-        UPDATE videos SET state = 'skipped',
-            skip_reason = CASE WHEN duration_seconds < $1
-                               THEN 'shorter than the ' || $1 || '-second floor'
-                               ELSE 'longer than the ' || ($2 / 60) || '-minute limit' END
-        WHERE state = 'discovered' AND live_status = 'none' AND duration_seconds IS NOT NULL
-          AND (duration_seconds < $1 OR duration_seconds > $2)
+        DELETE FROM videos
+        WHERE state = 'skipped'
+           OR (state = 'discovered' AND live_status = 'none' AND duration_seconds IS NOT NULL
+               AND (duration_seconds < $1 OR duration_seconds > $2))
         """,
         minimum,
         maximum,
