@@ -38,6 +38,8 @@ Rules:
 - Do NOT mark background music or sounds. Only a silent/music-only stretch longer than 10 seconds may be marked once, briefly, e.g. [music].
 - Output only the transcript."""
 
+MAX_OUTPUT_TOKENS = 32_768
+
 # A film this much longer than a piece is still asked about whole: 33 minutes is one call, not 30 and 3.
 WHOLE_UP_TO = 1.2
 
@@ -131,6 +133,9 @@ class GeminiTranscripts:
         self._config = types.GenerateContentConfig(
             media_resolution=types.MediaResolution.MEDIA_RESOLUTION_LOW,
             temperature=0.2,
+            # Measured on a 29-minute Polish film (13 October 2026): without it the answer is cut off at the model's
+            # default, long before the film ends. A quarter of an hour of speech is a few thousand tokens.
+            max_output_tokens=MAX_OUTPUT_TOKENS,
         )
 
     def price(self, request: TranscriptRequest) -> int:

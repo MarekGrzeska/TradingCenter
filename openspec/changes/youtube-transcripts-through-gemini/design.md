@@ -50,8 +50,8 @@ Wynik łańcucha to `ChainAnswer(result, passed)`, a `result` ma czwartą posta�
 - brak napisów i żadnego dostawcy słuchającego → `NoTranscript` (stara reguła);
 - same blokady → ostatnia `Blocked`;
 - nikogo nie zapytano → `Deferred`.
-Pętla na `Deferred` wywołuje `store.postpone(video_id, until=now + pierwsze opóźnienie ponowienia)`
-bez zmiany `attempts` i przechodzi do następnego filmu (nie zatrzymuje przebiegu).
+Pętla na `Deferred` niczego nie zapisuje (film nie ma nowej wiedzy; data ponowienia sprawiłaby, że
+kwadrans odpoczynku słuchającego trwałby godzinę) i przechodzi do następnego filmu, nie zatrzymując przebiegu.
 
 **3. Cena przed wywołaniem.** Protokół dostawcy dostaje `price(request) -> int` w jego jednostce:
 `direct` 1 zapytanie, `gemini` długość filmu w sekundach. Pętla pyta dostawcę tylko, gdy reszta jego

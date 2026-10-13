@@ -59,15 +59,22 @@ class Settings(BaseSettings):
     # Gemini, handed the film's address: it listens, so a film with no captions is ordinary work for it. Billed in
     # tokens, limited by Google in hours of film a day (eight on the free tier), so the ceiling is seconds of film.
     gemini_api_key: str | None = None
-    gemini_model: str = "gemini-3.8-flash"
-    # A film longer than this is written down in pieces: a whole hour in one answer risks a cut-off one.
-    gemini_chunk_minutes: int = 30
+    # Measured on 13 October 2026 with the same Polish film: `gemini-3.5-flash-lite`, `gemini-3.8-flash` and
+    # `gemini-3-flash-preview` answered 503 "experiencing high demand" or hung until the timeout; `gemini-3.1-flash-lite`
+    # wrote a 29-minute film down in 79 s for about 170k tokens and costs the least. Preview models are crowded.
+    gemini_model: str = "gemini-3.1-flash-lite"
+    # A film longer than this is written down in pieces. Fifteen minutes of Polish speech is a few thousand tokens of
+    # answer; a half hour in one call was cut off at the model's default limit, which is why the limit is raised as well.
+    gemini_chunk_minutes: int = 15
     gemini_daily_video_seconds: int = 28_800
-    # One piece of film is minutes of listening, not the seconds a listing takes.
-    gemini_timeout_seconds: float = 600.0
+    # One piece of film is a minute or two of listening, not the seconds a listing takes; a call past this is a hung one.
+    gemini_timeout_seconds: float = 300.0
     # A provider that refused us is not asked again for this long: from the cloud, captions are refused every time, and
     # asking costs a request and up to a minute before the chain reaches the provider that listens.
     provider_cooldown_minutes: int = 360
+    # The provider that listens rests far less: its refusals are a crowded model or a rate limit, gone in minutes, and
+    # six hours of rest would strand every film behind a 503 (13 October 2026: nine of them).
+    listener_cooldown_minutes: int = 15
 
     # The model. Absent key is a supported state, not a refusal — the package discovers and transcribes, and every
     # reading stays empty, which `/state` says.
@@ -100,7 +107,7 @@ class Settings(BaseSettings):
 
     # A film outside these is not worth a transcript: a short is a slogan, and a five-hour stream is a day of tokens.
     # Applied only where the source says how long the film is — a feed does not.
-    min_video_seconds: int = 60
+    min_video_seconds: int = 180
     max_video_seconds: int = 10_800
 
     # How long the watch list may grow, and what a topic gets when it is added without saying.
@@ -260,6 +267,7 @@ class Settings(BaseSettings):
         "gemini_chunk_minutes",
         "gemini_daily_video_seconds",
         "provider_cooldown_minutes",
+        "listener_cooldown_minutes",
     )
     @classmethod
     def _positive(cls, value: int, info: ValidationInfo) -> int:

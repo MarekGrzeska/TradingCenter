@@ -82,7 +82,8 @@ Ręczne napisy w innym języku to tłumaczenie, a odczyt rynkowy z tłumaczenia 
 
 ### Requirement: Zablokowany dostawca odpoczywa
 
-Dostawca, którego ostatnia odpowiedź była blokadą młodszą niż czas odpoczynku z ustawień, MUST NOT być
+Dostawca, którego ostatnia odpowiedź była blokadą młodszą niż czas odpoczynku z ustawień (krótszy dla
+dostawcy słuchającego, którego odmowa to przeciążony model, niż dla dostawcy napisów, którego odmowa jest stała), MUST NOT być
 pytany. Po upływie tego czasu MUST zostać zapytany znowu. Gdy żaden dostawca nie zostaje do zapytania,
 przebieg MUST przestać transkrybować, a filmy MUST zostać oczekujące z nietkniętą liczbą prób.
 
