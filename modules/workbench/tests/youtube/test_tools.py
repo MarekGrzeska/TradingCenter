@@ -3,6 +3,7 @@ archive's: it adds to a list, and it never takes anything off."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 from datetime import timedelta
 
@@ -219,8 +220,21 @@ async def test_a_film_named_by_hand_is_queued_and_a_non_film_is_refused_with_a_w
     queued = await call(tools, "analyse_video", reference="https://youtu.be/simfilm0004")
     refused = await call(tools, "analyse_video", reference="https://example.com/x")
 
-    assert queued["created"] is True and "coming pass" in queued["note"]
+    assert queued["created"] is True and "now, in the background" in queued["note"]
     assert "refused" in refused and "search_youtube" in refused["do_first"]
+
+
+async def test_a_film_named_by_hand_is_read_at_once_without_a_pass_of_the_loop(tools, rig, app) -> None:
+    app.state.ingest = rig.ingest
+    rig.clock.advance(minutes=30)
+
+    await call(tools, "analyse_video", reference="https://youtu.be/simfilm0004")
+
+    for _ in range(200):
+        if (await rig.states()).get("simfilm0004") == "quiet":
+            break
+        await asyncio.sleep(0.05)
+    assert (await rig.states())["simfilm0004"] == "quiet", "read in the background, with no tick"
 
 
 # --- searching, which is not free -----------------------------------------------------------------------------------

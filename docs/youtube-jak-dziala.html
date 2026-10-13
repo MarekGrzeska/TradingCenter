@@ -1,0 +1,336 @@
+<title>YouTube jak działa</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  h3.sub {
+    font-family: var(--head); font-weight: 700; font-size: 21px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 30px 0 10px;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+  ul { margin: 0 0 16px; padding-left: 22px; max-width: 70ch; }
+  li { margin-bottom: 6px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure pre { margin: 0; }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.5;
+  }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Archiwum YouTube · jak to działa</span>
+    <h1>Film wchodzi, ocena i alert wychodzą</h1>
+    <p class="lede">Wskazujesz kanały i tematy. System sam znajduje nowe filmy, spisuje, co w nich padło, każe modelowi to <b>ocenić pod kątem rynku</b> i — jeśli film jest ważny — wysyła ci wiadomość na Telegram. Ten dokument opisuje, <b>co robi</b>, bez żadnej techniki.</p>
+    <div class="strip">
+      <span>TradingCenter / YouTube</span>
+      <span>13 października 2026</span>
+      <span>na produkcji: <b>włączone</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">30 min</div><div class="l">co tyle system sprawdza kanały i dopracowuje filmy</div></div>
+      <div class="cell"><div class="v">1–10</div><div class="l">ocena „jak bardzo to ważne” każdego filmu</div></div>
+      <div class="cell"><div class="v">8+</div><div class="l">od tej oceny kanał zwykle dzwoni na Telegram</div></div>
+      <div class="cell"><div class="v">10</div><div class="l">narzędzi dla agenta rozmowy i zespołów</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Po co to jest</div>
+      <h2>Zamiast oglądać, czytasz wnioski</h2>
+      <p class="intro">Wybrani ludzie na YouTube mówią o rynkach godzinami. Archiwum ogląda to za ciebie: zapamiętuje <strong>co powiedzieli</strong>, <strong>co o tym sądzi model</strong> i <strong>czy warto się tym zainteresować teraz</strong>.</p>
+      <p>Nic tu nie handluje. Archiwum tylko czyta i informuje; decyzje i rachunek demo pozostają osobno.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Droga filmu</div>
+      <h2>Pięć kroków od premiery do wiadomości</h2>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>1. Znalezienie <span class="tag ok">co 30 min</span></h3>
+          <p>System zagląda do każdego obserwowanego kanału po najnowsze filmy, a dla każdego tematu szuka nowych filmów po frazie. Film znaleziony dwiema drogami (kanał i temat) jest w archiwum <strong>jednym filmem</strong>.</p>
+        </div>
+        <div class="fail">
+          <h3>2. Sito <span class="tag att">co odpada</span></h3>
+          <p>Odpadają filmy krótsze niż minuta (zajawki) i dłuższe niż trzy godziny (całodzienne transmisje). <strong>Transmisja na żywo czeka</strong>, aż się skończy, i dopiero wtedy jest brana. Każdy odrzucony film ma zapisany powód, żeby nie dało się go „zgubić po cichu”.</p>
+        </div>
+        <div class="fail">
+          <h3>3. Spisanie tego, co padło <span class="tag att">najtrudniejszy krok</span></h3>
+          <p>System najpierw bierze <strong>gotowe napisy</strong> z YouTube, w języku, którym film jest nagrany (nigdy tłumaczenie). Gdy napisów nie ma, <strong>model Gemini „słucha” filmu</strong> i go przepisuje. Szczegóły w następnej sekcji.</p>
+        </div>
+        <div class="fail">
+          <h3>4. Ocena <span class="tag ok">model czyta</span></h3>
+          <p>Model dostaje tekst i odpowiada w stałym układzie: streszczenie po polsku, najważniejsze punkty, <strong>co autor sądzi o których instrumentach</strong> (rośnie, spada, bez zdania, jak mocno jest przekonany, na jak długo), <strong>konkretne prognozy</strong> i ocenę ważności od 1 do 10. Tekst filmu traktowany jest jak <strong>cudze słowa do przeczytania, nie polecenia</strong> — autor nie może „rozkazać” modelowi niczego.</p>
+        </div>
+        <div class="fail ok">
+          <h3>5. Wiadomość <span class="tag ok">lub cisza</span></h3>
+          <p>Zależnie od reguły kanału film dostaje powiadomienie na Telegram z tytułem, streszczeniem i linkiem. Film, który nie został zgłoszony w ciągu dwóch dób od odczytu, uznajemy za „cichy”, żeby nie sypać zaległych wiadomości kupą.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Skąd bierze się tekst</div>
+      <h2>Napisy najpierw, Gemini gdy ich brak</h2>
+      <p class="intro">Napisy są darmowe i dokładne. Ale <span class="hl">z serwerów Azure YouTube ich nie wydaje</span> — odmawia każdemu zapytaniu. Dlatego na produkcji prawie każdy film przejdzie przez Gemini.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Sytuacja</th><th>Co robi system</th></tr></thead>
+          <tbody>
+            <tr><td><b>Film ma napisy w swoim języku</b></td><td>Bierze je za darmo. Tekst dostaje znaczniki czasu co ok. pół minuty.</td></tr>
+            <tr><td><b>Napisy są tylko w innym języku</b></td><td>Nie bierze ich: to tłumaczenie, a w tłumaczeniu giną nazwy i liczby. Idzie do Gemini.</td></tr>
+            <tr><td><b>Napisów brak</b></td><td>Gemini dostaje link do filmu i przepisuje go słowo w słowo. Długie filmy tnie na kawałki po pół godziny.</td></tr>
+            <tr><td><b>YouTube odmawia (typowo z chmury)</b></td><td>To nie jest „film bez napisów”: system <strong>nie liczy tego jako porażki filmu</strong>, a odmawiającego dostawcę zostawia w spokoju na 6 godzin i od razu idzie do Gemini.</td></tr>
+            <tr><td><b>Nikt nie ma tekstu</b></td><td>Ponawia po godzinie, po 6 godzinach i po dobie. Po czwartej próbie <strong>rezygnuje</strong> z filmu — każda próba kosztuje, więc ostatnia musi być.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px">Tekst od Gemini jest oznaczony nazwą modelu, bo to <strong>zapis zrobiony przez maszynę</strong> — może przekręcić nazwę spółki albo liczbę. Napisy automatyczne YouTube też bywają niedokładne.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Co obserwujesz</div>
+      <h2>Kanały, tematy, pojedyncze filmy</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Co</th><th>Jak działa</th><th>Limit</th></tr></thead>
+          <tbody>
+            <tr><td><b>Kanał</b></td><td>Podajesz adres, @uchwyt albo identyfikator. System bierze każdy jego nowy film.</td><td>do 100</td></tr>
+            <tr><td><b>Temat</b></td><td>Fraza wyszukiwana co jakiś czas (domyślnie co 6 godzin), z własnym limitem filmów na przebieg (domyślnie 3). Wyszukiwanie jest <strong>drogie</strong> w dziennym limicie YouTube, dlatego każdy temat ma własne granice.</td><td>do 20</td></tr>
+            <tr><td><b>Pojedynczy film</b></td><td>Wskazujesz link, a film jest <strong>przetwarzany od razu</strong>, w tle, poza kolejką: odpowiedź wraca natychmiast, a ocena pojawia się po kilkudziesięciu sekundach (z napisami) albo po kilku minutach (gdy Gemini musi film wysłuchać). Te same limity co zawsze.</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px">Każda pozycja ma <strong>regułę alertu</strong> i można ją wstrzymać bez usuwania. <strong>Usuwać z listy może tylko operator</strong> w terminalu — agent rozmowy może dopisywać, nie kasować.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Alerty</div>
+      <h2>Trzy reguły na kanał albo temat</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Reguła</th><th>Kiedy dzwoni</th></tr></thead>
+          <tbody>
+            <tr><td><b>Zawsze</b></td><td>Każdy odczytany film z tego źródła.</td></tr>
+            <tr><td><b>Próg</b> (domyślna)</td><td>Tylko gdy ocena ważności wynosi <strong>8 lub więcej</strong>. Telefon czytasz na bieżąco, a kanał, który mówi codziennie, przestaje się wtedy liczyć.</td></tr>
+            <tr><td><b>Nigdy</b></td><td>Film ląduje w archiwum, bez wiadomości.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px">Film jest oznaczony jako zgłoszony dopiero <strong>po udanym wysłaniu</strong> — jeśli Telegram nie odpowie, spróbuje ponownie. Film z symulacji jest w wiadomości wyraźnie oznaczony. Bez ustawionego adresata system czyta wszystko normalnie i po prostu nikogo nie powiadamia; na produkcji adresat jest ustawiony.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Bezpieczniki</div>
+      <h2>Co chroni budżet i spokój</h2>
+      <div class="fails">
+        <div class="fail ok"><h3>Dzienne sufity <span class="tag ok">liczone u nas</span></h3><p>Każdy dostawca ma własny sufit na dobę: YouTube (lista i wyszukiwanie), Gemini (8 godzin filmu dziennie, jak w darmowym planie), model oceniający (2 mln tokenów). Po przekroczeniu system czeka do następnej doby — <strong>nie zatrzymuje reszty</strong>. System liczy sam, bo panel dostawcy pokazuje wyczerpanie dopiero po fakcie.</p></div>
+        <div class="fail ok"><h3>Cena przed pytaniem <span class="tag ok">film nie „przepala” doby</span></h3><p>Zanim dostawca zostanie zapytany, system sprawdza, czy zostało mu na dziś dość na <em>ten</em> film. Jeśli nie, film czeka do jutra i <strong>nie traci prób</strong>.</p></div>
+        <div class="fail"><h3>Porcje <span class="tag att">bez lawiny</span></h3><p>Jeden przebieg robi tylko ograniczoną porcję każdego kroku (do 50 odkryć, 10 transkrypcji, 5 ocen, 10 alertów). Reszta czeka na kolejny. Zalany kanał nie zablokuje wszystkiego naraz.</p></div>
+        <div class="fail"><h3>Awaria nie rozlewa się <span class="tag att">krok po kroku</span></h3><p>Jeśli jeden krok się wywróci (np. YouTube nie odpowiada), kolejne kroki i tak się wykonują dla tego, co już czeka. Ostatni przebieg widać w pasku stanu — gdy nie ukończył się od kilku cykli, ekran to mówi.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Co widzisz</div>
+      <h2>Zakładka YouTube w terminalu</h2>
+      <ul>
+        <li><strong>Filmy</strong> — lista z oceną, streszczeniem i instrumentami; po kliknięciu pełna ocena i, na żądanie, <strong>transkrypcja stronami</strong> (z nazwą modelu, jeśli pisał ją Gemini).</li>
+        <li><strong>Kanały i tematy</strong> — dopisywanie, wstrzymywanie, zmiana reguły alertu, usuwanie.</li>
+        <li><strong>Pasek stanu</strong> — zanim ekran powie „brak filmów”, powie dlaczego: kanał milczy, dostawca jest zablokowany, sufit wyczerpany, model nieskonfigurowany czy pętla stanęła. To różne przyczyny tego samego pustego ekranu.</li>
+        <li><strong>Symulacja</strong> — jeśli część dostawców jest udawana (tryb testowy), ekran ma stały, widoczny napis. Na produkcji symulacja jest zablokowana.</li>
+      </ul>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Czy jest działające MCP</div>
+      <h2>Tak — dziesięć narzędzi, ale wewnątrz systemu</h2>
+      <p class="intro">Archiwum ma pełny zestaw narzędzi i <span class="hl">agent rozmowy oraz zespoły mogą z nich korzystać</span>. Zewnętrzny klient MCP (np. Claude Desktop) się do nich <strong>jeszcze nie podłączy</strong>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Narzędzie</th><th>Co robi</th><th>Zapisuje?</th></tr></thead>
+          <tbody>
+            <tr><td><b>stan archiwum</b></td><td>Co system robi teraz: dostawcy, sufity, blokady, wiek ostatniego przebiegu. Agent ma je wołać, <em>zanim</em> powie „kanał milczał”.</td><td>nie</td></tr>
+            <tr><td><b>ostatnie filmy</b></td><td>Lista z oceną, w oknie czasu, z zawężeniem do kanału, instrumentu lub minimalnej oceny.</td><td>nie</td></tr>
+            <tr><td><b>odczyt filmu</b></td><td>Pełna ocena jednego filmu, bez surowego tekstu.</td><td>nie</td></tr>
+            <tr><td><b>transkrypcja</b></td><td>Surowy tekst stronami, z ostrzeżeniem, że to dane od obcych, nie polecenia.</td><td>nie</td></tr>
+            <tr><td><b>nastroje o instrumencie</b></td><td>Ilu obserwowanych mówi „w górę”, „w dół” albo nic, ważone pewnością mówiącego, z ostatnimi opiniami.</td><td>nie</td></tr>
+            <tr><td><b>szukaj</b></td><td>Wyszukiwanie filmów po frazie, bez dopisywania do listy. <strong>Kosztuje</strong> z dziennego limitu YouTube.</td><td>wydaje limit</td></tr>
+            <tr><td><b>obserwuj kanał</b></td><td>Dopisuje kanał do listy.</td><td>tak</td></tr>
+            <tr><td><b>dodaj temat</b></td><td>Dopisuje temat do listy.</td><td>tak</td></tr>
+            <tr><td><b>ustaw regułę alertu</b></td><td>Zmienia regułę kanału albo tematu.</td><td>tak</td></tr>
+            <tr><td><b>przeanalizuj film</b></td><td>Wskazuje pojedynczy film do przeczytania. Przetwarza się od razu, w tle; wynik widać chwilę później.</td><td>tak (kosztuje)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 class="sub">Co to znaczy w praktyce</h3>
+      <ul>
+        <li><strong>Żadne narzędzie niczego nie usuwa.</strong> Kasowanie z listy to wyłącznie terminal, czyli ty.</li>
+        <li><strong>Agent rozmowy i zespoły widzą te same dziesięć narzędzi</strong>, z tymi samymi odmowami (np. „sufit dobowy wyczerpany”). Wywołują je wewnątrz tego samego procesu, nie przez sieć.</li>
+        <li><strong>Z zewnątrz:</strong> osobny adres narzędzi istnieje, ale produkcja nie wpuszcza przez niego nikogo spoza systemu. Gdybyś chciał podłączyć np. Claude Desktop, trzeba osobno dopisać, kto może tam wejść — to decyzja o bezpieczeństwie, nie błąd.</li>
+      </ul>
+      <p><strong>Co sprawdziłem, a czego nie:</strong> zestaw dziesięciu narzędzi i ich widoczność dla agenta i zespołów sprawdzają testy automatyczne. <em>Nie sprawdzałem na żywo na produkcji</em>, że agent w czacie je wywołuje — to wymaga zalogowanej sesji. Najprościej: zapytaj agenta o stan archiwum YouTube.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Stan dziś</div>
+      <h2>Co jest, a czego jeszcze nie sprawdzono</h2>
+      <div class="fails">
+        <div class="fail ok"><h3>Włączone na produkcji <span class="tag ok">od 13.10</span></h3><p>Pakiet działa, ma własną bazę, klucze YouTube i Gemini, a alerty trafiają na Telegram. Lista obserwacji jest jeszcze <strong>pusta</strong> — zacznij od jednego kanału.</p></div>
+        <div class="fail"><h3>Ścieżka Gemini nieprzetestowana naprawdę <span class="tag att">do pomiaru</span></h3><p>Jak dobrze Gemini przepisuje polskie filmy o rynkach (nazwy spółek, liczby), nie wiadomo. Plan to trzy filmy próbne i porównanie z napisami. Do tego czasu traktuj tekst od Gemini jako szkic.</p></div>
+        <div class="fail"><h3>Klucz Gemini <span class="tag att">sprawdź plan</span></h3><p>Darmowy plan pozwala Google używać przesłanych treści (tu: publiczne linki do filmów i polecenie). Dla produkcji lepszy płatny.</p></div>
+        <div class="fail"><h3>Ostrożność w czytaniu ocen <span class="tag att">to opinia modelu</span></h3><p>Ocena i „co sądzi autor” to <strong>zdanie modelu</strong>, podpisane jego nazwą. System niczego nie weryfikuje z rynkiem; sprawdzanie prognoz względem cen to osobna, jeszcze niezrobiona praca.</p></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Archiwum YouTube · opis funkcjonalny</span>
+    <span>Tryb jasny — jedyny</span>
+  </div>
+</footer>

@@ -58,11 +58,17 @@ class Ingest:
         self._heartbeat = heartbeat
         self._clock = providers.clock
         self._task: asyncio.Task | None = None
+        # One thing spends the providers' day at a time: the loop's pass, or a film somebody named by hand.
+        self._busy = asyncio.Lock()
+        self._named: set[asyncio.Task] = set()
 
     async def start(self) -> None:
         self._task = asyncio.create_task(self._run(), name="youtube-ingest")
 
     async def stop(self) -> None:
+        for task in list(self._named):
+            task.cancel()
+        await asyncio.gather(*self._named, return_exceptions=True)
         if self._task is None:
             return
         self._task.cancel()
@@ -71,6 +77,30 @@ class Ingest:
         except asyncio.CancelledError:
             pass
         self._task = None
+
+    def start_now(self, video_id: str) -> None:
+        """A film named by hand, processed now and in the background: the caller is told it is accepted, not what became
+        of it — a model that listens to a film takes minutes."""
+        task = asyncio.create_task(self.process_now(video_id), name=f"youtube-named-{video_id}")
+        self._named.add(task)
+        task.add_done_callback(self._named.discard)
+
+    async def process_now(self, video_id: str) -> None:
+        """Words, reading and announcement for this one film, without waiting for the loop and without touching the rest
+        of its queue. The same ceilings, prices and rests as a pass — and the same lock, so the two cannot spend one
+        day twice."""
+        async with self._busy:
+            try:
+                await self._transcribe(only=video_id)
+                await self._read(only=video_id)
+                await self._tell()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # Nobody is waiting on this: what failed is for the log, and the film stays where the loop will find it.
+                log.exception("the film %s named by hand could not be processed", video_id)
+            finally:
+                await self._flush()
 
     async def _run(self) -> None:
         while True:
@@ -99,16 +129,17 @@ class Ingest:
             ("read", self._read),
             ("announce", self._tell),
         )
-        for name, step in steps:
-            try:
-                await step()
-            except asyncio.CancelledError:
-                raise
-            except Exception as err:
-                log.exception("the %s step failed", name)
-                errors.append(err)
-            finally:
-                await self._flush()
+        async with self._busy:
+            for name, step in steps:
+                try:
+                    await step()
+                except asyncio.CancelledError:
+                    raise
+                except Exception as err:
+                    log.exception("the %s step failed", name)
+                    errors.append(err)
+                finally:
+                    await self._flush()
         if errors:
             raise errors[0]
 
@@ -248,7 +279,7 @@ class Ingest:
                 left[provider.name] = remaining
         return left
 
-    async def _transcribe(self) -> None:
+    async def _transcribe(self, only: str | None = None) -> None:
         now = self._clock.now()
         chain = self._providers.transcripts
         async with self._pool.acquire() as conn:
@@ -256,7 +287,7 @@ class Ingest:
             await store.skip_unwanted(
                 conn, minimum=self._settings.min_video_seconds, maximum=self._settings.max_video_seconds
             )
-            films = await store.due_for_transcription(conn, now, self._settings.transcribe_batch_limit)
+            films = await store.due_for_transcription(conn, now, self._settings.transcribe_batch_limit, only=only)
 
         for film in films:
             left = await self._available(self._clock.now())
@@ -318,14 +349,17 @@ class Ingest:
 
     # --- read --------------------------------------------------------------------------------------------------------
 
-    async def _read(self) -> None:
+    async def _read(self, only: str | None = None) -> None:
         analyser = self._providers.analyser
         if analyser is None:
             return
         ceiling = budget.Ceiling(budget.ANALYSER, budget.TOKENS, self._settings.daily_token_limit)
         async with self._pool.acquire() as conn:
             waiting = await store.due_for_reading(
-                conn, max_failures=self._settings.reading_max_failures, limit=self._settings.analyse_batch_limit
+                conn,
+                max_failures=self._settings.reading_max_failures,
+                limit=self._settings.analyse_batch_limit,
+                only=only,
             )
 
         for item in waiting:

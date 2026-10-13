@@ -11,9 +11,12 @@ from dataclasses import dataclass
 from . import budget, store
 from .analysis import PROFILES
 from .config import Settings
-from .models import ADDED_BY, ALERT_RULES, Channel, Topic
+from .models import ADDED_BY, ALERT_RULES, DISCOVERED, NO_TRANSCRIPT, TRANSCRIBED, Channel, Topic
 from .providers.base import ChannelInfo, SourceError, VideoSource
 from .providers.refs import video_id
+
+# A film in these states has no reading yet and may still get one; every other state is an end.
+_STILL_ON_ITS_ROAD = (DISCOVERED, NO_TRANSCRIPT, TRANSCRIBED)
 
 MAX_PHRASE_CHARS = 200
 # A topic that may send forty films to be read every pass is a bill, not a topic.
@@ -146,6 +149,9 @@ class Queued:
     video_id: str
     title: str
     created: bool
+    # Whether the film is still on its road, so the caller should have it processed now: a new film, or one that had no
+    # words yet or no reading. A film already read, given up on or skipped is left alone.
+    process: bool = False
 
 
 async def analyse_film(
@@ -157,8 +163,9 @@ async def analyse_film(
     profile: str = "market",
     alert_rule: str = "never",
 ) -> Queued:
-    """One film named by hand, put where the loop will pick it up. Costs what asking the source about it costs, counted
-    against the same day as everything else. Not an alert by default: whoever asked is already looking."""
+    """One film named by hand. Costs what asking the source about it costs, counted against the same day as everything
+    else; the caller then has it processed at once (`Ingest.start_now`) rather than left to the loop's next pass. Not an
+    alert by default: whoever asked is already looking."""
     _check_choice("profile", profile, tuple(PROFILES))
     _check_choice("alert_rule", alert_rule, ALERT_RULES)
     try:
@@ -171,7 +178,9 @@ async def analyse_film(
     async with pool.acquire() as conn:
         existing = await store.get_video(conn, wanted)
         if existing is not None:
-            return Queued(existing.video_id, existing.title, created=False)
+            return Queued(
+                existing.video_id, existing.title, created=False, process=existing.state in _STILL_ON_ITS_ROAD
+            )
         left = await budget.remaining(conn, ceiling, day=budget.utc_day(providers.clock.now()))
     if left < 1:
         raise WatchlistRefused(
@@ -191,4 +200,4 @@ async def analyse_film(
             conn, [store.Discovery(found[0], origin="manual", profile=profile, alert_rule=alert_rule)]
         )
         await store.add_usage(conn, providers.meter.drain(), day=budget.utc_day(providers.clock.now()))
-    return Queued(found[0].video_id, found[0].title, created=True)
+    return Queued(found[0].video_id, found[0].title, created=True, process=True)

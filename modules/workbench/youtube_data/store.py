@@ -292,16 +292,22 @@ async def live_pending(conn: Conn, limit: int) -> list[str]:
     return [row["video_id"] for row in rows]
 
 
-async def due_for_transcription(conn: Conn, now: datetime, limit: int) -> list[Video]:
+async def due_for_transcription(
+    conn: Conn, now: datetime, limit: int, *, only: str | None = None
+) -> list[Video]:
+    """The films waiting for words. `only` is the one film somebody named by hand: asked about now, whatever date its
+    last miss set for the next ask — the operator asking is the reason to ask."""
     rows = await conn.fetch(
         f"""
         SELECT {_VIDEO_COLUMNS} FROM videos
         WHERE state IN ('discovered', 'no_transcript') AND live_status = 'none'
-          AND (next_attempt_at IS NULL OR next_attempt_at <= $1)
+          AND ($3::text IS NULL OR video_id = $3)
+          AND ($3::text IS NOT NULL OR next_attempt_at IS NULL OR next_attempt_at <= $1)
         ORDER BY published_at DESC LIMIT $2
         """,
         now,
         limit,
+        only,
     )
     return [_video(row) for row in rows]
 
@@ -354,16 +360,19 @@ class ToRead:
     language: str
 
 
-async def due_for_reading(conn: Conn, *, max_failures: int, limit: int) -> list[ToRead]:
+async def due_for_reading(
+    conn: Conn, *, max_failures: int, limit: int, only: str | None = None
+) -> list[ToRead]:
     rows = await conn.fetch(
         f"""
         SELECT {", ".join(f"v.{c.strip()}" for c in _VIDEO_COLUMNS.split(","))}, t.content, t.language AS t_language
         FROM videos v JOIN transcripts t USING (video_id)
-        WHERE v.state = 'transcribed' AND v.reading_failures < $1
+        WHERE v.state = 'transcribed' AND v.reading_failures < $1 AND ($3::text IS NULL OR v.video_id = $3)
         ORDER BY v.published_at DESC LIMIT $2
         """,
         max_failures,
         limit,
+        only,
     )
     return [ToRead(_video(row), row["content"], row["t_language"]) for row in rows]
 
