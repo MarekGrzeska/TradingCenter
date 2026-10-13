@@ -8,6 +8,7 @@ unit the day's ceiling counts; the tokens are written down beside it, because th
 
 from __future__ import annotations
 
+import asyncio
 import re
 from typing import Any
 
@@ -48,6 +49,12 @@ _STAMP = re.compile(r"^\s*\[(?:(\d+):)?(\d{1,2}):(\d{2})\]\s*(.*)$")
 # Words in a 400 or 404 that make it about our key or our model rather than the film: Google answers a bad key with a
 # 400, and a model name it does not know with a 404 — read as "this film", either would give every film up.
 _ABOUT_US = ("api key", "api_key", "model")
+
+# What a crowded model answers: asked again a few seconds later it usually does not. Measured on 13 October 2026: about
+# one call in eight got a 503 from `gemini-3.1-flash-lite`, and a film is several calls, so without this nearly every
+# pass ended on one.
+RETRYABLE = (429, 500, 502, 503, 504)
+RETRY_DELAYS = (4.0, 12.0)
 
 
 def pieces(duration: int, piece: int) -> list[tuple[int, int | None]]:
@@ -118,6 +125,7 @@ class GeminiTranscripts:
         meter: Meter,
         timeout_seconds: float,
         transport: httpx.AsyncBaseTransport | None = None,
+        retry_delays: tuple[float, ...] = RETRY_DELAYS,
     ) -> None:
         # Our own client under the SDK's: one transport whatever else is installed, closed with the provider, and one a
         # test can stand in for. The SDK sends the key as `x-goog-api-key`, never in the address.
@@ -129,6 +137,7 @@ class GeminiTranscripts:
         self._model = model
         self._piece = piece_seconds
         self._meter = meter
+        self._retry_delays = retry_delays
         # Pieces already written down for a film that has not been finished yet. A film is several calls, and one of the
         # later ones may be refused (a 503 at 18:18 on 13 October): without this the film is asked again from its first
         # minute and the pieces already paid for are paid for again — 4600 seconds of film over three tries of one.
@@ -157,9 +166,7 @@ class GeminiTranscripts:
                 heard += kept
                 continue
             try:
-                response = await self._client.aio.models.generate_content(
-                    model=self._model, contents=_contents(url, start, end), config=self._config
-                )
+                response = await self._ask(url, start, end)
             except errors.APIError as err:
                 return self._refusal(err)
             except Exception as err:  # noqa: BLE001 - a timeout or a network error says nothing about the film
@@ -192,6 +199,23 @@ class GeminiTranscripts:
             provider=self.name,
             model=self._model,
         )
+
+    async def _ask(self, url: str, start: int, end: int | None) -> Any:
+        """One piece, asked again after a pause when the model is crowded or did not answer in time. A refusal about the
+        key, the model or the film is not retried: asking again would be refused the same way."""
+        for pause in (*self._retry_delays, None):
+            try:
+                return await self._client.aio.models.generate_content(
+                    model=self._model, contents=_contents(url, start, end), config=self._config
+                )
+            except errors.APIError as err:
+                if pause is None or err.code not in RETRYABLE:
+                    raise
+            except (httpx.TimeoutException, httpx.TransportError):
+                if pause is None:
+                    raise
+            await asyncio.sleep(pause)
+        raise AssertionError("unreachable: the last pause is None and raises above")
 
     def _refusal(self, err: errors.APIError) -> TranscriptResult:
         # The code and status only: the details are Google's text, and nothing from a response belongs in a log whole.

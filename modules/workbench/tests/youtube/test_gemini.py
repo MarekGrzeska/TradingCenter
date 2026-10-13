@@ -14,7 +14,9 @@ from youtube_data.providers.gemini import GeminiTranscripts, parse, pieces
 KEY = "secret-gemini-key"
 
 
-def answer(text: str | None, *, finish: str = "STOP", prompt: int = 1000, output: int = 200) -> httpx.Response:
+def answer(
+    text: str | None, *, finish: str = "STOP", prompt: int = 1000, output: int = 200
+) -> httpx.Response:
     parts = [] if text is None else [{"text": text}]
     return httpx.Response(
         200,
@@ -26,7 +28,9 @@ def answer(text: str | None, *, finish: str = "STOP", prompt: int = 1000, output
 
 
 def refusal(code: int, message: str, status: str) -> httpx.Response:
-    return httpx.Response(code, json={"error": {"code": code, "message": message, "status": status}})
+    return httpx.Response(
+        code, json={"error": {"code": code, "message": message, "status": status}}
+    )
 
 
 class Google:
@@ -38,7 +42,8 @@ class Google:
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         self.requests.append(request)
-        found = self._answers.pop(0)
+        # The last answer is the one a crowded model keeps giving, however often it is asked.
+        found = self._answers.pop(0) if len(self._answers) > 1 else self._answers[0]
         if isinstance(found, Exception):
             raise found
         return found
@@ -50,7 +55,9 @@ class Google:
         return [json.loads(request.content) for request in self.requests]
 
 
-def provider(google: Google, meter: Meter | None = None, *, piece_minutes: int = 30) -> GeminiTranscripts:
+def provider(
+    google: Google, meter: Meter | None = None, *, piece_minutes: int = 30
+) -> GeminiTranscripts:
     return GeminiTranscripts(
         api_key=KEY,
         model="gemini-test",
@@ -58,6 +65,7 @@ def provider(google: Google, meter: Meter | None = None, *, piece_minutes: int =
         meter=meter or Meter(),
         timeout_seconds=5,
         transport=httpx.MockTransport(google),
+        retry_delays=(0.0, 0.0),
     )
 
 
@@ -96,7 +104,9 @@ async def test_the_key_travels_in_a_header_and_never_in_the_address() -> None:
     assert KEY not in str(sent.url)
 
 
-async def test_an_hour_is_asked_about_in_two_pieces_and_the_second_reads_from_thirty_minutes() -> None:
+async def test_an_hour_is_asked_about_in_two_pieces_and_the_second_reads_from_thirty_minutes() -> (
+    None
+):
     """Gemini counts the second piece's time from the piece here; the first stamp decides it, and the offset is added."""
     google = Google(answer("[00:00] start"), answer("[00:05] po przerwie\n[1:10] dalej"))
 
@@ -105,7 +115,10 @@ async def test_an_hour_is_asked_about_in_two_pieces_and_the_second_reads_from_th
     assert isinstance(result, Transcript)
     assert result.text == "[00:00] start\n[30:05] po przerwie\n[31:10] dalej"
     clips = [body["contents"][0]["parts"][0]["videoMetadata"] for body in google.bodies()]
-    assert [(clip["start_offset"], clip["end_offset"]) for clip in clips] == [("0s", "1800s"), ("1800s", "3600s")]
+    assert [(clip["start_offset"], clip["end_offset"]) for clip in clips] == [
+        ("0s", "1800s"),
+        ("1800s", "3600s"),
+    ]
 
 
 def test_a_piece_already_counted_from_the_film_is_left_as_it_is() -> None:
@@ -123,13 +136,21 @@ def test_a_film_a_little_longer_than_a_piece_is_one_call() -> None:
         (refusal(429, "Resource has been exhausted", "RESOURCE_EXHAUSTED"), Blocked),
         (refusal(503, "The model is overloaded", "UNAVAILABLE"), Blocked),
         (refusal(403, "Permission denied", "PERMISSION_DENIED"), Blocked),
-        (refusal(400, "API key not valid. Please pass a valid API key.", "INVALID_ARGUMENT"), Blocked),
+        (
+            refusal(400, "API key not valid. Please pass a valid API key.", "INVALID_ARGUMENT"),
+            Blocked,
+        ),
         (refusal(404, "models/gemini-nope is not found", "NOT_FOUND"), Blocked),
         (httpx.ConnectError("refused"), Blocked),
-        (refusal(400, "Cannot fetch content from the provided URL", "INVALID_ARGUMENT"), NoTranscript),
+        (
+            refusal(400, "Cannot fetch content from the provided URL", "INVALID_ARGUMENT"),
+            NoTranscript,
+        ),
     ],
 )
-async def test_a_refusal_about_us_is_blocked_and_one_about_the_film_is_no_transcript(reply, kind) -> None:
+async def test_a_refusal_about_us_is_blocked_and_one_about_the_film_is_no_transcript(
+    reply, kind
+) -> None:
     """A bad key answers 400 and an unknown model 404: read as "this film", every film would be given up."""
     meter = Meter()
     google = Google(reply)
@@ -137,8 +158,12 @@ async def test_a_refusal_about_us_is_blocked_and_one_about_the_film_is_no_transc
     result = await provider(google, meter).fetch(request())
 
     assert isinstance(result, kind)
-    # Asked once: the loop decides when to ask again, not the SDK behind its back.
-    assert len(google.requests) == 1
+    retried = isinstance(reply, httpx.TransportError) or (
+        isinstance(reply, httpx.Response) and reply.status_code in (429, 500, 502, 503, 504)
+    )
+    assert len(google.requests) == (3 if retried else 1), (
+        "a crowded model is asked again; a refused key or film is not"
+    )
     assert KEY not in result.reason
     assert meter.drain() == {}
     if isinstance(result, NoTranscript):
@@ -147,9 +172,14 @@ async def test_a_refusal_about_us_is_blocked_and_one_about_the_film_is_no_transc
 
 @pytest.mark.parametrize(
     ("reply", "reason"),
-    [(answer("[00:00] urwane w poł", finish="MAX_TOKENS"), "cut off"), (answer(None, finish="SAFETY"), "SAFETY")],
+    [
+        (answer("[00:00] urwane w poł", finish="MAX_TOKENS"), "cut off"),
+        (answer(None, finish="SAFETY"), "SAFETY"),
+    ],
 )
-async def test_an_answer_cut_off_or_withheld_is_no_transcript_that_was_paid_for(reply, reason) -> None:
+async def test_an_answer_cut_off_or_withheld_is_no_transcript_that_was_paid_for(
+    reply, reason
+) -> None:
     meter = Meter()
 
     result = await provider(Google(reply), meter).fetch(request())
@@ -178,19 +208,47 @@ async def test_a_film_whose_language_nobody_declared_is_undetermined() -> None:
 
 async def test_pieces_already_written_are_not_paid_for_again_when_a_later_one_is_refused() -> None:
     """A film of two pieces whose second is refused with a 503 used to be asked again from its first minute, each try."""
-    google = Google(answer("[00:00] pierwsza część"), refusal(503, "The model is overloaded", "UNAVAILABLE"))
+    google = Google(
+        answer("[00:00] pierwsza część"), refusal(503, "The model is overloaded", "UNAVAILABLE")
+    )
     meter = Meter()
     listener = provider(google, meter, piece_minutes=15)
     film = request(duration=1500)  # two pieces: 0-900 and 900-1500
 
     first = await listener.fetch(film)
     assert isinstance(first, Blocked)
-    assert meter.drain()[("gemini", "video_seconds")] == 900, "the first piece was answered and paid for"
+    assert meter.drain()[("gemini", "video_seconds")] == 900, (
+        "the first piece was answered and paid for"
+    )
 
     google.then(answer("[00:10] druga część"))
     second = await listener.fetch(film)
 
     assert isinstance(second, Transcript)
     assert second.text == "[00:00] pierwsza część\n[15:10] druga część"
-    assert len(google.requests) == 3, "the first piece was not asked a second time"
+    firsts = [
+        body
+        for body in google.bodies()
+        if body["contents"][0]["parts"][0]["videoMetadata"]["start_offset"] == "0s"
+    ]
+    assert len(firsts) == 1, "the first piece was not asked a second time"
     assert meter.drain()[("gemini", "video_seconds")] == 600, "only the second piece was paid for"
+
+
+async def test_a_crowded_model_is_asked_again_within_the_call_and_the_film_still_comes_back_whole() -> (
+    None
+):
+    google = Google(
+        refusal(503, "The model is overloaded", "UNAVAILABLE"),
+        httpx.ReadTimeout("slow"),
+        answer("[00:00] słowa"),
+    )
+    meter = Meter()
+
+    result = await provider(google, meter).fetch(request())
+
+    assert isinstance(result, Transcript) and result.text == "[00:00] słowa"
+    assert len(google.requests) == 3
+    assert meter.drain()[("gemini", "video_seconds")] == 1200, (
+        "paid for once, though asked three times"
+    )
