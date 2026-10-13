@@ -42,7 +42,7 @@ class Settings(BaseSettings):
 
     # Two, not three: seven databases share one `B_Standard_B1ms` whose `max_connections` is 50, and
     # `scripts/tests/test_pool_budget.py` holds the total to 30 — which the packages before this one already fill to 29.
-    # Enabling this package in production is the change that finds the third connection.
+    # Enabling it in production found the connection: Telegram's pool went from four to three (`infra/app-service.tf`).
     database_pool_size: int = 2
 
     # Where films are found, where their words come from and who reads them. Each is a name, so replacing a provider is

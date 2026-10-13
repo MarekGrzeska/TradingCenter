@@ -394,7 +394,7 @@ resource "azurerm_linux_web_app" "workbench" {
       # `/telegram`, and its two tools are a local source. Its database — bots, their tokens, who receives — under its
       # own name, and its REST list is the operator's `az` alone: its bots and destinations answer nobody else.
       TELEGRAM_DATABASE_URL                = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.telegram.name}?sslmode=require"
-      TELEGRAM_DATABASE_POOL_SIZE          = "4"
+      TELEGRAM_DATABASE_POOL_SIZE          = "3"
       TELEGRAM_BOT_API_BASE_URL            = "https://api.telegram.org"
       TELEGRAM_REST_CALLER_APPLICATION_IDS = local.azure_cli_client_id
 
@@ -423,6 +423,21 @@ resource "azurerm_linux_web_app" "workbench" {
     # All three or none, and never a reference to a secret with no value: an unresolved Key Vault reference is left
     # in place as its own literal text, which `TELEGRAM_API_ID` would refuse to parse — a process that will not start
     # over a capability it is supposed to work without.
+    # The YouTube archive, all of it or none: its database url is what mounts the package, and the keys it is given are
+    # Key Vault references that must have values by then (`var.youtube_enabled` says so). Captions first, and Gemini for
+    # the films with none — from this app's address YouTube refuses the captions every time, so Gemini carries the load,
+    # and the search for films is the Data API's. The pool is two: the budget's last connections, taken from Telegram's.
+    var.youtube_enabled ? {
+      YOUTUBE_DATABASE_URL                = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.youtube.name}?sslmode=require"
+      YOUTUBE_DATABASE_POOL_SIZE          = "2"
+      YOUTUBE_VIDEO_SOURCE                = "data_api"
+      YOUTUBE_DATA_API_KEY                = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.youtube_data_api_key})"
+      YOUTUBE_TRANSCRIPT_PROVIDERS        = "direct,gemini"
+      YOUTUBE_GEMINI_API_KEY              = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.gemini_api_key})"
+      YOUTUBE_ANALYSER                    = "openai"
+      YOUTUBE_OPENAI_API_KEY              = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.openai_api_key})"
+      YOUTUBE_REST_CALLER_APPLICATION_IDS = azuread_application.terminal.client_id
+    } : {},
     var.telegram_account_session_configured ? {
       TELEGRAM_API_ID   = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.telegram_api_id})"
       TELEGRAM_API_HASH = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.telegram_api_hash})"

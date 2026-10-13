@@ -173,6 +173,24 @@ variable "telegram_account_session_configured" {
   default     = false
 }
 
+variable "youtube_enabled" {
+  description = <<-EOT
+    Whether the workbench is given the settings that mount the YouTube archive: its database, its two keys and the
+    providers that use them.
+
+    False is a working configuration and the default: without `YOUTUBE_DATABASE_URL` the package is not part of the
+    process. It is a variable for the reason `telegram_account_session_configured` is — an app setting that points at an
+    empty Key Vault secret is left in place as its own literal text, and the package then refuses to start the whole
+    process over a capability it is meant to work without. The database also has to be handed over first.
+
+    Order: apply with this false (creates the database and the secret names), run `scripts/enable_youtube_prod.py`
+    (hands the database over, writes the two keys), then flip this and apply. Clearing it back to false is the rollback
+    and costs one restart.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "telegram_alert_destination" {
   description = <<-EOT
     The destination name the workbench's post archive and strategy platform address when they notify the operator,

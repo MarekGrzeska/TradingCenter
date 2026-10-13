@@ -31,6 +31,7 @@ MODULES = {
     "workbench/social": ("social_data/config.py", "workbench", 1),
     "workbench/strategy": ("strategy/config.py", "workbench", 1),
     "workbench/telegram": ("telegram_gateway/config.py", "workbench", 1),
+    "workbench/youtube": ("youtube_data/config.py", "workbench", 1),
     "workbench": ("workbench/config.py", "workbench", 2),
 }
 
