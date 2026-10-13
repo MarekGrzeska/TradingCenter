@@ -427,13 +427,11 @@ resource "azurerm_linux_web_app" "workbench" {
     # Key Vault references that must have values by then (`var.youtube_enabled` says so). Gemini listens to every film —
     # from this app's address YouTube refuses its captions every time — and the search for films is the Data API's. The pool is two: the budget's last connections, taken from Telegram's.
     var.youtube_enabled ? {
-      YOUTUBE_DATABASE_URL       = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.youtube.name}?sslmode=require"
-      YOUTUBE_DATABASE_POOL_SIZE = "2"
-      YOUTUBE_VIDEO_SOURCE       = "data_api"
-      YOUTUBE_DATA_API_KEY       = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.youtube_data_api_key})"
-      YOUTUBE_TRANSCRIBER        = "gemini"
-      # Read only by images from before `youtube-gemini-only`, and kept for the one deploy between: removed next apply.
-      YOUTUBE_TRANSCRIPT_PROVIDERS        = "gemini"
+      YOUTUBE_DATABASE_URL                = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.youtube.name}?sslmode=require"
+      YOUTUBE_DATABASE_POOL_SIZE          = "2"
+      YOUTUBE_VIDEO_SOURCE                = "data_api"
+      YOUTUBE_DATA_API_KEY                = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.youtube_data_api_key})"
+      YOUTUBE_TRANSCRIBER                 = "gemini"
       YOUTUBE_GEMINI_API_KEY              = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.gemini_api_key})"
       YOUTUBE_ANALYSER                    = "openai"
       YOUTUBE_OPENAI_API_KEY              = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.openai_api_key})"
