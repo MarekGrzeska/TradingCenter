@@ -195,6 +195,11 @@ async def analyse_film(
     if not found:
         raise WatchlistRefused(f"the source knows no film {wanted}")
 
+    reason = store.unwanted_reason(found[0], (settings.min_video_seconds, settings.max_video_seconds))
+    if reason is not None:
+        # Named by hand, and still not kept: say why instead of storing a row nobody wants listed.
+        raise WatchlistRefused(f"{found[0].title!r} is {reason}, and the archive does not keep such films")
+
     async with pool.acquire() as conn:
         await store.upsert_films(
             conn, [store.Discovery(found[0], origin="manual", profile=profile, alert_rule=alert_rule)]

@@ -143,6 +143,11 @@ class Ingest:
         if errors:
             raise errors[0]
 
+    @property
+    def _bounds(self) -> tuple[int, int]:
+        """The shortest and longest film worth a transcript, in seconds."""
+        return self._settings.min_video_seconds, self._settings.max_video_seconds
+
     # --- the day -----------------------------------------------------------------------------------------------------
 
     def _day(self):
@@ -205,6 +210,7 @@ class Ingest:
                         store.Discovery(film, f"channel:{channel.channel_id}", channel.profile, channel.alert_rule)
                         for film in films
                     ],
+                    bounds=self._bounds,
                 )
                 await store.record_discovery(conn, channel.channel_id, at=now)
             left = await self._remaining(ceiling)
@@ -231,12 +237,13 @@ class Ingest:
                 await store.upsert_films(
                     conn,
                     [store.Discovery(film, f"topic:{topic.id}", topic.profile, topic.alert_rule) for film in films],
+                    bounds=self._bounds,
                 )
                 await store.record_topic_run(conn, topic.id, at=now)
             left = await self._remaining(ceiling)
 
         async with self._pool.acquire() as conn:
-            await store.skip_unwanted(
+            await store.drop_unwanted(
                 conn, minimum=self._settings.min_video_seconds, maximum=self._settings.max_video_seconds
             )
             live = await store.live_pending(conn, self._settings.discover_batch_limit)
@@ -254,7 +261,7 @@ class Ingest:
         async with self._pool.acquire() as conn:
             for film in films:
                 await store.refresh_film(conn, film)
-            await store.skip_unwanted(
+            await store.drop_unwanted(
                 conn, minimum=self._settings.min_video_seconds, maximum=self._settings.max_video_seconds
             )
 
@@ -287,7 +294,7 @@ class Ingest:
         chain = self._providers.transcripts
         async with self._pool.acquire() as conn:
             # Here as well as after discovery: a discovery that raised half way must not send a five-hour film on.
-            await store.skip_unwanted(
+            await store.drop_unwanted(
                 conn, minimum=self._settings.min_video_seconds, maximum=self._settings.max_video_seconds
             )
             films = await store.due_for_transcription(conn, now, self._settings.transcribe_batch_limit, only=only)
