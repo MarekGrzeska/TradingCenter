@@ -67,7 +67,8 @@ def settings() -> Settings:
         # A deployment's settings, so the real providers: the simulation is refused where DATABASE_USER is set.
         video_source="data_api",
         data_api_key="test-key",
-        transcript_providers="direct",
+        transcriber="gemini",
+        gemini_api_key="test-key",
         analyser="openai",
         _env_file=None,
     )

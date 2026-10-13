@@ -14,8 +14,7 @@ _TLS_REQUIRING_SSLMODES = {"require", "verify-ca", "verify-full"}
 
 # What each provider setting may name. The one place a new provider is announced to the configuration.
 KNOWN_VIDEO_SOURCES = ("data_api", "sim")
-KNOWN_TRANSCRIPT_PROVIDERS = ("direct", "gemini", "sim", "sim_gemini")
-SIMULATED_TRANSCRIPT_PROVIDERS = ("sim", "sim_gemini")
+KNOWN_TRANSCRIBERS = ("gemini", "sim")
 KNOWN_ANALYSERS = ("openai", "sim")
 
 
@@ -51,13 +50,10 @@ class Settings(BaseSettings):
     # configured works, and cannot be mistaken for a deployment that does.
     video_source: str = "sim"
     data_api_key: str | None = None
-    # A list, first choice first. The next is asked when the one before did not let us in, and after "no captions" only
-    # one that listens (`gemini`, `sim_gemini`) — the order production runs: free captions, then the model.
-    transcript_providers: str = "sim,sim_gemini"
-    # The languages captions are asked for when the source does not say what the film speaks, in order of preference.
-    transcript_languages: str = "pl,en"
-    # Gemini, handed the film's address: it listens, so a film with no captions is ordinary work for it. Billed in
-    # tokens, limited by Google in hours of film a day (eight on the free tier), so the ceiling is seconds of film.
+    # Who writes a film's words down: Gemini, handed the film's address, listens to it. YouTube's own captions are not
+    # read — from Azure YouTube refuses every request for them, so the one way that works from production is the only
+    # way. Billed in tokens, limited by Google in hours of film a day (eight on the free tier), so the ceiling is seconds.
+    transcriber: str = "sim"
     gemini_api_key: str | None = None
     # Measured on 13 October 2026 with the same Polish film: `gemini-3.5-flash-lite`, `gemini-3.8-flash` and
     # `gemini-3-flash-preview` answered 503 "experiencing high demand" or hung until the timeout; `gemini-3.1-flash-lite`
@@ -69,12 +65,9 @@ class Settings(BaseSettings):
     gemini_daily_video_seconds: int = 28_800
     # One piece of film is a minute or two of listening, not the seconds a listing takes; a call past this is a hung one.
     gemini_timeout_seconds: float = 300.0
-    # A provider that refused us is not asked again for this long: from the cloud, captions are refused every time, and
-    # asking costs a request and up to a minute before the chain reaches the provider that listens.
-    provider_cooldown_minutes: int = 360
-    # The provider that listens rests far less: its refusals are a crowded model or a rate limit, gone in minutes, and
-    # six hours of rest would strand every film behind a 503 (13 October 2026: nine of them).
-    listener_cooldown_minutes: int = 15
+    # After a refusal Gemini is not asked again for this long: a crowded model or a rate limit is gone in minutes, and a
+    # longer rest strands every film behind one 503 (13 October 2026: six hours, nine films).
+    transcriber_cooldown_minutes: int = 15
 
     # The model. Absent key is a supported state, not a refusal — the package discovers and transcribes, and every
     # reading stays empty, which `/state` says.
@@ -120,10 +113,9 @@ class Settings(BaseSettings):
     topic_default_max_videos: int = 3
 
     # Each provider's day, in the provider's own unit, counted here rather than trusted to the provider's dashboard.
-    # The source's is the YouTube Data API's 10,000 with room to spare; a topic search costs a hundred of them. Every
-    # captions provider gets `daily_transcript_units`; Gemini has its own, above, in seconds of film.
+    # The source's is the YouTube Data API's 10,000 with room to spare; a topic search costs a hundred of them. Gemini's
+    # is above, in seconds of film.
     daily_source_units: int = 8000
-    daily_transcript_units: int = 500
     daily_token_limit: int = 2_000_000
 
     # Who is told, by the name the operator bound at the door to Telegram — a package of this same process, so there is no
@@ -155,14 +147,6 @@ class Settings(BaseSettings):
         return _identifiers(self.rest_caller_application_ids)
 
     @property
-    def transcript_provider_names(self) -> tuple[str, ...]:
-        return tuple(part.strip() for part in self.transcript_providers.split(",") if part.strip())
-
-    @property
-    def languages(self) -> tuple[str, ...]:
-        return tuple(part.strip() for part in self.transcript_languages.split(",") if part.strip())
-
-    @property
     def alerts_configured(self) -> bool:
         return self.alert_destination is not None
 
@@ -174,7 +158,7 @@ class Settings(BaseSettings):
     def simulating(self) -> bool:
         return (
             self.video_source == "sim"
-            or any(name in SIMULATED_TRANSCRIPT_PROVIDERS for name in self.transcript_provider_names)
+            or self.transcriber == "sim"
             or self.analyser == "sim"
         )
 
@@ -235,18 +219,11 @@ class Settings(BaseSettings):
             raise ValueError(f"ANALYSER must be one of {', '.join(KNOWN_ANALYSERS)}; got {value!r}")
         return value
 
-    @field_validator("transcript_providers")
+    @field_validator("transcriber")
     @classmethod
-    def _known_transcript_providers(cls, value: str) -> str:
-        names = [part.strip() for part in value.split(",") if part.strip()]
-        if not names:
-            raise ValueError("TRANSCRIPT_PROVIDERS names no provider")
-        unknown = [name for name in names if name not in KNOWN_TRANSCRIPT_PROVIDERS]
-        if unknown:
-            raise ValueError(
-                f"TRANSCRIPT_PROVIDERS names {', '.join(unknown)}; the ones this package has are "
-                f"{', '.join(KNOWN_TRANSCRIPT_PROVIDERS)}"
-            )
+    def _known_transcriber(cls, value: str) -> str:
+        if value not in KNOWN_TRANSCRIBERS:
+            raise ValueError(f"TRANSCRIBER must be one of {', '.join(KNOWN_TRANSCRIBERS)}; got {value!r}")
         return value
 
     @field_validator(
@@ -265,12 +242,10 @@ class Settings(BaseSettings):
         "topic_default_interval_minutes",
         "topic_default_max_videos",
         "daily_source_units",
-        "daily_transcript_units",
         "daily_token_limit",
         "gemini_chunk_minutes",
         "gemini_daily_video_seconds",
-        "provider_cooldown_minutes",
-        "listener_cooldown_minutes",
+        "transcriber_cooldown_minutes",
     )
     @classmethod
     def _positive(cls, value: int, info: ValidationInfo) -> int:
@@ -310,10 +285,7 @@ class Settings(BaseSettings):
             name
             for name, is_sim in (
                 ("VIDEO_SOURCE", self.video_source == "sim"),
-                (
-                    "TRANSCRIPT_PROVIDERS",
-                    any(name in SIMULATED_TRANSCRIPT_PROVIDERS for name in self.transcript_provider_names),
-                ),
+                ("TRANSCRIBER", self.transcriber == "sim"),
                 ("ANALYSER", self.analyser == "sim"),
             )
             if is_sim
@@ -331,12 +303,12 @@ class Settings(BaseSettings):
         # a source that cannot do what was asked. Absent key for the *model* is the opposite — a supported state.
         if self.video_source == "data_api" and self.data_api_key is None:
             raise ValueError("VIDEO_SOURCE=data_api needs DATA_API_KEY — a free YouTube Data API key")
-        if "gemini" in self.transcript_provider_names:
+        if self.transcriber == "gemini":
             if self.gemini_api_key is None:
-                raise ValueError("TRANSCRIPT_PROVIDERS names gemini, which needs GEMINI_API_KEY")
+                raise ValueError("TRANSCRIBER=gemini needs GEMINI_API_KEY")
             # Simulated films do not exist on YouTube, so a real model would be paid to listen to nothing.
             if self.video_source != "data_api":
-                raise ValueError("TRANSCRIPT_PROVIDERS names gemini, which listens to real films — set VIDEO_SOURCE=data_api")
+                raise ValueError("TRANSCRIBER=gemini listens to real films — set VIDEO_SOURCE=data_api")
         return self
 
     @model_validator(mode="after")

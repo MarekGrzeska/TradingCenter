@@ -476,6 +476,23 @@ RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
         "MODELS",
         "the two surfaces keep separate catalogues: AGENT_MODELS and TEAMS_MODELS",
     ),
+    (
+        "YOUTUBE_TRANSCRIPT_PROVIDERS",
+        "the YouTube archive has one transcriber since `youtube-gemini-only` — YOUTUBE_TRANSCRIBER (gemini or sim)",
+    ),
+    (
+        "YOUTUBE_TRANSCRIPT_LANGUAGES",
+        "YouTube's captions are not read any more, so there is no language to ask them in",
+    ),
+    (
+        "YOUTUBE_PROVIDER_COOLDOWN_MINUTES",
+        "the captions provider it rested is gone; Gemini's rest is YOUTUBE_TRANSCRIBER_COOLDOWN_MINUTES",
+    ),
+    (
+        "YOUTUBE_LISTENER_COOLDOWN_MINUTES",
+        "renamed YOUTUBE_TRANSCRIBER_COOLDOWN_MINUTES when the captions provider went",
+    ),
+    ("YOUTUBE_DAILY_TRANSCRIPT_UNITS", "it was the captions provider's day; Gemini's is YOUTUBE_GEMINI_DAILY_VIDEO_SECONDS"),
 )
 
 

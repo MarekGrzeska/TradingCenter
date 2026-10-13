@@ -27,15 +27,13 @@ class Ceiling:
 
 
 def transcript_ceiling(settings: Settings, provider: TranscriptProvider) -> Ceiling:
-    """A provider that listens is paid in seconds of film and has its own day; every captions provider shares the one
-    setting, each with a day of its own."""
-    limit = settings.gemini_daily_video_seconds if provider.listens else settings.daily_transcript_units
-    return Ceiling(provider.name, provider.unit, limit)
+    """The transcriber is paid in seconds of film, the unit Google limits it in."""
+    return Ceiling(provider.name, provider.unit, settings.gemini_daily_video_seconds)
 
 
 def ceilings(settings: Settings, providers: Providers) -> list[Ceiling]:
     found = [Ceiling(providers.source.name, providers.source.unit, settings.daily_source_units)]
-    found += [transcript_ceiling(settings, provider) for provider in providers.transcripts.providers]
+    found.append(transcript_ceiling(settings, providers.transcriber))
     if providers.analyser is not None:
         found.append(Ceiling(ANALYSER, TOKENS, settings.daily_token_limit))
     return found

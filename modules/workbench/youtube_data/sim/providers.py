@@ -1,10 +1,10 @@
-"""The simulated providers — a source, a captions provider, one that listens and a model — each a protocol from
-`providers/base.py` and `analysis.py` over the shared `World`."""
+"""The simulated providers — a source, a transcriber and a model — each a protocol from `providers/base.py` and
+`analysis.py` over the shared `World`."""
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from ..analysis import Analysis, Film, Reading
 from ..providers.base import (
@@ -24,7 +24,6 @@ from ..providers.refs import channel_ref, uploads_playlist
 from .world import World
 
 UNIT = "sim_units"
-CREDIT = "sim_credits"
 VIDEO_SECONDS = "sim_video_seconds"
 
 # What the reading of a film without a prepared one says. Neutral on purpose: a simulation that invents opinions would
@@ -109,59 +108,11 @@ class SimSource:
         return [self._world.ref(video) for video in found if video is not None and self._world.visible(video)]
 
 
-class SimTranscripts:
+class SimTranscriber:
+    """Gemini's stand-in: hears what the scenario says the film says, paid in seconds of film."""
+
     name = "sim"
-    unit = CREDIT
-    listens = False
-
-    def __init__(self, world: World) -> None:
-        self._world = world
-
-    def price(self, request: TranscriptRequest) -> int:
-        return self._world.scenario.transcripts.native_credits
-
-    def _pay(self, credits: int) -> bool:
-        return self._world.spend(self.name, CREDIT, credits, cap=self._world.scenario.transcripts.daily_credits)
-
-    async def fetch(self, request: TranscriptRequest) -> TranscriptResult:
-        behaviour = self._world.scenario.transcripts
-        await self._world.lag(behaviour.latency_ms)
-
-        # Refused before anything is looked up: a blocked provider does not know whether the film has captions, and
-        # neither is any credit spent on the refusal.
-        if self._world.roll(request.video_id) < behaviour.block_ratio:
-            return Blocked(self.name, "the simulated provider refused this request")
-
-        video = self._world.video(request.video_id)
-        if video is None or not self._world.visible(video):
-            self._pay(behaviour.miss_credits)
-            return NoTranscript(self.name, "the simulation has no such film", charged=True)
-
-        captions = video.captions
-        if captions.mode == "never":
-            self._pay(behaviour.miss_credits)
-            return NoTranscript(self.name, "this film has no captions", charged=True)
-        if captions.mode == "after_minutes":
-            ready = self._world.published_at(video) + timedelta(minutes=captions.after_minutes)
-            if self._world.clock.now() < ready:
-                self._pay(behaviour.miss_credits)
-                return NoTranscript(self.name, "the captions are not there yet", charged=True)
-        if request.languages and captions.language not in request.languages:
-            # As at YouTube: captions in another language than the one asked for are a translation, not the film.
-            self._pay(behaviour.miss_credits)
-            return NoTranscript(self.name, f"no captions in {', '.join(request.languages)}", charged=True)
-
-        if not self._pay(behaviour.native_credits):
-            return Blocked(self.name, "the simulated provider's daily credits are spent")
-        return _written(self.name, captions.text, captions.language, automatic=captions.automatic, model=None)
-
-
-class SimListener:
-    """Gemini's stand-in: hears what the film says (`speech`, or the captions' text), paid in seconds of film."""
-
-    name = "sim_gemini"
     unit = VIDEO_SECONDS
-    listens = True
     model = "sim"
 
     def __init__(self, world: World) -> None:
@@ -171,37 +122,29 @@ class SimListener:
         return request.duration_seconds or 0
 
     async def fetch(self, request: TranscriptRequest) -> TranscriptResult:
-        behaviour = self._world.scenario.listening
+        behaviour = self._world.scenario.transcriber
         await self._world.lag(behaviour.latency_ms)
-        if self._world.roll(request.video_id, by="listen:") < behaviour.block_ratio:
-            return Blocked(self.name, "the simulated model is rate limited")
+        if self._world.roll(request.video_id) < behaviour.block_ratio:
+            return Blocked(self.name, "the simulated model is crowded")
 
         video = self._world.video(request.video_id)
         if video is None or not self._world.visible(video):
             return NoTranscript(self.name, "the simulation has no such film")
         if not request.duration_seconds:
             return NoTranscript(self.name, "the film's length is not known yet")
-        if not self._world.spend(
-            self.name, VIDEO_SECONDS, request.duration_seconds, cap=behaviour.daily_video_seconds
-        ):
+        if not self._world.spend(self.name, VIDEO_SECONDS, request.duration_seconds, cap=behaviour.daily_video_seconds):
             return Blocked(self.name, "the simulated model's daily seconds of film are spent")
-        heard = video.speech if video.speech is not None else video.captions.text
-        language = request.audio_language or video.captions.language
-        return _written(self.name, heard, language, automatic=True, model=self.model)
-
-
-def _written(provider: str, text: str, language: str, *, automatic: bool, model: str | None) -> TranscriptResult:
-    if not text.strip():
-        # A film whose captions are all silence: real providers call it no transcript, not an empty one.
-        return NoTranscript(provider, "there is nothing to write down", charged=True)
-    return Transcript(
-        text=f"{stamp(0)} {text.strip()}",
-        language=language,
-        automatic=automatic,
-        provider=provider,
-        simulated=True,
-        model=model,
-    )
+        if not video.speech.strip():
+            # Music over a chart: a real model answers with nothing, and that is no transcript, not an empty one.
+            return NoTranscript(self.name, "there is nothing to write down", charged=True)
+        return Transcript(
+            text=f"{stamp(0)} {video.speech.strip()}",
+            language=request.audio_language or video.language,
+            automatic=True,
+            provider=self.name,
+            simulated=True,
+            model=self.model,
+        )
 
 
 class SimAnalyser:

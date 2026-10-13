@@ -44,14 +44,13 @@ One pass every `YOUTUBE_POLL_INTERVAL_SECONDS`, four steps, each with a batch li
    Shorts (under `MIN_VIDEO_SECONDS`, 180) and films over `MAX_VIDEO_SECONDS` are **not kept at all** —
    never stored when the source lists them, deleted if their length arrives after they were stored, refused with the
    reason when named by hand. A stream still live waits until it has ended.
-2. **transcribe** — `discovered` → `transcribed`. Each film is priced by every provider before it is
-   asked (a request for captions, the film's seconds for Gemini) and only providers with that much left
-   of their day, and not resting after a refusal (`PROVIDER_COOLDOWN_MINUTES`, 360 for captions; `LISTENER_COOLDOWN_MINUTES`, 15, for the one that listens), are asked. Captions
-   come first, in the film's own language alone; **no captions goes on to the provider that listens**
-   (`gemini`), not to another captions provider. No text from anyone is `no_transcript`, asked again after
-   `RETRY_DELAYS_MINUTES` (60, 360, 1440) and then `gave_up`. **Blocked is not a miss**: a provider that
-   refuses us, times out or raises spends no attempt, and the pass stops asking it. A film nobody who
-   could answer was asked about waits an hour, also without an attempt.
+2. **transcribe** — `discovered` → `transcribed`. **Gemini listens to every film**; YouTube's own captions are
+   not read, because from Azure YouTube refuses every request for them. A film is priced before it is asked (its
+   seconds) and asked only when the day has that much left; a film the day cannot pay for waits for tomorrow. No
+   text (nothing said, an answer cut off, a private film) is `no_transcript`, asked again after
+   `RETRY_DELAYS_MINUTES` (60, 360, 1440) and then `gave_up`. **Blocked is not a miss**: a crowded model, a rate
+   limit, a timeout or a bad key spends no attempt; the pass stops asking and Gemini rests
+   `TRANSCRIBER_COOLDOWN_MINUTES` (15).
 3. **read** — one model call per film, no tools, no history, a strict JSON schema, the transcript marked
    as a stranger's data. An answer the schema rejects is one of the film's `READING_MAX_FAILURES`; a
    provider that could not be reached is none of them.
@@ -65,32 +64,29 @@ announced at once, in the background, under the same ceilings, prices and rests 
 the two never spend one day twice. Naming a film again skips the date of its last miss; a film already read is left alone.
 
 Every provider call is counted in `usage`, and daily ceilings stop the step that would exceed them, not
-the loop: `DAILY_SOURCE_UNITS`, `DAILY_TRANSCRIPT_UNITS` (per captions provider), `GEMINI_DAILY_VIDEO_SECONDS`
+the loop: `DAILY_SOURCE_UNITS`, `GEMINI_DAILY_VIDEO_SECONDS`
 (28 800, the free tier's eight hours; tokens are counted beside it for the bill), `DAILY_TOKEN_LIMIT`. `GET /state`
 says what is spent, what is blocked, and how many intervals ago the last complete pass was.
 
 ## Providers
 
-Three protocols in `providers/base.py`; which implementation runs is a setting. A transcript provider
-says whether it `listens` and what a film `price`s in its unit; `TranscriptChain` returns the answer and
-the refusals it passed on the way.
+Three protocols in `providers/base.py`; which implementation runs is a setting — the real one or the simulation.
 
 | Setting | Choices |
 |---|---|
 | `YOUTUBE_VIDEO_SOURCE` | `sim` · `data_api` (a free YouTube Data API key: 10 000 units a day, a list costs 1, a search 100; the key travels in `X-goog-api-key`, never in a URL). The feed (`rss`) is gone: it cannot say how long a film is |
-| `YOUTUBE_TRANSCRIPT_PROVIDERS` | ordered list: `direct` (`youtube-transcript-api`, captions; works from a home address, refused wholesale from a datacenter) · `gemini` (listens to the film from its address; `YOUTUBE_GEMINI_API_KEY`, needs `data_api`) · `sim` · `sim_gemini`. Production order: `direct,gemini` |
+| `YOUTUBE_TRANSCRIBER` | `sim` · `gemini` (listens to the film from its address; `YOUTUBE_GEMINI_API_KEY`, needs `data_api`) |
 | `YOUTUBE_ANALYSER` | `sim` · `openai` (`YOUTUBE_OPENAI_API_KEY`, `YOUTUBE_ANALYSIS_MODEL`). No key is a supported state: films wait `transcribed` and `/state` says why |
 
 Gemini writes the transcript down, in pieces of `YOUTUBE_GEMINI_CHUNK_MINUTES` (15; `gemini-3.1-flash-lite` by default — measured: a 29-minute film in 79 s, ~170k tokens), verbatim and in the
 film's language, with `[MM:SS]` per paragraph; the model's name is stored on the transcript and shown on the
-card. The reading stays with the analyser. Another provider is one class in `providers/` and one name in
-the list.
+card. The reading stays with the analyser.
 
 ## The simulation
 
-All of them default to `sim` (`sim,sim_gemini` for the transcripts: captions first, then the listener). `sim/scenarios/default.json` is a synthetic afternoon: three channels
+All three default to `sim`. `sim/scenarios/default.json` is a synthetic afternoon: three channels
 (`@simzloto`, `@simmarkets`, `@simkrypto`), twelve films covering every case the loop must survive —
-captions at once, two hours late, never (one of those has a `speech` only `sim_gemini` hears); an empty transcript; a Short, a five-hour
+Polish and English speech; a film with nothing said; a Short, a five-hour
 film, a live stream; a transcript that tries to instruct the model; an answer that breaks the schema —
 and a search catalogue for `gold`, `złoto`, `fed`, `rate` and `bitcoin`. Times are minutes from the
 start of the process, randomness is seeded, so a run replays.

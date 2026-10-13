@@ -1,6 +1,6 @@
-"""A scenario: which channels exist, which films appear when, what their captions do, and how badly the providers
-behave. Times are in minutes from the start of the run, so the same file replays the same afternoon whenever it is
-started — and a film may be published before the start (negative), so the run does not begin on an empty archive."""
+"""A scenario: which channels exist, which films appear when, what is said in them, and how badly the providers behave.
+Times are in minutes from the start of the run, so the same file replays the same afternoon whenever it is started — and a
+film may be published before the start (negative), so the run does not begin on an empty archive."""
 
 from __future__ import annotations
 
@@ -22,17 +22,6 @@ class SimChannel(BaseModel):
     language: str = ""
 
 
-class SimCaptions(BaseModel):
-    """`immediate`: there when asked. `after_minutes`: absent until that long after publication (automatic captions
-    arrive hours late). `never`: this film has none."""
-
-    mode: Literal["immediate", "after_minutes", "never"] = "never"
-    after_minutes: int = Field(default=0, ge=0)
-    text: str = ""
-    language: str = "en"
-    automatic: bool = True
-
-
 class SimVideo(BaseModel):
     video_id: str
     channel: str
@@ -41,27 +30,17 @@ class SimVideo(BaseModel):
     duration_seconds: int | None = 600
     # Live until this many minutes after the start; `None` is not live at all.
     live_until_minutes: int | None = None
-    captions: SimCaptions = SimCaptions()
-    # What a provider that listens hears; without it, a listener hears what the captions say.
-    speech: str | None = None
+    # What the simulated transcriber hears. Blank is a film with nothing said — music over a chart.
+    speech: str = ""
+    language: str = "en"
     # A prepared reading, the word `unusable` for a model that answers with something the schema refuses, or nothing
     # for the neutral one.
     reading: dict | Literal["unusable"] | None = None
 
 
-class SimTranscriptBehaviour(BaseModel):
-    # The share of requests the provider refuses outright: 0 never, 1 always. Rolled per film and per attempt from the
-    # scenario's seed, so the same run refuses the same requests.
-    block_ratio: float = Field(default=0.0, ge=0.0, le=1.0)
-    latency_ms: int = Field(default=0, ge=0)
-    native_credits: int = 1
-    # Asking about a film with no captions costs this — a provider that charges for a miss is the one to rehearse with.
-    miss_credits: int = 1
-    daily_credits: int | None = None
-
-
-class SimListeningBehaviour(BaseModel):
-    """The provider that listens: paid in seconds of film, as Gemini is, with a day of its own."""
+class SimTranscriberBehaviour(BaseModel):
+    """The transcriber: paid in seconds of film, as Gemini is. `block_ratio` is the share of requests refused outright
+    (a crowded model), rolled per film and per attempt from the scenario's seed, so the same run refuses the same ones."""
 
     block_ratio: float = Field(default=0.0, ge=0.0, le=1.0)
     latency_ms: int = Field(default=0, ge=0)
@@ -86,8 +65,7 @@ class Scenario(BaseModel):
     channels: list[SimChannel]
     videos: list[SimVideo]
     search: list[SearchEntry] = []
-    transcripts: SimTranscriptBehaviour = SimTranscriptBehaviour()
-    listening: SimListeningBehaviour = SimListeningBehaviour()
+    transcriber: SimTranscriberBehaviour = SimTranscriberBehaviour()
     source: SimSourceBehaviour = SimSourceBehaviour()
 
     @model_validator(mode="after")

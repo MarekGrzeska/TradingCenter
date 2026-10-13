@@ -1,10 +1,10 @@
-"""The three things this package asks of the outside world, as protocols, and the answers it can get back. A provider is
-a class that fits one of them; which ones run is a setting (`providers/build.py`), so a new transcript provider is a
-class and a line in `.env`, not a change to the loop.
+"""The three things this package asks of the outside world, as protocols, and the answers it can get back: films (the
+YouTube Data API), their words (Gemini, which listens to the film) and a reading (a model). Which implementation runs is a
+setting (`providers/build.py`) — the real one or the simulation.
 
-The answers are values rather than exceptions wherever the loop has to *decide* something from them: "this film has no
-captions" and "this provider will not let us in" are different next steps, and an exception would flatten both into
-the same `except`."""
+The answers are values rather than exceptions wherever the loop has to *decide* something from them: "nothing could be
+written down for this film" and "the provider will not let us in" are different next steps, and an exception would
+flatten both into the same `except`."""
 
 from __future__ import annotations
 
@@ -86,28 +86,17 @@ class VideoSource(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class TranscriptRequest:
-    """What a transcript provider is told about the film: enough to price it before asking, and to cut a long one."""
+    """What the transcriber is told about the film: enough to price it before asking, and to cut a long one."""
 
     video_id: str
     duration_seconds: int | None
-    # Captions are asked for in these, in order — the film's own language alone when it is known (`for_film`).
-    languages: tuple[str, ...]
     audio_language: str | None = None
-
-    @classmethod
-    def for_film(
-        cls, video_id: str, *, duration_seconds: int | None, audio_language: str | None, fallback: Sequence[str]
-    ) -> TranscriptRequest:
-        # Captions in another language than the film speaks are a translation, and a market reading of a translation
-        # loses the names and the numbers.
-        languages = (audio_language,) if audio_language else tuple(fallback)
-        return cls(video_id, duration_seconds, languages, audio_language)
 
 
 @dataclass(frozen=True, slots=True)
 class Transcript:
     """`text` is paragraphs, each opening with its time from the start of the film (`[MM:SS]`). `model` names the model
-    that wrote it down, for a provider that listens rather than reads captions."""
+    that wrote it down."""
 
     text: str
     language: str
@@ -119,8 +108,8 @@ class Transcript:
 
 @dataclass(frozen=True, slots=True)
 class NoTranscript:
-    """The provider answered, and it has no text for this film. `charged` is whether asking cost anything, which the
-    loop records either way: a miss that costs a credit is still a credit."""
+    """The provider answered, and it has no text for this film — private, cut off, nothing said. `charged` is whether
+    asking cost anything, which the loop records either way: a miss that was billed is still billed."""
 
     provider: str
     reason: str
@@ -129,8 +118,8 @@ class NoTranscript:
 
 @dataclass(frozen=True, slots=True)
 class Blocked:
-    """The provider did not let us in, or did not answer. Says nothing about the film — the loop must not count it as
-    an attempt, or a datacenter address refused wholesale would read as a run of films with no captions."""
+    """The provider did not let us in, or did not answer — a crowded model, a rate limit, a timeout, a bad key. Says
+    nothing about the film, so the loop must not count it as one of the film's attempts."""
 
     provider: str
     reason: str
@@ -142,8 +131,6 @@ TranscriptResult = Transcript | NoTranscript | Blocked
 class TranscriptProvider(Protocol):
     name: str
     unit: str
-    # A provider that listens to the film is worth asking about one with no captions; one that reads captions is not.
-    listens: bool
 
     def price(self, request: TranscriptRequest) -> int:
         """What asking about this film costs, in `unit`, so the loop asks only when the day can pay for it."""
