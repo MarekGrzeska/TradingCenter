@@ -158,7 +158,7 @@ def execute(
         ):
             say(f"  - {step}")
         return 0
-    if not args.gemini_key_is_paid:
+    if not args.skip_secrets and not args.gemini_key_is_paid:
         raise Refusal(
             "the Gemini key is sent every film's address, and the free tier lets Google use what it is sent: production "
             "needs a paid key. Confirm it is one with --gemini-key-is-paid"

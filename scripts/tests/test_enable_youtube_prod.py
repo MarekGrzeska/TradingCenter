@@ -134,3 +134,13 @@ def test_the_database_token_reaches_psql_through_the_environment(env_file) -> No
 
     assert psql_env == {"PGPASSWORD": "entra-token"}
     assert "entra-token" not in " ".join(command)
+
+
+def test_handing_the_database_over_does_not_wait_on_a_word_about_the_key(env_file) -> None:
+    """The paid-key confirmation guards the secrets only: the grant has nothing to do with Gemini."""
+    recorder = Recorder()
+
+    assert script.execute(args(env_file, gemini_key_is_paid=False, skip_secrets=True), run=recorder) == 0
+
+    assert recorder.written == {}
+    assert any(call[0] == "psql" for call in recorder.calls)
