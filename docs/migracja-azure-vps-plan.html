@@ -1,0 +1,300 @@
+<title>Migracja na VPS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  h3.sub {
+    font-family: var(--head); font-weight: 700; font-size: 21px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 30px 0 10px;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+  ul { margin: 0 0 16px; padding-left: 22px; max-width: 70ch; }
+  li { margin-bottom: 6px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure pre { margin: 0; }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.5;
+  }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Plan · infrastruktura</span>
+    <h1>Z Azure na własny serwer</h1>
+    <p class="lede">Cały TradingCenter na jednym VPS-ie: trzy procesy, Postgres, dwa ekrany, wdrożenia z GitHub Actions jak dziś. Zmiana żyje na <b>osobnej gałęzi</b>, wdrażana jest na VPS <b>obok</b> działającego Azure, a Azure znika i gałąź wchodzi do <code>main</code> dopiero <b>po testach</b>.</p>
+    <div class="strip">
+      <span>TradingCenter / migracja</span>
+      <span>13 października 2026</span>
+      <span>status: <b>D1 = B; spec: openspec/changes/move-from-azure-to-vps</b></span>
+      <span>gałąź: <b>infra/vps</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">1</div><div class="l">serwer zamiast 3 App Service, bazy, Key Vault i SWA</div></div>
+      <div class="cell"><div class="v">9</div><div class="l">faz, każda z warunkiem przejścia dalej</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">zmian w <code>main</code> do końca testów</div></div>
+      <div class="cell"><div class="v">?</div><div class="l">czy YouTube wpuści VPS — test w fazie 0, nie założenie</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">00 · Dlaczego i co się zmienia</div>
+      <h2>Mniej platformy, więcej kontroli</h2>
+      <p class="intro">Azure daje nam dziś rzeczy, za które płacimy złożonością: Easy Auth, którego trzeba pilnować trasa po trasie, tokeny Entra do bazy, Key Vault z referencjami, które potrafią zostać dosłownym tekstem, kolejność <code>apply</code> → obraz, i adresy, które YouTube blokuje w całości.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Dziś w Azure</th><th>Na VPS</th><th>Uwagi</th></tr></thead>
+          <tbody>
+            <tr><td><b>3 × App Service</b> (plan B2): gateway, workbench, trading-mcp</td><td>3 kontenery Docker Compose</td><td>Te same obrazy z GHCR, te same porty wewnątrz sieci Dockera.</td></tr>
+            <tr><td><b>PostgreSQL Flexible</b> B1ms, 8 baz, logowanie tokenem Entra</td><td>Postgres 17 w kontenerze, 8 baz, hasła per rola</td><td>Tak jak lokalny <code>compose.yaml</code>. Kopie zapasowe stają się <b>naszym</b> obowiązkiem.</td></tr>
+            <tr><td><b>Easy Auth</b> przed każdą aplikacją</td><td>Reverse proxy (Caddy, TLS) + weryfikacja tokenu w aplikacji albo dostęp tylko przez Tailscale</td><td>Największa zmiana — decyzja D1 niżej.</td></tr>
+            <tr><td><b>Key Vault</b></td><td>Plik <code>.env</code> na serwerze z prawami 600, zasilany z GitHub Secrets przy wdrożeniu</td><td>Wartości nie przechodzą przez repozytorium.</td></tr>
+            <tr><td><b>Static Web Apps</b>: terminal, pocket</td><td>Caddy serwuje zbudowane pliki z VPS (albo zostają na darmowym hostingu statycznym)</td><td>Zmienia się adres i URL przekierowania logowania.</td></tr>
+            <tr><td><b>App Insights + alerty</b></td><td>Logi Dockera, prosty monitoring dostępności, alerty na Telegram (mamy już drzwi do Telegrama)</td><td>Mniej wykresów, ale też mniej rzeczy, które same milczą.</td></tr>
+            <tr><td><b>Wdrożenia</b>: GitHub Actions → OIDC → App Service, sonda</td><td>GitHub Actions → GHCR → SSH → <code>docker compose up</code>, ta sama sonda i bramka</td><td><code>deploy_gate.py</code> i <code>deploy_probe.py</code> zostają, zmienia się tylko „jak podmienić obraz”.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">01 · Decyzje przed startem</div>
+      <h2>Trzy rzeczy, które trzeba ustalić najpierw</h2>
+      <div class="fails">
+        <div class="fail">
+          <h3>D1. Kto wpuszcza do aplikacji <span class="tag ok">wybrane: B</span></h3>
+          <p><strong>A — Tailscale:</strong> nic nie wystawiamy publicznie, terminal i pocket działają w sieci Tailscale (aplikacja na telefonie i komputerze). Usługi rozmawiają ze sobą kluczem, jak lokalnie. Najprościej i najbezpieczniej dla jednego operatora; minus — każde urządzenie musi być w sieci Tailscale.<br><strong>B — publicznie z logowaniem Entra (wybrane 13.10):</strong> Caddy z TLS, a weryfikację tokenu, którą robi dziś Easy Auth, przejmuje <code>tc-runtime</code> w aplikacji. Zostaje logowanie Microsoft, terminal działa z każdej przeglądarki. Więcej kodu i więcej do pilnowania.</p>
+        </div>
+        <div class="fail">
+          <h3>D2. Dostawca i rozmiar <span class="tag att">koszt i adres IP</span></h3>
+          <p>Dziś: 2 vCPU / 3,5 GB dla aplikacji + 1 vCPU / 2 GB dla bazy. Na VPS: <strong>4 vCPU / 8 GB</strong> z zapasem (dostawcy europejscy: kilkanaście–kilkadziesiąt EUR miesięcznie). <strong>Kluczowe:</strong> YouTube blokuje adresy dużych chmur, a duże firmy VPS (Hetzner, OVH, DigitalOcean) to też centra danych — <span class="hl">mogą być zablokowane tak samo jak Azure</span>. Dlatego wybór dostawcy rozstrzyga test w fazie 0, nie założenie.</p>
+        </div>
+        <div class="fail">
+          <h3>D3. Co zostaje z Microsoftu <span class="tag ok">może nic</span></h3>
+          <p>Konto Entra (logowanie) jest darmowe i może zostać, jeśli wybierzemy D1-B. Przy D1-A znika razem z resztą. Repozytorium, GHCR i Actions zostają na GitHubie.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Plan</div>
+      <h2>Dziewięć faz, każda z bramką</h2>
+      <p class="intro">Zasada: <strong>Azure działa bez zmian aż do fazy 8</strong>. Gałąź <code>infra/vps</code> jest regularnie przebudowywana na <code>main</code>, ale nic z niej nie trafia do <code>main</code> przed końcem testów.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Faza</th><th>Co powstaje</th><th>Bramka — przechodzimy dalej, gdy</th></tr></thead>
+          <tbody>
+            <tr><td class="n">0</td><td><b>Decyzje i test YouTube</b></td><td>Zmiana OpenSpec <code>move-from-azure-to-vps</code> (proposal, design, delty). Mały VPS próbny u 1–2 dostawców: pobranie napisów 10 filmów biblioteką <code>youtube-transcript-api</code> z każdego adresu.</td><td>Decyzje D1–D3 podjęte; wiemy, czy napisy przechodzą z wybranego VPS.</td></tr>
+            <tr><td class="n">1</td><td><b>Kod przenośny</b> (na gałęzi)</td><td>Tryb „serwer” w ustawieniach: baza po haśle w sieci Dockera (dziś tryb lokalny wymaga adresu pętli zwrotnej), dostęp według D1, sekrety z pliku. Docker Compose produkcyjny: 3 aplikacje, Postgres, Caddy.</td><td>Cały stos startuje z jednego <code>docker compose up</code> na czystej maszynie; testy CI zielone.</td></tr>
+            <tr><td class="n">2</td><td><b>Serwer jako kod</b></td><td>Provisioning (Terraform dla dostawcy albo cloud-init + Ansible): użytkownik bez hasła, tylko klucze SSH, firewall, automatyczne aktualizacje bezpieczeństwa, Docker, Tailscale.</td><td>Serwer odtwarzalny od zera jednym poleceniem; brak otwartych portów poza zamierzonymi.</td></tr>
+            <tr><td class="n">3</td><td><b>Automatyzacja wdrożeń</b></td><td>Workflow na gałęzi: build → GHCR → SSH (po Tailscale) → <code>docker compose pull && up -d</code> → sonda zdrowia → automatyczny powrót do poprzedniego tagu, gdy sonda nie przejdzie. <code>deploy_gate.py</code> bez zmian.</td><td>Celowo zepsuty obraz zostaje cofnięty sam, bez ręcznej pracy.</td></tr>
+            <tr><td class="n">4</td><td><b>Kopie zapasowe</b></td><td>Nocny <code>pg_dump</code> każdej z 8 baz poza serwer (zewnętrzny magazyn obiektów), retencja, alert gdy kopia nie powstała.</td><td><strong>Odtworzenie na świeżej maszynie przećwiczone</strong> — kopia, której nikt nie odtworzył, nie jest kopią.</td></tr>
+            <tr><td class="n">5</td><td><b>Dane — próba</b></td><td>Zrzut 8 baz z Azure, odtworzenie na VPS, migracje <code>alembic</code> do najnowszej wersji, porównanie liczby wierszy.</td><td>Liczby zgodne; procesy na VPS startują na skopiowanych danych.</td></tr>
+            <tr><td class="n">6</td><td><b>Testy na VPS</b></td><td>Lista dymna: zdrowie 3 aplikacji, logowanie z terminala i pocketa, wykres i strumień świec, zlecenie na demo, rozmowa z agentem, przebieg zespołu, alert na Telegram, film YouTube od dodania do oceny. Potem kilka dni pracy w tle.</td><td>Wszystko z listy działa; kilka dni bez niespodzianek w logach i alertach.</td></tr>
+            <tr><td class="n">7</td><td><b>Przełączenie</b></td><td>Krótkie okno: zatrzymanie pętli w Azure, ostatni zrzut i odtworzenie, start pętli na VPS, nowe adresy terminala i pocketa, monitoring dostępności przestawiony.</td><td>Produkcja na VPS; Azure zatrzymany, ale <strong>nieusunięty</strong> (powrót = start Azure).</td></tr>
+            <tr><td class="n">8</td><td><b>YouTube i sprzątanie</b></td><td>Powrót napisów YouTube (patrz niżej). Po kilku dniach stabilności: końcowy zrzut z Azure do archiwum, <code>terraform destroy</code> zasobów, merge <code>infra/vps</code> do <code>main</code>, aktualizacja <code>CLAUDE.md</code> i <code>docs/architecture.md</code>, archiwum zmiany OpenSpec.</td><td>Brak zasobów Azure poza tym, co świadomie zostaje (D3); <code>main</code> wdraża już tylko na VPS.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Pułapki przejścia</div>
+      <h2>Czego nie wolno robić równolegle</h2>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Dwa stosy naraz <span class="tag stop">krytyczne</span></h3>
+          <p>Konto capital.com ma jeden budżet zapytań — dwa stosy się zagłodzą. Bot Telegram odbierany z dwóch miejsc dostaje konflikt. Dwie pętle YouTube, Polymarket i postów zapłacą podwójnie i wyślą podwójne alerty. <strong>Na VPS w fazach 5–6 pętle i strumień rynkowy startują wyłączone</strong> (albo na innym koncie demo i testowym bocie), a pełny ruch dopiero w fazie 7.</p>
+        </div>
+        <div class="fail">
+          <h3>Gałąź, która odjeżdża <span class="tag att">utrzymanie</span></h3>
+          <p>Każdy PR do <code>main</code> w trakcie migracji to potencjalny konflikt. Gałąź przebudowujemy na <code>main</code> co kilka dni, a zmiany w infrastrukturze Azure w tym czasie zamrażamy.</p>
+        </div>
+        <div class="fail">
+          <h3>Odpowiedzialność, którą przejmujemy <span class="tag att">nowe</span></h3>
+          <p>Azure robił za nas kopie bazy, aktualizacje systemu i certyfikaty. Na VPS to nasze: kopie (faza 4), automatyczne aktualizacje (faza 2), certyfikaty (Caddy sam, albo Tailscale). Jeden serwer to też jeden punkt awarii — plan odtworzenia z kodu i z kopii jest tu zabezpieczeniem.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · YouTube</div>
+      <h2>Napisy wracają, jeśli VPS nie jest blokowany</h2>
+      <p class="intro">Dziś każdy film przepisuje Gemini, bo YouTube odmawia napisów każdemu adresowi Azure. Z innego adresu może być inaczej — <span class="hl">ale nie musi</span>: wiele firm VPS to też centra danych.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Wynik testu z fazy 0</th><th>Co robimy w fazie 8</th></tr></thead>
+          <tbody>
+            <tr><td><b>Napisy przechodzą</b></td><td>Przywracamy dostawcę napisów: kod z przed <code>youtube-gemini-only</code> jest w historii (PR #286 do cofnięcia, bez zmian w bazie). Kolejność: <strong>napisy pierwsze (za darmo, dosłowne), Gemini dla filmów bez napisów</strong>. Wynik w pasku stanu: zużycie Gemini spada.</td></tr>
+            <tr><td><b>Przechodzą częściowo / później blokowane</b></td><td>Jak wyżej, a łańcuch i odpoczynek dostawcy (też w historii) sam przełączy na Gemini, gdy napisy zostaną zablokowane.</td></tr>
+            <tr><td><b>Blokowane od razu</b></td><td>Zostajemy przy samym Gemini. Opcjonalnie proxy rezydencyjne dla napisów (kilka USD/mies., opisane wcześniej) — osobna decyzja.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px">Test w fazie 0 to 10 filmów z kilku kanałów, pobranych z adresu VPS, powtórzony po dobie — pierwsze zapytania z nowego adresu potrafią przejść, a blokada przychodzi później.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Co zrobię, a co jest twoje</div>
+      <h2>Podział pracy</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Moje (z gałęzi i z terminala)</th><th>Twoje</th></tr></thead>
+          <tbody>
+            <tr><td>Zmiana OpenSpec, kod przenośny, Compose, provisioning jako kod, workflow wdrożeń, kopie i ich test, migracja danych, testy, przełączenie, sprzątanie Azure, dokumentacja</td><td>Decyzje D1–D3; założenie konta u dostawcy VPS i magazynu na kopie; klucze/tokeny wklejone do lokalnego pliku (przeniosę je bez pokazywania); zgoda na okno przełączenia i na <code>terraform destroy</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="quote">Azure zostaje włączony, dopóki VPS nie przejdzie testów. Wyłączenie to ostatni krok, nie pierwszy.</div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Plan migracji Azure → VPS · do decyzji operatora</span>
+    <span>Tryb jasny — jedyny</span>
+  </div>
+</footer>
