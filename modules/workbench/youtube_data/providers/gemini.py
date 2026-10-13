@@ -129,6 +129,11 @@ class GeminiTranscripts:
         self._model = model
         self._piece = piece_seconds
         self._meter = meter
+        # Pieces already written down for a film that has not been finished yet. A film is several calls, and one of the
+        # later ones may be refused (a 503 at 18:18 on 13 October): without this the film is asked again from its first
+        # minute and the pieces already paid for are paid for again — 4600 seconds of film over three tries of one.
+        # In memory: a restart forgets them, which costs one repeat and not a schema.
+        self._written: dict[tuple[str, int], list[tuple[int, str]]] = {}
         self._config = types.GenerateContentConfig(
             media_resolution=types.MediaResolution.MEDIA_RESOLUTION_LOW,
             temperature=0.2,
@@ -147,6 +152,10 @@ class GeminiTranscripts:
         url = f"https://www.youtube.com/watch?v={request.video_id}"
         heard: list[tuple[int, str]] = []
         for start, end in pieces(request.duration_seconds, self._piece):
+            kept = self._written.get((request.video_id, start))
+            if kept is not None:
+                heard += kept
+                continue
             try:
                 response = await self._client.aio.models.generate_content(
                     model=self._model, contents=_contents(url, start, end), config=self._config
@@ -166,8 +175,13 @@ class GeminiTranscripts:
                 )
             if not text:
                 return NoTranscript(self.name, f"Gemini wrote nothing down (finish reason {reason})", charged=True)
-            heard += parse(text, start)
+            written = parse(text, start)
+            self._written[(request.video_id, start)] = written
+            heard += written
 
+        # Whole film done: nothing to keep.
+        for key in [key for key in self._written if key[0] == request.video_id]:
+            del self._written[key]
         if not heard:
             return NoTranscript(self.name, "Gemini heard nothing to write down", charged=True)
         return Transcript(

@@ -43,15 +43,18 @@ class Google:
             raise found
         return found
 
+    def then(self, *answers: httpx.Response | Exception) -> None:
+        self._answers.extend(answers)
+
     def bodies(self) -> list[dict]:
         return [json.loads(request.content) for request in self.requests]
 
 
-def provider(google: Google, meter: Meter | None = None) -> GeminiTranscripts:
+def provider(google: Google, meter: Meter | None = None, *, piece_minutes: int = 30) -> GeminiTranscripts:
     return GeminiTranscripts(
         api_key=KEY,
         model="gemini-test",
-        piece_seconds=30 * 60,
+        piece_seconds=piece_minutes * 60,
         meter=meter or Meter(),
         timeout_seconds=5,
         transport=httpx.MockTransport(google),
@@ -171,3 +174,23 @@ async def test_a_film_whose_language_nobody_declared_is_undetermined() -> None:
     result = await provider(Google(answer("[00:00] hello"))).fetch(request(audio=None))
 
     assert isinstance(result, Transcript) and result.language == "und"
+
+
+async def test_pieces_already_written_are_not_paid_for_again_when_a_later_one_is_refused() -> None:
+    """A film of two pieces whose second is refused with a 503 used to be asked again from its first minute, each try."""
+    google = Google(answer("[00:00] pierwsza część"), refusal(503, "The model is overloaded", "UNAVAILABLE"))
+    meter = Meter()
+    listener = provider(google, meter, piece_minutes=15)
+    film = request(duration=1500)  # two pieces: 0-900 and 900-1500
+
+    first = await listener.fetch(film)
+    assert isinstance(first, Blocked)
+    assert meter.drain()[("gemini", "video_seconds")] == 900, "the first piece was answered and paid for"
+
+    google.then(answer("[00:10] druga część"))
+    second = await listener.fetch(film)
+
+    assert isinstance(second, Transcript)
+    assert second.text == "[00:00] pierwsza część\n[15:10] druga część"
+    assert len(google.requests) == 3, "the first piece was not asked a second time"
+    assert meter.drain()[("gemini", "video_seconds")] == 600, "only the second piece was paid for"

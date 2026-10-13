@@ -74,8 +74,8 @@ export function warnings(state: ArchiveState, now: Date = new Date()): string[] 
   for (const provider of state.providers) {
     if (provider.blocked && !(provider.role === "transcripts" && someoneDelivers)) {
       found.push(
-        `Dostawca „${provider.name}" nie wpuszcza nas${provider.blockedReason ? ` (${provider.blockedReason})` : ""}. ` +
-          "Filmy czekają — to nie są filmy bez napisów.",
+        `Dostawca „${provider.name}" odmówił${provider.blockedReason ? ` (${provider.blockedReason})` : ""}. ` +
+          "To chwilowe — film zostaje w kolejce i zostanie ponowiony za kilkanaście minut.",
       );
     }
     if (provider.exhausted) {
