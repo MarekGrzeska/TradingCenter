@@ -93,3 +93,29 @@ def test_the_command_line_writes_a_complete_document() -> None:
     )
     assert result.returncode == 0, result.stderr
     assert "IMAGE_PREFIX='from-secrets'\n" in result.stdout
+
+
+def test_the_workflow_hands_the_script_exactly_the_names_it_reads() -> None:
+    """`toJSON(secrets)` would give the step the whole store; an explicit list is what a reviewer can read, and this keeps
+    it the list `env.required` (plus the optional names) says it is."""
+    import yaml
+
+    workflow = yaml.safe_load((ROOT / ".github" / "workflows" / "deploy-vps.yml").read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["deploy"]["steps"]
+    step = next(s for s in steps if s.get("name") == "Assemble the environment")
+    assert set(step["env"]) == set(NAMES) | set(assemble_env.OPTIONAL)
+    assert all(str(v).startswith(("${{ secrets.", "${{ vars.")) for v in step["env"].values())
+    assert "toJSON(secrets)" not in (ROOT / ".github" / "workflows" / "deploy-vps.yml").read_text(encoding="utf-8")
+
+
+def test_from_env_reads_the_environment_it_was_given() -> None:
+    environment = {**{name: "x" for name in NAMES}, **{n: "a-database-password-ok" for n in NAMES if n.endswith("_DB_PASSWORD")}}
+    result = subprocess.run(
+        [sys.executable, str(SCRIPT), "--from-env", str(ROOT / "deploy" / "env.required")],
+        env={**environment, "PATH": ""},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "GATEWAY_API_KEY='x'\n" in result.stdout

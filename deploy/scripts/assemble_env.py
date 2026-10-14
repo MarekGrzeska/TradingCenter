@@ -10,6 +10,7 @@ is held to characters a URL carries as they are."""
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import re
 import sys
@@ -43,11 +44,17 @@ def assemble(names: list[str], available: dict[str, str]) -> str:
 
 
 def main(argv: list[str]) -> int:
-    required = pathlib.Path(argv[1]) if len(argv) > 1 else pathlib.Path("deploy/env.required")
+    args = [a for a in argv[1:] if a != "--from-env"]
+    from_env = "--from-env" in argv[1:]
+    required = pathlib.Path(args[0]) if args else pathlib.Path("deploy/env.required")
     try:
-        document = json.load(sys.stdin)
-        # Variables first, secrets over them: a name in both is the secret's.
-        available = {**document.get("vars", {}), **document.get("secrets", {})}
+        if from_env:
+            # The workflow lists every name in its own `env:`, so this reads exactly what it was handed and nothing else.
+            available = dict(os.environ)
+        else:
+            document = json.load(sys.stdin)
+            # Variables first, secrets over them: a name in both is the secret's.
+            available = {**document.get("vars", {}), **document.get("secrets", {})}
         sys.stdout.write(assemble(names_in(required), available))
     except (Refused, ValueError, OSError) as err:
         print(f"assemble_env: {err}", file=sys.stderr)
