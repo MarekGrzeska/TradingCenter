@@ -137,7 +137,7 @@
       ansible.builtin.file:
         path: /var/lib/tradingcenter/backup-ack
         state: directory
-        owner: backup
+        owner: tcbackup
         group: deploy
         mode: "0755"
 
