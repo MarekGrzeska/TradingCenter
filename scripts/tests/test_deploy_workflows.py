@@ -189,7 +189,10 @@ def test_nothing_deploys_on_the_push_itself(path: Path) -> None:
     assert "push" not in on, f"{path.name} still deploys on the push, before checks"
     assert on["workflow_run"]["workflows"] == ["checks"]
     assert on["workflow_run"]["types"] == ["completed"]
-    assert on["workflow_run"]["branches"] == ["main"]
+    # `deploy-vps.yml` follows `infra/vps` until the branch is merged (tasks.md 9.4), and `main` after.
+    assert on["workflow_run"]["branches"] == (
+        ["infra/vps"] if path.name == "deploy-vps.yml" else ["main"]
+    )
     assert "workflow_dispatch" in on, "the operator's door around the gate"
 
 
