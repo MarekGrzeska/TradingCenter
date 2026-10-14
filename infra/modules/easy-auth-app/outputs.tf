@@ -8,12 +8,6 @@ output "application_id" {
   value       = azuread_application.this.id
 }
 
-output "password" {
-  description = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET for this app."
-  value       = azuread_application_password.this.value
-  sensitive   = true
-}
-
 output "scope_id" {
   description = "The delegated scope's stable GUID, or null where there is no scope."
   value       = var.scope == null ? null : random_uuid.scope[0].result

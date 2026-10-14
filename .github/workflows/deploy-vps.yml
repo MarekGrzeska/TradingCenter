@@ -1,17 +1,16 @@
 name: deploy-vps
 
-# The server's deployment (move-from-azure-to-vps): after a green `checks` run of the same commit — the gate is the one the
-# Azure deployments use — build the three images, build the two front ends, and hand the server what it needs over SSH. The
-# key it holds may run one command (`deploy/scripts/deploy.sh`, set by `deploy/ansible/site.yml`), so everything below is
+# The server's deployment (move-from-azure-to-vps): after a green `checks` run of the same commit — gated by
+# `scripts/deploy_gate.py` — build the three images, build the two front ends, and hand the server what it needs over SSH.
+# The key it holds may run one command (`deploy/scripts/deploy.sh`, set by `deploy/ansible/site.yml`), so everything below is
 # a verb of that script and nothing is run on the server by this workflow's own words.
 #
-# Only the branch `infra/vps` for now; `main` joins it when the Azure workflows leave (tasks.md 9.4). `workflow_dispatch`
-# is the operator's door around the gate.
+# Follows `main`. `workflow_dispatch` is the operator's door around the gate.
 on:
   workflow_run:
     workflows: [checks]
     types: [completed]
-    branches: [infra/vps]
+    branches: [main]
   workflow_dispatch: {}
 
 permissions:
