@@ -85,7 +85,7 @@
 {$TERMINAL_HOST} {
 	import hardening
 	encode zstd gzip
-	root * /srv/terminal
+	root * /srv/www/terminal
 	# A single-page application: an address that is a tab's route belongs to the page, not to a file.
 	try_files {path} /index.html
 	file_server
@@ -94,7 +94,7 @@
 {$POCKET_HOST} {
 	import hardening
 	encode zstd gzip
-	root * /srv/pocket
+	root * /srv/www/pocket
 	try_files {path} /index.html
 	file_server
 }
