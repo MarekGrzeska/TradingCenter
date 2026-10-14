@@ -43,6 +43,7 @@ dependencies = [
     "tc-openai",
     # The caller-identity middleware and the upstream-refusal helper the team tools use.
     "tc-mcp-kit",
+    "tc-entra-auth",
     # The post archive's two: its feed is a document written by somebody else, and `xml.etree` expands entities —
     # `defusedxml` refuses the document that would be a memory exhaustion performed on ourselves. `openai` direct,
     # not through `tc-openai`: one call per post with a fixed response schema, no stream and no tools.
@@ -69,6 +70,7 @@ package = false
 tc-runtime = { path = "../../packages/tc-runtime", editable = true }
 tc-openai = { path = "../../packages/tc-openai", editable = true }
 tc-mcp-kit = { path = "../../packages/tc-mcp-kit", editable = true }
+tc-entra-auth = { path = "../../packages/tc-entra-auth", editable = true }
 
 [tool.ruff]
 line-length = 100

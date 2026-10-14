@@ -1,0 +1,40 @@
+[project]
+name = "tc-entra-auth"
+version = "0.1.0"
+description = "Entra token verification in the process and the edge-or-key rule that turns it into one caller identity — for the modules that run on a server with no platform authenticator in front"
+requires-python = ">=3.12"
+dependencies = [
+    # Signature, issuer, audience and expiry; `cryptography` for RS256, which is what Entra signs with.
+    "pyjwt[crypto]>=2.8",
+    # The signing keys are fetched from the tenant's JWKS endpoint.
+    "httpx>=0.27",
+    # Raw ASGI, so only Starlette's types and its JSON response — no FastAPI, no database driver, no azure-*.
+    "starlette>=0.37",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tc_entra_auth"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pyright]
+include = ["tc_entra_auth"]
+typeCheckingMode = "basic"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pyright==1.1.411",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff==0.16.2",
+]

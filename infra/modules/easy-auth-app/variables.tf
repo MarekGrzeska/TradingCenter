@@ -11,11 +11,6 @@ variable "identifier_uri" {
   type        = string
 }
 
-variable "redirect_uri" {
-  description = "The Easy Auth callback — `https://<hostname>/.auth/login/aad/callback`."
-  type        = string
-}
-
 variable "scope" {
   description = <<-EOT
     The one delegated scope this API exposes, or null for the three registrations that expose
@@ -35,13 +30,3 @@ variable "scope" {
   default = null
 }
 
-variable "id_token_issuance_enabled" {
-  description = <<-EOT
-    The implicit `id_token` grant. On for the three registrations a browser signs in to, off
-    for the three only a managed identity reaches. It tracks `scope` today for that reason
-    and is still its own variable: the two answer different questions, and a seventh module
-    could need one without the other.
-  EOT
-  type        = bool
-  default     = false
-}

@@ -49,7 +49,8 @@ class ModelCatalogueEntry(BaseModel):
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    database_url: str
+    # Out of the repr: a server's URL carries its role's password, and a failed validation prints the model.
+    database_url: str = Field(repr=False)
     database_user: str | None = None
     azure_client_id: str | None = None
     azure_client_secret: str | None = None
@@ -73,6 +74,11 @@ class Settings(BaseSettings):
     # write tool never touches this one even when it is unreachable.
     trading_mcp_url: str | None = None
     trading_mcp_scope: str | None = None
+    # The gateway's key, which trading-mcp checks of the services that call it on a server — there is no managed
+    # identity there to present a scope with. Reaching a host named in `private_hosts` requires it.
+    trading_mcp_api_key: str | None = None
+    # Hosts on the container network of this machine (`PRIVATE_HOSTS`, comma-separated): reached with the key alone.
+    private_hosts: str = ""
     # A little past trading-mcp's own ceiling on capital-gateway — a write that takes the gateway's full
     # worst case still has to read here as "slow", not as this module's own timeout firing first.
     trading_mcp_request_timeout_seconds: float = 35.0
@@ -106,6 +112,7 @@ class Settings(BaseSettings):
         "database_user",
         "trading_mcp_url",
         "trading_mcp_scope",
+        "trading_mcp_api_key",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -139,11 +146,17 @@ class Settings(BaseSettings):
             return self
 
         host = (parsed.hostname or "").lower()
-        if not (host == "localhost" or host.startswith("127.") or host == "::1"):
+        loopback = host == "localhost" or host.startswith("127.") or host == "::1"
+        if not (loopback or host in self.private_host_names):
             raise ValueError(
                 f"DATABASE_URL points at {host!r} with no DATABASE_USER set. Without an "
                 "identity this module only connects to a database on this machine's "
-                "loopback — a remote database needs DATABASE_USER and an Entra identity."
+                "loopback, or a host of PRIVATE_HOSTS — a remote database needs DATABASE_USER and an Entra identity."
+            )
+        if not loopback and not (parsed.username and parsed.password):
+            raise ValueError(
+                f"DATABASE_URL points at the private host {host!r} without a role and password. On a server "
+                "this module connects as its own role, which owns its database — the URL must name it."
             )
         return self
 
@@ -152,12 +165,23 @@ class Settings(BaseSettings):
         """The same rule every module here sets for a mode: name one, or none, never both — checked
         independently per configured server, so an operator fixing one need not guess which a bare error names."""
         self.trading_mcp_url = self._coherent_tool_server_url(
-            url=self.trading_mcp_url, scope=self.trading_mcp_scope, env_prefix="TRADING_MCP"
+            url=self.trading_mcp_url,
+            scope=self.trading_mcp_scope,
+            env_prefix="TRADING_MCP",
+            api_key=self.trading_mcp_api_key,
+            private_hosts=self.private_host_names,
         )
         return self
 
     @staticmethod
-    def _coherent_tool_server_url(*, url: str | None, scope: str | None, env_prefix: str) -> str | None:
+    def _coherent_tool_server_url(
+        *,
+        url: str | None,
+        scope: str | None,
+        env_prefix: str,
+        api_key: str | None = None,
+        private_hosts: frozenset[str] = frozenset(),
+    ) -> str | None:
         if url is None:
             if scope is not None:
                 raise ValueError(
@@ -171,6 +195,19 @@ class Settings(BaseSettings):
         url = url.rstrip("/")
         host = (urlparse(url).hostname or "").lower()
         is_loopback = host == "localhost" or host.startswith("127.") or host == "::1"
+
+        if host in private_hosts:
+            if scope is not None:
+                raise ValueError(
+                    f"{env_prefix}_SCOPE is set but {env_prefix}_URL points at {host!r}, a private host of this "
+                    f"machine — a scope names a token for a remote server; unset {env_prefix}_SCOPE."
+                )
+            if not api_key:
+                raise ValueError(
+                    f"{env_prefix}_URL points at {host!r}, a private host, with no {env_prefix}_API_KEY — the "
+                    "tool server admits a service on the internal network only by its key."
+                )
+            return url
 
         if scope is not None:
             if is_loopback:
@@ -190,6 +227,10 @@ class Settings(BaseSettings):
                 "managed identity it is requested for."
             )
         return url
+
+    @property
+    def private_host_names(self) -> frozenset[str]:
+        return frozenset(h.strip().lower() for h in self.private_hosts.split(",") if h.strip())
 
     @model_validator(mode="after")
     def _catalogue_is_coherent(self) -> Settings:

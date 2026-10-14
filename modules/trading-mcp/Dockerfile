@@ -7,6 +7,7 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 # Dependencies first, from the lockfile alone, and only the package this module's pyproject.toml names: copying all of
 # `packages/` makes an edit to a package this image never installs invalidate every layer below.
 COPY packages/tc-mcp-kit /app/packages/tc-mcp-kit
+COPY packages/tc-entra-auth /app/packages/tc-entra-auth
 COPY modules/trading-mcp/pyproject.toml modules/trading-mcp/uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 

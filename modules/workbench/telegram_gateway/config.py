@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlparse
 
-from pydantic import ValidationInfo, field_validator, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # `prefer`/`allow` still let the client fall back to plaintext if the server does not
@@ -27,8 +27,12 @@ class Settings(BaseSettings):
 
     # `database_user` selects between the two connection modes and is the only switch: set means
     # identity mode over TLS with no credential in the URL, unset means the URL as given, on loopback.
-    database_url: str
+    # Out of the repr: a server's URL carries its role's password, and a failed validation prints the model.
+    database_url: str = Field(repr=False)
     database_user: str | None = None
+    # Hosts on the container network of this machine (`PRIVATE_HOSTS`, comma-separated), reached with the password in the
+    # URL — a database that is not on loopback and still never leaves the machine. Empty everywhere but a server.
+    private_hosts: str = ""
 
     # Identity mode only, and unset even there when running in Azure — the App Service's
     # system-assigned managed identity needs no configuration.
@@ -40,10 +44,10 @@ class Settings(BaseSettings):
     # polymarket-data: no migration here comes close to the length of a start.
     migration_lock_wait_seconds: float = 300.0
 
-    # Three (four until the YouTube archive needed the last connection): this module's work is one HTTP call per
-    # message, not a query per row. The logical databases share one `B_Standard_B1ms` whose `max_connections` is 50, so
-    # every module's number here is one budget — `scripts/tests/test_pool_budget.py` refuses a total above 30.
-    database_pool_size: int = 3
+    # Four again: this module's work is one HTTP call per message, not a query per row. It was three while the logical
+    # databases shared a `B_Standard_B1ms` whose `max_connections` is 50; on the server's own PostgreSQL (100) the
+    # budget is 60 — `scripts/tests/test_pool_budget.py` counts every module's number as one.
+    database_pool_size: int = 4
 
     # Creating a bot means talking to Telegram's creator bot, and only a *user account* may. All three
     # together enable it; absent, the module sends normally and refuses to create — a supported state.
@@ -135,6 +139,10 @@ class Settings(BaseSettings):
             )
         return self
 
+    @property
+    def private_host_names(self) -> frozenset[str]:
+        return frozenset(h.strip().lower() for h in self.private_hosts.split(",") if h.strip())
+
     @model_validator(mode="after")
     def _connection_mode_is_coherent(self) -> Settings:
         """The two connection modes, each with its own failure to refuse. Identity mode is off this
@@ -159,13 +167,19 @@ class Settings(BaseSettings):
             return self
 
         host = (parsed.hostname or "").lower()
-        if not (host == "localhost" or host.startswith("127.") or host == "::1"):
+        loopback = host == "localhost" or host.startswith("127.") or host == "::1"
+        if not (loopback or host in self.private_host_names):
             raise ValueError(
                 f"DATABASE_URL points at {host!r} with no DATABASE_USER set. Without an "
                 "identity this module only connects to a database on this machine's "
-                "loopback — a remote database (production included) needs DATABASE_USER "
+                "loopback, or a host of PRIVATE_HOSTS — a remote database (production included) needs DATABASE_USER "
                 "and an Entra identity, and local work belongs on the compose.yaml "
                 "container."
+            )
+        if not loopback and not (parsed.username and parsed.password):
+            raise ValueError(
+                f"DATABASE_URL points at the private host {host!r} without a role and password. On a server "
+                "this module connects as its own role, which owns its database — the URL must name it."
             )
         return self
 

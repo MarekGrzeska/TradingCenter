@@ -1,0 +1,57 @@
+#cloud-config
+# A fresh Ubuntu 24.04 machine, brought to the point where Ansible can finish the job (`deploy/ansible/`): two users that
+# can only be reached with a key, no root and no password over SSH, Docker, and Python for Ansible to run on.
+# Works at any provider that accepts user-data, which is why the server is code and not a provider's Terraform.
+#
+# Replace the key line below before use. The placeholder is kept in the repository on purpose, and
+# `scripts/tests/test_deploy_server.py` refuses a change that drops it for something that looks like a real key.
+
+disable_root: true
+ssh_pwauth: false
+
+users:
+  # The operator: reaches the machine to run Ansible and to open a tunnel to the database. Sudo without a password,
+  # because there is no password to give — the key is the whole credential.
+  - name: operator
+    groups: [sudo]
+    shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    lock_passwd: true
+    ssh_authorized_keys:
+      - ssh-ed25519 REPLACE_WITH_THE_OPERATORS_PUBLIC_KEY operator
+  # The deployment: owns /opt/tradingcenter and is in the `docker` group, which is why its key is restricted to one
+  # command in `authorized_keys` (the Ansible play writes that line; a key here would be unrestricted).
+  # Reads dumps and nothing else; its key is the restricted one the play writes, for the same reason as the deploy user's.
+  - name: tcbackup
+    shell: /bin/sh
+    lock_passwd: true
+    ssh_authorized_keys: []
+  - name: deploy
+    groups: [docker]
+    shell: /bin/bash
+    lock_passwd: true
+    ssh_authorized_keys: []
+
+package_update: true
+package_upgrade: true
+packages:
+  - docker.io
+  - docker-compose-v2
+  - python3
+  - python3-apt
+  - ufw
+  - unattended-upgrades
+
+write_files:
+  - path: /etc/ssh/sshd_config.d/10-tradingcenter.conf
+    permissions: "0644"
+    content: |
+      PermitRootLogin no
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      AllowUsers operator deploy tcbackup
+      X11Forwarding no
+
+runcmd:
+  - systemctl enable --now docker
+  - systemctl restart ssh

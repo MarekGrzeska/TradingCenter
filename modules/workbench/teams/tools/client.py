@@ -33,6 +33,9 @@ _SESSION_GONE_MESSAGE = "Session terminated"
 # `streamable_http_app()` and wraps it without touching the route).
 MCP_PATH = "/mcp"
 
+# What trading-mcp reads its callers' key from — the gateway's own header, since it is the gateway's key.
+GATEWAY_KEY_HEADER = "X-Gateway-Key"
+
 
 class ToolAccessError(RuntimeError):
     """Anything that stops a run before an agent is called. The run start catches this one type; the
@@ -97,6 +100,8 @@ class ToolServer:
         self._env_prefix = prefix.upper()
         self._url: str | None = getattr(settings, f"{prefix}_url")
         self._scope: str | None = getattr(settings, f"{prefix}_scope")
+        # The shared key, for a tool server on the internal network of a server — where the token cannot go.
+        self._api_key: str | None = getattr(settings, f"{prefix}_api_key", None)
         self._timeout: float = getattr(settings, f"{prefix}_request_timeout_seconds")
         self._credential = DefaultAzureCredential() if self._scope else None
 
@@ -252,6 +257,9 @@ class ToolServer:
             "have answered."
         )
 
+    def _key_headers(self) -> dict[str, str] | None:
+        return {GATEWAY_KEY_HEADER: self._api_key} if self._api_key else None
+
     def _unreachable(self, err: BaseException) -> str:
         return (
             f"the {self.label} tool server could not be reached: {_describe(err)}. "
@@ -277,7 +285,9 @@ class ToolServer:
                 # defaults it sets. `read` is left long; per-call time is bounded at the call sites.
                 http_client = await stack.enter_async_context(
                     create_mcp_http_client(
-                        timeout=httpx.Timeout(self._timeout, read=None), auth=auth
+                        headers=self._key_headers(),
+                        timeout=httpx.Timeout(self._timeout, read=None),
+                        auth=auth,
                     )
                 )
                 read, write, _ = await stack.enter_async_context(

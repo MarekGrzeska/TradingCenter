@@ -74,14 +74,6 @@ resource "azuread_application_federated_identity_credential" "pull_request_immut
   subject        = "repo:${local.github_repo_immutable}:pull_request"
 }
 
-# Contributor on the resource group this root manages — everything CI ever needs to
-# create, update or (via `terraform plan`) merely read.
-resource "azurerm_role_assignment" "github_actions_contributor" {
-  scope                = azurerm_resource_group.main.id
-  role_definition_name = "Contributor"
-  principal_id         = azuread_service_principal.github_actions.object_id
-}
-
 # The state backend lives in another resource group and is only referred to here. Composed as a string rather than read
 # with a data source: that is a management-plane GET, and CI's grant is data-plane only, so the lookup 403'd every plan.
 locals {

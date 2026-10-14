@@ -1,0 +1,245 @@
+# The whole system on one server (move-from-azure-to-vps). Read with `docker compose --env-file .env --env-file tags.env`:
+# `.env` is the secrets and the operator's values, assembled by the deployment from GitHub Secrets (`deploy/env.required`
+# lists every name); `tags.env` is which image of each module runs, which is also what a rollback puts back.
+#
+# **Only Caddy has `ports:`.** A test (`scripts/tests/test_deploy_compose.py`) refuses a port on any other service — the
+# edge marker the applications trust (`X-TC-Edge`) is only honest if every request from outside passes through Caddy.
+#
+# Three networks, because "internal" has two meanings here:
+#   edge      Caddy <-> the two applications it publishes.
+#   services  the applications and trading-mcp, which reach one another by name with the shared key. A normal bridge:
+#             the gateway and the workbench have to reach capital.com, OpenAI, Telegram and the rest of the internet.
+#   data      PostgreSQL and whoever may talk to it. `internal: true` — no route out, and no route in from the host.
+
+name: tradingcenter-vps
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 256m
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      API_HOST: ${API_HOST:?}
+      GATEWAY_HOST: ${GATEWAY_HOST:?}
+      TERMINAL_HOST: ${TERMINAL_HOST:?}
+      POCKET_HOST: ${POCKET_HOST:?}
+      ACME_EMAIL: ${ACME_EMAIL:?}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./www/terminal:/srv/terminal:ro
+      - ./www/pocket:/srv/pocket:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks: [edge]
+    depends_on: [workbench, gateway]
+
+  gateway:
+    image: ${IMAGE_PREFIX:?}/capital-gateway:${GATEWAY_TAG:?}
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 512m
+    environment:
+      GATEWAY_ENV: production
+      SERVER_MODE: "true"
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:?}
+      ENTRA_AUDIENCES: ${GATEWAY_ENTRA_AUDIENCES:?}
+      GATEWAY_API_KEY: ${GATEWAY_API_KEY:?}
+      CAPITAL_API_KEY: ${CAPITAL_API_KEY:?}
+      CAPITAL_IDENTIFIER: ${CAPITAL_IDENTIFIER:?}
+      CAPITAL_PASSWORD: ${CAPITAL_PASSWORD:?}
+      # The terminal reads the account directly; nothing else is a browser. The workbench and trading-mcp reach the
+      # gateway by name with the key, which the gateway names a module caller by itself.
+      BROWSER_CALLER_APPLICATION_IDS: '["${TERMINAL_APPLICATION_ID:?}"]'
+      MODULE_CALLER_APPLICATION_IDS: "[]"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:80/', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+    networks: [edge, services]
+
+  trading-mcp:
+    image: ${IMAGE_PREFIX:?}/trading-mcp:${TRADING_MCP_TAG:?}
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 512m
+    environment:
+      CAPITAL_GATEWAY_URL: http://gateway:80
+      # The gateway's own key twice over: what this module shows the gateway, and what it asks of the workbench.
+      CAPITAL_GATEWAY_API_KEY: ${GATEWAY_API_KEY:?}
+      SERVER_MODE: "true"
+      REQUIRE_AUTHENTICATED_PRINCIPAL: "true"
+    depends_on:
+      gateway:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:80/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+    networks: [services]
+
+  workbench:
+    image: ${IMAGE_PREFIX:?}/workbench:${WORKBENCH_TAG:?}
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 3g
+    environment:
+      SERVER_MODE: "true"
+      REQUIRE_AUTHENTICATED_PRINCIPAL: "true"
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:?}
+      ENTRA_AUDIENCES: ${WORKBENCH_ENTRA_AUDIENCES:?}
+      # Hosts that are this machine's own network: the database and the tool server, reached without a platform identity.
+      PRIVATE_HOSTS: postgres,trading-mcp
+
+      AGENT_DATABASE_URL: postgresql://agent:${AGENT_DB_PASSWORD:?}@postgres:5432/agent
+      TEAMS_DATABASE_URL: postgresql://teams:${TEAMS_DB_PASSWORD:?}@postgres:5432/teams
+      MARKET_DATABASE_URL: postgresql://market_data:${MARKET_DB_PASSWORD:?}@postgres:5432/market_data
+      POLYMARKET_DATABASE_URL: postgresql://polymarket:${POLYMARKET_DB_PASSWORD:?}@postgres:5432/polymarket
+      SOCIAL_DATABASE_URL: postgresql://social:${SOCIAL_DB_PASSWORD:?}@postgres:5432/social
+      STRATEGY_DATABASE_URL: postgresql://strategy:${STRATEGY_DB_PASSWORD:?}@postgres:5432/strategy
+      TELEGRAM_DATABASE_URL: postgresql://telegram:${TELEGRAM_DB_PASSWORD:?}@postgres:5432/telegram
+      YOUTUBE_DATABASE_URL: postgresql://youtube:${YOUTUBE_DB_PASSWORD:?}@postgres:5432/youtube
+      DATABASE_POOL_SIZE: "4"
+      MARKET_DATABASE_POOL_SIZE: "8"
+      POLYMARKET_DATABASE_POOL_SIZE: "3"
+      SOCIAL_DATABASE_POOL_SIZE: "3"
+      STRATEGY_DATABASE_POOL_SIZE: "3"
+      TELEGRAM_DATABASE_POOL_SIZE: "4"
+      YOUTUBE_DATABASE_POOL_SIZE: "2"
+
+      GATEWAY_BASE_URL: http://gateway:80
+      GATEWAY_STREAM_URL: ws://gateway:80/ws/stream
+      GATEWAY_API_KEY: ${GATEWAY_API_KEY:?}
+      TRADING_MCP_URL: http://trading-mcp:80
+      TRADING_MCP_API_KEY: ${GATEWAY_API_KEY:?}
+
+      AGENT_OPENAI_API_KEY: ${AGENT_OPENAI_API_KEY:?}
+      TEAMS_OPENAI_API_KEY: ${TEAMS_OPENAI_API_KEY:?}
+      SOCIAL_OPENAI_API_KEY: ${AGENT_OPENAI_API_KEY:?}
+      AGENT_MODELS: ${AGENT_MODELS:?}
+      TEAMS_MODELS: ${TEAMS_MODELS:?}
+      AGENT_DEFAULT_MODEL_ID: ${AGENT_DEFAULT_MODEL_ID:?}
+
+      TOOL_CALLER_APPLICATION_IDS: ""
+      REST_CALLER_APPLICATION_IDS: ${TERMINAL_APPLICATION_ID:?},${POCKET_APPLICATION_ID:?}
+      # The operator's `az` (a public Microsoft client id), admitted to `/telegram`'s bots and destinations alone.
+      TELEGRAM_REST_CALLER_APPLICATION_IDS: 04b07795-8ddb-461a-bbee-02f9e1bf7b46
+      YOUTUBE_REST_CALLER_APPLICATION_IDS: ${TERMINAL_APPLICATION_ID:?}
+
+      SCHEDULER_ENABLED: "true"
+
+      POLYMARKET_GAMMA_BASE_URL: https://gamma-api.polymarket.com
+      POLYMARKET_CLOB_BASE_URL: https://clob.polymarket.com
+      POLYMARKET_PROVIDER_USER_AGENT: tradingcenter-polymarket-data/0.1 (+https://github.com/MarekGrzeska)
+      SOCIAL_TRUTH_SOCIAL_FEED_URL: https://www.trumpstruth.org/feed
+      SOCIAL_PROVIDER_USER_AGENT: tradingcenter-social-data/0.1 (+https://github.com/MarekGrzeska)
+      TELEGRAM_BOT_API_BASE_URL: https://api.telegram.org
+
+      YOUTUBE_VIDEO_SOURCE: data_api
+      YOUTUBE_DATA_API_KEY: ${YOUTUBE_DATA_API_KEY:?}
+      YOUTUBE_TRANSCRIBER: gemini
+      YOUTUBE_GEMINI_API_KEY: ${YOUTUBE_GEMINI_API_KEY:?}
+      YOUTUBE_ANALYSER: openai
+      YOUTUBE_OPENAI_API_KEY: ${AGENT_OPENAI_API_KEY:?}
+
+      # Absent is a working configuration for these: nobody is told, and the account session is not started.
+      ALERT_DESTINATION: ${ALERT_DESTINATION:-}
+      TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
+      TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
+      TELEGRAM_SESSION: ${TELEGRAM_SESSION:-}
+    depends_on:
+      db-init:
+        condition: service_completed_successfully
+      gateway:
+        condition: service_healthy
+    healthcheck:
+      # The lifespan finishes only after every migration chain has, so a 200 here proves them. The candle archive's
+      # index can outlast a start-up, hence the long grace period.
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:80/health', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 1500s
+    networks: [edge, services, data]
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 2g
+    # No `ports:`. The operator reaches it through an SSH tunnel for a session, never through a rule or a published port.
+    command:
+      - postgres
+      - -c
+      - max_connections=100
+      - -c
+      - shared_preload_libraries=pg_stat_statements
+      - -c
+      - shared_buffers=768MB
+      - -c
+      - effective_cache_size=2GB
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?}
+      TZ: UTC
+      PGTZ: UTC
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -q"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    networks: [data]
+
+  # Roles and databases, every deploy and idempotently: `docker-entrypoint-initdb.d` fires only on an empty volume, and a
+  # ninth database added later would otherwise wait for one.
+  db-init:
+    image: postgres:17-alpine
+    restart: "no"
+    logging: *logging
+    entrypoint: ["sh", "/ensure-databases.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: ${POSTGRES_PASSWORD:?}
+      AGENT_DB_PASSWORD: ${AGENT_DB_PASSWORD:?}
+      TEAMS_DB_PASSWORD: ${TEAMS_DB_PASSWORD:?}
+      MARKET_DB_PASSWORD: ${MARKET_DB_PASSWORD:?}
+      POLYMARKET_DB_PASSWORD: ${POLYMARKET_DB_PASSWORD:?}
+      SOCIAL_DB_PASSWORD: ${SOCIAL_DB_PASSWORD:?}
+      STRATEGY_DB_PASSWORD: ${STRATEGY_DB_PASSWORD:?}
+      TELEGRAM_DB_PASSWORD: ${TELEGRAM_DB_PASSWORD:?}
+      YOUTUBE_DB_PASSWORD: ${YOUTUBE_DB_PASSWORD:?}
+    volumes:
+      - ./postgres/ensure-databases.sh:/ensure-databases.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [data]
+
+networks:
+  edge: {}
+  services: {}
+  data:
+    internal: true
+
+volumes:
+  pg-data:
+    name: tradingcenter-pg-data
+  caddy-data: {}
+  caddy-config: {}

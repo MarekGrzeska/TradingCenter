@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import os
 
-from pydantic import ValidationInfo, field_validator
+from pydantic import ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 DEMO_BASE_URL = "https://demo-api-capital.backend-capital.com"
@@ -49,6 +49,15 @@ class Settings(BaseSettings):
     module_caller_application_ids: list[str] = []
     browser_caller_application_ids: list[str] = []
 
+    # A server with no platform authenticator in front (`move-from-azure-to-vps`): the process checks the Entra
+    # token itself for what came through the edge proxy, and the shared key for what came from another service.
+    # Off everywhere else. Audiences are comma-separated, the way an App Service setting is easiest to write.
+    server_mode: bool = False
+    entra_tenant_id: str | None = None
+    entra_audiences: str = ""
+    # What a caller proving itself with the key is called; always a module caller, with nothing to add to the list.
+    internal_caller_application_id: str = "tc-internal"
+
     @field_validator("capital_api_key", "capital_identifier", "capital_password", "gateway_api_key")
     @classmethod
     def _not_blank(cls, value: str, info: ValidationInfo) -> str:
@@ -57,6 +66,29 @@ class Settings(BaseSettings):
         if not value.strip():
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value
+
+    @model_validator(mode="after")
+    def _server_mode_is_coherent(self) -> Settings:
+        if not self.server_mode:
+            return self
+        if not is_production():
+            # Without it the key opens every HTTP route, which is the one thing a server must not offer.
+            raise ValueError(f"SERVER_MODE needs {ENV_VAR}={PRODUCTION}: the key opens HTTP routes otherwise")
+        if not (self.entra_tenant_id or "").strip() or not self.audiences:
+            raise ValueError(
+                "SERVER_MODE needs ENTRA_TENANT_ID and ENTRA_AUDIENCES — without them no token could be checked, "
+                "and a browser would have no way in"
+            )
+        if self.internal_caller_application_id not in self.module_caller_application_ids:
+            self.module_caller_application_ids = [
+                *self.module_caller_application_ids,
+                self.internal_caller_application_id,
+            ]
+        return self
+
+    @property
+    def audiences(self) -> list[str]:
+        return [part.strip() for part in self.entra_audiences.split(",") if part.strip()]
 
     @field_validator("capital_base_url", "capital_stream_url")
     @classmethod

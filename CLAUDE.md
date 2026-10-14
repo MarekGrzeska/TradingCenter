@@ -26,10 +26,12 @@ to need something a package cannot give it, the change is wrong, not the rule.
 | `modules/trading-mcp` | MCP tools over the gateway's demo account. Network transport only, one named caller (the workbench). Demo checked against the gateway, not against a setting. |
 | `modules/terminal` | React+TS · the operator's screen. Consumes the others, publishes nothing. Call it the **terminal**, never a "console" or "dashboard". |
 | `modules/pocket` | React+TS · the archive on a phone, and a chat with the workbench beside it. A second consumer, sharing the terminal's generated contract and none of its code. |
-| `packages/tc-runtime` | database, migrations, schema check, Easy Auth, the caller-access machinery, the OpenAPI response rule. |
+| `packages/tc-runtime` | database, migrations, schema check, the caller-access machinery, the OpenAPI response rule. |
 | `packages/tc-mcp-kit` | caller identity both ways, the upstream-refusal helper, the tool-schema slimmer, mounting a FastMCP at `/mcp`. |
+| `packages/tc-entra-auth` | the Entra token check in the process and `EdgeAuth`, for a server with no platform authenticator (`SERVER_MODE`; the gateway, trading-mcp and the workbench). `openspec/changes/move-from-azure-to-vps`. |
 | `packages/tc-openai` | the streamed OpenAI call, with tools — taken only by the workbench. Duplication is measured by `scripts/measure-duplication.py`. |
-| `infra/` | Terraform · Azure. `infra/bootstrap/` is a separate root with local state. |
+| `deploy/` | the server: Compose (only Caddy publishes ports), Caddyfile, Ansible, `deploy.sh` (the one command the deploy key runs), backups. `deploy/README.md`. |
+| `infra/` | Terraform · Entra only — the two API audiences, the terminal's and pocket's registrations, CI's identity. State in Azure Storage (`infra/bootstrap/`, a separate root with local state). |
 | `openspec/` · `docs/` | specs (the truth) and proposals · architecture and reference, true today. `docs/archive/` is the road, not the state. A new `docs/*.html` copies `docs/style-template.html`. |
 
 In `modules/workbench` only `workbench/` — the assembly — imports the packages, mounting each former
@@ -76,8 +78,9 @@ its prefix), 8060 trading-mcp, 5173 terminal, 5174 pocket. 8020, 8040, 8050, 807
 **The dev database is the `compose.yaml` container**, on `127.0.0.1:55432`, started first by the
 dev scripts — Docker is required to run the stack, not only to test it. Leaving `DATABASE_USER`
 unset selects this local mode and narrows every database URL to loopback: a remote host is refused
-at startup, by `dev.py` and `config.py` both. Production uses an Entra identity instead. Do not
-"restore" dev on the Azure server; that was reversed the day it was made. The dev scripts create
+at startup, by `dev.py` and `config.py` both. Production is the server's own PostgreSQL, reached by
+name with each role's password — the host is in `PRIVATE_HOSTS`, the only other place a password URL is
+allowed. The dev scripts create
 each logical database and role themselves — `docker-entrypoint-initdb.d` only fires on an empty volume.
 
 **Contracts are committed copies** — the terminal's and the pocket's generated TypeScript, and
@@ -106,24 +109,22 @@ and decide as usual and tell nobody.
 account is a demo one *before* it opens a port. Both dev scripts compare the two files and refuse up
 front; otherwise the symptom is the whole stack going down with "a service exited".
 
-**The gateway's door asks for different things in different places, and in production the key
-opens no HTTP route at all.** Locally the shared key is the whole credential. In production the
-gateway's Easy Auth requires a validated token: the workbench and `trading-mcp` present their managed
-identities' tokens (`GATEWAY_SCOPE`, `CAPITAL_GATEWAY_SCOPE`) beside the key, the terminal the
-operator's; the application the token names decides (`MODULE_CALLER_APPLICATION_IDS` reach
-everything, the terminal the account). Two exceptions, both deliberate: `/` is the health route, and
-**`/ws/stream` is the one path whose door is the shared key alone** — an authenticator in front of a
-WebSocket upgrade never completes it, which killed every candle feed for an hour, so that check
-lives inside the gateway's handler.
+**On the server the door is in the process, and the route decides what it asks for**
+(`packages/tc-entra-auth`, `SERVER_MODE`). Caddy writes `X-TC-Edge` on every request from outside:
+such a request needs a valid Entra token; one without the marker came from another service on the
+internal network and needs the shared key (`GATEWAY_API_KEY`, which trading-mcp also checks). Either
+way `EdgeAuth` removes whatever `X-MS-CLIENT-PRINCIPAL*` arrived and writes its own, so the caller
+records read what they read behind Easy Auth. Locally there is no marker and no `SERVER_MODE`: the
+key is the whole credential. **`/ws/stream` checks the key in its handler** and is not carried at the
+edge at all; nothing outside calls it.
 
-**Easy Auth authorizes an application, not a route** — so every package keeps its own caller record
+**Caller records authorize an application, not a person** — every package keeps its own
 (`caller_access.py`), and the workbench's root routes keep one too (`workbench/root_access.py`). The
-workbench admits the operator's `az` since the door to Telegram moved in; only `/telegram`'s bots and
-destinations answer it (`TELEGRAM_REST_CALLER_APPLICATION_IDS`), every other record refuses it. Both
-kinds of list hold **application** ids from the token's `azp`/`appid`, never
-`X-MS-CLIENT-PRINCIPAL-ID`, which names the signed-in *person* for a delegated token — measured by
+operator's `az` reaches only `/telegram`'s bots and destinations
+(`TELEGRAM_REST_CALLER_APPLICATION_IDS`). Every list holds **application** ids from the token's
+`azp`/`appid`, never `X-MS-CLIENT-PRINCIPAL-ID`, which names the signed-in *person* — measured by
 deploying the opposite and refusing every request the terminal made. A package reading another's
-REST goes through `tc_runtime.caller_access.in_process`, never through the platform's door.
+REST goes through `tc_runtime.caller_access.in_process`, never through the door.
 
 **Capital sessions coexist.** What constrains parallel work is the rate budget — 10 req/s counted
 against the **account**, so two stacks starve each other. `modules/capital-gateway/README.md`.
@@ -132,12 +133,9 @@ against the **account**, so two stacks starve each other. `modules/capital-gatew
 Entra directory write access. `infra/bootstrap/` keeps local state that *is* committed; its
 storage-account keys are inert by design (`shared_access_key_enabled = false`). Don't "fix" that by rotating.
 
-**Settings reach the app before the image that needs them.** A route record is empty in a fresh
-deployment and a required setting missing is a refused start, so an `apply` landing after the deploy
-is an outage in between. `TRADING_MCP_URL` needs both the apply **and** the workbench's identity in
-trading-mcp's `allowed_applications`; neither substitutes for the other. Rolling back is the same
-lever: clear the setting, restart. The workbench App Service is still `app-tradingcenter-agent` — a
-name here is an identity, not a label.
+**Secrets live in the GitHub environment `vps`**, and `.env` on the server is rebuilt from them on
+every deploy (`deploy/scripts/assemble_env.py`, names in `deploy/env.required`). A name missing there
+stops the deploy before anything is sent. `deploy/scripts/fill-github-environment.sh` fills it.
 
 ## Migrations are never the operator's job
 
@@ -145,16 +143,16 @@ name here is an identity, not a label.
 serving.** No operator step between the merge and a working application. The deployment applies
 `alembic upgrade head` against every database the module owns, itself, before the new image serves;
 new tables are usable by the app's own role the moment they exist; and the deployment's check fails
-when either did not happen — a check reading the App Service control plane is not enough (it reported
-`Running` over a crash-looping container on 16 August 2026).
+when either did not happen — `deploy.sh` waits for every container to be healthy and puts the previous
+images back otherwise; a check of "the container runs" is not enough (Azure reported `Running` over a
+crash-looping container on 16 August 2026).
 
 Each module does this in its own `lifespan`, under a Postgres advisory lock keyed per module (in the
 workbench 8020, 8030, 8050, 8070, 8080, 8090 and 8100 — each the port that package used to have), with
 its own identity. Reasoning: `openspec/changes/archive/…-modules-migrate-their-own-database`.
 
-**One thing stays the operator's, exactly once per database:** the app role must own what it is
-about to alter — `scripts/grant-schema-ownership.sql`, plus `GRANT CONNECT` when a database changes
-hands. The workbench needs it in every one of its seven databases, since one App Service presents one identity.
+Each role owns its database from the start: `deploy/postgres/ensure-databases.sh` creates both on every
+deploy, so there is no operator step left between a new database and its first migration.
 
 ## How much test is enough
 
@@ -225,12 +223,12 @@ committed snapshot of the gateway's whole OpenAPI document.
 
 **There is no branch protection on this repository** — a skipped job blocks nothing.
 
-The `deploy-*.yml` workflows deploy **after a green `checks` run of the same commit**
-(`workflow_run`), gated by `scripts/deploy_gate.py` and ending in `scripts/deploy_probe.py`; after a
-merge, the `deploy-watch` skill follows it and rolls a failed start back before anything else.
-`workflow_dispatch` is the door around the gate. **No App Service carries an address restriction** — each door is its own authentication.
-`terraform.yml` plans on infra PRs; `terraform-apply.yml` is a manual dispatch that refuses any plan
-touching `azuread_*`, since CI holds `Application.Read.All` and not write.
+`deploy-vps.yml` deploys **after a green `checks` run of the same commit** (`workflow_run`), gated by
+`scripts/deploy_gate.py`: it builds the three images and both front ends, sends the server `.env`,
+its files and the built front ends over SSH, and `deploy.sh release` rolls back by itself if the new
+containers are not healthy; `scripts/vps_probe.py` then asks the server and the public addresses.
+After a merge the `deploy-watch` skill follows it. `workflow_dispatch` is the door around the gate.
+`terraform.yml` plans on infra PRs; there is no apply in CI — everything left in `infra/` is Entra.
 
 Parallel work: use `git worktree` rather than a second clone — but the dev database container, the
 Capital session and the fixed ports are shared across worktrees, so only one agent at a time can run

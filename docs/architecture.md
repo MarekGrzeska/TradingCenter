@@ -112,6 +112,19 @@ packages of which none imports a neighbour, and one assembly that imports all of
 understanding. The first convenient dependency is written in a hurry, and a rule with no failing
 case is a preference. Between processes the old sentence holds unchanged.
 
+## Where it runs
+
+**Since 14 October 2026 the whole system is one server** (`openspec/changes/move-from-azure-to-vps`): Docker Compose
+with Caddy, the three processes and PostgreSQL 17 holding the eight databases (`deploy/`). Only Caddy publishes ports;
+the applications and the database sit on internal networks, the database's with no route out. The boundary between
+processes is unchanged — it is still one process per rule of writing, reached only through a contract — but what checks
+a caller moved into the processes themselves: `packages/tc-entra-auth` verifies the Entra token of anything that came
+through the edge, and takes the shared key from anything that came from another service, then writes the identity the
+caller records already read. Entra stays for sign-in (the registrations in `infra/`); everything else Azure ran is gone.
+
+Where the sections below speak of App Services, Easy Auth, managed identities or Application Insights, they describe the
+road to here: the processes, packages and records are the same, the platform around them is not.
+
 ## The prediction-market archive
 
 `polymarket-data` arrived on 22 August 2026 and is `market-data`'s shape rather than the

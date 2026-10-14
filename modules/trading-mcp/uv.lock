@@ -1417,6 +1417,31 @@ wheels = [
 ]
 
 [[package]]
+name = "tc-entra-auth"
+version = "0.1.0"
+source = { editable = "../../packages/tc-entra-auth" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pyjwt", extra = ["crypto"] },
+    { name = "starlette" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "pyjwt", extras = ["crypto"], specifier = ">=2.8" },
+    { name = "starlette", specifier = ">=0.37" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pyright", specifier = "==1.1.411" },
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "ruff", specifier = "==0.16.2" },
+]
+
+[[package]]
 name = "tc-mcp-kit"
 version = "0.1.0"
 source = { editable = "../../packages/tc-mcp-kit" }
@@ -1455,6 +1480,7 @@ dependencies = [
     { name = "mcp" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "tc-entra-auth" },
     { name = "tc-mcp-kit" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -1476,6 +1502,7 @@ requires-dist = [
     { name = "mcp", specifier = "==1.27.0" },
     { name = "pydantic", specifier = ">=2.7" },
     { name = "pydantic-settings", specifier = ">=2.2" },
+    { name = "tc-entra-auth", editable = "../../packages/tc-entra-auth" },
     { name = "tc-mcp-kit", editable = "../../packages/tc-mcp-kit" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.29" },
 ]

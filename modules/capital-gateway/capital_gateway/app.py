@@ -20,6 +20,7 @@ from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, 
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
+from tc_entra_auth import EdgeAuth
 
 from .adapter import CapitalAdapter
 from .caller_access import (
@@ -45,6 +46,7 @@ from .dtos import (
     UpdatePositionRequest,
     WorkingOrder,
 )
+from .edge import edge_config, edge_provider
 from .errors import GatewayError
 from .history import parse_candle_ts
 from .stream.forming import Bar
@@ -105,6 +107,7 @@ async def lifespan(app: FastAPI):
     )
 
     app.state.settings = settings
+    app.state.edge = edge_config(settings)
     app.state.client = client
     app.state.adapter = adapter
     app.state.hub = hub
@@ -188,6 +191,8 @@ app = FastAPI(
     openapi_url="/openapi.json" if not is_production() else None,
 )
 app.add_middleware(GatewayDoor)
+# After the door, so outermost: it settles who is calling before the door reads it. A no-op unless SERVER_MODE.
+app.add_middleware(EdgeAuth, config=edge_provider(app))
 
 
 @app.exception_handler(GatewayError)

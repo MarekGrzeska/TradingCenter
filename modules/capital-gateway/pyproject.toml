@@ -12,11 +12,17 @@ dependencies = [
     # Exports this module's logs to Application Insights when a connection string is
     # configured, and is inert without one. Same version market-data pins.
     "azure-monitor-opentelemetry>=1.6",
+    # The token check for a server with no platform authenticator in front. Taken for that and nothing else: this
+    # module still has no database and needs nothing of `tc-runtime`.
+    "tc-entra-auth",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.
 [tool.uv]
 package = false
+
+[tool.uv.sources]
+tc-entra-auth = { path = "../../packages/tc-entra-auth", editable = true }
 
 [tool.ruff]
 line-length = 100

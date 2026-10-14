@@ -24,6 +24,7 @@ telemetry.configure(quiet=("httpx", "httpcore", "urllib3"))
 
 from fastapi import FastAPI
 from starlette.routing import Mount
+from tc_entra_auth import EdgeAuth
 from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
@@ -56,6 +57,7 @@ from . import model_successors
 from .archive_client import archive_client
 from .assembly import mount_package
 from .config import Settings, youtube_enabled
+from .edge import edge_config, edge_provider
 from .local_tools import ConversationLocalTools, TeamsLocalTools
 from .root_access import RootCallers
 from .team_tools import LocalTeamsTools
@@ -236,6 +238,7 @@ async def lifespan(app: FastAPI):
                 )
 
             app.state.settings = settings
+            app.state.edge = edge_config(settings)
             app.state.agent = agent.surface.State(
                 settings=conversation_settings,
                 pool=conversation_pool,
@@ -360,3 +363,5 @@ app.add_middleware(
     state=app.state,
     package_prefixes=frozenset(route.path for route in app.routes if isinstance(route, Mount)),
 )
+# Last, so outermost: it settles who is calling before any record reads it. A no-op unless SERVER_MODE.
+app.add_middleware(EdgeAuth, config=edge_provider(app))

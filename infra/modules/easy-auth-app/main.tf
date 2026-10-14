@@ -36,17 +36,8 @@ resource "azuread_application" "this" {
     }
   }
 
-  web {
-    redirect_uris = [var.redirect_uri]
-
-    dynamic "implicit_grant" {
-      for_each = var.id_token_issuance_enabled ? [true] : []
-
-      content {
-        id_token_issuance_enabled = true
-      }
-    }
-  }
+  # No web redirect and no implicit grant since the platform authenticator went with Azure: nothing signs in *to* this
+  # registration any more, and a redirect URI on a hostname nobody holds is one somebody else could register.
 }
 
 # Generated once and kept in state. A scope id must be a stable GUID: regenerating it would
@@ -57,16 +48,4 @@ resource "random_uuid" "scope" {
 
 resource "azuread_service_principal" "this" {
   client_id = azuread_application.this.client_id
-}
-
-# What Easy Auth reads as MICROSOFT_PROVIDER_AUTHENTICATION_SECRET. `end_date` is ignored after creation: `timestamp()`
-# moves on every plan, and a rotation the app has not restarted for is an app rejecting every token.
-resource "azuread_application_password" "this" {
-  application_id = azuread_application.this.id
-  display_name   = "easy-auth"
-  end_date       = timeadd(timestamp(), "8760h")
-
-  lifecycle {
-    ignore_changes = [end_date]
-  }
 }

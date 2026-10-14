@@ -22,6 +22,7 @@ def _no_ambient_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         "TRADING_MCP_PORT",
         "TRADING_MCP_HOST",
         "REQUIRE_AUTHENTICATED_PRINCIPAL",
+        "SERVER_MODE",
     ):
         monkeypatch.delenv(name, raising=False)
 
