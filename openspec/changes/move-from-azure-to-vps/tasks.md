@@ -32,7 +32,7 @@ Kroki oznaczone **(operator)** wymagają konta, decyzji albo zgody operatora.
 
 - [x] 4.1 `deploy/cloud-init.yaml`: użytkownik `deploy`, klucze, bez hasła i roota, Docker, Python
 - [x] 4.2 `deploy/ansible/`: zapora (80/443, 22 z ograniczonych adresów), automatyczne aktualizacje bezpieczeństwa, rotacja logów Dockera, katalog `/opt/tradingcenter`, użytkownik aplikacji, cron kopii i alertów dysku
-- [ ] 4.3 **(operator)** Postawienie produkcyjnego VPS i zastosowanie 4.1–4.2; sprawdzenie skanem portów z zewnątrz
+- [x] 4.3 **(operator)** Postawienie produkcyjnego VPS i zastosowanie 4.1–4.2; sprawdzenie skanem portów z zewnątrz
 
 ## 5. Wdrożenie z sondą i powrotem
 
