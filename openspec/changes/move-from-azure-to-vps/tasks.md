@@ -51,16 +51,16 @@ Kroki oznaczone **(operator)** wymagają konta, decyzji albo zgody operatora.
 ## 7. Dane i testy na VPS
 
 - [x] 7.1 **(operator)** Rejestracje Entra: nowe adresy przekierowań terminala i pocketa (`azuread_*`, `terraform apply`)
-- [ ] 7.2 Zrzut ośmiu baz z Azure (tunel przez tymczasową regułę zapory), odtworzenie na VPS, `alembic upgrade head`, porównanie liczby wierszy
-- [ ] 7.3 Start na VPS z wyłączonymi pętlami i strumieniem rynkowym (albo osobne konto demo i testowy bot)
+- [x] 7.2 Zrzut ośmiu baz z Azure (tunel przez tymczasową regułę zapory), odtworzenie na VPS, `alembic upgrade head`, porównanie liczby wierszy — **14 października 2026:** zrzut z VPS-a (tymczasowa reguła zapory, token Entra operatora w pliku 600, usunięte po), odtworzenie bez błędów, liczby wierszy w każdej z 8 baz tabela po tabeli zgodne ze źródłem (polymarket 36,5 mln, market_data 1,18 mln), migracje bez zmian
+- [x] 7.3 Start na VPS z wyłączonymi pętlami i strumieniem rynkowym (albo osobne konto demo i testowy bot) — zastąpione przez pełne okno na życzenie operatora: Azure zatrzymany przed zrzutem, więc pętle nie pracowały równolegle ani przez chwilę
 - [ ] 7.4 Lista dymna: zdrowie trzech aplikacji; logowanie terminala i pocketa; nieważny token → 401 z zewnątrz; wykres i strumień świec; zlecenie demo; rozmowa z agentem z narzędziami rachunku; przebieg zespołu; alert Telegram; film YouTube od dodania do oceny
 - [ ] 7.5 Zewnętrzny monitor dostępności trzech tras zdrowia z alertem
 - [ ] 7.6 Kilka dni pracy w tle bez niespodzianek w logach; `review.md`
 
 ## 8. Przełączenie
 
-- [ ] 8.1 **(operator)** Zgoda na okno
-- [ ] 8.2 Zatrzymanie pętli w Azure; końcowy zrzut i odtworzenie; włączenie pętli na VPS; terminal i pocket pod nowymi adresami
+- [x] 8.1 **(operator)** Zgoda na okno — operator, 14 października 2026
+- [x] 8.2 Zatrzymanie pętli w Azure; końcowy zrzut i odtworzenie; włączenie pętli na VPS; terminal i pocket pod nowymi adresami — Azure (workbench, gateway, trading-mcp) zatrzymany 14:19 UTC, VPS pracuje od 14:26 UTC; terminal i pocket pod `*.57-129-181-251.sslip.io`
 - [ ] 8.3 Kilka dni obserwacji; Azure zatrzymany, nieusunięty (powrót = start Azure)
 
 ## 9. Sprzątanie i merge
