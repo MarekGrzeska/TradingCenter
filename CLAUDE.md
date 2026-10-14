@@ -28,6 +28,7 @@ to need something a package cannot give it, the change is wrong, not the rule.
 | `modules/pocket` | React+TS · the archive on a phone, and a chat with the workbench beside it. A second consumer, sharing the terminal's generated contract and none of its code. |
 | `packages/tc-runtime` | database, migrations, schema check, Easy Auth, the caller-access machinery, the OpenAPI response rule. |
 | `packages/tc-mcp-kit` | caller identity both ways, the upstream-refusal helper, the tool-schema slimmer, mounting a FastMCP at `/mcp`. |
+| `packages/tc-entra-auth` | the Entra token check in the process and `EdgeAuth`, for a server with no platform authenticator (`SERVER_MODE`; the gateway, trading-mcp and the workbench). `openspec/changes/move-from-azure-to-vps`. |
 | `packages/tc-openai` | the streamed OpenAI call, with tools — taken only by the workbench. Duplication is measured by `scripts/measure-duplication.py`. |
 | `infra/` | Terraform · Azure. `infra/bootstrap/` is a separate root with local state. |
 | `openspec/` · `docs/` | specs (the truth) and proposals · architecture and reference, true today. `docs/archive/` is the road, not the state. A new `docs/*.html` copies `docs/style-template.html`. |
