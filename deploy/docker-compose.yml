@@ -37,8 +37,9 @@ services:
       ACME_EMAIL: ${ACME_EMAIL:?}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./www/terminal:/srv/terminal:ro
-      - ./www/pocket:/srv/pocket:ro
+      # The parent, not each front end: `deploy.sh www` swaps a front end in by renaming its directory, and a bind mount
+      # of the directory itself keeps pointing at the one renamed away — the terminal answered 404 after the first such swap.
+      - ./www:/srv/www:ro
       - caddy-data:/data
       - caddy-config:/config
     networks: [edge]

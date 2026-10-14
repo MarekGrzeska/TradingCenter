@@ -63,6 +63,14 @@ def test_the_optional_names_are_blank_by_default_and_not_required() -> None:
     assert not optional & required_names()
 
 
+def test_the_front_ends_are_served_through_their_parent_directory() -> None:
+    """A front end is swapped in by renaming its directory; a bind mount of that directory would keep the old one."""
+    volumes = SERVICES["caddy"]["volumes"]
+    assert "./www:/srv/www:ro" in volumes
+    assert not [v for v in volumes if v.startswith("./www/")]
+    assert "root * /srv/www/terminal" in CADDYFILE and "root * /srv/www/pocket" in CADDYFILE
+
+
 def test_every_service_rotates_its_logs() -> None:
     assert [name for name, service in SERVICES.items() if "logging" not in service] == []
 
