@@ -132,9 +132,11 @@ async def test_no_key_opens_the_workbench_from_inside_the_network() -> None:
         assert (await client.get("/sessions", headers={"X-Gateway-Key": "gateway-key"})).status_code == 401
 
 
-async def test_the_assembled_application_refuses_before_its_settings_exist() -> None:
+async def test_the_assembled_application_refuses_before_its_settings_exist(monkeypatch) -> None:
     """Nothing is served until the lifespan has filled the state, whatever the path: the outermost layer is the one
-    saying so, which is how this proves the assembly installed it."""
+    saying so, which is how this proves the assembly installed it. The state is emptied first, because the application
+    object is shared and another test's lifespan may already have filled it."""
+    monkeypatch.delattr(workbench_app.state, "edge", raising=False)
     transport = httpx.ASGITransport(app=workbench_app)
     async with httpx.AsyncClient(transport=transport, base_url="http://workbench") as client:
         assert (await client.get("/sessions", headers=EDGE)).status_code == 503
