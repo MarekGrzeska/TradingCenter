@@ -193,6 +193,18 @@ class TestOneFileAtATime:
         assert decisions["workbench"]
         assert not decisions["capital-gateway"]
 
+    def test_tc_entra_auth_reaches_the_three_doors_it_stands_in(self) -> None:
+        """The gateway, trading-mcp and the workbench each wear it as their outermost layer; a change to the token
+        check that ran only one of them would be the invisible regression sharing source is paid for with."""
+        decisions = decide(["packages/tc-entra-auth/tc_entra_auth/edge.py"])
+        assert decisions["capital-gateway"]
+        assert decisions["trading-mcp"]
+        assert decisions["workbench"]
+
+
+    def test_the_server_files_run_the_tests_that_read_them(self) -> None:
+        assert decide(["deploy/Caddyfile"])["scripts"]
+
 
 class TestTheMatrixTheJobRuns:
     """`package-list` is the diff intersected with `packages/`. Neither half alone is right: the directory

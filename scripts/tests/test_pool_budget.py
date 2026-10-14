@@ -1,5 +1,5 @@
-"""Seven logical databases share one `B_Standard_B1ms` whose `max_connections` is 50, and every module
-sizes its own pool. That makes the numbers one budget nobody was adding up: before this test they came
+"""The logical databases share one server — a `B_Standard_B1ms` with `max_connections` 50 until the move to a VPS,
+then the PostgreSQL in `deploy/docker-compose.yml` with 100 — and every module sizes its own pool. That makes the numbers one budget nobody was adding up: before this test they came
 to 64 on paper, held together only by `min_size=1` and a quiet day.
 
 Two sources are checked, because either alone would let the total through. A module deployed with no
@@ -19,8 +19,8 @@ APP_SERVICE = REPO_ROOT / "infra" / "app-service.tf"
 # The server's own ceiling, and what is left for everything that is not an application pool: the
 # operator's `psql`, a migration holding its own connection, the platform's own probes. Measured on
 # production on 16 September 2026; this said 35 until then, and the budget did not move with it.
-MAX_CONNECTIONS = 50
-BUDGET = 30
+MAX_CONNECTIONS = 100
+BUDGET = 60
 
 # module directory -> (config path, Terraform's resource name, how many pools that one setting sizes).
 # The workbench is the only entry above one pool: two schemas, two pools, one process, one setting. The five packages

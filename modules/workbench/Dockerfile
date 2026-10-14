@@ -9,6 +9,7 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 COPY packages/tc-runtime /app/packages/tc-runtime
 COPY packages/tc-openai /app/packages/tc-openai
 COPY packages/tc-mcp-kit /app/packages/tc-mcp-kit
+COPY packages/tc-entra-auth /app/packages/tc-entra-auth
 COPY modules/workbench/pyproject.toml modules/workbench/uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 

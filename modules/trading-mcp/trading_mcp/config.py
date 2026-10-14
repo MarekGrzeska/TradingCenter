@@ -3,7 +3,7 @@ on every request, loopback included. The token beside it follows the address; th
 
 from __future__ import annotations
 
-from pydantic import ValidationInfo, field_validator
+from pydantic import ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,6 +25,21 @@ class Settings(BaseSettings):
 
     # Whether a platform authenticator stands in front of this module. Off locally, on in Azure.
     require_authenticated_principal: bool = False
+
+    # A server with no platform authenticator (`move-from-azure-to-vps`). This module is never published at the edge,
+    # so what reaches it is another service on the internal network, and proves itself with the gateway's key — the one
+    # shared secret the system has. Anything carrying the edge marker is refused whatever token it holds.
+    server_mode: bool = False
+    internal_caller_application_id: str = "tc-internal"
+
+    @model_validator(mode="after")
+    def _server_mode_asks_for_an_identity(self) -> Settings:
+        if self.server_mode and not self.require_authenticated_principal:
+            raise ValueError(
+                "SERVER_MODE needs REQUIRE_AUTHENTICATED_PRINCIPAL=true: the door writes the identity the "
+                "tools are gated on, and a process that does not ask for it admits a caller with none"
+            )
+        return self
 
     @field_validator("capital_gateway_url")
     @classmethod

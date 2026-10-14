@@ -1,21 +1,23 @@
 # Multi-stage: uv resolves and builds the venv, the runtime stage ships only that venv and the source — no compiler
 # toolchain, no uv binary, no lockfile parsing at container start.
+# **The build context is the repository root**: uv resolves `tc-entra-auth`'s path while installing the lock.
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
-WORKDIR /app
+WORKDIR /app/modules/capital-gateway
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
 # Dependencies first, from the lockfile alone — this layer only invalidates when
 # pyproject.toml or uv.lock change, not on every source edit.
-COPY pyproject.toml uv.lock ./
+COPY packages/tc-entra-auth /app/packages/tc-entra-auth
+COPY modules/capital-gateway/pyproject.toml modules/capital-gateway/uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
-COPY capital_gateway ./capital_gateway
+COPY modules/capital-gateway/capital_gateway ./capital_gateway
 RUN uv sync --frozen --no-dev
 
 FROM python:3.12-slim-bookworm
-WORKDIR /app
+WORKDIR /app/modules/capital-gateway
 COPY --from=builder /app /app
-ENV PATH="/app/.venv/bin:$PATH"
+ENV PATH="/app/modules/capital-gateway/.venv/bin:$PATH"
 
 # Azure App Service's default expectation for a Linux custom container — matches
 # infra/app-service.tf, which sets no WEBSITES_PORT override.

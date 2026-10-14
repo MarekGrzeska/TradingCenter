@@ -48,16 +48,28 @@ się w logach wdrożenia ani w argumentach poleceń.
 - **THEN** wdrożenie kończy się błędem nazywającym brakującą nazwę
 - **AND** działające kontenery zostają nietknięte
 
-### Requirement: Kopie bazy są codzienne, poza serwerem i odtwarzane
+### Requirement: Kopie bazy są codzienne, trafiają poza serwer i są odtwarzane
 
-Każda baza systemu MUST mieć codzienny zrzut przechowywany poza serwerem, z retencją co najmniej 14 dni.
-Brak zrzutu z ostatniej doby MUST wywołać alert do operatora. Odtworzenie zrzutu na świeżej maszynie
+Każda baza systemu MUST mieć codzienny zrzut z retencją co najmniej 14 dni na serwerze, a kopie MUST trafiać poza
+serwer na komputer operatora, który je odbiera, a serwer MUST NOT mieć poświadczeń do miejsca docelowego ani prawa do
+zapisu na komputerze operatora; klucz, którym komputer się łączy, MUST pozwalać tylko na wylistowanie, pobranie i
+potwierdzenie zrzutów. Brak zrzutu z ostatniej doby oraz brak potwierdzonego odbioru od 3 dni MUST wywołać alert do operatora. Odtworzenie zrzutu na świeżej maszynie
 MUST być przećwiczone przed przełączeniem produkcji i powtarzane co miesiąc.
 
 #### Scenario: Nocna kopia się nie udała
 
 - **WHEN** zrzut którejkolwiek bazy nie powstał w ostatniej dobie
 - **THEN** operator dostaje alert nazywający bazę
+
+#### Scenario: Komputer operatora nie odbiera kopii
+
+- **WHEN** od 3 dni żaden zrzut nie został potwierdzony jako odebrany
+- **THEN** operator dostaje alert, że kopie nie wyszły poza serwer
+
+#### Scenario: Przejęty serwer
+
+- **WHEN** ktoś przejmuje serwer
+- **THEN** nie znajduje tam poświadczeń do miejsca, w którym leżą odebrane kopie
 
 #### Scenario: Próba odtworzenia
 

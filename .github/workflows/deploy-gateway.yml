@@ -28,13 +28,11 @@ jobs:
       # What this image bakes in, as git pathspecs: the gate diffs them since the last green checks run.
       paths: |
         modules/capital-gateway
+        packages/tc-entra-auth
         .github/workflows/deploy-gateway.yml
         .github/workflows/_deploy-app-service.yml
         scripts/deploy_probe.py
       app_name: app-tradingcenter-gateway
-      # The one module whose build context is its own directory: it takes no package, and its Dockerfile
-      # copies `pyproject.toml` from the context root.
-      build_context: modules/capital-gateway
       # This went without an HTTP probe for two months on a premise nobody checked — an IP restriction that
       # appears nowhere in `infra/`. Matching on `capital-gateway` rather than a status word: the body carries
       # this module's own name, so a 200 from anything else in front of the container cannot pass for it.

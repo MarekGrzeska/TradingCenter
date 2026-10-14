@@ -7,12 +7,15 @@ from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
+from tc_entra_auth import EdgeAuth, EdgeConfig
 from tc_mcp_kit.network_identity import RequireCallerIdentity
 from tc_mcp_kit.tool_schemas import slim_tool_schemas
 
 from . import tools
-from .client import GatewayClient
+from .client import GATEWAY_KEY_HEADER, GatewayClient
 from .config import Settings
+
+HEALTH_PATH = "/health"
 
 INSTRUCTIONS = (
     "Tools over capital-gateway's demo account: read positions, working orders and "
@@ -44,6 +47,21 @@ def build_server(settings: Settings, gateway: GatewayClient) -> FastMCP:
 
 def build_http_app(settings: Settings, gateway: GatewayClient) -> ASGIApp:
     mcp = build_server(settings, gateway)
-    return RequireCallerIdentity(
+    guarded = RequireCallerIdentity(
         mcp.streamable_http_app(), settings.require_authenticated_principal
+    )
+    return EdgeAuth(guarded, edge_config(settings))
+
+
+def edge_config(settings: Settings) -> EdgeConfig | None:
+    """`None` is not a server, and the door stays as the platform left it. A server has no verifier at all: this
+    module is not published at the edge, so a request carrying the edge marker is refused whatever it presents."""
+    if not settings.server_mode:
+        return None
+    return EdgeConfig(
+        verifier=None,
+        service_key=settings.capital_gateway_api_key,
+        internal_application_id=settings.internal_caller_application_id,
+        key_header=GATEWAY_KEY_HEADER.lower().encode(),
+        exempt_paths=frozenset({HEALTH_PATH}),
     )

@@ -69,15 +69,16 @@ jobs:
           tc_runtime='^packages/tc-runtime/'
           tc_openai='^packages/tc-openai/'
           tc_mcp_kit='^packages/tc-mcp-kit/'
+          tc_entra_auth='^packages/tc-entra-auth/'
 
           # Keyed by the job name each pattern decides, so there is one list of names rather than two. The `case`
           # block this replaces existed because a bash variable cannot hold a hyphen, and cost two edits per job.
           declare -A PATTERNS=()
 
-          PATTERNS[capital-gateway]='^modules/capital-gateway/'
+          PATTERNS[capital-gateway]="^modules/capital-gateway/|$tc_entra_auth"
           # One module where there were eight. It takes `tc-mcp-kit` as well as the other two, because the team
           # tools moved into it with their schema slimmer, and the archive's eleven tools sit under its ceiling.
-          PATTERNS[workbench]="^modules/workbench/|$tc_runtime|$tc_openai|$tc_mcp_kit"
+          PATTERNS[workbench]="^modules/workbench/|$tc_runtime|$tc_openai|$tc_mcp_kit|$tc_entra_auth"
           # The terminal is filtered on one other module because its `contract:check` is the check for those seams:
           # the workbench whole, since six schemas — the archive's among them — are built from routes and from
           # models those files import.
@@ -86,14 +87,15 @@ jobs:
           # The second front end, filtered on the one module it reads: it keeps its own generated copy of that
           # schema, so `contract:check` there is the check for this seam exactly as it is for the terminal.
           PATTERNS[pocket]='^modules/pocket/|^modules/workbench/(polymarket_data|social_data)/(contract|openapi)\.py$|^modules/workbench/agent/'
-          PATTERNS[trading-mcp]="^modules/trading-mcp/|^modules/capital-gateway/|$tc_mcp_kit"
+          PATTERNS[trading-mcp]="^modules/trading-mcp/|^modules/capital-gateway/|$tc_mcp_kit|$tc_entra_auth"
           # The archive-shape check, plus the script that is the shape. There used to be a third pairing above —
           # teams-mcp's snapshot of the teams document — gone with the module that kept it.
           PATTERNS[openspec]='^openspec/|^scripts/trim-openspec-archive\.sh$'
           PATTERNS[packages]='^packages/'
           # Repository tooling with tests of its own. `CLAUDE.md` is here because `test_guide_ceiling.py` reads it:
-          # filtered on `^scripts/` alone, an edit to the guide ran none of the guard written against it.
-          PATTERNS[scripts]='^scripts/|^CLAUDE\.md$'
+          # filtered on `^scripts/` alone, an edit to the guide ran none of the guard written against it. `deploy/` for the
+          # same reason: `test_deploy_compose.py` reads the Compose file and the Caddyfile.
+          PATTERNS[scripts]='^scripts/|^deploy/|^CLAUDE\.md$'
           # Terraform reached `main` unvalidated until 18 August 2026, since `terraform.yml` runs on pull_request only.
           # `fmt` and `validate` need no credentials, so they belong here. Both roots — bootstrap keeps its own state.
           PATTERNS[infra]='^infra/'

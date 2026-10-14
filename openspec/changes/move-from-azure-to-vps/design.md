@@ -35,7 +35,7 @@ dla każdej usługi (client credentials) — odrzucona: trzy nowe sekrety do rot
 daje za darmo, i dalsza zależność usług od Entra.
 
 **3. Trzeci tryb połączenia z bazą: „serwer”.** Dziś: lokalny (pętla zwrotna, hasło w adresie) albo tożsamość
-(token Entra, TLS). Na VPS: hasło roli w adresie, host z listy `DATABASE_PRIVATE_HOSTS` (domyślnie `postgres`),
+(token Entra, TLS). Na VPS: hasło roli w adresie, host z listy `PRIVATE_HOSTS` (nazwy w sieci kontenerów, np. `postgres`; ta sama lista wpuszcza adresy usług bez tokenu tożsamości),
 bez TLS — ruch nie opuszcza hosta, a sieć Compose jest oznaczona jako `internal`. Host spoza listy i spoza pętli
 zwrotnej bez tożsamości: dalej odmowa startu. Każdy pakiet dostaje własną rolę i hasło (rola jest właścicielem
 swojej bazy od początku — koniec z `grant-schema-ownership.sql`). Tryb tożsamości zostaje w kodzie do fazy 8, żeby
@@ -69,13 +69,16 @@ aktualizacje bezpieczeństwa, katalogi, Compose, Caddy, rotacja logów, cron kop
 na serwer. Jedna domena, ścieżki albo poddomeny (np. `terminal.`, `pocket.`, `api.`) — decyzja w fazie 0 razem z
 domeną. Rejestracje Entra dostają nowe adresy przekierowań (Terraform `azuread_*`, `apply` operatora).
 
-**9. Stan Terraform po Azure.** Konto Azure Storage z `infra/bootstrap/` znika z resztą. Korzeń `infra/`
-ogranicza się do `azuread_*` i przenosi stan do backendu niezależnego od Azure (S3-kompatybilny magazyn, ten sam co
-kopie zapasowe), z migracją `terraform init -migrate-state` **przed** `destroy`.
+**9. Stan Terraform zostaje w Azure Storage (zmiana z 15 października 2026: operator odrzucił osobny magazyn S3).**
+Konto z `infra/bootstrap/` jest jedynym zasobem Azure, który przeżywa wyłączenie reszty (poza Entra): kosztuje
+grosze, jego klucze są nieaktywne z założenia (`shared_access_key_enabled = false`), a dostęp idzie tożsamością.
+Korzeń `infra/` ogranicza się do `azuread_*` i dalej używa tego backendu — nie ma `init -migrate-state`, nie ma
+drugiego dostawcy. Subskrypcja zostaje więc z jedną grupą zasobów; D3 („z Microsoftu zostaje tylko Entra”) czytamy jako
+Entra plus to jedno konto.
 
 **10. Obserwacja.** Zewnętrzny monitor dostępności (usługa hostowana poza serwerem, darmowy plan) odpytuje trasy
 zdrowia trzech aplikacji co minutę i powiadamia operatora. Na serwerze: rotacja logów Dockera, alert przy braku
-nocnej kopii i przy zapełnieniu dysku (> 80%) — przez `/telegram` workbencha, który już ma adresata. App Insights i
+nocnej kopii, przy braku odbioru kopii na komputer operatora i przy zapełnieniu dysku (> 80%) — decyzja 16. App Insights i
 `deploy-watch`/`prod-health` przepisane na `docker logs` i `docker stats` przez SSH.
 
 **11. Równoległa praca dwóch stosów jest zakazana dla pętli.** Na VPS w fazach 5–6 pętle (`*_INGEST_ENABLED`,
@@ -86,6 +89,52 @@ Przełączenie (faza 7) = zatrzymanie pętli w Azure, końcowy zrzut, odtworzeni
 **12. YouTube.** Faza 0: z próbnego VPS u wybranego dostawcy pobranie napisów 10 filmów (`youtube-transcript-api`),
 powtórzone po dobie. Wynik zapisany w `tasks.md`. Przywrócenie dostawcy napisów to **osobna zmiana** po
 przełączeniu (cofnięcie #286 bez zmian w bazie), bo zależy od wyniku testu, a ta zmiana nie powinna czekać.
+
+**13. Weryfikator tokenu to osobny pakiet `tc-entra-auth` (zmiana decyzji 1, 15 października 2026).** `capital-gateway`
+nie zależy od `tc-runtime` — celowo, bo ten ciągnie sterownik bazy i `azure-*`, a gateway bazy nie ma — a spec
+`capital-access-control` wymaga weryfikacji tokenu także tam. Więc weryfikator nie mieszka w `tc-runtime`, tylko w
+małym pakiecie (`PyJWT[crypto]`, `httpx`, `starlette`), który biorą gateway, workbench i trading-mcp. Warunek 1 z
+`docs/architecture.md` (drugie wejście: kod nowy, więcej niż jeden konsument, identyczny od pierwszego dnia) jest
+spełniony; warunki 2 i 3: różnice (tenant, audiencje, ścieżki bez tokenu, identyfikator wołającego z klucza) są
+argumentami, a zmiana pod `packages/tc-entra-auth/` uruchamia testy trzech modułów (`checks.yml`).
+
+**14. Jak weryfikacja spotyka rejestry: nagłówek `X-MS-CLIENT-PRINCIPAL` jest *wytwarzany*, nie czytany od klienta.**
+Middleware `EdgeAuth` stoi jako najbardziej zewnętrzny, w trybie serwera najpierw wycina z żądania każdy nagłówek
+`X-MS-CLIENT-PRINCIPAL*`, a potem — po sprawdzeniu tokenu (droga z nagłówkiem krawędzi `X-TC-Edge`) albo klucza (droga
+bez niego) — wpisuje własny `X-MS-CLIENT-PRINCIPAL` z jednym oświadczeniem `azp` i `-ID`/`-NAME` z tokenu. Dzięki temu
+`calling_application`, `CallerAccess`, `RootCallers`, `GatewayDoor` i bilety strumienia czytają to samo, co czytały za
+Easy Auth, i żaden rejestr ani jego test się nie zmienia. Bezpieczeństwo trzyma jedno miejsce: nic, co przyszło od
+klienta, nie dociera do rejestru jako tożsamość. Ścieżki bez tokenu (zdrowie, `/market/ws/candles` z własnym biletem,
+`/ws/stream` z kluczem sprawdzanym w obsłudze) są argumentem `EdgeAuth`, odpowiednikiem `excluded_paths` Easy Auth.
+
+**15. Tożsamość z klucza to jeden wpisany identyfikator.** Wołanie siecią wewnętrzną z poprawnym `X-Gateway-Key` dostaje
+`azp` równe `INTERNAL_CALLER_APPLICATION_ID` (domyślnie `tc-internal`); gateway wpuszcza ten identyfikator jak aplikację
+modułową (nie trzeba go dopisywać do listy). Klucz jest jeden na system — ten sam `GATEWAY_API_KEY`, który workbench
+pokazuje gatewayowi, a trading-mcp zna jako `CAPITAL_GATEWAY_API_KEY` i sprawdza u swoich wołających; workbench
+dostaje nowe ustawienie `TRADING_MCP_API_KEY` na ten sam klucz u klientów narzędzi. Zero nowych sekretów.
+
+**16. Alerty z serwera idą wprost do Bot API Telegrama, nie przez `/telegram` workbencha (zmiana decyzji 10, 15 października 2026).**
+Zadanie cron na hoście (brak nocnej kopii, zapełniony dysk) nie ma tokenu Entra, a `/telegram` odpowiada tylko `az`
+operatora; poza tym te alerty są właśnie o stanie, w którym workbench może nie odpowiadać. `deploy/scripts/alert.sh`
+czyta `ALERT_BOT_TOKEN` i `ALERT_CHAT_ID` z `/opt/tradingcenter/alert.env` (prawa 600, wpisywany przez wdrożenie z
+sekretów). Alerty samego systemu (post archive, strategia) dalej idą przez `/telegram`.
+
+**17. Cztery nazwy, nic poza nimi nie jest publiczne.** `API_HOST` (workbench z archiwami pod prefiksami), `GATEWAY_HOST`
+(gateway, z którego terminal czyta rachunek), `TERMINAL_HOST` i `POCKET_HOST` (pliki statyczne) — poddomeny, bo ścieżki
+gatewaya (`/accounts`, `/positions`) i workbencha mogłyby się zderzyć. Krawędź zwraca 404 na każdy `/mcp` i na
+`/ws/stream`: żadna przeglądarka ich nie woła (strumień świec terminala to `/market/ws/candles` z własnym biletem),
+a workbench sięga strumienia gatewaya po nazwie w sieci wewnętrznej. Wyjątek „strumień kluczem” z
+`capital-access-control` zostaje w aplikacji (obsługa sprawdza klucz sama, z obu stron), ale krawędź go nie niesie.
+CORS, który robił App Service, robi teraz Caddy, dla dwóch źródeł: terminala i pocketa.
+
+**18. Kopie: zrzuty na serwerze, odbiór na komputer operatora (zmiana z 15 października 2026).** Nocny `pg_dump` każdej bazy
+ląduje w `/opt/tradingcenter/backups` (retencja 14 dni; chroni przed błędną migracją i pomyłką, nie przed utratą
+serwera). Poza serwer wynosi je operator: zadanie zaplanowane na jego komputerze (`scripts/pull-backups.ps1`) ściąga nowe
+zrzuty po SSH kluczem tylko do odczytu — osobny użytkownik `backup`, w `authorized_keys` z `command=` na skrypt
+`backup-serve` (czasowniki `list`, `get <plik>`, `ack`, nic poza tym). Serwer nie ma żadnych poświadczeń do miejsca
+docelowego, więc jego przejęcie nie niszczy kopii. Koszt, który operator przyjmuje: kopia jest tak świeża, jak ostatnie
+włączenie komputera. Dlatego serwer alarmuje (`alert.sh`), gdy `ack` nie przyszedł od 3 dni, a próba odtworzenia (6.2)
+idzie z kopii z komputera, nie z serwera. Opcjonalna druga warstwa: migawki dostawcy VPS.
 
 ## Risks / Trade-offs
 
@@ -109,4 +158,5 @@ Fazy 0–8 z `docs/migracja-azure-vps-plan.html`; zadania w `tasks.md`. Powrót 
 - Dostawca VPS i rozmiar (operator; min. 4 vCPU / 8 GB / 80 GB SSD, region UE).
 - Domena i układ adresów (poddomeny czy ścieżki).
 - SSH dla wdrożeń: zakresy GitHub Actions czy Tailscale.
-- Magazyn na kopie i stan Terraform (S3-kompatybilny, poza dostawcą VPS).
+- (rozstrzygnięte 15 października 2026) Magazyn na kopie i stan Terraform: bez S3 — stan zostaje w Azure Storage
+  (decyzja 9), kopie ściąga komputer operatora (decyzja 18).

@@ -394,7 +394,7 @@ resource "azurerm_linux_web_app" "workbench" {
       # `/telegram`, and its two tools are a local source. Its database — bots, their tokens, who receives — under its
       # own name, and its REST list is the operator's `az` alone: its bots and destinations answer nobody else.
       TELEGRAM_DATABASE_URL                = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.telegram.name}?sslmode=require"
-      TELEGRAM_DATABASE_POOL_SIZE          = "3"
+      TELEGRAM_DATABASE_POOL_SIZE          = "4"
       TELEGRAM_BOT_API_BASE_URL            = "https://api.telegram.org"
       TELEGRAM_REST_CALLER_APPLICATION_IDS = local.azure_cli_client_id
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlparse
 
-from pydantic import ValidationInfo, field_validator, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # `prefer`/`allow` still let the client fall back to plaintext if the server offers no TLS, and the spec
@@ -31,8 +31,12 @@ class Settings(BaseSettings):
 
     # `database_user` selects between the two connection modes and is the only switch: set means
     # identity mode over TLS with no credential in the URL, unset means the URL as given, on loopback.
-    database_url: str
+    # Out of the repr: a server's URL carries its role's password, and a failed validation prints the model.
+    database_url: str = Field(repr=False)
     database_user: str | None = None
+    # Hosts on the container network of this machine (`PRIVATE_HOSTS`, comma-separated), reached with the password in the
+    # URL — a database that is not on loopback and still never leaves the machine. Empty everywhere but a server.
+    private_hosts: str = ""
 
     # Identity mode only, and unset even there when running in Azure — the App Service's
     # system-assigned managed identity needs no configuration.
@@ -46,7 +50,7 @@ class Settings(BaseSettings):
 
     # Three: the runner evaluates one watch at a time, and a backtest reads market-data over HTTP
     # rather than out of this database. Seven databases share one `B_Standard_B1ms` whose
-    # `max_connections` is 50 — `scripts/tests/test_pool_budget.py` refuses a total above 30.
+    # `max_connections` is 50 — `scripts/tests/test_pool_budget.py` refuses a total above its budget (60 on the server).
     database_pool_size: int = 3
 
     # How often the loop wakes to ask whether a new bar has closed — not the resolution it decides on.
@@ -127,6 +131,10 @@ class Settings(BaseSettings):
             raise ValueError(f"{str(info.field_name).upper()} must be at least 1; got {value}")
         return value
 
+    @property
+    def private_host_names(self) -> frozenset[str]:
+        return frozenset(h.strip().lower() for h in self.private_hosts.split(",") if h.strip())
+
     @model_validator(mode="after")
     def _connection_mode_is_coherent(self) -> Settings:
         """The two connection modes, each with its own failure to refuse. Identity mode is off this
@@ -151,12 +159,18 @@ class Settings(BaseSettings):
             return self
 
         host = (parsed.hostname or "").lower()
-        if not (host == "localhost" or host.startswith("127.") or host == "::1"):
+        loopback = host == "localhost" or host.startswith("127.") or host == "::1"
+        if not (loopback or host in self.private_host_names):
             raise ValueError(
                 f"DATABASE_URL points at {host!r} with no DATABASE_USER set. Without an "
                 "identity this module only connects to a database on this machine's "
-                "loopback — a remote database (production included) needs DATABASE_USER "
+                "loopback, or a host of PRIVATE_HOSTS — a remote database (production included) needs DATABASE_USER "
                 "and an Entra identity, and local work belongs on the compose.yaml "
                 "container."
+            )
+        if not loopback and not (parsed.username and parsed.password):
+            raise ValueError(
+                f"DATABASE_URL points at the private host {host!r} without a role and password. On a server "
+                "this module connects as its own role, which owns its database — the URL must name it."
             )
         return self

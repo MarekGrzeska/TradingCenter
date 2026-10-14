@@ -31,6 +31,7 @@ jobs:
       paths: |
         modules/trading-mcp
         packages/tc-mcp-kit
+        packages/tc-entra-auth
         .github/workflows/deploy-trading-mcp.yml
         .github/workflows/_deploy-app-service.yml
         scripts/deploy_probe.py

@@ -33,7 +33,7 @@ Decyzje operatora (13 października 2026, `docs/migracja-azure-vps-plan.html`):
   poprzedniego tagu**, gdy sonda nie przejdzie.
 - **Serwer jako kod**: cloud-init + Ansible (bez Terraforma dostawcy — D2): użytkownik bez hasła, tylko klucze
   SSH, firewall (22 ograniczony, 80/443), automatyczne aktualizacje bezpieczeństwa, Docker.
-- **Kopie zapasowe**: nocny `pg_dump` każdej bazy poza serwer, retencja, alert przy braku kopii, odtworzenie
+- **Kopie zapasowe**: nocny `pg_dump` każdej bazy na serwerze, odbiór na komputer operatora kluczem tylko do odczytu, alert przy braku zrzutu lub odbioru, odtworzenie
   przećwiczone.
 - **Obserwacja**: zewnętrzny test dostępności tras zdrowia i alert do operatora (Telegram/e-mail) zamiast App
   Insights; logi Dockera z rotacją.
@@ -66,10 +66,10 @@ Decyzje operatora (13 października 2026, `docs/migracja-azure-vps-plan.html`):
 - Każdy moduł: ustawienia trybu serwera; `capital-gateway` i `trading-mcp` bez tokenów tożsamości zarządzanej.
 - Nowe: `deploy/` (Compose, Caddyfile, cloud-init, Ansible, skrypty kopii), workflow `deploy-vps.yml`.
 - `scripts/deploy_probe.py`: sonda także przez SSH/HTTP zamiast `az`.
-- `infra/`: na koniec zostaje wyłącznie Entra (`azuread_*`), z nowym miejscem stanu Terraform — dziś stan leży
-  na koncie Azure Storage, które znika.
+- `infra/`: na koniec zostaje Entra (`azuread_*`) i jedno konto Azure Storage ze stanem Terraform (`infra/bootstrap/`);
+  reszta Azure znika.
 - Terminal i pocket: nowe adresy API i przekierowania logowania (rejestracje Entra).
-- Operator: domena (TLS i przekierowania Entra wymagają HTTPS na nazwie), konto VPS, magazyn na kopie, okno
+- Operator: domena (TLS i przekierowania Entra wymagają HTTPS na nazwie), konto VPS, komputer odbierający kopie, okno
   przełączenia, zgoda na `terraform destroy`.
 - `CLAUDE.md`, `docs/architecture.md`, skille `deploy-watch` i `prod-health` — przepisane po przełączeniu.
 - `review.md`: tak — zmiana warstwy uwierzytelniania i hostingu to najwięcej ryzyka w historii repozytorium.

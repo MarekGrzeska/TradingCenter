@@ -14,6 +14,7 @@ dependencies = [
     # The caller-identity middleware and the upstream-refusal helper, one copy each. Everything else stays here: this
     # module's server, client, settings and error taxonomy are not copies.
     "tc-mcp-kit",
+    "tc-entra-auth",
     # This module's own identity, presented to capital-gateway wherever there is a
     # directory to get a token from (the-gateway-door-authenticates).
     "azure-identity>=1.19",
@@ -29,6 +30,7 @@ package = false
 
 [tool.uv.sources]
 tc-mcp-kit = { path = "../../packages/tc-mcp-kit", editable = true }
+tc-entra-auth = { path = "../../packages/tc-entra-auth", editable = true }
 
 [tool.ruff]
 line-length = 100

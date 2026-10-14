@@ -33,6 +33,7 @@ jobs:
         packages/tc-runtime
         packages/tc-openai
         packages/tc-mcp-kit
+        packages/tc-entra-auth
         .github/workflows/deploy-workbench.yml
         .github/workflows/_deploy-app-service.yml
         scripts/deploy_probe.py

@@ -40,6 +40,9 @@ _SESSION_GONE_MESSAGE = "Session terminated"
 # `streamable_http_app()` and wraps it without touching the route).
 MCP_PATH = "/mcp"
 
+# What trading-mcp reads its callers' key from — the gateway's own header, since it is the gateway's key.
+GATEWAY_KEY_HEADER = "X-Gateway-Key"
+
 # No header for an operator's own credential any more: every server reached from here is reached on this
 # module's own identity. The one tool source that acts for a person is not on a network at all.
 
@@ -100,6 +103,8 @@ class ToolServer:
         self.can_move_the_account = can_move_the_account
         self._url: str | None = getattr(settings, f"{prefix}_url")
         self._scope: str | None = getattr(settings, f"{prefix}_scope")
+        # The shared key, for a tool server on the internal network of a server — where the token cannot go.
+        self._api_key: str | None = getattr(settings, f"{prefix}_api_key", None)
         self._timeout: float = getattr(settings, f"{prefix}_request_timeout_seconds")
         self._credential = DefaultAzureCredential() if self._scope else None
 
@@ -285,7 +290,9 @@ class ToolServer:
             # defaults it sets. `read` is left long; per-call time is bounded at the call sites instead.
         http_client = await stack.enter_async_context(
             create_mcp_http_client(
-                timeout=httpx.Timeout(self._timeout, read=None), auth=auth
+                headers=self._key_headers(),
+                timeout=httpx.Timeout(self._timeout, read=None),
+                auth=auth,
             )
         )
         read, write, _ = await stack.enter_async_context(
@@ -294,6 +301,9 @@ class ToolServer:
         session = await stack.enter_async_context(ClientSession(read, write))
         await asyncio.wait_for(session.initialize(), timeout=self._timeout)
         return session
+
+    def _key_headers(self) -> dict[str, str] | None:
+        return {GATEWAY_KEY_HEADER: self._api_key} if self._api_key else None
 
     async def _disconnect(self) -> None:
         """Drops the session so the next call opens a fresh one. The tool list goes with it: a server that
