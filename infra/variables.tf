@@ -206,3 +206,19 @@ variable "telegram_alert_destination" {
   type        = string
   default     = ""
 }
+
+# Where the terminal and the pocket are served on the VPS (openspec/changes/move-from-azure-to-vps), beside the Static Web Apps
+# above until those go. Each is an origin, no trailing slash: the registrations add it, as they do for the origins above.
+# Defaults are the names the VPS answers on today (sslip.io resolves them to its address, which Let's Encrypt accepts); the day
+# a domain exists these change in one place and the registrations follow. Entra needs HTTPS on a name, so an address would not do.
+variable "vps_terminal_origins" {
+  description = "Origins the terminal is served from on the VPS; added to its redirect URIs."
+  type        = list(string)
+  default     = ["https://terminal.57-129-181-251.sslip.io"]
+}
+
+variable "vps_pocket_origins" {
+  description = "Origins the pocket is served from on the VPS; added to its redirect URIs."
+  type        = list(string)
+  default     = ["https://pocket.57-129-181-251.sslip.io"]
+}

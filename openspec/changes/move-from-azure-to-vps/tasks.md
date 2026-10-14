@@ -50,7 +50,7 @@ Kroki oznaczone **(operator)** wymagają konta, decyzji albo zgody operatora.
 
 ## 7. Dane i testy na VPS
 
-- [ ] 7.1 **(operator)** Rejestracje Entra: nowe adresy przekierowań terminala i pocketa (`azuread_*`, `terraform apply`)
+- [x] 7.1 **(operator)** Rejestracje Entra: nowe adresy przekierowań terminala i pocketa (`azuread_*`, `terraform apply`)
 - [ ] 7.2 Zrzut ośmiu baz z Azure (tunel przez tymczasową regułę zapory), odtworzenie na VPS, `alembic upgrade head`, porównanie liczby wierszy
 - [ ] 7.3 Start na VPS z wyłączonymi pętlami i strumieniem rynkowym (albo osobne konto demo i testowy bot)
 - [ ] 7.4 Lista dymna: zdrowie trzech aplikacji; logowanie terminala i pocketa; nieważny token → 401 z zewnątrz; wykres i strumień świec; zlecenie demo; rozmowa z agentem z narzędziami rachunku; przebieg zespołu; alert Telegram; film YouTube od dodania do oceny

@@ -11,7 +11,7 @@ resource "azuread_application" "terminal" {
   single_page_application {
     # The trailing slash is not optional — the provider refuses a redirect URI without one when there is no path
     # segment — and MSAL's default `window.location.origin` has none, so the terminal sets `redirectUri` explicitly.
-    redirect_uris = ["${local.terminal_origin}/"]
+    redirect_uris = concat(["${local.terminal_origin}/"], [for origin in var.vps_terminal_origins : "${origin}/"])
   }
 
   # One process, one registration, one scope to ask for — the archive's own went with its process in stage 3 of
@@ -111,7 +111,7 @@ resource "azuread_application" "pocket" {
   single_page_application {
     # The trailing slash is not optional — the provider refuses a redirect URI without one when there is no path
     # segment — and MSAL's default `window.location.origin` has none, so `auth/entra.ts` sets `redirectUri` itself.
-    redirect_uris = ["${local.pocket_origin}/"]
+    redirect_uris = concat(["${local.pocket_origin}/"], [for origin in var.vps_pocket_origins : "${origin}/"])
   }
 
 
