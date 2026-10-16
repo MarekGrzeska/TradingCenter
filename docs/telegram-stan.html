@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Telegram — stan integracji</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7; --card: #ffffff; --band: #14306b; --band-2: #1d4291;
+    --line: #ddd9cd; --line-soft: #ebe8de; --ink: #16181d; --ink-2: #4f535e; --ink-3: #85899a;
+    --navy: #14306b; --navy-soft: #e6ebf5; --yellow: #f2c313; --yellow-soft: #fdf3d0;
+    --green: #17734c; --green-soft: #e0f0e8; --red: #b8322a; --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink-2); font-family: var(--body); font-size: 16.5px; line-height: 1.64; -webkit-font-smoothing: antialiased; }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+  header.hero { background: var(--band); color: #fff; padding: 52px 0 46px; }
+  header.hero .kicker { display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--band); background: var(--yellow); padding: 5px 11px; margin-bottom: 22px; }
+  header.hero h1 { font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px); line-height: 0.98; letter-spacing: -0.035em; color: #fff; margin: 0 0 18px; max-width: 17ch; text-wrap: balance; }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 60ch; }
+  header.hero .lede b { color: #fff; font-weight: 700; }
+  header.hero .strip { display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.22); font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2; }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+  main { padding-bottom: 96px; }
+  .rail { background: var(--card); border: 1px solid var(--line); margin: -30px 0 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); position: relative; box-shadow: 0 10px 30px -18px rgba(20,48,107,0.4); }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v { font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92; letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums; }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+  section { padding-top: 60px; }
+  .eyebrow { font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--navy); margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 { font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px); line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px; max-width: 24ch; text-wrap: balance; }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); }
+  a { color: var(--navy); }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption { font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px; border-top: 3px solid var(--yellow); max-width: 74ch; }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th { text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #fff; background: var(--navy); padding: 10px 16px; }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+  .tag { display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap; }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+  .quote { background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0; font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px); line-height: 1.16; letter-spacing: -0.02em; max-width: 34ch; }
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail { background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow); padding: 15px 18px; }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 { font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em; color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .fail p { margin: 0; font-size: 15px; max-width: 74ch; }
+  footer { background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0; font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Integracje · Telegram</span>
+    <h1>Jedne drzwi do Telegrama</h1>
+    <p class="lede">Dziś alert z archiwum postów, platformy strategii i archiwum YouTube trafia do operatora przez <b>jeden pakiet workbencha</b>. Ten dokument mówi, co dokładnie działa, czego świadomie nie ma — i co z tego tematu wisi niedokończone w specyfikacjach.</p>
+    <div class="strip">
+      <span>TradingCenter / workbench / telegram_gateway</span>
+      <span>16 października 2026 · stan <b>main @ 5ae6bbe</b></span>
+      <span>produkcja: <b>VPS</b>, alert Telegram sprawdzony 14 października</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">12</div><div class="l">tras REST pod <code>/telegram</code></div></div>
+      <div class="cell"><div class="v">2</div><div class="l">narzędzia MCP dla modelu</div></div>
+      <div class="cell"><div class="v">3</div><div class="l">pakiety wołające w procesie</div></div>
+      <div class="cell"><div class="v">7</div><div class="l">specyfikacji <code>telegram-gateway-*</code></div></div>
+      <div class="cell"><div class="v">125</div><div class="l">testów w <code>tests/telegram</code></div></div>
+      <div class="cell"><div class="v">0</div><div class="l">zmian OpenSpec o Telegramie w toku</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Kształt</div>
+      <h2>Pakiet, który niczego nie pamięta</h2>
+      <p class="intro">Do 23 września 2026 Telegram był osobnym modułem na porcie 8100. Dziś to pakiet <code>telegram_gateway</code> w workbenchu, zamontowany pod <code>/telegram</code>, z własną bazą <code>telegram</code> i jedną migracją (<code>0001_bots_and_destinations</code>).</p>
+      <p>Baza trzyma <span class="hl">boty, adresatów, jednorazowe kody powiązania i przesunięcie <code>getUpdates</code></span>. Nie trzyma żadnej wiadomości: nie ma kolejki, ponawiania ani tabeli wysłanych. Wywołujący dostaje odpowiedź Telegrama i sam decyduje, co dalej.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 250" role="img" aria-label="Archiwum postów, platforma strategii i archiwum YouTube wołają POST /messages w procesie; rozmowa i zespoły wołają dwa narzędzia jako funkcje; operator przez az woła boty i adresatów; wszystko schodzi do pakietu telegram_gateway, a stamtąd do Bot API Telegrama; zakładanie bota idzie przez sesję konta MTProto">
+            <defs>
+              <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path></marker>
+            </defs>
+            <g font-family="Karla, sans-serif" fill="currentColor">
+              <rect x="12" y="14" width="210" height="44" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+              <text x="117" y="41" text-anchor="middle" font-size="13" font-weight="700">social_data · strategy · youtube_data</text>
+              <rect x="12" y="84" width="210" height="44" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+              <text x="117" y="111" text-anchor="middle" font-size="13" font-weight="700">rozmowa (agent) · zespoły</text>
+              <rect x="12" y="154" width="210" height="44" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+              <text x="117" y="181" text-anchor="middle" font-size="13" font-weight="700">operator (az, curl)</text>
+
+              <rect x="400" y="60" width="190" height="100" fill="#14306b" stroke="#14306b"></rect>
+              <text x="495" y="95" text-anchor="middle" font-size="15" font-weight="700" fill="#fff">telegram_gateway</text>
+              <text x="495" y="115" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#f2c313">/telegram · baza telegram</text>
+              <text x="495" y="135" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#a9b5d2">bez historii wysłanych</text>
+
+              <rect x="770" y="30" width="198" height="50" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="6 4"></rect>
+              <text x="869" y="52" text-anchor="middle" font-size="13" font-weight="700">api.telegram.org</text>
+              <text x="869" y="68" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" opacity="0.6">sendMessage · getUpdates</text>
+              <rect x="770" y="130" width="198" height="50" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="6 4"></rect>
+              <text x="869" y="152" text-anchor="middle" font-size="13" font-weight="700">BotFather (MTProto)</text>
+              <text x="869" y="168" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" opacity="0.6">tylko z sesją konta</text>
+
+              <line x1="224" y1="36" x2="396" y2="82" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="312" y="48" font-size="10.5" font-family="Roboto Mono, monospace" opacity="0.75">POST /messages</text>
+              <line x1="224" y1="106" x2="396" y2="106" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="262" y="98" font-size="10.5" font-family="Roboto Mono, monospace" opacity="0.75">2 narzędzia, funkcje</text>
+              <line x1="224" y1="176" x2="396" y2="136" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="262" y="170" font-size="10.5" font-family="Roboto Mono, monospace" opacity="0.75">boty · adresaci (REST)</text>
+              <line x1="592" y1="90" x2="766" y2="58" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <line x1="592" y1="130" x2="766" y2="152" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <rect x="400" y="200" width="190" height="20" fill="#f2c313"></rect>
+              <text x="495" y="214" text-anchor="middle" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#14306b" letter-spacing="0.07em">TOKENY NIE WYCHODZĄ</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — trzy rodzaje wołających, jeden pakiet. Wołania pakietów idą przez <code>httpx.ASGITransport</code> do zamontowanej aplikacji (<code>workbench/telegram_client.py</code>), więc rekord wołających i odmowy działają jak przez sieć.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Powierzchnie</div>
+      <h2>Co kto może zrobić</h2>
+      <p>Podział nie przebiega między czytaniem a pisaniem — obie powierzchnie wysyłają. Przebiega tam, gdzie akt <strong>przeżywa rozmowę</strong>: bot i powiązanie adresata są wyłącznie w REST.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Powierzchnia</th><th>Trasa / narzędzie</th><th>Co robi</th><th>Kto</th></tr></thead>
+          <tbody>
+            <tr><td rowspan="1"><b>REST</b></td><td><code>POST /messages</code></td><td>jedna wiadomość do nazwanego adresata, teraz</td><td>pakiety w procesie</td></tr>
+            <tr><td><b>REST</b></td><td><code>GET /bots</code> · <code>POST /bots/adopted</code> · <code>POST /bots/created</code> · <code>DELETE /bots/{username}</code></td><td>boty: wklejony token albo założenie przez BotFathera</td><td>operator (<code>az</code>)</td></tr>
+            <tr><td><b>REST</b></td><td><code>GET/POST /destinations</code> · <code>DELETE /destinations/{name}</code></td><td>adresaci i link startowy, który ich wiąże</td><td>operator (<code>az</code>)</td></tr>
+            <tr><td><b>REST</b></td><td><code>GET /state</code> · <code>/</code> · <code>/ping</code> · <code>/health</code></td><td>czy da się zakładać boty, ilu adresatów <em>odbiera</em>; sonda, żywotność, baza</td><td>operator, wdrożenie</td></tr>
+            <tr><td><b>MCP</b></td><td><code>send_telegram_message</code></td><td>wysyła; pusta brama odmawia z instrukcją, co ma zrobić operator</td><td>rozmowa, zespoły</td></tr>
+            <tr><td><b>MCP</b></td><td><code>telegram_destinations</code></td><td>nazwy adresatów i czy odbierają (<code>pending</code> / <code>ready</code> / <code>blocked</code>)</td><td>rozmowa, zespoły</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Żadna odpowiedź nie niesie tokenu bota, także ta na żądanie, które go założyło. <code>Bot</code> i <code>BotCredential</code> to osobne typy, a <code>store.credential_of</code> jest jedyną instrukcją w pakiecie, która token wybiera. Filtr <code>RedactTokens</code> czyści logi — i jest instalowany przez <code>serving</code> od 23 września, bo wcześniej App Insights zebrało 61 027 linii z tokenem.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Wołający</div>
+      <h2>Kto wysyła i na jakich zasadach</h2>
+      <p>Każdy pakiet wnosi <span class="hl">własny próg i własny znacznik „już powiedziane”</span>, zapisywany <strong>po</strong> udanej wysyłce. Nieudana wysyłka nie zostawia znacznika, więc następny przebieg próbuje ponownie — to całe ponawianie w systemie. Cena: dostarczona wiadomość z niezapisanym znacznikiem pójdzie dwa razy, i to wybór świadomy.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Wołający</th><th>Kiedy wysyła</th><th>Limity</th><th>Język</th></tr></thead>
+          <tbody>
+            <tr><td><b>social_data</b></td><td>post z oceną wpływu ≥ <code>ALERT_MIN_IMPACT_SCORE</code> (domyślnie 8); post bez oceny nigdy</td><td>do 10 na przebieg, fragment 900 znaków</td><td>polski</td></tr>
+            <tr><td><b>strategy</b></td><td>decyzja, która <em>nazywa transakcję</em> i jest zmianą względem poprzedniej decyzji dla pary; odmowy nigdy</td><td>bez instrukcji i wielkości pozycji</td><td>—</td></tr>
+            <tr><td><b>youtube_data</b></td><td>reguła kanału lub tematu: <code>always</code> / <code>threshold</code> / <code>never</code>; film niezapowiedziany w ciągu 48 h puszczany cicho</td><td>wiadomość do 3500 znaków, do 6 instrumentów</td><td>polski</td></tr>
+            <tr><td><b>rozmowa i zespoły</b></td><td>model decyduje; nie ma progu</td><td>bez deduplikacji — dwa wywołania to dwie wiadomości</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="quote">Brak ALERT_DESTINATION to konfiguracja działająca: wszyscy zbierają i decydują jak zawsze, i nikomu nie mówią.</div>
+      <p>To jednocześnie pułapka z <code>CLAUDE.md</code>: puste ustawienie wygląda jak sprawna brama, która milczy, bo nie ma o czym mówić. Rozróżnia je <code>GET /state</code> — <code>destinations_ready: 0</code> znaczy, że nikt nie dotknął linku startowego.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Granice Telegrama</div>
+      <h2>Czego projekt nie przeskoczy</h2>
+      <div class="fails">
+        <div class="fail">
+          <h3>Bot nie odezwie się pierwszy <span class="tag att">1 tapnięcie</span></h3>
+          <p>Adresat powstaje z tego, że człowiek raz otworzył rozmowę. Moduł wydaje <code>t.me/&lt;bot&gt;?start=&lt;nonce&gt;</code>, obserwuje <code>getUpdates</code> (ważność 30 minut) i wiąże czat, gdy kod wróci. Do zera skrócić się tego nie da. Konfiguracja <em>nie</em> przyjmuje identyfikatora czatu — adresuje się nazwą.</p>
+        </div>
+        <div class="fail">
+          <h3>Zakładanie bota wymaga konta użytkownika <span class="tag att">opcjonalne</span></h3>
+          <p>Żadne API nie zakłada bota; BotFather to bot na czacie, więc potrzebna jest sesja MTProto (<code>TELEGRAM_API_ID</code>, <code>_API_HASH</code>, <code>_SESSION</code>). Wszystkie trzy albo żadne — dwa z trzech nie startują. Bez nich pakiet wysyła i uczciwie odmawia zakładania. Wysyłka <em>nigdy</em> nie idzie sesją konta. Sufit: 20 botów (<code>MAX_BOTS</code>), sprawdzany przed rozmową z BotFatherem.</p>
+        </div>
+        <div class="fail">
+          <h3>Długa treść to odmowa, nie ucięcie <span class="tag ok">4096 znaków</span></h3>
+          <p>Ucięty alert jest alertem o czym innym. Wołający sami tną wcześniej, tam gdzie cięcie da się oznaczyć. Limit 429 dociera do wołającego z <code>retry_after</code> Telegrama; zablokowany bot oznacza adresata jako <code>blocked</code> i przestaje go próbować.</p>
+        </div>
+        <div class="fail">
+          <h3>Long-polling, nie webhook <span class="tag ok">decyzja</span></h3>
+          <p>Webhook wymagałby wyjątku w bramie uwierzytelniającej — pierwszej ścieżki przyjmującej <em>treść</em> z internetu. <code>getUpdates</code> go nie potrzebuje. Po przejściu na VPS powód zmienił nazwę (Easy Auth → krawędź Caddy z tokenem Entra), ale nie rozstrzygnięcie.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Specyfikacje</div>
+      <h2>Siedem żywych, wszystkie zsynchronizowane</h2>
+      <p>Zmiana <code>a-notification-reaches-the-operator</code> (1 września) i <code>a-refused-alert-is-tried-again</code> (2 września) są zarchiwizowane, a ich wymagania siedzą w <code>openspec/specs/</code>. Żaden z siedmiu plików nie ma otwartej delty.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Zdolność</th><th class="n">Wymagań</th><th>O czym</th></tr></thead>
+          <tbody>
+            <tr><td><code>telegram-gateway-api</code></td><td class="n">4</td><td>wysyłka osobno od zarządzania; zakładanie, kasowanie, wiązanie tylko w REST; trasa stanu; żywotność bez bazy i Telegrama</td></tr>
+            <tr><td><code>telegram-gateway-bots</code></td><td class="n">5</td><td>brak sesji konta jest wspierany; bot tylko na żądanie; sufit przed rozmową; odpowiedź bez tokenu to odmowa; token nie wychodzi</td></tr>
+            <tr><td><code>telegram-gateway-caller-access</code></td><td class="n">3</td><td>moduł sprawdza wołającego sam, po <em>aplikacji</em>; rozłączne listy dla narzędzi i REST; odmowa niezależna od kolejności ładowania</td></tr>
+            <tr><td><code>telegram-gateway-delivery</code></td><td class="n">4</td><td>wysłanie to jeden akt bez śladu; odmowa Telegrama dociera w całości; adresowanie nazwą; za długie = odmowa</td></tr>
+            <tr><td><code>telegram-gateway-destinations</code></td><td class="n">3</td><td>adresat z tapnięcia; zablokowany przestaje być próbowany; usunięcie adresata nie rusza bota</td></tr>
+            <tr><td><code>telegram-gateway-tools</code></td><td class="n">3</td><td>model wysyła, ale nie zakłada ani nie wiąże; widzi adresatów przed adresowaniem; brak adresatów to odpowiedź, nie awaria</td></tr>
+            <tr><td><code>telegram-gateway-upstream-access</code></td><td class="n">4</td><td>wysyłka kanałem bota, nigdy kontem; sesja konta służy jednej rzeczy; sekret nie w adresie ani logu; brak sesji nie blokuje startu</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Niedokończone</div>
+      <h2>Co z Telegramem wisi w specyfikacjach</h2>
+      <p class="intro">Nie ma żadnej otwartej zmiany OpenSpec poświęconej Telegramowi. Są cztery rzeczy, które go dotykają — dwie realne, dwie przeterminowane po przejściu na VPS.</p>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Zewnętrzny monitor i alerty hosta <span class="tag stop">move-from-azure-to-vps 7.5</span></h3>
+          <p>Jedyne realnie otwarte zadanie. Alerty serwera (<code>deploy/scripts/alert.sh</code>: dysk &gt; 80%, brak nocnego zrzutu, brak odbioru kopii) idą <strong>prosto do Bot API</strong>, nie przez <code>/telegram</code>, i wymagają <code>ALERT_BOT_TOKEN</code> i <code>ALERT_CHAT_ID</code>. Nie są ustawione, a wdrożenie nie zapisuje <code>alert.env</code>, więc dziś te alerty lądują w dzienniku systemowym. Gdy padnie cały workbench, milczy też <code>/telegram</code>. Opcje i rekomendacja (HetrixTools z zewnątrz + Healthchecks.io od środka, jeden bot): <a href="monitor-z-zewnatrz-opcje.html">monitor-z-zewnatrz-opcje.html</a>; wpis na liście: <a href="vps-todo.html">vps-todo.html</a>. Do ręki operatora: bot u @BotFather i pliki w <code>.local/</code>.</p>
+        </div>
+        <div class="fail">
+          <h3>Dwustronność — rozmowa z workbenchem przez Telegram <span class="tag att">świadomie odłożone</span></h3>
+          <p>Poza zakresem od pierwszej propozycji. Powód zmierzony 19 sierpnia: sesja rozmowy wiąże się z <code>current_principal</code> czytanym z <code>X-MS-CLIENT-PRINCIPAL-ID</code>, którego nie ma dla tokenu app-only. Schemat jest przygotowany (powiązanie <code>chat_id</code> ↔ operator powstaje przy <code>/start</code>), ale zmiany w workbenchu nie ma i nie ma jej w żadnym szkicu. Do rozważenia, jeśli kiedykolwiek będzie potrzebna — osobna zmiana, nie dopisek.</p>
+        </div>
+        <div class="fail">
+          <h3>Przebieg ręczny alertu YouTube na testowym bocie <span class="tag att">add-youtube-archive 9.2</span></h3>
+          <p>Jedyne niezaznaczone zadanie tej zmiany: film od odkrycia do alertu przez <code>scripts/dev.py</code> na bocie testowym. Alert YouTube na produkcji nie jest tu osobno potwierdzony; 14 października operator potwierdził ogólnie „Telegram” i „YouTube” (lista dymna 7.4).</p>
+        </div>
+        <div class="fail">
+          <h3>Resztki z epoki Azure <span class="tag stop">do zamknięcia przy archiwizacji</span></h3>
+          <p><strong>enable-youtube-in-production</strong> (zadania 1.4, 2.1–2.6 niezaznaczone) opisuje Terraform, <code>youtube_enabled</code> i pulę Telegrama spadającą z 4 do 3. Po VPS-ie produkcją rządzi <code>deploy/docker-compose.yml</code> (pula 4, <code>YOUTUBE_DATABASE_URL</code>), więc zmiana jest w większości nieaktualna. <strong>one-process-per-security-boundary 5.2</strong> czeka na <code>DROP ROLE app-tradingcenter-telegram-gateway</code> — bazy Azure już nie ma. Obie czekają na decyzję, czy zamknąć je jako zrealizowane inaczej.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Dług</div>
+      <h2>Rozjazdy, które znalazłem przy okazji</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Co</th><th>Gdzie</th><th>Stan</th></tr></thead>
+          <tbody>
+            <tr><td><b>Tokeny botów nigdy nie były rotowane</b></td><td>wątek z 23 września; logi z tokenami zniknęły z Azure, tokeny nie</td><td><span class="tag stop">do zrobienia</span> — u @BotFather i w <code>/telegram</code></td></tr>
+            <tr><td><b>README pakietu opisuje Azure</b></td><td><code>telegram_gateway/README.md</code>: <code>azurewebsites.net</code>, <code>terraform.tfvars</code> / <code>telegram_alert_destination</code>, „B1ms, max_connections 50”, rejestracja <code>workbench_cli</code></td><td><span class="tag att">nieaktualne</span> — „Binding the first bot” nie zadziała na VPS bez poprawki adresu i sposobu ustawienia <code>ALERT_DESTINATION</code> (sekret/zmienna środowiska <code>vps</code>)</td></tr>
+            <tr><td><b>Komentarze w <code>config.py</code></b></td><td>„App Service’s managed identity”, „Azure” przy tożsamości bazy</td><td><span class="tag att">kosmetyka</span>, dopóki tryb tożsamości nie zostanie usunięty (9.4)</td></tr>
+            <tr><td><b>Dwie drogi do Telegrama</b></td><td><code>/telegram</code> dla aplikacji, <code>alert.sh</code> dla hosta</td><td><span class="tag ok">celowo</span> — host nie może zależeć od workbencha, o którego padnięciu ma alarmować</td></tr>
+            <tr><td><b>Bot hosta a bot aplikacji</b></td><td>monitor-z-zewnatrz-opcje.html zakłada „jeden bot dla wszystkiego”</td><td><span class="tag att">do rozstrzygnięcia</span> — wspólny bot oznacza, że token hosta leży też w <code>.local/</code>, poza bazą <code>telegram</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Wniosek</div>
+      <h2>Co wiem, a czego nie sprawdziłem</h2>
+      <p>Kod, specyfikacje, deploy i dokumenty sprawdziłem w repozytorium. <strong>Nie</strong> odpytywałem produkcji: nie wiem, ilu adresatów ma dziś <code>GET /state</code>, jaki jest <code>ALERT_DESTINATION</code> ani czy sesja konta jest skonfigurowana — to pytanie dla <code>prod-health</code>. Testów nie uruchamiałem; liczba 125 to liczba funkcji <code>test_</code>.</p>
+      <div class="quote">Rdzeń jest skończony. Brakuje dwóch rzeczy wokół niego: alarmu, gdy padnie wszystko, i sprzątania po Azure.</div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>TradingCenter · docs/telegram-stan.html</span>
+    <span>źródła: telegram_gateway/, openspec/specs/telegram-gateway-*, deploy/</span>
+  </div>
+</footer>
+
+</body>
+</html>
