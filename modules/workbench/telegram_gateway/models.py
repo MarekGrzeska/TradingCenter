@@ -104,3 +104,15 @@ class Assignment:
     key: str
     destination_id: int
     assigned_at: datetime | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class AccountRecord:
+    """The account that owns the bots — **without its session**, for the same reason `Bot` has no token: every
+    read and every response is built from this, and the encrypted session is fetched by the one function that
+    needs it."""
+
+    username: str
+    phone_masked: str
+    logged_in_at: datetime
+    rejected_at: datetime | None = None

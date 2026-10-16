@@ -115,17 +115,62 @@ class TelegramUnreachable(GatewayError):
 
 
 class CreatingBotsUnavailable(GatewayError):
-    """Asked to create a bot with no account session configured — a supported state, not a fault.
+    """Asked to create, delete or rotate a bot with no usable owner account — a supported state, not a fault.
 
-    Creating a bot means talking to Telegram's creator bot, and only a user account may, so this
-    names the settings rather than failing as though something broke.
+    Those acts are a conversation with Telegram's creator bot, which only a logged-in user account can hold.
+    `reason` says which part is missing, so the operator is sent to the right step rather than to a setting.
     """
+
+    def __init__(self, reason: str = "no Telegram account is logged in") -> None:
+        super().__init__(reason)
+        self.reason = reason
 
     def __str__(self) -> str:
         return (
-            "creating a bot needs a Telegram account session, and none is configured. Set "
-            "TELEGRAM_API_ID, TELEGRAM_API_HASH and TELEGRAM_SESSION together to enable it — "
-            "the gateway sends normally without them."
+            f"creating, deleting or rotating a bot needs the owner account logged in, and {self.reason}. "
+            "Log it in from the terminal's Telegram tab — the gateway sends normally without it."
+        )
+
+
+@dataclass
+class LoginUnavailable(GatewayError):
+    """A login that cannot start because a setting is missing. Refused before Telegram is spoken to, with the
+    setting named: a code sent to a phone for a login that could never be saved is a wasted attempt."""
+
+    setting: str
+
+    def __str__(self) -> str:
+        return f"the account cannot be logged in: {self.setting} is not set. Nothing was asked of Telegram."
+
+
+class LoginNotInProgress(GatewayError):
+    """A code or a password with no login to give it to — never started, expired, or lost to a restart."""
+
+    def __str__(self) -> str:
+        return (
+            "no login is in progress (it expired after ten minutes, or the process restarted). "
+            "Start again from the phone number."
+        )
+
+
+@dataclass
+class LoginRefused(GatewayError):
+    """Telegram said no to a step of the login, in its own words. The step stays open: a wrong code is
+    followed by another code, not by starting over."""
+
+    detail: str
+
+    def __str__(self) -> str:
+        return f"Telegram refused the login: {self.detail}"
+
+
+class SessionRejected(GatewayError):
+    """Telegram no longer honours the stored session — ended from the phone, or the account was reset."""
+
+    def __str__(self) -> str:
+        return (
+            "Telegram rejected the stored session, so the account has to be logged in again. "
+            "Nothing was done to any bot."
         )
 
 

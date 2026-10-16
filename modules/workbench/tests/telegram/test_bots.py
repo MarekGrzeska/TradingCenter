@@ -47,10 +47,10 @@ class TestTheUsernameRule:
 
 
 class TestWhatIsCheckedBeforeSpeaking:
-    def test_no_account_session_names_the_settings(self) -> None:
-        """A supported state, not a fault: the module sends without them, and only creating needs a
-        credential to the operator's personal Telegram."""
-        with pytest.raises(CreatingBotsUnavailable, match="TELEGRAM_API_ID"):
+    def test_no_logged_in_account_says_so(self) -> None:
+        """A supported state, not a fault: the module sends without an account, and only creating needs
+        one logged in."""
+        with pytest.raises(CreatingBotsUnavailable, match="logged in"):
             creator.guard(can_create=False, held=0, ceiling=20)
 
     def test_the_ceiling_refuses_before_telegram_is_asked(self) -> None:

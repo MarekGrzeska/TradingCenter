@@ -84,7 +84,7 @@ tylko operator, więc to nie poszerza kręgu ludzi, tylko daje mu ekran.
 
 ## Migration Plan
 
-1. Migracja `0002`: `purposes`, `assignments`, `account_session`. Przy starcie, po migracji, jeżeli
+1. Migracje `0002` (`purposes`, `assignments`) i `0003` (`account_session`). Przy starcie, po migracji, jeżeli
    `ALERT_DESTINATION` jest ustawione, nie ma jeszcze przypisania `*`, a adresat o tej nazwie istnieje,
    brama zasiewa `*` — jedyne miejsce, w którym czyta to ustawienie. W starcie, nie w migracji, bo
    migracja nie widzi ustawień procesu, a zasiew ma być idempotentny przy każdym starcie.

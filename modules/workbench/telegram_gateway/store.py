@@ -12,7 +12,16 @@ from datetime import datetime
 from tc_runtime.db import Conn, fetch_one
 
 from . import purposes as purpose_rules
-from .models import Assignment, Binding, Bot, BotCredential, Destination, DestinationState, Purpose
+from .models import (
+    AccountRecord,
+    Assignment,
+    Binding,
+    Bot,
+    BotCredential,
+    Destination,
+    DestinationState,
+    Purpose,
+)
 
 # Every column of `bots` except the one. Written once and reused, so that adding a column here is a
 # deliberate act rather than something `SELECT *` did on somebody's behalf.
@@ -392,3 +401,58 @@ async def count_unheard(conn: Conn) -> int:
     if purpose_rules.DEFAULT_KEY in keys:
         return 0
     return sum(1 for one in seen if purpose_rules.deciding_key(one.name, keys) is None)
+
+
+# --- the account that owns the bots ----------------------------------------------------------------
+
+
+async def get_account(conn: Conn) -> AccountRecord | None:
+    """Who is logged in. **Not the session**: that is `encrypted_session`, alone, like a bot's token."""
+    row = await conn.fetchrow(
+        "SELECT username, phone_masked, logged_in_at, rejected_at FROM account_session WHERE id = 1"
+    )
+    if row is None:
+        return None
+    return AccountRecord(
+        username=row["username"],
+        phone_masked=row["phone_masked"],
+        logged_in_at=row["logged_in_at"],
+        rejected_at=row["rejected_at"],
+    )
+
+
+async def encrypted_session(conn: Conn) -> str | None:
+    """The stored session, still encrypted. The only statement in this module that selects it."""
+    return await conn.fetchval("SELECT session_encrypted FROM account_session WHERE id = 1")
+
+
+async def save_account(
+    conn: Conn, *, session_encrypted: str, username: str, phone_masked: str
+) -> None:
+    """One account: a second login replaces the first, and clears a rejection."""
+    await conn.execute(
+        """
+        INSERT INTO account_session (id, session_encrypted, username, phone_masked)
+        VALUES (1, $1, $2, $3)
+        ON CONFLICT (id) DO UPDATE SET
+            session_encrypted = EXCLUDED.session_encrypted,
+            username = EXCLUDED.username,
+            phone_masked = EXCLUDED.phone_masked,
+            logged_in_at = now(),
+            rejected_at = NULL
+        """,
+        session_encrypted,
+        username,
+        phone_masked,
+    )
+
+
+async def delete_account(conn: Conn) -> bool:
+    result = await conn.execute("DELETE FROM account_session WHERE id = 1")
+    return result.endswith(" 1")
+
+
+async def mark_account_rejected(conn: Conn) -> None:
+    """Telegram refused the session when it was used. Kept as a fact so the state route can say so without
+    asking Telegram again."""
+    await conn.execute("UPDATE account_session SET rejected_at = now() WHERE id = 1")

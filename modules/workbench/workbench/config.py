@@ -119,7 +119,7 @@ class Settings(BaseSettings):
     youtube_database_url: str | None = Field(default=None, repr=False)
     telegram_api_id: int | None = None
     telegram_api_hash: str | None = None
-    telegram_session: str | None = None
+    telegram_session_key: str | None = Field(default=None, repr=False)
 
     @field_validator("youtube_database_url")
     @classmethod
@@ -162,7 +162,7 @@ class Settings(BaseSettings):
         "trading_mcp_scope",
         "alert_destination",
         "telegram_api_hash",
-        "telegram_session",
+        "telegram_session_key",
         "gateway_scope",
         "entra_tenant_id",
         "trading_mcp_api_key",
@@ -344,7 +344,7 @@ class Settings(BaseSettings):
             tool_caller_application_ids=self.tool_caller_application_ids,
             telegram_api_id=self.telegram_api_id,
             telegram_api_hash=self.telegram_api_hash,
-            telegram_session=self.telegram_session,
+            telegram_session_key=self.telegram_session_key,
             seed_default_destination=self.alert_destination,
         )
 

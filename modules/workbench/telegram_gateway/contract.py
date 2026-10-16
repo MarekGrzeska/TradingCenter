@@ -154,13 +154,57 @@ class StartLinkOut(BaseModel):
     expires_in_seconds: int
 
 
+class AccountOut(BaseModel):
+    """The account that owns the bots. Never the session, the code or the password; the number only masked."""
+
+    status: Literal["logged_out", "logged_in", "needs_login"]
+    username: str | None = None
+    phone: str | None = Field(default=None, description="masked: at most the last four digits are shown")
+    reason: str | None = Field(
+        default=None, description="why a stored account cannot be used; present with 'needs_login'"
+    )
+    session_key_configured: bool = Field(description="whether TELEGRAM_SESSION_KEY is set")
+    api_credentials_configured: bool = Field(
+        description="whether TELEGRAM_API_ID and TELEGRAM_API_HASH are set"
+    )
+
+
+class LoginStartRequest(BaseModel):
+    phone: str = Field(description="international form, like +48123456789")
+
+
+class LoginCodeRequest(BaseModel):
+    code: str
+
+
+class LoginPasswordRequest(BaseModel):
+    password: str
+
+
+class LoginStepOut(BaseModel):
+    """Where the login is. `code` and `password` mean the next thing Telegram wants; `done` carries the account."""
+
+    step: Literal["code", "password", "done"]
+    account: AccountOut | None = None
+
+
+class LogoutOut(BaseModel):
+    ended_at_telegram: bool = Field(
+        description="false when Telegram could not be told: the stored session is gone either way, "
+        "and the device should be ended from the phone's settings"
+    )
+
+
 class StateOut(BaseModel):
     """What this gateway is able to do at all. Read before concluding it is broken: a gateway with
     no destination and one that cannot reach Telegram answer the same nothing without this."""
 
-    account_session_configured: bool = Field(
-        description="whether creating bots is available; false is a supported configuration, and "
-        "sending works either way"
+    account: AccountOut = Field(
+        description="the account that owns the bots, and whether it can be used; logged out is a "
+        "supported configuration, and sending works either way"
+    )
+    can_create_bots: bool = Field(
+        description="whether creating, deleting and rotating bots would be attempted right now"
     )
     bots: int
     destinations: int
