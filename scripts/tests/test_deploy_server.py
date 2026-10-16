@@ -127,3 +127,9 @@ def test_the_dumps_are_readable_by_the_backup_group_only() -> None:
 def test_the_nightly_dump_and_the_morning_check_are_scheduled() -> None:
     jobs = {t["ansible.builtin.cron"]["name"] for t in PLAY["tasks"] if "ansible.builtin.cron" in t}
     assert {"tradingcenter backup", "tradingcenter backup check"} <= jobs
+
+def test_the_acknowledgement_directory_belongs_to_the_backup_account() -> None:
+    """The account whose key writes the acknowledgement must own where it is written: it was left owned by Debian's own
+    `backup` account when this one was renamed, and the first collection found `Permission denied`."""
+    directory = _task("Backup acknowledgements")["ansible.builtin.file"]
+    assert directory["owner"] == "tcbackup"

@@ -25,6 +25,8 @@
   Where dumps are kept. Default: Documents\tradingcenter-backups.
 .PARAMETER KeyFile
   The private key of the backup account. Default: whatever ssh would use.
+.PARAMETER KnownHostsFile
+  A file holding the server's host key, checked strictly: a task that runs unattended must not learn a key on first use.
 .PARAMETER KeepDays
   Dumps older than this are removed from here — except the newest of each database, always.
 .PARAMETER Ssh
@@ -35,6 +37,7 @@ param(
   [Parameter(Mandatory)][string]$Server,
   [string]$Destination = (Join-Path ([Environment]::GetFolderPath('MyDocuments')) 'tradingcenter-backups'),
   [string]$KeyFile,
+  [string]$KnownHostsFile,
   [int]$KeepDays = 60,
   [string]$Ssh = 'ssh'
 )
@@ -42,9 +45,15 @@ param(
 $ErrorActionPreference = 'Stop'
 New-Item -ItemType Directory -Force -Path $Destination | Out-Null
 
+function Get-SshOptions {
+  $options = @('-o', 'BatchMode=yes')
+  if ($KeyFile) { $options += @('-i', $KeyFile, '-o', 'IdentitiesOnly=yes') }
+  if ($KnownHostsFile) { $options += @('-o', "UserKnownHostsFile=$KnownHostsFile", '-o', 'StrictHostKeyChecking=yes') }
+  return $options
+}
+
 function Invoke-Server([string]$Command) {
-  $sshArgs = @('-o', 'BatchMode=yes')
-  if ($KeyFile) { $sshArgs += @('-i', $KeyFile, '-o', 'IdentitiesOnly=yes') }
+  $sshArgs = Get-SshOptions
   $sshArgs += @($Server, $Command)
   $output = & $Ssh @sshArgs
   if ($LASTEXITCODE -ne 0) { throw "ssh '$Command' failed with exit code $LASTEXITCODE" }
@@ -66,11 +75,12 @@ foreach ($dump in $listed) {
   if ((Test-Path $target) -and (Get-Item $target).Length -eq $dump.Bytes) { continue }
 
   $partial = Join-Path $Destination ".$($dump.Name).partial"
-  $sshArgs = @('-o', 'BatchMode=yes')
-  if ($KeyFile) { $sshArgs += @('-i', $KeyFile, '-o', 'IdentitiesOnly=yes') }
+  $sshArgs = Get-SshOptions
   $sshArgs += @($Server, "get $($dump.Name)")
   # Raw bytes straight to a file: PowerShell's pipeline would re-encode a binary dump as text.
-  $process = Start-Process -FilePath $Ssh -ArgumentList $sshArgs -NoNewWindow -Wait -PassThru -RedirectStandardOutput $partial
+  # `Start-Process` joins an argument array with spaces and no quoting: a key path or a command with a space in it falls apart.
+  $quoted = $sshArgs | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }
+  $process = Start-Process -FilePath $Ssh -ArgumentList $quoted -NoNewWindow -Wait -PassThru -RedirectStandardOutput $partial
   if ($process.ExitCode -ne 0 -or (Get-Item $partial).Length -ne $dump.Bytes) {
     Remove-Item -Force -ErrorAction SilentlyContinue $partial
     throw "$($dump.Name): the copy is not the size the server listed ($($dump.Bytes) bytes); not acknowledging"
