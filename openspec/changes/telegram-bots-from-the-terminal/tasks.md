@@ -1,12 +1,12 @@
 ## 1. Schemat i cele
 
-- [ ] 1.1 Migracja `0002`: `purposes`, `assignments` (`key` unikalny, `ON DELETE RESTRICT`), `account_session`; zasianie `*` z `ALERT_DESTINATION`, jeśli adresat istnieje; test pod blokadą (`-m db`)
-- [ ] 1.2 Walidacja kształtu celu i kandydaci przedrostkowi — testy jednostkowe (segmenty, `market.price` ≠ `market.prices`, `*`)
-- [ ] 1.3 `store`: upsert celu przy wysyłce, zgłoszenie z opisem, rozstrzygnięcie jednym zapytaniem, CRUD przypisań, liczba celów bez adresata; `db-cost-check` dla upsertu i rozstrzygnięcia
-- [ ] 1.4 `POST /messages` przyjmuje dokładnie jedno z `destination` / `purpose`; odmowa `unassigned` odróżnialna od reszty; odpowiedź nazywa adresata
-- [ ] 1.5 REST: `GET /purposes`, `PUT /purposes/{name}`, `GET /assignments`, `PUT` / `DELETE /assignments/{key}`; odmowa usunięcia bota i adresata z przypisaniem, z nazwami celów, przed botem-twórcą
-- [ ] 1.6 `GET /state`: konto, klucz sesji, przypisanie domyślne, cele bez adresata
-- [ ] 1.7 Test powierzchni narzędziowej: brak narzędzi przypisań, konta i rotacji
+- [x] 1.1 Migracja `0002`: `purposes`, `assignments` (`key` unikalny, `ON DELETE RESTRICT`); `account_session` dochodzi z grupą 2; zasianie `*` z `ALERT_DESTINATION` przy starcie (`seed_default_assignment`), nie w migracji — migracja nie widzi ustawień procesu; testy `-m db`
+- [x] 1.2 Walidacja kształtu celu i kandydaci przedrostkowi — testy jednostkowe (segmenty, `market.price` ≠ `market.prices`, `*`)
+- [x] 1.3 `store`: upsert celu przy wysyłce, zgłoszenie z opisem, rozstrzygnięcie jednym zapytaniem, CRUD przypisań, liczba celów bez adresata; `db-cost-check` dla upsertu i rozstrzygnięcia
+- [x] 1.4 `POST /messages` przyjmuje dokładnie jedno z `destination` / `purpose`; odmowa `unassigned` odróżnialna od reszty; odpowiedź nazywa adresata
+- [x] 1.5 REST: `GET /purposes`, `PUT /purposes/{name}`, `GET /assignments`, `PUT` / `DELETE /assignments/{key}`; odmowa usunięcia bota i adresata z przypisaniem, z nazwami celów, przed botem-twórcą
+- [x] 1.6 `GET /state`: konto, klucz sesji, przypisanie domyślne, cele bez adresata
+- [x] 1.7 Test powierzchni narzędziowej: brak narzędzi przypisań, konta i rotacji
 
 ## 2. Konto-właściciel
 

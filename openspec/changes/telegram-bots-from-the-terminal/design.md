@@ -84,9 +84,10 @@ tylko operator, więc to nie poszerza kręgu ludzi, tylko daje mu ekran.
 
 ## Migration Plan
 
-1. Migracja `0002`: `purposes`, `assignments`, `account_session`. Jeżeli w środowisku procesu jest
-   `ALERT_DESTINATION`, a adresat o tej nazwie istnieje, migracja zasiewa przypisanie `*` — jedyne
-   miejsce, w którym brama czyta to ustawienie.
+1. Migracja `0002`: `purposes`, `assignments`, `account_session`. Przy starcie, po migracji, jeżeli
+   `ALERT_DESTINATION` jest ustawione, nie ma jeszcze przypisania `*`, a adresat o tej nazwie istnieje,
+   brama zasiewa `*` — jedyne miejsce, w którym czyta to ustawienie. W starcie, nie w migracji, bo
+   migracja nie widzi ustawień procesu, a zasiew ma być idempotentny przy każdym starcie.
 2. Producenci przechodzą na cel w tym samym wdrożeniu; dzięki zasianemu `*` alerty idą tam, gdzie
    szły.
 3. Po zielonym wdrożeniu i sprawdzeniu `*` w terminalu: `ALERT_DESTINATION` i `TELEGRAM_SESSION`

@@ -47,7 +47,12 @@ class TestSending:
         response = await api.post("/messages", json={"destination": "operator", "text": "hi"})
 
         assert response.status_code == 200
-        assert response.json() == {"destination": "operator", "message_id": 77, "chat_id": 5}
+        assert response.json() == {
+            "destination": "operator",
+            "message_id": 77,
+            "chat_id": 5,
+            "purpose": None,
+        }
 
     async def test_a_rate_limit_reaches_the_caller_with_the_wait_telegram_asked_for(
         self, api, app, db
@@ -163,6 +168,8 @@ class TestState:
             "bots": 0,
             "destinations": 0,
             "destinations_ready": 0,
+            "default_assignment": False,
+            "purposes_unheard": 0,
         }
 
     async def test_it_reports_the_account_session_when_there_is_one(self, api, app, db) -> None:

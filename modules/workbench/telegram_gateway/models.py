@@ -84,3 +84,23 @@ class Binding:
 
     def usable_at(self, moment: datetime) -> bool:
         return self.used_at is None and moment < self.expires_at
+
+
+@dataclass(frozen=True, slots=True)
+class Purpose:
+    """A kind of event somebody has sent under, or announced. Never the messages themselves."""
+
+    name: str
+    first_seen: datetime
+    last_seen: datetime
+    description: str | None = None
+    last_caller: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class Assignment:
+    """Who hears about a purpose, a prefix of one, or everything (`*`)."""
+
+    key: str
+    destination_id: int
+    assigned_at: datetime | None = None

@@ -16,15 +16,30 @@ from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
-from . import mcp_app, redaction
+from . import mcp_app, redaction, store
+from . import purposes as purpose_rules
 from .binding import Watcher
 from .bot_api import bot_api
 from .caller_access import RECORD, CallerAccess
 from .config import Settings
-from .routers import bots, destinations, messages, meta, state
+from .routers import bots, destinations, messages, meta, purposes, state
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
 log = logging.getLogger(__name__)
+
+
+async def seed_default_assignment(conn, destination_name: str) -> None:
+    """The one place the retired `ALERT_DESTINATION` is still read: it becomes the `*` assignment, once, so that
+    the first deploy after the producers moved to purposes tells the same person it told before. An assignment
+    the operator already made is never overwritten, and a name that is no destination is logged, not invented."""
+    if any(a.key == purpose_rules.DEFAULT_KEY for a, _ in await store.list_assignments(conn)):
+        return
+    destination = await store.destination_by_name(conn, destination_name)
+    if destination is None:
+        log.warning("ALERT_DESTINATION names %r, which is no destination here; nothing seeded", destination_name)
+        return
+    await store.assign(conn, key=purpose_rules.DEFAULT_KEY, destination_id=destination.id)
+    log.info("seeded the default assignment from ALERT_DESTINATION: %r", destination_name)
 
 
 @asynccontextmanager
@@ -59,6 +74,10 @@ async def serving(app: FastAPI, settings: Settings):
 
         app.state.pool = pool
         app.state.telegram = telegram
+
+        if settings.seed_default_destination:
+            async with pool.acquire() as conn:
+                await seed_default_assignment(conn, settings.seed_default_destination)
 
         # After the migration and not before it: a bound destination is a write, and a write to a
         # schema this process does not know is not undone by a later error response.
@@ -99,6 +118,7 @@ def create_app() -> FastAPI:
     app.include_router(messages.router)
     app.include_router(bots.router)
     app.include_router(destinations.router)
+    app.include_router(purposes.router)
 
     server, tool_app = mcp_app.build_mcp_app(app)
     app.state.mcp_server = server

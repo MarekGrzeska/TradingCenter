@@ -18,8 +18,11 @@ from .errors import (
     DestinationNotReady,
     MessageTooLong,
     NoSuchDestination,
+    PurposeUnassigned,
     TelegramUnreachable,
 )
+from .models import Destination
+from .purposes import valid_purpose
 
 
 async def send(
@@ -41,6 +44,38 @@ async def send(
     destination = await store.destination_by_name(conn, name)
     if destination is None:
         raise NoSuchDestination(name)
+    return await _deliver(conn, api, destination, name=name, text=text)
+
+
+async def send_to_purpose(
+    conn: Conn,
+    api: BotApi,
+    *,
+    purpose: str,
+    text: str,
+    max_chars: int,
+    caller: str | None,
+) -> tuple[Destination, Delivered]:
+    """One message to whoever hears this purpose, now. The destination it went to comes back with it.
+
+    The purpose is noted before it is resolved, so one nobody listens to yet still shows up in the
+    terminal — which is how an operator finds out there is something to assign.
+    """
+    valid_purpose(purpose)
+    if len(text) > max_chars:
+        raise MessageTooLong(length=len(text), ceiling=max_chars)
+
+    await store.note_purpose(conn, purpose, caller=caller)
+    destination = await store.recipient_of(conn, purpose)
+    if destination is None:
+        raise PurposeUnassigned(purpose)
+    delivered = await _deliver(conn, api, destination, name=destination.name, text=text)
+    return destination, delivered
+
+
+async def _deliver(
+    conn: Conn, api: BotApi, destination: Destination, *, name: str, text: str
+) -> Delivered:
     if not destination.receives:
         # One refusal for "never bound" and "blocked", told apart by the state it carries: the
         # operator's move differs, and both are a start link rather than a retry.
