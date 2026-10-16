@@ -358,6 +358,66 @@ class TestClosingTheGapARestartLeaves:
         assert fake.history_calls == []
 
 
+class TestThinningOldSamples:
+    @staticmethod
+    def _hour_ago(days: int) -> datetime:
+        return (_now() - timedelta(days=days)).replace(minute=0, second=0, microsecond=0)
+
+    async def test_old_minutes_keep_the_last_sample_of_each_hour_and_fresh_ones_stay(
+        self, pool
+    ) -> None:
+        event_id = await track(pool, fakes.event_payload())
+        old_start, fresh_start = self._hour_ago(40), self._hour_ago(2)
+        async with pool.acquire() as conn:
+            outcome_id = (await store.outcomes_of_event(conn, event_id))[0][0]
+            await store.record_samples(
+                conn,
+                [_sample(outcome_id, old_start + timedelta(minutes=m)) for m in range(180)]
+                + [_sample(outcome_id, fresh_start + timedelta(minutes=m)) for m in range(30)],
+            )
+            await store.record_collected(conn, outcome_id, old_start, old_start + timedelta(hours=3))
+
+        deleted = await ingest(pool, fakes.FakeProvider()).thin(pause=0)
+        again = await ingest(pool, fakes.FakeProvider()).thin(pause=0)
+
+        async with pool.acquire() as conn:
+            old = await store.history(
+                conn, outcome_id, since=old_start, until=old_start + timedelta(hours=3)
+            )
+            fresh = await store.history(conn, outcome_id, since=fresh_start, until=_now())
+            ranges = await store.collected_ranges(conn, outcome_id)
+            through = await conn.fetchval(
+                "SELECT thinned_through FROM outcomes WHERE id = $1", outcome_id
+            )
+        assert (deleted, again) == (177, 0)
+        assert [s.observed_at.minute for s in old] == [59, 59, 59]
+        assert len(fresh) == 30
+        assert [(r.starts_at, r.ends_at) for r in ranges] == [
+            (old_start, old_start + timedelta(hours=3))
+        ], "thinning cuts nothing out of what was collected"
+        assert through == self._hour_ago(30)
+
+    async def test_a_backfill_behind_the_boundary_moves_it_back_to_be_thinned_again(
+        self, pool
+    ) -> None:
+        event_id = await track(pool, fakes.event_payload())
+        await ingest(pool, fakes.FakeProvider()).thin(pause=0)
+        refilled = self._hour_ago(35) + timedelta(minutes=10)
+        minutes = [(int((refilled + timedelta(minutes=m)).timestamp()), "0.5") for m in range(5)]
+        fake = fakes.FakeProvider(history={"m-1-t0": minutes, "m-1-t1": []})
+
+        await ingest(pool, fake).backfill_event(event_id, since=refilled)
+        async with pool.acquire() as conn:
+            outcome_id = (await store.outcomes_of_event(conn, event_id))[0][0]
+            through = await conn.fetchval(
+                "SELECT thinned_through FROM outcomes WHERE id = $1", outcome_id
+            )
+        rethinned = await ingest(pool, fakes.FakeProvider()).thin(pause=0)
+
+        assert through == self._hour_ago(35)
+        assert rethinned == 4
+
+
 def _now() -> datetime:
     return datetime.now(UTC)
 

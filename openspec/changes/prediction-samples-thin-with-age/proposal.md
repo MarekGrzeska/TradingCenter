@@ -17,8 +17,9 @@ ustala, co dzieje się z tym, co już jest.
 - **Próg i takt jako wymaganie**: próbki starsze niż **30 dni** są zagęszczane do **jednej na godzinę
   na wynik** — ostatnia próbka z każdej godziny, z jej własnym `observed_at`, więc wartość zostaje
   prawdziwą obserwacją, nie średnią.
-- **Odróżnialność**: próbka zachowana przez zagęszczenie niesie znacznik (kolumna `thinned_at`), a odczyt
-  historii mówi, od którego momentu takt jest godzinowy. Pytanie „czy w tej minucie było notowanie" dla
+- **Odróżnialność**: wynik niesie granicę zagęszczenia (`outcomes.thinned_through`), a odczyt historii
+  mówi, od którego momentu takt jest godzinowy (`hourly_until`). Znacznik na każdej zachowanej próbce
+  znaczyłby setki tysięcy aktualizacji w tabeli, którą ta zmiana odchudza, i mówiłby to samo co granica. Pytanie „czy w tej minucie było notowanie" dla
   okresu zagęszczonego odpowiada „nie wiadomo na tym takcie", nie „cisza na rynku".
 - **Zakresy bez zmian**: `collected_ranges` dalej ogłasza okres jako zebrany; zagęszczenie niczego z niego
   nie wycina.
@@ -27,7 +28,7 @@ ustala, co dzieje się z tym, co już jest.
 - **Szacunek**: przy dzisiejszym tempie ≈ 60× mniej wierszy dla wszystkiego starszego niż 30 dni; tabela
   przestaje rosnąć liniowo z czasem obserwacji i rośnie z liczbą obserwowanych wyników.
 
-Do decyzji operatora przed `/opsx:apply`: próg (30 dni) i takt (godzina). Alternatywą jest usuwanie próbek
+Operator zatwierdził 27 września 2026: próg 30 dni, takt godzinowy. Alternatywą jest usuwanie próbek
 rynków rozstrzygniętych dawniej niż N dni — tańsze, ale wbrew scenariuszowi „Rynek rozstrzygnięty przed
 miesiącem", więc wymagałoby zmiany istniejącego wymagania, a nie tylko dopisania nowego.
 
@@ -40,4 +41,6 @@ miesiącem", więc wymagałoby zmiany istniejącego wymagania, a nie tylko dopis
 
 - `modules/workbench/polymarket_data/` (pętla, magazyn, odczyt historii), nowa migracja `polymarket`.
 - Kontrakt `/polymarket` zyskuje pole mówiące o takcie historii — `contract:generate` w terminalu i pocket.
-- `design.md` i `tasks.md` powstaną po decyzji o progu i takcie; dziś to propozycja do rozstrzygnięcia.
+- Bez `design.md`: decyzje mieszczą się w tej propozycji i w `tasks.md` — granica na wyniku zamiast
+  znacznika na próbce, przebieg porcjami po 7 dni z przerwą między porcjami, backfill sięgający poniżej
+  granicy cofa ją do swojej godziny.

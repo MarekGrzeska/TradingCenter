@@ -34,6 +34,14 @@ BACKFILL_OUTCOMES_AT_ONCE = 4
 # a pass. A longer silence was a stall, and claiming it would hide a real gap.
 TICK_CONTINUITY_PASSES = 10
 
+# The retention `polymarket-data-store` records: older than this, one sample an hour per outcome.
+THIN_AFTER = timedelta(days=30)
+THIN_EVERY = timedelta(days=1)
+# One statement's reach, and a breath between statements. The first pass deletes most of a 21-million-row
+# table on a burstable server; spread over hours it spends CPU credits the server earns back meanwhile.
+THIN_CHUNK = timedelta(days=7)
+THIN_PAUSE_SECONDS = 1.0
+
 
 def _now() -> datetime:
     return datetime.now(UTC)
@@ -71,6 +79,7 @@ class Ingest:
         # Backfills started by tracking, held so they are cancelled with the module rather
         # than left writing into a closing pool.
         self._backfills: set[asyncio.Task] = set()
+        self._next_thin_at: datetime | None = None
         self.started_at: datetime | None = None
 
     @asynccontextmanager
@@ -85,6 +94,7 @@ class Ingest:
 
     async def start(self) -> None:
         self.started_at = _now()
+        self._next_thin_at = self.started_at
         self._task = asyncio.create_task(self._run(), name="polymarket-sampler")
 
     def event_tracked(self, event_id: int) -> None:
@@ -139,7 +149,53 @@ class Ingest:
                 # happen, and a heartbeat beaten regardless would report a stopped loop as healthy.
                 if self._heartbeat is not None:
                     self._heartbeat.beat()
+            self._thin_when_due()
             await asyncio.sleep(self._interval)
+
+    def _thin_when_due(self) -> None:
+        """Beside the tick, like the catch-up: a first pass takes hours and must not stop collection."""
+        now = _now()
+        if self._next_thin_at is None or now < self._next_thin_at:
+            return
+        self._next_thin_at = now + THIN_EVERY
+        task = asyncio.create_task(self._thin_quietly(), name="polymarket-thinning")
+        self._backfills.add(task)
+        task.add_done_callback(self._backfills.discard)
+
+    async def _thin_quietly(self) -> None:
+        try:
+            deleted = await self.thin()
+            log.info("thinning deleted %s samples older than %s days", deleted, THIN_AFTER.days)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # Tomorrow's pass starts from each outcome's boundary, so nothing done today is redone.
+            log.exception("thinning the old samples failed")
+
+    async def thin(self, *, pause: float = THIN_PAUSE_SECONDS) -> int:
+        """Every outcome's samples older than `THIN_AFTER` down to one an hour, from its boundary on.
+        The boundary moves only after a whole outcome is done, so a stop mid-way repeats a chunk, never skips one."""
+        cutoff = (_now() - THIN_AFTER).replace(minute=0, second=0, microsecond=0)
+        async with self._connection() as conn:
+            outcomes = await store.outcomes_to_thin(conn, cutoff)
+
+        deleted = 0
+        for outcome_id, was in outcomes:
+            through = was
+            if through is None:
+                async with self._connection() as conn:
+                    oldest = await store.oldest_sample_at(conn, outcome_id)
+                through = oldest.replace(minute=0, second=0, microsecond=0) if oldest else cutoff
+            start = through
+            while start < cutoff:
+                end = min(start + THIN_CHUNK, cutoff)
+                async with self._connection() as conn:
+                    deleted += await store.thin_samples(conn, outcome_id, start, end)
+                start = end
+                await asyncio.sleep(pause)
+            async with self._connection() as conn:
+                await store.note_thinned(conn, outcome_id, cutoff, was=was)
+        return deleted
 
     async def _close_gaps_quietly(self) -> None:
         try:
@@ -313,6 +369,7 @@ class Ingest:
         async with self._connection() as conn:
             written = await store.record_samples(conn, samples)
             await store.record_collected(conn, outcome_id, window_start, window_end)
+            await store.unthin_from(conn, outcome_id, min(s.observed_at for s in samples))
             if oldest_returned - window_start > NOTHING_OLDER_SLACK:
                 # Written at the oldest point the read actually returned, never at the edge of the
                 # window asked for: those two are separated by everything the provider did not have.
