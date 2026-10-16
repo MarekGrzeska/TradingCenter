@@ -1,0 +1,267 @@
+<title>Monitor z zewnątrz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Decyzja · zadanie 7.5</span>
+    <h1>Kto powie, że serwer padł</h1>
+    <p class="lede">Testy dostępności żyły w Application Insights i zniknęły razem z Azure. Dziś <b>nic z zewnątrz nie zauważy</b>, że VPS przestał odpowiadać — a alerty z samego serwera nie mają jeszcze dokąd iść.</p>
+    <div class="strip">
+      <span>TradingCenter / produkcja na VPS</span>
+      <span>14 października 2026</span>
+      <span>openspec/changes/<b>move-from-azure-to-vps</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">4</div><div class="l">publiczne adresy do sprawdzania</div></div>
+      <div class="cell"><div class="v">3</div><div class="l">alerty serwera bez kanału (dysk, kopia, odbiór kopii)</div></div>
+      <div class="cell"><div class="v">8</div><div class="l">opcji przejrzanych</div></div>
+      <div class="cell"><div class="v">0 zł</div><div class="l">koszt rekomendacji</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Co jest dziś odkryte</div>
+      <h2>Dwie dziury, jedna przyczyna</h2>
+      <p class="intro">Monitor musi stać <strong>poza serwerem</strong>, którego pilnuje: proces martwy i serwer martwy wyglądają od środka tak samo — nikt nie wyśle alertu.</p>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Padnięcie z zewnątrz <span class="tag stop">nie wykrywane</span></h3>
+          <p>Wyłączony VPS, zepsuty Caddy, wygasły certyfikat, awaria sieci OVH. Zauważysz to dopiero, otwierając terminal.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Alerty z serwera <span class="tag stop">bez adresata</span></h3>
+          <p><code>alert.sh</code> (dysk ponad 80%, brak nocnego zrzutu, brak odbioru kopii od 3 dni) potrzebuje bota Telegrama: <code>ALERT_BOT_TOKEN</code> i <code>ALERT_CHAT_ID</code>. Nie są ustawione, a wdrożenie jeszcze nie zapisuje <code>alert.env</code>. Dziś te alerty trafiają tylko do dziennika systemowego.</p>
+        </div>
+        <div class="fail">
+          <h3>Pętle, które ucichły <span class="tag att">częściowo</span></h3>
+          <p>Archiwum, strategia i zbieracz postów same wysyłają alerty przez <code>/telegram</code> — ale tylko wtedy, gdy workbench żyje. Gdy padnie cały proces, milczą razem z nim.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Co trzeba pokryć</div>
+      <h2>Dwa kierunki i jeden kanał</h2>
+      <p><strong>Z zewnątrz (aktywnie):</strong> ktoś co kilka minut pyta <code>api.…/health</code> (200 i <code>ok</code>), <code>gateway.…/</code> (200 i <code>capital-gateway</code>), <code>terminal.…/</code> i <code>pocket.…/</code> (200). To łapie padnięcie serwera, sieci, Caddy i certyfikatu.</p>
+      <p><strong>Od środka (meldunki, „dead man’s switch”):</strong> serwer sam melduje się pod unikalnym adresem — np. co 5 minut i po każdym nocnym zrzucie. Brak meldunku w oknie czasu to alarm. To łapie zatrzymany cron, nieudaną kopię i zawieszoną maszynę, która jeszcze odpowiada na ping.</p>
+      <p><strong>Kanał:</strong> bot Telegrama, jeden dla wszystkiego — monitora z zewnątrz, meldunków i <code>alert.sh</code>. Telefon i tak jest tam, gdzie przychodzą alerty systemu.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Opcje</div>
+      <h2>Osiem kandydatów</h2>
+      <p>Dane z oficjalnych cenników tam, gdzie dało się je pobrać (<span class="tag ok">oficjalne</span>); reszta z porównań w sieci, które się miejscami różnią (<span class="tag att">zewnętrzne</span>). Stan na 14 października 2026.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Usługa</th><th>Rodzaj</th><th>Za darmo</th><th class="n">Interwał</th><th>Telegram za darmo</th><th>Haczyki</th></tr></thead>
+          <tbody>
+            <tr><td><b>HetrixTools</b><br><span class="tag ok">oficjalne</span></td><td>z zewnątrz</td><td>15 monitorów, 4 z 12 lokalizacji</td><td class="n">1 min</td><td><span class="tag ok">tak</span></td><td>Logowanie do panelu co najmniej raz na 90 dni, inaczej konto wygasa. Plan „dla projektów osobistych”. Brak SMS-ów w cenie.</td></tr>
+            <tr><td><b>UptimeRobot</b><br><span class="tag ok">oficjalne</span></td><td>z zewnątrz</td><td>50 monitorów, słowo kluczowe, 1 strona statusu</td><td class="n">5 min</td><td><span class="tag stop">nie</span> — od planu Solo (ok. 10 USD/mies.)</td><td>Za darmo: e-mail, Discord, Google Chat, Pushover, Pushbullet. Plan opisany jako „dla hobby i non-profit”; co do użytku komercyjnego źródła są sprzeczne.</td></tr>
+            <tr><td><b>Better Stack</b><br><span class="tag ok">oficjalne</span></td><td>z zewnątrz + meldunki</td><td>10 monitorów i meldunków łącznie, 1 strona statusu</td><td class="n">3 min</td><td><span class="tag stop">nie wymieniony</span> — e-mail i Slack</td><td>„Free for personal projects”. Interwał 3 min z porównań, nie z cennika.</td></tr>
+            <tr><td><b>StatusCake</b><br><span class="tag att">zewnętrzne</span></td><td>z zewnątrz</td><td>10 testów (część źródeł: 3)</td><td class="n">5 min</td><td><span class="tag att">niepewne</span></td><td>Źródła niespójne co do limitów; podobno wymaga logowania co 90 dni.</td></tr>
+            <tr><td><b>Healthchecks.io</b><br><span class="tag ok">oficjalne</span></td><td>od środka (meldunki)</td><td>20 meldunków, 100 wpisów historii na meldunek</td><td class="n">dowolny</td><td><span class="tag ok">tak</span> (według porównań)</td><td>Nie sprawdza adresów z zewnątrz — tylko czeka na meldunek. Otwarty kod (BSD), da się postawić u siebie.</td></tr>
+            <tr><td><b>Upptime</b> / GitHub Actions<br><span class="tag att">zewnętrzne</span></td><td>z zewnątrz, w repozytorium</td><td>za darmo, bez nowego konta</td><td class="n">5 min</td><td>własny krok z Bot API</td><td>Harmonogram GitHuba się spóźnia: zmierzono przerwy 18 min i dłuższe, czasem godzinę. Alert to nieudany przebieg.</td></tr>
+            <tr><td><b>Cloudflare Workers</b> (cron)<br><span class="tag att">zewnętrzne</span></td><td>z zewnątrz, własny kod</td><td>5 wyzwalaczy, 100 tys. zapytań dziennie</td><td class="n">1 min</td><td>własny kod z Bot API</td><td>Trzeba napisać i utrzymywać kod; 10 ms CPU na uruchomienie (czekanie na sieć się nie liczy). Kolejne konto.</td></tr>
+            <tr><td><b>Uptime Kuma</b> / <b>Gatus</b><br><span class="tag att">zewnętrzne</span></td><td>własny serwer</td><td>oprogramowanie darmowe</td><td class="n">do 20 s</td><td><span class="tag ok">tak</span></td><td>Musi stać na <em>innej</em> maszynie niż ta, której pilnuje — drugi serwer albo komputer włączony 24/7. Twój komputer nie jest włączony cały czas.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Rekomendacja</div>
+      <h2>HetrixTools z zewnątrz, Healthchecks.io od środka</h2>
+      <div class="quote">Dwie darmowe usługi, jeden bot Telegrama, żadnego kodu do utrzymania.</div>
+      <p><strong>HetrixTools</strong> na cztery adresy: sprawdza co minutę z czterech miejsc, a Telegram jest w darmowym planie — jako jedyny z dużych. Koszt to jeden nawyk: zalogować się do panelu raz na kwartał.</p>
+      <p><strong>Healthchecks.io</strong> na dwa meldunki: serwer co 5 minut (żyje i ma sieć) oraz nocny zrzut po każdym udanym przebiegu. To łapie, czego monitor z zewnątrz nie zobaczy — zatrzymany cron i kopię, która się nie zrobiła — zegarem, który nie stoi na tym samym serwerze.</p>
+      <p><strong>Jeśli wolisz jedną usługę:</strong> UptimeRobot (50 monitorów, 5 minut) z alertami na e-mail albo Discord; Telegram dopiero za opłatą. <strong>Jeśli żadnego nowego konta:</strong> zaplanowany workflow w GitHub Actions — tylko jako zapas, bo harmonogram GitHuba potrafi spóźnić się o godzinę.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Co dalej</div>
+      <h2>Kto co robi</h2>
+      <div class="fails">
+        <div class="fail">
+          <h3>Ty <span class="tag att">ok. 15 minut</span></h3>
+          <p>1. Bot w Telegramie: <code>/newbot</code> u @BotFather, token do pliku <code>.local/alert-bot.env</code>, jedna wiadomość do bota (żebym odczytał <code>chat_id</code>). 2. Konto HetrixTools i klucz API do <code>.local/hetrixtools.env</code>. 3. Konto Healthchecks.io i klucz API do <code>.local/healthchecks.env</code>. Żadnego klucza nie wklejaj do rozmowy.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Ja <span class="tag ok">kod i próba</span></h3>
+          <p>Sekrety bota do środowiska <code>vps</code> i zapis <code>alert.env</code> przy wdrożeniu; skrypt zakładający cztery monitory i dwa meldunki przez API; meldunek z crona serwera i z <code>backup.sh</code>. Na koniec próba prawdziwym zdarzeniem: zatrzymany kontener i wiadomość na telefonie.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Źródła</div>
+      <h2>Skąd te liczby</h2>
+      <p>Oficjalne: <a href="https://hetrixtools.com/pricing/uptime-monitor/">HetrixTools — cennik</a>, <a href="https://uptimerobot.com/pricing/">UptimeRobot — cennik</a>, <a href="https://help.uptimerobot.com/en/articles/11361285-uptimerobot-integrations-basic-information-overview">UptimeRobot — integracje w planach</a>, <a href="https://uptimerobot.com/blog/new-feature-telegram-integration/">UptimeRobot — Telegram</a>, <a href="https://betterstack.com/pricing">Better Stack — cennik</a>, <a href="https://healthchecks.io/pricing/">Healthchecks.io — cennik</a>, <a href="https://developers.cloudflare.com/workers/platform/limits">Cloudflare Workers — limity</a>.</p>
+      <p>Porównania i pomiary: <a href="https://upptime.js.org/blog/2021/01/22/github-actions-schedule-not-working/">Upptime o spóźnieniach harmonogramu GitHuba</a>, <a href="https://notifier.so/guides/statuscake-vs-uptimerobot/">StatusCake vs UptimeRobot</a>, <a href="https://lemwatch.com/pricing/statuscake">StatusCake — limity</a>, <a href="https://dev.to/r0tten0x/uptimerobot-free-plan-in-2026-the-limits-thatll-actually-bite-you-445g">UptimeRobot — limity darmowego planu</a>, <a href="https://dev.to/mike_tickstem/healthchecksio-alternatives-for-developers-2026-bj5">Healthchecks.io — alternatywy</a>, <a href="https://valebyte.com/en/blog/self-hosted-uptime-monitoring-2026-uptime-kuma-and-what-to-run-around-it/">Uptime Kuma na osobnej maszynie</a>.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>TradingCenter · monitor z zewnątrz · zadanie 7.5</span>
+    <span>14 października 2026</span>
+  </div>
+</footer>
+
