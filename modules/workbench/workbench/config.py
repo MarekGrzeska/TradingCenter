@@ -345,6 +345,7 @@ class Settings(BaseSettings):
             telegram_api_id=self.telegram_api_id,
             telegram_api_hash=self.telegram_api_hash,
             telegram_session=self.telegram_session,
+            seed_default_destination=self.alert_destination,
         )
 
     def for_youtube(self) -> YoutubeSettings:

@@ -53,7 +53,7 @@ async def test_the_surface_holds_no_way_to_create_a_bot_or_bind_a_destination(
     names = {tool.name for tool in tools}
     surface = json.dumps([tool.model_dump() for tool in tools]).lower()
 
-    for act in ("create", "delete", "remove", "bind", "adopt"):
+    for act in ("create", "delete", "remove", "bind", "adopt", "assign", "purpose", "login", "rotate"):
         assert not any(act in name for name in names), f"{act} is on the tool surface: {names}"
     # Nor by another name: a tool that handed out a start link would bind a destination without
     # being called one, and one that handed out a token would be worse.
