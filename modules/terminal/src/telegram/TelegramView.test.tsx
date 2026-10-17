@@ -158,6 +158,23 @@ describe("TelegramView", () => {
     expect(loginResend).toHaveBeenCalledTimes(1);
   });
 
+  it("remembers the number in this browser once a code was sent, so the next login is one click", async () => {
+    localStorage.removeItem("tc.telegram.ownerPhone");
+    const loginStart = vi.fn(async () => ({ step: "code" as const, delivery: "app" as const }));
+    const first = render(<TelegramView api={api({ state: vi.fn(async () => LOGGED_OUT), loginStart })} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Zaloguj konto…" }));
+    await userEvent.type(screen.getByPlaceholderText("+48123456789"), "+48111222333");
+    await userEvent.click(screen.getByRole("button", { name: "Wyślij kod" }));
+    await screen.findByLabelText(/Kod, który przyszedł/);
+    first.unmount();
+
+    render(<TelegramView api={api({ state: vi.fn(async () => LOGGED_OUT), loginStart })} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Zaloguj konto…" }));
+
+    expect(screen.getByPlaceholderText("+48123456789")).toHaveValue("+48111222333");
+    localStorage.removeItem("tc.telegram.ownerPhone");
+  });
+
   it("names the settings the server lacks instead of offering a login that cannot start", async () => {
     const lacking: GateState = {
       ...LOGGED_OUT,
