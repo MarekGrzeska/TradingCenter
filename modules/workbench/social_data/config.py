@@ -84,11 +84,6 @@ class Settings(BaseSettings):
     # How long a headline lives unless the operator kept it. News is a stream to pick from, not an archive.
     news_retention_days: int = 28
 
-    # Who is told, by the name the operator bound at the door to Telegram — a package of this same process, so
-    # there is no address to set. Its *absence* is a working configuration: the module collects and reads exactly
-    # as before and tells nobody, which `/state` reports.
-    alert_destination: str | None = None
-
     # How impactful a post must be to be worth a notification. Eight rather than five: the operator
     # reads every one of these on a phone, and a channel that speaks daily is one nobody looks at.
     alert_min_impact_score: int = 8
@@ -110,12 +105,6 @@ class Settings(BaseSettings):
     @property
     def model_configured(self) -> bool:
         return bool(self.openai_api_key and self.openai_api_key.strip())
-
-    @property
-    def alerts_configured(self) -> bool:
-        """Whether this deployment can tell anybody anything. Asked at runtime rather than refused
-        at startup: silence is a state this module supports, and one it reports."""
-        return self.alert_destination is not None
 
     @field_validator("database_pool_size")
     @classmethod
@@ -149,7 +138,7 @@ class Settings(BaseSettings):
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()
 
-    @field_validator("database_user", "alert_destination")
+    @field_validator("database_user")
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
         # `DATABASE_USER=` left in a .env is the same intent as the line being absent —

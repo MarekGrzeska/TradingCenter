@@ -89,13 +89,3 @@ class TestCallerLists:
         settings = build(tool_caller_application_ids=" a , ,b ", rest_caller_application_ids="")
         assert settings.tool_caller_ids == {"a", "b"}
         assert settings.rest_caller_ids == frozenset()
-
-
-class TestTheDestination:
-    """The door to Telegram is a package of this process; who is told is the one setting left here."""
-
-    def test_no_destination_is_a_working_configuration(self) -> None:
-        assert build().alerts_configured is False
-
-    def test_a_destination_is_what_turns_telling_on(self) -> None:
-        assert build(alert_destination="operator").alerts_configured is True

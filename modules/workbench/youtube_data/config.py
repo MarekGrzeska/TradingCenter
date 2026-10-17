@@ -122,10 +122,6 @@ class Settings(BaseSettings):
     daily_source_units: int = 8000
     daily_token_limit: int = 2_000_000
 
-    # Who is told, by the name the operator bound at the door to Telegram — a package of this same process, so there is no
-    # address to set. Its *absence* is a working configuration: the package reads exactly as before and tells nobody, which
-    # `/state` reports.
-    alert_destination: str | None = None
     # How impactful a film must be to be worth a notification under a `threshold` rule. Eight, for the reason the post
     # archive gives: the operator reads these on a phone, and a channel that speaks daily is one nobody looks at.
     alert_min_impact_score: int = 8
@@ -149,10 +145,6 @@ class Settings(BaseSettings):
     @property
     def rest_caller_ids(self) -> frozenset[str]:
         return _identifiers(self.rest_caller_application_ids)
-
-    @property
-    def alerts_configured(self) -> bool:
-        return self.alert_destination is not None
 
     @property
     def retry_delays(self) -> tuple[int, ...]:
@@ -188,7 +180,7 @@ class Settings(BaseSettings):
             raise ValueError(f"ALERT_MIN_IMPACT_SCORE must be between 1 and 10; got {value}")
         return value
 
-    @field_validator("data_api_key", "gemini_api_key", "openai_api_key", "openai_base_url", "alert_destination")
+    @field_validator("data_api_key", "gemini_api_key", "openai_api_key", "openai_base_url")
     @classmethod
     def _blank_secret_is_absent(cls, value: str | None) -> str | None:
         # A key line somebody stopped filling means the same as a line that is not there.

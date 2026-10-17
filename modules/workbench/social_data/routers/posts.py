@@ -81,5 +81,12 @@ async def state(request: Request) -> StateOut:
     Read before a screen says "no posts", because a quiet source and one that has been unreachable
     for three hours produce the same empty window.
     """
+    announcer = getattr(request.app.state, "alerts", None)
     async with request.app.state.pool.acquire() as conn:
-        return await views.state(conn, request.app.state.settings, now=datetime.now(UTC))
+        return await views.state(
+            conn,
+            request.app.state.settings,
+            now=datetime.now(UTC),
+            # Told, not merely wired: a purpose the door says nobody receives is the silence this field reports.
+            alerts_configured=announcer is not None and announcer.telling,
+        )

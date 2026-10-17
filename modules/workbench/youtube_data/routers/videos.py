@@ -124,6 +124,11 @@ async def analyse(request: Request, body: AnalyseIn) -> QueuedOut:
     return QueuedOut(video_id=queued.video_id, title=queued.title, created=queued.created)
 
 
+def _telling(announcer) -> bool:
+    """Wired to the door, and the door did not last say that nobody receives these films."""
+    return announcer is not None and announcer.telling
+
+
 @router.get("/state", response_model=StateOut, tags=["meta"])
 async def state(request: Request) -> StateOut:
     """What the archive is doing: which providers answer, what the day has cost, how old the loop's last pass is.
@@ -138,5 +143,5 @@ async def state(request: Request) -> StateOut:
             app_state.settings,
             app_state.providers,
             heartbeat=None if heartbeats is None else heartbeats["ingest"],
-            alerts_configured=getattr(app_state, "alerts", None) is not None,
+            alerts_configured=_telling(getattr(app_state, "alerts", None)),
         )

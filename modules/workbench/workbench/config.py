@@ -103,9 +103,9 @@ class Settings(BaseSettings):
     tool_caller_application_ids: str = ""
     rest_caller_application_ids: str = ""
 
-    # Who the post archive and the strategy platform tell, by the name the operator bound at the door to Telegram.
-    # Unset is a working configuration in which both collect and decide and nobody is told. Unprefixed, because both
-    # read it, and there is one destination.
+    # What used to decide, for every producer, who is told. Producers send under a purpose now and the operator assigns
+    # purposes in the terminal; this survives one more release only to seed the door's `*` assignment from a name that
+    # already exists (`telegram-bots-from-the-terminal`), and is retired in the deploy that follows.
     alert_destination: str | None = None
 
     # The door to Telegram, a package of this process since stage 4 of `one-process-per-security-boundary`: its
@@ -280,7 +280,6 @@ class Settings(BaseSettings):
             require_authenticated_principal=self.require_authenticated_principal,
             tool_caller_application_ids=self.tool_caller_application_ids,
             rest_caller_application_ids=self.rest_caller_application_ids,
-            alert_destination=self.alert_destination,
         )
 
     def for_strategy(self) -> StrategySettings:
@@ -301,7 +300,6 @@ class Settings(BaseSettings):
             rest_caller_application_ids=self.rest_caller_application_ids,
             # No archive address and no gateway address: the host hands the platform a client over each one's
             # own application.
-            alert_destination=self.alert_destination,
         )
 
     def for_market(self) -> MarketSettings:
@@ -370,7 +368,6 @@ class Settings(BaseSettings):
             tool_caller_application_ids=self.tool_caller_application_ids,
             # Not the process's list, which holds the pocket: this package's REST writes and spends. Read as
             # YOUTUBE_REST_CALLER_APPLICATION_IDS, like `/telegram`'s.
-            alert_destination=self.alert_destination,
         )
 
 
