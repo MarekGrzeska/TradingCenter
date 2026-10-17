@@ -66,7 +66,7 @@ writes at all. Nothing this system does on Polymarket touches money.
 
 The post archive and the strategy platform reach the door to Telegram the way the platform reaches the
 candle archive: its own application through `httpx.ASGITransport`, as this process
-(`workbench/telegram_client.py`) — `ALERT_DESTINATION` says who is told, and unset is silence that works.
+(`workbench/telegram_client.py`) — they say what kind of event it is, the operator's assignments in the terminal say who is told, and a purpose nobody hears is silence that works.
 The platform's local source is the one the teams' clock reads: `pending_setups` on the
 strategy platform is a number a trigger compares against its threshold, and it travels the
 same road as every other reading rather than a client of its own, so the woken team reads the

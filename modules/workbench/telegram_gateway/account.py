@@ -265,11 +265,14 @@ class TelethonLoginClient:
         from telethon.sessions import StringSession
 
         self._client = TelegramClient(StringSession(), self._api_id, self._api_hash)
-        await self._client.connect()
         try:
+            await self._client.connect()
             sent = await self._client.send_code_request(phone)
         except RPCError as err:
             raise LoginRefused(_telethon_words(err)) from err
+        except (OSError, TimeoutError) as err:
+            # A network that did not answer is a reason the operator can act on, not an unhandled error with no words.
+            raise LoginRefused("Telegram could not be reached — try again in a moment") from err
         self._phone = phone
         self._hash = sent.phone_code_hash
 
@@ -283,6 +286,8 @@ class TelethonLoginClient:
             return None
         except RPCError as err:
             raise LoginRefused(_telethon_words(err)) from err
+        except (OSError, TimeoutError) as err:
+            raise LoginRefused("Telegram could not be reached — the login is still open, try the code again") from err
         return await self._identity()
 
     async def sign_in_password(self, password: str) -> Identity:
@@ -293,6 +298,8 @@ class TelethonLoginClient:
             await self._client.sign_in(password=password)
         except RPCError as err:
             raise LoginRefused(_telethon_words(err)) from err
+        except (OSError, TimeoutError) as err:
+            raise LoginRefused("Telegram could not be reached — the login is still open, try the password again") from err
         return await self._identity()
 
     async def _identity(self) -> Identity:

@@ -11,7 +11,14 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from strategy import store
-from strategy.alerts import Alerts, GatewayRefused, GatewayUnreachable, is_new_setup, message
+from strategy.alerts import (
+    Alerts,
+    GatewayRefused,
+    GatewayUnassigned,
+    GatewayUnreachable,
+    is_new_setup,
+    message,
+)
 from strategy.runner.loop import evaluate_once
 from strategy.spec import Decision
 
@@ -170,6 +177,24 @@ class TestThroughTheLoop:
             assert (
                 await conn.fetchval("SELECT notified_at FROM decisions WHERE id = $1", written.id)
             ) is None
+
+    async def test_a_purpose_nobody_hears_is_a_state_the_decision_survives_and_the_next_change_announces(
+        self, pool
+    ) -> None:
+        watch = await a_watch(pool)
+        archive = FakeArchive(last_bar=BAR, facts=crossing())
+        deaf = _alerts(RecordingGateway(GatewayUnassigned("strategy.setup")))
+
+        result = await evaluate_once(pool, archive, watch, deaf)
+
+        assert result.recorded is True and result.announced is False
+        assert deaf.telling is False
+        async with pool.acquire() as conn:
+            written = await store.last_decision(conn, watch.strategy_id, watch.symbol)
+            assert written is not None and written.notified_at is None
+        archive.last_bar = BAR + timedelta(minutes=15)
+        heard = RecordingGateway()
+        assert (await evaluate_once(pool, archive, watch, _alerts(heard))).announced is True
 
     async def test_a_refused_setup_is_tried_again_on_the_next_bar(self, pool) -> None:
         """The whole retry this system has. The first delivery is refused, so no marker is written,
