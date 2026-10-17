@@ -154,6 +154,7 @@ class FakeLoginClient:
         self.phone: str | None = None
         self.disconnected = False
         self.resends = 0
+        self.expire_first = False
 
     async def send_code(self, phone: str):
         from telegram_gateway.account import CodeSent
@@ -186,6 +187,35 @@ class FakeLoginClient:
         if password != self._password:
             raise LoginRefused("the password is wrong")
         return Identity(username=self._username, phone=self.phone or "", session="SESSION-STRING-1")
+
+    async def start_qr(self):
+        import asyncio
+        from datetime import UTC, datetime, timedelta
+
+        from telegram_gateway.account import QrTicket
+
+        self.scanned = asyncio.Event()
+        self.qr_tickets = 1
+        return QrTicket(url="tg://login?token=first", expires_at=datetime.now(UTC) + timedelta(seconds=30))
+
+    async def wait_qr(self):
+        from telegram_gateway.account import Identity
+
+        if self.expire_first:
+            self.expire_first = False
+            raise TimeoutError
+        await self.scanned.wait()
+        if self._password is not None:
+            return None
+        return Identity(username=self._username, phone="+48123456789", session="SESSION-STRING-1")
+
+    async def renew_qr(self):
+        from datetime import UTC, datetime, timedelta
+
+        from telegram_gateway.account import QrTicket
+
+        self.qr_tickets += 1
+        return QrTicket(url=f"tg://login?token=renewed{self.qr_tickets}", expires_at=datetime.now(UTC) + timedelta(seconds=30))
 
     async def disconnect(self) -> None:
         self.disconnected = True

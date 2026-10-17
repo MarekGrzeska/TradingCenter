@@ -204,6 +204,17 @@ class LoginStepOut(BaseModel):
     )
 
 
+class QrLoginOut(BaseModel):
+    """A login by QR code. `waiting` carries the code to show (it changes about every half minute); `password` wants the
+    two-step password next; `done` carries the account; `failed` says why."""
+
+    status: Literal["waiting", "password", "done", "failed"]
+    url: str | None = Field(default=None, description="tg://login?token=… — draw it as a QR code; never log it")
+    expires_at: datetime | None = None
+    account: AccountOut | None = None
+    reason: str | None = None
+
+
 class LogoutOut(BaseModel):
     ended_at_telegram: bool = Field(
         description="false when Telegram could not be told: the stored session is gone either way, "

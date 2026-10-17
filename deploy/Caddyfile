@@ -82,8 +82,17 @@
 	}
 }
 
+# The page is asked for again on every visit and the hashed assets are kept for good: without this a browser keeps an
+# index.html by heuristics from Last-Modified, and a deploy reaches the screen only after a hard refresh.
+(spa_caching) {
+	@page not path /assets/*
+	header @page Cache-Control "no-cache"
+	header /assets/* Cache-Control "public, max-age=31536000, immutable"
+}
+
 {$TERMINAL_HOST} {
 	import hardening
+	import spa_caching
 	encode zstd gzip
 	root * /srv/www/terminal
 	# A single-page application: an address that is a tab's route belongs to the page, not to a file.
@@ -93,6 +102,7 @@
 
 {$POCKET_HOST} {
 	import hardening
+	import spa_caching
 	encode zstd gzip
 	root * /srv/www/pocket
 	try_files {path} /index.html

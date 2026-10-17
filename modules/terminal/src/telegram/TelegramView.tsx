@@ -242,45 +242,76 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
         {bots.status === "ready" && bots.value.length === 0 && (
           <p className="text-sm text-ink-muted">Brama nie zna jeszcze żadnego bota.</p>
         )}
-        <ul className="flex flex-col gap-1">
+        <ul className="flex flex-col gap-2">
           {bots.value.map((bot) => {
             const mine = destinationsOf(bot, destinations.value);
             const routed = assignmentsOf(bot, assignments.value);
             const isOpen = bot.username === openBot;
+            const receiving = mine.filter((one) => one.receives).length;
             return (
-              <li key={bot.username} className="rounded border border-border bg-panel">
-                <button
-                  type="button"
-                  aria-expanded={isOpen}
-                  className="flex w-full cursor-pointer flex-wrap items-center gap-3 px-3 py-2 text-left hover:bg-panel-strong"
-                  onClick={() => setOpenBot(isOpen ? null : bot.username)}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="text-sm text-ink">@{bot.username}</span>{" "}
-                    <span className="text-xs text-ink-faint">{bot.title}</span>{" "}
-                    <span className="rounded bg-raised px-1 text-[11px] text-ink-muted">
-                      {bot.createdHere ? "utworzony tu" : "dodany tokenem"}
+              <li key={bot.username} className="overflow-hidden rounded-md border border-border bg-panel">
+                <div className="flex flex-wrap items-center gap-3 px-3 py-2">
+                  <button
+                    type="button"
+                    aria-expanded={isOpen}
+                    aria-label={`@${bot.username} — ${isOpen ? "zwiń" : "pokaż odbiorców i przypisania"}`}
+                    className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
+                    onClick={() => setOpenBot(isOpen ? null : bot.username)}
+                  >
+                    <span aria-hidden className="w-3 text-xs text-ink-faint">
+                      {isOpen ? "▾" : "▸"}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium text-ink">@{bot.username}</span>
+                      <span className="block truncate text-xs text-ink-faint">
+                        {bot.title} · {bot.createdHere ? "utworzony tu" : "dodany tokenem"}
+                      </span>
+                    </span>
+                  </button>
+                  <span className="flex gap-2 text-[11px]">
+                    <span
+                      className={[
+                        "rounded px-1.5 py-0.5",
+                        receiving > 0 ? "bg-raised text-ink-secondary" : "bg-warning-soft text-warning",
+                      ].join(" ")}
+                    >
+                      {receiving}/{mine.length} odbiera
+                    </span>
+                    <span className="rounded bg-raised px-1.5 py-0.5 text-ink-secondary">
+                      {routed.length} {routed.length === 1 ? "przypisanie" : "przypisań"}
                     </span>
                   </span>
-                  <span className="text-xs text-ink-faint">
-                    {mine.filter((one) => one.receives).length}/{mine.length} odbiorców · {routed.length}{" "}
-                    {routed.length === 1 ? "przypisanie" : "przypisań"}
+                  <span className="flex gap-1.5">
+                    <Button size="xs" tone="quiet" onClick={() => setDialog({ kind: "activate", bot })}>
+                      Dodaj odbiorcę…
+                    </Button>
+                    <Button
+                      size="xs"
+                      tone="muted"
+                      disabled={!gate.canCreateBots}
+                      title={gate.canCreateBots ? undefined : "Rotacja wymaga zalogowanego konta-właściciela"}
+                      onClick={() => setDialog({ kind: "rotate", bot })}
+                    >
+                      Rotuj token
+                    </Button>
+                    <Button
+                      size="xs"
+                      tone="critical"
+                      aria-label={`Usuń bota @${bot.username}`}
+                      onClick={() => setDialog({ kind: "remove-bot", bot })}
+                    >
+                      Usuń bota
+                    </Button>
                   </span>
-                  <span aria-hidden className="text-xs text-ink-faint">
-                    {isOpen ? "▾" : "▸"}
-                  </span>
-                </button>
+                </div>
                 {isOpen && (
                   <BotDetail
-                    bot={bot}
                     destinations={mine}
                     assignments={routed}
-                    canManage={gate.canCreateBots}
                     onActivate={(existing) => setDialog({ kind: "activate", bot, existing })}
-                    onRotate={() => setDialog({ kind: "rotate", bot })}
-                    onRemove={() => setDialog({ kind: "remove-bot", bot })}
                     onRemoveDestination={(destination) => setDialog({ kind: "remove-destination", destination })}
                     onAssign={() => setDialog({ kind: "assign", only: mine })}
+                    onSend={(destination, text) => client.sendMessage(destination, text, signal())}
                     onMove={(assignment, destination) =>
                       void act(
                         () => client.assign(assignment.key, destination, signal()),
@@ -431,113 +462,210 @@ function Section({
   );
 }
 
-/** One bot opened: who receives through it, and which kinds of event are sent to them. Everything about a bot in one place,
- *  so that removing it can be understood from what is on the screen. */
+/** One bot opened: who receives through it, and which kinds of event are sent to them — side by side, because the second
+ *  is only readable against the first. */
 function BotDetail({
-  bot,
   destinations,
   assignments,
-  canManage,
   onActivate,
-  onRotate,
-  onRemove,
   onRemoveDestination,
   onAssign,
+  onSend,
   onMove,
   onRelease,
 }: {
-  bot: Bot;
   destinations: Destination[];
   assignments: Assignment[];
-  canManage: boolean;
   onActivate(existing?: Destination): void;
-  onRotate(): void;
-  onRemove(): void;
   onRemoveDestination(destination: Destination): void;
   onAssign(): void;
+  onSend(destination: string, text: string): Promise<number>;
   onMove(assignment: Assignment, destination: string): void;
   onRelease(assignment: Assignment): void;
 }) {
   return (
-    <div className="flex flex-col gap-3 border-t border-border px-3 py-3">
-      <div className="flex flex-wrap gap-2">
-        <Button size="xs" tone="primary" onClick={() => onActivate()}>
-          Dodaj odbiorcę…
-        </Button>
-        <Button size="xs" tone="muted" disabled={!canManage} onClick={onRotate}>
-          Rotuj token
-        </Button>
-        <Button size="xs" tone="critical" aria-label={`Usuń bota @${bot.username}`} onClick={onRemove}>
-          Usuń bota
-        </Button>
-      </div>
-
-      <div className="flex flex-col gap-1">
-        <h3 className="text-xs font-semibold text-ink-secondary">Odbiorcy</h3>
-        {destinations.length === 0 && <p className="text-xs text-ink-faint">Nikt jeszcze nie odbiera przez tego bota.</p>}
-        <ul className="flex flex-col gap-0.5">
-          {destinations.map((destination) => (
-            <li key={destination.name} className="flex flex-wrap items-center gap-3 text-xs">
-              <span className="text-ink">{recipientLabel(destination)}</span>
-              <span className="text-ink-faint">({destination.name})</span>
-              <span className={destination.receives ? "text-ink-secondary" : "text-warning"}>
-                {DESTINATION_LABEL[destination.state]}
-              </span>
-              {!destination.receives && (
-                <Button size="2xs" tone="muted" onClick={() => onActivate(destination)}>
-                  {destination.state === "blocked" ? "Wiąż ponownie" : "Nowy link"}
-                </Button>
-              )}
-              <Button
-                size="2xs"
-                tone="critical"
-                aria-label={`Usuń odbiorcę ${destination.name}`}
-                onClick={() => onRemoveDestination(destination)}
-              >
-                Usuń
+    <div className="grid gap-3 border-t border-border bg-sunken/40 p-3 md:grid-cols-2">
+      <Card title="Odbiorcy" hint="Kto dostaje wiadomości od tego bota. Każdy raz dotknął „Start”.">
+        {destinations.length === 0 && <Empty>Nikt jeszcze nie odbiera — „Dodaj odbiorcę…” pokaże link i kod QR.</Empty>}
+        {destinations.map((destination) => (
+          <Row key={destination.name}>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm text-ink">{recipientLabel(destination)}</span>
+              <span className="block text-[11px] text-ink-faint">nazwa w przypisaniach: {destination.name}</span>
+            </span>
+            <span
+              className={[
+                "rounded px-1.5 py-0.5 text-[11px]",
+                destination.receives ? "bg-raised text-ink-secondary" : "bg-warning-soft text-warning",
+              ].join(" ")}
+            >
+              {DESTINATION_LABEL[destination.state]}
+            </span>
+            {!destination.receives && (
+              <Button size="2xs" tone="muted" onClick={() => onActivate(destination)}>
+                {destination.state === "blocked" ? "Wiąż ponownie" : "Nowy link"}
               </Button>
-            </li>
-          ))}
-        </ul>
-      </div>
+            )}
+            <Button
+              size="2xs"
+              tone="critical"
+              aria-label={`Usuń odbiorcę ${destination.name}`}
+              onClick={() => onRemoveDestination(destination)}
+            >
+              Usuń
+            </Button>
+          </Row>
+        ))}
+      </Card>
 
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-3">
-          <h3 className="text-xs font-semibold text-ink-secondary">Co tu trafia</h3>
+      <Card
+        title="Co tu trafia"
+        hint="Cel albo przedrostek celu (np. youtube.film); * to wszystko, czego nic innego nie złapało."
+        action={
           <Button size="2xs" tone="primary" disabled={destinations.length === 0} onClick={onAssign}>
             Dodaj przypisanie…
           </Button>
-        </div>
-        <p className="text-xs text-ink-faint">
-          Cel albo przedrostek celu (np. <code>youtube.film</code>) wysyłany do odbiorcy tego bota; <code>*</code> to wszystko,
-          czego nic innego nie złapało.
-        </p>
-        {assignments.length === 0 && <p className="text-xs text-ink-faint">Nic nie jest tu kierowane.</p>}
-        <ul className="flex flex-col gap-1">
-          {assignments.map((assignment) => (
-            <li key={assignment.key} className="flex flex-wrap items-center gap-3 text-xs">
-              <code className="text-ink">{assignment.key}</code>
-              <span className="text-ink-faint">→</span>
-              <select
-                className={SELECT}
-                aria-label={`odbiorca dla ${assignment.key}`}
-                value={assignment.destination}
-                onChange={(e) => onMove(assignment, e.target.value)}
-              >
-                {destinations.map((destination) => (
-                  <option key={destination.name} value={destination.name}>
-                    {recipientLabel(destination)}
-                  </option>
-                ))}
-              </select>
-              {!assignment.receives && <span className="text-warning">jeszcze nie odbiera</span>}
-              <Button size="2xs" tone="critical" onClick={() => onRelease(assignment)}>
-                Zdejmij
-              </Button>
-            </li>
-          ))}
-        </ul>
-      </div>
+        }
+      >
+        {assignments.length === 0 && <Empty>Nic nie jest tu kierowane.</Empty>}
+        {assignments.map((assignment) => (
+          <Row key={assignment.key}>
+            <code className="min-w-0 flex-1 truncate text-sm text-ink">{assignment.key}</code>
+            <span className="text-ink-faint">→</span>
+            <select
+              className={SELECT}
+              aria-label={`odbiorca dla ${assignment.key}`}
+              value={assignment.destination}
+              onChange={(e) => onMove(assignment, e.target.value)}
+            >
+              {destinations.map((destination) => (
+                <option key={destination.name} value={destination.name}>
+                  {recipientLabel(destination)}
+                </option>
+              ))}
+            </select>
+            {!assignment.receives && <span className="text-[11px] text-warning">jeszcze nie odbiera</span>}
+            <Button size="2xs" tone="critical" onClick={() => onRelease(assignment)}>
+              Zdejmij
+            </Button>
+          </Row>
+        ))}
+      </Card>
+
+      <TestMessage destinations={destinations} onSend={onSend} />
     </div>
   );
+}
+
+/** Says something through this bot, now, to one of its recipients — to see that the road works end to end without waiting
+ *  for an archive to have news. A real message on a real phone, so it asks for nothing it cannot say plainly. */
+function TestMessage({
+  destinations,
+  onSend,
+}: {
+  destinations: Destination[];
+  onSend(destination: string, text: string): Promise<number>;
+}) {
+  const ready = destinations.filter((one) => one.receives);
+  const [chosen, setChosen] = useState("");
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [outcome, setOutcome] = useState<{ ok: boolean; text: string } | null>(null);
+  const target = ready.find((one) => one.name === chosen)?.name ?? ready[0]?.name ?? "";
+
+  async function send(): Promise<void> {
+    setBusy(true);
+    setOutcome(null);
+    try {
+      const id = await onSend(target, text);
+      setOutcome({ ok: true, text: `Wysłane (wiadomość nr ${id} w Telegramie).` });
+      setText("");
+    } catch (cause: unknown) {
+      setOutcome({ ok: false, text: messageOf(cause, "nie udało się wysłać") });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="md:col-span-2">
+      <Card title="Wyślij wiadomość" hint="Do jednego z odbiorców tego bota, od razu — do wypróbowania drogi. Nic nie jest zapisywane.">
+        {ready.length === 0 ? (
+          <Empty>Nikt jeszcze nie odbiera przez tego bota, więc nie ma do kogo.</Empty>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <label className="flex items-center gap-2 text-ink-secondary">
+                Do
+                <select
+                  className={SELECT}
+                  aria-label="odbiorca wiadomości"
+                  value={target}
+                  onChange={(e) => setChosen(e.target.value)}
+                >
+                  {ready.map((one) => (
+                    <option key={one.name} value={one.name}>
+                      {recipientLabel(one)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <textarea
+              className="min-h-20 rounded border border-border bg-sunken px-2 py-1 text-sm text-ink"
+              aria-label="treść wiadomości"
+              placeholder="Treść…"
+              value={text}
+              maxLength={4096}
+              onChange={(e) => setText(e.target.value)}
+            />
+            <div className="flex items-center gap-3">
+              <Button size="xs" tone="primary" disabled={busy || text.trim() === ""} onClick={() => void send()}>
+                {busy ? "Wysyłam…" : "Wyślij"}
+              </Button>
+              {outcome !== null && (
+                <span className={outcome.ok ? "text-xs text-ink-secondary" : "text-xs text-critical"}>{outcome.text}</span>
+              )}
+            </div>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+function Card({
+  title,
+  hint,
+  action,
+  children,
+}: {
+  title: string;
+  hint: string;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-2 rounded border border-border bg-panel p-3">
+      <div className="flex items-center gap-2">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-ink-secondary">{title}</h3>
+        <span className="flex-1" />
+        {action}
+      </div>
+      <p className="text-[11px] text-ink-faint">{hint}</p>
+      <div className="flex flex-col gap-1">{children}</div>
+    </div>
+  );
+}
+
+function Row({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded border border-border/60 bg-sunken/40 px-2 py-1.5 text-xs">
+      {children}
+    </div>
+  );
+}
+
+function Empty({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs text-ink-faint">{children}</p>;
 }

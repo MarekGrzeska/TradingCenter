@@ -65,7 +65,163 @@ const DELIVERY_TEXT: Record<CodeDelivery, string> = {
 };
 
 /** Telegram's steps in Telegram's order. The number is the only thing remembered between them, and only to say which. */
+/** Two ways in. **By QR code first**: nothing is sent anywhere, so nothing can fail to arrive — an app already logged in
+ *  to the account scans this server's code. The number and a code are the fallback. */
 export function LoginDialog({
+  api,
+  onClose,
+  onDone,
+}: {
+  api: TelegramApi;
+  onClose(): void;
+  onDone(): void;
+}) {
+  const [method, setMethod] = useState<"qr" | "phone">("qr");
+  return method === "qr" ? (
+    <QrLoginDialog api={api} onClose={onClose} onDone={onDone} onUsePhone={() => setMethod("phone")} />
+  ) : (
+    <PhoneLoginDialog api={api} onClose={onClose} onDone={onDone} />
+  );
+}
+
+const QR_POLL_MS = 2000;
+
+function QrLoginDialog({
+  api,
+  onClose,
+  onDone,
+  onUsePhone,
+}: {
+  api: TelegramApi;
+  onClose(): void;
+  onDone(): void;
+  onUsePhone(): void;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [status, setStatus] = useState<"starting" | "waiting" | "password" | "failed">("starting");
+  const [reason, setReason] = useState<string | null>(null);
+  const [password, setPassword] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  const finished = useRef({ onDone, onClose });
+  useEffect(() => {
+    finished.current = { onDone, onClose };
+  }, [onDone, onClose]);
+
+  useEffect(() => {
+    let alive = true;
+    setStatus("starting");
+    setReason(null);
+    api
+      .loginQrStart(signal())
+      .then((started) => {
+        if (!alive) return;
+        setUrl(started.url);
+        setStatus("waiting");
+      })
+      .catch((cause: unknown) => {
+        if (!alive) return;
+        setStatus("failed");
+        setReason(cause instanceof Error ? cause.message : "nie udało się zacząć logowania");
+      });
+    return () => {
+      alive = false;
+    };
+  }, [api, attempt]);
+
+  useEffect(() => {
+    if (status !== "waiting") return;
+    const timer = setInterval(() => {
+      void api
+        .loginQrState(signal())
+        .then((now) => {
+          if (now.status === "done") {
+            clearInterval(timer);
+            finished.current.onDone();
+            finished.current.onClose();
+            return;
+          }
+          if (now.status === "waiting") {
+            if (now.url) setUrl(now.url);
+            return;
+          }
+          setStatus(now.status);
+          setReason(now.reason);
+        })
+        .catch(() => undefined);
+    }, QR_POLL_MS);
+    return () => clearInterval(timer);
+  }, [api, status]);
+
+  if (status === "password") {
+    return (
+      <ConfirmDialog
+        title="Hasło dwuetapowe"
+        confirmLabel="Zaloguj"
+        busyLabel="Loguję…"
+        confirmDisabled={password === ""}
+        fallbackError="logowanie się nie udało"
+        closeOnSuccess={false}
+        onConfirm={async () => {
+          await api.loginPassword(password, signal());
+          onDone();
+          onClose();
+        }}
+        onClose={onClose}
+      >
+        <Field label="Hasło dwuetapowe tego konta" hint="Kod zeskanowany; konto ma jeszcze hasło dwuetapowe.">
+          <input
+            className={INPUT}
+            type="password"
+            value={password}
+            autoFocus
+            autoComplete="off"
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </Field>
+      </ConfirmDialog>
+    );
+  }
+
+  return (
+    <ConfirmDialog
+      title="Zaloguj konto-właściciela kodem QR"
+      confirmLabel={status === "failed" ? "Spróbuj ponownie" : "Zamknij"}
+      busyLabel="Chwila…"
+      cancelLabel={status === "failed" ? "Cancel" : null}
+      closeOnSuccess={status !== "failed"}
+      onConfirm={() => {
+        if (status === "failed") setAttempt((n) => n + 1);
+      }}
+      onClose={onClose}
+    >
+      <div className="flex flex-col items-center gap-3 text-xs text-ink-secondary">
+        <p className="self-stretch rounded bg-warning-soft px-2 py-1 text-warning">
+          Użyj <strong>osobnego konta tylko do botów</strong>, nie swojego prywatnego.
+        </p>
+        <ol className="list-decimal self-stretch pl-5">
+          <li>Otwórz Telegram na koncie-właścicielu (telefon albo komputer, na którym jest zalogowane).</li>
+          <li>
+            <strong>Ustawienia → Urządzenia → Połącz urządzenie</strong> (Link Desktop Device).
+          </li>
+          <li>Zeskanuj kod poniżej. To okno samo zauważy skan.</li>
+        </ol>
+        {status === "starting" && <p>Pytam Telegram o kod…</p>}
+        {status === "waiting" && url !== null && (
+          <>
+            <QrCode text={url} label="Kod QR logowania konta-właściciela" />
+            <p className="text-ink-faint">Kod odnawia się sam co około pół minuty.</p>
+          </>
+        )}
+        {status === "failed" && <p className="text-critical">{reason ?? "logowanie się nie udało"}</p>}
+        <button type="button" className="text-primary underline" onClick={onUsePhone}>
+          Zaloguj numerem telefonu zamiast tego
+        </button>
+      </div>
+    </ConfirmDialog>
+  );
+}
+
+function PhoneLoginDialog({
   api,
   onClose,
   onDone,
