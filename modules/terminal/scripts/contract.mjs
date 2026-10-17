@@ -94,6 +94,19 @@ const SOURCES = [
 `,
   },
   {
+    name: "telegram-gateway",
+    moduleDir: resolve(terminal, "..", "workbench"),
+    pythonModule: "telegram_gateway.openapi",
+    output: join(terminal, "src", "data", "contract.telegram.generated.ts"),
+    banner: `/**
+ * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
+ *
+ * Printed from the door to Telegram's models by \`python -m telegram_gateway.openapi\`. No model here carries a bot's
+ * token or the account's session: the contract has nowhere to put one, which is the rule the whole package is arranged around.
+ */
+`,
+  },
+  {
     name: "strategy",
     moduleDir: resolve(terminal, "..", "workbench"),
     pythonModule: "strategy.openapi",

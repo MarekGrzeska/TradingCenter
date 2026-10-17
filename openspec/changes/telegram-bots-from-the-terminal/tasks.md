@@ -27,12 +27,12 @@
 
 ## 4. Terminal
 
-- [ ] 4.1 `telegram_gateway/contract.py` i `openapi.py` obejmują nowe trasy; siódmy kontrakt terminala; `contract-sync`
-- [ ] 4.2 Zakładka `src/telegram/`: stan i pierwsze kroki, sekcja konta z ostrzeżeniem o koncie dedykowanym i krokiem hasła
-- [ ] 4.3 Boty: założenie / wklejenie tokenu, licznik wobec sufitu, rotacja i usunięcie z potwierdzeniem
-- [ ] 4.4 Aktywacja: odnośnik i QR (`qrcode` w przeglądarce), odpytywanie co 3 s tylko przy otwartym odnośniku i widocznej karcie, wygaśnięcie i nowy odnośnik
-- [ ] 4.5 Cele: adresat dziś, przypisanie, z którego pochodzi, przypisz / przepnij / zdejmij dla celu, przedrostka i `*`; wyróżnienie celów bez adresata
-- [ ] 4.6 Testy według reguły CRUD (szczęśliwa ścieżka, błąd, odmowa) na zakładkę; rozstrzyganie „skąd adresat” jako test jednostkowy funkcji, nie DOM
+- [x] 4.1 `telegram_gateway/contract.py` i `openapi.py` obejmują nowe trasy; siódmy kontrakt terminala; `contract-sync`
+- [x] 4.2 Zakładka `src/telegram/`: stan i pierwsze kroki, sekcja konta z ostrzeżeniem o koncie dedykowanym i krokiem hasła
+- [x] 4.3 Boty: założenie / wklejenie tokenu, licznik wobec sufitu, rotacja i usunięcie z potwierdzeniem
+- [x] 4.4 Aktywacja: odnośnik i QR (`qrcode` w przeglądarce), odpytywanie co 3 s tylko przy otwartym odnośniku i widocznej karcie, wygaśnięcie i nowy odnośnik
+- [x] 4.5 Cele: adresat dziś, przypisanie, z którego pochodzi, przypisz / przepnij / zdejmij dla celu, przedrostka i `*`; wyróżnienie celów bez adresata
+- [x] 4.6 Testy według reguły CRUD (szczęśliwa ścieżka, błąd, odmowa) na zakładkę; rozstrzyganie „skąd adresat” jako test jednostkowy funkcji, nie DOM
 
 ## 5. Wdrożenie
 
