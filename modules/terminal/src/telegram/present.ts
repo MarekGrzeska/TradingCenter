@@ -1,4 +1,4 @@
-import type { Account, Bot, Destination, GateState, Purpose } from "./telegramApi";
+import type { Account, Assignment, Bot, Destination, GateState, Purpose } from "./telegramApi";
 
 /** What the screen says, decided here so the decisions can be tested without a DOM. */
 
@@ -42,6 +42,19 @@ export function unheard(purposes: Purpose[]): Purpose[] {
 /** The destinations of one bot, in the order they were made (the door lists them that way). */
 export function destinationsOf(bot: Bot, destinations: Destination[]): Destination[] {
   return destinations.filter((one) => one.bot === bot.username);
+}
+
+/** The assignments that end at one of this bot's recipients. */
+export function assignmentsOf(bot: Bot, assignments: Assignment[]): Assignment[] {
+  return assignments.filter((one) => one.bot === bot.username);
+}
+
+/** Who a recipient is, the way a person would say it: `@nick · Name`, a group by its title, and the label it was given
+ *  when Telegram has not said. */
+export function recipientLabel(destination: Destination): string {
+  const who = [destination.username ? `@${destination.username}` : null, destination.title].filter(Boolean).join(" · ");
+  const kind = destination.kind === "private" || destination.kind === null ? "" : " (grupa)";
+  return who === "" ? destination.name : `${who}${kind}`;
 }
 
 export const ACCOUNT_LABEL: Record<Account["status"], string> = {

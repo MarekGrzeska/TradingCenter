@@ -46,3 +46,6 @@
 ## 6. Po pierwszym użyciu
 
 - [x] 6.1 Logowanie nie mówiło, dokąd poszedł kod (pierwsze prawdziwe logowanie, 17 października 2026: kod nie dotarł do operatora, a ekran nie dawał nic do sprawdzenia): `delivery` w odpowiedzi, `POST /account/login/resend`, przycisk „Nie dostałem kodu” w oknie logowania
+- [x] 6.2 „Nie dostałem kodu” pokazuje się tylko gdy Telegram oferuje inną drogę (`can_resend` z `next_type`); inaczej okno mówi, że kod jest tylko tam, gdzie poszedł
+- [x] 6.3 Zakładka od botów: lista botów, a po kliknięciu odbiorcy z nickami i przypisania tego bota; cele bez odbiorcy jako ostrzeżenie na górze. Odbiorca pamięta, kim jest na Telegramie (`@nick`, imię, grupa; migracja `0004`, uzupełniana raz przy starcie dla wcześniej związanych)
+- [x] 6.4 Numer konta-właściciela: pamiętany w przeglądarce po pierwszym przyjętym kodzie, a domyślnie ze zmiennej `TELEGRAM_OWNER_PHONE` środowiska `vps` (nie z gita)

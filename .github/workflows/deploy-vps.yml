@@ -138,6 +138,8 @@ jobs:
           VITE_ENTRA_SCOPE_SOCIAL: api://tradingcenter-agent/access_as_user
           VITE_ENTRA_SCOPE_YOUTUBE: api://tradingcenter-agent/access_as_user
           VITE_ENTRA_SCOPE_TELEGRAM: api://tradingcenter-agent/access_as_user
+          # The owner account's number, pre-filled in the login dialog; a variable of the environment, not a line in git.
+          VITE_TELEGRAM_OWNER_PHONE: ${{ vars.TELEGRAM_OWNER_PHONE }}
         run: |
           pnpm install --frozen-lockfile
           VITE_ARCHIVE_HTTP="$API/market" \

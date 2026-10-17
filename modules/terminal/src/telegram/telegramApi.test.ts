@@ -32,7 +32,7 @@ describe("the login", () => {
     );
     const api = createTelegramApi(BASE);
 
-    expect(await api.loginStart("+48123456789", signal())).toEqual({ step: "code", delivery: "app" });
+    expect(await api.loginStart("+48123456789", signal())).toEqual({ step: "code", delivery: "app", canResend: true });
     expect(await api.loginCode("12345", signal())).toEqual({ step: "password" });
     const done = await api.loginPassword("pw", signal());
 

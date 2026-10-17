@@ -56,7 +56,11 @@ async def begin(request: Request, body: LoginStartRequest) -> LoginStepOut:
         delivery = await request.app.state.login.begin(body.phone, api_id=api_id, api_hash=api_hash)
     except GatewayError as err:
         raise deps.refusal(err) from err
-    return LoginStepOut(step="code", delivery=delivery)  # pyright: ignore[reportArgumentType]
+    return LoginStepOut(
+        step="code",
+        delivery=delivery.delivery,  # pyright: ignore[reportArgumentType]
+        can_resend=delivery.can_resend,
+    )
 
 
 @router.post("/login/resend", response_model=LoginStepOut, responses=_REFUSALS)
@@ -67,7 +71,11 @@ async def resend(request: Request) -> LoginStepOut:
         delivery = await request.app.state.login.resend()
     except GatewayError as err:
         raise deps.refusal(err) from err
-    return LoginStepOut(step="code", delivery=delivery)  # pyright: ignore[reportArgumentType]
+    return LoginStepOut(
+        step="code",
+        delivery=delivery.delivery,  # pyright: ignore[reportArgumentType]
+        can_resend=delivery.can_resend,
+    )
 
 
 @router.post("/login/code", response_model=LoginStepOut, responses=_REFUSALS)

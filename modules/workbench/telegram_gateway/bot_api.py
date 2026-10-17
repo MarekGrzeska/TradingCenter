@@ -57,6 +57,8 @@ class BotApi(Protocol):
 
     async def get_updates(self, token: str, *, offset: int, timeout: int) -> list[dict[str, Any]]: ...
 
+    async def get_chat(self, token: str, *, chat_id: int) -> dict[str, Any]: ...
+
 
 class HttpBotApi:
     """The real one. One `httpx.AsyncClient` for every bot: the token is per request, not per client."""
@@ -105,6 +107,10 @@ class HttpBotApi:
         """Who this token belongs to. How a pasted token becomes a bot row — its numeric id and its
         @name come from Telegram rather than from whoever typed them."""
         return await self._call(token, "getMe")
+
+    async def get_chat(self, token: str, *, chat_id: int) -> dict[str, Any]:
+        """Who a chat is — read, never written: the one thing asked of Telegram about a destination after binding it."""
+        return await self._call(token, "getChat", {"chat_id": chat_id})
 
     async def get_updates(
         self, token: str, *, offset: int, timeout: int

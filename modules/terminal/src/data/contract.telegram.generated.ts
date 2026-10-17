@@ -575,6 +575,11 @@ export interface components {
             bot: string;
             /** Bound At */
             bound_at: string | null;
+            /**
+             * Kind
+             * @description private, group, supergroup or channel
+             */
+            kind: string | null;
             /** Name */
             name: string;
             /** Receives */
@@ -585,6 +590,16 @@ export interface components {
              * @enum {string}
              */
             state: "pending" | "ready" | "blocked";
+            /**
+             * Title
+             * @description their display name, or the group's title
+             */
+            title: string | null;
+            /**
+             * Username
+             * @description the @name of who receives, as Telegram reported it
+             */
+            username: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -615,6 +630,11 @@ export interface components {
          */
         LoginStepOut: {
             account: components["schemas"]["AccountOut"] | null;
+            /**
+             * Can Resend
+             * @description whether Telegram offers another way of sending the code; false means the code is only where `delivery` says
+             */
+            can_resend: boolean | null;
             /**
              * Delivery
              * @description where Telegram sent the code, present with step 'code': 'app' is a message from Telegram in an app already logged in to the account, 'sms' a text to the number, 'call' a phone call

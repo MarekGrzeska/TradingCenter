@@ -66,10 +66,23 @@ class Destination:
     chat_id: int | None = None
     bound_at: datetime | None = None
     blocked_at: datetime | None = None
+    # Who it is on Telegram, for the screen; never what a message is addressed by.
+    chat_username: str | None = None
+    chat_title: str | None = None
+    chat_kind: str | None = None
 
     @property
     def receives(self) -> bool:
         return self.state is DestinationState.READY and self.chat_id is not None
+
+
+@dataclass(frozen=True, slots=True)
+class ChatIdentity:
+    """Who opened a conversation, as Telegram describes them: `kind` is `private`, `group`, `supergroup` or `channel`."""
+
+    username: str | None
+    title: str | None
+    kind: str | None
 
 
 @dataclass(frozen=True, slots=True)

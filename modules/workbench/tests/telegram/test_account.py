@@ -204,7 +204,7 @@ class TestLoggingInOverTheWire:
         started = await api.post("/account/login", json={"phone": PHONE})
         finished = await api.post("/account/login/code", json={"code": "12345"})
 
-        assert started.json() == {"step": "code", "account": None, "delivery": "app"}
+        assert started.json() == {"step": "code", "account": None, "delivery": "app", "can_resend": True}
         assert finished.json()["step"] == "done"
         owner = finished.json()["account"]
         assert (owner["status"], owner["username"], owner["phone"]) == (
@@ -221,7 +221,7 @@ class TestLoggingInOverTheWire:
         again = await api.post("/account/login/resend")
         finished = await api.post("/account/login/code", json={"code": "12345"})
 
-        assert again.json() == {"step": "code", "account": None, "delivery": "sms"}
+        assert again.json() == {"step": "code", "account": None, "delivery": "sms", "can_resend": False}
         assert platform.login.resends == 1
         assert finished.json()["step"] == "done"
 
@@ -421,3 +421,12 @@ class TestWhereTelegramSaidTheCodeWent:
         sent = SimpleNamespace(type=type(kind, (), {})())
 
         assert _delivery_of(sent) == expected
+
+    @pytest.mark.db
+    async def test_the_answer_says_when_telegram_offers_no_other_way(self, api, platform) -> None:
+        """The button that asks again is only worth showing when Telegram would answer it with something."""
+        platform.login = FakeLoginClient(can_resend=False)
+
+        started = await api.post("/account/login", json={"phone": PHONE})
+
+        assert started.json()["can_resend"] is False
