@@ -101,8 +101,8 @@ that refuse to start; `dev.py` names each at startup (`RETIRED_SETTINGS`).
 configuration**: the conversation simply has no account tools — while a team whose agents were
 *assigned* those tools refuses to run rather than answer without them. That asymmetry is the trap;
 the symptom is the operator asking about positions and the agent saying it cannot see them.
-`ALERT_DESTINATION` has the same shape: unset, the post archive and the strategy platform collect
-and decide as usual and tell nobody.
+Telegram has the same shape: a purpose the operator has not assigned in the terminal (or `ALERT_DESTINATION`
+unset, before the first one is) is collected and decided as usual and told to nobody.
 
 **`trading-mcp` will not start on a wish.** `CAPITAL_GATEWAY_API_KEY` must be the gateway's own
 `GATEWAY_API_KEY` — checked on every caller, loopback included — and it asks the gateway whether the

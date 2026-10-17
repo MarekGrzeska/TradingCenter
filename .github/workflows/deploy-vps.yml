@@ -230,7 +230,7 @@ jobs:
           ALERT_DESTINATION: ${{ vars.ALERT_DESTINATION }}
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
-          TELEGRAM_SESSION: ${{ secrets.TELEGRAM_SESSION }}
+          TELEGRAM_SESSION_KEY: ${{ secrets.TELEGRAM_SESSION_KEY }}
         run: |
           set -euo pipefail
           python3 deploy/scripts/assemble_env.py --from-env deploy/env.required > "$RUNNER_TEMP/server.env"

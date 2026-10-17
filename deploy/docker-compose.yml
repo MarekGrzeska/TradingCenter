@@ -137,8 +137,9 @@ services:
 
       TOOL_CALLER_APPLICATION_IDS: ""
       REST_CALLER_APPLICATION_IDS: ${TERMINAL_APPLICATION_ID:?},${POCKET_APPLICATION_ID:?}
-      # The operator's `az` (a public Microsoft client id), admitted to `/telegram`'s bots and destinations alone.
-      TELEGRAM_REST_CALLER_APPLICATION_IDS: 04b07795-8ddb-461a-bbee-02f9e1bf7b46
+      # Admitted to `/telegram`'s account, bots, recipients and assignments alone: the operator's `az` (a public Microsoft
+      # client id) and the terminal, which is where the account is logged in and the purposes are assigned.
+      TELEGRAM_REST_CALLER_APPLICATION_IDS: 04b07795-8ddb-461a-bbee-02f9e1bf7b46,${TERMINAL_APPLICATION_ID:?}
       YOUTUBE_REST_CALLER_APPLICATION_IDS: ${TERMINAL_APPLICATION_ID:?}
 
       SCHEDULER_ENABLED: "true"
@@ -157,11 +158,14 @@ services:
       YOUTUBE_ANALYSER: openai
       YOUTUBE_OPENAI_API_KEY: ${AGENT_OPENAI_API_KEY:?}
 
-      # Absent is a working configuration for these: nobody is told, and the account session is not started.
+      # Absent is a working configuration for these: no account can be logged in from the terminal, and nobody is told
+      # until the operator assigns a purpose there. ALERT_DESTINATION only seeds the `*` assignment, once, and goes in
+      # the deploy after the one that proved it. The session itself is never a setting: it lives in the database,
+      # encrypted with TELEGRAM_SESSION_KEY (`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`).
       ALERT_DESTINATION: ${ALERT_DESTINATION:-}
       TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
       TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
-      TELEGRAM_SESSION: ${TELEGRAM_SESSION:-}
+      TELEGRAM_SESSION_KEY: ${TELEGRAM_SESSION_KEY:-}
     depends_on:
       db-init:
         condition: service_completed_successfully

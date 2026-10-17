@@ -140,5 +140,5 @@ set_variable DEPLOY_KNOWN_HOSTS "$(ssh-keyscan -t ed25519 "$HOST" 2>/dev/null)"
 
 echo
 echo "Done. Names to answer on: api.$DOMAIN gateway.$DOMAIN terminal.$DOMAIN pocket.$DOMAIN"
-echo "Not set (optional): ALERT_BOT_TOKEN ALERT_CHAT_ID TELEGRAM_API_ID TELEGRAM_API_HASH TELEGRAM_SESSION"
+echo "Not set (optional): ALERT_BOT_TOKEN ALERT_CHAT_ID TELEGRAM_API_ID TELEGRAM_API_HASH TELEGRAM_SESSION_KEY"
 echo "Owner of the images: $OWNER_LC"
