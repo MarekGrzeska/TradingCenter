@@ -113,6 +113,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/account/login/resend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resend
+         * @description The code did not come: asks Telegram for another way of delivering it (an app message, then SMS, then a call) and
+         *     says which. The login stays the one that is open, so the code that arrives is accepted by it.
+         */
+        post: operations["resend_account_login_resend_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/assignments": {
         parameters: {
             query?: never;
@@ -595,6 +616,11 @@ export interface components {
         LoginStepOut: {
             account: components["schemas"]["AccountOut"] | null;
             /**
+             * Delivery
+             * @description where Telegram sent the code, present with step 'code': 'app' is a message from Telegram in an app already logged in to the account, 'sms' a text to the number, 'call' a phone call
+             */
+            delivery: ("app" | "sms" | "call" | "other") | null;
+            /**
              * Step
              * @enum {string}
              */
@@ -1021,6 +1047,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    resend_account_login_resend_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginStepOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
             /** @description Not Implemented */

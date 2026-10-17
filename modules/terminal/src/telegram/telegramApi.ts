@@ -76,7 +76,13 @@ export interface Assignment {
   receives: boolean;
 }
 
-export type LoginStep = { step: "code" } | { step: "password" } | { step: "done"; account: Account };
+/** Where Telegram said the login code went. `app` is a message from "Telegram" in an app already logged in to the account. */
+export type CodeDelivery = Schemas["LoginStepOut"]["delivery"] extends infer D ? Exclude<D, null | undefined> : never;
+
+export type LoginStep =
+  | { step: "code"; delivery: CodeDelivery | null }
+  | { step: "password" }
+  | { step: "done"; account: Account };
 
 function mapAccount(raw: Schemas["AccountOut"]): Account {
   return {
@@ -105,6 +111,8 @@ export interface TelegramApi {
   state(signal: AbortSignal): Promise<GateState>;
   loginStart(phone: string, signal: AbortSignal): Promise<LoginStep>;
   loginCode(code: string, signal: AbortSignal): Promise<LoginStep>;
+  /** The code did not come: Telegram's next way of delivering it (app → SMS → call), on the same login. */
+  loginResend(signal: AbortSignal): Promise<LoginStep>;
   loginPassword(password: string, signal: AbortSignal): Promise<LoginStep>;
   /** `true` when Telegram was told; `false` when only this side forgot, and the device should be ended from the phone. */
   logout(signal: AbortSignal): Promise<boolean>;
@@ -128,7 +136,7 @@ export function createTelegramApi(httpBase: string, identity: Identity = noIdent
 
   function step(raw: Schemas["LoginStepOut"]): LoginStep {
     if (raw.step === "done" && raw.account) return { step: "done", account: mapAccount(raw.account) };
-    return raw.step === "password" ? { step: "password" } : { step: "code" };
+    return raw.step === "password" ? { step: "password" } : { step: "code", delivery: raw.delivery ?? null };
   }
 
   return {
@@ -155,6 +163,10 @@ export function createTelegramApi(httpBase: string, identity: Identity = noIdent
       return step(
         await http.json<Schemas["LoginStepOut"]>(`${httpBase}/account/login/code`, { signal, method: "POST", body }),
       );
+    },
+
+    async loginResend(signal) {
+      return step(await http.json<Schemas["LoginStepOut"]>(`${httpBase}/account/login/resend`, { signal, method: "POST" }));
     },
 
     async loginPassword(password, signal) {

@@ -42,3 +42,7 @@
 - [ ] 5.4 Drugie wdrożenie: `ALERT_DESTINATION` z Compose, `assemble_env.py`, `vps`, `.env.example` i z `seed_default_destination`; do `RETIRED_SETTINGS` w `scripts/dev.py` (`TELEGRAM_SESSION` zdjęte już w 5.1 — nic go nie czytało)
 - [ ] 5.5 Operator: konto dedykowane z 2FA, `api_id`/`api_hash` z niego w `vps`, `TELEGRAM_SESSION_KEY`; logowanie w zakładce, nowy bot, aktywacja, przypisania; stare boty zrotowane albo usunięte
 - [x] 5.6 `review.md`
+
+## 6. Po pierwszym użyciu
+
+- [x] 6.1 Logowanie nie mówiło, dokąd poszedł kod (pierwsze prawdziwe logowanie, 17 października 2026: kod nie dotarł do operatora, a ekran nie dawał nic do sprawdzenia): `delivery` w odpowiedzi, `POST /account/login/resend`, przycisk „Nie dostałem kodu” w oknie logowania

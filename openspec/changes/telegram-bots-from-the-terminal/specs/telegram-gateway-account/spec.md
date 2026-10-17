@@ -27,6 +27,31 @@ MUST zastępować poprzednie.
 - **WHEN** proces restartuje się między podaniem numeru a kodu
 - **THEN** podanie kodu MUST być odmową mówiącą, że logowanie trzeba zacząć od numeru
 
+### Requirement: Logowanie mówi, dokąd poszedł kod, i pozwala poprosić o inną drogę
+
+Odpowiedź na podanie numeru MUST nazywać, którą drogą Telegram wysłał kod: do aplikacji zalogowanej na koncie, SMS-em
+albo telefonem. Brama MUST pozwolić poprosić o następną drogę (aplikacja, potem SMS, potem telefon) w tym samym
+logowaniu, tak żeby kod, który przyjdzie, przyjęło to logowanie. Odmowa Telegrama (na przykład brak kolejnej drogi) MUST
+dotrzeć jego słowami i MUST zostawić logowanie otwarte.
+
+Kod wysłany do aplikacji, na którą nikt nie patrzy, wygląda jak kod, który nie przyszedł; operator musi wiedzieć, gdzie
+szukać, zanim zacznie wysyłać następne prośby, które Telegram ogranicza.
+
+#### Scenario: Kod poszedł do aplikacji
+
+- **WHEN** operator podaje numer konta zalogowanego w aplikacji Telegrama
+- **THEN** odpowiedź MUST mówić, że kod poszedł do aplikacji, a zakładka MUST to napisać wprost
+
+#### Scenario: Kod nie przyszedł
+
+- **WHEN** operator prosi o kod jeszcze raz w otwartym logowaniu
+- **THEN** brama MUST poprosić Telegram o następną drogę, nazwać ją w odpowiedzi i przyjąć kod z niej w tym samym logowaniu
+
+#### Scenario: Prośba bez logowania
+
+- **WHEN** ktoś prosi o kod jeszcze raz, a żadne logowanie nie jest otwarte
+- **THEN** brama MUST odmówić, mówiąc, że trzeba zacząć od numeru
+
 ### Requirement: Sesja leży w bazie wyłącznie zaszyfrowana
 
 Po udanym logowaniu brama MUST zapisać sesję konta w swojej bazie wyłącznie w postaci zaszyfrowanej
