@@ -55,6 +55,7 @@ function api(overrides: Partial<TelegramApi> = {}): TelegramApi {
     state: vi.fn(async () => LOGGED_IN),
     loginStart: vi.fn(),
     loginCode: vi.fn(),
+    loginResend: vi.fn(),
     loginPassword: vi.fn(),
     logout: vi.fn(async () => true),
     bots: vi.fn(async () => [BOT]),
@@ -120,7 +121,7 @@ describe("TelegramView", () => {
   });
 
   it("logs the account in through Telegram's steps, and shows the password field only when asked", async () => {
-    const loginStart = vi.fn(async () => ({ step: "code" as const }));
+    const loginStart = vi.fn(async () => ({ step: "code" as const, delivery: "app" as const }));
     const loginCode = vi.fn(async () => ({ step: "password" as const }));
     const loginPassword = vi.fn(async () => ({ step: "done" as const, account: LOGGED_IN.account }));
     render(
@@ -139,6 +140,22 @@ describe("TelegramView", () => {
     expect(loginStart).toHaveBeenCalledWith("+48123456789", expect.anything());
     expect(loginCode).toHaveBeenCalledWith("12345", expect.anything());
     expect(loginPassword).toHaveBeenCalledWith("hunter2", expect.anything());
+  });
+
+  it("says where the code went and asks for another way when it did not come", async () => {
+    const loginStart = vi.fn(async () => ({ step: "code" as const, delivery: "app" as const }));
+    const loginResend = vi.fn(async () => ({ step: "code" as const, delivery: "sms" as const }));
+    render(<TelegramView api={api({ state: vi.fn(async () => LOGGED_OUT), loginStart, loginResend })} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Zaloguj konto…" }));
+    await userEvent.type(screen.getByPlaceholderText("+48123456789"), "+48123456789");
+    await userEvent.click(screen.getByRole("button", { name: "Wyślij kod" }));
+
+    expect(await screen.findByText(/aplikacji Telegram zalogowanej na tym koncie/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Nie dostałem kodu/ }));
+
+    expect(await screen.findByText(/Kod poszedł SMS-em/)).toBeInTheDocument();
+    expect(loginResend).toHaveBeenCalledTimes(1);
   });
 
   it("names the settings the server lacks instead of offering a login that cannot start", async () => {

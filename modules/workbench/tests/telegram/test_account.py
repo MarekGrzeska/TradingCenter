@@ -204,7 +204,7 @@ class TestLoggingInOverTheWire:
         started = await api.post("/account/login", json={"phone": PHONE})
         finished = await api.post("/account/login/code", json={"code": "12345"})
 
-        assert started.json() == {"step": "code", "account": None}
+        assert started.json() == {"step": "code", "account": None, "delivery": "app"}
         assert finished.json()["step"] == "done"
         owner = finished.json()["account"]
         assert (owner["status"], owner["username"], owner["phone"]) == (
@@ -212,6 +212,24 @@ class TestLoggingInOverTheWire:
             "ownerbot_account",
             "+•••••••6789",
         )
+
+    async def test_a_code_that_did_not_come_is_asked_for_again_by_another_way_on_the_same_login(
+        self, api, platform
+    ) -> None:
+        await api.post("/account/login", json={"phone": PHONE})
+
+        again = await api.post("/account/login/resend")
+        finished = await api.post("/account/login/code", json={"code": "12345"})
+
+        assert again.json() == {"step": "code", "account": None, "delivery": "sms"}
+        assert platform.login.resends == 1
+        assert finished.json()["step"] == "done"
+
+    async def test_resending_without_a_login_is_a_refusal_about_the_login(self, api) -> None:
+        response = await api.post("/account/login/resend")
+
+        assert response.status_code == 409
+        assert "Start again" in response.json()["detail"]["detail"]
 
     async def test_an_account_with_a_password_walks_one_more_step(self, api, platform) -> None:
         platform.login = FakeLoginClient(password="hunter2")
@@ -380,3 +398,26 @@ class TestRotatingAToken:
 
         assert response.status_code == 502
         assert credential is not None and credential.token == builders.token_for(bot.telegram_id)
+
+
+class TestWhereTelegramSaidTheCodeWent:
+    @pytest.mark.parametrize(
+        ("kind", "expected"),
+        [
+            ("SentCodeTypeApp", "app"),
+            ("SentCodeTypeSms", "sms"),
+            ("SentCodeTypeCall", "call"),
+            ("SentCodeTypeFlashCall", "call"),
+            ("SentCodeTypeEmailCode", "other"),
+        ],
+    )
+    def test_by_the_class_of_telegrams_answer_and_other_for_what_it_does_not_know(
+        self, kind: str, expected: str
+    ) -> None:
+        from types import SimpleNamespace
+
+        from telegram_gateway.account import _delivery_of
+
+        sent = SimpleNamespace(type=type(kind, (), {})())
+
+        assert _delivery_of(sent) == expected

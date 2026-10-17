@@ -53,10 +53,21 @@ async def begin(request: Request, body: LoginStartRequest) -> LoginStepOut:
     settings = request.app.state.settings
     try:
         api_id, api_hash, _ = account.require_login_settings(settings)
-        await request.app.state.login.begin(body.phone, api_id=api_id, api_hash=api_hash)
+        delivery = await request.app.state.login.begin(body.phone, api_id=api_id, api_hash=api_hash)
     except GatewayError as err:
         raise deps.refusal(err) from err
-    return LoginStepOut(step="code")
+    return LoginStepOut(step="code", delivery=delivery)  # pyright: ignore[reportArgumentType]
+
+
+@router.post("/login/resend", response_model=LoginStepOut, responses=_REFUSALS)
+async def resend(request: Request) -> LoginStepOut:
+    """The code did not come: asks Telegram for another way of delivering it (an app message, then SMS, then a call) and
+    says which. The login stays the one that is open, so the code that arrives is accepted by it."""
+    try:
+        delivery = await request.app.state.login.resend()
+    except GatewayError as err:
+        raise deps.refusal(err) from err
+    return LoginStepOut(step="code", delivery=delivery)  # pyright: ignore[reportArgumentType]
 
 
 @router.post("/login/code", response_model=LoginStepOut, responses=_REFUSALS)

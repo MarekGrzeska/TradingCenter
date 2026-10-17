@@ -138,11 +138,17 @@ class FakeLoginClient:
         self._username = username
         self.phone: str | None = None
         self.disconnected = False
+        self.resends = 0
 
-    async def send_code(self, phone: str) -> None:
+    async def send_code(self, phone: str) -> str:
         if self._send_error is not None:
             raise self._send_error
         self.phone = phone
+        return "app"
+
+    async def resend_code(self) -> str:
+        self.resends += 1
+        return "sms"
 
     async def sign_in_code(self, code: str):
         from telegram_gateway.account import Identity

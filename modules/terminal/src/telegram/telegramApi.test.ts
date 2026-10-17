@@ -26,13 +26,13 @@ const ACCOUNT = {
 describe("the login", () => {
   it("walks Telegram's steps and ends with the account, masked as the door sent it", async () => {
     server.use(
-      http.post(`${BASE}/account/login`, () => HttpResponse.json({ step: "code", account: null })),
+      http.post(`${BASE}/account/login`, () => HttpResponse.json({ step: "code", account: null, delivery: "app" })),
       http.post(`${BASE}/account/login/code`, () => HttpResponse.json({ step: "password", account: null })),
       http.post(`${BASE}/account/login/password`, () => HttpResponse.json({ step: "done", account: ACCOUNT })),
     );
     const api = createTelegramApi(BASE);
 
-    expect(await api.loginStart("+48123456789", signal())).toEqual({ step: "code" });
+    expect(await api.loginStart("+48123456789", signal())).toEqual({ step: "code", delivery: "app" });
     expect(await api.loginCode("12345", signal())).toEqual({ step: "password" });
     const done = await api.loginPassword("pw", signal());
 

@@ -65,10 +65,21 @@ class AccountView:
     reason: str | None = None
 
 
+# Where Telegram said the code went. `app` is a message from "Telegram" in an app already logged in to the account — and
+# the one that fails silently when nobody is looking at that account.
+DELIVERIES = ("app", "sms", "call", "other")
+
+
 class LoginClient(Protocol):
     """One login with Telegram, as the manager drives it. A protocol because the real one needs a phone."""
 
-    async def send_code(self, phone: str) -> None: ...
+    async def send_code(self, phone: str) -> str:
+        """Asks for a code and returns where Telegram sent it (one of `DELIVERIES`)."""
+        ...
+
+    async def resend_code(self) -> str:
+        """Asks Telegram for the next way of delivering the same code (app → SMS → call), and says which."""
+        ...
 
     async def sign_in_code(self, code: str) -> Identity | None:
         """The identity, or `None` when the account has a password and wants it next."""
@@ -117,18 +128,29 @@ class LoginManager:
         self._client: LoginClient | None = None
         self._deadline: datetime | None = None
 
-    async def begin(self, phone: str, *, api_id: int, api_hash: str) -> None:
+    async def begin(self, phone: str, *, api_id: int, api_hash: str) -> str:
         number = valid_phone(phone)
         async with self._lock:
             await self._drop()
             client = self._factory(api_id, api_hash)
             try:
-                await client.send_code(number)
+                delivery = await client.send_code(number)
             except BaseException:
                 await client.disconnect()
                 raise
             self._client = client
             self._deadline = self._clock() + LOGIN_LIFETIME
+            log.info("a login code was sent by %s", delivery)
+            return delivery
+
+    async def resend(self) -> str:
+        """The same login, asked again for another way of delivering the code. Extends nothing: the ten minutes run
+        from the number."""
+        async with self._lock:
+            client = await self._live()
+            delivery = await client.resend_code()
+            log.info("a login code was sent again by %s", delivery)
+            return delivery
 
     async def code(self, code: str) -> Identity | None:
         async with self._lock:
@@ -259,7 +281,7 @@ class TelethonLoginClient:
         self._phone = ""
         self._hash = ""
 
-    async def send_code(self, phone: str) -> None:
+    async def send_code(self, phone: str) -> str:
         from telethon import TelegramClient
         from telethon.errors import RPCError
         from telethon.sessions import StringSession
@@ -275,6 +297,23 @@ class TelethonLoginClient:
             raise LoginRefused("Telegram could not be reached — try again in a moment") from err
         self._phone = phone
         self._hash = sent.phone_code_hash
+        return _delivery_of(sent)
+
+    async def resend_code(self) -> str:
+        from telethon.errors import RPCError
+
+        assert self._client is not None
+        try:
+            # A second request for a phone Telethon already holds a hash for is a resend: Telegram moves to the next
+            # delivery it offers.
+            sent = await self._client.send_code_request(self._phone)
+        except RPCError as err:
+            raise LoginRefused(_telethon_words(err)) from err
+        except (OSError, TimeoutError) as err:
+            raise LoginRefused("Telegram could not be reached — try again in a moment") from err
+        if sent.phone_code_hash:
+            self._hash = sent.phone_code_hash
+        return _delivery_of(sent)
 
     async def sign_in_code(self, code: str) -> Identity | None:
         from telethon.errors import RPCError, SessionPasswordNeededError
@@ -315,6 +354,19 @@ class TelethonLoginClient:
             await self._client.disconnect()  # type: ignore[misc]
 
 
+def _delivery_of(sent) -> str:
+    """Where Telegram says it sent the code. By the class of the answer, which is Telegram's vocabulary; anything this
+    does not know is `other` rather than a guess."""
+    kind = type(sent.type).__name__
+    if kind == "SentCodeTypeApp":
+        return "app"
+    if kind == "SentCodeTypeSms":
+        return "sms"
+    if kind in ("SentCodeTypeCall", "SentCodeTypeFlashCall", "SentCodeTypeMissedCall"):
+        return "call"
+    return "other"
+
+
 def _telethon_words(err: Exception) -> str:
     """What Telegram said, by its class — never `str(err)`, which is free to quote what was sent. The few the
     operator can act on get a sentence."""
@@ -325,6 +377,7 @@ def _telethon_words(err: Exception) -> str:
         "PasswordHashInvalidError": "the password is wrong",
         "PhoneNumberInvalidError": "Telegram does not accept that number",
         "ApiIdInvalidError": "Telegram does not accept this application id and hash",
+        "SendCodeUnavailableError": "Telegram has no other way of sending the code — wait a few minutes and start again",
     }
     if name in known:
         return known[name]

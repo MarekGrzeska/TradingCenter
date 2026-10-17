@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { botUsernameProblem, keyProblem } from "./present";
 import { QrCode } from "./QrCode";
-import type { Bot, Destination, StartLink, TelegramApi } from "./telegramApi";
+import type { Bot, CodeDelivery, Destination, StartLink, TelegramApi } from "./telegramApi";
 
 /**
  * The questions this tab asks. A refusal from the door — a wrong code, an assignment still pointing at what is being removed,
@@ -32,6 +32,14 @@ function Field({
 
 type Step = "phone" | "code" | "password";
 
+/** Said, because "a code was sent" is no help to somebody looking in the wrong place. */
+const DELIVERY_TEXT: Record<CodeDelivery, string> = {
+  app: "Kod poszedł do aplikacji Telegram zalogowanej na tym koncie — szukaj wiadomości od „Telegram” (czat serwisowy).",
+  sms: "Kod poszedł SMS-em na ten numer.",
+  call: "Telegram zadzwoni na ten numer i poda kod.",
+  other: "Telegram wysłał kod inną drogą niż aplikacja czy SMS.",
+};
+
 /** Telegram's steps in Telegram's order. The number is the only thing remembered between them, and only to say which. */
 export function LoginDialog({
   api,
@@ -46,6 +54,9 @@ export function LoginDialog({
   const [phone, setPhone] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
+  const [delivery, setDelivery] = useState<CodeDelivery | null>(null);
+  const [resending, setResending] = useState(false);
+  const [resendFailure, setResendFailure] = useState<string | null>(null);
 
   const labels: Record<Step, { title: string; confirm: string; busy: string; disabled: boolean }> = {
     phone: { title: "Zaloguj konto-właściciela", confirm: "Wyślij kod", busy: "Pytam Telegram…", disabled: phone.trim() === "" },
@@ -66,7 +77,21 @@ export function LoginDialog({
       onClose();
       return;
     }
+    if (result.step === "code") setDelivery(result.delivery);
     setStep(result.step);
+  }
+
+  async function resend(): Promise<void> {
+    setResendFailure(null);
+    setResending(true);
+    try {
+      const result = await api.loginResend(signal());
+      if (result.step === "code") setDelivery(result.delivery);
+    } catch (cause: unknown) {
+      setResendFailure(cause instanceof Error ? cause.message : "nie udało się poprosić o kod jeszcze raz");
+    } finally {
+      setResending(false);
+    }
   }
 
   return (
@@ -101,16 +126,34 @@ export function LoginDialog({
           </>
         )}
         {step === "code" && (
-          <Field label="Kod, który przyszedł do Telegrama" hint="Zły kod nie kończy logowania — można podać kolejny.">
-            <input
-              className={INPUT}
-              value={code}
-              autoFocus
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              onChange={(e) => setCode(e.target.value)}
-            />
-          </Field>
+          <>
+            {delivery !== null && <p className="text-xs text-ink-secondary">{DELIVERY_TEXT[delivery]}</p>}
+            <Field label="Kod, który przyszedł do Telegrama" hint="Zły kod nie kończy logowania — można podać kolejny.">
+              <input
+                className={INPUT}
+                value={code}
+                autoFocus
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                onChange={(e) => setCode(e.target.value)}
+              />
+            </Field>
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                className="self-start text-xs text-primary underline disabled:opacity-40"
+                disabled={resending}
+                onClick={() => void resend()}
+              >
+                {resending ? "Proszę o kod…" : "Nie dostałem kodu — wyślij inaczej"}
+              </button>
+              {resendFailure !== null && <p className="text-xs text-critical">{resendFailure}</p>}
+              <p className="text-xs text-ink-faint">
+                Telegram próbuje po kolei: aplikacja, SMS, telefon. Poczekaj chwilę między próbami — zbyt wiele próśb o kod
+                zostaje ograniczone.
+              </p>
+            </div>
+          </>
         )}
         {step === "password" && (
           <Field label="Hasło dwuetapowe tego konta">

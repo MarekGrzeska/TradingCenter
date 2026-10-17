@@ -186,6 +186,11 @@ class LoginStepOut(BaseModel):
 
     step: Literal["code", "password", "done"]
     account: AccountOut | None = None
+    delivery: Literal["app", "sms", "call", "other"] | None = Field(
+        default=None,
+        description="where Telegram sent the code, present with step 'code': 'app' is a message from Telegram in an "
+        "app already logged in to the account, 'sms' a text to the number, 'call' a phone call",
+    )
 
 
 class LogoutOut(BaseModel):

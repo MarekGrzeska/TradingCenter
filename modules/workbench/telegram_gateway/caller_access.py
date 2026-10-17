@@ -35,6 +35,7 @@ REST_PATHS: tuple[str, ...] = (
     "/account",
     "/account/login",
     "/account/login/code",
+    "/account/login/resend",
     "/account/login/password",
     "/destinations",
     "/destinations/{name}",
