@@ -49,6 +49,10 @@ export interface Destination {
   bot: string;
   state: DestinationState;
   receives: boolean;
+  /** Who it is on Telegram, as Telegram reported it when the chat was bound; null until known. */
+  username: string | null;
+  title: string | null;
+  kind: string | null;
 }
 
 export interface StartLink {
@@ -80,7 +84,7 @@ export interface Assignment {
 export type CodeDelivery = Schemas["LoginStepOut"]["delivery"] extends infer D ? Exclude<D, null | undefined> : never;
 
 export type LoginStep =
-  | { step: "code"; delivery: CodeDelivery | null }
+  | { step: "code"; delivery: CodeDelivery | null; canResend: boolean }
   | { step: "password" }
   | { step: "done"; account: Account };
 
@@ -96,7 +100,15 @@ function mapAccount(raw: Schemas["AccountOut"]): Account {
 }
 
 function mapDestination(raw: Schemas["DestinationOut"]): Destination {
-  return { name: raw.name, bot: raw.bot, state: raw.state, receives: raw.receives };
+  return {
+    name: raw.name,
+    bot: raw.bot,
+    state: raw.state,
+    receives: raw.receives,
+    username: raw.username ?? null,
+    title: raw.title ?? null,
+    kind: raw.kind ?? null,
+  };
 }
 
 function mapBot(raw: Schemas["BotOut"]): Bot {
@@ -136,7 +148,7 @@ export function createTelegramApi(httpBase: string, identity: Identity = noIdent
 
   function step(raw: Schemas["LoginStepOut"]): LoginStep {
     if (raw.step === "done" && raw.account) return { step: "done", account: mapAccount(raw.account) };
-    return raw.step === "password" ? { step: "password" } : { step: "code", delivery: raw.delivery ?? null };
+    return raw.step === "password" ? { step: "password" } : { step: "code", delivery: raw.delivery ?? null, canResend: raw.can_resend ?? true };
   }
 
   return {

@@ -38,10 +38,13 @@ type Step = "phone" | "code" | "password";
 const PHONE_KEY = "tc.telegram.ownerPhone";
 
 function rememberedPhone(): string {
+  // The deployment's default number comes from a build variable (`TELEGRAM_OWNER_PHONE` in the GitHub environment), so it
+  // is a setting of the server rather than a line in git — though, like everything in a front end, visible in the bundle.
+  const configured = (import.meta.env.VITE_TELEGRAM_OWNER_PHONE as string | undefined)?.trim() ?? "";
   try {
-    return safeLocalStorage()?.getItem(PHONE_KEY) ?? "";
+    return safeLocalStorage()?.getItem(PHONE_KEY) || configured;
   } catch {
-    return "";
+    return configured;
   }
 }
 
@@ -76,6 +79,7 @@ export function LoginDialog({
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [delivery, setDelivery] = useState<CodeDelivery | null>(null);
+  const [canResend, setCanResend] = useState(true);
   const [resending, setResending] = useState(false);
   const [resendFailure, setResendFailure] = useState<string | null>(null);
 
@@ -100,7 +104,10 @@ export function LoginDialog({
       onClose();
       return;
     }
-    if (result.step === "code") setDelivery(result.delivery);
+    if (result.step === "code") {
+      setDelivery(result.delivery);
+      setCanResend(result.canResend);
+    }
     setStep(result.step);
   }
 
@@ -109,7 +116,10 @@ export function LoginDialog({
     setResending(true);
     try {
       const result = await api.loginResend(signal());
-      if (result.step === "code") setDelivery(result.delivery);
+      if (result.step === "code") {
+        setDelivery(result.delivery);
+        setCanResend(result.canResend);
+      }
     } catch (cause: unknown) {
       setResendFailure(cause instanceof Error ? cause.message : "nie udało się poprosić o kod jeszcze raz");
     } finally {
@@ -162,19 +172,29 @@ export function LoginDialog({
               />
             </Field>
             <div className="flex flex-col gap-1">
-              <button
-                type="button"
-                className="self-start text-xs text-primary underline disabled:opacity-40"
-                disabled={resending}
-                onClick={() => void resend()}
-              >
-                {resending ? "Proszę o kod…" : "Nie dostałem kodu — wyślij inaczej"}
-              </button>
-              {resendFailure !== null && <p className="text-xs text-critical">{resendFailure}</p>}
-              <p className="text-xs text-ink-faint">
-                Telegram próbuje po kolei: aplikacja, SMS, telefon. Poczekaj chwilę między próbami — zbyt wiele próśb o kod
-                zostaje ograniczone.
-              </p>
+              {canResend ? (
+                <>
+                  <button
+                    type="button"
+                    className="self-start text-xs text-primary underline disabled:opacity-40"
+                    disabled={resending}
+                    onClick={() => void resend()}
+                  >
+                    {resending ? "Proszę o kod…" : "Nie dostałem kodu — wyślij inaczej"}
+                  </button>
+                  {resendFailure !== null && <p className="text-xs text-critical">{resendFailure}</p>}
+                  <p className="text-xs text-ink-faint">
+                    Telegram próbuje po kolei: aplikacja, SMS, telefon. Poczekaj chwilę między próbami — zbyt wiele próśb o
+                    kod zostaje ograniczone.
+                  </p>
+                </>
+              ) : (
+                <p className="text-xs text-ink-faint">
+                  Telegram nie oferuje dla tego numeru innej drogi — kod jest tylko tam, gdzie napisano wyżej. Jeśli go nie
+                  widzisz, sprawdź aplikację zalogowaną na tym koncie (także wyciszone czaty) i zacznij od numeru za kilka
+                  minut.
+                </p>
+              )}
             </div>
           </>
         )}

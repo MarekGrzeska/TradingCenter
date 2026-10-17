@@ -18,6 +18,7 @@ from .models import (
     Binding,
     Bot,
     BotCredential,
+    ChatIdentity,
     Destination,
     DestinationState,
     Purpose,
@@ -48,6 +49,9 @@ def _destination(row) -> Destination:
         chat_id=row["chat_id"],
         bound_at=row["bound_at"],
         blocked_at=row["blocked_at"],
+        chat_username=row["chat_username"],
+        chat_title=row["chat_title"],
+        chat_kind=row["chat_kind"],
     )
 
 
@@ -131,7 +135,7 @@ async def create_destination(conn: Conn, *, name: str, bot_id: int) -> Destinati
         """
         INSERT INTO destinations (name, bot_id)
         VALUES ($1, $2)
-        RETURNING id, name, bot_id, chat_id, state, bound_at, blocked_at
+        RETURNING id, name, bot_id, chat_id, state, bound_at, blocked_at, chat_username, chat_title, chat_kind
         """,
         name,
         bot_id,
@@ -141,7 +145,7 @@ async def create_destination(conn: Conn, *, name: str, bot_id: int) -> Destinati
 
 async def list_destinations(conn: Conn) -> list[Destination]:
     rows = await conn.fetch(
-        "SELECT id, name, bot_id, chat_id, state, bound_at, blocked_at "
+        "SELECT id, name, bot_id, chat_id, state, bound_at, blocked_at, chat_username, chat_title, chat_kind "
         "FROM destinations ORDER BY created_at, id"
     )
     return [_destination(row) for row in rows]
@@ -149,7 +153,7 @@ async def list_destinations(conn: Conn) -> list[Destination]:
 
 async def destination_by_name(conn: Conn, name: str) -> Destination | None:
     row = await conn.fetchrow(
-        "SELECT id, name, bot_id, chat_id, state, bound_at, blocked_at "
+        "SELECT id, name, bot_id, chat_id, state, bound_at, blocked_at, chat_username, chat_title, chat_kind "
         "FROM destinations WHERE name = $1",
         name,
     )
@@ -213,7 +217,12 @@ async def binding_for(conn: Conn, nonce: str) -> Binding | None:
 
 
 async def bind_destination(
-    conn: Conn, *, nonce: str, chat_id: int, moment: datetime
+    conn: Conn,
+    *,
+    nonce: str,
+    chat_id: int,
+    moment: datetime,
+    who: ChatIdentity | None = None,
 ) -> Destination | None:
     """Spends the secret and turns the intention into an address, or neither.
 
@@ -236,15 +245,38 @@ async def bind_destination(
             conn,
             """
             UPDATE destinations
-            SET chat_id = $2, state = 'ready', bound_at = $3, blocked_at = NULL
+            SET chat_id = $2, state = 'ready', bound_at = $3, blocked_at = NULL,
+                chat_username = $4, chat_title = $5, chat_kind = $6
             WHERE id = $1
-            RETURNING id, name, bot_id, chat_id, state, bound_at, blocked_at
+            RETURNING id, name, bot_id, chat_id, state, bound_at, blocked_at, chat_username, chat_title, chat_kind
             """,
             spent["destination_id"],
             chat_id,
             moment,
+            who.username if who else None,
+            who.title if who else None,
+            who.kind if who else None,
         )
     return _destination(row)
+
+
+async def note_identity(conn: Conn, destination_id: int, who: ChatIdentity) -> None:
+    """Who a destination bound before this was recorded turns out to be — asked of Telegram once, after the fact."""
+    await conn.execute(
+        "UPDATE destinations SET chat_username = $2, chat_title = $3, chat_kind = $4 WHERE id = $1",
+        destination_id,
+        who.username,
+        who.title,
+        who.kind,
+    )
+
+
+async def destinations_without_identity(conn: Conn) -> list[Destination]:
+    rows = await conn.fetch(
+        "SELECT id, name, bot_id, chat_id, state, bound_at, blocked_at, chat_username, chat_title, chat_kind "
+        "FROM destinations WHERE chat_id IS NOT NULL AND chat_kind IS NULL"
+    )
+    return [_destination(row) for row in rows]
 
 
 async def mark_blocked(conn: Conn, destination_id: int, moment: datetime) -> None:
@@ -278,7 +310,9 @@ async def note_offset(conn: Conn, bot_id: int, offset: int) -> None:
 
 # --- purposes and who hears them -----------------------------------------------------------------
 
-_DESTINATION_COLUMNS = "d.id, d.name, d.bot_id, d.chat_id, d.state, d.bound_at, d.blocked_at"
+_DESTINATION_COLUMNS = (
+    "d.id, d.name, d.bot_id, d.chat_id, d.state, d.bound_at, d.blocked_at, d.chat_username, d.chat_title, d.chat_kind"
+)
 
 
 def _purpose(row) -> Purpose:

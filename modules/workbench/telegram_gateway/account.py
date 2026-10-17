@@ -65,6 +65,14 @@ class AccountView:
     reason: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class CodeSent:
+    """Where Telegram sent the code, and whether it would send it another way if asked."""
+
+    delivery: str
+    can_resend: bool
+
+
 # Where Telegram said the code went. `app` is a message from "Telegram" in an app already logged in to the account — and
 # the one that fails silently when nobody is looking at that account.
 DELIVERIES = ("app", "sms", "call", "other")
@@ -73,11 +81,11 @@ DELIVERIES = ("app", "sms", "call", "other")
 class LoginClient(Protocol):
     """One login with Telegram, as the manager drives it. A protocol because the real one needs a phone."""
 
-    async def send_code(self, phone: str) -> str:
+    async def send_code(self, phone: str) -> CodeSent:
         """Asks for a code and returns where Telegram sent it (one of `DELIVERIES`)."""
         ...
 
-    async def resend_code(self) -> str:
+    async def resend_code(self) -> CodeSent:
         """Asks Telegram for the next way of delivering the same code (app → SMS → call), and says which."""
         ...
 
@@ -128,7 +136,7 @@ class LoginManager:
         self._client: LoginClient | None = None
         self._deadline: datetime | None = None
 
-    async def begin(self, phone: str, *, api_id: int, api_hash: str) -> str:
+    async def begin(self, phone: str, *, api_id: int, api_hash: str) -> CodeSent:
         number = valid_phone(phone)
         async with self._lock:
             await self._drop()
@@ -140,16 +148,16 @@ class LoginManager:
                 raise
             self._client = client
             self._deadline = self._clock() + LOGIN_LIFETIME
-            log.info("a login code was sent by %s", delivery)
+            log.info("a login code was sent by %s", delivery.delivery)
             return delivery
 
-    async def resend(self) -> str:
+    async def resend(self) -> CodeSent:
         """The same login, asked again for another way of delivering the code. Extends nothing: the ten minutes run
         from the number."""
         async with self._lock:
             client = await self._live()
             delivery = await client.resend_code()
-            log.info("a login code was sent again by %s", delivery)
+            log.info("a login code was sent again by %s", delivery.delivery)
             return delivery
 
     async def code(self, code: str) -> Identity | None:
@@ -281,7 +289,7 @@ class TelethonLoginClient:
         self._phone = ""
         self._hash = ""
 
-    async def send_code(self, phone: str) -> str:
+    async def send_code(self, phone: str) -> CodeSent:
         from telethon import TelegramClient
         from telethon.errors import RPCError
         from telethon.sessions import StringSession
@@ -297,9 +305,9 @@ class TelethonLoginClient:
             raise LoginRefused("Telegram could not be reached — try again in a moment") from err
         self._phone = phone
         self._hash = sent.phone_code_hash
-        return _delivery_of(sent)
+        return CodeSent(delivery=_delivery_of(sent), can_resend=getattr(sent, "next_type", None) is not None)
 
-    async def resend_code(self) -> str:
+    async def resend_code(self) -> CodeSent:
         from telethon.errors import RPCError
 
         assert self._client is not None
@@ -313,7 +321,7 @@ class TelethonLoginClient:
             raise LoginRefused("Telegram could not be reached — try again in a moment") from err
         if sent.phone_code_hash:
             self._hash = sent.phone_code_hash
-        return _delivery_of(sent)
+        return CodeSent(delivery=_delivery_of(sent), can_resend=getattr(sent, "next_type", None) is not None)
 
     async def sign_in_code(self, code: str) -> Identity | None:
         from telethon.errors import RPCError, SessionPasswordNeededError

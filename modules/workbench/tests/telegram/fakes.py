@@ -17,9 +17,12 @@ class FakeBotApi:
         send: Exception | Delivered | None = None,
         me: dict[str, Any] | Exception | None = None,
         updates: list[list[dict[str, Any]]] | None = None,
+        chat: dict[str, Any] | Exception | None = None,
     ) -> None:
         self._send = send
         self._me = me
+        self._chat = chat
+        self.chats_asked: list[int] = []
         # A list per poll, so a test can script "nothing, then a start command".
         self._updates = list(updates or [])
         self.sent: list[tuple[str, int, str]] = []
@@ -36,6 +39,12 @@ class FakeBotApi:
             raise self._me
         return self._me or {"id": int(token.split(":")[0]), "username": "afakebot", "first_name": "A"}
 
+    async def get_chat(self, token: str, *, chat_id: int) -> dict[str, Any]:
+        self.chats_asked.append(chat_id)
+        if isinstance(self._chat, Exception):
+            raise self._chat
+        return self._chat or {"id": chat_id, "type": "private", "username": "someone", "first_name": "Some", "last_name": "One"}
+
     async def get_updates(
         self, token: str, *, offset: int, timeout: int
     ) -> list[dict[str, Any]]:
@@ -43,13 +52,17 @@ class FakeBotApi:
         return self._updates.pop(0) if self._updates else []
 
 
-def start_update(update_id: int, *, chat_id: int, payload: str) -> dict[str, Any]:
-    """One `/start <payload>` as Telegram delivers it."""
+def start_update(
+    update_id: int, *, chat_id: int, payload: str, username: str | None = None, first_name: str = "Marek"
+) -> dict[str, Any]:
+    """One `/start <payload>` as Telegram delivers it, from a person."""
+    sender = {"id": chat_id, "is_bot": False, "first_name": first_name, **({"username": username} if username else {})}
     return {
         "update_id": update_id,
         "message": {
             "message_id": update_id,
-            "chat": {"id": chat_id, "type": "private"},
+            "from": sender,
+            "chat": {"id": chat_id, "type": "private", "first_name": first_name},
             "text": f"/start {payload}".strip(),
         },
     }
@@ -131,7 +144,9 @@ class FakeLoginClient:
         password: str | None = None,
         send_error: Exception | None = None,
         username: str = "ownerbot_account",
+        can_resend: bool = True,
     ) -> None:
+        self._can_resend = can_resend
         self._code = code
         self._password = password
         self._send_error = send_error
@@ -140,15 +155,19 @@ class FakeLoginClient:
         self.disconnected = False
         self.resends = 0
 
-    async def send_code(self, phone: str) -> str:
+    async def send_code(self, phone: str):
+        from telegram_gateway.account import CodeSent
+
         if self._send_error is not None:
             raise self._send_error
         self.phone = phone
-        return "app"
+        return CodeSent(delivery="app", can_resend=self._can_resend)
 
-    async def resend_code(self) -> str:
+    async def resend_code(self):
+        from telegram_gateway.account import CodeSent
+
         self.resends += 1
-        return "sms"
+        return CodeSent(delivery="sms", can_resend=False)
 
     async def sign_in_code(self, code: str):
         from telegram_gateway.account import Identity

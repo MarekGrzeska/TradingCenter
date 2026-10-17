@@ -124,6 +124,9 @@ class DestinationOut(BaseModel):
     receives: bool
     bound_at: datetime | None = None
     blocked_at: datetime | None = None
+    username: str | None = Field(default=None, description="the @name of who receives, as Telegram reported it")
+    title: str | None = Field(default=None, description="their display name, or the group's title")
+    kind: str | None = Field(default=None, description="private, group, supergroup or channel")
 
     @classmethod
     def of(cls, destination: Destination, bot_username: str) -> DestinationOut:
@@ -134,6 +137,9 @@ class DestinationOut(BaseModel):
             receives=destination.receives,
             bound_at=destination.bound_at,
             blocked_at=destination.blocked_at,
+            username=destination.chat_username,
+            title=destination.chat_title,
+            kind=destination.chat_kind,
         )
 
 
@@ -190,6 +196,11 @@ class LoginStepOut(BaseModel):
         default=None,
         description="where Telegram sent the code, present with step 'code': 'app' is a message from Telegram in an "
         "app already logged in to the account, 'sms' a text to the number, 'call' a phone call",
+    )
+    can_resend: bool | None = Field(
+        default=None,
+        description="whether Telegram offers another way of sending the code; false means the code is only where "
+        "`delivery` says",
     )
 
 

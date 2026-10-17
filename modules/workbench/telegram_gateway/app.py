@@ -8,6 +8,7 @@ lifespan is never run. `app` and `lifespan` below are what `python -m telegram_g
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -19,7 +20,7 @@ from tc_runtime.db import pool as make_pool
 from . import mcp_app, redaction, store
 from . import purposes as purpose_rules
 from .account import LoginManager, TelethonPlatform
-from .binding import Watcher
+from .binding import Watcher, backfill_identities
 from .bot_api import bot_api
 from .caller_access import RECORD, CallerAccess
 from .config import Settings
@@ -90,6 +91,11 @@ async def serving(app: FastAPI, settings: Settings):
         watcher = Watcher(pool, telegram)
         app.state.watcher = watcher
         await watcher.start()
+        # Bounded and best effort: a start that waited on Telegram would make Telegram a condition of starting.
+        try:
+            await asyncio.wait_for(backfill_identities(pool, telegram), timeout=15)
+        except (TimeoutError, OSError) as err:
+            log.info("asking Telegram who the destinations are did not finish: %s", type(err).__name__)
 
         # The tool surface's session manager: a mounted application's lifespan is never run, so the
         # task group has to be started here or every tool call fails.

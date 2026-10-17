@@ -35,7 +35,15 @@ const LOGGED_OUT: GateState = {
 };
 
 const BOT: Bot = { username: "tc_alerts_bot", title: "Alerts", createdHere: true };
-const OPERATOR: Destination = { name: "operator", bot: "tc_alerts_bot", state: "ready", receives: true };
+const OPERATOR: Destination = {
+  name: "operator",
+  bot: "tc_alerts_bot",
+  state: "ready",
+  receives: true,
+  username: "marek",
+  title: "Marek G.",
+  kind: "private",
+};
 
 function purpose(overrides: Partial<Purpose> = {}): Purpose {
   return {
@@ -84,24 +92,37 @@ afterEach(() => {
 });
 
 describe("TelegramView", () => {
-  it("says first, and loudly, what nobody hears — and lists it above what is heard", async () => {
+  it("says at the top what nobody hears and offers to assign it, before any bot is opened", async () => {
     render(<TelegramView api={api()} />);
 
     expect(await screen.findByText(/nie ma odbiorcy — są zbierane, ale nikt o nich nie usłyszy/)).toBeInTheDocument();
-    const rows = (await screen.findAllByRole("combobox", { name: /odbiorca dla (social|youtube)\.post|film/ })).map(
-      (select) => select.getAttribute("aria-label"),
-    );
-    expect(rows.indexOf("odbiorca dla social.post.trump")).toBeLessThan(rows.indexOf("odbiorca dla youtube.film.gold-talk"));
-    expect(screen.getByText(/z przypisania „youtube”/)).toBeInTheDocument();
-    expect(screen.getByText(/nikt nie słucha/)).toBeInTheDocument();
+    expect(screen.getByText("social.post.trump")).toBeInTheDocument();
+    expect(screen.queryByText("youtube")).not.toBeInTheDocument();
   });
 
-  it("assigns a purpose from its own row", async () => {
+  it("shows only the bots until one is opened, and then who receives through it and what is sent there", async () => {
+    render(<TelegramView api={api()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /@tc_alerts_bot/ }));
+
+    expect(screen.getAllByText("@marek · Marek G.").length).toBeGreaterThan(0);
+    expect(screen.getByRole("combobox", { name: "odbiorca dla youtube" })).toBeInTheDocument();
+  });
+
+  it("does not show the assignments of a bot that is not open", async () => {
+    render(<TelegramView api={api()} />);
+
+    await screen.findByRole("button", { name: /@tc_alerts_bot/ });
+
+    expect(screen.queryByRole("combobox", { name: "odbiorca dla youtube" })).not.toBeInTheDocument();
+  });
+
+  it("assigns an unheard purpose from the top", async () => {
     const assign = vi.fn(async () => ({ key: "social.post.trump", destination: "operator", bot: BOT.username, receives: true }));
     render(<TelegramView api={api({ assign })} />);
 
-    const select = await screen.findByRole("combobox", { name: "odbiorca dla social.post.trump" });
-    await userEvent.selectOptions(select, "operator");
+    await userEvent.click(await screen.findByRole("button", { name: "Przypisz…" }));
+    await userEvent.click(screen.getByRole("button", { name: "Przypisz" }));
 
     expect(assign).toHaveBeenCalledWith("social.post.trump", "operator", expect.anything());
   });
@@ -112,6 +133,7 @@ describe("TelegramView", () => {
       .mockRejectedValue(new MarketDataError("refused", "@tc_alerts_bot still receives 'youtube'. Move those assignments first."));
     render(<TelegramView api={api({ removeBot })} />);
 
+    await userEvent.click(await screen.findByRole("button", { name: /@tc_alerts_bot/ }));
     await userEvent.click(await screen.findByRole("button", { name: "Usuń bota @tc_alerts_bot" }));
     await userEvent.click(screen.getByRole("button", { name: "Usuń bota" }));
 
@@ -121,7 +143,7 @@ describe("TelegramView", () => {
   });
 
   it("logs the account in through Telegram's steps, and shows the password field only when asked", async () => {
-    const loginStart = vi.fn(async () => ({ step: "code" as const, delivery: "app" as const }));
+    const loginStart = vi.fn(async () => ({ step: "code" as const, delivery: "app" as const, canResend: true }));
     const loginCode = vi.fn(async () => ({ step: "password" as const }));
     const loginPassword = vi.fn(async () => ({ step: "done" as const, account: LOGGED_IN.account }));
     render(
@@ -143,8 +165,8 @@ describe("TelegramView", () => {
   });
 
   it("says where the code went and asks for another way when it did not come", async () => {
-    const loginStart = vi.fn(async () => ({ step: "code" as const, delivery: "app" as const }));
-    const loginResend = vi.fn(async () => ({ step: "code" as const, delivery: "sms" as const }));
+    const loginStart = vi.fn(async () => ({ step: "code" as const, delivery: "app" as const, canResend: true }));
+    const loginResend = vi.fn(async () => ({ step: "code" as const, delivery: "sms" as const, canResend: false }));
     render(<TelegramView api={api({ state: vi.fn(async () => LOGGED_OUT), loginStart, loginResend })} />);
 
     await userEvent.click(await screen.findByRole("button", { name: "Zaloguj konto…" }));
@@ -158,9 +180,21 @@ describe("TelegramView", () => {
     expect(loginResend).toHaveBeenCalledTimes(1);
   });
 
+  it("does not offer another way when Telegram has none, and says where the code is instead", async () => {
+    const loginStart = vi.fn(async () => ({ step: "code" as const, delivery: "app" as const, canResend: false }));
+    render(<TelegramView api={api({ state: vi.fn(async () => LOGGED_OUT), loginStart })} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Zaloguj konto…" }));
+    await userEvent.type(screen.getByPlaceholderText("+48123456789"), "+48123456789");
+    await userEvent.click(screen.getByRole("button", { name: "Wyślij kod" }));
+
+    expect(await screen.findByText(/nie oferuje dla tego numeru innej drogi/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Nie dostałem kodu/ })).not.toBeInTheDocument();
+  });
+
   it("remembers the number in this browser once a code was sent, so the next login is one click", async () => {
     localStorage.removeItem("tc.telegram.ownerPhone");
-    const loginStart = vi.fn(async () => ({ step: "code" as const, delivery: "app" as const }));
+    const loginStart = vi.fn(async () => ({ step: "code" as const, delivery: "app" as const, canResend: true }));
     const first = render(<TelegramView api={api({ state: vi.fn(async () => LOGGED_OUT), loginStart })} />);
     await userEvent.click(await screen.findByRole("button", { name: "Zaloguj konto…" }));
     await userEvent.type(screen.getByPlaceholderText("+48123456789"), "+48111222333");
@@ -212,7 +246,15 @@ describe("TelegramView", () => {
   });
 
   it("says a start link has expired and issues a new one in one action", async () => {
-    const waiting: Destination = { name: "phone", bot: BOT.username, state: "pending", receives: false };
+    const waiting: Destination = {
+      name: "phone",
+      bot: BOT.username,
+      state: "pending",
+      receives: false,
+      username: null,
+      title: null,
+      kind: null,
+    };
     const offerDestination = vi
       .fn()
       .mockResolvedValueOnce({
@@ -227,7 +269,8 @@ describe("TelegramView", () => {
       });
     render(<TelegramView api={api({ offerDestination })} />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Aktywuj odbiorcę…" }));
+    await userEvent.click(await screen.findByRole("button", { name: /@tc_alerts_bot/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Dodaj odbiorcę…" }));
     await userEvent.click(screen.getByRole("button", { name: "Pokaż link" }));
 
     expect(await screen.findByText(/Odnośnik wygasł/)).toBeInTheDocument();
@@ -240,7 +283,15 @@ describe("TelegramView", () => {
   it("shows a code for the start link and turns the address on when the tap arrives", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-    const waiting: Destination = { name: "phone", bot: BOT.username, state: "pending", receives: false };
+    const waiting: Destination = {
+      name: "phone",
+      bot: BOT.username,
+      state: "pending",
+      receives: false,
+      username: null,
+      title: null,
+      kind: null,
+    };
     const tapped: Destination = { ...waiting, state: "ready", receives: true };
     const destinations = vi.fn<TelegramApi["destinations"]>().mockResolvedValue([OPERATOR, waiting]);
     const offerDestination = vi.fn(async () => ({
@@ -250,7 +301,8 @@ describe("TelegramView", () => {
     }));
     render(<TelegramView api={api({ destinations, offerDestination })} />);
 
-    await user.click(await screen.findByRole("button", { name: "Aktywuj odbiorcę…" }));
+    await user.click(await screen.findByRole("button", { name: /@tc_alerts_bot/ }));
+    await user.click(await screen.findByRole("button", { name: "Dodaj odbiorcę…" }));
     const name = screen.getByLabelText(/Nazwa odbiorcy/);
     await user.clear(name);
     await user.type(name, "phone");
