@@ -311,6 +311,7 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
                     onActivate={(existing) => setDialog({ kind: "activate", bot, existing })}
                     onRemoveDestination={(destination) => setDialog({ kind: "remove-destination", destination })}
                     onAssign={() => setDialog({ kind: "assign", only: mine })}
+                    onSend={(destination, text) => client.sendMessage(destination, text, signal())}
                     onMove={(assignment, destination) =>
                       void act(
                         () => client.assign(assignment.key, destination, signal()),
@@ -469,6 +470,7 @@ function BotDetail({
   onActivate,
   onRemoveDestination,
   onAssign,
+  onSend,
   onMove,
   onRelease,
 }: {
@@ -477,6 +479,7 @@ function BotDetail({
   onActivate(existing?: Destination): void;
   onRemoveDestination(destination: Destination): void;
   onAssign(): void;
+  onSend(destination: string, text: string): Promise<number>;
   onMove(assignment: Assignment, destination: string): void;
   onRelease(assignment: Assignment): void;
 }) {
@@ -547,6 +550,85 @@ function BotDetail({
             </Button>
           </Row>
         ))}
+      </Card>
+
+      <TestMessage destinations={destinations} onSend={onSend} />
+    </div>
+  );
+}
+
+/** Says something through this bot, now, to one of its recipients — to see that the road works end to end without waiting
+ *  for an archive to have news. A real message on a real phone, so it asks for nothing it cannot say plainly. */
+function TestMessage({
+  destinations,
+  onSend,
+}: {
+  destinations: Destination[];
+  onSend(destination: string, text: string): Promise<number>;
+}) {
+  const ready = destinations.filter((one) => one.receives);
+  const [chosen, setChosen] = useState("");
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [outcome, setOutcome] = useState<{ ok: boolean; text: string } | null>(null);
+  const target = ready.find((one) => one.name === chosen)?.name ?? ready[0]?.name ?? "";
+
+  async function send(): Promise<void> {
+    setBusy(true);
+    setOutcome(null);
+    try {
+      const id = await onSend(target, text);
+      setOutcome({ ok: true, text: `Wysłane (wiadomość nr ${id} w Telegramie).` });
+      setText("");
+    } catch (cause: unknown) {
+      setOutcome({ ok: false, text: messageOf(cause, "nie udało się wysłać") });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="md:col-span-2">
+      <Card title="Wyślij wiadomość" hint="Do jednego z odbiorców tego bota, od razu — do wypróbowania drogi. Nic nie jest zapisywane.">
+        {ready.length === 0 ? (
+          <Empty>Nikt jeszcze nie odbiera przez tego bota, więc nie ma do kogo.</Empty>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <label className="flex items-center gap-2 text-ink-secondary">
+                Do
+                <select
+                  className={SELECT}
+                  aria-label="odbiorca wiadomości"
+                  value={target}
+                  onChange={(e) => setChosen(e.target.value)}
+                >
+                  {ready.map((one) => (
+                    <option key={one.name} value={one.name}>
+                      {recipientLabel(one)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <textarea
+              className="min-h-20 rounded border border-border bg-sunken px-2 py-1 text-sm text-ink"
+              aria-label="treść wiadomości"
+              placeholder="Treść…"
+              value={text}
+              maxLength={4096}
+              onChange={(e) => setText(e.target.value)}
+            />
+            <div className="flex items-center gap-3">
+              <Button size="xs" tone="primary" disabled={busy || text.trim() === ""} onClick={() => void send()}>
+                {busy ? "Wysyłam…" : "Wyślij"}
+              </Button>
+              {outcome !== null && (
+                <span className={outcome.ok ? "text-xs text-ink-secondary" : "text-xs text-critical"}>{outcome.text}</span>
+              )}
+            </div>
+          </div>
+        )}
       </Card>
     </div>
   );

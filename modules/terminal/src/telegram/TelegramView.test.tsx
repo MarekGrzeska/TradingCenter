@@ -76,6 +76,7 @@ function api(overrides: Partial<TelegramApi> = {}): TelegramApi {
     destinations: vi.fn(async () => [OPERATOR]),
     offerDestination: vi.fn(),
     removeDestination: vi.fn(async () => undefined),
+    sendMessage: vi.fn(async () => 77),
     purposes: vi.fn(async () => [
       purpose(),
       purpose({ name: "social.post.trump", destination: null, assignedBy: null }),
@@ -180,6 +181,29 @@ describe("TelegramView", () => {
 
     expect(await screen.findByText(/Kod poszedł SMS-em/)).toBeInTheDocument();
     expect(loginResend).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends a message through a bot to one of its recipients, and says what Telegram answered", async () => {
+    const sendMessage = vi.fn(async () => 4242);
+    render(<TelegramView api={api({ sendMessage })} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /pokaż odbiorców i przypisania/ }));
+    await userEvent.type(screen.getByRole("textbox", { name: "treść wiadomości" }), "test z terminala");
+    await userEvent.click(screen.getByRole("button", { name: "Wyślij" }));
+
+    expect(await screen.findByText(/Wysłane \(wiadomość nr 4242/)).toBeInTheDocument();
+    expect(sendMessage).toHaveBeenCalledWith("operator", "test z terminala", expect.anything());
+  });
+
+  it("keeps Telegram's refusal beside the message when it cannot be sent", async () => {
+    const sendMessage = vi.fn().mockRejectedValue(new MarketDataError("refused", "'operator' blocked the bot"));
+    render(<TelegramView api={api({ sendMessage })} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /pokaż odbiorców i przypisania/ }));
+    await userEvent.type(screen.getByRole("textbox", { name: "treść wiadomości" }), "halo");
+    await userEvent.click(screen.getByRole("button", { name: "Wyślij" }));
+
+    expect(await screen.findByText(/blocked the bot/)).toBeInTheDocument();
   });
 
   it("does not offer another way when Telegram has none, and says where the code is instead", async () => {

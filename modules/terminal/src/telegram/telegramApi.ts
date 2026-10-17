@@ -148,6 +148,8 @@ export interface TelegramApi {
   destinations(signal: AbortSignal): Promise<Destination[]>;
   offerDestination(name: string, bot: string, signal: AbortSignal): Promise<StartLink>;
   removeDestination(name: string, signal: AbortSignal): Promise<void>;
+  /** One message to a recipient, now — for trying a bot out. Telegram's own id for it comes back; nothing is kept. */
+  sendMessage(destination: string, text: string, signal: AbortSignal): Promise<number>;
   purposes(signal: AbortSignal): Promise<Purpose[]>;
   assignments(signal: AbortSignal): Promise<Assignment[]>;
   assign(key: string, destination: string, signal: AbortSignal): Promise<Assignment>;
@@ -262,6 +264,12 @@ export function createTelegramApi(httpBase: string, identity: Identity = noIdent
 
     async removeDestination(name, signal) {
       await http.send(`${httpBase}/destinations/${segment(name)}`, { signal, method: "DELETE" });
+    },
+
+    async sendMessage(destination, text, signal) {
+      const body: Schemas["SendRequest"] = { destination, text };
+      const raw = await http.json<Schemas["Sent"]>(`${httpBase}/messages`, { signal, method: "POST", body });
+      return raw.message_id;
     },
 
     async purposes(signal) {
