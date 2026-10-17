@@ -19,11 +19,11 @@
 
 ## 3. Producenci
 
-- [ ] 3.1 `social_data/alerts.py`: cel `social.post.<autor>`, zgłoszenie `social.post` przy starcie, `unassigned` bez znacznika, stan mówi „cel bez adresata”
-- [ ] 3.2 `strategy/alerts.py`: to samo z `strategy.setup`
-- [ ] 3.3 `youtube_data/alerts.py`: `youtube.film.<kanał>`, zgłoszenie `youtube.film`; reguły `always`/`threshold`/`never` bez zmian
-- [ ] 3.4 Normalizacja segmentu źródła jako funkcja każdego producenta z osobna (bez wspólnego importu); jeden test na producenta
-- [ ] 3.5 `workbench/config.py`: `alert_destination` znika z ustawień pakietów; `alerts_configured` zastąpione odpowiedzią bramy
+- [x] 3.1 `social_data/alerts.py`: cel `social.post.<autor>`, zgłoszenie `social.post` przy starcie, `unassigned` bez znacznika, stan mówi „cel bez adresata”
+- [x] 3.2 `strategy/alerts.py`: to samo z `strategy.setup`
+- [x] 3.3 `youtube_data/alerts.py`: `youtube.film.<kanał>`, zgłoszenie `youtube.film`; reguły `always`/`threshold`/`never` bez zmian
+- [x] 3.4 Normalizacja segmentu źródła jako funkcja każdego producenta z osobna (bez wspólnego importu); jeden test na producenta
+- [x] 3.5 `workbench/config.py`: `alert_destination` znika z ustawień pakietów; `alerts_configured` zastąpione odpowiedzią bramy
 
 ## 4. Terminal
 

@@ -57,11 +57,6 @@ class Settings(BaseSettings):
     # Waking more often than the bar closes costs one cheap query that finds nothing new.
     evaluation_interval_seconds: int = 60
 
-    # Who is told, by the name the operator bound at the door to Telegram — a package of this same process, so
-    # there is no address to set. Its *absence* is a working configuration: the platform evaluates and records
-    # exactly as before and says nothing.
-    alert_destination: str | None = None
-
     # Whether a platform authenticator stands in front. The module MUST NOT assume the layer in front is
     # doing its job: one wrong line in Terraform would leave both surfaces open.
     require_authenticated_principal: bool = False
@@ -78,12 +73,6 @@ class Settings(BaseSettings):
     @property
     def rest_caller_ids(self) -> frozenset[str]:
         return _identifiers(self.rest_caller_application_ids)
-
-    @property
-    def alerts_configured(self) -> bool:
-        """Whether this deployment can tell the operator anything. Asked at runtime rather than
-        refused at startup: silence is a state this module supports."""
-        return self.alert_destination is not None
 
     @field_validator("database_pool_size")
     @classmethod
@@ -115,7 +104,7 @@ class Settings(BaseSettings):
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()
 
-    @field_validator("database_user", "alert_destination")
+    @field_validator("database_user")
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
         # `DATABASE_USER=` left in a .env is the same intent as the line being absent —

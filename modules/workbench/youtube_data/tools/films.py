@@ -111,7 +111,7 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
                 ctx.settings,
                 ctx.providers,
                 heartbeat=None if heartbeats is None else heartbeats["ingest"],
-                alerts_configured=getattr(app, "alerts", None) is not None,
+                alerts_configured=getattr(getattr(app, "alerts", None), "telling", False),
             )
             channels = await store.list_channels(conn)
             topics = await store.list_topics(conn)

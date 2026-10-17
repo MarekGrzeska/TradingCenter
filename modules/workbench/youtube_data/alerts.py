@@ -15,6 +15,7 @@ the day the gateway comes back."""
 from __future__ import annotations
 
 import logging
+import re
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -32,6 +33,21 @@ MAX_INSTRUMENTS = 6
 # A title, a channel name and an instrument name come from strangers and carry no length of their own.
 LINE_CHARS = 300
 
+PURPOSE = "youtube.film"
+PURPOSE_DESCRIPTION = "A film the model read, by the channel's or topic's alert rule"
+
+
+def slug(text: str) -> str:
+    """A name as one segment of a purpose: lowercase letters, digits, `_` and `-`; the rest becomes a dash."""
+    cleaned = re.sub(r"[^a-z0-9_-]+", "-", text.lower()).strip("-_")[:60]
+    return cleaned or "unknown"
+
+
+def purpose_for(video) -> str:
+    """One purpose for the archive, one segment for the channel: an assignment can move every film or a single channel."""
+    return f"{PURPOSE}.{slug(video.channel_title)}"
+
+
 ARROWS = {"bullish": "▲", "bearish": "▼", "neutral": "▬"}
 
 
@@ -44,20 +60,49 @@ class GatewayUnreachable(Exception):
     """The gateway did not answer at all."""
 
 
+class GatewayUnassigned(Exception):
+    """Nobody receives this purpose yet. Not a failure and never read as "delivered": the film keeps no marker, so it is
+    announced the pass after somebody is assigned - unless the window has let it go as quiet first."""
+
+    def __init__(self, purpose: str) -> None:
+        super().__init__(f"nobody receives {purpose!r}")
+        self.purpose = purpose
+
+
 class Gateway:
-    """The one route this package calls on the door to Telegram. The client is the host's, over the door's application in
-    this process, so its refusals and its caller record read here exactly as they did over HTTP."""
+    """The two routes this package calls on the door to Telegram: send under a purpose, and announce one. The client is
+    the host's, over the door's application in this process, so its refusals and its caller record read here exactly as
+    they did over HTTP."""
 
     def __init__(self, client: httpx.AsyncClient) -> None:
         self._client = client
 
-    async def send(self, *, destination: str, text: str) -> None:
+    async def send(self, *, purpose: str, text: str) -> None:
         try:
-            response = await self._client.post("/messages", json={"destination": destination, "text": text})
+            response = await self._client.post("/messages", json={"purpose": purpose, "text": text})
         except httpx.RequestError as err:
             raise GatewayUnreachable(f"the gateway did not answer: {err}") from err
         if response.is_error:
+            if _nobody_listens(response):
+                raise GatewayUnassigned(purpose)
             raise GatewayRefused(f"the gateway refused: {_detail(response)}")
+
+    async def describe(self, purpose: str, description: str) -> None:
+        """Tells the door this purpose exists, so the terminal lists it before the first event. Best effort."""
+        try:
+            await self._client.put(f"/purposes/{purpose}", json={"description": description})
+        except httpx.RequestError as err:
+            log.info("could not announce the purpose %s: %s", purpose, err)
+
+
+def _nobody_listens(response: httpx.Response) -> bool:
+    """The door's own code for a purpose with no recipient — not a fault, and not to be read as a refusal."""
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    detail = body.get("detail") if isinstance(body, dict) else None
+    return response.status_code == 409 and isinstance(detail, dict) and detail.get("code") == "unassigned"
 
 
 def _detail(response: httpx.Response) -> str:
@@ -115,17 +160,24 @@ class Alerts:
         pool,
         gateway: Gateway,
         *,
-        destination: str,
         min_score: int,
         batch_limit: int,
         window: timedelta,
     ) -> None:
         self._pool = pool
         self._gateway = gateway
-        self._destination = destination
+        # What the door last said: nobody receives these films. `/state` reports it.
+        self.unheard = False
         self._min_score = min_score
         self._limit = batch_limit
         self._window = window
+
+    @property
+    def telling(self) -> bool:
+        return not self.unheard
+
+    async def announce_purposes(self) -> None:
+        await self._gateway.describe(PURPOSE, PURPOSE_DESCRIPTION)
 
     def _wanted(self, item: store.ToAnnounce) -> bool:
         rule = item.video.alert_rule
@@ -143,36 +195,43 @@ class Alerts:
             waiting = await store.analysed_for_alert(conn, limit=self._limit)
 
         sent = 0
+        heard = False
         for item in waiting:
             if not self._wanted(item):
                 async with self._pool.acquire() as conn:
                     await store.set_outcome(conn, item.video.video_id, "quiet")
                 continue
             try:
-                await self._gateway.send(destination=self._destination, text=message(item))
+                await self._gateway.send(purpose=purpose_for(item.video), text=message(item))
+            except GatewayUnassigned as err:
+                self.unheard = True
+                log.info("film %s waits: %s", item.video.video_id, err)
+                continue
             except (GatewayRefused, GatewayUnreachable) as err:
                 # No marker, so the next pass tries again. Named at warning rather than swallowed: a gateway refusing
                 # everything is a silence the operator has to be able to find.
                 log.warning("could not announce %s: %s", item.video.video_id, err)
                 continue
+            heard = True
             async with self._pool.acquire() as conn:
                 await store.set_outcome(conn, item.video.video_id, "notified", at=datetime.now(UTC))
             sent += 1
+        if heard:
+            self.unheard = False
         return sent
 
 
 def build(pool, settings: Settings, gateway: httpx.AsyncClient | None) -> Alerts | None:
     """The alerting this deployment is configured for, or `None`.
 
-    `None` is a supported state, and the reason it is a return value rather than a refusal: without an adresat the package
-    discovers, reads and says nothing, which `/state` reports rather than leaving anybody to guess at."""
-    if settings.alert_destination is None or gateway is None:
-        log.info("no telegram destination is configured — films will be read and nobody told")
+    `None` only where there is no door to Telegram at all. With a door, who hears what is the operator's to assign, and a
+    purpose nobody hears is reported by `/state` rather than refused at start."""
+    if gateway is None:
+        log.info("no door to telegram — films will be read and nobody told")
         return None
     return Alerts(
         pool,
         Gateway(gateway),
-        destination=settings.alert_destination,
         min_score=settings.alert_min_impact_score,
         batch_limit=settings.announce_batch_limit,
         window=timedelta(hours=settings.alert_window_hours),

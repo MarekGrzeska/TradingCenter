@@ -35,23 +35,49 @@ class GatewayUnreachable(Exception):
     """The gateway did not answer at all."""
 
 
+class GatewayUnassigned(Exception):
+    """Nobody receives this purpose yet. Not a failure and never read as "delivered": the decision stays unmarked, so
+    the next change after the operator assigns it is announced."""
+
+    def __init__(self, purpose: str) -> None:
+        super().__init__(f"nobody receives {purpose!r}")
+        self.purpose = purpose
+
+
 
 class Gateway:
-    """The one route this module calls on telegram-gateway. Sending is all it does there — this
-    platform decides and never touches an account, and it does not manage the gateway either."""
+    """The two routes this package calls on the door to Telegram: send under a purpose, and announce one. Sending is
+    all it does there — this platform decides and never touches an account, and it does not manage the door either."""
 
     def __init__(self, client: httpx.AsyncClient) -> None:
         self._client = client
 
-    async def send(self, *, destination: str, text: str) -> None:
+    async def send(self, *, purpose: str, text: str) -> None:
         try:
-            response = await self._client.post(
-                "/messages", json={"destination": destination, "text": text}
-            )
+            response = await self._client.post("/messages", json={"purpose": purpose, "text": text})
         except httpx.RequestError as err:
             raise GatewayUnreachable(f"the gateway did not answer: {err}") from err
         if response.is_error:
+            if _nobody_listens(response):
+                raise GatewayUnassigned(purpose)
             raise GatewayRefused(f"the gateway refused: {_detail(response)}")
+
+    async def describe(self, purpose: str, description: str) -> None:
+        """Tells the door this purpose exists, so the terminal lists it before the first event. Best effort."""
+        try:
+            await self._client.put(f"/purposes/{purpose}", json={"description": description})
+        except httpx.RequestError as err:
+            log.info("could not announce the purpose %s: %s", purpose, err)
+
+
+def _nobody_listens(response: httpx.Response) -> bool:
+    """The door's own code for a purpose with no recipient — not a fault, and not to be read as a refusal."""
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    detail = body.get("detail") if isinstance(body, dict) else None
+    return response.status_code == 409 and isinstance(detail, dict) and detail.get("code") == "unassigned"
 
 
 def _detail(response: httpx.Response) -> str:
@@ -65,6 +91,10 @@ def _detail(response: httpx.Response) -> str:
     if isinstance(detail, dict):
         return str(detail.get("detail") or detail)
     return str(detail or body)
+
+
+PURPOSE = "strategy.setup"
+PURPOSE_DESCRIPTION = "A strategy decision that names a trade, once per change of setup"
 
 
 def is_new_setup(decision: Decision, previous: RecordedDecision | None) -> bool:
@@ -105,12 +135,19 @@ def message(strategy_id: str, symbol: str, decision: Decision) -> str:
 
 
 class Alerts:
-    """What the loop calls when a pass has found something. Holds no state: what is already said is
-    a column on the decision, not something this object remembers."""
+    """What the loop calls when a pass has found something. Holds no state about what is said: that is a column on
+    the decision. The one thing it remembers is whether the door last said nobody receives it."""
 
-    def __init__(self, gateway: Gateway, *, destination: str) -> None:
+    def __init__(self, gateway: Gateway) -> None:
         self._gateway = gateway
-        self._destination = destination
+        self.unheard = False
+
+    @property
+    def telling(self) -> bool:
+        return not self.unheard
+
+    async def announce_purposes(self) -> None:
+        await self._gateway.describe(PURPOSE, PURPOSE_DESCRIPTION)
 
     async def announce(
         self, pool, *, strategy_id: str, symbol: str, decision: Decision, decision_id: int
@@ -124,13 +161,15 @@ class Alerts:
         from . import store  # local: `store` imports nothing of this, and this keeps it that way
 
         try:
-            await self._gateway.send(
-                destination=self._destination,
-                text=message(strategy_id, symbol, decision),
-            )
+            await self._gateway.send(purpose=PURPOSE, text=message(strategy_id, symbol, decision))
+        except GatewayUnassigned as err:
+            self.unheard = True
+            log.info("%s on %s waits: %s", strategy_id, symbol, err)
+            return False
         except (GatewayRefused, GatewayUnreachable) as err:
             log.warning("could not announce %s on %s: %s", strategy_id, symbol, err)
             return False
+        self.unheard = False
         async with pool.acquire() as conn:
             await store.mark_decision_notified(conn, decision_id, at=datetime.now(UTC))
         return True
@@ -139,10 +178,9 @@ class Alerts:
 def build(settings, gateway: httpx.AsyncClient | None) -> Alerts | None:
     """The alerting this deployment is configured for, or `None`.
 
-    `None` is a supported state: without a destination the platform evaluates and records exactly as it
-    did, and says nothing. That is also the rollback — clear the destination and restart.
-    """
-    if settings.alert_destination is None or gateway is None:
-        log.info("no telegram destination is configured — decisions will be recorded and nobody told")
+    `None` only where there is no door to Telegram at all. With a door, who hears what is the operator's to assign;
+    clearing every assignment is the rollback, and the platform evaluates and records exactly as it did."""
+    if gateway is None:
+        log.info("no door to telegram — decisions will be recorded and nobody told")
         return None
-    return Alerts(Gateway(gateway), destination=settings.alert_destination)
+    return Alerts(Gateway(gateway))

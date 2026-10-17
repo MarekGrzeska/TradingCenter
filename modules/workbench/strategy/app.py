@@ -85,6 +85,8 @@ async def serving(
         # `None` without a gateway, and the platform runs the same either way: deciding is its job,
         # and saying so is something it does when there is somewhere to say it.
         app.state.alerts = alerts.build(settings, telegram)
+        if app.state.alerts is not None:
+            await app.state.alerts.announce_purposes()
 
         # One heartbeat per loop, on the state so `/health` can answer with it and so the metric's
         # callback can read it without awaiting. "evaluate" is what the alert's `loop` dimension says.

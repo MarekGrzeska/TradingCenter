@@ -26,14 +26,14 @@ class RecordingGateway:
         self._fails = fails
         self.sent: list[tuple[str, str]] = []
 
-    async def send(self, *, destination: str, text: str) -> None:
-        self.sent.append((destination, text))
+    async def send(self, *, purpose: str, text: str) -> None:
+        self.sent.append((purpose, text))
         if self._fails is not None:
             raise self._fails
 
 
 def _alerts(gateway) -> Alerts:
-    return Alerts(gateway, destination="operator")  # type: ignore[arg-type]
+    return Alerts(gateway)  # type: ignore[arg-type]
 
 
 async def a_watch(pool, *, strategy_id: str = "baseline_ma_cross", symbol: str = "US100"):
@@ -113,8 +113,8 @@ class TestThroughTheLoop:
         result = await evaluate_once(pool, archive, watch, _alerts(gateway))
 
         assert result.announced is True
-        [(destination, text)] = gateway.sent
-        assert destination == "operator"
+        [(purpose, text)] = gateway.sent
+        assert purpose == "strategy.setup"
         assert "US100" in text and "long" in text
         async with pool.acquire() as conn:
             written = await store.last_decision(conn, watch.strategy_id, watch.symbol)

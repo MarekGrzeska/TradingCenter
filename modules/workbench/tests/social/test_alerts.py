@@ -12,7 +12,14 @@ import httpx
 import pytest
 
 from social_data import alerts, store
-from social_data.alerts import Alerts, GatewayRefused, GatewayUnreachable
+from social_data.alerts import (
+    Alerts,
+    Gateway,
+    GatewayRefused,
+    GatewayUnassigned,
+    GatewayUnreachable,
+    slug,
+)
 from social_data.ingest import Ingest
 
 from .builders import TRUTH_SOCIAL, raw_post
@@ -30,8 +37,8 @@ class RecordingGateway:
         self._fails = fails
         self.sent: list[tuple[str, str]] = []
 
-    async def send(self, *, destination: str, text: str) -> None:
-        self.sent.append((destination, text))
+    async def send(self, *, purpose: str, text: str) -> None:
+        self.sent.append((purpose, text))
         if self._fails is not None:
             raise self._fails
 
@@ -51,7 +58,7 @@ async def _post(pool, external_id: str, *, score: int | None, content: str = "TA
 
 
 def _alerts(pool, gateway, *, min_score: int = 8) -> Alerts:
-    return Alerts(pool, gateway, destination="operator", min_score=min_score)  # type: ignore[arg-type]
+    return Alerts(pool, gateway, min_score=min_score)  # type: ignore[arg-type]
 
 
 async def test_a_post_over_the_threshold_is_announced_once(pool) -> None:
@@ -62,8 +69,8 @@ async def test_a_post_over_the_threshold_is_announced_once(pool) -> None:
     assert await announcing.run(SINCE) == 1
     assert await announcing.run(SINCE) == 0
 
-    [(destination, text)] = gateway.sent
-    assert destination == "operator"
+    [(purpose, text)] = gateway.sent
+    assert purpose == "social.post.realdonaldtrump"
     assert "9/10" in text
     async with pool.acquire() as conn:
         assert await store.post_by_external_id(conn, TRUTH_SOCIAL, "loud") is not None
@@ -113,8 +120,8 @@ async def test_one_post_failing_does_not_stop_the_rest(pool) -> None:
     await _post(pool, "second", score=10)
 
     class FailsTheFirst(RecordingGateway):
-        async def send(self, *, destination: str, text: str) -> None:
-            self.sent.append((destination, text))
+        async def send(self, *, purpose: str, text: str) -> None:
+            self.sent.append((purpose, text))
             if len(self.sent) == 1:
                 raise GatewayUnreachable("no answer")
 
@@ -216,17 +223,12 @@ class TestTheMessageSpeaksPolish:
 
 
 class TestBuild:
-    def test_no_destination_is_a_supported_state(self, pool, settings) -> None:
-        assert alerts.build(pool, settings, httpx.AsyncClient()) is None
+    def test_no_door_to_telegram_is_a_supported_state(self, pool, settings) -> None:
+        """Standalone, with no host to hand the door in: nobody can be told, and the module collects anyway."""
+        assert alerts.build(pool, settings, None) is None
 
-    def test_a_destination_without_the_door_tells_nobody(self, pool, settings) -> None:
-        """Standalone, with no host to hand the door in: the destination alone reaches nothing."""
-        configured = settings.model_copy(update={"alert_destination": "operator"})
-        assert alerts.build(pool, configured, None) is None
-
-    def test_a_destination_and_the_door_are_built(self, pool, settings) -> None:
-        configured = settings.model_copy(update={"alert_destination": "operator"})
-        assert alerts.build(pool, configured, httpx.AsyncClient()) is not None
+    def test_with_the_door_it_is_built_and_there_is_nothing_else_to_configure(self, pool, settings) -> None:
+        assert alerts.build(pool, settings, httpx.AsyncClient()) is not None
 
     async def test_collection_is_untouched_where_there_is_no_gateway(self, pool) -> None:
         """The rollback lever, and a supported state rather than a fault: clear the destination, and the
@@ -261,3 +263,50 @@ class TestConfiguration:
         with pytest.raises(ValueError) as err:
             self._settings(settings, alert_min_impact_score=11)
         assert "ALERT_MIN_IMPACT_SCORE" in str(err.value)
+
+
+class TestPurposes:
+    def test_an_author_is_one_segment_of_the_purpose(self) -> None:
+        assert slug("Donald J. Trump (@realDonaldTrump)") == "donald-j-trump-realdonaldtrump"
+        assert slug("***") == "unknown"
+        assert len(slug("x" * 200)) == 60
+
+    async def test_a_purpose_nobody_hears_leaves_no_marker_and_is_said_by_the_state(self, pool) -> None:
+        post_id = await _post(pool, "loud", score=9)
+        deaf = RecordingGateway(fails=GatewayUnassigned("social.post.realdonaldtrump"))
+        announcing = _alerts(pool, deaf)
+
+        assert await announcing.run(SINCE) == 0
+
+        assert announcing.telling is False
+        async with pool.acquire() as conn:
+            assert await conn.fetchval("SELECT notified_at FROM posts WHERE id = $1", post_id) is None
+
+    async def test_assigning_later_announces_what_waited_and_the_state_recovers(self, pool) -> None:
+        await _post(pool, "loud", score=9)
+        announcing = _alerts(pool, RecordingGateway(fails=GatewayUnassigned("social.post.x")))
+        await announcing.run(SINCE)
+        announcing._gateway = RecordingGateway()  # type: ignore[assignment]
+
+        assert await announcing.run(SINCE) == 1
+        assert announcing.telling is True
+
+
+class TestTheGatewayClient:
+    def _gateway(self, status_code: int, body: dict) -> Gateway:
+        def answer(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(status_code, json=body)
+
+        return Gateway(httpx.AsyncClient(transport=httpx.MockTransport(answer), base_url="http://door"))
+
+    async def test_the_doors_unassigned_code_is_not_a_refusal(self) -> None:
+        gateway = self._gateway(409, {"detail": {"detail": "nobody receives", "code": "unassigned"}})
+
+        with pytest.raises(GatewayUnassigned):
+            await gateway.send(purpose="social.post.x", text="hi")
+
+    async def test_any_other_conflict_is_a_refusal_in_the_doors_words(self) -> None:
+        gateway = self._gateway(409, {"detail": {"detail": "has never been bound", "code": None}})
+
+        with pytest.raises(GatewayRefused, match="never been bound"):
+            await gateway.send(purpose="social.post.x", text="hi")

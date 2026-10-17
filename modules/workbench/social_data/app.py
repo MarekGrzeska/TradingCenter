@@ -75,10 +75,12 @@ async def serving(app: FastAPI, settings: Settings, telegram: httpx.AsyncClient 
         enricher = enrichment.build(pool, settings)
         app.state.enrichment = enricher
 
-        # `None` without a destination, and the module runs anyway: collecting without telling anybody
-        # is a supported state, which `/state` names rather than leaving the screen to guess at.
+        # `None` without a door to Telegram, and the module runs anyway: collecting without telling anybody is a
+        # supported state, which `/state` names rather than leaving the screen to guess at.
         announcer = alerts.build(pool, settings, telegram)
         app.state.alerts = announcer
+        if announcer is not None:
+            await announcer.announce_purposes()
 
         # After the migration and not before it: a pass started earlier would write into a schema
         # it does not know, and a bad write is not undone by a later error response.

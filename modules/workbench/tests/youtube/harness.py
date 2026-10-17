@@ -49,12 +49,11 @@ class Rig:
         )
         self.ingest = Ingest(pool, self.providers, self.settings)
 
-    def announcing_to(self, gateway, *, destination: str = "operator") -> Alerts:
+    def announcing_to(self, gateway) -> Alerts:
         """The loop, now told to announce through `gateway`, which is a recording one rather than Telegram."""
         alerts = Alerts(
             self.pool,
             gateway,
-            destination=destination,
             min_score=self.settings.alert_min_impact_score,
             batch_limit=self.settings.announce_batch_limit,
             window=timedelta(hours=self.settings.alert_window_hours),
