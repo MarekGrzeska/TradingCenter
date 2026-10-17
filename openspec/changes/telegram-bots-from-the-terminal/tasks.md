@@ -1,6 +1,6 @@
 ## 1. Schemat i cele
 
-- [x] 1.1 Migracja `0002`: `purposes`, `assignments` (`key` unikalny, `ON DELETE RESTRICT`); `account_session` dochodzi z grupą 2; zasianie `*` z `ALERT_DESTINATION` przy starcie (`seed_default_assignment`), nie w migracji — migracja nie widzi ustawień procesu; testy `-m db`
+- [x] 1.1 Migracja `0002`: `purposes`, `assignments` (`key` unikalny, `ON DELETE RESTRICT`); `account_session` jest w migracji `0003` (grupa 2); zasianie `*` z `ALERT_DESTINATION` przy starcie (`seed_default_assignment`), nie w migracji — migracja nie widzi ustawień procesu; testy `-m db`
 - [x] 1.2 Walidacja kształtu celu i kandydaci przedrostkowi — testy jednostkowe (segmenty, `market.price` ≠ `market.prices`, `*`)
 - [x] 1.3 `store`: upsert celu przy wysyłce, zgłoszenie z opisem, rozstrzygnięcie jednym zapytaniem, CRUD przypisań, liczba celów bez adresata; `db-cost-check` dla upsertu i rozstrzygnięcia
 - [x] 1.4 `POST /messages` przyjmuje dokładnie jedno z `destination` / `purpose`; odmowa `unassigned` odróżnialna od reszty; odpowiedź nazywa adresata
@@ -10,12 +10,12 @@
 
 ## 2. Konto-właściciel
 
-- [ ] 2.1 `cryptography` w `pyproject.toml`; `TELEGRAM_SESSION_KEY` w `config.py` (walidacja klucza Fernet, pusty = brak); `TELEGRAM_SESSION` przestaje być czytane
-- [ ] 2.2 Logowanie w pamięci: `POST /account/login` (numer), `/account/login/code`, `/account/login/password`; jedno naraz, 10 minut, odmowy słowami Telegrama
-- [ ] 2.3 Zapis zaszyfrowanej sesji, nazwa konta i zamaskowany numer; nieczytelna albo odrzucona sesja jako stan
-- [ ] 2.4 `DELETE /account`: `log_out()` u Telegrama, usunięcie z bazy mimo jego niedostępności, odpowiedź mówiąca, co się nie udało
-- [ ] 2.5 `creator.py` bierze sesję z bazy zamiast z ustawień; `RedactTokens` obejmuje kod, hasło, sesję i klucz — test logu nieudanego logowania
-- [ ] 2.6 `POST /bots/{username}/token` — rotacja przez `/revoke`, `getMe` nowym tokenem przed zapisem; test, że adresat dalej odbiera
+- [x] 2.1 `cryptography` w `pyproject.toml`; `TELEGRAM_SESSION_KEY` w `config.py` (walidacja klucza Fernet, pusty = brak); `TELEGRAM_SESSION` przestaje być czytane
+- [x] 2.2 Logowanie w pamięci: `POST /account/login` (numer), `/account/login/code`, `/account/login/password`; jedno naraz, 10 minut, odmowy słowami Telegrama
+- [x] 2.3 Zapis zaszyfrowanej sesji, nazwa konta i zamaskowany numer; nieczytelna albo odrzucona sesja jako stan
+- [x] 2.4 `DELETE /account`: `log_out()` u Telegrama, usunięcie z bazy mimo jego niedostępności, odpowiedź mówiąca, co się nie udało
+- [x] 2.5 `creator.py` bierze sesję z bazy zamiast z ustawień; `RedactTokens` obejmuje kod, hasło, sesję i klucz — test logu nieudanego logowania
+- [x] 2.6 `POST /bots/{username}/token` — rotacja przez `/revoke`, `getMe` nowym tokenem przed zapisem; test, że adresat dalej odbiera
 
 ## 3. Producenci
 

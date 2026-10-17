@@ -14,8 +14,10 @@ def token_for(telegram_id: int) -> str:
     return f"{telegram_id}:" + "A" * 35
 
 
-async def bot(conn, *, username: str | None = None, created_here: bool = False):
-    telegram_id = next(_ids) * 1000
+async def bot(
+    conn, *, username: str | None = None, created_here: bool = False, telegram_id: int | None = None
+):
+    telegram_id = telegram_id or next(_ids) * 1000
     name = username or f"alerts{telegram_id}bot"
     return await store.add_bot(
         conn,

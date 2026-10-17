@@ -11,7 +11,6 @@ import httpx
 import pytest
 
 from telegram_gateway.bot_api import Delivered
-from telegram_gateway.config import Settings
 from telegram_gateway.errors import RateLimited
 
 from . import builders
@@ -107,13 +106,11 @@ class TestBots:
         # Watched from now rather than from the next restart — binding a destination needs a poll.
         assert app.state.watcher.watching == ["pastedbot"]
 
-    async def test_creating_one_without_an_account_session_names_the_missing_setting(
-        self, api
-    ) -> None:
+    async def test_creating_one_with_no_account_logged_in_says_so(self, api) -> None:
         response = await api.post("/bots/created", json={"title": "Alerts", "username": "abot"})
 
         assert response.status_code == 501
-        assert "TELEGRAM_SESSION" in response.json()["detail"]["detail"]
+        assert "logged in" in response.json()["detail"]["detail"]
 
     async def test_deleting_a_bot_this_gateway_does_not_hold_is_a_refusal_about_the_name(
         self, api
@@ -164,7 +161,15 @@ class TestState:
 
         assert response.status_code == 200
         assert response.json() == {
-            "account_session_configured": False,
+            "account": {
+                "status": "logged_out",
+                "username": None,
+                "phone": None,
+                "reason": None,
+                "session_key_configured": False,
+                "api_credentials_configured": False,
+            },
+            "can_create_bots": False,
             "bots": 0,
             "destinations": 0,
             "destinations_ready": 0,
@@ -172,18 +177,9 @@ class TestState:
             "purposes_unheard": 0,
         }
 
-    async def test_it_reports_the_account_session_when_there_is_one(self, api, app, db) -> None:
-        app.state.settings = Settings(
-            database_url="postgresql://localhost:5432/test?sslmode=require",
-            database_user="test-user",
-            telegram_api_id=1,
-            telegram_api_hash="hash",
-            telegram_session="session",
-            _env_file=None,
-        )
+    async def test_it_counts_the_bots_it_holds(self, api, db) -> None:
         await builders.bot(db)
 
         body = (await api.get("/state")).json()
 
-        assert body["account_session_configured"] is True
         assert body["bots"] == 1

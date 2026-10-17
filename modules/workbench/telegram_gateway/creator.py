@@ -19,7 +19,7 @@ import re
 from dataclasses import dataclass
 from typing import Protocol
 
-from .errors import CreatingBotsUnavailable, CreatorBotUnreadable, TooManyBots
+from .errors import CreatingBotsUnavailable, CreatorBotUnreadable, SessionRejected, TooManyBots
 
 log = logging.getLogger(__name__)
 
@@ -58,6 +58,11 @@ class CreatorBot(Protocol):
         ...
 
     async def delete(self, *, username: str) -> str: ...
+
+    async def revoke(self, *, username: str) -> str:
+        """Asks for a new token for a bot and returns @BotFather's reply, verbatim. The old token stops working
+        the moment he answers — which is the whole of what rotating is."""
+        ...
 
 
 def token_in(reply: str) -> str:
@@ -105,21 +110,6 @@ def guard(*, can_create: bool, held: int, ceiling: int) -> None:
         raise TooManyBots(held=held, ceiling=ceiling)
 
 
-def from_settings(settings) -> CreatorBot | None:
-    """The conversation, or `None` where no account session is configured.
-
-    `None` rather than a raising stub: the absence is a supported state, and the refusal that names
-    the missing settings belongs to `guard`, which every path already passes through.
-    """
-    if not settings.can_create_bots:
-        return None
-    return TelethonCreatorBot(
-        api_id=settings.telegram_api_id,
-        api_hash=settings.telegram_api_hash,
-        session=settings.telegram_session,
-    )
-
-
 class TelethonCreatorBot:
     """The real conversation, over MTProto.
 
@@ -140,6 +130,10 @@ class TelethonCreatorBot:
         client = TelegramClient(StringSession(self._session), self._api_id, self._api_hash)
         await client.connect()
         try:
+            # Before the first word: a session ended from the phone connects fine and fails on the first message,
+            # in a way that reads like a creator bot that stopped answering.
+            if not await client.is_user_authorized():
+                raise SessionRejected()
             reply = ""
             async with client.conversation(CREATOR_BOT, timeout=60) as chat:
                 for line in lines:
@@ -153,6 +147,9 @@ class TelethonCreatorBot:
         # The exchange is three messages and each answer is a prompt for the next; only the last one
         # carries the token, which is why every step's reply is kept but only the final is returned.
         return await self._converse(["/newbot", title, username])
+
+    async def revoke(self, *, username: str) -> str:
+        return await self._converse(["/revoke", f"@{username}"])
 
     async def delete(self, *, username: str) -> str:
         # The creator bot asks for a confirmation phrase it names itself, and it is this one.

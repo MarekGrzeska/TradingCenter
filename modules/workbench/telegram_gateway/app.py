@@ -18,10 +18,12 @@ from tc_runtime.db import pool as make_pool
 
 from . import mcp_app, redaction, store
 from . import purposes as purpose_rules
+from .account import LoginManager, TelethonPlatform
 from .binding import Watcher
 from .bot_api import bot_api
 from .caller_access import RECORD, CallerAccess
 from .config import Settings
+from .routers import account as account_routes
 from .routers import bots, destinations, messages, meta, purposes, state
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
@@ -74,6 +76,10 @@ async def serving(app: FastAPI, settings: Settings):
 
         app.state.pool = pool
         app.state.telegram = telegram
+        # Everything that speaks to Telegram as the owner account, behind one object so a test replaces one thing.
+        platform = TelethonPlatform()
+        app.state.platform = platform
+        app.state.login = LoginManager(platform.login_client)
 
         if settings.seed_default_destination:
             async with pool.acquire() as conn:
@@ -89,13 +95,16 @@ async def serving(app: FastAPI, settings: Settings):
         # task group has to be started here or every tool call fails.
         async with mcp_app.tool_surface_session(app):
             log.info(
-                "telegram-gateway is serving; creating bots is %s",
-                "available" if settings.can_create_bots else "unavailable (no account session)",
+                "telegram-gateway is serving; the owner account logs in from the terminal, and %s",
+                "login is available"
+                if settings.session_key_configured and settings.api_credentials_configured
+                else "login is unavailable (TELEGRAM_API_ID/_HASH or TELEGRAM_SESSION_KEY unset)",
             )
             try:
                 yield
             finally:
                 await watcher.stop()
+                await app.state.login.close()
 
 
 @asynccontextmanager
@@ -119,6 +128,7 @@ def create_app() -> FastAPI:
     app.include_router(bots.router)
     app.include_router(destinations.router)
     app.include_router(purposes.router)
+    app.include_router(account_routes.router)
 
     server, tool_app = mcp_app.build_mcp_app(app)
     app.state.mcp_server = server

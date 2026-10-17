@@ -23,6 +23,9 @@ PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "telegram_gateway"
 # The account session's one door. Everything about MTProto lives behind this module, and `bots.py`
 # is the only caller because creating and deleting are the only things it is for.
 CREATOR_MODULE = "creator"
+# The owner account's login and its stored session. Like the creator, off the sending path: a notification
+# goes out as the bot, and nothing that sends may be able to reach the account.
+ACCOUNT_MODULE = "account"
 
 # The path a notification travels, end to end: both surfaces, the send itself, and the client that
 # puts it on the wire. None of these may know the account session exists.
@@ -81,10 +84,11 @@ def _sources() -> list[Path]:
 def test_the_sending_path_cannot_reach_the_account_session(name: str) -> None:
     path = PACKAGE_ROOT / name
     reached = _own_modules_imported(_tree(path))
-    assert CREATOR_MODULE not in reached, (
-        f"{name} imports {CREATOR_MODULE}. A notification goes out as the bot; the moment the "
-        "sending path can reach the account session, an alert can arrive as the operator."
-    )
+    for forbidden in (CREATOR_MODULE, ACCOUNT_MODULE):
+        assert forbidden not in reached, (
+            f"{name} imports {forbidden}. A notification goes out as the bot; the moment the "
+            "sending path can reach the account session, an alert can arrive as the operator."
+        )
 
 
 @pytest.mark.parametrize("path", _sources(), ids=lambda p: p.name)
@@ -92,20 +96,44 @@ def test_mtproto_lives_in_one_file(path: Path) -> None:
     """The session is a credential to a personal account. One importer is one place to read to know
     everything it is used for."""
     reached = _top_level_packages_imported(_tree(path)) & MTPROTO_PACKAGES
-    if path.name == "creator.py":
+    if path.name in ("creator.py", "account.py"):
         return
     assert not reached, f"{path.name} imports {', '.join(sorted(reached))}"
 
 
-def test_the_account_session_has_one_importer_besides_the_route() -> None:
-    """`bots.py` holds the two acts the session is for, and the route hands it the conversation.
-    Anything else reaching for it is a use nobody asked this gateway to make."""
+def test_the_creator_conversation_has_two_importers() -> None:
+    """`bots.py` holds the acts the session is for, and `account.py` builds the conversation from a stored session.
+    The routes get it from `account`, never from `creator`. Anything else reaching for it is a use nobody asked this
+    gateway to make."""
     importers = {
         path.relative_to(PACKAGE_ROOT).as_posix()
         for path in _sources()
         if path.name != "creator.py" and CREATOR_MODULE in _own_modules_imported(_tree(path))
     }
-    assert importers == {"bots.py", "routers/bots.py"}, importers
+    assert importers == {"bots.py", "account.py"}, importers
+
+
+def test_the_stored_session_has_two_readers() -> None:
+    """The encrypted session is selected by one statement; this is the other half of that rule. Only the account
+    module asks for it, and only the account routes and bot routes reach the account module."""
+    readers = {
+        path.relative_to(PACKAGE_ROOT).as_posix()
+        for path in _sources()
+        if "encrypted_session" in path.read_text(encoding="utf-8") and path.name != "store.py"
+    }
+    assert readers == {"account.py"}, readers
+    importers = {
+        path.relative_to(PACKAGE_ROOT).as_posix()
+        for path in _sources()
+        if path.relative_to(PACKAGE_ROOT).as_posix() != "account.py"
+        and ACCOUNT_MODULE in _own_modules_imported(_tree(path))
+    }
+    assert importers == {
+        "app.py",
+        "routers/account.py",
+        "routers/bots.py",
+        "routers/state.py",
+    }, importers
 
 
 def test_the_creator_bot_is_a_constant_and_not_a_setting() -> None:
@@ -143,7 +171,7 @@ def test_nothing_creates_a_bot_on_its_own_initiative() -> None:
             if (
                 isinstance(node, ast.Call)
                 and isinstance(node.func, ast.Attribute)
-                and node.func.attr in ("create", "destroy")
+                and node.func.attr in ("create", "destroy", "rotate")
                 and isinstance(node.func.value, ast.Name)
                 and node.func.value.id == "bots"
             ):

@@ -49,11 +49,13 @@ class Settings(BaseSettings):
     # budget is 60 — `scripts/tests/test_pool_budget.py` counts every module's number as one.
     database_pool_size: int = 4
 
-    # Creating a bot means talking to Telegram's creator bot, and only a *user account* may. All three
-    # together enable it; absent, the module sends normally and refuses to create — a supported state.
+    # Creating a bot means talking to Telegram's creator bot, and only a *user account* may. The application
+    # credentials (my.telegram.org) come from the environment; the account itself is logged in from the terminal and
+    # its session lives in the database, encrypted with `telegram_session_key`. Absent, the module sends normally
+    # and refuses to log in or create — a supported state, and the one every deployment starts in.
     telegram_api_id: int | None = None
     telegram_api_hash: str | None = None
-    telegram_session: str | None = None
+    telegram_session_key: str | None = Field(default=None, repr=False)
 
     # Telegram's own ceiling on how many bots one account may hold. A setting because Telegram raises it
     # on request, and checking it before speaking costs an attempt that counts against the account.
@@ -83,14 +85,14 @@ class Settings(BaseSettings):
         return _identifiers(self.rest_caller_application_ids)
 
     @property
-    def can_create_bots(self) -> bool:
-        """Whether the account session needed to reach the creator bot is configured. Its absence is a
-        configuration this module supports, so this is a question asked at runtime, not at startup."""
-        return (
-            self.telegram_api_id is not None
-            and bool(self.telegram_api_hash)
-            and bool(self.telegram_session)
-        )
+    def api_credentials_configured(self) -> bool:
+        """Whether Telegram's application id and hash are set — what logging an account in needs before anything
+        is asked of Telegram. Whether an account *is* logged in is the database's to say, at runtime."""
+        return self.telegram_api_id is not None and bool(self.telegram_api_hash)
+
+    @property
+    def session_key_configured(self) -> bool:
+        return self.telegram_session_key is not None
 
     @field_validator("bot_api_base_url")
     @classmethod
@@ -114,35 +116,36 @@ class Settings(BaseSettings):
         return value.strip()
 
     @field_validator(
-        "database_user", "telegram_api_hash", "telegram_session", "seed_default_destination"
+        "database_user", "telegram_api_hash", "telegram_session_key", "seed_default_destination"
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
-        # `TELEGRAM_SESSION=` left in a .env is the same intent as the line being absent, and for
+        # `TELEGRAM_SESSION_KEY=` left in a .env is the same intent as the line being absent, and for
         # DATABASE_USER it is local mode — not a role named "".
         if value is None or not value.strip():
             return None
         return value.strip()
 
+    @field_validator("telegram_session_key")
+    @classmethod
+    def _usable_session_key(cls, value: str | None) -> str | None:
+        """A key that is not a Fernet key would start the process and fail at the first login, in the middle of a
+        conversation with Telegram. Caught here, by name."""
+        if value is not None:
+            from .session_crypto import check_key
+
+            check_key(value)
+        return value
+
     @model_validator(mode="after")
-    def _account_session_is_whole_or_absent(self) -> Settings:
-        """Two of the three is the failure worth naming: it looks configured, refuses at the moment the
-        operator asks for a bot, and the reason is a variable nobody remembers leaving blank."""
-        given = [
-            name
-            for name, value in (
-                ("TELEGRAM_API_ID", self.telegram_api_id),
-                ("TELEGRAM_API_HASH", self.telegram_api_hash),
-                ("TELEGRAM_SESSION", self.telegram_session),
-            )
-            if value
-        ]
-        if given and len(given) < 3:
+    def _application_credentials_are_whole_or_absent(self) -> Settings:
+        """One of the two is the failure worth naming: it looks configured, refuses at the moment the operator
+        logs the account in, and the reason is a variable nobody remembers leaving blank."""
+        if (self.telegram_api_id is None) != (not self.telegram_api_hash):
             raise ValueError(
-                "TELEGRAM_API_ID, TELEGRAM_API_HASH and TELEGRAM_SESSION must be given "
-                f"together or not at all — only {given} were set, which reaches nothing. "
-                "All three absent is a supported configuration: the module sends, and "
-                "refuses to create bots."
+                "TELEGRAM_API_ID and TELEGRAM_API_HASH must be given together or not at all — only one was set, "
+                "which reaches nothing. Both absent is a supported configuration: the module sends, and refuses "
+                "to log an account in or create bots."
             )
         return self
 

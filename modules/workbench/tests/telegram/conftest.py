@@ -18,6 +18,7 @@ from .fakes import FakeBotApi
 # Emptied between tests so one test's rows are never another's premise. TRUNCATE rather than
 # re-migrating, and named in full rather than left to CASCADE, so the statement says what it empties.
 TABLES: tuple[str, ...] = (
+    "account_session",
     "assignments",
     "purposes",
     "update_offsets",
