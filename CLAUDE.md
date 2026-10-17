@@ -22,7 +22,7 @@ to need something a package cannot give it, the change is wrong, not the rule.
 | Where | What |
 |---|---|
 | `modules/capital-gateway` | capital.com: trading, deep history, live stream. Demo only, and the only door to the provider. |
-| `modules/workbench` | one process, nine packages that never import each other: the conversation (`agent`), the teams (`teams`, `teams_tools`), three archives under `/market`, `/polymarket`, `/social`, the strategy platform under `/strategy` (decides, **never touches an account**), the one door to Telegram under `/telegram`, and the YouTube archive under `/youtube` — **mounted only when `YOUTUBE_DATABASE_URL` is set**. Seven schemas (eight with YouTube), two OpenAI keys. What each package may write: `modules/workbench/README.md`. Every package's tools reach the conversation as functions, not over MCP. |
+| `modules/workbench` | one process, eight packages that never import each other: the conversation (`agent`), the teams (`teams`, `teams_tools`), three archives under `/market`, `/polymarket`, `/social`, the one door to Telegram under `/telegram`, and the YouTube archive under `/youtube` — **mounted only when `YOUTUBE_DATABASE_URL` is set**. Six schemas (seven with YouTube), two OpenAI keys. What each package may write: `modules/workbench/README.md`. Every package's tools reach the conversation as functions, not over MCP. |
 | `modules/trading-mcp` | MCP tools over the gateway's demo account. Network transport only, one named caller (the workbench). Demo checked against the gateway, not against a setting. |
 | `modules/terminal` | React+TS · the operator's screen. Consumes the others, publishes nothing. Call it the **terminal**, never a "console" or "dashboard". |
 | `modules/pocket` | React+TS · the archive on a phone, and a chat with the workbench beside it. A second consumer, sharing the terminal's generated contract and none of its code. |
@@ -56,7 +56,7 @@ module runs `uv run pytest` · `ruff check .` · `pyright`, the terminal and `po
 | Module | |
 |---|---|
 | `capital-gateway` | `uv run uvicorn capital_gateway.app:app --reload --port 8010` |
-| `workbench` | `uv run alembic -c alembic-<chain>.ini upgrade head` for `market`, `agent`, `teams`, `polymarket`, `social`, `strategy`, `telegram` (the process runs all seven itself), then `uv run uvicorn workbench.app:app --reload --port 8030` |
+| `workbench` | `uv run alembic -c alembic-<chain>.ini upgrade head` for `market`, `agent`, `teams`, `polymarket`, `social`, `telegram` (the process runs all six itself), then `uv run uvicorn workbench.app:app --reload --port 8030` |
 | `trading-mcp` | `uv run python -m trading_mcp` (8060) · plus `uv run python scripts/contract.py check`, its snapshot of the gateway's OpenAPI |
 | `terminal` | `pnpm dev` (5173) |
 | `pocket` | `pnpm dev` (5174) · `--host` is what a phone on the same Wi-Fi needs |
@@ -92,7 +92,7 @@ indicator** is not a contract change: `modules/workbench/market_data/README.md`.
 workbench reads one `.env` and a prefix marks what is doubled on purpose — `AGENT_`/`TEAMS_DATABASE_URL`,
 `_OPENAI_API_KEY` (teams bill on their own line), `_MODELS`, and `AGENT_DEFAULT_MODEL_ID` (no teams
 twin: every agent names its own model) — or what is one package's own (`MARKET_`, `POLYMARKET_`,
-`SOCIAL_`, `STRATEGY_`, `TELEGRAM_`). Everything else is one setting for the process, read only by
+`SOCIAL_`, `TELEGRAM_`). Everything else is one setting for the process, read only by
 `workbench/config.py`; the gateway quartet (`GATEWAY_BASE_URL`, `_STREAM_URL`, `_API_KEY`, `_SCOPE`)
 is the process's. A `.env` from before a fold carries settings read by nothing, or unprefixed ones
 that refuse to start; `dev.py` names each at startup (`RETIRED_SETTINGS`).
@@ -101,8 +101,8 @@ that refuse to start; `dev.py` names each at startup (`RETIRED_SETTINGS`).
 configuration**: the conversation simply has no account tools — while a team whose agents were
 *assigned* those tools refuses to run rather than answer without them. That asymmetry is the trap;
 the symptom is the operator asking about positions and the agent saying it cannot see them.
-`ALERT_DESTINATION` has the same shape: unset, the post archive and the strategy platform collect
-and decide as usual and tell nobody.
+`ALERT_DESTINATION` has the same shape: unset, the post archive collects
+as usual and tells nobody.
 
 **`trading-mcp` will not start on a wish.** `CAPITAL_GATEWAY_API_KEY` must be the gateway's own
 `GATEWAY_API_KEY` — checked on every caller, loopback included — and it asks the gateway whether the

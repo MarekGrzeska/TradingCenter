@@ -40,7 +40,6 @@ const config: EntraConfig = {
     workbench: "api://workbench/access_as_user",
     gateway: "api://gateway/access_as_user",
     polymarket: "api://polymarket/access_as_user",
-    strategy: "api://strategy/access_as_user",
     social: "api://social/access_as_user",
     youtube: "api://youtube/access_as_user",
   },

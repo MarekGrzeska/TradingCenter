@@ -7,7 +7,6 @@ import { InstrumentsView } from "../instruments/InstrumentsView";
 import { NewsView } from "../news/NewsView";
 import { PolymarketView } from "../polymarket/PolymarketView";
 import { SocialView } from "../social/SocialView";
-import { StrategyView } from "../strategy/StrategyView";
 import { TeamsView } from "../teams/TeamsView";
 import { YoutubeView } from "../youtube/YoutubeView";
 
@@ -36,7 +35,6 @@ export const TABS: TabDefinition[] = [
   { id: "social", label: "Social", path: "social", Component: SocialView },
   { id: "news", label: "News", path: "news", Component: NewsView },
   { id: "youtube", label: "YouTube", path: "youtube", Component: YoutubeView },
-  { id: "strategy", label: "Strategie", path: "strategy", Component: StrategyView },
   { id: "accounts", label: "Accounts", path: "accounts", Component: AccountsView },
   {
     id: "agent-settings",

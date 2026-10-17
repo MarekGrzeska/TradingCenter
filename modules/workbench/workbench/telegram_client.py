@@ -1,6 +1,5 @@
-"""The door to Telegram as the post archive and the strategy platform reach it, when all three are packages of one
-process: the gateway's own application through `httpx.ASGITransport`, as this process — the road
-`archive_client.py` opened for the candle archive in stage 3b, taken again in stage 4.
+"""The door to Telegram as the post archive and the YouTube archive reach it, when all of them are packages of one
+process: the gateway's own application through `httpx.ASGITransport`, as this process.
 
 Both callers keep their REST client and the gateway keeps its contract, route record and refusals; what goes away is
 an address, a scope and a token for another App Service's audience.

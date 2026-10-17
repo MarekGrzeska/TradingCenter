@@ -44,7 +44,7 @@ and `BotCredential` are separate types for that reason — the read has no token
 ## Who calls it
 
 Three callers, none of them over a network any more but one. The conversation and the teams call the two
-tools as functions (`workbench/local_tools.py`). The post archive and the strategy platform call
+tools as functions (`workbench/local_tools.py`). The post archive and the YouTube archive call
 `POST /messages` through the gateway's own application, as this process (`workbench/telegram_client.py`),
 and `ALERT_DESTINATION` says who they tell — unset, both collect and decide exactly as before and say
 nothing. The operator's `az` is the one caller from outside: `TELEGRAM_REST_CALLER_APPLICATION_IDS` is its
@@ -118,7 +118,7 @@ address, and `GET /state` says `destinations_ready` is zero. Where the account s
 configured, `POST /bots/created` replaces the first call and @BotFather is never opened by hand.
 
 **Only then the callers.** Set `telegram_alert_destination` in `terraform.tfvars` to the name
-bound above and apply: the workbench gets `ALERT_DESTINATION` and its post archive and strategy platform start
+bound above and apply: the workbench gets `ALERT_DESTINATION` and its post archive and YouTube archive start
 announcing. Setting it earlier is not an outage — the sends are refused, nothing is marked as
 told, and each next pass tries again.
 

@@ -336,7 +336,7 @@ class ToolServerRegistry:
         return cls(
             {
                 # No market server: the candle archive is a package of this process, and its tools reach
-                # a run through `local` like the two archives' and the strategy platform's.
+                # a run through `local` like the two archives'.
                 "trading-mcp": ToolServer(
                     settings, prefix="trading_mcp", can_move_the_account=True
                 ),
@@ -344,8 +344,6 @@ class ToolServerRegistry:
                 # assembly adds their tools to `local` — no address, no identity, no session.
                 # No Telegram server: the door to Telegram is a package of this process since stage 4, and the
                 # assembly adds its two tools to `local` — sending, and seeing who there is to send to.
-                # No strategy server: the platform is a package of this process, and `pending_setups` — the
-                # number a trigger wakes a team on — is announced by a local source the assembly adds.
             },
             {MEMORY_LABEL: MemoryToolSource(pool)},
         )

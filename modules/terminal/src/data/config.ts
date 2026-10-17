@@ -45,10 +45,6 @@ export interface Endpoints {
    *  the archive became a package of that process, and so the workbench's scope. Kept as its own setting,
    *  because the archive is still its own contract. */
   polymarketHttp: string;
-  /** `strategy`, for the strategy platform: the catalogue of entries, which pairs are
-   *  watched, every decision with the reason it carries, and the backtest reports that
-   *  were kept. The workbench's address plus `/strategy`, like the two archives. */
-  strategyHttp: string;
   /** `social-data`, for the posts: the archive of what was said and what a model made of it. The
    *  workbench's address plus `/social`, for the reason the prediction-market archive is. */
   socialHttp: string;
@@ -67,7 +63,6 @@ const DEFAULT_ARCHIVE_WS = "/archive-api/ws";
 const DEFAULT_WORKBENCH_HTTP = "/workbench-api";
 const DEFAULT_GATEWAY_HTTP = "/gateway-api";
 const DEFAULT_POLYMARKET_HTTP = "/polymarket-api";
-const DEFAULT_STRATEGY_HTTP = "/strategy-api";
 const DEFAULT_SOCIAL_HTTP = "/social-api";
 const DEFAULT_YOUTUBE_HTTP = "/youtube-api";
 
@@ -77,7 +72,6 @@ export interface EnvVars {
   VITE_WORKBENCH_HTTP?: string;
   VITE_GATEWAY_HTTP?: string;
   VITE_POLYMARKET_HTTP?: string;
-  VITE_STRATEGY_HTTP?: string;
   VITE_SOCIAL_HTTP?: string;
   VITE_YOUTUBE_HTTP?: string;
   VITE_ENTRA_CLIENT_ID?: string;
@@ -86,7 +80,6 @@ export interface EnvVars {
   VITE_ENTRA_SCOPE_WORKBENCH?: string;
   VITE_ENTRA_SCOPE_GATEWAY?: string;
   VITE_ENTRA_SCOPE_POLYMARKET?: string;
-  VITE_ENTRA_SCOPE_STRATEGY?: string;
   VITE_ENTRA_SCOPE_SOCIAL?: string;
   VITE_ENTRA_SCOPE_YOUTUBE?: string;
 }
@@ -98,7 +91,6 @@ export interface ModuleScopes {
   workbench: string | null;
   gateway: string | null;
   polymarket: string | null;
-  strategy: string | null;
   social: string | null;
   youtube: string | null;
 }
@@ -137,7 +129,6 @@ export function resolveEntra(env: EnvVars = import.meta.env): EntraConfig | null
       workbench: env.VITE_ENTRA_SCOPE_WORKBENCH?.trim() || null,
       gateway: env.VITE_ENTRA_SCOPE_GATEWAY?.trim() || null,
       polymarket: env.VITE_ENTRA_SCOPE_POLYMARKET?.trim() || null,
-      strategy: env.VITE_ENTRA_SCOPE_STRATEGY?.trim() || null,
       social: env.VITE_ENTRA_SCOPE_SOCIAL?.trim() || null,
       youtube: env.VITE_ENTRA_SCOPE_YOUTUBE?.trim() || null,
     },
@@ -154,7 +145,6 @@ export function resolveEndpoints(
     workbenchHttp: resolveHttpBase(env.VITE_WORKBENCH_HTTP || DEFAULT_WORKBENCH_HTTP),
     gatewayHttp: resolveHttpBase(env.VITE_GATEWAY_HTTP || DEFAULT_GATEWAY_HTTP),
     polymarketHttp: resolveHttpBase(env.VITE_POLYMARKET_HTTP || DEFAULT_POLYMARKET_HTTP),
-    strategyHttp: resolveHttpBase(env.VITE_STRATEGY_HTTP || DEFAULT_STRATEGY_HTTP),
     socialHttp: resolveHttpBase(env.VITE_SOCIAL_HTTP || DEFAULT_SOCIAL_HTTP),
     youtubeHttp: resolveHttpBase(env.VITE_YOUTUBE_HTTP || DEFAULT_YOUTUBE_HTTP),
   };

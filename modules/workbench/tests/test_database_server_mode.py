@@ -1,5 +1,5 @@
 """move-from-azure-to-vps — a package reaches its database by the password of its own role when the host is one the
-operator named as private to this machine, and by nothing else off loopback. One file for all eight packages: the
+operator named as private to this machine, and by nothing else off loopback. One file for all seven packages: the
 rule is the same one, written eight times, and a test per copy would drift the way the copies did."""
 
 from __future__ import annotations
@@ -15,12 +15,11 @@ PACKAGES = [
     "teams",
     "polymarket",
     "social",
-    "strategy",
     "market",
     "telegram",
     "youtube",
 ]
-DATABASES = ["agent", "teams", "polymarket", "social", "strategy", "market", "telegram", "youtube"]
+DATABASES = ["agent", "teams", "polymarket", "social", "market", "telegram", "youtube"]
 
 
 def _url(name: str, host: str, credential: str = f"{{name}}:{PASSWORD}") -> str:

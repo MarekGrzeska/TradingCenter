@@ -48,7 +48,7 @@ is a map, not a verdict.
    Cadences live in each package's `config.py` (`*_interval_seconds`) or a module constant. On
    23 September: the market_data ingest supervisor and its reconcile (5 min), the job runner's idle
    poll (5 s per worker), the candle-age gauge refresh (60 s); the Polymarket sampler (60 s) and its
-   catch-up; the social collector (300 s); strategy evaluation (60 s); the teams scheduler clock
+   catch-up; the social collector (300 s); the teams scheduler clock
    (15 s); the Telegram binding watcher. For each: what one tick reads, for how many items, and what
    it does when nothing is new.
 2. **Gauges that compute by querying.** A metric refreshed by a loop or an observable callback runs
@@ -61,8 +61,7 @@ is a map, not a verdict.
    polling while the document is hidden (`refetchIntervalInBackground: false`), but a tab visible on
    a second monitor keeps polling, and a raw `setInterval` never stops by itself. For each poll:
    the route, and the SQL behind the route, classified.
-5. **Reads through tools.** A scheduled team, or the strategy loop through
-   `workbench/archive_client.py`, reads the archive in-process; a tool that summarises "everything"
+5. **Reads through tools.** A scheduled team reads the archive through its tools, in-process; a tool that summarises "everything"
    is C3 multiplied by every run. Check the window is bounded and served by
    `candles_pkey (symbol, resolution, period_start)` — and remember the in-process call still
    serialises JSON, which is the app's CPU rather than the database's.

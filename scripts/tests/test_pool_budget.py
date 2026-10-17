@@ -26,7 +26,6 @@ MODULES = {
     "workbench/market": ("market_data/config.py", "MARKET_DATABASE_POOL_SIZE", 1),
     "workbench/polymarket": ("polymarket_data/config.py", "POLYMARKET_DATABASE_POOL_SIZE", 1),
     "workbench/social": ("social_data/config.py", "SOCIAL_DATABASE_POOL_SIZE", 1),
-    "workbench/strategy": ("strategy/config.py", "STRATEGY_DATABASE_POOL_SIZE", 1),
     "workbench/telegram": ("telegram_gateway/config.py", "TELEGRAM_DATABASE_POOL_SIZE", 1),
     "workbench/youtube": ("youtube_data/config.py", "YOUTUBE_DATABASE_POOL_SIZE", 1),
     "workbench": ("workbench/config.py", "DATABASE_POOL_SIZE", 2),

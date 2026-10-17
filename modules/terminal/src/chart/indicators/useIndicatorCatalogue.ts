@@ -22,7 +22,7 @@ export function useIndicatorCatalogue(
 ): IndicatorCatalogueState {
   const read = useRead({
     // The shape behind this key is the entries, not the document: the cache is shared and keyed by name
-    // alone, so the strategy configurator holding the whole object here broke `entries.map` in the grid.
+    // alone, so a consumer holding the whole object here once broke `entries.map` in the grid.
     key: ["archive", "indicator-catalogue"],
     read: async (signal) => (await source!.indicatorCatalogue(signal)).indicators,
     initial: NONE,

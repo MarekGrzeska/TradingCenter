@@ -140,7 +140,7 @@ SERVICES: tuple[Service, ...] = (
             "conversation and the teams catalogue are one process here — 8050 has belonged "
             "to nobody since `agent-and-teams-one-workbench`, and 8070 to nobody since "
             "`one-process-per-security-boundary` folded polymarket-data into this process, "
-            "8090 since it folded social-data in, 8080 since strategy, 8020 since market-data, "
+            "8090 since it folded social-data in, 8080 since the strategy platform was removed, 8020 since market-data, "
             "8100 since telegram-gateway. "
             "The archive inside it opens a subscription per tracked pair the moment it starts, "
             "so a gateway not listening yet costs it a round of backoff. It calls one tool "
@@ -192,7 +192,6 @@ MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
     ("workbench", "alembic-teams.ini"),
     ("workbench", "alembic-polymarket.ini"),
     ("workbench", "alembic-social.ini"),
-    ("workbench", "alembic-strategy.ini"),
     ("workbench", "alembic-telegram.ini"),
 )
 
@@ -202,7 +201,7 @@ YOUTUBE_CHAIN: tuple[str, str] = ("workbench", "alembic-youtube.ini")
 
 # Created here if missing rather than through docker-entrypoint-initdb.d, which only runs against
 # an empty volume and would never fire for a container from before these modules existed.
-LOGICAL_DATABASES = ("agent", "teams", "polymarket", "social", "strategy", "telegram", "youtube")
+LOGICAL_DATABASES = ("agent", "teams", "polymarket", "social", "telegram", "youtube")
 
 
 
@@ -433,10 +432,19 @@ RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
     ),
     (
         "STRATEGY_MCP_URL",
-        (
-            "the strategy platform is a package of this process since the same change; its tools "
-            "need no address, and STRATEGY_DATABASE_URL is the line this file needs instead"
-        ),
+        "the strategy platform is gone (`remove-strategy-platform`); nothing reads this",
+    ),
+    (
+        "STRATEGY_DATABASE_URL",
+        "the strategy platform is gone (`remove-strategy-platform`); nothing reads this",
+    ),
+    (
+        "STRATEGY_DATABASE_POOL_SIZE",
+        "the strategy platform is gone (`remove-strategy-platform`); nothing reads this",
+    ),
+    (
+        "STRATEGY_EVALUATION_INTERVAL_SECONDS",
+        "the strategy platform is gone (`remove-strategy-platform`); nothing reads this",
     ),
     (
         "MARKET_MCP_URL",
@@ -457,15 +465,15 @@ RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
     (
         "TELEGRAM_GATEWAY_URL",
         (
-            "the post archive and the strategy platform reach the door to Telegram inside this "
+            "the post archive and the YouTube archive reach the door to Telegram inside this "
             "process since the same stage; ALERT_DESTINATION alone says who they tell"
         ),
     ),
     (
         "DATABASE_URL",
         (
-            "the workbench owns seven databases: MARKET_, AGENT_, TEAMS_, POLYMARKET_, SOCIAL_, "
-            "STRATEGY_ and TELEGRAM_DATABASE_URL"
+            "the workbench owns six databases (seven with YouTube): MARKET_, AGENT_, TEAMS_, "
+            "POLYMARKET_, SOCIAL_ and TELEGRAM_DATABASE_URL"
         ),
     ),
     (
@@ -898,10 +906,9 @@ def ready_lines(*, start_front_ends: bool) -> list[str]:
         f"  Workbench docs      http://{LOOPBACK}:8030/docs",
         f"  Polymarket docs     http://{LOOPBACK}:8030/polymarket/docs",
         f"  Social docs         http://{LOOPBACK}:8030/social/docs",
-        f"  Strategy docs       http://{LOOPBACK}:8030/strategy/docs",
         f"  Telegram docs       http://{LOOPBACK}:8030/telegram/docs",
         (
-            "  Database            market_data, agent, teams, polymarket, social, strategy, "
+            "  Database            market_data, agent, teams, polymarket, social, "
             "telegram @ localhost:55432 "
             "(compose.yaml; 'docker compose down' keeps the data)"
         ),

@@ -55,7 +55,6 @@ describe("resolveEndpoints", () => {
         VITE_WORKBENCH_HTTP: "/workbench-api",
         VITE_GATEWAY_HTTP: "/gateway-api",
         VITE_POLYMARKET_HTTP: "/polymarket-api",
-        VITE_STRATEGY_HTTP: "/strategy-api",
         VITE_SOCIAL_HTTP: "/social-api",
         VITE_YOUTUBE_HTTP: "/youtube-api",
       },
@@ -67,7 +66,6 @@ describe("resolveEndpoints", () => {
       workbenchHttp: "/workbench-api",
       gatewayHttp: "/gateway-api",
       polymarketHttp: "/polymarket-api",
-      strategyHttp: "/strategy-api",
       socialHttp: "/social-api",
       youtubeHttp: "/youtube-api",
     });
@@ -81,7 +79,6 @@ describe("resolveEndpoints", () => {
         VITE_WORKBENCH_HTTP: "https://workbench.example.com",
         VITE_GATEWAY_HTTP: "https://gateway.example.com",
         VITE_POLYMARKET_HTTP: "https://polymarket.example.com",
-        VITE_STRATEGY_HTTP: "https://strategy.example.com",
         VITE_SOCIAL_HTTP: "https://social.example.com",
         VITE_YOUTUBE_HTTP: "https://youtube.example.com",
       },
@@ -93,7 +90,6 @@ describe("resolveEndpoints", () => {
       workbenchHttp: "https://workbench.example.com",
       gatewayHttp: "https://gateway.example.com",
       polymarketHttp: "https://polymarket.example.com",
-      strategyHttp: "https://strategy.example.com",
       socialHttp: "https://social.example.com",
       youtubeHttp: "https://youtube.example.com",
     });
@@ -106,7 +102,6 @@ describe("resolveEndpoints", () => {
       workbenchHttp: "/workbench-api",
       gatewayHttp: "/gateway-api",
       polymarketHttp: "/polymarket-api",
-      strategyHttp: "/strategy-api",
       socialHttp: "/social-api",
       youtubeHttp: "/youtube-api",
     });
@@ -161,7 +156,6 @@ describe("resolveEntra", () => {
         workbench: null,
         gateway: null,
         polymarket: null,
-        strategy: null,
         social: null,
         youtube: null,
       },
@@ -175,7 +169,6 @@ describe("resolveEntra", () => {
         VITE_ENTRA_SCOPE_WORKBENCH: "api://agent/access_as_user",
         VITE_ENTRA_SCOPE_GATEWAY: "api://gateway/access_as_user",
         VITE_ENTRA_SCOPE_POLYMARKET: "api://polymarket/access_as_user",
-        VITE_ENTRA_SCOPE_STRATEGY: "api://strategy/access_as_user",
         VITE_ENTRA_SCOPE_SOCIAL: "api://social/access_as_user",
         VITE_ENTRA_SCOPE_YOUTUBE: "api://youtube/access_as_user",
       })?.scopes,
@@ -184,7 +177,6 @@ describe("resolveEntra", () => {
       workbench: "api://agent/access_as_user",
       gateway: "api://gateway/access_as_user",
       polymarket: "api://polymarket/access_as_user",
-      strategy: "api://strategy/access_as_user",
       social: "api://social/access_as_user",
       youtube: "api://youtube/access_as_user",
     });

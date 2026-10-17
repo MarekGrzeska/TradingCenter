@@ -5,7 +5,7 @@
 #   bash .claude/skills/db-cost-check/scripts/explain.sh <database> "<SQL>"
 set -euo pipefail
 
-DB="${1:?database: market_data agent teams polymarket social strategy telegram}"
+DB="${1:?database: market_data agent teams polymarket social telegram}"
 SQL="${2:?the statement, with literals in place of parameters}"
 
 if [ -z "$(docker ps -q -f name=tradingcenter-db)" ]; then

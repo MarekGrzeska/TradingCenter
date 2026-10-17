@@ -111,14 +111,6 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/youtube-api/, "/youtube"),
           configure: quietProxyErrors("workbench", workbench),
         },
-
-        // The strategy platform, served by the workbench under /strategy, same shape and same reason as above.
-        "/strategy-api": {
-          target: workbench,
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/strategy-api/, "/strategy"),
-          configure: quietProxyErrors("workbench", workbench),
-        },
       },
     },
     test: {

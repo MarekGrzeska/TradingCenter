@@ -20,7 +20,6 @@ PACKAGES_UNDER = {
     "/market": "market_data",
     "/polymarket": "polymarket_data",
     "/social": "social_data",
-    "/strategy": "strategy",
     "/telegram": "telegram_gateway",
 }
 HOST_OWN_PATHS = {"/health"}

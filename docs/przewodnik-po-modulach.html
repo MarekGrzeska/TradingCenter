@@ -182,15 +182,15 @@
     <section>
       <div class="eyebrow">01 · Mapa</div>
       <h2>Granica bezpieczeństwa to proces</h2>
-      <p class="intro">Cztery procesy, bo cztery różne reguły zapisu: bramka jest jedynymi drzwiami do dostawcy, trading-mcp jedynym, który rusza rachunek, telegram-gateway jedynym, który sięga do Telegrama, a workbench — wszystkim, co pozostało: rozmowa, zespoły, trzy archiwa i strategia. Dwa ekrany konsumują i nie publikują niczego.</p>
+      <p class="intro">Cztery procesy, bo cztery różne reguły zapisu: bramka jest jedynymi drzwiami do dostawcy, trading-mcp jedynym, który rusza rachunek, telegram-gateway jedynym, który sięga do Telegrama, a workbench — wszystkim, co pozostało: rozmowa, zespoły, trzy archiwa. Dwa ekrany konsumują i nie publikują niczego.</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Proces</th><th class="n">Port</th><th>Co robi</th><th>Kto do niego dzwoni</th></tr></thead>
           <tbody>
             <tr><td><b>capital-gateway</b></td><td class="n">8010</td><td>handel na demo, głęboka historia, jeden strumień na parę; zero bazy</td><td>workbench (archiwum w środku), trading-mcp, terminal (rachunek)</td></tr>
-            <tr><td><b>workbench</b></td><td class="n">8030</td><td>rozmowa, zespoły, archiwa świec (<code>/market</code>), Polymarketu (<code>/polymarket</code>) i wpisów (<code>/social</code>), strategie (<code>/strategy</code>); sześć baz</td><td>terminal, pocket; sam dzwoni do bramki, trading-mcp i telegram-gateway</td></tr>
+            <tr><td><b>workbench</b></td><td class="n">8030</td><td>rozmowa, zespoły, archiwa świec (<code>/market</code>), Polymarketu (<code>/polymarket</code>) i wpisów (<code>/social</code>); sześć baz</td><td>terminal, pocket; sam dzwoni do bramki, trading-mcp i telegram-gateway</td></tr>
             <tr><td><b>trading-mcp</b></td><td class="n">8060</td><td>dwanaście narzędzi nad rachunkiem demo bramki; demo sprawdzane zanim otworzy port</td><td>tylko workbench — jeden wpis na liście</td></tr>
-            <tr><td><b>telegram-gateway</b></td><td class="n">8100</td><td>jedne drzwi do Telegrama: własne boty, własna baza, niczego nie pamięta</td><td>workbench (archiwum wpisów, strategia, model przez narzędzie)</td></tr>
+            <tr><td><b>telegram-gateway</b></td><td class="n">8100</td><td>jedne drzwi do Telegrama: własne boty, własna baza, niczego nie pamięta</td><td>workbench (archiwum wpisów, model przez narzędzie)</td></tr>
             <tr><td><b>terminal</b></td><td class="n">5173</td><td>ekran operatora: dziewięć zakładek, panel czatu obok tras</td><td>nikt — konsument</td></tr>
             <tr><td><b>pocket</b></td><td class="n">5174</td><td>archiwum Polymarketu na telefonie i czat obok</td><td>nikt — drugi konsument</td></tr>
           </tbody>
@@ -211,7 +211,7 @@
 
               <rect x="230" y="120" width="420" height="96" fill="#14306b" stroke="#14306b"></rect>
               <text x="440" y="143" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">workbench · 8030</text>
-              <text x="440" y="162" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#f2c313">agent · teams · market_data · polymarket_data · social_data · strategy</text>
+              <text x="440" y="162" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#f2c313">agent · teams · market_data · polymarket_data · social_data</text>
               <text x="440" y="180" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#d6dcec">sześć baz · jedna tożsamość · jedna rejestracja Easy Auth</text>
               <text x="440" y="200" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#d6dcec">workbench/ składa; żaden pakiet nie importuje innego</text>
 
@@ -289,14 +289,13 @@
         <table>
           <thead><tr><th>Pakiet</th><th>Przedrostek · rygiel</th><th>Co trzyma i czego odmawia</th></tr></thead>
           <tbody>
-            <tr><td><b>workbench/</b></td><td>— · składanie</td><td><code>app.py</code>, <code>assembly.py</code>, <code>config.py</code>, <code>local_tools.py</code> (narzędzia pakietów jako źródło rozmowy), <code>team_tools.py</code> (rejestr FastMCP zespołów jako źródło, principal osoby w <code>carrying()</code>), <code>archive_client.py</code> (klient archiwum świec dla strategii). Jedyny pakiet, który importuje pozostałe.</td></tr>
+            <tr><td><b>workbench/</b></td><td>— · składanie</td><td><code>app.py</code>, <code>assembly.py</code>, <code>config.py</code>, <code>local_tools.py</code> (narzędzia pakietów jako źródło rozmowy), <code>team_tools.py</code> (rejestr FastMCP zespołów jako źródło, principal osoby w <code>carrying()</code>). Jedyny pakiet, który importuje pozostałe.</td></tr>
             <tr><td><b>agent/</b></td><td>REST · 8030</td><td>rozmowa: LangGraph o dwóch węzłach, sufit ośmiu wywołań narzędzi na turę, prompt w tabeli (seed nigdy nie nadpisuje edycji operatora), koszt liczony raz przy zapisie, dwufazowy ślad wywołań ruszających rachunkiem</td></tr>
             <tr><td><b>teams/</b></td><td><code>/teams</code> · 8050</td><td>zespół jako dane: <code>TeamDefinition</code> w JSONB (agenci, krawędzie bez cyklu, każdy agent nazywa model), rewizje <strong>tylko INSERT</strong>, przebiegi ze śladem pisanym na bieżąco, limity kosztu sprawdzane przed każdym wywołaniem modelu, cron po warszawsku, wyzwalacze na zboczu warunku</td></tr>
             <tr><td><b>teams_tools/</b></td><td>funkcje</td><td>narzędzia, którymi model w rozmowie tworzy, rewiduje, uruchamia i harmonogramuje zespoły; <code>revise_team</code> robi read-modify-write z łatki, żeby poprawka jednej roli nie skasowała agenta</td></tr>
             <tr><td><b>market_data/</b></td><td><code>/market</code> · 8020</td><td>archiwum świec, jedenaście narzędzi tylko-odczyt, <code>/market/ws/candles</code> — jedyny WebSocket tego procesu, poza Easy Auth, za jednorazowym biletem; największa tabela w systemie, rygiel czeka do 1500 s</td></tr>
             <tr><td><b>polymarket_data/</b></td><td><code>/polymarket</code> · 8070</td><td>archiwum rynków predykcyjnych, jedyne drzwi do Polymarketu; dwa narzędzia <strong>piszą</strong>, oba tylko <em>dodają</em> obserwację — usunięcie jest REST-only</td></tr>
             <tr><td><b>social_data/</b></td><td><code>/social</code> · 8090</td><td>archiwum wpisów Truth Social i odczyt modelu z nich, stemplowany modelem i nadpisywany, bez wersji i bez backfillu; <strong>nic na żadnej powierzchni nie pisze</strong></td></tr>
-            <tr><td><b>strategy/</b></td><td><code>/strategy</code> · 8080</td><td>katalog strategii: fakty, parametry, jedno czyste <code>evaluate</code> — kod w obrazie albo niezmienna rewizja operatora; czyta archiwum świec <em>w procesie</em> i nigdy nie dotyka rachunku: decyduje, zespoły wykonują</td></tr>
           </tbody>
         </table>
       </div>
@@ -307,7 +306,7 @@
       <h3 class="sub">Archiwum świec: zebrane bije wyliczone</h3>
       <p>Świeca wchodzi żywą subskrypcją (zamknięte świece przez <code>commit_candles()</code>: zapis + pokrycie + odświeżenie pochodnych w jednym wejściu) albo chunkiem zlecenia zbierania; obie drogi liczą się do jednego semafora, bo budżet liczy się na rachunek. <code>coverage_ranges</code> zapisuje, co <em>zweryfikowano</em>, więc „brak świecy” ma dwie odpowiedzi — rynek zamknięty albo nikt nie zbierał. Interwały <code>MINUTE_5…HOUR_4</code> są wyliczane z serii minutowej do osobnej tabeli, DAY i WEEK nigdy. Upsert ma regułę autorytetu w <code>WHERE</code>: świeca z historii nie zostanie nadpisana świecą ze strumienia, a formująca się podana do zapisu odrzuca całą partię.</p>
       <p>Wskaźniki: katalog jest danymi, nie kodem — nowy wskaźnik to wpis w <code>indicators/catalogue/&lt;grupa&gt;.py</code>, dokładnie jeden plik, publikowany przez <code>GET /indicators</code> bez <code>contract:generate</code>. Matematyka w <code>kernel.py</code>: czysty numpy, <code>float64</code>, indeksowanie po świecy; TA-Lib jest wyrocznią w testach i niczym w produkcie. Nowe <em>pole</em> na drucie jedzie za to pięcioma przystankami (model → <code>contract.py</code> → <code>pnpm contract:generate</code> → mapper → typ domeny) i dlatego zmiana pod <code>modules/workbench/</code> odpala w CI job terminala.</p>
-      <p>Jedenaście narzędzi nie oddaje modelowi surowych danych hurtem: <code>get_candles</code> agreguje powyżej 200 świec i odmawia powyżej 2000, mówiąc, o co zapytać; każda pusta odpowiedź mówi, <em>jakim rodzajem pustki</em> jest (niepokryte, wyliczone, formująca się). Cała powierzchnia ma sufit znakowy z testem. Strategia czyta to archiwum bez sieci: klient nad aplikacją archiwum przez <code>httpx.ASGITransport</code>, żądanie nazwane na scope ASGI jako ten proces (<code>tc_runtime.caller_access.in_process</code>) — klucz, którego żaden nagłówek z sieci nie ustawi.</p>
+      <p>Jedenaście narzędzi nie oddaje modelowi surowych danych hurtem: <code>get_candles</code> agreguje powyżej 200 świec i odmawia powyżej 2000, mówiąc, o co zapytać; każda pusta odpowiedź mówi, <em>jakim rodzajem pustki</em> jest (niepokryte, wyliczone, formująca się). Cała powierzchnia ma sufit znakowy z testem.</p>
     </section>
 
     <section>
@@ -328,14 +327,14 @@ gateway = GatewayClient(settings)
       <div class="eyebrow">06 · telegram-gateway</div>
       <h2>Jedne drzwi, żadnej pamięci</h2>
       <p class="intro">Każdy moduł, który ma coś wartego obudzenia operatora, wysyła to tutaj; model może wysłać przez dwa narzędzia na <code>/mcp</code> (<code>telegram_destinations</code>, <code>send_telegram_message</code>). Własna baza <code>telegram</code>, własne boty. <strong>Nie pamięta, co wysłał</strong> — bez kolejki, ponowień i tabeli wiadomości.</p>
-      <p>Cena jest nazwana, nie ukryta: deduplikacja i retry należą do wołającego. Kształt, który za to płaci, warto kopiować — wołający zapisuje własny znacznik „już powiedziane” <em>po</em> udanej wysyłce; nieudana nie zostawia znacznika, więc następny przebieg próbuje znowu. Archiwum wpisów i strategia sięgają tu w procesie, przez aplikację bramy jako ten proces (<code>workbench/telegram_client.py</code>), a <code>ALERT_DESTINATION</code> mówi, komu — bez niego proces zbiera i decyduje jak zwykle i nic nie mówi. Od 23 września 2026 (etap 4) to pakiet workbencha pod <code>/telegram</code>, nie osobna aplikacja.</p>
+      <p>Cena jest nazwana, nie ukryta: deduplikacja i retry należą do wołającego. Kształt, który za to płaci, warto kopiować — wołający zapisuje własny znacznik „już powiedziane” <em>po</em> udanej wysyłce; nieudana nie zostawia znacznika, więc następny przebieg próbuje znowu. Archiwum wpisów sięga tu w procesie, przez aplikację bramy jako ten proces (<code>workbench/telegram_client.py</code>), a <code>ALERT_DESTINATION</code> mówi, komu — bez niego proces zbiera i decyduje jak zwykle i nic nie mówi. Od 23 września 2026 (etap 4) to pakiet workbencha pod <code>/telegram</code>, nie osobna aplikacja.</p>
     </section>
 
     <section>
       <div class="eyebrow">07 · terminal i pocket</div>
       <h2>Konsumenci, nie partnerzy</h2>
-      <p class="intro">Terminal: React 19 + TypeScript, Vite, Azure Static Web Apps. Dziewięć zakładek z jednego rejestru w <code>tabs.ts</code> — Graph, Instruments, Data History, Teams, Polymarket, Social, Strategie, Accounts, Agent Settings — i panel czatu zamontowany raz w <code>Shell</code> jako rodzeństwo outletu, nie nakładka. Pocket: to samo archiwum Polymarketu pod kciuk i czat obok; dzieli z terminalem wygenerowany kontrakt i żadnego komponentu.</p>
-      <p>Widoki widzą jedno <code>MarketDataSource</code> i nie dowiadują się, które wywołanie poszło dokąd — kompozycja mieszka w <code>src/data/marketData.ts</code>. Od etapu 3 to dwa adresy: workbench (z przedrostkami <code>/market</code>, <code>/polymarket</code>, <code>/social</code>, <code>/strategy</code>, <code>/teams</code>) i bramka dla ekranu Accounts. Kształty z drutu są snake_case i żyją wyłącznie w plikach-adapterach; reszta mówi camelCase typami domeny, a czas to epoka w sekundach wszędzie poza drutem.</p>
+      <p class="intro">Terminal: React 19 + TypeScript, Vite, Azure Static Web Apps. Osiem zakładek z jednego rejestru w <code>tabs.ts</code> — Graph, Instruments, Data History, Teams, Polymarket, Social, Accounts, Agent Settings — i panel czatu zamontowany raz w <code>Shell</code> jako rodzeństwo outletu, nie nakładka. Pocket: to samo archiwum Polymarketu pod kciuk i czat obok; dzieli z terminalem wygenerowany kontrakt i żadnego komponentu.</p>
+      <p>Widoki widzą jedno <code>MarketDataSource</code> i nie dowiadują się, które wywołanie poszło dokąd — kompozycja mieszka w <code>src/data/marketData.ts</code>. Od etapu 3 to dwa adresy: workbench (z przedrostkami <code>/market</code>, <code>/polymarket</code>, <code>/social</code>, <code>/teams</code>) i bramka dla ekranu Accounts. Kształty z drutu są snake_case i żyją wyłącznie w plikach-adapterach; reszta mówi camelCase typami domeny, a czas to epoka w sekundach wszędzie poza drutem.</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Obszar</th><th>Wybór</th><th>Powód, który gryzie</th></tr></thead>
@@ -361,7 +360,7 @@ gateway = GatewayClient(settings)
           <thead><tr><th>Moduł</th><th class="n">Plików testów</th><th>Co trzyma architekturę</th></tr></thead>
           <tbody>
             <tr><td><b>capital-gateway</b></td><td class="n">14</td><td>offline na respx; „żadna odpowiedź nie niesie poświadczenia”; fixture czyszczący <code>CAPITAL_*</code>/<code>GATEWAY_*</code> ze środowiska</td></tr>
-            <tr><td><b>workbench</b></td><td class="n">166</td><td><code>test_layering.py</code> (AST sześciu pakietów), <code>test_route_collisions.py</code> (literał wygrywa z <code>{team_id}</code> wyłącznie kolejnością rejestracji), prawdziwy FastMCP na porcie zamiast mocka sesji, jeden test integracji, że strategia widzi świecę, której odmawia się sieci</td></tr>
+            <tr><td><b>workbench</b></td><td class="n">166</td><td><code>test_layering.py</code> (AST sześciu pakietów), <code>test_route_collisions.py</code> (literał wygrywa z <code>{team_id}</code> wyłącznie kolejnością rejestracji), prawdziwy FastMCP na porcie zamiast mocka sesji</td></tr>
             <tr><td><b>trading-mcp</b></td><td class="n">9</td><td>„zapis nigdy nie ponawiany po 5xx ani po timeoutcie”, „401 to awaria dostępu, nie odmowa”, „port nigdy nie został otwarty” przy nie-demo</td></tr>
             <tr><td><b>telegram-gateway</b></td><td class="n">11</td><td>redakcja tokenów botów, rekord wołających, odmowa startu bez ustawień</td></tr>
             <tr><td><b>terminal · pocket</b></td><td class="n">obok kodu</td><td><code>Foo.tsx</code> ↔ <code>Foo.test.tsx</code>, bez osobnego drzewa; strażnik „żaden backend nie dostaje prefiksu zajętego przez zakładkę” — spisany fix po tym, jak <code>/archive</code> przesłoniło zakładkę</td></tr>

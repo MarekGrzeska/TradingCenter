@@ -93,18 +93,6 @@ const SOURCES = [
  */
 `,
   },
-  {
-    name: "strategy",
-    moduleDir: resolve(terminal, "..", "workbench"),
-    pythonModule: "strategy.openapi",
-    output: join(terminal, "src", "data", "contract.strategy.generated.ts"),
-    banner: `/**
- * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
- *
- * Printed from the strategy platform's models by \`python -m strategy.openapi\`. Most of what it describes is
- * a refusal: \`reason_kind\` names the layer that said no, and an optional field is \`T | null\`, never absent.
-`,
-  },
 ];
 
 function schemaJson(source, envDir) {

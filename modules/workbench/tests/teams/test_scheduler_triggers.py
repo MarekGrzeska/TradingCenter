@@ -43,18 +43,17 @@ def _register_value_tool(mcp: FastMCP, box: list[float]) -> None:
         return _ValueOut(value=box[0])
 
 
-class _PendingOut(BaseModel):
-    strategy_id: str
-    pending: int
+class _CountOut(BaseModel):
+    label: str
+    count: int
 
 
-def _register_pending_setups(mcp: FastMCP, box: list[int]) -> None:
-    """The shape of the strategy platform's own tool, with the number moved by hand the way a
-    recorded decision would move it."""
+def _register_count_tool(mcp: FastMCP, box: list[int]) -> None:
+    """A counting tool, with the number moved by hand the way a recorded fact would move it."""
 
-    @mcp.tool(name="pending_setups", description="How many setups a strategy is standing on.")
-    def pending_setups(strategy_id: str, window_hours: int = 24) -> _PendingOut:
-        return _PendingOut(strategy_id=strategy_id, pending=box[0])
+    @mcp.tool(name="open_count", description="How many items of a kind are open.")
+    def open_count(label: str, window_hours: int = 24) -> _CountOut:
+        return _CountOut(label=label, count=box[0])
 
 
 def _register_refusing_tool(mcp: FastMCP) -> None:
@@ -185,25 +184,25 @@ async def test_a_condition_crossing_the_threshold_fires_exactly_once(pool: async
         assert len(await _fires(pool, trigger_id=trigger["id"])) == 1
 
 
-async def test_a_setup_counted_by_the_strategy_platform_wakes_the_team_once(pool: asyncpg.Pool) -> None:
-    """specs/teams-triggers, "Decyzja platformy strategii jest źródłem warunku": the tool is found by name
+async def test_a_count_read_by_name_from_a_tool_server_wakes_the_team_once(pool: asyncpg.Pool) -> None:
+    """specs/teams-triggers, "Warunek jest czytany narzędziami serwera narzędzi": the tool is found by name
     on whichever source announces it, so what differs from the test above is which server carries it here
     and which name the trigger calls. In the process it is a local source; a stand-in server is the same road."""
     box = [0]
-    async with serving(build=lambda mcp: _register_pending_setups(mcp, box)) as url:
+    async with serving(build=lambda mcp: _register_count_tool(mcp, box)) as url:
         settings = settings_for(url)
         team_id, revision_id = await _team_and_revision(pool)
         trigger = await _trigger(
             pool,
             team_id=team_id,
             revision_id=revision_id,
-            tool_name="pending_setups",
-            arguments={"strategy_id": "baseline_ma_cross"},
-            field_path="pending",
+            tool_name="open_count",
+            arguments={"label": "setups"},
+            field_path="count",
             comparison="gte",
             threshold="1",
         )
-        clock = _clock(pool, provider=ScriptedProvider(default=says("a setup is standing")), settings=settings)
+        clock = _clock(pool, provider=ScriptedProvider(default=says("an item is open")), settings=settings)
 
         await clock.tick()
         assert await _fires(pool, trigger_id=trigger["id"]) == []
