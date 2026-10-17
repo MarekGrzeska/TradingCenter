@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { safeLocalStorage } from "../data/storage";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { botUsernameProblem, keyProblem } from "./present";
 import { QrCode } from "./QrCode";
@@ -32,6 +33,26 @@ function Field({
 
 type Step = "phone" | "code" | "password";
 
+// The owner account's number, kept in this browser after the first code was sent, so the next login is one click. In the
+// browser and not in the code: the terminal's bundle is downloadable without signing in, and git keeps what it is given.
+const PHONE_KEY = "tc.telegram.ownerPhone";
+
+function rememberedPhone(): string {
+  try {
+    return safeLocalStorage()?.getItem(PHONE_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function rememberPhone(phone: string): void {
+  try {
+    safeLocalStorage()?.setItem(PHONE_KEY, phone);
+  } catch {
+    // A browser that will not keep it asks again next time; nothing else depends on it.
+  }
+}
+
 /** Said, because "a code was sent" is no help to somebody looking in the wrong place. */
 const DELIVERY_TEXT: Record<CodeDelivery, string> = {
   app: "Kod poszedł do aplikacji Telegram zalogowanej na tym koncie — szukaj wiadomości od „Telegram” (czat serwisowy).",
@@ -51,7 +72,7 @@ export function LoginDialog({
   onDone(): void;
 }) {
   const [step, setStep] = useState<Step>("phone");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(rememberedPhone);
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
   const [delivery, setDelivery] = useState<CodeDelivery | null>(null);
@@ -72,6 +93,8 @@ export function LoginDialog({
         : step === "code"
           ? await api.loginCode(code.trim(), signal())
           : await api.loginPassword(password, signal());
+    // After Telegram accepted it, and not before: a typo must not become the number offered next time.
+    if (step === "phone") rememberPhone(phone.trim());
     if (result.step === "done") {
       onDone();
       onClose();
