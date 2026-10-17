@@ -112,6 +112,15 @@ export default defineConfig(({ mode }) => {
           configure: quietProxyErrors("workbench", workbench),
         },
 
+        // The door to Telegram, served by the workbench under /telegram. Reached with the workbench's token, but only the
+        // terminal's and the operator's applications are admitted to it.
+        "/telegram-api": {
+          target: workbench,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/telegram-api/, "/telegram"),
+          configure: quietProxyErrors("workbench", workbench),
+        },
+
         // The strategy platform, served by the workbench under /strategy, same shape and same reason as above.
         "/strategy-api": {
           target: workbench,

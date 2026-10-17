@@ -146,7 +146,7 @@ export function YoutubeView({ api }: { api?: YoutubeApi } = {}) {
       ))}
       {state.status === "ready" && !found.alertsConfigured && (
         <p className="text-sm text-ink-muted">
-          Nikt nie jest powiadamiany (nie ustawiono ALERT_DESTINATION) — filmy są czytane, ale wiadomość nie wychodzi.
+          Nikt nie słyszy celu youtube.film (zakładka Telegram → Cele) — filmy są czytane, ale wiadomość nie wychodzi.
         </p>
       )}
       {state.status === "ready" && found.providers.length > 0 && (
