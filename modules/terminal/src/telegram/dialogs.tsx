@@ -283,6 +283,9 @@ export function ActivateDialog({
   const [name, setName] = useState(existing?.name ?? "operator");
   const [link, setLink] = useState<StartLink | null>(null);
   const [received, setReceived] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const [renewing, setRenewing] = useState(false);
+  const [renewFailure, setRenewFailure] = useState<string | null>(null);
   // The watching must not restart each time the parent renders a fresh callback, or the interval never gets to fire.
   const done = useRef(onDone);
   useEffect(() => {
@@ -292,6 +295,7 @@ export function ActivateDialog({
   useEffect(() => {
     if (link === null || received) return;
     const timer = setInterval(() => {
+      setNow(Date.now());
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       void api
         .destinations(signal())
@@ -320,6 +324,39 @@ export function ActivateDialog({
           <span className="text-ink">{link?.destination.name}</span> odbiera wiadomości od @{bot.username}. Przypisz mu teraz
           cele w sekcji poniżej.
         </p>
+      </ConfirmDialog>
+    );
+  }
+
+  if (link !== null && now >= link.expiresAt.getTime()) {
+    return (
+      <ConfirmDialog
+        title="Odnośnik wygasł"
+        confirmLabel={renewing ? "Wydaję…" : "Wydaj nowy link"}
+        busyLabel="Wydaję…"
+        confirmDisabled={renewing}
+        fallbackError="nie udało się wydać nowego linku"
+        closeOnSuccess={false}
+        onConfirm={async () => {
+          setRenewFailure(null);
+          setRenewing(true);
+          try {
+            const fresh = await api.offerDestination(link.destination.name, bot.username, signal());
+            setLink(fresh);
+            setNow(Date.now());
+          } catch (cause: unknown) {
+            setRenewFailure(cause instanceof Error ? cause.message : "nie udało się wydać nowego linku");
+          } finally {
+            setRenewing(false);
+          }
+        }}
+        onClose={onClose}
+      >
+        <p className="text-xs text-ink-secondary">
+          Nikt nie dotknął „Start” w ciągu 30 minut, więc ten link już nic nie wiąże. Odbiorca{" "}
+          <span className="text-ink">{link.destination.name}</span> dalej istnieje — wystarczy wydać nowy link.
+        </p>
+        {renewFailure !== null && <p className="mt-2 text-xs text-critical">{renewFailure}</p>}
       </ConfirmDialog>
     );
   }

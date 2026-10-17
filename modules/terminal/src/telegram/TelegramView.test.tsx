@@ -152,6 +152,57 @@ describe("TelegramView", () => {
     expect(screen.getByRole("button", { name: "Zaloguj konto…" })).toBeDisabled();
   });
 
+  it("says where to begin on a door with nothing in it, instead of showing empty tables", async () => {
+    render(
+      <TelegramView
+        api={api({
+          state: vi.fn(async () => ({ ...LOGGED_OUT, bots: 0, destinations: 0, destinationsReady: 0, purposesUnheard: 0 })),
+          bots: vi.fn(async () => []),
+          destinations: vi.fn(async () => []),
+          purposes: vi.fn(async () => []),
+          assignments: vi.fn(async () => []),
+        })}
+      />,
+    );
+
+    expect(await screen.findByText(/Zacznij od zalogowania konta-właściciela/)).toBeInTheDocument();
+  });
+
+  it("says the door does not answer, and does not show its lists as empty", async () => {
+    const down = new MarketDataError("unreachable", "telegram is not reachable");
+    render(<TelegramView api={api({ state: vi.fn().mockRejectedValue(down) })} />);
+
+    expect(await screen.findByText(/telegram is not reachable/)).toBeInTheDocument();
+    expect(screen.queryByText(/Brama nie zna jeszcze żadnego bota/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Zacznij od zalogowania/)).not.toBeInTheDocument();
+  });
+
+  it("says a start link has expired and issues a new one in one action", async () => {
+    const waiting: Destination = { name: "phone", bot: BOT.username, state: "pending", receives: false };
+    const offerDestination = vi
+      .fn()
+      .mockResolvedValueOnce({
+        destination: waiting,
+        url: "https://t.me/tc_alerts_bot?start=old",
+        expiresAt: new Date(Date.now() - 1000),
+      })
+      .mockResolvedValueOnce({
+        destination: waiting,
+        url: "https://t.me/tc_alerts_bot?start=fresh",
+        expiresAt: new Date(Date.now() + 30 * 60_000),
+      });
+    render(<TelegramView api={api({ offerDestination })} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Aktywuj odbiorcę…" }));
+    await userEvent.click(screen.getByRole("button", { name: "Pokaż link" }));
+
+    expect(await screen.findByText(/Odnośnik wygasł/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Wydaj nowy link" }));
+
+    expect(await screen.findByRole("link", { name: /start=fresh/ })).toBeInTheDocument();
+    expect(offerDestination).toHaveBeenCalledTimes(2);
+  });
+
   it("shows a code for the start link and turns the address on when the tap arrives", async () => {
     vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });

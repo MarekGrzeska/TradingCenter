@@ -137,6 +137,20 @@ class TestSendingByPurpose:
         assert (seen.name, seen.last_caller) == ("social.post.x", "the post archive")
         assert await store.count_unheard(db) == 1
 
+    async def test_a_recipient_that_has_not_tapped_yet_can_be_assigned_but_not_sent_to(self, db) -> None:
+        from telegram_gateway.errors import DestinationNotReady
+
+        waiting = await builders.destination(db, name="waiting")
+        await store.assign(db, key="*", destination_id=waiting.id)
+        api = FakeBotApi()
+
+        with pytest.raises(DestinationNotReady):
+            await sending.send_to_purpose(
+                db, api, purpose="a.b", text="hi", max_chars=CEILING, caller=None
+            )
+
+        assert api.sent == []
+
     async def test_a_default_assignment_hears_what_nobody_named(self, db) -> None:
         destination = await ready_destination(db, "operator")
         assert destination is not None

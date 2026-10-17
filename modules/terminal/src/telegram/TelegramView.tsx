@@ -159,6 +159,13 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
         </p>
       )}
 
+      {ready && account.status === "logged_out" && bots.status === "ready" && bots.value.length === 0 && (
+        <p className="rounded bg-panel px-3 py-2 text-sm text-ink-secondary">
+          Zacznij od zalogowania konta-właściciela (osobnego konta tylko do botów), a potem utwórz bota i aktywuj odbiorcę.
+          Masz już bota z @BotFathera? Dodaj jego token i pomiń logowanie.
+        </p>
+      )}
+
       <Section title="Konto-właściciel">
         <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm text-ink">
