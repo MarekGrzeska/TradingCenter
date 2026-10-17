@@ -88,6 +88,15 @@ export type LoginStep =
   | { step: "password" }
   | { step: "done"; account: Account };
 
+/** A login by QR code, as the door reports it while the code is on screen. */
+export interface QrLogin {
+  status: Schemas["QrLoginOut"]["status"];
+  /** `tg://login?token=…` — drawn as a QR code; changes about every half minute. */
+  url: string | null;
+  account: Account | null;
+  reason: string | null;
+}
+
 function mapAccount(raw: Schemas["AccountOut"]): Account {
   return {
     status: raw.status,
@@ -123,6 +132,9 @@ export interface TelegramApi {
   state(signal: AbortSignal): Promise<GateState>;
   loginStart(phone: string, signal: AbortSignal): Promise<LoginStep>;
   loginCode(code: string, signal: AbortSignal): Promise<LoginStep>;
+  /** A login with no code at all: an app logged in to the account scans the QR code this returns. */
+  loginQrStart(signal: AbortSignal): Promise<QrLogin>;
+  loginQrState(signal: AbortSignal): Promise<QrLogin>;
   /** The code did not come: Telegram's next way of delivering it (app → SMS → call), on the same login. */
   loginResend(signal: AbortSignal): Promise<LoginStep>;
   loginPassword(password: string, signal: AbortSignal): Promise<LoginStep>;
@@ -145,6 +157,15 @@ export interface TelegramApi {
 export function createTelegramApi(httpBase: string, identity: Identity = noIdentity): TelegramApi {
   const http = jsonClient("telegram", mapStatus, identity);
   const segment = encodeURIComponent;
+
+  function qr(raw: Schemas["QrLoginOut"]): QrLogin {
+    return {
+      status: raw.status,
+      url: raw.url ?? null,
+      account: raw.account ? mapAccount(raw.account) : null,
+      reason: raw.reason ?? null,
+    };
+  }
 
   function step(raw: Schemas["LoginStepOut"]): LoginStep {
     if (raw.step === "done" && raw.account) return { step: "done", account: mapAccount(raw.account) };
@@ -175,6 +196,14 @@ export function createTelegramApi(httpBase: string, identity: Identity = noIdent
       return step(
         await http.json<Schemas["LoginStepOut"]>(`${httpBase}/account/login/code`, { signal, method: "POST", body }),
       );
+    },
+
+    async loginQrStart(signal) {
+      return qr(await http.json<Schemas["QrLoginOut"]>(`${httpBase}/account/login/qr`, { signal, method: "POST" }));
+    },
+
+    async loginQrState(signal) {
+      return qr(await http.json<Schemas["QrLoginOut"]>(`${httpBase}/account/login/qr`, { signal }));
     },
 
     async loginResend(signal) {

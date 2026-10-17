@@ -64,6 +64,8 @@ function api(overrides: Partial<TelegramApi> = {}): TelegramApi {
     loginStart: vi.fn(),
     loginCode: vi.fn(),
     loginResend: vi.fn(),
+    loginQrStart: vi.fn(async () => ({ status: "waiting" as const, url: "tg://login?token=abc", account: null, reason: null })),
+    loginQrState: vi.fn(async () => ({ status: "waiting" as const, url: "tg://login?token=abc", account: null, reason: null })),
     loginPassword: vi.fn(),
     logout: vi.fn(async () => true),
     bots: vi.fn(async () => [BOT]),
@@ -103,17 +105,16 @@ describe("TelegramView", () => {
   it("shows only the bots until one is opened, and then who receives through it and what is sent there", async () => {
     render(<TelegramView api={api()} />);
 
-    await userEvent.click(await screen.findByRole("button", { name: /@tc_alerts_bot/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /pokaż odbiorców i przypisania/ }));
 
     expect(screen.getAllByText("@marek · Marek G.").length).toBeGreaterThan(0);
     expect(screen.getByRole("combobox", { name: "odbiorca dla youtube" })).toBeInTheDocument();
   });
 
-  it("does not show the assignments of a bot that is not open", async () => {
+  it("keeps a closed bot's actions in reach and its assignments out of the way", async () => {
     render(<TelegramView api={api()} />);
 
-    await screen.findByRole("button", { name: /@tc_alerts_bot/ });
-
+    expect(await screen.findByRole("button", { name: "Usuń bota @tc_alerts_bot" })).toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "odbiorca dla youtube" })).not.toBeInTheDocument();
   });
 
@@ -133,7 +134,6 @@ describe("TelegramView", () => {
       .mockRejectedValue(new MarketDataError("refused", "@tc_alerts_bot still receives 'youtube'. Move those assignments first."));
     render(<TelegramView api={api({ removeBot })} />);
 
-    await userEvent.click(await screen.findByRole("button", { name: /@tc_alerts_bot/ }));
     await userEvent.click(await screen.findByRole("button", { name: "Usuń bota @tc_alerts_bot" }));
     await userEvent.click(screen.getByRole("button", { name: "Usuń bota" }));
 
@@ -151,6 +151,7 @@ describe("TelegramView", () => {
     );
 
     await userEvent.click(await screen.findByRole("button", { name: "Zaloguj konto…" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Zaloguj numerem telefonu zamiast tego" }));
     expect(screen.getByText(/osobnego konta tylko do botów/)).toBeInTheDocument();
     await userEvent.type(screen.getByPlaceholderText("+48123456789"), "+48123456789");
     await userEvent.click(screen.getByRole("button", { name: "Wyślij kod" }));
@@ -170,6 +171,7 @@ describe("TelegramView", () => {
     render(<TelegramView api={api({ state: vi.fn(async () => LOGGED_OUT), loginStart, loginResend })} />);
 
     await userEvent.click(await screen.findByRole("button", { name: "Zaloguj konto…" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Zaloguj numerem telefonu zamiast tego" }));
     await userEvent.type(screen.getByPlaceholderText("+48123456789"), "+48123456789");
     await userEvent.click(screen.getByRole("button", { name: "Wyślij kod" }));
 
@@ -185,6 +187,7 @@ describe("TelegramView", () => {
     render(<TelegramView api={api({ state: vi.fn(async () => LOGGED_OUT), loginStart })} />);
 
     await userEvent.click(await screen.findByRole("button", { name: "Zaloguj konto…" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Zaloguj numerem telefonu zamiast tego" }));
     await userEvent.type(screen.getByPlaceholderText("+48123456789"), "+48123456789");
     await userEvent.click(screen.getByRole("button", { name: "Wyślij kod" }));
 
@@ -197,6 +200,7 @@ describe("TelegramView", () => {
     const loginStart = vi.fn(async () => ({ step: "code" as const, delivery: "app" as const, canResend: true }));
     const first = render(<TelegramView api={api({ state: vi.fn(async () => LOGGED_OUT), loginStart })} />);
     await userEvent.click(await screen.findByRole("button", { name: "Zaloguj konto…" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Zaloguj numerem telefonu zamiast tego" }));
     await userEvent.type(screen.getByPlaceholderText("+48123456789"), "+48111222333");
     await userEvent.click(screen.getByRole("button", { name: "Wyślij kod" }));
     await screen.findByLabelText(/Kod, który przyszedł/);
@@ -204,9 +208,32 @@ describe("TelegramView", () => {
 
     render(<TelegramView api={api({ state: vi.fn(async () => LOGGED_OUT), loginStart })} />);
     await userEvent.click(await screen.findByRole("button", { name: "Zaloguj konto…" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Zaloguj numerem telefonu zamiast tego" }));
 
     expect(screen.getByPlaceholderText("+48123456789")).toHaveValue("+48111222333");
     localStorage.removeItem("tc.telegram.ownerPhone");
+  });
+
+  it("logs in by QR code first: shows the code, and finishes when the scan arrives", async () => {
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const loginQrState = vi
+      .fn<TelegramApi["loginQrState"]>()
+      .mockResolvedValue({ status: "waiting", url: "tg://login?token=abc", account: null, reason: null });
+    const state = vi.fn<TelegramApi["state"]>().mockResolvedValue(LOGGED_OUT);
+    render(<TelegramView api={api({ state, loginQrState })} />);
+
+    await user.click(await screen.findByRole("button", { name: "Zaloguj konto…" }));
+
+    expect(await screen.findByRole("img", { name: "Kod QR logowania konta-właściciela" })).toBeInTheDocument();
+    expect(screen.getByText(/Połącz urządzenie/)).toBeInTheDocument();
+
+    loginQrState.mockResolvedValue({ status: "done", url: null, account: LOGGED_IN.account, reason: null });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2100);
+    });
+
+    expect(screen.queryByRole("img", { name: "Kod QR logowania konta-właściciela" })).not.toBeInTheDocument();
   });
 
   it("names the settings the server lacks instead of offering a login that cannot start", async () => {
@@ -269,7 +296,6 @@ describe("TelegramView", () => {
       });
     render(<TelegramView api={api({ offerDestination })} />);
 
-    await userEvent.click(await screen.findByRole("button", { name: /@tc_alerts_bot/ }));
     await userEvent.click(await screen.findByRole("button", { name: "Dodaj odbiorcę…" }));
     await userEvent.click(screen.getByRole("button", { name: "Pokaż link" }));
 
@@ -301,7 +327,6 @@ describe("TelegramView", () => {
     }));
     render(<TelegramView api={api({ destinations, offerDestination })} />);
 
-    await user.click(await screen.findByRole("button", { name: /@tc_alerts_bot/ }));
     await user.click(await screen.findByRole("button", { name: "Dodaj odbiorcę…" }));
     const name = screen.getByLabelText(/Nazwa odbiorcy/);
     await user.clear(name);

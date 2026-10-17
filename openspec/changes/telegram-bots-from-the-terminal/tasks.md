@@ -49,3 +49,6 @@
 - [x] 6.2 „Nie dostałem kodu” pokazuje się tylko gdy Telegram oferuje inną drogę (`can_resend` z `next_type`); inaczej okno mówi, że kod jest tylko tam, gdzie poszedł
 - [x] 6.3 Zakładka od botów: lista botów, a po kliknięciu odbiorcy z nickami i przypisania tego bota; cele bez odbiorcy jako ostrzeżenie na górze. Odbiorca pamięta, kim jest na Telegramie (`@nick`, imię, grupa; migracja `0004`, uzupełniana raz przy starcie dla wcześniej związanych)
 - [x] 6.4 Numer konta-właściciela: pamiętany w przeglądarce po pierwszym przyjętym kodzie, a domyślnie ze zmiennej `TELEGRAM_OWNER_PHONE` środowiska `vps` (nie z gita)
+- [x] 6.5 Logowanie kodem QR jako pierwsza droga (nic nie jest wysyłane, więc nic nie może nie dojść): `POST`/`GET /account/login/qr`, token odnawiany sam; numer i kod zostają jako wyjście awaryjne. Pierwsze prawdziwe logowanie numerem: Telegram przyjął numer i kod nie dotarł (konto odbierało kody z my.telegram.org)
+- [x] 6.6 Wiersz bota pokazuje „Usuń bota”, „Rotuj token” i „Dodaj odbiorcę” bez rozwijania; rozwinięcie to dwie karty (odbiorcy, co tu trafia). Caddy: `no-cache` dla strony i `immutable` dla `/assets`, `caddy reload` przy wdrożeniu
+

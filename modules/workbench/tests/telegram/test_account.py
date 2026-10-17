@@ -430,3 +430,51 @@ class TestWhereTelegramSaidTheCodeWent:
         started = await api.post("/account/login", json={"phone": PHONE})
 
         assert started.json()["can_resend"] is False
+
+
+async def _settle() -> None:
+    """Lets the QR watcher run what it was woken for."""
+    import asyncio
+
+    for _ in range(5):
+        await asyncio.sleep(0)
+
+
+@pytest.mark.db
+class TestLoggingInByQrCode:
+    async def test_a_scan_logs_the_account_in_without_any_code_being_sent(self, api, platform) -> None:
+        started = await api.post("/account/login/qr")
+        waiting = await api.get("/account/login/qr")
+        platform.login.scanned.set()
+        await _settle()
+        done = await api.get("/account/login/qr")
+
+        assert started.json()["status"] == "waiting"
+        assert started.json()["url"] == "tg://login?token=first"
+        assert waiting.json()["status"] == "waiting"
+        assert done.json()["status"] == "done"
+        assert done.json()["account"]["username"] == "ownerbot_account"
+        assert platform.login.phone is None, "no code was ever asked for"
+        assert (await api.get("/account/login/qr")).status_code == 409
+
+    async def test_an_account_with_a_password_asks_for_it_after_the_scan(self, api, platform) -> None:
+        platform.login = FakeLoginClient(password="hunter2")
+        await api.post("/account/login/qr")
+        platform.login.scanned.set()
+        await _settle()
+
+        asked = await api.get("/account/login/qr")
+        done = await api.post("/account/login/password", json={"password": "hunter2"})
+
+        assert asked.json()["status"] == "password"
+        assert done.json()["step"] == "done"
+
+    async def test_an_expired_code_is_replaced_by_a_fresh_one(self, api, platform) -> None:
+        platform.login.expire_first = True
+        await api.post("/account/login/qr")
+        await _settle()
+
+        state = (await api.get("/account/login/qr")).json()
+
+        assert state["status"] == "waiting"
+        assert state["url"].startswith("tg://login?token=renewed")

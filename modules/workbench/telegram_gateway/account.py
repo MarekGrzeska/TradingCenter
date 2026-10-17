@@ -73,6 +73,25 @@ class CodeSent:
     can_resend: bool
 
 
+@dataclass(frozen=True, slots=True)
+class QrTicket:
+    """A login token as `tg://login?token=…` and when it stops working (about half a minute). The token logs in whoever
+    scans it *into this server*, so it is shown to the operator and never logged."""
+
+    url: str
+    expires_at: datetime
+
+
+@dataclass
+class QrState:
+    """Where a QR login is: `waiting` for a scan, `password` wanted, `done` with an identity to save, or `failed`."""
+
+    status: str
+    ticket: QrTicket | None = None
+    identity: Identity | None = None
+    reason: str | None = None
+
+
 # Where Telegram said the code went. `app` is a message from "Telegram" in an app already logged in to the account — and
 # the one that fails silently when nobody is looking at that account.
 DELIVERIES = ("app", "sms", "call", "other")
@@ -94,6 +113,17 @@ class LoginClient(Protocol):
         ...
 
     async def sign_in_password(self, password: str) -> Identity: ...
+
+    async def start_qr(self) -> QrTicket:
+        """Asks Telegram for a login token to show as a QR code. No code is sent anywhere."""
+        ...
+
+    async def wait_qr(self) -> Identity | None:
+        """Waits until an app logged in to the account scans the code: the identity, or `None` when the account has a
+        password and wants it next. Raises `TimeoutError` when the token expires first."""
+        ...
+
+    async def renew_qr(self) -> QrTicket: ...
 
     async def disconnect(self) -> None: ...
 
@@ -135,6 +165,70 @@ class LoginManager:
         self._lock = asyncio.Lock()
         self._client: LoginClient | None = None
         self._deadline: datetime | None = None
+        self._qr: QrState | None = None
+        self._qr_task: asyncio.Task | None = None
+
+    async def begin_qr(self, *, api_id: int, api_hash: str) -> QrTicket:
+        """A login by QR code: no code is sent, an app already logged in to the account scans this server's token. The
+        token is renewed by itself until the ten minutes run out."""
+        async with self._lock:
+            await self._drop()
+            client = self._factory(api_id, api_hash)
+            try:
+                ticket = await client.start_qr()
+            except BaseException:
+                await client.disconnect()
+                raise
+            self._client = client
+            self._deadline = self._clock() + LOGIN_LIFETIME
+            self._qr = QrState(status="waiting", ticket=ticket)
+            self._qr_task = asyncio.create_task(self._watch_qr(client), name="telegram-qr-login")
+            log.info("a QR login is waiting for a scan")
+            return ticket
+
+    async def _watch_qr(self, client: LoginClient) -> None:
+        while True:
+            try:
+                identity = await client.wait_qr()
+            except TimeoutError:
+                if self._qr is None or self._deadline is None or self._clock() >= self._deadline:
+                    if self._qr is not None:
+                        self._qr.status, self._qr.reason = "failed", "the login expired — start again"
+                    return
+                try:
+                    ticket = await client.renew_qr()
+                except LoginRefused as err:
+                    if self._qr is not None:
+                        self._qr.status, self._qr.reason = "failed", str(err)
+                    return
+                if self._qr is not None:
+                    self._qr.ticket = ticket
+                continue
+            except LoginRefused as err:
+                if self._qr is not None:
+                    self._qr.status, self._qr.reason = "failed", str(err)
+                return
+            if self._qr is None:
+                return
+            if identity is None:
+                self._qr.status = "password"
+                log.info("the QR login was scanned; the account wants its password")
+                return
+            self._qr.status, self._qr.identity = "done", identity
+            log.info("the QR login was scanned")
+            return
+
+    async def qr_state(self) -> QrState:
+        """The QR login as it stands. A `done` state is handed over once: the identity leaves this object with it."""
+        async with self._lock:
+            if self._qr is None:
+                raise LoginNotInProgress()
+            state = QrState(
+                status=self._qr.status, ticket=self._qr.ticket, identity=self._qr.identity, reason=self._qr.reason
+            )
+            if state.status in ("done", "failed"):
+                await self._drop()
+            return state
 
     async def begin(self, phone: str, *, api_id: int, api_hash: str) -> CodeSent:
         number = valid_phone(phone)
@@ -186,6 +280,9 @@ class LoginManager:
         return self._client
 
     async def _drop(self) -> None:
+        task, self._qr_task, self._qr = self._qr_task, None, None
+        if task is not None and not task.done():
+            task.cancel()
         client, self._client, self._deadline = self._client, None, None
         if client is not None:
             await client.disconnect()
@@ -288,6 +385,7 @@ class TelethonLoginClient:
         self._client = None
         self._phone = ""
         self._hash = ""
+        self._qr = None
 
     async def send_code(self, phone: str) -> CodeSent:
         from telethon import TelegramClient
@@ -353,9 +451,49 @@ class TelethonLoginClient:
         assert self._client is not None
         me = await self._client.get_me()
         name = getattr(me, "username", None) or getattr(me, "first_name", None) or str(getattr(me, "id", ""))
+        # A QR login never typed a number: the account says its own.
+        own = getattr(me, "phone", None)
+        phone = self._phone or (f"+{own}" if own else "")
         # Telethon types `session` as optional and `get_me` as a peer; both are a logged-in user here.
         session = self._client.session.save()  # pyright: ignore[reportAttributeAccessIssue]
-        return Identity(username=str(name), phone=self._phone, session=session)
+        return Identity(username=str(name), phone=phone, session=session)
+
+    async def start_qr(self) -> QrTicket:
+        from telethon import TelegramClient
+        from telethon.errors import RPCError
+        from telethon.sessions import StringSession
+
+        self._client = TelegramClient(StringSession(), self._api_id, self._api_hash)
+        try:
+            await self._client.connect()
+            self._qr = await self._client.qr_login()
+        except RPCError as err:
+            raise LoginRefused(_telethon_words(err)) from err
+        except (OSError, TimeoutError) as err:
+            raise LoginRefused("Telegram could not be reached — try again in a moment") from err
+        return QrTicket(url=self._qr.url, expires_at=self._qr.expires)
+
+    async def wait_qr(self) -> Identity | None:
+        from telethon.errors import RPCError, SessionPasswordNeededError
+
+        assert self._qr is not None
+        try:
+            await self._qr.wait()
+        except SessionPasswordNeededError:
+            return None
+        except RPCError as err:
+            raise LoginRefused(_telethon_words(err)) from err
+        return await self._identity()
+
+    async def renew_qr(self) -> QrTicket:
+        from telethon.errors import RPCError
+
+        assert self._qr is not None
+        try:
+            await self._qr.recreate()
+        except RPCError as err:
+            raise LoginRefused(_telethon_words(err)) from err
+        return QrTicket(url=self._qr.url, expires_at=self._qr.expires)
 
     async def disconnect(self) -> None:
         if self._client is not None:

@@ -113,6 +113,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/account/login/qr": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Qr State
+         * @description Where the QR login is — asked every few seconds while the code is on screen. A scan without a password saves the
+         *     account here, once.
+         */
+        get: operations["qr_state_account_login_qr_get"];
+        put?: never;
+        /**
+         * Begin Qr
+         * @description Starts a login by QR code: nothing is sent to the account, an app logged in to it scans the code (Settings →
+         *     Devices → Link Desktop Device). Replaces a login already in progress.
+         */
+        post: operations["begin_qr_account_login_qr_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/account/login/resend": {
         parameters: {
             query?: never;
@@ -750,6 +776,28 @@ export interface components {
             name: string;
         };
         /**
+         * QrLoginOut
+         * @description A login by QR code. `waiting` carries the code to show (it changes about every half minute); `password` wants the
+         *     two-step password next; `done` carries the account; `failed` says why.
+         */
+        QrLoginOut: {
+            account: components["schemas"]["AccountOut"] | null;
+            /** Expires At */
+            expires_at: string | null;
+            /** Reason */
+            reason: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "waiting" | "password" | "done" | "failed";
+            /**
+             * Url
+             * @description tg://login?token=… — draw it as a QR code; never log it
+             */
+            url: string | null;
+        };
+        /**
          * SendRequest
          * @description A message, addressed by a destination's name or by a purpose — exactly one of the two. There is
          *     no `chat_id` and no bot here on purpose: a number every caller keeps its own copy of is invalidated
@@ -1067,6 +1115,82 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    qr_state_account_login_qr_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QrLoginOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Not Implemented */
+            501: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    begin_qr_account_login_qr_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QrLoginOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
             /** @description Not Implemented */

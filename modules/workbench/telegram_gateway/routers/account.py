@@ -20,6 +20,7 @@ from ..contract import (
     LoginStepOut,
     LogoutOut,
     Problem,
+    QrLoginOut,
 )
 from ..errors import GatewayError
 from . import deps
@@ -75,6 +76,40 @@ async def resend(request: Request) -> LoginStepOut:
         step="code",
         delivery=delivery.delivery,  # pyright: ignore[reportArgumentType]
         can_resend=delivery.can_resend,
+    )
+
+
+@router.post("/login/qr", response_model=QrLoginOut, responses=_REFUSALS)
+async def begin_qr(request: Request) -> QrLoginOut:
+    """Starts a login by QR code: nothing is sent to the account, an app logged in to it scans the code (Settings →
+    Devices → Link Desktop Device). Replaces a login already in progress."""
+    settings = request.app.state.settings
+    try:
+        api_id, api_hash, _ = account.require_login_settings(settings)
+        ticket = await request.app.state.login.begin_qr(api_id=api_id, api_hash=api_hash)
+    except GatewayError as err:
+        raise deps.refusal(err) from err
+    return QrLoginOut(status="waiting", url=ticket.url, expires_at=ticket.expires_at)
+
+
+@router.get("/login/qr", response_model=QrLoginOut, responses=_REFUSALS)
+async def qr_state(request: Request) -> QrLoginOut:
+    """Where the QR login is — asked every few seconds while the code is on screen. A scan without a password saves the
+    account here, once."""
+    settings = request.app.state.settings
+    try:
+        state = await request.app.state.login.qr_state()
+    except GatewayError as err:
+        raise deps.refusal(err) from err
+    if state.status == "done" and state.identity is not None:
+        async with deps.connection(request.app.state.pool) as conn:
+            await account.save_login(conn, settings, state.identity)
+            return QrLoginOut(status="done", account=await account_out(conn, settings))
+    return QrLoginOut(
+        status=state.status,  # pyright: ignore[reportArgumentType]
+        url=state.ticket.url if state.ticket and state.status == "waiting" else None,
+        expires_at=state.ticket.expires_at if state.ticket and state.status == "waiting" else None,
+        reason=state.reason,
     )
 
 
