@@ -31,6 +31,7 @@ REST_PATHS: tuple[str, ...] = (
     "/event-types/{name}",
     "/events",
     "/drafts",
+    "/state",
     # FastAPI's own, published by the framework rather than by a router.
     "/docs",
     "/docs/oauth2-redirect",

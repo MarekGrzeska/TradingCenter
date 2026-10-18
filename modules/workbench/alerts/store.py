@@ -476,3 +476,46 @@ async def draft_tokens_since(conn: Conn, since: datetime) -> int:
     spent = await conn.fetchval("SELECT coalesce(sum(input_tokens + output_tokens), 0) FROM draft_usage WHERE at >= $1", since)
     return int(spent or 0)
 
+
+# --- what happened, and how things stand ----------------------------------------------------------------------------
+
+
+async def recent_fires(conn: Conn, rule_id: int, limit: int) -> list[asyncpg.Record]:
+    return list(
+        await conn.fetch(
+            "SELECT created_at, state, reason, text FROM fires WHERE rule_id = $1 ORDER BY created_at DESC, id DESC LIMIT $2",
+            rule_id,
+            limit,
+        )
+    )
+
+
+async def recent_checks(conn: Conn, rule_id: int, limit: int) -> list[asyncpg.Record]:
+    return list(
+        await conn.fetch(
+            "SELECT checked_at, outcome, reason FROM rule_checks WHERE rule_id = $1 ORDER BY checked_at DESC, id DESC LIMIT $2",
+            rule_id,
+            limit,
+        )
+    )
+
+
+async def standing(conn: Conn) -> asyncpg.Record:
+    """The numbers `/state` reports, in one read of two small tables: the rules (a list an operator wrote by hand) and the
+    fires still waiting (an index on exactly those)."""
+    return await fetch_one(
+        conn,
+        """
+        SELECT
+            (SELECT count(*) FROM rules WHERE enabled) AS enabled,
+            (SELECT count(*) FROM rules WHERE NOT enabled) AS disabled,
+            (SELECT count(*) FROM rules WHERE defect IS NOT NULL) AS drifted,
+            (SELECT count(*) FROM fires WHERE state = 'pending') AS waiting,
+            (SELECT count(*) FROM event_types) AS event_types
+        """,
+    )
+
+
+async def destinations_in_use(conn: Conn) -> set[str]:
+    return {row["destination"] for row in await conn.fetch("SELECT DISTINCT destination FROM rules")}
+

@@ -192,6 +192,31 @@ class EventAccepted(BaseModel):
     fires: int
 
 
+class ClockOut(BaseModel):
+    ran: bool
+    age_seconds: float = Field(description="since the clock last finished a tick, or since it started if it has not")
+    expected_seconds: float
+
+
+class StateOut(BaseModel):
+    """What the package cannot say through a list of rules: whether it is doing its job at all."""
+
+    rules_enabled: int
+    rules_disabled: int
+    # Rules quiet for a reason that is not the market's: a recipient who is gone, a schema that took an attribute away.
+    rules_with_defects: int
+    # Fires that have not arrived yet and are still being tried.
+    waiting_fires: int
+    event_types: int
+    # `False` when the process has no door to Telegram: rules are checked and fire, and nothing reaches a phone.
+    delivering: bool
+    # `False` without ALERTS_OPENAI_API_KEY.
+    drafting: bool
+    # `False` when the process hands this package no tools: value rules cannot be looked at.
+    reading_values: bool
+    clock: ClockOut
+
+
 class DestinationOut(BaseModel):
     name: str
     bot: str

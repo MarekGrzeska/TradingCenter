@@ -47,8 +47,8 @@
 
 ## 7. Trasa stanu i narzędzia
 
-- [ ] 7.1 `GET /alerts/state` (`alerts-api`)
-- [ ] 7.2 Narzędzia `alert_rules` i `alert_fires` podpięte w `workbench/local_tools.py`; test, że brak narzędzia zapisującego
+- [x] 7.1 `GET /alerts/state` (`alerts-api`)
+- [x] 7.2 Narzędzia `alert_rules` i `alert_fires` podpięte w `workbench/local_tools.py`; test, że brak narzędzia zapisującego
 
 ## 8. Producenci
 
