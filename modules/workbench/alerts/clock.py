@@ -16,6 +16,8 @@ from tc_runtime.liveness import LoopHeartbeat
 from . import conditions, store, template
 from .catalog import ToolSource
 from .config import Settings
+from .delivery import Deliverer
+from .gateway import Gateway
 
 log = logging.getLogger(__name__)
 
@@ -35,11 +37,13 @@ class Clock:
         settings: Settings,
         tools: ToolSource | None,
         heartbeat: LoopHeartbeat,
+        gateway: Gateway | None = None,
     ) -> None:
         self._pool = pool
         self._settings = settings
         self._tools = tools
         self._heartbeat = heartbeat
+        self.deliverer = Deliverer(pool, settings, gateway)
         self._woken = asyncio.Event()
         self._last_cleanup: datetime | None = None
         self._task: asyncio.Task[None] | None = None
@@ -77,7 +81,8 @@ class Clock:
             self._woken.clear()
 
     async def tick(self, now: datetime | None = None) -> int:
-        """One wake: every value rule that is due, looked at. Public so a test can drive it. Returns how many were looked at."""
+        """One wake: every value rule that is due, looked at, and every message that is due, sent. Public so a test can drive
+        it. Returns how many rules were looked at."""
         moment = now or datetime.now(UTC)
         async with self._pool.acquire() as conn:
             due = await store.claim_due(conn, limit=BATCH, now=moment)
@@ -93,6 +98,7 @@ class Clock:
                     log.exception("rule %s could not be looked at", row["id"])
 
         await asyncio.gather(*(one(row) for row in due))
+        await self.deliverer.run(moment)
         await self._forget_old_events(moment)
         return len(due)
 

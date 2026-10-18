@@ -353,3 +353,108 @@ async def delete_events_before(conn: Conn, before: datetime) -> int:
     result = await conn.execute("DELETE FROM events WHERE occurred_at < $1", before)
     return int(result.rsplit(" ", 1)[-1])
 
+
+# --- delivery -------------------------------------------------------------------------------------------------------
+
+
+async def claim_deliveries(conn: Conn, *, now: datetime, limit: int, lease_seconds: int) -> list[asyncpg.Record]:
+    """The fires waiting to be sent, each leased for a minute in the same statement. The lease is what keeps two ticks —
+    or two instances — from sending one message twice; a crash in the middle leaves the fire to be tried again once the
+    lease runs out, which is a message possibly told twice and never one lost."""
+    return list(
+        await conn.fetch(
+            """
+            WITH due AS (
+                SELECT id FROM fires
+                 WHERE state = 'pending' AND next_attempt_at <= $1::timestamptz
+                 ORDER BY next_attempt_at
+                 LIMIT $2
+                   FOR UPDATE SKIP LOCKED
+            ), leased AS (
+                UPDATE fires f
+                   SET attempts = f.attempts + 1,
+                       next_attempt_at = $1::timestamptz + make_interval(secs => $3)
+                  FROM due
+                 WHERE f.id = due.id
+             RETURNING f.id, f.rule_id, f.text, f.created_at, f.attempts
+            )
+            SELECT leased.*, r.name AS rule_name, r.destination, r.mode, r.enabled, r.max_per_hour
+              FROM leased JOIN rules r ON r.id = leased.rule_id
+            """,
+            now,
+            limit,
+            lease_seconds,
+        )
+    )
+
+
+async def settle_fire(
+    conn: Conn, fire_id: int, *, state: str, reason: str | None = None, now: datetime | None = None
+) -> None:
+    """The fire's last word. `delivered_at` is set only for a delivery."""
+    await conn.execute(
+        """
+        UPDATE fires
+           SET state = $2, reason = $3, next_attempt_at = NULL,
+               delivered_at = CASE WHEN $2 = 'delivered' THEN $4::timestamptz END
+         WHERE id = $1
+        """,
+        fire_id,
+        state,
+        reason,
+        now,
+    )
+
+
+async def retry_fire(conn: Conn, fire_id: int, *, at: datetime, reason: str) -> None:
+    await conn.execute("UPDATE fires SET next_attempt_at = $2, reason = $3 WHERE id = $1", fire_id, at, reason)
+
+
+async def delivered_since(conn: Conn, rule_id: int, since: datetime) -> int:
+    counted = await conn.fetchval(
+        "SELECT count(*) FROM fires WHERE rule_id = $1 AND state = 'delivered' AND delivered_at > $2", rule_id, since
+    )
+    return counted or 0
+
+
+async def throttled_since(conn: Conn, rule_id: int, since: datetime) -> int:
+    counted = await conn.fetchval(
+        "SELECT count(*) FROM fires WHERE rule_id = $1 AND state = 'throttled' AND created_at > $2", rule_id, since
+    )
+    return counted or 0
+
+
+async def claim_throttle_notice(conn: Conn, rule_id: int, *, now: datetime, since: datetime) -> bool:
+    """Whether this caller is the one to tell the operator the rule is throttled: one statement decides, so the fires of a
+    batch that are all throttled together say it once between them."""
+    claimed = await conn.fetchval(
+        """
+        UPDATE rules SET throttle_notified_at = $2
+         WHERE id = $1 AND (throttle_notified_at IS NULL OR throttle_notified_at < $3)
+        RETURNING id
+        """,
+        rule_id,
+        now,
+        since,
+    )
+    return claimed is not None
+
+
+async def release_throttle_notice(conn: Conn, rule_id: int) -> None:
+    """The notice did not go; the next throttled fire may try."""
+    await conn.execute("UPDATE rules SET throttle_notified_at = NULL WHERE id = $1", rule_id)
+
+
+async def finish_once_rule(conn: Conn, rule_id: int, reason: str) -> None:
+    """A one-time rule that has said its one thing: switched off, with the reason, and not looked at again."""
+    await conn.execute(
+        "UPDATE rules SET enabled = false, disabled_reason = $2, next_check_at = NULL, updated_at = now() WHERE id = $1",
+        rule_id,
+        reason,
+    )
+
+
+async def reopen_once_rule(conn: Conn, rule_id: int) -> None:
+    """A one-time rule whose one alert never arrived may fire again: its 'already told' is taken back."""
+    await conn.execute("UPDATE rules SET last_fired_at = NULL WHERE id = $1 AND mode = 'once'", rule_id)
+

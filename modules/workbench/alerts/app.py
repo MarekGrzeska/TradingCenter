@@ -69,7 +69,7 @@ async def serving(
         heartbeats = Heartbeats(LoopHeartbeat("clock", expected_seconds=settings.tick_seconds))
         app.state.heartbeats = heartbeats
         liveness.register_metrics("alerts", heartbeats)
-        clock = Clock(pool, settings, tools, heartbeats["clock"])
+        clock = Clock(pool, settings, tools, heartbeats["clock"], app.state.gateway)
         app.state.clock = clock
         await clock.start()
         log.info("alerts is serving")
