@@ -362,6 +362,7 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
           api={client}
           bot={dialog.bot}
           existing={dialog.existing}
+          destinations={destinations.value}
           onClose={() => {
             setDialog(null);
             refresh();

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { safeLocalStorage } from "../data/storage";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import { botUsernameProblem, keyProblem } from "./present";
+import { botUsernameProblem, freeNameFor, keyProblem } from "./present";
 import { QrCode } from "./QrCode";
 import type { Bot, CodeDelivery, Destination, StartLink, TelegramApi } from "./telegramApi";
 
@@ -512,6 +512,7 @@ export function ActivateDialog({
   api,
   bot,
   existing,
+  destinations,
   onClose,
   onDone,
 }: {
@@ -519,10 +520,13 @@ export function ActivateDialog({
   bot: Bot;
   /** When set, a fresh link for a destination that already has a name — an expired one, or a blocked one. */
   existing?: Destination;
+  /** Every recipient of every bot: names are unique across them, and the dialog says when it had to change one. */
+  destinations: Destination[];
   onClose(): void;
   onDone(): void;
 }) {
   const [name, setName] = useState(existing?.name ?? "operator");
+  const effectiveName = existing !== undefined ? existing.name : freeNameFor(name, bot, destinations);
   const [link, setLink] = useState<StartLink | null>(null);
   const [received, setReceived] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -636,13 +640,17 @@ export function ActivateDialog({
       fallbackError="nie udało się przygotować odbiorcy"
       closeOnSuccess={false}
       onConfirm={async () => {
-        setLink(await api.offerDestination(name.trim(), bot.username, signal()));
+        setLink(await api.offerDestination(effectiveName, bot.username, signal()));
       }}
       onClose={onClose}
     >
       <Field
         label="Nazwa odbiorcy"
-        hint="To nazwa w przypisaniach, nie czat — przeżywa wymianę bota. Bot nie może odezwać się pierwszy, więc ktoś musi raz dotknąć linku."
+        hint={
+          effectiveName !== name.trim() && name.trim() !== ""
+            ? `„${name.trim()}” już odbiera przez innego bota — ta osoba może odbierać przez wiele botów, ale to osobna rozmowa, więc dostanie nazwę „${effectiveName}” i musi dotknąć tego linku osobno.`
+            : "To nazwa w przypisaniach, nie czat. Ta sama osoba może odbierać przez wiele botów (każdy to osobna rozmowa z własnym tapnięciem). Bot nie może odezwać się pierwszy."
+        }
       >
         <input className={INPUT} value={name} autoFocus disabled={existing !== undefined} onChange={(e) => setName(e.target.value)} />
       </Field>
