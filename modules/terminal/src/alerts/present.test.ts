@@ -4,6 +4,8 @@ import {
   argumentFields,
   attributeKind,
   blankForm,
+  botsOf,
+  recipientNames,
   defectsFor,
   describeSource,
   formFrom,
@@ -69,6 +71,7 @@ const PRICE: RuleInput = {
     pollIntervalSeconds: 60,
   },
   destination: "phone",
+  bot: "alerts_bot",
   template: "",
   cooldownSeconds: 3600,
   mode: "repeat",
@@ -88,6 +91,7 @@ const FILMS: RuleInput = {
     ],
   },
   destination: "phone",
+  bot: "alerts_bot",
   template: "{channel}: {impact_score}",
   cooldownSeconds: null,
   mode: "once",
@@ -174,13 +178,28 @@ describe("the form and the rule it builds", () => {
     expect(Number(form.interval)).toBeGreaterThanOrEqual(CATALOG.minIntervalSeconds);
   });
 
+  it("offers each recipient once and its bots in the next field, receiving ones first", () => {
+    const many = {
+      ...CATALOG,
+      recipients: [
+        { name: "phone", bot: "posts_bot", receives: false },
+        { name: "phone", bot: "films_bot", receives: true },
+        { name: "tablet", bot: "posts_bot", receives: true },
+      ],
+    };
+
+    expect(recipientNames(many)).toEqual(["phone", "tablet"]);
+    expect(botsOf("phone", many).map((one) => one.name)).toEqual(["films_bot", "posts_bot"]);
+    expect(formProblem({ ...blankForm(many), name: "x", threshold: "1", bot: "" }, many)).toMatch(/bota/);
+  });
+
   it("asks for a name, a recipient and a threshold before it can be saved, and for nothing else", () => {
     const blank = blankForm(CATALOG);
 
-    expect(formProblem(blank)).toMatch(/Nazwij/);
-    expect(formProblem({ ...blank, name: "x", destination: "" })).toMatch(/kogo/);
-    expect(formProblem({ ...blank, name: "x", threshold: "" })).toMatch(/próg/);
-    expect(formProblem({ ...blank, name: "x", threshold: "1" })).toBeNull();
+    expect(formProblem(blank, CATALOG)).toMatch(/Nazwij/);
+    expect(formProblem({ ...blank, name: "x", destination: "" }, CATALOG)).toMatch(/kogo/);
+    expect(formProblem({ ...blank, name: "x", threshold: "" }, CATALOG)).toMatch(/próg/);
+    expect(formProblem({ ...blank, name: "x", threshold: "1" }, CATALOG)).toBeNull();
   });
 });
 

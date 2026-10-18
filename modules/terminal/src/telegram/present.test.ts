@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { botUsernameProblem, freeNameFor, headline, missingSettings } from "./present";
+import { botUsernameProblem, headline, missingSettings, otherBotsOf } from "./present";
 import type { GateState } from "./telegramApi";
 
 describe("what the operator types", () => {
@@ -39,7 +39,7 @@ describe("headline and missing settings", () => {
   });
 });
 
-describe("freeNameFor", () => {
+describe("otherBotsOf", () => {
   const bot = { username: "second_bot", title: "Second", createdHere: false };
   const held = (name: string, owner: string) => ({
     name,
@@ -51,18 +51,13 @@ describe("freeNameFor", () => {
     kind: null,
   });
 
-  it("keeps a name nobody holds, and a name this very bot holds (a fresh link for the same recipient)", () => {
-    expect(freeNameFor("operator", bot, [])).toBe("operator");
-    expect(freeNameFor("operator", bot, [held("operator", "second_bot")])).toBe("operator");
+  it("names the other bots a recipient already receives through, so a second one is added knowingly", () => {
+    expect(otherBotsOf("operator", bot, [held("operator", "first_bot"), held("operator", "third_bot")])).toEqual(["first_bot", "third_bot"]);
   });
 
-  it("qualifies a name another bot holds, so one person can receive through many bots", () => {
-    expect(freeNameFor("operator", bot, [held("operator", "first_bot")])).toBe("operator-second_bot");
-  });
-
-  it("numbers it when even the qualified name is taken", () => {
-    const taken = [held("operator", "first_bot"), held("operator-second_bot", "third_bot")];
-
-    expect(freeNameFor("operator", bot, taken)).toBe("operator-second_bot-2");
+  it("says nothing for a new name, for this bot's own binding, and for somebody else's name", () => {
+    expect(otherBotsOf("operator", bot, [])).toEqual([]);
+    expect(otherBotsOf("operator", bot, [held("operator", "second_bot")])).toEqual([]);
+    expect(otherBotsOf("operator", bot, [held("risk", "first_bot")])).toEqual([]);
   });
 });

@@ -270,54 +270,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/destinations": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Destinations
-         * @description Every destination and how far along it is. One read of the bots, because a name is what a
-         *     caller addresses and the bot behind it is what a response has to name.
-         */
-        get: operations["list_destinations_destinations_get"];
-        put?: never;
-        /**
-         * Offer
-         * @description Names a destination and hands back the link that will bind it.
-         *
-         *     Asking twice is not an error and does not make a second destination: it issues a fresh secret,
-         *     which is what an expired link needs. The destination cannot receive until somebody taps it.
-         */
-        post: operations["offer_destinations_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/destinations/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Remove
-         * @description Removes the binding and only the binding — the bot stands, and its other destinations with it.
-         */
-        delete: operations["remove_destinations__name__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/health": {
         parameters: {
             query?: never;
@@ -350,7 +302,7 @@ export interface paths {
         put?: never;
         /**
          * Send
-         * @description One message, now, to a destination by name.
+         * @description One message, now, to a recipient by name, through a bot when the recipient has several.
          *
          *     Nothing is queued and nothing is retried here. A refusal carries Telegram's own answer — the wait
          *     on a rate limit, the block on a recipient who left — because the caller decides from it whether
@@ -379,6 +331,90 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recipients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Recipients */
+        get: operations["list_recipients_recipients_get"];
+        put?: never;
+        /**
+         * Create
+         * @description Names a recipient. Asking for one that exists is not an error and changes nothing.
+         */
+        post: operations["create_recipients_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recipients/{name}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove
+         * @description Removes the recipient with every binding of it. The bots stand.
+         */
+        delete: operations["remove_recipients__name__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recipients/{name}/bots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Add Bot
+         * @description Reaches the recipient through a bot and hands back the link that will bind it.
+         *
+         *     Asking twice is not an error and does not make a second binding: it issues a fresh secret, which is what an expired
+         *     link needs. The binding cannot receive until somebody taps it — and a tap on another bot's link does not count.
+         */
+        post: operations["add_bot_recipients__name__bots_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/recipients/{name}/bots/{bot}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Remove Binding
+         * @description Removes one binding and only that: the bot stands, and so do the recipient's other bindings.
+         */
+        delete: operations["remove_binding_recipients__name__bots__bot__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -571,6 +607,14 @@ export interface components {
              */
             ended_at_telegram: boolean;
         };
+        /** NewBindingRequest */
+        NewBindingRequest: {
+            /**
+             * Bot
+             * @description the @name of the bot that will carry messages to this recipient
+             */
+            bot: string;
+        };
         /**
          * NewBotRequest
          * @description A bot to create through Telegram's creator bot. Available only where an account session is
@@ -588,13 +632,8 @@ export interface components {
              */
             username: string;
         };
-        /** NewDestinationRequest */
-        NewDestinationRequest: {
-            /**
-             * Bot
-             * @description the @name of the bot that will carry it
-             */
-            bot: string;
+        /** NewRecipientRequest */
+        NewRecipientRequest: {
             /**
              * Name
              * @description what callers will address; it survives a change of bot
@@ -652,18 +691,35 @@ export interface components {
             url: string | null;
         };
         /**
+         * RecipientOut
+         * @description Somebody to tell, and every bot they can be reached through. A recipient with no binding exists and cannot be
+         *     written to: nobody has added a bot to it yet.
+         */
+        RecipientOut: {
+            /** Bindings */
+            bindings: components["schemas"]["DestinationOut"][];
+            /** Name */
+            name: string;
+        };
+        /**
          * SendRequest
-         * @description A message, addressed by a destination's name. There is no `chat_id` and no bot here on purpose: a number every
-         *     caller keeps its own copy of is invalidated for all of them the day the bot is replaced. Nor is there a purpose any
+         * @description A message, addressed by a recipient's name and, when the recipient has several, the bot. There is no `chat_id`
+         *     here on purpose: a number every caller keeps its own copy of is invalidated for all of them the day the bot is
+         *     replaced. Nor is there a purpose any
          *     more — who is told what is decided by the rules of the alerts package, which name a destination — and a request that
          *     still sends one is refused rather than having it ignored.
          */
         SendRequest: {
             /**
-             * Destination
-             * @description the name the destination was bound under
+             * Bot
+             * @description the @name of the bot to send through; may be left out only when the recipient is reached through one
              */
-            destination: string;
+            bot?: string | null;
+            /**
+             * Recipient
+             * @description the name the recipient was given
+             */
+            recipient: string;
             /** Text */
             text: string;
         };
@@ -676,15 +732,15 @@ export interface components {
             /** Chat Id */
             chat_id: number;
             /**
-             * Destination
-             * @description the destination it went to
-             */
-            destination: string;
-            /**
              * Message Id
              * @description Telegram's own identifier for the delivered message
              */
             message_id: number;
+            /**
+             * Recipient
+             * @description the recipient it went to
+             */
+            recipient: string;
         };
         /**
          * StartLinkOut
@@ -1331,115 +1387,6 @@ export interface operations {
             };
         };
     };
-    list_destinations_destinations_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DestinationOut"][];
-                };
-            };
-        };
-    };
-    offer_destinations_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["NewDestinationRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["StartLinkOut"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    remove_destinations__name__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
     health_health_get: {
         parameters: {
             query?: never;
@@ -1549,6 +1496,180 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    list_recipients_recipients_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecipientOut"][];
+                };
+            };
+        };
+    };
+    create_recipients_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewRecipientRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecipientOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_recipients__name__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_bot_recipients__name__bots_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewBindingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StartLinkOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    remove_binding_recipients__name__bots__bot__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+                bot: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

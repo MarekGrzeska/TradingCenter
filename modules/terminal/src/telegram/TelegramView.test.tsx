@@ -164,7 +164,7 @@ describe("TelegramView", () => {
     await userEvent.click(screen.getByRole("button", { name: "Wyślij" }));
 
     expect(await screen.findByText(/Wysłane \(wiadomość nr 4242/)).toBeInTheDocument();
-    expect(sendMessage).toHaveBeenCalledWith("operator", "test z terminala", expect.anything());
+    expect(sendMessage).toHaveBeenCalledWith("operator", BOT.username, "test z terminala", expect.anything());
   });
 
   it("keeps Telegram's refusal beside the message when it cannot be sent", async () => {
@@ -178,10 +178,10 @@ describe("TelegramView", () => {
     expect(await screen.findByText(/blocked the bot/)).toBeInTheDocument();
   });
 
-  it("offers the same person a second bot under a name of its own instead of refusing the name", async () => {
+  it("adds the same recipient through a second bot under the same name, and says the rules without a bot will stop", async () => {
     const other: Bot = { username: "tc_second_bot", title: "Second", createdHere: false };
     const offerDestination = vi.fn(async () => ({
-      destination: { ...OPERATOR, name: "operator-tc_second_bot", bot: other.username, receives: false, state: "pending" as const },
+      destination: { ...OPERATOR, bot: other.username, receives: false, state: "pending" as const },
       url: "https://t.me/tc_second_bot?start=abc",
       expiresAt: new Date(Date.now() + 30 * 60_000),
     }));
@@ -190,9 +190,10 @@ describe("TelegramView", () => {
     const adds = await screen.findAllByRole("button", { name: "Dodaj odbiorcę…" });
     await userEvent.click(adds[1]);
 
-    expect(screen.getByText(/dostanie nazwę „operator-tc_second_bot”/)).toBeInTheDocument();
+    expect(screen.getByText(/już odbiera przez @tc_alerts_bot/)).toBeInTheDocument();
+    expect(screen.getByText(/nie wskazują bota/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Pokaż link" }));
-    expect(offerDestination).toHaveBeenCalledWith("operator-tc_second_bot", "tc_second_bot", expect.anything());
+    expect(offerDestination).toHaveBeenCalledWith("operator", "tc_second_bot", expect.anything());
   });
 
   it("does not offer another way when Telegram has none, and says where the code is instead", async () => {

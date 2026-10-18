@@ -17,13 +17,13 @@
 
 ## 3. Terminal
 
-- [ ] 3.1 Zakładka Telegram: adresaci z wiązaniami i ich stanem, „dodaj przez kolejnego bota” z odnośnikiem startowym i komunikatem o tapnięciu; ostrzeżenie o regułach bez bota
-- [ ] 3.2 Usunięcie wiązania z nazwą bota w potwierdzeniu; usunięcie adresata wymienia jego boty
-- [ ] 3.3 Formularz reguły: „Którym botem” z botami wybranego adresata; lista reguł mówi, przez którego bota; edycja starej reguły wypełnia jedynego bota
-- [ ] 3.4 Regeneracja kontraktów `telegram` i `alerts` (`contract-sync`), testy widoków wg „How much test is enough”
+- [x] 3.1 Zakładka Telegram: adresaci z wiązaniami i ich stanem, „dodaj przez kolejnego bota” z odnośnikiem startowym i komunikatem o tapnięciu; ostrzeżenie o regułach bez bota
+- [x] 3.2 Usunięcie wiązania z nazwą bota w potwierdzeniu; usunięcie adresata wymienia jego boty
+- [x] 3.3 Formularz reguły: „Którym botem” z botami wybranego adresata; lista reguł mówi, przez którego bota; edycja starej reguły wypełnia jedynego bota
+- [x] 3.4 Regeneracja kontraktów `telegram` i `alerts` (`contract-sync`), testy widoków wg „How much test is enough”
 
 ## 4. Dokumentacja i wdrożenie
 
-- [ ] 4.1 README bramy i pakietu `alerts`, `docs/architecture.md` jeśli opisuje adresata
+- [x] 4.1 README bramy i pakietu `alerts`, `docs/architecture.md` jeśli opisuje adresata
 - [ ] 4.2 Osobna, późniejsza zmiana: usunięcie kolumny `destinations.name` po jednym zweryfikowanym wydaniu
 - [ ] 4.3 Po scaleniu `deploy-watch`; dopiero po wdrożeniu dodanie drugiego bota przez operatora (Migration Plan, pkt 3)

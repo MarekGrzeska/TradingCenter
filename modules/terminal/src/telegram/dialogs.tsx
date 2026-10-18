@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { safeLocalStorage } from "../data/storage";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import { botUsernameProblem, freeNameFor } from "./present";
+import { botUsernameProblem, otherBotsOf } from "./present";
 import { QrCode } from "./QrCode";
 import type { Bot, CodeDelivery, Destination, StartLink, TelegramApi } from "./telegramApi";
 
@@ -526,7 +526,8 @@ export function ActivateDialog({
   onDone(): void;
 }) {
   const [name, setName] = useState(existing?.name ?? "operator");
-  const effectiveName = existing !== undefined ? existing.name : freeNameFor(name, bot, destinations);
+  const effectiveName = existing !== undefined ? existing.name : name.trim();
+  const alsoThrough = otherBotsOf(effectiveName, bot, destinations);
   const [link, setLink] = useState<StartLink | null>(null);
   const [received, setReceived] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -546,7 +547,7 @@ export function ActivateDialog({
       void api
         .destinations(signal())
         .then((all) => {
-          if (all.some((one) => one.name === link.destination.name && one.receives)) {
+          if (all.some((one) => one.name === link.destination.name && one.bot === link.destination.bot && one.receives)) {
             setReceived(true);
             done.current();
           }
@@ -647,9 +648,9 @@ export function ActivateDialog({
       <Field
         label="Nazwa odbiorcy"
         hint={
-          effectiveName !== name.trim() && name.trim() !== ""
-            ? `„${name.trim()}” już odbiera przez innego bota — ta osoba może odbierać przez wiele botów, ale to osobna rozmowa, więc dostanie nazwę „${effectiveName}” i musi dotknąć tego linku osobno.`
-            : "To nazwa w przypisaniach, nie czat. Ta sama osoba może odbierać przez wiele botów (każdy to osobna rozmowa z własnym tapnięciem). Bot nie może odezwać się pierwszy."
+          alsoThrough.length > 0
+            ? `„${effectiveName}” już odbiera przez ${alsoThrough.map((one) => `@${one}`).join(", ")}. Ten bot to osobna rozmowa, więc ta osoba musi dotknąć także tego linku. Reguły w zakładce Alerty, które nie wskazują bota dla „${effectiveName}”, przestaną dostarczać, dopóki nie wybierzesz w nich bota.`
+            : "To nazwa w regułach, nie czat. Tę samą nazwę możesz dodać przez kilka botów (każdy to osobna rozmowa z własnym tapnięciem). Bot nie może odezwać się pierwszy."
         }
       >
         <input className={INPUT} value={name} autoFocus disabled={existing !== undefined} onChange={(e) => setName(e.target.value)} />

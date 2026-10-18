@@ -7,22 +7,10 @@ export function destinationsOf(bot: Bot, destinations: Destination[]): Destinati
   return destinations.filter((one) => one.bot === bot.username);
 }
 
-/** The name a recipient gets through this bot. The door keeps names unique across bots (a name is what an assignment and a
- *  message are addressed by), but one person may well receive through several bots — each a separate conversation that needs
- *  its own tap — so a name another bot already holds becomes `name-botname`, and a number if even that is taken. */
-export function freeNameFor(wanted: string, bot: Bot, destinations: Destination[]): string {
-  const name = wanted.trim();
-  const holder = (candidate: string) => destinations.find((one) => one.name === candidate);
-  const free = (candidate: string) => {
-    const found = holder(candidate);
-    return found === undefined || found.bot === bot.username;
-  };
-  if (free(name)) return name;
-  const qualified = `${name}-${bot.username}`;
-  if (free(qualified)) return qualified;
-  for (let n = 2; ; n++) {
-    if (free(`${qualified}-${n}`)) return `${qualified}-${n}`;
-  }
+/** The bots a recipient is already reached through, other than this one: what a person adding the same name through one
+ *  more bot should be told, because each is a separate conversation that needs its own tap. */
+export function otherBotsOf(name: string, bot: Bot, destinations: Destination[]): string[] {
+  return destinations.filter((one) => one.name === name.trim() && one.bot !== bot.username).map((one) => one.bot);
 }
 
 /** Who a recipient is, the way a person would say it: `@nick · Name`, a group by its title, and the label it was given

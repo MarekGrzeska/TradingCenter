@@ -49,6 +49,8 @@ export interface RuleInput {
   name: string;
   source: Source;
   destination: string;
+  /** The @name of the bot to tell through; `null` means the recipient's only bot. */
+  bot: string | null;
   template: string;
   cooldownSeconds: number | null;
   mode: Mode;
@@ -215,6 +217,7 @@ function inputOnTheWire(input: RuleInput): Schemas["RuleIn"] {
     name: input.name,
     source: sourceOnTheWire(input.source),
     destination: input.destination,
+    bot: input.bot,
     template: input.template,
     cooldown_seconds: input.cooldownSeconds,
     mode: input.mode,
@@ -228,6 +231,7 @@ function inputFromTheWire(raw: Schemas["RuleIn"]): RuleInput {
     name: raw.name,
     source: mapSource(raw.source),
     destination: raw.destination,
+    bot: raw.bot ?? null,
     template: raw.template,
     cooldownSeconds: raw.cooldown_seconds ?? null,
     mode: raw.mode,
@@ -242,6 +246,7 @@ function mapRule(raw: Schemas["RuleOut"]): Rule {
     name: raw.name,
     source: mapSource(raw.source),
     destination: raw.destination,
+    bot: raw.bot ?? null,
     template: raw.template,
     cooldownSeconds: raw.cooldown_seconds,
     mode: raw.mode,

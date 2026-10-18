@@ -14,7 +14,7 @@ uv run pytest tests/alerts                            # anything needing a datab
 
 ## A rule
 
-`source` + `destination` + `template` + a rhythm. The source is one of two kinds, and they are not two flavours of one thing:
+`source` + `destination` (+ `bot`) + `template` + a rhythm. The `bot` is the @name to tell through; empty means the recipient's only bot, and a recipient with several bots makes a rule that did not choose one a defect, never a guess. The source is one of two kinds, and they are not two flavours of one thing:
 
 - **a value** — a read-only tool of this process (`get_last_price`, an indicator, a prediction market's price) is asked
   again and again, and the rule goes off on the step from *no* to *yes*, not on every look that finds yes. The first look

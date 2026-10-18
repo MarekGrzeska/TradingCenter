@@ -485,6 +485,8 @@ export interface components {
          *     the default of the rule's kind, which is why they are not required.
          */
         RuleIn: {
+            /** Bot */
+            bot?: string | null;
             /** Cooldown Seconds */
             cooldown_seconds?: number | null;
             /** Destination */
@@ -514,6 +516,8 @@ export interface components {
         };
         /** RuleOut */
         RuleOut: {
+            /** Bot */
+            bot: string | null;
             /** Cooldown Seconds */
             cooldown_seconds: number;
             /**

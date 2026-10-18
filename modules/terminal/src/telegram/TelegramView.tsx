@@ -246,7 +246,7 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
                     destinations={mine}
                     onActivate={(existing) => setDialog({ kind: "activate", bot, existing })}
                     onRemoveDestination={(destination) => setDialog({ kind: "remove-destination", destination })}
-                    onSend={(destination, text) => client.sendMessage(destination, text, signal())}
+                    onSend={(destination, text) => client.sendMessage(destination, bot.username, text, signal())}
                   />
                 )}
               </li>
@@ -347,12 +347,13 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
           fallbackError="nie udało się usunąć odbiorcy"
           body={
             <p>
-              Znika tylko powiązanie z czatem — bot zostaje. Reguły w zakładce Alerty, które go wskazują, zostaną na liście,
-              ale przestaną dostarczać.
+              Znika tylko powiązanie tego odbiorcy z @{dialog.destination.bot} — bot zostaje, a ta sama nazwa przez innych
+              botów dalej działa. Reguły w zakładce Alerty, które wskazują ten bot, zostaną na liście, ale przestaną
+              dostarczać.
             </p>
           }
           onConfirm={async () => {
-            await client.removeDestination(dialog.destination.name, signal());
+            await client.removeDestination(dialog.destination.name, dialog.destination.bot, signal());
             refresh();
           }}
           onClose={() => setDialog(null)}
