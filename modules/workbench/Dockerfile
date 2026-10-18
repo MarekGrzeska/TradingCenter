@@ -24,6 +24,7 @@ COPY modules/workbench/social_data ./social_data
 COPY modules/workbench/market_data ./market_data
 COPY modules/workbench/telegram_gateway ./telegram_gateway
 COPY modules/workbench/youtube_data ./youtube_data
+COPY modules/workbench/alerts ./alerts
 COPY modules/workbench/migrations ./migrations
 RUN uv sync --frozen --no-dev
 

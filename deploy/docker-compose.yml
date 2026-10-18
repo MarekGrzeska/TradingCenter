@@ -113,12 +113,14 @@ services:
       SOCIAL_DATABASE_URL: postgresql://social:${SOCIAL_DB_PASSWORD:?}@postgres:5432/social
       TELEGRAM_DATABASE_URL: postgresql://telegram:${TELEGRAM_DB_PASSWORD:?}@postgres:5432/telegram
       YOUTUBE_DATABASE_URL: postgresql://youtube:${YOUTUBE_DB_PASSWORD:?}@postgres:5432/youtube
+      ALERTS_DATABASE_URL: postgresql://alerts:${ALERTS_DB_PASSWORD:?}@postgres:5432/alerts
       DATABASE_POOL_SIZE: "4"
       MARKET_DATABASE_POOL_SIZE: "8"
       POLYMARKET_DATABASE_POOL_SIZE: "3"
       SOCIAL_DATABASE_POOL_SIZE: "3"
       TELEGRAM_DATABASE_POOL_SIZE: "4"
       YOUTUBE_DATABASE_POOL_SIZE: "2"
+      ALERTS_DATABASE_POOL_SIZE: "2"
 
       GATEWAY_BASE_URL: http://gateway:80
       GATEWAY_STREAM_URL: ws://gateway:80/ws/stream
@@ -139,6 +141,8 @@ services:
       # client id) and the terminal, which is where the account is logged in and the purposes are assigned.
       TELEGRAM_REST_CALLER_APPLICATION_IDS: 04b07795-8ddb-461a-bbee-02f9e1bf7b46,${TERMINAL_APPLICATION_ID:?}
       YOUTUBE_REST_CALLER_APPLICATION_IDS: ${TERMINAL_APPLICATION_ID:?}
+      # The rules decide who is told what: the terminal alone writes them.
+      ALERTS_REST_CALLER_APPLICATION_IDS: ${TERMINAL_APPLICATION_ID:?}
 
       SCHEDULER_ENABLED: "true"
 
@@ -227,6 +231,7 @@ services:
       SOCIAL_DB_PASSWORD: ${SOCIAL_DB_PASSWORD:?}
       TELEGRAM_DB_PASSWORD: ${TELEGRAM_DB_PASSWORD:?}
       YOUTUBE_DB_PASSWORD: ${YOUTUBE_DB_PASSWORD:?}
+      ALERTS_DB_PASSWORD: ${ALERTS_DB_PASSWORD:?}
     volumes:
       - ./postgres/ensure-databases.sh:/ensure-databases.sh:ro
     depends_on:

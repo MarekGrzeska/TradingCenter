@@ -1,11 +1,11 @@
 ## 1. Szkielet pakietu
 
-- [ ] 1.1 `alerts/` z `config.py` (prefiks `ALERTS_`: baza, pula 2, tick, najkrótszy interwał, okno ponowień, sufit/h, retencja, klucz i model szkicu, sufit dobowy szkiców), `runtime.py` (klucz blokady `8120`), `app.py`, `openapi.py`
-- [ ] 1.2 `alembic-alerts.ini` i migracja: `event_types`, `events` (unikalne `(type, source_key)`), `rules`, `rule_checks`, `fires` (unikalne `(rule_id, event_id)` i `(rule_id, edge_at)`), `draft_usage`, `migrations_done`; indeksy częściowe z design 7
-- [ ] 1.3 `caller_access.py`: trasy operatora z listy aplikacji, trasy producentów wyłącznie dla `IN_PROCESS_CALLER`
-- [ ] 1.4 Montaż warunkowy w `workbench/app.py`, kolejność lifespanów z design 8, wpis w `tests/test_layering.py` i `scripts/tests/test_pool_budget.py`
-- [ ] 1.5 `scripts/dev.py` (`LOGICAL_DATABASES`, łańcuch), `.env.example`, `deploy/postgres/ensure-databases.sh`, `deploy/env.required` (`ALERTS_DATABASE_URL`)
-- [ ] 1.6 Testy: start bez bazy, baza nieosiągalna (odmowa z nazwą), migracja pod blokadą (`-m db`)
+- [x] 1.1 `alerts/` z `config.py` (prefiks `ALERTS_`: baza, pula 2, tick, najkrótszy interwał, okno ponowień, sufit/h, retencja, klucz i model szkicu, sufit dobowy szkiców), `runtime.py` (klucz blokady `8120`), `app.py`, `openapi.py`
+- [x] 1.2 `alembic-alerts.ini` i migracja: `event_types`, `events` (unikalne `(type, source_key)`), `rules`, `rule_checks`, `fires` (unikalne `(rule_id, event_id)` i `(rule_id, edge_at)`), `draft_usage`, `migrations_done`; indeksy częściowe z design 7
+- [x] 1.3 `caller_access.py`: trasy operatora z listy aplikacji, trasy producentów wyłącznie dla `IN_PROCESS_CALLER`
+- [x] 1.4 Montaż warunkowy w `workbench/app.py`, kolejność lifespanów z design 8, wpis w `tests/test_layering.py` i `scripts/tests/test_pool_budget.py`
+- [x] 1.5 `scripts/dev.py` (`LOGICAL_DATABASES`, łańcuch), `.env.example`, `deploy/postgres/ensure-databases.sh`, `deploy/env.required` (`ALERTS_DATABASE_URL`)
+- [x] 1.6 Testy: start bez bazy, baza nieosiągalna (odmowa z nazwą), migracja pod blokadą (`-m db`)
 
 ## 2. Katalog i reguły
 
