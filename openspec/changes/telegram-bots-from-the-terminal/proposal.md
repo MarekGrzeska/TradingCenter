@@ -48,7 +48,7 @@ na jeden cel. `review.md` powstanie po zadaniach, bo zmiana dotyka sekretu konta
 - `telegram-gateway-upstream-access`: sesja konta służy także logowaniu, wylogowaniu i rotacji; zawsze konto dedykowane.
 - `telegram-gateway-destinations`: usunięcie adresata z przypisaniem jest odmową.
 - `telegram-gateway-api`: trasa stanu mówi, czyje jest konto i ile celów nie ma adresata.
-- `social-data-alerts`, `strategy-alerts`: „brak bramy” staje się „cel bez adresata”.
+- `social-data-alerts`: „brak bramy” staje się „cel bez adresata”. (Delta `strategy-alerts` wycięta 18.10.2026: specyfikację usunęła `remove-strategy-platform`.)
 
 ## Impact
 

@@ -148,7 +148,7 @@ images back otherwise; a check of "the container runs" is not enough (Azure repo
 crash-looping container on 16 August 2026).
 
 Each module does this in its own `lifespan`, under a Postgres advisory lock keyed per module (in the
-workbench 8020, 8030, 8050, 8070, 8080, 8090 and 8100 — each the port that package used to have), with
+workbench 8020, 8030, 8050, 8070, 8090, 8100 and YouTube's 8110 — the port each package used to have), with
 its own identity. Reasoning: `openspec/changes/archive/…-modules-migrate-their-own-database`.
 
 Each role owns its database from the start: `deploy/postgres/ensure-databases.sh` creates both on every
