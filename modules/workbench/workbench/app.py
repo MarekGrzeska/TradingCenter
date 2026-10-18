@@ -34,7 +34,6 @@ import agent.surface
 import market_data.app
 import polymarket_data.app
 import social_data.app
-import strategy.app
 import teams.surface
 import telegram_gateway.app
 import youtube_data.app
@@ -54,7 +53,6 @@ from teams.scheduler import Clock
 from teams.tools import ToolServerRegistry as TeamsToolServerRegistry
 
 from . import model_successors
-from .archive_client import archive_client
 from .assembly import mount_package
 from .config import Settings, youtube_enabled
 from .edge import edge_config, edge_provider
@@ -73,7 +71,6 @@ async def lifespan(app: FastAPI):
     teams_settings = settings.for_teams()
     polymarket_settings = settings.for_polymarket()
     social_settings = settings.for_social()
-    strategy_settings = settings.for_strategy()
     market_settings = settings.for_market()
     telegram_settings = settings.for_telegram()
     youtube_settings = settings.for_youtube() if YOUTUBE_MOUNTED else None
@@ -81,7 +78,6 @@ async def lifespan(app: FastAPI):
     # archive's eleven were the first tools this process ever called, over the network; they are the last to move in.
     polymarket_tools = ConversationLocalTools("polymarket-data", polymarket_app.state.mcp_server)
     social_tools = ConversationLocalTools("social-data", social_app.state.mcp_server)
-    strategy_tools = ConversationLocalTools("strategy", strategy_app.state.mcp_server)
     market_tools = ConversationLocalTools("market-data", market_app.state.mcp_server)
     telegram_tools = ConversationLocalTools("telegram-gateway", telegram_app.state.mcp_server)
     youtube_tools = (
@@ -102,7 +98,6 @@ async def lifespan(app: FastAPI):
             market_tools,
             polymarket_tools,
             social_tools,
-            strategy_tools,
             telegram_tools,
             *([] if youtube_tools is None else [youtube_tools]),
         ],
@@ -130,21 +125,11 @@ async def lifespan(app: FastAPI):
         # archive's first pass may already have something to say.
         telegram_gateway.app.serving(telegram_app, telegram_settings),
         telegram_client(telegram_app, "the post archive") as social_telegram,
-        telegram_client(telegram_app, "the strategy platform") as strategy_telegram,
         polymarket_data.app.serving(polymarket_app, polymarket_settings),
         social_data.app.serving(social_app, social_settings, telegram=social_telegram),
-        # The archive before the platform that reads it, and the platform handed the archive's own application
-        # rather than an address: no hop through the platform's authenticator to reach this very process.
         # The archive's migration may wait on an index over the candle table, and its ingest opens a subscription
         # per tracked pair the moment it starts.
         market_data.app.serving(market_app, market_settings),
-        archive_client(market_app) as strategy_archive,
-        strategy.app.serving(
-            strategy_app,
-            strategy_settings,
-            archive_client=strategy_archive,
-            telegram=strategy_telegram,
-        ),
         # Entered only when mounted: with no database configured this is a block that does nothing, and the start-up
         # log line is what says why.
         (
@@ -168,10 +153,6 @@ async def lifespan(app: FastAPI):
         )
         teams_tool_servers.local["social-data"] = TeamsLocalTools(
             "social-data", social_app.state.mcp_server
-        )
-        # The one the clock reads: `pending_setups` is the number a trigger wakes a team on.
-        teams_tool_servers.local["strategy"] = TeamsLocalTools(
-            "strategy", strategy_app.state.mcp_server
         )
         teams_tool_servers.local["market-data"] = TeamsLocalTools(
             "market-data", market_app.state.mcp_server
@@ -298,8 +279,7 @@ app = FastAPI(
         "it is written, against this process's own rate configuration, never recomputed "
         "later. The tools that build and run teams are a layer in this process, and so are "
         "the three archives it serves — the candle archive under /market, prediction markets "
-        "under /polymarket, and posts with what a model made of them under /social — the "
-        "strategy platform under /strategy, which decides and never touches an account, and "
+        "under /polymarket, and posts with what a model made of them under /social — and "
         "the one door to Telegram under /telegram."
     ),
     version="0.1.0",
@@ -337,8 +317,6 @@ polymarket_app = polymarket_data.app.create_app()
 mount_package(app, "/polymarket", polymarket_app)
 social_app = social_data.app.create_app()
 mount_package(app, "/social", social_app)
-strategy_app = strategy.app.create_app()
-mount_package(app, "/strategy", strategy_app)
 # The candle archive, whole: its REST contract, its `/mcp`, and the one WebSocket this process serves —
 # `/market/ws/candles`, outside Easy Auth and behind the archive's own one-time ticket.
 market_app = market_data.app.create_app()

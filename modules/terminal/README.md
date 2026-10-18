@@ -200,8 +200,8 @@ reads it, instead of arriving as `undefined` and showing up as a blank cell.
 The `map*` functions stay hand-written. They are not transcription: they turn ISO strings
 into epoch seconds, which is what keeps one timestamp spelling across the module.
 
-Eight sources: market-data, the workbench's two surfaces (`teams.openapi`,
-`agent.openapi`), polymarket-data, social-data, youtube-data, strategy and the door to Telegram
+Seven sources: market-data, the workbench's two surfaces (`teams.openapi`,
+`agent.openapi`), polymarket-data, social-data, youtube-data and the door to Telegram
 (`telegram_gateway.openapi`, which has no model that can carry a token or a session). The conversation's was the
 last hand-written one, and the one seam `contract:check` could not see drift across; its
 event stream (`stream.ts`) stays hand-written, because OpenAPI does not describe SSE.

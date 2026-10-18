@@ -6,7 +6,7 @@ One repository, three processes, no shared runtime. A module is a directory unde
 that runs on its own and publishes a contract, and it is a process because it has a rule of
 writing nobody else has: the gateway is the only door to the provider, `trading-mcp` the only
 thing that moves an account, and the `workbench` everything else — the conversation, the teams,
-three archives, the strategy platform and the door to Telegram, as packages of one process. Nothing imports across a process boundary at runtime; source may be
+three archives and the door to Telegram, as packages of one process. Nothing imports across a process boundary at runtime; source may be
 shared at build time through `packages/`, under the conditions in "What may be shared, and what
 may not".
 
@@ -28,8 +28,6 @@ may not".
   │  market_data      /market      candles · /ws       │
   │  polymarket_data  /polymarket  the other archive   │──▶ Telegram
   │  social_data      /social      the post archive    │
-  │  strategy         /strategy    reads /market in-   │
-  │                                process             │
   │  telegram_gateway /telegram    the door out        │
   │  seven databases · one identity · one Easy Auth    │◀── OpenAI ×2
   └───────────┬───────────────────────────┬────────────┘
@@ -66,7 +64,8 @@ like "collected beats computed" from being made twice. Those tools stood in a mo
 until 19 August 2026, and what that module was made of turned out to be mostly the separation
 itself; the archive itself stood in a module of its own until 6 September, and so did the other
 two archives and the strategy platform — "One process per security boundary" below is that
-story, with the numbers.
+story, with the numbers. The strategy platform has since been removed (`remove-strategy-platform`, October
+2026) to be written again differently; the sections below that name it describe the road, not the state.
 
 A gate in front of an application authorizes the **application**, so admitting a caller for
 eleven read-only tools would admit it to `POST /pairs` and `DELETE /pairs/{symbol}` as well. What
@@ -355,7 +354,7 @@ and skipped. A week with open markets is what the plan's alert at 92% is still w
 86–90% — but it was also the week the database ran out of CPU credits, and queued requests weigh on
 memory. After the database was fixed the peaks sat at 84%, touching 85% only while a deploy ran two
 containers side by side. On that borderline the operator chose to fold: one App Service, one Easy Auth
-registration, one identity and ~230 MB fewer. The post archive and the strategy platform reach
+registration, one identity and ~230 MB fewer. The post archive and the strategy platform (since removed) reach
 `POST /telegram/messages` the way the platform reaches the archive (`workbench/telegram_client.py`), and
 the operator's `az` — the one caller that is a person — is admitted to the whole workbench by Easy
 Auth and answered by `/telegram`'s bots and destinations alone: the root routes keep a caller record

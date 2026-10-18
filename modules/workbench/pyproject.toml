@@ -1,7 +1,7 @@
 [project]
 name = "workbench"
 version = "0.1.0"
-description = "The operator's conversation with a model, the teams they compose, three archives and the strategy platform — one process, six schemas"
+description = "The operator's conversation with a model, the teams they compose, three archives and the door to Telegram — one process"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.110",
@@ -83,7 +83,7 @@ line-length = 100
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
 [tool.pyright]
-include = ["workbench", "agent", "teams", "teams_tools", "polymarket_data", "social_data", "strategy", "market_data", "youtube_data", "migrations"]
+include = ["workbench", "agent", "teams", "teams_tools", "polymarket_data", "social_data", "market_data", "youtube_data", "migrations"]
 typeCheckingMode = "basic"
 
 [tool.pytest.ini_options]

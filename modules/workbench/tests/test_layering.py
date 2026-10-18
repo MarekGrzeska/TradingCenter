@@ -18,7 +18,6 @@ PACKAGES = (
     "teams_tools",
     "polymarket_data",
     "social_data",
-    "strategy",
     "market_data",
     "telegram_gateway",
     "youtube_data",

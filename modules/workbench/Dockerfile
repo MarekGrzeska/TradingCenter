@@ -21,7 +21,6 @@ COPY modules/workbench/teams ./teams
 COPY modules/workbench/teams_tools ./teams_tools
 COPY modules/workbench/polymarket_data ./polymarket_data
 COPY modules/workbench/social_data ./social_data
-COPY modules/workbench/strategy ./strategy
 COPY modules/workbench/market_data ./market_data
 COPY modules/workbench/telegram_gateway ./telegram_gateway
 COPY modules/workbench/youtube_data ./youtube_data

@@ -86,7 +86,6 @@ def _server_settings(**overrides) -> Settings:
         "teams_database_url": "postgresql://x@127.0.0.1/t",
         "polymarket_database_url": "postgresql://x@127.0.0.1/p",
         "social_database_url": "postgresql://x@127.0.0.1/s",
-        "strategy_database_url": "postgresql://x@127.0.0.1/st",
         "market_database_url": "postgresql://x@127.0.0.1/m",
         "telegram_database_url": "postgresql://x@127.0.0.1/tg",
         "gateway_api_key": "gateway-key",

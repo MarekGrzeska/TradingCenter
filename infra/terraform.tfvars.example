@@ -26,6 +26,6 @@ telegram_account_session_configured = false
 # Key Vault. False is a working configuration: the YouTube archive is simply not part of the process.
 youtube_enabled = false
 
-# The name the workbench's post archive and strategy platform send their alerts to, bound in the gateway by hand. Empty leaves both silent,
+# The name the workbench's post archive and YouTube archive send their alerts to, bound in the gateway by hand. Empty leaves both silent,
 # which is a working configuration and the rollback lever.
 telegram_alert_destination = ""

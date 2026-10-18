@@ -39,8 +39,6 @@ class ToolServerRegistry:
                 # `one-process-per-security-boundary`, and their tools arrive through `local_sources`.
                 # No Telegram server: the door to Telegram is a package of this process since stage 4, and its
                 # two tools — one of them the only effect visible outside this system — arrive through `local_sources`.
-                # No strategy server either: the platform is the third package of this process, and its
-                # read-only tools arrive through `local_sources` like the two archives'.
                 *(local_sources or []),
             ]
         )

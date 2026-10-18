@@ -48,9 +48,6 @@ export const gatewayIdentity: Identity = scopeFor((s) => s.gateway);
 /** `polymarket-data`, for the prediction-market tab. */
 export const polymarketIdentity: Identity = scopeFor((s) => s.polymarket);
 
-/** `strategy`, for the strategy tab. */
-export const strategyIdentity: Identity = scopeFor((s) => s.strategy);
-
 /** `social-data`, for the posts tab. */
 export const socialIdentity: Identity = scopeFor((s) => s.social);
 

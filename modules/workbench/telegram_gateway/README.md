@@ -28,7 +28,7 @@ What it *does* remember is **that a purpose was used** — a name and when, neve
 ## Who hears what: purposes and assignments
 
 A producer does not say who to tell. It says **what kind of event this is** — a *purpose*, an open dotted name:
-`social.post.<author>`, `strategy.setup`, `youtube.film.<channel>`, and whatever a rule the operator sets up tomorrow
+`social.post.<author>`, `youtube.film.<channel>`, and whatever a rule the operator sets up tomorrow
 invents (`market.price.eurusd`). The operator assigns purposes to recipients in the terminal:
 
 - an assignment key is a purpose, a **prefix of one cut at a dot** (`youtube` catches `youtube.film.anything`, not
@@ -66,8 +66,8 @@ them. `Bot` and `BotCredential` are separate types for that reason — the read 
 
 ## Who calls it
 
-The conversation and the teams call the two tools as functions (`workbench/local_tools.py`). The post archive, the
-YouTube archive and the strategy platform call `POST /messages` with a purpose through the gateway's own application, as
+The conversation and the teams call the two tools as functions (`workbench/local_tools.py`). The post archive and the
+YouTube archive call `POST /messages` with a purpose through the gateway's own application, as
 this process (`workbench/telegram_client.py`). From outside, two applications are admitted to the REST contract, and only
 those (`TELEGRAM_REST_CALLER_APPLICATION_IDS`): the operator's `az`, and the terminal, which is where the account is logged
 in and purposes are assigned. The workbench's root record (`workbench/root_access.py`) refuses both everywhere else.

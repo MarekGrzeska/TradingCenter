@@ -78,7 +78,7 @@ resource "azuread_application_pre_authorized" "workbench_terminal" {
   permission_ids       = [module.workbench_easy_auth.scope_id]
 }
 
-# No pre-authorization for the archives or the strategy platform: all three are served by the workbench, whose
+# No pre-authorization for the archives: all three are served by the workbench, whose
 # scope the one above covers.
 
 

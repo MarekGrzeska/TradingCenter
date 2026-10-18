@@ -28,7 +28,6 @@ MODULES = {
     "workbench:teams_tools": "workbench/teams_tools",
     "workbench:polymarket_data": "workbench/polymarket_data",
     "workbench:social_data": "workbench/social_data",
-    "workbench:strategy": "workbench/strategy",
     "workbench:market_data": "workbench/market_data",
     "workbench:telegram_gateway": "workbench/telegram_gateway",
     "workbench:youtube_data": "workbench/youtube_data",
