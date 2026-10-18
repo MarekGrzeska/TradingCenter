@@ -54,6 +54,7 @@ from teams.scheduler import Clock
 from teams.tools import ToolServerRegistry as TeamsToolServerRegistry
 
 from . import model_successors
+from .alert_tools import AlertTools
 from .assembly import mount_package
 from .config import Settings, alerts_enabled, youtube_enabled
 from .edge import edge_config, edge_provider
@@ -86,6 +87,16 @@ async def lifespan(app: FastAPI):
         None
         if youtube_app is None
         else ConversationLocalTools("youtube-data", youtube_app.state.mcp_server)
+    )
+
+    # What a rule can read: every package's read-only tools, called as functions. The door to Telegram has nothing to read.
+    alert_tools = AlertTools(
+        {
+            "market-data": market_app.state.mcp_server,
+            "polymarket-data": polymarket_app.state.mcp_server,
+            "social-data": social_app.state.mcp_server,
+            **({} if youtube_app is None else {"youtube-data": youtube_app.state.mcp_server}),
+        }
     )
 
     # Constructed, not connected: a session opens on the first turn that wants a tool. Reaching trading-mcp at startup
@@ -129,7 +140,12 @@ async def lifespan(app: FastAPI):
         # After the door, before every package that publishes: what an archive announces at start has to find the
         # rules already there. Entered only when mounted, like the YouTube archive below.
         (
-            alerts.app.serving(alerts_app, alerts_settings)
+            telegram_client(telegram_app, "the alerts package")
+            if alerts_app is not None
+            else nullcontext(None)
+        ) as alerts_telegram,
+        (
+            alerts.app.serving(alerts_app, alerts_settings, tools=alert_tools, telegram=alerts_telegram)
             if alerts_app is not None and alerts_settings is not None
             else nullcontext()
         ),

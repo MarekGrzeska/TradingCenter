@@ -294,7 +294,7 @@
         <li><strong>niedostępność to trzeci stan</strong> — narzędzie, które nie odpowiedziało, nie jest „warunkiem niespełnionym” (<code>last_result = NULL</code>);</li>
         <li><strong>sprawdzanie nie kosztuje modelu</strong> — to jedno wywołanie narzędzia, zero tokenów; <code>claim_trigger_for_check</code> zajmuje wiersz, więc sprawdzenie się nie dubluje; historia trafia do <code>fires</code>.</li>
       </ul>
-      <p>Do tego narzędzia archiwów są osiągalne w procesie jako funkcje — przez rejestr narzędzi, który zespoły już dostają od <code>workbench/app.py</code>. <code>get_last_price</code> zwraca bieżącą, jeszcze tworzącą się świecę (<code>forming</code>) razem z jej high i low. <code>docs/architecture.md</code> wymienia <span class="hl">„typed events” jako dozwolony kontrakt</span> obok HTTP i MCP, więc zdarzenia między pakietami nie łamią zasady.</p>
+      <p>Do tego narzędzia archiwów są osiągalne w procesie jako funkcje — przez rejestr narzędzi, który zespoły już dostają od <code>workbench/app.py</code>. <code>get_last_price</code> zwraca cenę bieżącej, jeszcze tworzącej się świecy (<code>forming</code>) razem z jej wiekiem. <code>docs/architecture.md</code> wymienia <span class="hl">„typed events” jako dozwolony kontrakt</span> obok HTTP i MCP, więc zdarzenia między pakietami nie łamią zasady.</p>
       <p>Słabość istniejącego formularza: narzędzie wybiera się z listy, ale <code>arguments</code> to ręcznie wpisywany JSON, a <code>field_path</code> to zwykły tekst. Ten sam problem co z kluczem w Telegramie, tylko głębiej.</p>
     </section>
 
@@ -390,7 +390,7 @@
       <div class="eyebrow">06 · Cena wprost</div>
       <h2>Alert cenowy: odpytywanie czy tick</h2>
       <p>Strumień cen płynie już przez <code>market_data/ingest/live.py</code>, więc kusi, żeby sprawdzać próg na każdym ticku: dokładnie i bez bazy. Ale wtedy archiwum rynku musiałoby znać reguły Telegrama. To pakiet sięgający po wiedzę sąsiada, czyli dokładnie to, czego zabrania <code>test_layering.py</code>.</p>
-      <p><span class="hl">Rekomendacja: odpytywanie <code>get_last_price</code></span>, z przebiciem liczonym po <em>high/low tworzącej się świecy</em>, a nie po samym <code>close</code>. Wtedy szpilka, która przebiła poziom i wróciła między dwoma sprawdzeniami, i tak zostanie złapana. Koszt: jeden odczyt najnowszej świecy z indeksu na regułę na sprawdzenie, czyli przy 20 regułach co 30 s — 40 lekkich zapytań na minutę. Przed wdrożeniem trzeba to sprawdzić skillem <code>db-cost-check</code> z <code>EXPLAIN</code>.</p>
+      <p><span class="hl">Rekomendacja: odpytywanie <code>get_last_price</code></span>. Zastrzeżenie, które wyszło przy wdrażaniu: to narzędzie podaje cenę bieżącej świecy (<code>close</code>), a nie jej high/low — archiwum świadomie nie podaje zakresu okresu w toku jako zakresu. Reguła widzi więc cenę z chwili sprawdzenia, i szpilka, która przebiła poziom i wróciła między dwoma sprawdzeniami, przepadnie. Najkrótszy interwał (30 s) zawęża tę lukę; ekstremum okresu wymagałoby zmiany w archiwum rynku. Koszt: jeden odczyt najnowszej świecy z indeksu na regułę na sprawdzenie, czyli przy 20 regułach co 30 s — 40 lekkich zapytań na minutę. Przed wdrożeniem trzeba to sprawdzić skillem <code>db-cost-check</code> z <code>EXPLAIN</code>.</p>
       <p>Do ustalenia przy projektowaniu: czy alert ma być jednorazowy (wyłącza się po odpaleniu, jak w TradingView), czy powtarzalny z czasem martwym. Warto mieć oba warianty jako opcję reguły.</p>
     </section>
 

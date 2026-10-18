@@ -25,6 +25,10 @@ TOOLS_PREFIX = "/mcp"
 # application can never disagree with it, and disagreeing is the whole job.
 REST_PATHS: tuple[str, ...] = (
     "/health",
+    "/catalog",
+    "/rules",
+    "/rules/{rule_id}",
+    "/event-types/{name}",
     # FastAPI's own, published by the framework rather than by a router.
     "/docs",
     "/docs/oauth2-redirect",

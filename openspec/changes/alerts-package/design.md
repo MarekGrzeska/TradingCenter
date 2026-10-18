@@ -120,6 +120,7 @@ serwują.
 
 ## Risks / Trade-offs
 
+- [Reguła ceny widzi wartość z chwili sprawdzenia, nie ekstremum między sprawdzeniami: szpilka, która przebiła poziom i wróciła w ciągu jednego interwału, przepadnie] → `get_last_price` celowo nie niesie high/low okresu w toku (`market-data-tools`: zakres okresu w toku nie jest zakresem zamkniętym), więc zmiana tego narzędzia byłaby zmianą kontraktu archiwum. Najkrótszy interwał (30 s) zawęża lukę; ekstremum okresu jest osobną zmianą w `market_data`.
 - [Film odczytany tuż przed wdrożeniem 1 ma znacznik starej wysyłki, a nowy kod opublikuje go
   ponownie] → znacznik publikacji to ta sama kolumna co znacznik wysyłki. Film już powiadomiony nie
   jest publikowany, kosztem tego, że nie trafi do historii zdarzeń.
