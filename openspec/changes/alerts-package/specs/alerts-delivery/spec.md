@@ -49,8 +49,7 @@ Wiadomość o filmie z rana doręczona wieczorem, w stosie z dwudziestoma innymi
 
 Reguła MUST NOT doręczyć więcej wiadomości w ciągu godziny niż sufit z ustawień pakietu. Odpalenia ponad
 sufit MUST być zapisane jako zdławione i MUST NOT być wysyłane później. Pierwsze zdławienie w danej
-godzinie MUST dać jedną wiadomość do adresata reguły mówiącą, że reguła została zdławiona i ile
-odpaleń pominięto.
+godzinie MUST dać jedną wiadomość do adresata reguły mówiącą, że reguła została zdławiona i ile odpaleń pominięto do tej chwili.
 
 Reguła „każdy post” ustawiona przez pomyłkę na archiwum, które właśnie nadrabia zaległości, to setki
 wiadomości. Jedna wiadomość o zdławieniu mówi więcej niż one wszystkie.

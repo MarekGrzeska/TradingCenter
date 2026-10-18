@@ -8,7 +8,7 @@ from typing import Any
 
 from alerts.catalog import CatalogTool, ToolOutcome
 from alerts.contract import ConditionSource, EventSource, FilterTerm, RuleIn
-from alerts.gateway import Recipient
+from alerts.gateway import Recipient, Sent
 from alerts.validation import Known
 
 LAST_PRICE_INPUT = {
@@ -116,11 +116,14 @@ class FakeTools:
 
 
 class FakeGateway:
-    """The door's list of recipients, which can fail."""
+    """The door: its recipients, which can fail to be listed, and what it says about each message sent, in the order the
+    test queued it (an `ok` once the queue is empty)."""
 
     def __init__(self, names: list[str] | None = None) -> None:
         self.names = ["phone"] if names is None else names
         self.down = False
+        self.sent: list[tuple[str, str]] = []
+        self.answers: list[Sent] = []
 
     async def recipients(self) -> list[Recipient]:
         from alerts.gateway import GatewayUnreachable
@@ -128,3 +131,7 @@ class FakeGateway:
         if self.down:
             raise GatewayUnreachable("the door to Telegram did not answer: test")
         return [Recipient(name, "@bot", True) for name in self.names]
+
+    async def send(self, destination: str, text: str) -> Sent:
+        self.sent.append((destination, text))
+        return self.answers.pop(0) if self.answers else Sent(ok=True)
