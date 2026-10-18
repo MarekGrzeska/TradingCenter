@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import asyncpg
@@ -25,6 +25,7 @@ BATCH = 50
 # How many of them are looked at at once. A look is a read against an archive in this process, so this is a courtesy to
 # the archive's pool and not a limit of ours.
 CONCURRENCY = 5
+CLEANUP_EVERY = timedelta(hours=1)
 
 
 class Clock:
@@ -40,6 +41,7 @@ class Clock:
         self._tools = tools
         self._heartbeat = heartbeat
         self._woken = asyncio.Event()
+        self._last_cleanup: datetime | None = None
         self._task: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
@@ -91,7 +93,18 @@ class Clock:
                     log.exception("rule %s could not be looked at", row["id"])
 
         await asyncio.gather(*(one(row) for row in due))
+        await self._forget_old_events(moment)
         return len(due)
+
+    async def _forget_old_events(self, now: datetime) -> None:
+        """Once an hour: events past their retention go, the fires they caused stay."""
+        if self._last_cleanup is not None and now - self._last_cleanup < CLEANUP_EVERY:
+            return
+        self._last_cleanup = now
+        async with self._pool.acquire() as conn:
+            gone = await store.delete_events_before(conn, now - timedelta(days=self._settings.event_retention_days))
+        if gone:
+            log.info("forgot %d event(s) older than %d days", gone, self._settings.event_retention_days)
 
     async def _check(self, row: asyncpg.Record, now: datetime) -> None:
         arguments = store.json_of(row["arguments"]) or {}

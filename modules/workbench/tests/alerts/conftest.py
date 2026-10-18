@@ -86,6 +86,15 @@ def app():
     return create_app()
 
 
+def _idle_clock(pool, settings, tools):
+    """The clock the application would have, not running: a route may wake it, and a test drives its ticks itself."""
+    from tc_runtime.liveness import LoopHeartbeat
+
+    from alerts.clock import Clock
+
+    return Clock(pool, settings, tools, LoopHeartbeat("clock", expected_seconds=5))
+
+
 @pytest.fixture
 def tools():
     from .builders import FakeTools
@@ -109,6 +118,7 @@ async def api(app, pool, settings, tools, door):
     app.state.settings = settings
     app.state.tools = tools
     app.state.gateway = door
+    app.state.clock = _idle_clock(pool, settings, tools)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://tests") as client:
         yield client
@@ -124,6 +134,7 @@ async def inside(app, pool, settings, tools, door):
     app.state.settings = settings
     app.state.tools = tools
     app.state.gateway = door
+    app.state.clock = _idle_clock(pool, settings, tools)
     transport = httpx.ASGITransport(app=in_process(app, "the youtube archive"))
     async with httpx.AsyncClient(transport=transport, base_url="http://tests") as client:
         yield client

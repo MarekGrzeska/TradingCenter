@@ -26,10 +26,10 @@
 
 ## 4. Źródło „zdarzenie”
 
-- [ ] 4.1 `POST /alerts/events`: walidacja wobec schematu, idempotencja, odpalenia pasujących reguł w tej samej transakcji, pobudka zegara
-- [ ] 4.2 Filtr: równość, lista, porównania liczbowe, zawieranie; testy jednostkowe dopasowania
-- [ ] 4.3 Retencja zdarzeń raz na godzinę; odpalenia zostają
-- [ ] 4.4 Test, że żądanie z krawędzi (token terminala, klucz wspólny) jest odmową i nic nie zapisuje
+- [x] 4.1 `POST /alerts/events`: walidacja wobec schematu, idempotencja, odpalenia pasujących reguł w tej samej transakcji, pobudka zegara
+- [x] 4.2 Filtr: równość, lista, porównania liczbowe, zawieranie; testy jednostkowe dopasowania
+- [x] 4.3 Retencja zdarzeń raz na godzinę; odpalenia zostają
+- [x] 4.4 Test, że żądanie z krawędzi (token terminala, klucz wspólny) jest odmową i nic nie zapisuje
 
 ## 5. Doręczenie
 
