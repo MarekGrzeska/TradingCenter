@@ -104,19 +104,25 @@ Publikacja zdarzenia budzi zegar od razu (`asyncio.Event`), więc alert o filmie
 sekund. Zapytania 1 i 2 przechodzą przez skill `db-cost-check` przed scaleniem, z indeksami
 częściowymi na `next_check_at WHERE enabled` i `next_attempt_at WHERE state = 'pending'`.
 
-### 8. Przejście w dwóch wdrożeniach (expand / contract)
+### 8. Przejście w trzech krokach, w których nic nie milknie
 
-- **Wdrożenie 1**: `alerts` startuje, a jego lifespan wykonuje jednorazową migrację danych, oznaczoną
-  w tabeli `migrations_done`. Czyta przypisania (`GET /telegram/assignments`), reguły kanałów i
-  tematów (`GET /youtube/channels`, `/topics`) i próg postów (ustawienie) w procesie, po czym tworzy
-  reguły. Producenci przełączają się z wysyłki na publikację w tym samym wdrożeniu. Tabele `purposes`,
-  `assignments` i kolumna `alert_rule` jeszcze zostają, a trasy celów odpowiadają `410`.
-- **Wdrożenie 2**: migracje usuwają `purposes`, `assignments` i `alert_rule`, a
-  `ALERT_MIN_IMPACT_SCORE` trafia do `RETIRED_SETTINGS`.
+Każde scalenie wdraża produkcję, a wdrożenie nie może zostawić alertów bez drogi do telefonu. Stąd kolejność:
 
-Kolejność startu pakietów w lifespanie: `telegram`, `youtube` i `social` migrują przed `alerts`, a
-`alerts` przed producentami pętli. Migrację danych robi `alerts` dopiero po tym, jak sąsiedzi
-serwują.
+1. **Konwersja** (grupa 8). `alerts` startuje i raz, pod znacznikiem w `migrations_done`, zamienia to, co operator już
+   ustawił, na reguły: przypisania bramy, reguły alertu kanałów i tematów oraz próg postów. Dane bierze od sąsiadów
+   przez klienta z assembly (`GET /telegram/assignments`, `/youtube/channels`, `/youtube/topics`), a regułom daje typy
+   zdarzeń w minimalnym kształcie, które konwersja sama wstawia. Producenci wysyłają jeszcze po staremu, więc reguły stoją
+   bezczynnie, a stare przypisania dalej działają.
+2. **Producenci** (grupa 9). Zamiast wysyłać do bramy z celem, publikują zdarzenie; ogłoszenie ich typu zastępuje
+   minimalny kształt. Od tej chwili reguły z kroku 1 są jedyną drogą.
+3. **Sprzątanie** (grupa 11). Znikają `purposes`, `assignments`, `alert_rule` i trasy, które ich dotyczyły.
+
+Kroki 1 i 2 leżą w różnych scaleniach i wdrożeniach; okno między nimi nic nie kosztuje, bo dopóki producenci nie
+publikują, reguły nie mają co łapać. Zostaje jedno okno w kroku 2: zdarzenie opublikowane w sekundach między startem
+procesu a ogłoszeniem typu.
+
+Kolejność startu pakietów w lifespanie: `telegram`, `youtube` i `social` migrują przed `alerts`, a konwersja czyta ich
+dane dopiero po tym, jak serwują.
 
 ## Risks / Trade-offs
 
@@ -137,12 +143,12 @@ serwują.
 
 ## Migration Plan
 
-Dwa wdrożenia, jak w decyzji 8. Przed pierwszym: `ALERTS_DATABASE_URL` w `deploy/env.required`, baza i
-rola w `ensure-databases.sh`, ewentualnie `ALERTS_OPENAI_API_KEY` w środowisku `vps`.
+Trzy kroki, jak w decyzji 8. Przed pierwszym wdrożeniem: `ALERTS_DB_PASSWORD` w środowisku `vps`
+(`deploy/scripts/fill-github-environment.sh`), ewentualnie `ALERTS_OPENAI_API_KEY`.
 
-Wycofanie wdrożenia 1: `deploy.sh` przywraca poprzednie obrazy. Tabele celów i przypisań stoją
-nietknięte, więc stara brama działa jak przedtem, a reguły w bazie `alerts` czekają nieużywane.
-Wdrożenie 2 jest nieodwracalne tylko dla tabel, które od wdrożenia 1 nikt nie czytał.
+Wycofanie kroku 1 lub 2: `deploy.sh` przywraca poprzednie obrazy. Tabele celów i przypisań stoją nietknięte aż do
+kroku 3, więc stara brama działa jak przedtem, a reguły w bazie `alerts` czekają nieużywane. Krok 3 jest
+nieodwracalny tylko dla tabel, których od kroku 2 nikt nie czyta.
 
 ## Open Questions
 
