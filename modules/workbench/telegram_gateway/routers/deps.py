@@ -20,16 +20,13 @@ from ..errors import (
     CreatorBotUnreadable,
     DestinationNotReady,
     GatewayError,
-    InvalidPurpose,
     LoginNotInProgress,
     LoginRefused,
     LoginUnavailable,
     MessageTooLong,
     NoSuchDestination,
-    PurposeUnassigned,
     RateLimited,
     SessionRejected,
-    StillAssigned,
     TelegramRefused,
     TelegramUnreachable,
     TooManyBots,
@@ -46,11 +43,6 @@ _STATUS: tuple[tuple[type[GatewayError], int, str, bool], ...] = (
     (DestinationNotReady, status.HTTP_409_CONFLICT, "module", False),
     (Blocked, status.HTTP_409_CONFLICT, "telegram", False),
     (MessageTooLong, status.HTTP_422_UNPROCESSABLE_CONTENT, "request", False),
-    (InvalidPurpose, status.HTTP_422_UNPROCESSABLE_CONTENT, "request", False),
-    # 409 with its own `kind`, not folded into DestinationNotReady: "nobody listens" is the producer's
-    # cue to leave its marker unset, and the operator's cue to open the terminal.
-    (PurposeUnassigned, status.HTTP_409_CONFLICT, "module", False),
-    (StillAssigned, status.HTTP_409_CONFLICT, "module", False),
     (LoginUnavailable, status.HTTP_501_NOT_IMPLEMENTED, "module", False),
     (LoginNotInProgress, status.HTTP_409_CONFLICT, "module", False),
     (LoginRefused, status.HTTP_409_CONFLICT, "telegram", False),
@@ -81,7 +73,6 @@ def refusal(error: GatewayError) -> HTTPException:
                 retry_after_seconds=(
                     error.retry_after_seconds if isinstance(error, RateLimited) else None
                 ),
-                code="unassigned" if isinstance(error, PurposeUnassigned) else None,
             )
             return HTTPException(code, detail=problem.model_dump())
     return HTTPException(

@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .bot_api import Delivered
 from .models import Bot, Destination
@@ -30,25 +30,17 @@ class Problem(BaseModel):
         default=None,
         description="how long Telegram asked this gateway to wait; present only on a rate limit",
     )
-    code: Literal["unassigned"] | None = Field(
-        default=None,
-        description="'unassigned' when a purpose has no recipient: nothing is wrong, nobody listens yet, "
-        "and a caller keeps its own marker unset",
-    )
 
 
 class SendRequest(BaseModel):
-    """A message, addressed by a destination's name or by a purpose — exactly one of the two. There is
-    no `chat_id` and no bot here on purpose: a number every caller keeps its own copy of is invalidated
-    for all of them the day the bot is replaced."""
+    """A message, addressed by a destination's name. There is no `chat_id` and no bot here on purpose: a number every
+    caller keeps its own copy of is invalidated for all of them the day the bot is replaced. Nor is there a purpose any
+    more — who is told what is decided by the rules of the alerts package, which name a destination — and a request that
+    still sends one is refused rather than having it ignored."""
 
-    destination: str | None = Field(
-        default=None, description="the name the destination was bound under"
-    )
-    purpose: str | None = Field(
-        default=None,
-        description="a dotted name for the kind of event; the operator's assignments decide who hears it",
-    )
+    model_config = ConfigDict(extra="forbid")
+
+    destination: str = Field(description="the name the destination was bound under")
     text: str
 
 
@@ -56,19 +48,13 @@ class Sent(BaseModel):
     """What Telegram said about a message it accepted. Nothing is kept after the response — this is
     the whole of what this gateway can ever say about a message."""
 
-    destination: str = Field(description="the destination it went to — for a purpose, the one resolved")
+    destination: str = Field(description="the destination it went to")
     message_id: int = Field(description="Telegram's own identifier for the delivered message")
     chat_id: int
-    purpose: str | None = Field(default=None, description="echoed when the message was sent by purpose")
 
     @classmethod
-    def of(cls, name: str, delivered: Delivered, *, purpose: str | None = None) -> Sent:
-        return cls(
-            destination=name,
-            message_id=delivered.message_id,
-            chat_id=delivered.chat_id,
-            purpose=purpose,
-        )
+    def of(cls, name: str, delivered: Delivered) -> Sent:
+        return cls(destination=name, message_id=delivered.message_id, chat_id=delivered.chat_id)
 
 
 class BotOut(BaseModel):
@@ -238,40 +224,3 @@ class StateOut(BaseModel):
     destinations_ready: int = Field(
         description="how many can actually receive — the rest are waiting on a tap or blocked"
     )
-    default_assignment: bool = Field(
-        description="whether '*' is assigned, so that a purpose nobody mentioned still reaches somebody"
-    )
-    purposes_unheard: int = Field(
-        description="known purposes no assignment matches — what is being collected and told to nobody"
-    )
-
-
-class PurposeOut(BaseModel):
-    """A kind of event the gateway has seen or been told about, and who hears it today."""
-
-    name: str
-    description: str | None = None
-    first_seen: datetime
-    last_seen: datetime
-    last_caller: str | None = None
-    destination: str | None = Field(
-        description="the destination that receives it now, or null when nobody does"
-    )
-    assigned_by: str | None = Field(
-        description="the assignment key that decides it: the purpose itself, a prefix, or '*'"
-    )
-
-
-class DescribePurposeRequest(BaseModel):
-    description: str = Field(max_length=300)
-
-
-class AssignmentOut(BaseModel):
-    key: str = Field(description="a purpose, a prefix of one cut at a dot, or '*'")
-    destination: str
-    bot: str
-    receives: bool
-
-
-class AssignRequest(BaseModel):
-    destination: str = Field(description="the name of the destination that is to hear this key")

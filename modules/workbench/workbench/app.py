@@ -59,7 +59,6 @@ from .alert_tools import AlertTools
 from .assembly import mount_package
 from .config import Settings, alerts_enabled, youtube_enabled
 from .edge import edge_config, edge_provider
-from .legacy_alerts import LegacyAlerts
 from .local_tools import ConversationLocalTools, TeamsLocalTools
 from .root_access import RootCallers
 from .team_tools import LocalTeamsTools
@@ -160,26 +159,7 @@ async def lifespan(app: FastAPI):
             else nullcontext(None)
         ) as alerts_telegram,
         (
-            package_client(youtube_app, "the alerts package", "http://youtube.in-process")
-            if alerts_app is not None and youtube_app is not None
-            else nullcontext(None)
-        ) as alerts_youtube,
-        (
-            alerts.app.serving(
-                alerts_app,
-                alerts_settings,
-                tools=alert_tools,
-                telegram=alerts_telegram,
-                # What the operator set before this package, converted once into rules: read from the packages that held it.
-                legacy=LegacyAlerts(
-                    alerts_telegram,
-                    alerts_youtube,
-                    youtube_min_score=youtube_settings.alert_min_impact_score if youtube_settings else 8,
-                    social_min_score=social_settings.alert_min_impact_score,
-                )
-                if alerts_telegram is not None
-                else None,
-            )
+            alerts.app.serving(alerts_app, alerts_settings, tools=alert_tools, telegram=alerts_telegram)
             if alerts_app is not None and alerts_settings is not None
             else nullcontext()
         ),

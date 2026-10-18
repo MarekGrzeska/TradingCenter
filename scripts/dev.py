@@ -475,8 +475,8 @@ RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
     (
         "TELEGRAM_GATEWAY_URL",
         (
-            "the post archive and the YouTube archive reach the door to Telegram inside this "
-            "process since the same stage; ALERT_DESTINATION alone says who they tell"
+            "the post archive and the YouTube archive no longer reach the door to Telegram at all: they hand "
+            "what they read to the alerts package, whose rules say who is told"
         ),
     ),
     (
@@ -511,6 +511,18 @@ RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
         "renamed YOUTUBE_TRANSCRIBER_COOLDOWN_MINUTES when the captions provider went",
     ),
     ("YOUTUBE_DAILY_TRANSCRIPT_UNITS", "it was the captions provider's day; Gemini's is YOUTUBE_GEMINI_DAILY_VIDEO_SECONDS"),
+    (
+        "ALERT_DESTINATION",
+        "who is told is decided by the rules in the terminal's Alerts tab (`alerts-package`); the old assignment it seeded is gone",
+    ),
+    (
+        "SOCIAL_ALERT_MIN_IMPACT_SCORE",
+        "the post archive hands over every read post; the score a rule asks for is part of the rule (`alerts-package`)",
+    ),
+    (
+        "YOUTUBE_ALERT_MIN_IMPACT_SCORE",
+        "the YouTube archive hands over every read film; the score a rule asks for is part of the rule (`alerts-package`)",
+    ),
 )
 
 

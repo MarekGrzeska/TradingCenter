@@ -128,9 +128,6 @@ class StateOut(BaseModel):
         description="whether this archive can notify the operator at all — false means it "
         "collects and says nothing by configuration, which is a supported state"
     )
-    alert_min_impact_score: int = Field(
-        description="the reading a post needs before it is worth a notification"
-    )
 
 
 DelayUnmeasured = Literal["no_publish_time", "found_there", "publish_time_in_future"]

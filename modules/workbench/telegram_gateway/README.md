@@ -23,42 +23,32 @@ The shape that pays for it is worth copying: a caller records its own *already t
 **after** a successful send. A failed send leaves no marker, so the caller's next pass tries
 again — which is the whole retry mechanism this system has.
 
-What it *does* remember is **that a purpose was used** — a name and when, never a text.
+It remembers no message, and no purpose either: who is told what is not decided here.
 
-## Who hears what: purposes and assignments
+## Who hears what: not decided here
 
-A producer does not say who to tell. It says **what kind of event this is** — a *purpose*, an open dotted name:
-`social.post.<author>`, `youtube.film.<channel>`, and whatever a rule the operator sets up tomorrow
-invents (`market.price.eurusd`). The operator assigns purposes to recipients in the terminal:
+This door says **how** to reach somebody, never **whether** to. A message is addressed to a destination by name, and what
+decides that a message is sent at all — and to whom — is a rule in the **alerts** package (`modules/workbench/alerts/`):
+the operator sets rules in the terminal's Alerts tab, and the package sends through `POST /messages` by name. Until
+`alerts-package` this door held purposes and assignments of its own; they were converted into rules and the tables are gone
+(migration `0005`). A request that still sends a `purpose` is refused with `422`, not ignored.
 
-- an assignment key is a purpose, a **prefix of one cut at a dot** (`youtube` catches `youtube.film.anything`, not
-  `youtubers`), or `*` for everything nothing else caught; the **longest matching key wins**, `*` last;
-- one key has at most one recipient (the primary key says so), and a change holds from the next message;
-- a purpose nobody hears answers **`409` with `code: "unassigned"`** — not a fault, and the producer's cue to leave its
-  marker unset, so what waited is announced the pass after somebody is assigned (inside each producer's own limits);
-- a recipient or a bot that is still somebody's recipient **cannot be removed**: the route refuses and names the keys
-  first, and `ON DELETE RESTRICT` holds when a route forgets.
-
-`ALERT_DESTINATION` used to decide this for everybody. It now only seeds the `*` assignment, once, at start, from a
-recipient that already exists — and is retired in the deploy after the one that proves it.
+A recipient or a bot can be removed freely: the rules that name it stay on their list, flagged, and stop delivering.
 
 ## What each surface publishes
 
 | REST | |
 |---|---|
-| `POST /messages` | one message, now — to a destination by name **or** to whoever hears a purpose (exactly one of the two) |
-| `GET /purposes` · `PUT /purposes/{name}` | what has been used or announced, and who hears it; announcing one with a description before its first event |
-| `GET /assignments` · `PUT` / `DELETE /assignments/{key}` | which key goes to which recipient |
+| `POST /messages` | one message, now, to a destination by name |
 | `GET /bots` · `POST /bots/adopted` · `POST /bots/created` · `POST /bots/{username}/token` · `DELETE /bots/{username}` | the bots this gateway may speak as — adopted from a pasted token, created or rotated through the creator bot, removed |
 | `GET /destinations` · `POST /destinations` · `DELETE /destinations/{name}` | who can be written to, and the start link that binds one |
 | `GET /account` · `POST /account/login` · `/login/code` · `/login/password` · `DELETE /account` | the dedicated account that owns the bots |
-| `GET /state` | the account, whether bots can be created, how many bots and recipients, whether `*` is assigned, how many known purposes nobody hears |
+| `GET /state` | the account, whether bots can be created, how many bots and recipients |
 | `GET /` · `GET /ping` · `GET /health` | the deploy probe, liveness, and the database |
 
 At `/mcp` there are **two** tools: `send_telegram_message` and `telegram_destinations`. Creating a
-bot, deleting or rotating one, logging the account in, binding a destination and assigning a purpose are REST-only, and
-that is the boundary worth stating: a message can be taken back by saying the next thing, while a bot, a session and an
-assignment outlive the conversation that asked for them.
+bot, deleting or rotating one, logging the account in, and binding a destination are REST-only, and
+that is the boundary worth stating: a message can be taken back by saying the next thing, while a bot and a session outlive the conversation that asked for them.
 
 **No response carries a bot token or the account's session**, including the response to the request that created
 them. `Bot` and `BotCredential` are separate types for that reason — the read has no token to give — and
@@ -66,11 +56,10 @@ them. `Bot` and `BotCredential` are separate types for that reason — the read 
 
 ## Who calls it
 
-The conversation and the teams call the two tools as functions (`workbench/local_tools.py`). The post archive and the
-YouTube archive call `POST /messages` with a purpose through the gateway's own application, as
-this process (`workbench/telegram_client.py`). From outside, two applications are admitted to the REST contract, and only
+The conversation and the teams call the two tools as functions (`workbench/local_tools.py`). The alerts package calls
+`POST /messages` by destination name through the gateway's own application, as this process (`workbench/telegram_client.py`). From outside, two applications are admitted to the REST contract, and only
 those (`TELEGRAM_REST_CALLER_APPLICATION_IDS`): the operator's `az`, and the terminal, which is where the account is logged
-in and purposes are assigned. The workbench's root record (`workbench/root_access.py`) refuses both everywhere else.
+in. The workbench's root record (`workbench/root_access.py`) refuses both everywhere else.
 
 ## Telegram has two surfaces, and they are not two flavours of one thing
 
@@ -128,6 +117,4 @@ in `scripts/tests/test_pool_budget.py`, and this work is one HTTP call per messa
 3. In the terminal's **Telegram** tab: *Zaloguj konto…* (phone, the code from the Telegram app, the password), then
    *Utwórz bota…* and *Aktywuj odbiorcę…* — scan the QR code **from the account that should receive the alerts** and press
    Start; the dialog notices. (No account? *Dodaj token…* adopts a bot made by hand with @BotFather.)
-4. Assign: `*` to your recipient first, so nothing is ever collected and told to nobody, then refine by prefix.
-
-Rolling back is clearing the assignments: the producers collect and decide exactly as before and say nothing.
+4. In the **Alerts** tab, make a rule that tells that recipient. Without one nothing is sent: the archives collect and read as before and say nothing.

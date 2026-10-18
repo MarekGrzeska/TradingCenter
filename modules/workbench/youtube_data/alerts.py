@@ -30,6 +30,9 @@ MAX_INSTRUMENTS = 6
 # A title, a channel name and an instrument name come from strangers and carry no length of their own.
 LINE_CHARS = 300
 
+# The one origin that is not a door the archive looks through: a film the operator or the agent named.
+MANUAL = "manual"
+
 EVENT_TYPE = "youtube.film.read"
 EVENT_DESCRIPTION = "A film the model read, with its impact score and the instruments it spoke about"
 EVENT_SCHEMA = {
@@ -193,6 +196,11 @@ class Alerts:
         handed = 0
         failed = False
         for item in waiting:
+            if item.video.origins == (MANUAL,):
+                # Named by hand: whoever asked is already looking, and a rule about the channel was not asked about this film.
+                async with self._pool.acquire() as conn:
+                    await store.set_outcome(conn, item.video.video_id, "quiet")
+                continue
             try:
                 await self._publisher.publish(
                     source_key=item.video.video_id, attributes=attributes_of(item), text=message(item)

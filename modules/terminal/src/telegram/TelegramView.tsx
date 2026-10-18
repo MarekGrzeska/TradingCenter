@@ -7,7 +7,6 @@ import { UnreachableNotice } from "../ui/UnreachableNotice";
 import {
   ActivateDialog,
   AdoptBotDialog,
-  AssignDialog,
   ConfirmRemoval,
   CreateBotDialog,
   LoginDialog,
@@ -16,20 +15,16 @@ import {
 import {
   ACCOUNT_LABEL,
   DESTINATION_LABEL,
-  assignmentsOf,
   destinationsOf,
   headline,
   missingSettings,
   recipientLabel,
-  unheard,
 } from "./present";
 import {
   createTelegramApi,
-  type Assignment,
   type Bot,
   type Destination,
   type GateState,
-  type Purpose,
   type TelegramApi,
 } from "./telegramApi";
 
@@ -57,8 +52,6 @@ const NO_STATE: GateState = {
   bots: 0,
   destinations: 0,
   destinationsReady: 0,
-  defaultAssignment: false,
-  purposesUnheard: 0,
 };
 
 type Dialog =
@@ -69,8 +62,7 @@ type Dialog =
   | { kind: "activate"; bot: Bot; existing?: Destination }
   | { kind: "rotate"; bot: Bot }
   | { kind: "remove-bot"; bot: Bot }
-  | { kind: "remove-destination"; destination: Destination }
-  | { kind: "assign"; key?: string; only?: Destination[] };
+  | { kind: "remove-destination"; destination: Destination };
 
 export function TelegramView({ api }: { api?: TelegramApi } = {}) {
   const client = useMemo(
@@ -78,7 +70,6 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
     [api],
   );
   const [dialog, setDialog] = useState<Dialog | null>(null);
-  const [failure, setFailure] = useState<string | null>(null);
   const [openBot, setOpenBot] = useState<string | null>(null);
 
   const state = useRead<GateState>({
@@ -105,45 +96,15 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
     pollMs: POLL_MS,
     enabled: ready,
   });
-  const purposes = useRead<Purpose[]>({
-    key: ["telegram", "purposes"],
-    read: (s) => client.purposes(s),
-    initial: [],
-    fallbackMessage: "nie udało się wczytać celów",
-    pollMs: POLL_MS,
-    enabled: ready,
-  });
-  const assignments = useRead<Assignment[]>({
-    key: ["telegram", "assignments"],
-    read: (s) => client.assignments(s),
-    initial: [],
-    fallbackMessage: "nie udało się wczytać przypisań",
-    pollMs: POLL_MS,
-    enabled: ready,
-  });
-
   const refresh = () => {
     state.reload();
     bots.reload();
     destinations.reload();
-    purposes.reload();
-    assignments.reload();
   };
-
-  async function act(work: () => Promise<unknown>, fallback: string): Promise<void> {
-    setFailure(null);
-    try {
-      await work();
-      refresh();
-    } catch (cause: unknown) {
-      setFailure(messageOf(cause, fallback));
-    }
-  }
 
   const gate = state.value;
   const account = gate.account;
   const missing = missingSettings(account);
-  const nobodyHears = unheard(purposes.value);
 
   return (
     <section className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto p-4">
@@ -152,35 +113,11 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
         {ready && <span className="text-xs text-ink-faint">{headline(gate)}</span>}
       </header>
 
-      <p className="rounded bg-warning-soft px-3 py-1 text-sm text-warning">
-        Przypisania poniżej nie decydują już, kto o czym słyszy — od teraz robią to reguły w zakładce Alerty (te z przypisań
-        już tam są). Znikną stąd w następnej zmianie.
-      </p>
       {state.error !== null && <UnreachableNotice onRetry={state.reload}>{state.error}</UnreachableNotice>}
-      {failure !== null && <p className="text-sm text-critical">{failure}</p>}
-      {ready && nobodyHears.length > 0 && (
-        <div className="rounded bg-warning-soft px-3 py-2 text-sm text-warning">
-          <p className="font-semibold">
-            {nobodyHears.length} {nobodyHears.length === 1 ? "rodzaj zdarzeń nie ma" : "rodzajów zdarzeń nie ma"} odbiorcy —
-            są zbierane, ale nikt o nich nie usłyszy.
-          </p>
-          <ul className="mt-1 flex flex-wrap gap-2">
-            {nobodyHears.map((purpose) => (
-              <li key={purpose.name} className="flex items-center gap-1">
-                <code className="text-xs">{purpose.name}</code>
-                <Button
-                  size="2xs"
-                  tone="quiet"
-                  disabled={destinations.value.length === 0}
-                  onClick={() => setDialog({ kind: "assign", key: purpose.name })}
-                >
-                  Przypisz…
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <p className="text-xs text-ink-faint">
+        Kto o czym słyszy — jakie zdarzenia i jakie ceny dają wiadomość, i do którego z tych odbiorców — ustawiasz w zakładce
+        Alerty. Tu jest tylko droga: konto, boty i odbiorcy.
+      </p>
       {ready && account.status === "logged_out" && bots.status === "ready" && bots.value.length === 0 && (
         <p className="rounded bg-panel px-3 py-2 text-sm text-ink-secondary">
           Zacznij od zalogowania konta-właściciela (osobnego konta tylko do botów), a potem utwórz bota i aktywuj odbiorcę.
@@ -249,7 +186,6 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
         <ul className="flex flex-col gap-2">
           {bots.value.map((bot) => {
             const mine = destinationsOf(bot, destinations.value);
-            const routed = assignmentsOf(bot, assignments.value);
             const isOpen = bot.username === openBot;
             const receiving = mine.filter((one) => one.receives).length;
             return (
@@ -258,7 +194,7 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
                   <button
                     type="button"
                     aria-expanded={isOpen}
-                    aria-label={`@${bot.username} — ${isOpen ? "zwiń" : "pokaż odbiorców i przypisania"}`}
+                    aria-label={`@${bot.username} — ${isOpen ? "zwiń" : "pokaż odbiorców"}`}
                     className="flex min-w-0 flex-1 cursor-pointer items-center gap-2 text-left"
                     onClick={() => setOpenBot(isOpen ? null : bot.username)}
                   >
@@ -280,9 +216,6 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
                       ].join(" ")}
                     >
                       {receiving}/{mine.length} odbiera
-                    </span>
-                    <span className="rounded bg-raised px-1.5 py-0.5 text-ink-secondary">
-                      {routed.length} {routed.length === 1 ? "przypisanie" : "przypisań"}
                     </span>
                   </span>
                   <span className="flex gap-1.5">
@@ -311,20 +244,9 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
                 {isOpen && (
                   <BotDetail
                     destinations={mine}
-                    assignments={routed}
                     onActivate={(existing) => setDialog({ kind: "activate", bot, existing })}
                     onRemoveDestination={(destination) => setDialog({ kind: "remove-destination", destination })}
-                    onAssign={() => setDialog({ kind: "assign", only: mine })}
                     onSend={(destination, text) => client.sendMessage(destination, text, signal())}
-                    onMove={(assignment, destination) =>
-                      void act(
-                        () => client.assign(assignment.key, destination, signal()),
-                        "nie udało się zmienić przypisania",
-                      )
-                    }
-                    onRelease={(assignment) =>
-                      void act(() => client.unassign(assignment.key, signal()), "nie udało się zdjąć przypisania")
-                    }
                   />
                 )}
               </li>
@@ -381,7 +303,7 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
           fallbackError="nie udało się zrotować tokenu"
           body={
             <p>
-              BotFather wyda nowy token, a stary przestanie działać od razu. Odbiorcy i przypisania zostają — nikt nie musi
+              BotFather wyda nowy token, a stary przestanie działać od razu. Odbiorcy zostają — nikt nie musi
               dotykać linku ponownie.
             </p>
           }
@@ -405,7 +327,8 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
                   : "Ten bot został dodany tokenem: brama go zapomni, ale u BotFathera zostaje do ręcznego skasowania."}
               </p>
               <p>
-                Jeśli któryś z jego odbiorców ma jeszcze przypisane cele, brama odmówi i wskaże je — najpierw je przepnij.
+                Reguły w zakładce Alerty, które wskazują jego odbiorców, zostaną na liście, ale przestaną dostarczać — brama
+                nie ma już jak ich ostrzec, więc sprawdź je najpierw.
               </p>
             </>
           }
@@ -424,7 +347,8 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
           fallbackError="nie udało się usunąć odbiorcy"
           body={
             <p>
-              Znika tylko powiązanie z czatem — bot zostaje. Jeśli odbiorca ma przypisane cele, brama odmówi i wskaże je.
+              Znika tylko powiązanie z czatem — bot zostaje. Reguły w zakładce Alerty, które go wskazują, zostaną na liście,
+              ale przestaną dostarczać.
             </p>
           }
           onConfirm={async () => {
@@ -432,15 +356,6 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
             refresh();
           }}
           onClose={() => setDialog(null)}
-        />
-      )}
-      {dialog?.kind === "assign" && (
-        <AssignDialog
-          api={client}
-          destinations={dialog.only ?? destinations.value}
-          initialKey={dialog.key}
-          onClose={() => setDialog(null)}
-          onDone={refresh}
         />
       )}
     </section>
@@ -467,26 +382,17 @@ function Section({
   );
 }
 
-/** One bot opened: who receives through it, and which kinds of event are sent to them — side by side, because the second
- *  is only readable against the first. */
+/** One bot opened: who receives through it, and a message to try the road with. */
 function BotDetail({
   destinations,
-  assignments,
   onActivate,
   onRemoveDestination,
-  onAssign,
   onSend,
-  onMove,
-  onRelease,
 }: {
   destinations: Destination[];
-  assignments: Assignment[];
   onActivate(existing?: Destination): void;
   onRemoveDestination(destination: Destination): void;
-  onAssign(): void;
   onSend(destination: string, text: string): Promise<number>;
-  onMove(assignment: Assignment, destination: string): void;
-  onRelease(assignment: Assignment): void;
 }) {
   return (
     <div className="grid gap-3 border-t border-border bg-sunken/40 p-3 md:grid-cols-2">
@@ -496,7 +402,7 @@ function BotDetail({
           <Row key={destination.name}>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm text-ink">{recipientLabel(destination)}</span>
-              <span className="block text-[11px] text-ink-faint">nazwa w przypisaniach: {destination.name}</span>
+              <span className="block text-[11px] text-ink-faint">nazwa w regułach: {destination.name}</span>
             </span>
             <span
               className={[
@@ -518,40 +424,6 @@ function BotDetail({
               onClick={() => onRemoveDestination(destination)}
             >
               Usuń
-            </Button>
-          </Row>
-        ))}
-      </Card>
-
-      <Card
-        title="Co tu trafia"
-        hint="Cel albo przedrostek celu (np. youtube.film); * to wszystko, czego nic innego nie złapało."
-        action={
-          <Button size="2xs" tone="primary" disabled={destinations.length === 0} onClick={onAssign}>
-            Dodaj przypisanie…
-          </Button>
-        }
-      >
-        {assignments.length === 0 && <Empty>Nic nie jest tu kierowane.</Empty>}
-        {assignments.map((assignment) => (
-          <Row key={assignment.key}>
-            <code className="min-w-0 flex-1 truncate text-sm text-ink">{assignment.key}</code>
-            <span className="text-ink-faint">→</span>
-            <select
-              className={SELECT}
-              aria-label={`odbiorca dla ${assignment.key}`}
-              value={assignment.destination}
-              onChange={(e) => onMove(assignment, e.target.value)}
-            >
-              {destinations.map((destination) => (
-                <option key={destination.name} value={destination.name}>
-                  {recipientLabel(destination)}
-                </option>
-              ))}
-            </select>
-            {!assignment.receives && <span className="text-[11px] text-warning">jeszcze nie odbiera</span>}
-            <Button size="2xs" tone="critical" onClick={() => onRelease(assignment)}>
-              Zdejmij
             </Button>
           </Row>
         ))}

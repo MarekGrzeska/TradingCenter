@@ -160,45 +160,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/assignments": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** List Assignments */
-        get: operations["list_assignments_assignments_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/assignments/{key}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Assign
-         * @description Points a purpose, a prefix of one, or `*` at a destination, replacing whatever it pointed at. In effect
-         *     from the next message: nothing is cached.
-         */
-        put: operations["assign_assignments__key__put"];
-        post?: never;
-        /** Unassign */
-        delete: operations["unassign_assignments__key__delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/bots": {
         parameters: {
             query?: never;
@@ -389,12 +350,11 @@ export interface paths {
         put?: never;
         /**
          * Send
-         * @description One message, now — to a destination by name, or to whoever hears a purpose.
+         * @description One message, now, to a destination by name.
          *
          *     Nothing is queued and nothing is retried here. A refusal carries Telegram's own answer — the wait
          *     on a rate limit, the block on a recipient who left — because the caller decides from it whether
-         *     its "already told" marker may be recorded. A purpose nobody hears answers 409 with
-         *     `code: "unassigned"`: not a fault, and the cue to leave that marker unset.
+         *     to try again.
          */
         post: operations["send_messages_post"];
         delete?: never;
@@ -417,48 +377,6 @@ export interface paths {
          */
         get: operations["ping_ping_get"];
         put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/purposes": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List Purposes
-         * @description Every purpose seen or announced, with the destination that hears it today and the assignment
-         *     that decides it. Two reads and a loop in memory: the screen shows all of them at once.
-         */
-        get: operations["list_purposes_purposes_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/purposes/{name}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /**
-         * Announce
-         * @description Announces a purpose with a description, before the first event: it is in the terminal, ready to be
-         *     assigned. A purpose already known keeps its history and takes the new description.
-         */
-        put: operations["announce_purposes__name__put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -532,28 +450,6 @@ export interface components {
             /** Token */
             token: string;
         };
-        /** AssignRequest */
-        AssignRequest: {
-            /**
-             * Destination
-             * @description the name of the destination that is to hear this key
-             */
-            destination: string;
-        };
-        /** AssignmentOut */
-        AssignmentOut: {
-            /** Bot */
-            bot: string;
-            /** Destination */
-            destination: string;
-            /**
-             * Key
-             * @description a purpose, a prefix of one cut at a dot, or '*'
-             */
-            key: string;
-            /** Receives */
-            receives: boolean;
-        };
         /**
          * BotOut
          * @description A bot as every read publishes it: who it is on Telegram, and nothing to send with.
@@ -578,11 +474,6 @@ export interface components {
              * @description its @name, without the @ — how routes address it
              */
             username: string;
-        };
-        /** DescribePurposeRequest */
-        DescribePurposeRequest: {
-            /** Description */
-            description: string;
         };
         /**
          * DestinationOut
@@ -725,11 +616,6 @@ export interface components {
              * @enum {string}
              */
             cause: "module" | "telegram" | "request";
-            /**
-             * Code
-             * @description 'unassigned' when a purpose has no recipient: nothing is wrong, nobody listens yet, and a caller keeps its own marker unset
-             */
-            code: "unassigned" | null;
             /** Detail */
             detail: string;
             /**
@@ -742,38 +628,6 @@ export interface components {
              * @default false
              */
             retryable: boolean;
-        };
-        /**
-         * PurposeOut
-         * @description A kind of event the gateway has seen or been told about, and who hears it today.
-         */
-        PurposeOut: {
-            /**
-             * Assigned By
-             * @description the assignment key that decides it: the purpose itself, a prefix, or '*'
-             */
-            assigned_by: string | null;
-            /** Description */
-            description: string | null;
-            /**
-             * Destination
-             * @description the destination that receives it now, or null when nobody does
-             */
-            destination: string | null;
-            /**
-             * First Seen
-             * Format: date-time
-             */
-            first_seen: string;
-            /** Last Caller */
-            last_caller: string | null;
-            /**
-             * Last Seen
-             * Format: date-time
-             */
-            last_seen: string;
-            /** Name */
-            name: string;
         };
         /**
          * QrLoginOut
@@ -799,21 +653,17 @@ export interface components {
         };
         /**
          * SendRequest
-         * @description A message, addressed by a destination's name or by a purpose — exactly one of the two. There is
-         *     no `chat_id` and no bot here on purpose: a number every caller keeps its own copy of is invalidated
-         *     for all of them the day the bot is replaced.
+         * @description A message, addressed by a destination's name. There is no `chat_id` and no bot here on purpose: a number every
+         *     caller keeps its own copy of is invalidated for all of them the day the bot is replaced. Nor is there a purpose any
+         *     more — who is told what is decided by the rules of the alerts package, which name a destination — and a request that
+         *     still sends one is refused rather than having it ignored.
          */
         SendRequest: {
             /**
              * Destination
              * @description the name the destination was bound under
              */
-            destination?: string | null;
-            /**
-             * Purpose
-             * @description a dotted name for the kind of event; the operator's assignments decide who hears it
-             */
-            purpose?: string | null;
+            destination: string;
             /** Text */
             text: string;
         };
@@ -827,7 +677,7 @@ export interface components {
             chat_id: number;
             /**
              * Destination
-             * @description the destination it went to — for a purpose, the one resolved
+             * @description the destination it went to
              */
             destination: string;
             /**
@@ -835,11 +685,6 @@ export interface components {
              * @description Telegram's own identifier for the delivered message
              */
             message_id: number;
-            /**
-             * Purpose
-             * @description echoed when the message was sent by purpose
-             */
-            purpose: string | null;
         };
         /**
          * StartLinkOut
@@ -873,11 +718,6 @@ export interface components {
              * @description whether creating, deleting and rotating bots would be attempted right now
              */
             can_create_bots: boolean;
-            /**
-             * Default Assignment
-             * @description whether '*' is assigned, so that a purpose nobody mentioned still reaches somebody
-             */
-            default_assignment: boolean;
             /** Destinations */
             destinations: number;
             /**
@@ -885,11 +725,6 @@ export interface components {
              * @description how many can actually receive — the rest are waiting on a tap or blocked
              */
             destinations_ready: number;
-            /**
-             * Purposes Unheard
-             * @description known purposes no assignment matches — what is being collected and told to nobody
-             */
-            purposes_unheard: number;
         };
         /** ValidationError */
         ValidationError: {
@@ -1238,108 +1073,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    list_assignments_assignments_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AssignmentOut"][];
-                };
-            };
-        };
-    };
-    assign_assignments__key__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["AssignRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AssignmentOut"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-        };
-    };
-    unassign_assignments__key__delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                key: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1696,15 +1429,6 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
-            /** @description Conflict */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
             /** @description Validation Error */
             422: {
                 headers: {
@@ -1825,59 +1549,6 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
-                };
-            };
-        };
-    };
-    list_purposes_purposes_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PurposeOut"][];
-                };
-            };
-        };
-    };
-    announce_purposes__name__put: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                name: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["DescribePurposeRequest"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unprocessable Entity */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
                 };
             };
         };

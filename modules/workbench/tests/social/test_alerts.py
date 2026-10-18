@@ -273,24 +273,6 @@ class TestBuild:
             ) is None
 
 
-class TestConfiguration:
-    def _settings(self, settings, **overrides):
-        from social_data.config import Settings
-
-        return Settings(
-            **{
-                **settings.model_dump(),
-                **overrides,
-            },
-            _env_file=None,
-        )
-
-    def test_a_threshold_outside_the_reading_range_is_refused(self, settings) -> None:
-        with pytest.raises(ValueError) as err:
-            self._settings(settings, alert_min_impact_score=11)
-        assert "ALERT_MIN_IMPACT_SCORE" in str(err.value)
-
-
 class TestTheWords:
     def test_an_author_is_one_word_of_the_attribute(self) -> None:
         assert slug("Donald J. Trump (@realDonaldTrump)") == "donald-j-trump-realdonaldtrump"

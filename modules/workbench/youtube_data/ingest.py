@@ -207,7 +207,7 @@ class Ingest:
                 await store.upsert_films(
                     conn,
                     [
-                        store.Discovery(film, f"channel:{channel.channel_id}", channel.profile, channel.alert_rule)
+                        store.Discovery(film, f"channel:{channel.channel_id}", channel.profile)
                         for film in films
                     ],
                     bounds=self._bounds,
@@ -236,7 +236,7 @@ class Ingest:
             async with self._pool.acquire() as conn:
                 await store.upsert_films(
                     conn,
-                    [store.Discovery(film, f"topic:{topic.id}", topic.profile, topic.alert_rule) for film in films],
+                    [store.Discovery(film, f"topic:{topic.id}", topic.profile) for film in films],
                     bounds=self._bounds,
                 )
                 await store.record_topic_run(conn, topic.id, at=now)

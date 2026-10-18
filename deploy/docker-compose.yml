@@ -161,10 +161,8 @@ services:
       YOUTUBE_OPENAI_API_KEY: ${AGENT_OPENAI_API_KEY:?}
 
       # Absent is a working configuration for these: no account can be logged in from the terminal, and nobody is told
-      # until the operator assigns a purpose there. ALERT_DESTINATION only seeds the `*` assignment, once, and goes in
-      # the deploy after the one that proved it. The session itself is never a setting: it lives in the database,
+      # until the operator sets a rule in the Alerts tab. The session itself is never a setting: it lives in the database,
       # encrypted with TELEGRAM_SESSION_KEY (`python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`).
-      ALERT_DESTINATION: ${ALERT_DESTINATION:-}
       TELEGRAM_API_ID: ${TELEGRAM_API_ID:-}
       TELEGRAM_API_HASH: ${TELEGRAM_API_HASH:-}
       TELEGRAM_SESSION_KEY: ${TELEGRAM_SESSION_KEY:-}

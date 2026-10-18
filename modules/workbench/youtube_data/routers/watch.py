@@ -56,7 +56,6 @@ async def follow(request: Request, body: ChannelIn) -> ChannelAddedOut:
             state.settings,
             body.reference,
             added_by="operator",
-            alert_rule=body.alert_rule,
             profile=body.profile,
             language=body.language,
         )
@@ -75,7 +74,7 @@ async def patch_channel(request: Request, channel_id: str, body: ChannelPatch) -
         raise _refuse(f"profile must be one of {', '.join(PROFILES)}; got {body.profile!r}")
     async with connection(request.app.state.pool) as conn:
         updated = await store.update_channel(
-            conn, channel_id, alert_rule=body.alert_rule, profile=body.profile, active=body.active
+            conn, channel_id, profile=body.profile, active=body.active
         )
     if updated is None:
         raise _missing(f"no channel {channel_id!r} on the list")
@@ -119,7 +118,6 @@ async def add_topic(request: Request, body: TopicIn) -> TopicAddedOut:
             language=body.language,
             interval_minutes=body.interval_minutes,
             max_videos_per_run=body.max_videos_per_run,
-            alert_rule=body.alert_rule,
             profile=body.profile,
         )
     except WatchlistRefused as err:
@@ -132,7 +130,7 @@ async def add_topic(request: Request, body: TopicIn) -> TopicAddedOut:
 @router.patch("/topics/{topic_id}", response_model=TopicOut, responses={404: {"model": Problem}})
 async def patch_topic(request: Request, topic_id: int, body: TopicPatch) -> TopicOut:
     async with connection(request.app.state.pool) as conn:
-        updated = await store.update_topic(conn, topic_id, alert_rule=body.alert_rule, active=body.active)
+        updated = await store.update_topic(conn, topic_id, active=body.active)
     if updated is None:
         raise _missing(f"no topic {topic_id} on the list")
     return TopicOut.of(updated)

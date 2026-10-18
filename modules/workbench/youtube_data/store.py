@@ -28,16 +28,16 @@ from .models import (
 from .providers.base import ChannelInfo, Transcript, VideoRef
 
 _CHANNEL_COLUMNS = """
-    channel_id, title, handle, uploads_playlist_id, language, profile, alert_rule, active,
+    channel_id, title, handle, uploads_playlist_id, language, profile, active,
     added_by, added_at, last_discovery_at
 """
 _TOPIC_COLUMNS = """
-    id, phrase, language, interval_minutes, max_videos_per_run, profile, alert_rule, active,
+    id, phrase, language, interval_minutes, max_videos_per_run, profile, active,
     added_by, added_at, last_run_at
 """
 _VIDEO_COLUMNS = """
     video_id, channel_id, channel_title, title, published_at, duration_seconds, live_status, origins,
-    audio_language, profile, alert_rule, state, skip_reason, attempts, next_attempt_at, reading_failures,
+    audio_language, profile, state, skip_reason, attempts, next_attempt_at, reading_failures,
     simulated, discovered_at, notified_at
 """
 
@@ -77,14 +77,14 @@ async def list_channels(conn: Conn, *, active_only: bool = False) -> list[Channe
 
 
 async def add_channel(
-    conn: Conn, info: ChannelInfo, *, language: str, profile: str, alert_rule: str, added_by: str
+    conn: Conn, info: ChannelInfo, *, language: str, profile: str, added_by: str
 ) -> Channel:
     """The channel, inserted — or the one that was already there, untouched: following it again by another spelling of
     its address is not a reason to change what the operator set."""
     await conn.execute(
         """
-        INSERT INTO channels (channel_id, title, handle, uploads_playlist_id, language, profile, alert_rule, added_by)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO channels (channel_id, title, handle, uploads_playlist_id, language, profile, added_by)
+        VALUES ($1, $2, $3, $4, $5, $6, $7)
         ON CONFLICT (channel_id) DO NOTHING
         """,
         info.channel_id,
@@ -93,7 +93,6 @@ async def add_channel(
         info.uploads_playlist_id,
         language,
         profile,
-        alert_rule,
         added_by,
     )
     channel = await get_channel(conn, info.channel_id)
@@ -105,20 +104,17 @@ async def update_channel(
     conn: Conn,
     channel_id: str,
     *,
-    alert_rule: str | None = None,
     profile: str | None = None,
     active: bool | None = None,
 ) -> Channel | None:
     await conn.execute(
         """
         UPDATE channels SET
-            alert_rule = COALESCE($2, alert_rule),
-            profile = COALESCE($3, profile),
-            active = COALESCE($4, active)
+            profile = COALESCE($2, profile),
+            active = COALESCE($3, active)
         WHERE channel_id = $1
         """,
         channel_id,
-        alert_rule,
         profile,
         active,
     )
@@ -159,14 +155,13 @@ async def add_topic(
     interval_minutes: int,
     max_videos_per_run: int,
     profile: str,
-    alert_rule: str,
     added_by: str,
 ) -> Topic:
     """The topic, inserted — or the one that was already there under another spelling of the case, untouched."""
     await conn.execute(
         """
-        INSERT INTO topics (phrase, language, interval_minutes, max_videos_per_run, profile, alert_rule, added_by)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO topics (phrase, language, interval_minutes, max_videos_per_run, profile, added_by)
+        VALUES ($1, $2, $3, $4, $5, $6)
         ON CONFLICT (lower(phrase), language) DO NOTHING
         """,
         phrase,
@@ -174,7 +169,6 @@ async def add_topic(
         interval_minutes,
         max_videos_per_run,
         profile,
-        alert_rule,
         added_by,
     )
     row = await conn.fetchrow(
@@ -183,15 +177,8 @@ async def add_topic(
     return _topic(row)
 
 
-async def update_topic(
-    conn: Conn, topic_id: int, *, alert_rule: str | None = None, active: bool | None = None
-) -> Topic | None:
-    await conn.execute(
-        "UPDATE topics SET alert_rule = COALESCE($2, alert_rule), active = COALESCE($3, active) WHERE id = $1",
-        topic_id,
-        alert_rule,
-        active,
-    )
+async def update_topic(conn: Conn, topic_id: int, *, active: bool | None = None) -> Topic | None:
+    await conn.execute("UPDATE topics SET active = COALESCE($2, active) WHERE id = $1", topic_id, active)
     return await get_topic(conn, topic_id)
 
 
@@ -213,7 +200,6 @@ class Discovery:
     ref: VideoRef
     origin: str
     profile: str
-    alert_rule: str
 
 
 def unwanted_reason(ref: VideoRef, bounds: tuple[int, int]) -> str | None:
@@ -246,9 +232,9 @@ async def upsert_films(
             """
             INSERT INTO videos (
                 video_id, channel_id, channel_title, title, published_at, duration_seconds, live_status,
-                origins, profile, alert_rule, simulated, audio_language
+                origins, profile, simulated, audio_language
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, ARRAY[$8]::text[], $9, $10, $11, $12)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, ARRAY[$8]::text[], $9, $10, $11)
             ON CONFLICT (video_id) DO UPDATE SET
                 origins = (SELECT array_agg(DISTINCT o) FROM unnest(videos.origins || EXCLUDED.origins) AS o),
                 duration_seconds = COALESCE(videos.duration_seconds, EXCLUDED.duration_seconds),
@@ -270,7 +256,6 @@ async def upsert_films(
             ref.live_status,
             found.origin,
             found.profile,
-            found.alert_rule,
             ref.simulated,
             ref.audio_language,
         )

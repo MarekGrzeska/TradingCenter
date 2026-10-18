@@ -10,7 +10,6 @@ from fastapi import APIRouter, Request, Response, status
 
 from .. import binding, store
 from ..contract import DestinationOut, NewDestinationRequest, Problem, StartLinkOut
-from ..errors import StillAssigned
 from . import deps
 
 router = APIRouter(prefix="/destinations", tags=["destinations"])
@@ -65,7 +64,7 @@ async def offer(request: Request, body: NewDestinationRequest) -> StartLinkOut:
 @router.delete(
     "/{name}",
     status_code=status.HTTP_204_NO_CONTENT,
-    responses={404: {"model": Problem}, 409: {"model": Problem}},
+    responses={404: {"model": Problem}},
 )
 async def remove(request: Request, name: str) -> Response:
     """Removes the binding and only the binding — the bot stands, and its other destinations with it."""
@@ -73,8 +72,5 @@ async def remove(request: Request, name: str) -> Response:
         existing = await store.destination_by_name(conn, name)
         if existing is None:
             raise deps.not_found(f"{name!r} is not a destination this gateway knows")
-        keys = await store.assigned_to(conn, existing.id)
-        if keys:
-            raise deps.refusal(StillAssigned(what=repr(name), keys=keys))
         await store.remove_destination(conn, name)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

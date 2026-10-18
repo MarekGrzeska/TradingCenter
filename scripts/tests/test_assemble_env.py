@@ -38,8 +38,8 @@ def test_a_dollar_sign_survives_because_the_value_is_single_quoted() -> None:
 
 
 def test_the_optional_names_are_written_only_when_there_is_a_value() -> None:
-    assert "ALERT_DESTINATION" not in assemble_env.assemble(NAMES, full())
-    assert "ALERT_DESTINATION='ops'\n" in assemble_env.assemble(NAMES, full(ALERT_DESTINATION="ops"))
+    assert "TELEGRAM_API_ID" not in assemble_env.assemble(NAMES, full())
+    assert "TELEGRAM_API_ID='12345'\n" in assemble_env.assemble(NAMES, full(TELEGRAM_API_ID="12345"))
 
 
 @pytest.mark.parametrize("value", ["", "   "])

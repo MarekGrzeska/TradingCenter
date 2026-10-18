@@ -296,7 +296,7 @@ async def test_a_step_that_breaks_does_not_stop_the_ones_after_it_but_the_pass_i
     async with pool.acquire() as conn:
         await store.upsert_films(
             conn,
-            [store.Discovery(_ref("late01"), "manual", "market", "never")],
+            [store.Discovery(_ref("late01"), "manual", "market")],
         )
     real = rig.providers.source.latest_videos
 

@@ -84,10 +84,6 @@ class Settings(BaseSettings):
     # How long a headline lives unless the operator kept it. News is a stream to pick from, not an archive.
     news_retention_days: int = 28
 
-    # How impactful a post must be to be worth a notification. Eight rather than five: the operator
-    # reads every one of these on a phone, and a channel that speaks daily is one nobody looks at.
-    alert_min_impact_score: int = 8
-
     # Easy Auth authorizes an application, not a route, and both surfaces stand in one process — so
     # which caller reaches which of them is this module's own record.
     require_authenticated_principal: bool = False
@@ -212,11 +208,3 @@ class Settings(BaseSettings):
             raise ValueError(f"{str(info.field_name).upper()} must be positive; got {value}")
         return value
 
-    @field_validator("alert_min_impact_score")
-    @classmethod
-    def _within_the_score_range(cls, value: int) -> int:
-        # The reading is 1..10, so a threshold outside it is a channel that is either silent for
-        # ever or one that says everything — both of which look like a working configuration.
-        if not 1 <= value <= 10:
-            raise ValueError(f"ALERT_MIN_IMPACT_SCORE must be between 1 and 10; got {value}")
-        return value

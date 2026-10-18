@@ -1,5 +1,4 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { MarketDataError } from "../data/types";
 import { http, HttpResponse, setupServer } from "../test/httpDouble";
 import { createTelegramApi } from "./telegramApi";
 
@@ -50,42 +49,5 @@ describe("the login", () => {
       kind: "refused",
       message: "Telegram refused the login: the code is wrong",
     });
-  });
-});
-
-describe("assignments", () => {
-  it("addresses the default key as it is and a prefix as a path segment", async () => {
-    const seen: string[] = [];
-    const answer = (key: string) =>
-      http.put(`${BASE}/assignments/${key}`, () => {
-        seen.push(key);
-        return HttpResponse.json({ key, destination: "operator", bot: "tc_bot", receives: true });
-      });
-    server.use(answer("*"), answer("youtube.film"));
-    const api = createTelegramApi(BASE);
-
-    await api.assign("*", "operator", signal());
-    await api.assign("youtube.film", "operator", signal());
-
-    expect(seen).toEqual(["*", "youtube.film"]);
-  });
-
-  it("reads a refusal to remove as a refusal, naming what still hangs on it", async () => {
-    server.use(
-      http.delete(`${BASE}/bots/tc_bot`, () =>
-        HttpResponse.json(
-          { detail: { detail: "@tc_bot still receives '*'. Move those assignments first." } },
-          { status: 409 },
-        ),
-      ),
-    );
-
-    const failure = await createTelegramApi(BASE)
-      .removeBot("tc_bot", signal())
-      .catch((cause: unknown) => cause);
-
-    expect(failure).toBeInstanceOf(MarketDataError);
-    expect((failure as MarketDataError).kind).toBe("refused");
-    expect((failure as MarketDataError).message).toContain("'*'");
   });
 });

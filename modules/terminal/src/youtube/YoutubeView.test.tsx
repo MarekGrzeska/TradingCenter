@@ -60,7 +60,6 @@ const CHANNEL: Channel = {
   channelId: "UC1",
   title: "Sim Złoto PL",
   handle: "@simzloto",
-  alertRule: "threshold",
   active: true,
   addedBy: "operator",
   lastDiscoveryAt: null,
@@ -192,7 +191,7 @@ describe("YoutubeView", () => {
     await userEvent.click(screen.getByRole("button", { name: "Obserwuj" }));
 
     expect(await screen.findByText(/which is its ceiling/)).toBeInTheDocument();
-    expect(followChannel).toHaveBeenCalledWith("@zapelniony", "threshold", expect.anything());
+    expect(followChannel).toHaveBeenCalledWith("@zapelniony", expect.anything());
   });
 
   it("takes a channel off only after asking, and says its films stay", async () => {
@@ -207,13 +206,5 @@ describe("YoutubeView", () => {
     await userEvent.click(screen.getAllByRole("button", { name: "Zdejmij" }).at(-1)!);
 
     expect(client.unfollowChannel).toHaveBeenCalledWith("UC1", expect.anything());
-  });
-});
-
-describe("YoutubeView and the rules that replaced the alert rule", () => {
-  it("points to the Alerts tab, because the rule on a channel no longer changes anything", async () => {
-    render(<YoutubeView api={api([film()])} />);
-
-    expect(await screen.findByText(/ustawiają teraz reguły w zakładce Alerty/)).toBeInTheDocument();
   });
 });

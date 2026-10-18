@@ -3,11 +3,11 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MarketDataError } from "../data/types";
 import { TelegramView } from "./TelegramView";
-import type { Assignment, Bot, Destination, GateState, Purpose, TelegramApi } from "./telegramApi";
+import type { Bot, Destination, GateState, TelegramApi } from "./telegramApi";
 
 /**
- * The tab from the operator's seat: that what nobody hears is the first thing said, that a purpose is assigned from its
- * row, that the account logs in through Telegram's steps, that a refusal stays in the dialog in the door's words, and that
+ * The tab from the operator's seat: that it points to the Alerts tab for who is told what, that the account logs in through
+ * Telegram's steps, that a refusal stays in the dialog in the door's words, and that
  * the tap on a start link turns an address on without a reload.
  */
 
@@ -24,8 +24,6 @@ const LOGGED_IN: GateState = {
   bots: 1,
   destinations: 1,
   destinationsReady: 1,
-  defaultAssignment: false,
-  purposesUnheard: 1,
 };
 
 const LOGGED_OUT: GateState = {
@@ -44,19 +42,6 @@ const OPERATOR: Destination = {
   title: "Marek G.",
   kind: "private",
 };
-
-function purpose(overrides: Partial<Purpose> = {}): Purpose {
-  return {
-    name: "youtube.film.gold-talk",
-    description: null,
-    firstSeen: new Date("2026-10-01T10:00:00Z"),
-    lastSeen: new Date("2026-10-02T10:00:00Z"),
-    lastCaller: "the YouTube archive",
-    destination: "operator",
-    assignedBy: "youtube",
-    ...overrides,
-  };
-}
 
 function api(overrides: Partial<TelegramApi> = {}): TelegramApi {
   return {
@@ -77,15 +62,6 @@ function api(overrides: Partial<TelegramApi> = {}): TelegramApi {
     offerDestination: vi.fn(),
     removeDestination: vi.fn(async () => undefined),
     sendMessage: vi.fn(async () => 77),
-    purposes: vi.fn(async () => [
-      purpose(),
-      purpose({ name: "social.post.trump", destination: null, assignedBy: null }),
-    ]),
-    assignments: vi.fn(
-      async (): Promise<Assignment[]> => [{ key: "youtube", destination: "operator", bot: BOT.username, receives: true }],
-    ),
-    assign: vi.fn(),
-    unassign: vi.fn(async () => undefined),
     ...overrides,
   };
 }
@@ -95,50 +71,46 @@ afterEach(() => {
 });
 
 describe("TelegramView", () => {
-  it("says at the top what nobody hears and offers to assign it, before any bot is opened", async () => {
+  it("points to the Alerts tab for who is told what, since this tab is only the road", async () => {
     render(<TelegramView api={api()} />);
 
-    expect(await screen.findByText(/nie ma odbiorcy — są zbierane, ale nikt o nich nie usłyszy/)).toBeInTheDocument();
-    expect(screen.getByText("social.post.trump")).toBeInTheDocument();
-    expect(screen.queryByText("youtube")).not.toBeInTheDocument();
+    expect(await screen.findByText(/ustawiasz w zakładce\s+Alerty/)).toBeInTheDocument();
   });
 
-  it("shows only the bots until one is opened, and then who receives through it and what is sent there", async () => {
+  it("shows only the bots until one is opened, and then who receives through it and a message to try it with", async () => {
     render(<TelegramView api={api()} />);
 
-    await userEvent.click(await screen.findByRole("button", { name: /pokaż odbiorców i przypisania/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /pokaż odbiorców/ }));
 
     expect(screen.getAllByText("@marek · Marek G.").length).toBeGreaterThan(0);
-    expect(screen.getByRole("combobox", { name: "odbiorca dla youtube" })).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: "odbiorca wiadomości" })).toBeInTheDocument();
   });
 
-  it("keeps a closed bot's actions in reach and its assignments out of the way", async () => {
+  it("keeps a closed bot's actions in reach and its recipients out of the way", async () => {
     render(<TelegramView api={api()} />);
 
     expect(await screen.findByRole("button", { name: "Usuń bota @tc_alerts_bot" })).toBeInTheDocument();
-    expect(screen.queryByRole("combobox", { name: "odbiorca dla youtube" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "odbiorca wiadomości" })).not.toBeInTheDocument();
   });
 
-  it("assigns an unheard purpose from the top", async () => {
-    const assign = vi.fn(async () => ({ key: "social.post.trump", destination: "operator", bot: BOT.username, receives: true }));
-    render(<TelegramView api={api({ assign })} />);
+  it("warns, before a bot or a recipient is removed, that the rules pointing at it stop delivering", async () => {
+    render(<TelegramView api={api()} />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Przypisz…" }));
-    await userEvent.click(screen.getByRole("button", { name: "Przypisz" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Usuń bota @tc_alerts_bot" }));
 
-    expect(assign).toHaveBeenCalledWith("social.post.trump", "operator", expect.anything());
+    expect(screen.getByText(/przestaną dostarczać/)).toBeInTheDocument();
   });
 
-  it("keeps the door's reason in the dialog when it refuses to remove a bot that is still heard", async () => {
+  it("keeps the door's reason in the dialog when it refuses to remove a bot", async () => {
     const removeBot = vi
       .fn()
-      .mockRejectedValue(new MarketDataError("refused", "@tc_alerts_bot still receives 'youtube'. Move those assignments first."));
+      .mockRejectedValue(new MarketDataError("refused", "Telegram would not delete @tc_alerts_bot: the creator bot did not answer."));
     render(<TelegramView api={api({ removeBot })} />);
 
     await userEvent.click(await screen.findByRole("button", { name: "Usuń bota @tc_alerts_bot" }));
     await userEvent.click(screen.getByRole("button", { name: "Usuń bota" }));
 
-    expect(await screen.findByText(/still receives 'youtube'/)).toBeInTheDocument();
+    expect(await screen.findByText(/the creator bot did not answer/)).toBeInTheDocument();
     expect(removeBot).toHaveBeenCalledTimes(1);
     expect(screen.getAllByText("@tc_alerts_bot").length).toBeGreaterThan(0);
   });
@@ -187,7 +159,7 @@ describe("TelegramView", () => {
     const sendMessage = vi.fn(async () => 4242);
     render(<TelegramView api={api({ sendMessage })} />);
 
-    await userEvent.click(await screen.findByRole("button", { name: /pokaż odbiorców i przypisania/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /pokaż odbiorców/ }));
     await userEvent.type(screen.getByRole("textbox", { name: "treść wiadomości" }), "test z terminala");
     await userEvent.click(screen.getByRole("button", { name: "Wyślij" }));
 
@@ -199,7 +171,7 @@ describe("TelegramView", () => {
     const sendMessage = vi.fn().mockRejectedValue(new MarketDataError("refused", "'operator' blocked the bot"));
     render(<TelegramView api={api({ sendMessage })} />);
 
-    await userEvent.click(await screen.findByRole("button", { name: /pokaż odbiorców i przypisania/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /pokaż odbiorców/ }));
     await userEvent.type(screen.getByRole("textbox", { name: "treść wiadomości" }), "halo");
     await userEvent.click(screen.getByRole("button", { name: "Wyślij" }));
 
@@ -292,11 +264,9 @@ describe("TelegramView", () => {
     render(
       <TelegramView
         api={api({
-          state: vi.fn(async () => ({ ...LOGGED_OUT, bots: 0, destinations: 0, destinationsReady: 0, purposesUnheard: 0 })),
+          state: vi.fn(async () => ({ ...LOGGED_OUT, bots: 0, destinations: 0, destinationsReady: 0 })),
           bots: vi.fn(async () => []),
           destinations: vi.fn(async () => []),
-          purposes: vi.fn(async () => []),
-          assignments: vi.fn(async () => []),
         })}
       />,
     );
@@ -384,14 +354,5 @@ describe("TelegramView", () => {
 
     const done = await screen.findByText(/odbiera wiadomości od @tc_alerts_bot/);
     expect(within(done.closest("div") as HTMLElement).getByText("phone")).toBeInTheDocument();
-  });
-});
-
-describe("TelegramView and the rules that replaced the assignments", () => {
-  it("says the assignments no longer decide who is told, and where that is decided now", async () => {
-    render(<TelegramView api={api()} />);
-
-    expect(await screen.findByText(/nie decydują już, kto o czym słyszy/)).toBeInTheDocument();
-    expect(screen.getByText(/zakładce Alerty/)).toBeInTheDocument();
   });
 });

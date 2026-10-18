@@ -65,11 +65,6 @@ class Settings(BaseSettings):
     # a shortened alert is an alert about something else.
     max_message_chars: int = 4096
 
-    # What `ALERT_DESTINATION` used to decide for every producer. Read once, at start, to seed the `*` assignment
-    # when there is none — after that the operator's assignments are the only truth, and this setting is on its way
-    # out (`telegram-bots-from-the-terminal`, the second deploy).
-    seed_default_destination: str | None = None
-
     # Easy Auth authorizes an application, not a route. The split here is not reading from writing — both
     # surfaces send — but that creating a bot and binding a destination are REST alone.
     require_authenticated_principal: bool = False
@@ -116,7 +111,7 @@ class Settings(BaseSettings):
         return value.strip()
 
     @field_validator(
-        "database_user", "telegram_api_hash", "telegram_session_key", "seed_default_destination"
+        "database_user", "telegram_api_hash", "telegram_session_key"
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:

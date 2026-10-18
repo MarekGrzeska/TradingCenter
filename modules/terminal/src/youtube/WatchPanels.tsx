@@ -3,34 +3,14 @@ import { Button } from "../ui/Button";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { messageOf, useRead } from "../data/query";
 import { AddTopicDialog, FollowChannelDialog, RemoveDialog } from "./dialogs";
-import { ALERT_RULES, ALERT_RULE_LABEL } from "./present";
-import type { AlertRule, Channel, Topic, YoutubeApi } from "./youtubeApi";
+import type { Channel, Topic, YoutubeApi } from "./youtubeApi";
 
 /**
- * What is followed. The operator adds, changes the rule, pauses and — alone — takes off: the tools the agent holds add and
+ * What is followed. The operator adds, pauses and — alone — takes off: the tools the agent holds add and
  * never remove, so this screen is the one door out.
  */
 
-const SELECT = "rounded border border-border bg-sunken px-1 py-0.5 text-xs text-ink";
 const POLL_MS = 60_000;
-
-function RuleSelect({ value, disabled, onChange }: { value: AlertRule; disabled: boolean; onChange(rule: AlertRule): void }) {
-  return (
-    <select
-      className={SELECT}
-      value={value}
-      disabled={disabled}
-      aria-label="reguła powiadomień"
-      onChange={(e) => onChange(e.target.value as AlertRule)}
-    >
-      {ALERT_RULES.map((rule) => (
-        <option key={rule} value={rule}>
-          {ALERT_RULE_LABEL[rule]}
-        </option>
-      ))}
-    </select>
-  );
-}
 
 function Origin({ by }: { by: "operator" | "agent" }) {
   return (
@@ -52,7 +32,7 @@ export function ChannelsPanel({ client, onChanged }: { client: YoutubeApi; onCha
   const [removing, setRemoving] = useState<Channel | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
-  async function change(channel: Channel, patch: { alertRule?: AlertRule; active?: boolean }) {
+  async function change(channel: Channel, patch: { active?: boolean }) {
     setFailure(null);
     try {
       await client.setChannel(channel.channelId, patch, new AbortController().signal);
@@ -93,11 +73,6 @@ export function ChannelsPanel({ client, onChanged }: { client: YoutubeApi; onCha
                 ostatnio sprawdzony: {channel.lastDiscoveryAt?.toLocaleString("pl-PL") ?? "jeszcze nie"}
               </span>
             </span>
-            <RuleSelect
-              value={channel.alertRule}
-              disabled={false}
-              onChange={(alertRule) => void change(channel, { alertRule })}
-            />
             <Button size="xs" tone="muted" onClick={() => void change(channel, { active: !channel.active })}>
               {channel.active ? "Wstrzymaj" : "Wznów"}
             </Button>
@@ -146,7 +121,7 @@ export function TopicsPanel({ client, onChanged }: { client: YoutubeApi; onChang
   const [removing, setRemoving] = useState<Topic | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
-  async function change(topic: Topic, patch: { alertRule?: AlertRule; active?: boolean }) {
+  async function change(topic: Topic, patch: { active?: boolean }) {
     setFailure(null);
     try {
       await client.setTopic(topic.id, patch, new AbortController().signal);
@@ -183,11 +158,6 @@ export function TopicsPanel({ client, onChanged }: { client: YoutubeApi; onChang
                 {topic.lastRunAt?.toLocaleString("pl-PL") ?? "jeszcze nie szukano"}
               </span>
             </span>
-            <RuleSelect
-              value={topic.alertRule}
-              disabled={false}
-              onChange={(alertRule) => void change(topic, { alertRule })}
-            />
             <Button size="xs" tone="muted" onClick={() => void change(topic, { active: !topic.active })}>
               {topic.active ? "Wstrzymaj" : "Wznów"}
             </Button>

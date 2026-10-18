@@ -29,22 +29,22 @@ def film(video_id: str = "v1", **overrides) -> VideoRef:
 
 
 def discovery(video_id: str = "v1", origin: str = "channel:UC1", **overrides) -> Discovery:
-    return Discovery(film(video_id, **overrides), origin, "market", "threshold")
+    return Discovery(film(video_id, **overrides), origin, "market")
 
 
 async def test_following_a_channel_twice_keeps_what_the_operator_set(db) -> None:
     info = ChannelInfo(channel_id="UC1", title="A Channel")
-    first = await store.add_channel(db, info, language="pl", profile="market", alert_rule="always", added_by="operator")
+    first = await store.add_channel(db, info, language="pl", profile="market", added_by="operator")
 
-    again = await store.add_channel(db, info, language="", profile="market", alert_rule="never", added_by="agent")
+    again = await store.add_channel(db, info, language="", profile="market", added_by="agent")
 
     assert again == first
-    assert again.alert_rule == "always" and again.added_by == "operator"
+    assert again.language == "pl" and again.added_by == "operator"
 
 
 async def test_pausing_a_channel_is_not_removing_it(db) -> None:
     info = ChannelInfo(channel_id="UC1", title="A Channel")
-    await store.add_channel(db, info, language="", profile="market", alert_rule="threshold", added_by="operator")
+    await store.add_channel(db, info, language="", profile="market", added_by="operator")
 
     paused = await store.update_channel(db, "UC1", active=False)
 
@@ -164,3 +164,15 @@ async def test_a_provider_is_blocked_until_it_next_answers(db) -> None:
 
 def test_a_provider_that_was_never_blocked_is_not_blocked() -> None:
     assert not ProviderState("direct", last_ok_at=None, last_blocked_at=None, blocked_reason=None).blocked
+
+
+async def test_nothing_in_the_archive_says_who_is_told_any_more(db) -> None:
+    """Dropped by migration 0003: the rule of a channel, a topic and a film belongs to the alerts package."""
+    columns = {
+        (row["table_name"], row["column_name"])
+        for row in await db.fetch(
+            "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'public'"
+        )
+    }
+
+    assert not {pair for pair in columns if pair[1] == "alert_rule"}

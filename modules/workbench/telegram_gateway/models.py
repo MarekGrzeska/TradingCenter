@@ -100,26 +100,6 @@ class Binding:
 
 
 @dataclass(frozen=True, slots=True)
-class Purpose:
-    """A kind of event somebody has sent under, or announced. Never the messages themselves."""
-
-    name: str
-    first_seen: datetime
-    last_seen: datetime
-    description: str | None = None
-    last_caller: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class Assignment:
-    """Who hears about a purpose, a prefix of one, or everything (`*`)."""
-
-    key: str
-    destination_id: int
-    assigned_at: datetime | None = None
-
-
-@dataclass(frozen=True, slots=True)
 class AccountRecord:
     """The account that owns the bots — **without its session**, for the same reason `Bot` has no token: every
     read and every response is built from this, and the encrypted session is fetched by the one function that

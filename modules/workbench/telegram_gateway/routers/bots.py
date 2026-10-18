@@ -12,7 +12,7 @@ from tc_runtime.db import Conn
 
 from .. import account, bots, store
 from ..contract import AdoptBotRequest, BotOut, NewBotRequest, Problem
-from ..errors import GatewayError, SessionRejected, StillAssigned
+from ..errors import GatewayError, SessionRejected
 from . import deps
 
 router = APIRouter(prefix="/bots", tags=["bots"])
@@ -150,12 +150,6 @@ async def remove(request: Request, username: str) -> Response:
         existing = await store.bot_by_username(conn, username)
         if existing is None:
             raise deps.not_found(f"@{username} is not a bot this gateway holds")
-
-        # Before the creator bot is spoken to: a refusal here is free, and a bot deleted on Telegram
-        # while its destinations still hear a purpose cannot be put back.
-        keys = await store.assigned_to_bot(conn, existing.id)
-        if keys:
-            raise deps.refusal(StillAssigned(what=f"@{username}", keys=keys))
 
         try:
             conversation = await owner_conversation(request, conn)

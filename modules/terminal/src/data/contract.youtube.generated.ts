@@ -259,12 +259,6 @@ export interface components {
         /** ChannelIn */
         ChannelIn: {
             /**
-             * Alert Rule
-             * @default threshold
-             * @enum {string}
-             */
-            alert_rule: "always" | "threshold" | "never";
-            /**
              * Language
              * @default
              */
@@ -294,11 +288,6 @@ export interface components {
              * @enum {string}
              */
             added_by: "operator" | "agent";
-            /**
-             * Alert Rule
-             * @enum {string}
-             */
-            alert_rule: "always" | "threshold" | "never";
             /** Channel Id */
             channel_id: string;
             /** Handle */
@@ -319,8 +308,6 @@ export interface components {
              * @description false pauses discovery without taking anything off
              */
             active?: boolean | null;
-            /** Alert Rule */
-            alert_rule?: ("always" | "threshold" | "never") | null;
             /** Profile */
             profile?: string | null;
         };
@@ -564,12 +551,6 @@ export interface components {
         /** TopicIn */
         TopicIn: {
             /**
-             * Alert Rule
-             * @default threshold
-             * @enum {string}
-             */
-            alert_rule: "always" | "threshold" | "never";
-            /**
              * Interval Minutes
              * @description null takes the setting's default
              */
@@ -606,11 +587,6 @@ export interface components {
              * @enum {string}
              */
             added_by: "operator" | "agent";
-            /**
-             * Alert Rule
-             * @enum {string}
-             */
-            alert_rule: "always" | "threshold" | "never";
             /** Id */
             id: number;
             /** Interval Minutes */
@@ -630,8 +606,6 @@ export interface components {
         TopicPatch: {
             /** Active */
             active?: boolean | null;
-            /** Alert Rule */
-            alert_rule?: ("always" | "threshold" | "never") | null;
         };
         /** TopicsOut */
         TopicsOut: {

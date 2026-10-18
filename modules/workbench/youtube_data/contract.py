@@ -134,8 +134,6 @@ class TranscriptPageOut(BaseModel):
     next_offset: int | None = Field(description="where the next page starts, or null at the end")
 
 
-AlertRule = Literal["always", "threshold", "never"]
-
 
 class ChannelOut(BaseModel):
     channel_id: str
@@ -143,7 +141,6 @@ class ChannelOut(BaseModel):
     handle: str | None = None
     language: str
     profile: str
-    alert_rule: AlertRule
     active: bool
     added_by: Literal["operator", "agent"]
     added_at: datetime
@@ -157,7 +154,6 @@ class ChannelOut(BaseModel):
             handle=channel.handle,
             language=channel.language,
             profile=channel.profile,
-            alert_rule=channel.alert_rule,  # type: ignore[arg-type]
             active=channel.active,
             added_by=channel.added_by,  # type: ignore[arg-type]
             added_at=channel.added_at,
@@ -172,13 +168,11 @@ class ChannelsOut(BaseModel):
 
 class ChannelIn(BaseModel):
     reference: str = Field(description="a channel id (UC…), an @handle, or a youtube.com channel address")
-    alert_rule: AlertRule = "threshold"
     profile: str = "market"
     language: str = ""
 
 
 class ChannelPatch(BaseModel):
-    alert_rule: AlertRule | None = None
     profile: str | None = None
     active: bool | None = Field(default=None, description="false pauses discovery without taking anything off")
 
@@ -195,7 +189,6 @@ class TopicOut(BaseModel):
     interval_minutes: int
     max_videos_per_run: int
     profile: str
-    alert_rule: AlertRule
     active: bool
     added_by: Literal["operator", "agent"]
     added_at: datetime
@@ -210,7 +203,6 @@ class TopicOut(BaseModel):
             interval_minutes=topic.interval_minutes,
             max_videos_per_run=topic.max_videos_per_run,
             profile=topic.profile,
-            alert_rule=topic.alert_rule,  # type: ignore[arg-type]
             active=topic.active,
             added_by=topic.added_by,  # type: ignore[arg-type]
             added_at=topic.added_at,
@@ -228,12 +220,10 @@ class TopicIn(BaseModel):
     language: str = ""
     interval_minutes: int | None = Field(default=None, description="null takes the setting's default")
     max_videos_per_run: int | None = Field(default=None, description="null takes the setting's default")
-    alert_rule: AlertRule = "threshold"
     profile: str = "market"
 
 
 class TopicPatch(BaseModel):
-    alert_rule: AlertRule | None = None
     active: bool | None = None
 
 

@@ -19,8 +19,6 @@ from .fakes import FakeBotApi
 # re-migrating, and named in full rather than left to CASCADE, so the statement says what it empties.
 TABLES: tuple[str, ...] = (
     "account_session",
-    "assignments",
-    "purposes",
     "update_offsets",
     "binding_nonces",
     "destinations",

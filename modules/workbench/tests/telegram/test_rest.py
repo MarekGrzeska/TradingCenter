@@ -50,7 +50,6 @@ class TestSending:
             "destination": "operator",
             "message_id": 77,
             "chat_id": 5,
-            "purpose": None,
         }
 
     async def test_a_rate_limit_reaches_the_caller_with_the_wait_telegram_asked_for(
@@ -173,8 +172,6 @@ class TestState:
             "bots": 0,
             "destinations": 0,
             "destinations_ready": 0,
-            "default_assignment": False,
-            "purposes_unheard": 0,
         }
 
     async def test_it_counts_the_bots_it_holds(self, api, db) -> None:
@@ -183,3 +180,20 @@ class TestState:
         body = (await api.get("/state")).json()
 
         assert body["bots"] == 1
+
+
+class TestAMessageStillAddressedByPurpose:
+    async def test_a_request_that_sends_a_purpose_is_refused_and_sends_nothing(self, api, app) -> None:
+        """Who is told what is a rule of the alerts package now; a producer that still sends under a purpose hears no, in
+        words, rather than being sent to nobody."""
+        refused = await api.post("/messages", json={"destination": "operator", "purpose": "youtube.film", "text": "hi"})
+
+        assert refused.status_code == 422
+        assert app.state.telegram.sent == []
+
+
+async def test_the_door_keeps_no_purposes_and_no_assignments_any_more(db) -> None:
+    """Dropped by migration 0005: who is told what is decided by rules in the alerts package, which name a destination."""
+    tables = {row["tablename"] for row in await db.fetch("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")}
+
+    assert not tables & {"purposes", "assignments"}

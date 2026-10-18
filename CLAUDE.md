@@ -22,7 +22,7 @@ to need something a package cannot give it, the change is wrong, not the rule.
 | Where | What |
 |---|---|
 | `modules/capital-gateway` | capital.com: trading, deep history, live stream. Demo only, and the only door to the provider. |
-| `modules/workbench` | one process, eight packages that never import each other: the conversation (`agent`), the teams (`teams`, `teams_tools`), three archives under `/market`, `/polymarket`, `/social`, the one door to Telegram under `/telegram`, and the YouTube archive under `/youtube` — **mounted only when `YOUTUBE_DATABASE_URL` is set**. Six schemas (seven with YouTube), two OpenAI keys. What each package may write: `modules/workbench/README.md`. Every package's tools reach the conversation as functions, not over MCP. |
+| `modules/workbench` | one process, nine packages that never import each other: the conversation (`agent`), the teams (`teams`, `teams_tools`), three archives under `/market`, `/polymarket`, `/social`, the one door to Telegram under `/telegram`, the YouTube archive under `/youtube` and the rules that decide who is told what under `/alerts` — **those last two mounted only when `YOUTUBE_DATABASE_URL` / `ALERTS_DATABASE_URL` is set**. Six schemas (eight with both), three OpenAI keys. What each package may write: `modules/workbench/README.md`. Every package's tools reach the conversation as functions, not over MCP. |
 | `modules/trading-mcp` | MCP tools over the gateway's demo account. Network transport only, one named caller (the workbench). Demo checked against the gateway, not against a setting. |
 | `modules/terminal` | React+TS · the operator's screen. Consumes the others, publishes nothing. Call it the **terminal**, never a "console" or "dashboard". |
 | `modules/pocket` | React+TS · the archive on a phone, and a chat with the workbench beside it. A second consumer, sharing the terminal's generated contract and none of its code. |
@@ -36,7 +36,7 @@ to need something a package cannot give it, the change is wrong, not the rule.
 
 In `modules/workbench` only `workbench/` — the assembly — imports the packages, mounting each former
 module whole under its prefix (`workbench/assembly.py`); `tests/test_layering.py` generates the
-forbidden map from its package list, so a ninth package is one entry there. Why `market-mcp`,
+forbidden map from its package list, so a tenth package is one entry there. Why `market-mcp`,
 `teams-mcp` and five other modules no longer exist, and why `trading-mcp` still does:
 `docs/architecture.md`, "The order path".
 
@@ -56,7 +56,7 @@ module runs `uv run pytest` · `ruff check .` · `pyright`, the terminal and `po
 | Module | |
 |---|---|
 | `capital-gateway` | `uv run uvicorn capital_gateway.app:app --reload --port 8010` |
-| `workbench` | `uv run alembic -c alembic-<chain>.ini upgrade head` for `market`, `agent`, `teams`, `polymarket`, `social`, `telegram` (the process runs all six itself), then `uv run uvicorn workbench.app:app --reload --port 8030` |
+| `workbench` | `uv run alembic -c alembic-<chain>.ini upgrade head` for `market`, `agent`, `teams`, `polymarket`, `social`, `telegram` (the process runs all six itself, plus `youtube` and `alerts` when configured), then `uv run uvicorn workbench.app:app --reload --port 8030` |
 | `trading-mcp` | `uv run python -m trading_mcp` (8060) · plus `uv run python scripts/contract.py check`, its snapshot of the gateway's OpenAPI |
 | `terminal` | `pnpm dev` (5173) |
 | `pocket` | `pnpm dev` (5174) · `--host` is what a phone on the same Wi-Fi needs |
@@ -101,8 +101,8 @@ that refuse to start; `dev.py` names each at startup (`RETIRED_SETTINGS`).
 configuration**: the conversation simply has no account tools — while a team whose agents were
 *assigned* those tools refuses to run rather than answer without them. That asymmetry is the trap;
 the symptom is the operator asking about positions and the agent saying it cannot see them.
-Telegram has the same shape: a purpose the operator has not assigned in the terminal (or `ALERT_DESTINATION`
-unset, before the first one is) is collected and decided as usual and told to nobody.
+Alerts have the same shape: with no rule in the terminal's Alerts tab (or no `ALERTS_DATABASE_URL`) the archives
+collect and read as usual and nobody is told. The archives only say what they read; **who is told is a rule, not a setting**.
 
 **`trading-mcp` will not start on a wish.** `CAPITAL_GATEWAY_API_KEY` must be the gateway's own
 `GATEWAY_API_KEY` — checked on every caller, loopback included — and it asks the gateway whether the
@@ -148,7 +148,7 @@ images back otherwise; a check of "the container runs" is not enough (Azure repo
 crash-looping container on 16 August 2026).
 
 Each module does this in its own `lifespan`, under a Postgres advisory lock keyed per module (in the
-workbench 8020, 8030, 8050, 8070, 8090, 8100 and YouTube's 8110 — the port each package used to have), with
+workbench 8020, 8030, 8050, 8070, 8090, 8100, YouTube's 8110 and alerts' 8120 — the port each package used to have, then the next free number), with
 its own identity. Reasoning: `openspec/changes/archive/…-modules-migrate-their-own-database`.
 
 Each role owns its database from the start: `deploy/postgres/ensure-databases.sh` creates both on every
