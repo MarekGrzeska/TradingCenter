@@ -206,6 +206,23 @@ describe("TelegramView", () => {
     expect(await screen.findByText(/blocked the bot/)).toBeInTheDocument();
   });
 
+  it("offers the same person a second bot under a name of its own instead of refusing the name", async () => {
+    const other: Bot = { username: "tc_second_bot", title: "Second", createdHere: false };
+    const offerDestination = vi.fn(async () => ({
+      destination: { ...OPERATOR, name: "operator-tc_second_bot", bot: other.username, receives: false, state: "pending" as const },
+      url: "https://t.me/tc_second_bot?start=abc",
+      expiresAt: new Date(Date.now() + 30 * 60_000),
+    }));
+    render(<TelegramView api={api({ bots: vi.fn(async () => [BOT, other]), offerDestination })} />);
+
+    const adds = await screen.findAllByRole("button", { name: "Dodaj odbiorcę…" });
+    await userEvent.click(adds[1]);
+
+    expect(screen.getByText(/dostanie nazwę „operator-tc_second_bot”/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Pokaż link" }));
+    expect(offerDestination).toHaveBeenCalledWith("operator-tc_second_bot", "tc_second_bot", expect.anything());
+  });
+
   it("does not offer another way when Telegram has none, and says where the code is instead", async () => {
     const loginStart = vi.fn(async () => ({ step: "code" as const, delivery: "app" as const, canResend: false }));
     render(<TelegramView api={api({ state: vi.fn(async () => LOGGED_OUT), loginStart })} />);

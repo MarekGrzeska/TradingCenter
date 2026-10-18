@@ -44,6 +44,24 @@ export function destinationsOf(bot: Bot, destinations: Destination[]): Destinati
   return destinations.filter((one) => one.bot === bot.username);
 }
 
+/** The name a recipient gets through this bot. The door keeps names unique across bots (a name is what an assignment and a
+ *  message are addressed by), but one person may well receive through several bots — each a separate conversation that needs
+ *  its own tap — so a name another bot already holds becomes `name-botname`, and a number if even that is taken. */
+export function freeNameFor(wanted: string, bot: Bot, destinations: Destination[]): string {
+  const name = wanted.trim();
+  const holder = (candidate: string) => destinations.find((one) => one.name === candidate);
+  const free = (candidate: string) => {
+    const found = holder(candidate);
+    return found === undefined || found.bot === bot.username;
+  };
+  if (free(name)) return name;
+  const qualified = `${name}-${bot.username}`;
+  if (free(qualified)) return qualified;
+  for (let n = 2; ; n++) {
+    if (free(`${qualified}-${n}`)) return `${qualified}-${n}`;
+  }
+}
+
 /** The assignments that end at one of this bot's recipients. */
 export function assignmentsOf(bot: Bot, assignments: Assignment[]): Assignment[] {
   return assignments.filter((one) => one.bot === bot.username);
