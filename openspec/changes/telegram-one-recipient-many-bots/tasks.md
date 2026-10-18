@@ -1,19 +1,19 @@
 ## 1. Brama Telegrama: adresat i wiązanie
 
-- [ ] 1.1 Migracja `telegram`: tabela `recipients`, `destinations.recipient_id` (uzupełnienie po nazwie, `NOT NULL`, klucz obcy `ON DELETE CASCADE`, `UNIQUE (recipient_id, bot_id)`), zdjęcie unikalności `name` przy zachowaniu kolumny; test migracji na bazie z istniejącymi wiązaniami
-- [ ] 1.2 `store` i `models`: adresat (zakładanie, lista z wiązaniami, usunięcie), wiązanie po (adresat, bot), `binding` wiąże po `recipient_id`; `destination_by_name` zastąpione
-- [ ] 1.3 Trasy: `GET/POST /recipients`, `DELETE /recipients/{name}`, `POST /recipients/{name}/bots`, `DELETE /recipients/{name}/bots/{bot}`; `/destinations` usunięte; `caller_access` i `openapi`
-- [ ] 1.4 `POST /messages` z `{recipient, bot?}`: bez bota przy jednym wiązaniu, `409` z listą botów przy kilku, odmowa dla bota spoza adresata i dla adresata bez wiązania
-- [ ] 1.5 Blokada i stan per wiązanie (test: zablokowany jeden bot nie rusza drugiego); narzędzia MCP bramy i ich opisy
+- [x] 1.1 Migracja `telegram`: tabela `recipients`, `destinations.recipient_id` (uzupełnienie po nazwie, `NOT NULL`, klucz obcy `ON DELETE CASCADE`, `UNIQUE (recipient_id, bot_id)`), zdjęcie unikalności `name` przy zachowaniu kolumny; test migracji na bazie z istniejącymi wiązaniami
+- [x] 1.2 `store` i `models`: adresat (zakładanie, lista z wiązaniami, usunięcie), wiązanie po (adresat, bot), `binding` wiąże po `recipient_id`; `destination_by_name` zastąpione
+- [x] 1.3 Trasy: `GET/POST /recipients`, `DELETE /recipients/{name}`, `POST /recipients/{name}/bots`, `DELETE /recipients/{name}/bots/{bot}`; `/destinations` usunięte; `caller_access` i `openapi`
+- [x] 1.4 `POST /messages` z `{recipient, bot?}`: bez bota przy jednym wiązaniu, `409` z listą botów przy kilku, odmowa dla bota spoza adresata i dla adresata bez wiązania
+- [x] 1.5 Blokada i stan per wiązanie (test: zablokowany jeden bot nie rusza drugiego); narzędzia MCP bramy i ich opisy
 
 ## 2. Pakiet alertów: reguła z botem
 
-- [ ] 2.1 Migracja `alerts`: `rules.bot text NULL`
-- [ ] 2.2 `contract`, `store`, `rules`: pole `bot` w regule i w odpowiedziach
-- [ ] 2.3 `gateway.send(destination, bot, text)`; `delivery` przekazuje bota; odmowa dwuznaczności jest ostateczna z powodem nazywającym boty
-- [ ] 2.4 `validation`: bot spoza adresata i brak bota przy kilku wiązaniach to wady przy polu `bot`, razem z pozostałymi; `known` niesie wiązania
-- [ ] 2.5 Wada stanu reguły: `rules_with_defects` liczy dwuznaczny adres i bota, którego adresat już nie ma
-- [ ] 2.6 Szkic ze zdania: prompt zna boty adresata, model może zwrócić bota, ten sam walidator
+- [x] 2.1 Migracja `alerts`: `rules.bot text NULL`
+- [x] 2.2 `contract`, `store`, `rules`: pole `bot` w regule i w odpowiedziach
+- [x] 2.3 `gateway.send(destination, bot, text)`; `delivery` przekazuje bota; odmowa dwuznaczności jest ostateczna z powodem nazywającym boty
+- [x] 2.4 `validation`: bot spoza adresata i brak bota przy kilku wiązaniach to wady przy polu `bot`, razem z pozostałymi; `known` niesie wiązania
+- [x] 2.5 Wada stanu reguły: `rules_with_defects` liczy dwuznaczny adres i bota, którego adresat już nie ma
+- [x] 2.6 Szkic ze zdania: bot zostaje pusty, a ten sam walidator wskazuje wybór przy adresacie o kilku botach (model nie wybiera bota)
 
 ## 3. Terminal
 

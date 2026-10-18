@@ -24,7 +24,7 @@ from .bot_api import bot_api
 from .caller_access import RECORD, CallerAccess
 from .config import Settings
 from .routers import account as account_routes
-from .routers import bots, destinations, messages, meta, state
+from .routers import bots, messages, meta, recipients, state
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
 log = logging.getLogger(__name__)
@@ -113,7 +113,7 @@ def create_app() -> FastAPI:
     app.include_router(state.router)
     app.include_router(messages.router)
     app.include_router(bots.router)
-    app.include_router(destinations.router)
+    app.include_router(recipients.router)
     app.include_router(account_routes.router)
 
     server, tool_app = mcp_app.build_mcp_app(app)

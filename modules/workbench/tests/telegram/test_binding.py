@@ -19,7 +19,7 @@ class TestTheOffer:
     async def test_the_link_points_at_the_bot_and_carries_the_secret(self, db) -> None:
         bot = await builders.bot(db, username="alertsbot")
 
-        destination, link = await binding.offer(db, name="operator", bot=bot)
+        destination, link = await builders.offer(db, name="operator", bot=bot)
 
         assert link.startswith("https://t.me/alertsbot?start=")
         issued = link.split("start=")[1]
@@ -31,7 +31,7 @@ class TestTheOffer:
         the address arrives when a person taps."""
         bot = await builders.bot(db)
 
-        destination, _ = await binding.offer(db, name="operator", bot=bot)
+        destination, _ = await builders.offer(db, name="operator", bot=bot)
 
         assert destination.state is DestinationState.PENDING
         assert destination.receives is False
@@ -40,9 +40,9 @@ class TestTheOffer:
         """How a lost link is replaced, and how a blocked destination is re-bound — neither should
         require deleting the name every caller already holds."""
         bot = await builders.bot(db)
-        _, first = await binding.offer(db, name="operator", bot=bot)
+        _, first = await builders.offer(db, name="operator", bot=bot)
 
-        _, second = await binding.offer(db, name="operator", bot=bot)
+        _, second = await builders.offer(db, name="operator", bot=bot)
 
         assert first != second
         assert len(await store.list_destinations(db)) == 1
@@ -52,7 +52,7 @@ class TestTheOffer:
         who saw the link and a destination bound to their chat."""
         bot = await builders.bot(db)
 
-        _, link = await binding.offer(db, name="operator", bot=bot)
+        _, link = await builders.offer(db, name="operator", bot=bot)
 
         assert len(link.split("start=")[1]) >= 20
 
@@ -60,7 +60,7 @@ class TestTheOffer:
         bot = await builders.bot(db)
         issued_at = datetime.now(UTC)
 
-        _, link = await binding.offer(db, name="operator", bot=bot, now=issued_at)
+        _, link = await builders.offer(db, name="operator", bot=bot, now=issued_at)
 
         found = await store.binding_for(db, link.split("start=")[1])
         assert found is not None
@@ -70,7 +70,7 @@ class TestTheOffer:
 class TestWhatComesBack:
     async def test_a_start_with_the_secret_binds_the_chat_that_sent_it(self, db) -> None:
         bot = await builders.bot(db)
-        _, link = await binding.offer(db, name="operator", bot=bot)
+        _, link = await builders.offer(db, name="operator", bot=bot)
         nonce = link.split("start=")[1]
 
         bound = await binding.consume(
@@ -78,7 +78,7 @@ class TestWhatComesBack:
         )
 
         assert bound == 1
-        found = await store.destination_by_name(db, "operator")
+        found = await builders.only_binding(db, "operator")
         assert found is not None
         assert found.receives is True
         assert found.chat_id == 4242
@@ -87,17 +87,17 @@ class TestWhatComesBack:
         """Somebody opened the bot without a link. There is nothing to bind it to, and guessing
         would attach a stranger's chat to whatever destination was waiting."""
         bot = await builders.bot(db)
-        await binding.offer(db, name="operator", bot=bot)
+        await builders.offer(db, name="operator", bot=bot)
 
         bound = await binding.consume(db, bot, [fakes.start_update(1, chat_id=99, payload="")])
 
         assert bound == 0
-        found = await store.destination_by_name(db, "operator")
+        found = await builders.only_binding(db, "operator")
         assert found is not None and found.receives is False
 
     async def test_an_unknown_secret_binds_nothing(self, db) -> None:
         bot = await builders.bot(db)
-        await binding.offer(db, name="operator", bot=bot)
+        await builders.offer(db, name="operator", bot=bot)
 
         bound = await binding.consume(
             db, bot, [fakes.start_update(1, chat_id=99, payload="not-a-real-nonce")]
@@ -107,7 +107,7 @@ class TestWhatComesBack:
 
     async def test_the_same_secret_arriving_twice_binds_once(self, db) -> None:
         bot = await builders.bot(db)
-        _, link = await binding.offer(db, name="operator", bot=bot)
+        _, link = await builders.offer(db, name="operator", bot=bot)
         nonce = link.split("start=")[1]
         await binding.consume(db, bot, [fakes.start_update(1, chat_id=4242, payload=nonce)])
 
@@ -116,12 +116,12 @@ class TestWhatComesBack:
         )
 
         assert bound == 0
-        found = await store.destination_by_name(db, "operator")
+        found = await builders.only_binding(db, "operator")
         assert found is not None and found.chat_id == 4242
 
     async def test_an_expired_secret_binds_nothing(self, db) -> None:
         bot = await builders.bot(db)
-        _, link = await binding.offer(db, name="operator", bot=bot)
+        _, link = await builders.offer(db, name="operator", bot=bot)
         nonce = link.split("start=")[1]
 
         bound = await binding.consume(
@@ -156,7 +156,7 @@ class TestTheCursor:
 
     async def test_the_cursor_survives_the_binding(self, db) -> None:
         bot = await builders.bot(db)
-        _, link = await binding.offer(db, name="operator", bot=bot)
+        _, link = await builders.offer(db, name="operator", bot=bot)
 
         await binding.consume(
             db, bot, [fakes.start_update(7, chat_id=4242, payload=link.split("start=")[1])]
@@ -190,14 +190,14 @@ class TestTheWatcher:
     async def test_a_poll_binds_what_it_finds(self, pool) -> None:
         async with pool.acquire() as conn:
             bot = await builders.bot(conn)
-            _, link = await binding.offer(conn, name="operator", bot=bot)
+            _, link = await builders.offer(conn, name="operator", bot=bot)
         nonce = link.split("start=")[1]
         api = fakes.FakeBotApi(updates=[[fakes.start_update(1, chat_id=4242, payload=nonce)]])
 
         assert await binding.Watcher(pool, api).poll_once(bot) == 1
 
         async with pool.acquire() as conn:
-            found = await store.destination_by_name(conn, "operator")
+            found = await builders.only_binding(conn, "operator")
         assert found is not None and found.receives is True
 
     async def test_a_bot_removed_mid_poll_is_not_an_error(self, pool) -> None:
@@ -213,20 +213,20 @@ class TestTheWatcher:
 class TestWhoReceives:
     async def test_the_person_who_tapped_is_recorded_by_name(self, db) -> None:
         bot = await builders.bot(db, username="alertsbot")
-        _, link = await binding.offer(db, name="operator", bot=bot)
+        _, link = await builders.offer(db, name="operator", bot=bot)
         nonce = link.split("start=")[1]
 
         await binding.consume(
             db, bot, [fakes.start_update(1, chat_id=4242, payload=nonce, username="marek", first_name="Marek")]
         )
 
-        found = await store.destination_by_name(db, "operator")
+        found = await builders.only_binding(db, "operator")
         assert found is not None
         assert (found.chat_username, found.chat_title, found.chat_kind) == ("marek", "Marek", "private")
 
     async def test_a_group_is_recorded_by_its_title(self, db) -> None:
         bot = await builders.bot(db, username="alertsbot")
-        _, link = await binding.offer(db, name="desk", bot=bot)
+        _, link = await builders.offer(db, name="desk", bot=bot)
         nonce = link.split("start=")[1]
         update = fakes.start_update(1, chat_id=-100123, payload=nonce)
         update["message"]["chat"] = {"id": -100123, "type": "supergroup", "title": "Trading desk"}
@@ -234,7 +234,7 @@ class TestWhoReceives:
 
         await binding.consume(db, bot, [update])
 
-        found = await store.destination_by_name(db, "desk")
+        found = await builders.only_binding(db, "desk")
         assert found is not None
         assert (found.chat_title, found.chat_kind, found.receives) == ("Trading desk", "supergroup", True)
 
@@ -247,5 +247,5 @@ class TestWhoReceives:
         assert await binding.backfill_identities(pool, api) == 1
         assert await binding.backfill_identities(pool, api) == 0
 
-        found = await store.destination_by_name(db, "operator")
+        found = await builders.only_binding(db, "operator")
         assert found is not None and found.chat_username == "marek"

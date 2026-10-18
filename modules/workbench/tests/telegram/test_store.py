@@ -34,7 +34,7 @@ class TestTheTokenDoesNotLeak:
             await store.list_bots(db),
             await store.bot_by_username(db, added.username),
             await store.list_destinations(db),
-            await store.destination_by_name(db, "operator"),
+            await builders.only_binding(db, "operator"),
             await store.binding_for(db, "s3cret"),
         ]
 
@@ -134,7 +134,7 @@ class TestDestinations:
         again = await store.bind_destination(db, nonce="s3cret", chat_id=9999, moment=NOON)
 
         assert again is None
-        found = await store.destination_by_name(db, "operator")
+        found = await builders.only_binding(db, "operator")
         assert found is not None and found.chat_id == 4242
 
     async def test_an_expired_secret_binds_nothing(self, db) -> None:
@@ -168,7 +168,7 @@ class TestDestinations:
 
         await store.mark_blocked(db, created.id, NOON + timedelta(days=1))
 
-        found = await store.destination_by_name(db, "operator")
+        found = await builders.only_binding(db, "operator")
         assert found is not None
         assert found.state is DestinationState.BLOCKED
         assert found.receives is False
@@ -195,7 +195,7 @@ class TestDestinations:
         await builders.destination(db, name="first", bot_id=carrier.id)
         await builders.destination(db, name="second", bot_id=carrier.id)
 
-        assert await store.remove_destination(db, "first")
+        assert await store.remove_destination(db, "first", carrier.id)
 
         assert len(await store.list_bots(db)) == 1
         assert [d.name for d in await store.list_destinations(db)] == ["second"]

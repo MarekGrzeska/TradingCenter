@@ -114,11 +114,20 @@ class RuleIn(BaseModel):
     name: str = Field(min_length=1, max_length=80)
     source: Source
     destination: str = Field(min_length=1)
+    # The @name of the bot to tell through. Empty means the recipient's only bot, which is what every rule written before
+    # a recipient could have several means.
+    bot: str | None = None
     template: str = ""
     cooldown_seconds: int | None = Field(default=None, ge=0)
     mode: Mode = "repeat"
     max_per_hour: int | None = Field(default=None, ge=1)
     enabled: bool = True
+
+    @field_validator("bot")
+    @classmethod
+    def _bot_without_at(cls, value: str | None) -> str | None:
+        cleaned = (value or "").strip().lstrip("@")
+        return cleaned or None
 
     @field_validator("name", "destination")
     @classmethod
@@ -152,6 +161,7 @@ class RuleOut(BaseModel):
     name: str
     source: Source
     destination: str
+    bot: str | None
     template: str
     cooldown_seconds: int
     mode: Mode

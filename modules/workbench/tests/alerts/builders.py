@@ -9,7 +9,7 @@ from typing import Any
 from alerts.catalog import CatalogTool, ToolOutcome
 from alerts.contract import ConditionSource, EventSource, FilterTerm, RuleIn
 from alerts.drafts import Answer
-from alerts.gateway import Recipient, Sent
+from alerts.gateway import Binding, Recipient, Sent
 from alerts.validation import Known
 
 LAST_PRICE_INPUT = {
@@ -64,13 +64,13 @@ def known(
     *,
     tools: list[CatalogTool] | None = None,
     event_types: dict[str, dict[str, Any]] | None = None,
-    destinations: frozenset[str] | None = frozenset({"phone"}),
+    destinations: dict[str, tuple[str, ...]] | None | str = "phone-by-one-bot",
     min_interval_seconds: int = 30,
 ) -> Known:
     return Known(
         tools={one.name: one for one in (tools if tools is not None else [tool(), tool("add_channel", read_only=False)])},
         event_types={"youtube.film.read": FILM_SCHEMA} if event_types is None else event_types,
-        destinations=destinations,
+        destinations={"phone": ("bot",)} if destinations == "phone-by-one-bot" else destinations,  # type: ignore[arg-type]
         min_interval_seconds=min_interval_seconds,
     )
 
@@ -127,8 +127,11 @@ class FakeGateway:
 
     def __init__(self, names: list[str] | None = None) -> None:
         self.names = ["phone"] if names is None else names
+        # Recipient -> bots it is reached through; a name not listed here is reached through one, `bot`.
+        self.bots: dict[str, list[str]] = {}
         self.down = False
         self.sent: list[tuple[str, str]] = []
+        self.sent_via: list[str | None] = []
         self.answers: list[Sent] = []
 
     async def recipients(self) -> list[Recipient]:
@@ -136,10 +139,11 @@ class FakeGateway:
 
         if self.down:
             raise GatewayUnreachable("the door to Telegram did not answer: test")
-        return [Recipient(name, "@bot", True) for name in self.names]
+        return [Recipient(name, tuple(Binding(bot, True) for bot in self.bots.get(name, ["bot"]))) for name in self.names]
 
-    async def send(self, destination: str, text: str) -> Sent:
+    async def send(self, destination: str, bot: str | None, text: str) -> Sent:
         self.sent.append((destination, text))
+        self.sent_via.append(bot)
         return self.answers.pop(0) if self.answers else Sent(ok=True)
 
 

@@ -19,6 +19,7 @@ from .models import (
     ChatIdentity,
     Destination,
     DestinationState,
+    Recipient,
 )
 
 # Every column of `bots` except the one. Written once and reused, so that adding a column here is a
@@ -124,36 +125,77 @@ async def remove_bot(conn: Conn, bot_id: int) -> bool:
     return result.endswith(" 1")
 
 
-async def create_destination(conn: Conn, *, name: str, bot_id: int) -> Destination:
-    """The intention. It cannot receive yet: a bot may not speak first, so what makes this an address
-    is a person opening the conversation, recorded by `bind_destination` below."""
+# The columns of a destination, with the recipient's name taken from `recipients`: the copy left in `destinations.name`
+# is for the image before this one and is not read.
+_DESTINATION_SELECT = (
+    "SELECT d.id, r.name, d.bot_id, d.chat_id, d.state, d.bound_at, d.blocked_at, d.chat_username, d.chat_title, "
+    "d.chat_kind FROM destinations d JOIN recipients r ON r.id = d.recipient_id"
+)
+
+
+async def create_recipient(conn: Conn, name: str) -> Recipient:
+    """The name, once. Asking again for one that exists is not an error: it is the same recipient."""
     row = await fetch_one(
         conn,
         """
-        INSERT INTO destinations (name, bot_id)
-        VALUES ($1, $2)
-        RETURNING id, name, bot_id, chat_id, state, bound_at, blocked_at, chat_username, chat_title, chat_kind
+        INSERT INTO recipients (name) VALUES ($1)
+        ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+        RETURNING id, name, created_at
         """,
         name,
+    )
+    return Recipient(id=row["id"], name=row["name"], created_at=row["created_at"])
+
+
+async def list_recipients(conn: Conn) -> list[Recipient]:
+    rows = await conn.fetch("SELECT id, name, created_at FROM recipients ORDER BY created_at, id")
+    return [Recipient(id=row["id"], name=row["name"], created_at=row["created_at"]) for row in rows]
+
+
+async def recipient_by_name(conn: Conn, name: str) -> Recipient | None:
+    row = await conn.fetchrow("SELECT id, name, created_at FROM recipients WHERE name = $1", name)
+    if row is None:
+        return None
+    return Recipient(id=row["id"], name=row["name"], created_at=row["created_at"])
+
+
+async def remove_recipient(conn: Conn, name: str) -> bool:
+    """The recipient and, by the cascade, every binding of it. The bots stand."""
+    result = await conn.execute("DELETE FROM recipients WHERE name = $1", name)
+    return result.endswith(" 1")
+
+
+async def create_destination(conn: Conn, *, recipient: Recipient, bot_id: int) -> Destination:
+    """The intention to reach a recipient through a bot. It cannot receive yet: a bot may not speak first, so what makes
+    this an address is a person opening the conversation, recorded by `bind_destination` below. Asking again for the same
+    pair returns the one that exists."""
+    await conn.execute(
+        """
+        INSERT INTO destinations (recipient_id, name, bot_id) VALUES ($1, $2, $3)
+        ON CONFLICT (recipient_id, bot_id) DO NOTHING
+        """,
+        recipient.id,
+        recipient.name,
         bot_id,
     )
-    return _destination(row)
+    found = await destination_of(conn, recipient.name, bot_id)
+    assert found is not None
+    return found
 
 
 async def list_destinations(conn: Conn) -> list[Destination]:
-    rows = await conn.fetch(
-        "SELECT id, name, bot_id, chat_id, state, bound_at, blocked_at, chat_username, chat_title, chat_kind "
-        "FROM destinations ORDER BY created_at, id"
-    )
+    rows = await conn.fetch(f"{_DESTINATION_SELECT} ORDER BY d.created_at, d.id")
     return [_destination(row) for row in rows]
 
 
-async def destination_by_name(conn: Conn, name: str) -> Destination | None:
-    row = await conn.fetchrow(
-        "SELECT id, name, bot_id, chat_id, state, bound_at, blocked_at, chat_username, chat_title, chat_kind "
-        "FROM destinations WHERE name = $1",
-        name,
-    )
+async def destinations_of(conn: Conn, name: str) -> list[Destination]:
+    """Every way a recipient can be reached, in the order they were added."""
+    rows = await conn.fetch(f"{_DESTINATION_SELECT} WHERE r.name = $1 ORDER BY d.created_at, d.id", name)
+    return [_destination(row) for row in rows]
+
+
+async def destination_of(conn: Conn, name: str, bot_id: int) -> Destination | None:
+    row = await conn.fetchrow(f"{_DESTINATION_SELECT} WHERE r.name = $1 AND d.bot_id = $2", name, bot_id)
     return _destination(row) if row is not None else None
 
 
@@ -170,9 +212,13 @@ async def count_destinations(conn: Conn, *, receiving: bool = False) -> int:
     )
 
 
-async def remove_destination(conn: Conn, name: str) -> bool:
-    """The binding, and only the binding. The bot stands: it may be carrying other destinations."""
-    result = await conn.execute("DELETE FROM destinations WHERE name = $1", name)
+async def remove_destination(conn: Conn, name: str, bot_id: int) -> bool:
+    """One binding, and only that. The bot stands, and so do the recipient's other bindings."""
+    result = await conn.execute(
+        "DELETE FROM destinations d USING recipients r WHERE r.id = d.recipient_id AND r.name = $1 AND d.bot_id = $2",
+        name,
+        bot_id,
+    )
     return result.endswith(" 1")
 
 
@@ -241,11 +287,17 @@ async def bind_destination(
         row = await fetch_one(
             conn,
             """
-            UPDATE destinations
-            SET chat_id = $2, state = 'ready', bound_at = $3, blocked_at = NULL,
-                chat_username = $4, chat_title = $5, chat_kind = $6
-            WHERE id = $1
-            RETURNING id, name, bot_id, chat_id, state, bound_at, blocked_at, chat_username, chat_title, chat_kind
+            WITH bound AS (
+                UPDATE destinations
+                SET chat_id = $2, state = 'ready', bound_at = $3, blocked_at = NULL,
+                    chat_username = $4, chat_title = $5, chat_kind = $6
+                WHERE id = $1
+                RETURNING id, recipient_id, bot_id, chat_id, state, bound_at, blocked_at, chat_username, chat_title,
+                          chat_kind
+            )
+            SELECT b.id, r.name, b.bot_id, b.chat_id, b.state, b.bound_at, b.blocked_at, b.chat_username,
+                   b.chat_title, b.chat_kind
+              FROM bound b JOIN recipients r ON r.id = b.recipient_id
             """,
             spent["destination_id"],
             chat_id,
@@ -269,10 +321,7 @@ async def note_identity(conn: Conn, destination_id: int, who: ChatIdentity) -> N
 
 
 async def destinations_without_identity(conn: Conn) -> list[Destination]:
-    rows = await conn.fetch(
-        "SELECT id, name, bot_id, chat_id, state, bound_at, blocked_at, chat_username, chat_title, chat_kind "
-        "FROM destinations WHERE chat_id IS NOT NULL AND chat_kind IS NULL"
-    )
+    rows = await conn.fetch(f"{_DESTINATION_SELECT} WHERE d.chat_id IS NOT NULL AND d.chat_kind IS NULL")
     return [_destination(row) for row in rows]
 
 
@@ -303,13 +352,6 @@ async def note_offset(conn: Conn, bot_id: int, offset: int) -> None:
         bot_id,
         offset,
     )
-
-
-# --- destinations as they are read ---------------------------------------------------------------
-
-_DESTINATION_COLUMNS = (
-    "d.id, d.name, d.bot_id, d.chat_id, d.state, d.bound_at, d.blocked_at, d.chat_username, d.chat_title, d.chat_kind"
-)
 
 
 # --- the account that owns the bots ----------------------------------------------------------------

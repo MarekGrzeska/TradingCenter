@@ -91,3 +91,24 @@ def test_an_interval_below_the_floor_names_the_floor() -> None:
     ]
 
     assert "45 s" in defect.message
+
+
+MANY = {"phone": ("postsbot", "filmsbot")}
+
+
+def test_a_recipient_with_several_bots_needs_the_rule_to_choose_one() -> None:
+    assert "bot" in fields_of(rule(), destinations=MANY)
+    assert fields_of(rule(bot="filmsbot"), destinations=MANY) == set()
+
+
+def test_a_bot_the_recipient_is_not_reached_through_is_refused_at_the_bot_field() -> None:
+    assert fields_of(rule(bot="otherbot"), destinations=MANY) == {"bot"}
+    assert fields_of(rule(bot="@filmsbot"), destinations=MANY) == set()
+
+
+def test_a_recipient_with_no_bot_yet_is_refused_at_the_recipient() -> None:
+    assert fields_of(rule(), destinations={"phone": ()}) == {"destination"}
+
+
+def test_a_rule_written_without_a_bot_still_works_for_a_recipient_with_one() -> None:
+    assert fields_of(rule(), destinations={"phone": ("postsbot",)}) == set()

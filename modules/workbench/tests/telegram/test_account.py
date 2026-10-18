@@ -369,7 +369,7 @@ class TestRotatingAToken:
         app.state.telegram = FakeBotApi(me={"id": bot.telegram_id, "username": "alertsbot"})
 
         response = await api.post("/bots/alertsbot/token")
-        sent = await api.post("/messages", json={"destination": "operator", "text": "hi"})
+        sent = await api.post("/messages", json={"recipient": "operator", "text": "hi"})
 
         assert response.status_code == 200
         assert new not in response.text

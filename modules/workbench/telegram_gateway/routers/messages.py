@@ -29,7 +29,7 @@ router = APIRouter(tags=["messages"])
     },
 )
 async def send(request: Request, body: SendRequest) -> Sent:
-    """One message, now, to a destination by name.
+    """One message, now, to a recipient by name, through a bot when the recipient has several.
 
     Nothing is queued and nothing is retried here. A refusal carries Telegram's own answer — the wait
     on a rate limit, the block on a recipient who left — because the caller decides from it whether
@@ -41,10 +41,11 @@ async def send(request: Request, body: SendRequest) -> Sent:
             delivered = await sending.send(
                 conn,
                 request.app.state.telegram,
-                name=body.destination,
+                name=body.recipient,
+                bot=body.bot,
                 text=body.text,
                 max_chars=settings.max_message_chars,
             )
         except GatewayError as err:
             raise deps.refusal(err) from err
-    return Sent.of(body.destination, delivered)
+    return Sent.of(body.recipient, delivered)

@@ -25,6 +25,31 @@ class NoSuchDestination(GatewayError):
 
 
 @dataclass
+class NoBotForRecipient(GatewayError):
+    """The recipient exists but is not reached through the bot named (or through any bot, when none was named)."""
+
+    name: str
+    bot: str | None = None
+
+    def __str__(self) -> str:
+        if self.bot is None:
+            return f"{self.name!r} is not bound through any bot yet: a bot has to be added to it and its start link tapped"
+        return f"{self.name!r} is not reached through @{self.bot}"
+
+
+@dataclass
+class AmbiguousBot(GatewayError):
+    """The recipient is reached through several bots and the request did not say which."""
+
+    name: str
+    bots: list[str]
+
+    def __str__(self) -> str:
+        listed = ", ".join(f"@{bot}" for bot in self.bots)
+        return f"{self.name!r} is reached through several bots ({listed}); say which one"
+
+
+@dataclass
 class DestinationNotReady(GatewayError):
     """The name exists, but nobody has opened the conversation — or the recipient blocked the bot.
 

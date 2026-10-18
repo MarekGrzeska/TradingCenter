@@ -15,7 +15,7 @@ from .contract import ConditionSource, EventSource, RuleIn
 from .validation import effective_cooldown, effective_template
 
 RULE_COLUMNS = """
-    id, name, kind, destination, template, cooldown_seconds, mode, max_per_hour,
+    id, name, kind, destination, bot, template, cooldown_seconds, mode, max_per_hour,
     tool_name, arguments, field_path, comparison, threshold, poll_interval_seconds,
     event_type, filter, enabled, disabled_reason, defect,
     next_check_at, last_result, last_known_result, last_checked_at, last_fired_at, throttle_notified_at,
@@ -65,9 +65,9 @@ async def insert_rule(conn: Conn, rule: RuleIn, *, created_by: str, now: datetim
         INSERT INTO rules (
             name, kind, destination, template, cooldown_seconds, mode, max_per_hour, enabled,
             tool_name, arguments, field_path, comparison, threshold, poll_interval_seconds,
-            event_type, filter, next_check_at, created_by
+            event_type, filter, next_check_at, created_by, bot
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14, $15, $16::jsonb, $17, $18)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11, $12, $13, $14, $15, $16::jsonb, $17, $18, $19)
         RETURNING {RULE_COLUMNS}
         """,
         rule.name,
@@ -88,6 +88,7 @@ async def insert_rule(conn: Conn, rule: RuleIn, *, created_by: str, now: datetim
         filter_,
         now if kind == "condition" and rule.enabled else None,
         created_by,
+        rule.bot,
     )
 
 
@@ -103,7 +104,7 @@ async def replace_rule(conn: Conn, rule_id: int, rule: RuleIn, *, now: datetime)
             tool_name = $10, arguments = $11::jsonb, field_path = $12, comparison = $13, threshold = $14,
             poll_interval_seconds = $15, event_type = $16, filter = $17::jsonb,
             defect = NULL, next_check_at = $18, last_result = NULL, last_known_result = NULL,
-            throttle_notified_at = NULL, updated_at = now(),
+            bot = $19, throttle_notified_at = NULL, updated_at = now(),
             last_fired_at = CASE WHEN $7 = 'once' THEN NULL ELSE last_fired_at END
          WHERE id = $1
         RETURNING {RULE_COLUMNS}
@@ -126,6 +127,7 @@ async def replace_rule(conn: Conn, rule_id: int, rule: RuleIn, *, now: datetime)
         event_type,
         filter_,
         now if kind == "condition" and rule.enabled else None,
+        rule.bot,
     )
 
 
@@ -381,7 +383,7 @@ async def claim_deliveries(conn: Conn, *, now: datetime, limit: int, lease_secon
                  WHERE f.id = due.id
              RETURNING f.id, f.rule_id, f.text, f.created_at, f.attempts
             )
-            SELECT leased.*, r.name AS rule_name, r.destination, r.mode, r.enabled, r.max_per_hour
+            SELECT leased.*, r.name AS rule_name, r.destination, r.bot, r.mode, r.enabled, r.max_per_hour
               FROM leased JOIN rules r ON r.id = leased.rule_id
             """,
             now,
@@ -523,13 +525,10 @@ async def destinations_in_use(conn: Conn) -> set[str]:
     return {row["destination"] for row in await conn.fetch("SELECT DISTINCT destination FROM rules")}
 
 
-async def rules_with_defects(conn: Conn, missing: set[str]) -> int:
-    """The rules with something wrong: a schema that moved under them, or a recipient the door no longer knows. Counted as
-    rules, once each, whatever the number of things wrong with one."""
-    counted = await conn.fetchval(
-        "SELECT count(*) FROM rules WHERE defect IS NOT NULL OR destination = ANY($1::text[])", sorted(missing)
-    )
-    return int(counted or 0)
+async def rule_targets(conn: Conn) -> list[asyncpg.Record]:
+    """Where every rule would tell and whether its own schema still fits: what the state needs to count rules with
+    something wrong, one row per rule."""
+    return list(await conn.fetch("SELECT id, destination, bot, defect FROM rules"))
 
 
 async def seen_values(conn: Conn, event_type: str, attribute: str, limit: int = 50) -> list[str]:

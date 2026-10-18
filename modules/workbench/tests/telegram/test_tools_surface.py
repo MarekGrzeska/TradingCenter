@@ -100,7 +100,7 @@ async def test_sending_answers_with_the_identifier_telegram_gave_it(
 
     sent = await call(tool_server, "send_telegram_message", destination="operator", text="hi")
 
-    assert sent == {"destination": "operator", "message_id": 31}
+    assert sent == {"destination": "operator", "bot": None, "message_id": 31}
 
 
 async def test_an_empty_gateway_is_answered_rather_than_failed(tool_server) -> None:

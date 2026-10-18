@@ -71,6 +71,13 @@ async def test_a_rule_is_one_defect_however_many_things_are_wrong_and_many_rules
     assert (await api.get("/state")).json()["rules_with_defects"] == 3
 
 
+async def test_a_rule_that_became_ambiguous_because_its_recipient_got_a_second_bot_is_counted_once(api, pool, door) -> None:
+    await saved(pool)
+    door.bots = {"phone": ["postsbot", "filmsbot"]}
+
+    assert (await api.get("/state")).json()["rules_with_defects"] == 1
+
+
 async def test_fires_waiting_to_be_retried_are_counted(api, pool, db) -> None:
     rule_id = await saved(pool)
     async with pool.acquire() as conn:

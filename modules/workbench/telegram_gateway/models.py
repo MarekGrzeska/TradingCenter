@@ -55,8 +55,17 @@ class BotCredential:
 
 
 @dataclass(frozen=True, slots=True)
+class Recipient:
+    """Somebody to tell, by the name the operator gave them. Reached through zero or more bots, each its own `Destination`."""
+
+    id: int
+    name: str
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class Destination:
-    """Somewhere this module can send. `chat_id` is absent until a person has opened the conversation
+    """A recipient reached through one bot: somewhere this module can send. `chat_id` is absent until a person has opened the conversation
     — a bot cannot speak first, so a destination is an intention before it is an address."""
 
     id: int
