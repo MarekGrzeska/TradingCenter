@@ -458,3 +458,21 @@ async def reopen_once_rule(conn: Conn, rule_id: int) -> None:
     """A one-time rule whose one alert never arrived may fire again: its 'already told' is taken back."""
     await conn.execute("UPDATE rules SET last_fired_at = NULL WHERE id = $1 AND mode = 'once'", rule_id)
 
+
+# --- drafts ---------------------------------------------------------------------------------------------------------
+
+
+async def record_draft_usage(conn: Conn, *, model: str, input_tokens: int, output_tokens: int, now: datetime) -> None:
+    await conn.execute(
+        "INSERT INTO draft_usage (at, model, input_tokens, output_tokens) VALUES ($1, $2, $3, $4)",
+        now,
+        model,
+        input_tokens,
+        output_tokens,
+    )
+
+
+async def draft_tokens_since(conn: Conn, since: datetime) -> int:
+    spent = await conn.fetchval("SELECT coalesce(sum(input_tokens + output_tokens), 0) FROM draft_usage WHERE at >= $1", since)
+    return int(spent or 0)
+

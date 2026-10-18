@@ -49,4 +49,5 @@ async def catalog(request: Request) -> CatalogOut:
         destinations=[DestinationOut(name=one.name, bot=one.bot, receives=one.receives) for one in recipients or []],
         gateway=recipients is not None,
         min_interval_seconds=state.settings.min_interval_seconds,
+        drafting=state.drafter is not None,
     )
