@@ -62,8 +62,8 @@ identity, no session. Five of the prediction-market archive's twelve tools write
 write is a watch list and its groups, not an account; nothing on the post archive's four
 writes at all. Nothing this system does on Polymarket touches money.
 
-The post archive and the YouTube archive reach the door to Telegram the way the platform reaches the
-candle archive: its own application through `httpx.ASGITransport`, as this process
+The post archive and the YouTube archive reach the door to Telegram through the gateway's own
+application over `httpx.ASGITransport`, as this process
 (`workbench/telegram_client.py`) — they say what kind of event it is, the operator's assignments in the terminal say who is told, and a purpose nobody hears is silence that works.
 
 The **team tools** are the other source that is not on a network at all. They keep every
