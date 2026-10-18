@@ -23,7 +23,9 @@ import {
  * sentence on top says only that the rule was refused, so the operator is never reading the same reason twice.
  */
 
-const INPUT = "rounded border border-border bg-sunken px-2 py-1 text-ink";
+// One height for every control, so a row of selects, numbers and text lines sits on one line whatever sits under each.
+const INPUT = "h-8 rounded border border-border bg-sunken px-2 text-ink";
+const TEXTAREA = "rounded border border-border bg-sunken px-2 py-1 text-ink";
 const signal = () => new AbortController().signal;
 const OTHER = "__other__";
 
@@ -40,7 +42,7 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1 text-xs">
-      <span className="text-ink-secondary">{label}</span>
+      <span className="text-ink-secondary">{label || " "}</span>
       {children}
       {hint && <span className="text-ink-faint">{hint}</span>}
       {problems.map((one) => (
@@ -208,7 +210,7 @@ export function RuleDialog({
               </p>
             ))}
 
-            <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-wrap items-start gap-3">
               <Field label="Której wartości" problems={about("source.field_path")}>
                 {tool && tool.numberFields.length > 0 ? (
                   <select className={INPUT} value={form.fieldPath} onChange={(e) => change({ fieldPath: e.target.value })}>
@@ -330,7 +332,7 @@ export function RuleDialog({
           hint={`Puste = treść domyślna. W nawiasach klamrowych: ${slots.map((one) => `{${one}}`).join(" ")}`}
           problems={about("template")}
         >
-          <textarea className={INPUT} rows={2} value={form.template} onChange={(e) => change({ template: e.target.value })} />
+          <textarea className={TEXTAREA} rows={2} value={form.template} onChange={(e) => change({ template: e.target.value })} />
         </Field>
         <p className="rounded bg-sunken/60 px-2 py-1 text-xs text-ink-secondary" aria-label="podgląd wiadomości">
           Podgląd: {previewOf(form, catalog)}
@@ -338,7 +340,7 @@ export function RuleDialog({
 
         <details className="text-xs">
           <summary className="cursor-pointer text-ink-secondary">Rytm i granice</summary>
-          <div className="mt-2 flex flex-wrap items-end gap-3">
+          <div className="mt-2 flex flex-wrap items-start gap-3">
             <Field label="Czas martwy (s)" hint="pusto = domyślnie (900 dla wartości, 0 dla zdarzeń)">
               <input
                 className={`${INPUT} w-28`}
@@ -363,10 +365,12 @@ export function RuleDialog({
                 onChange={(e) => change({ maxPerHour: e.target.value })}
               />
             </Field>
-            <label className="flex items-center gap-1 text-ink">
-              <input type="checkbox" checked={form.enabled} onChange={(e) => change({ enabled: e.target.checked })} />
-              włączona
-            </label>
+            <Field label="">
+              <span className="flex h-8 items-center gap-1 text-ink">
+                <input type="checkbox" checked={form.enabled} onChange={(e) => change({ enabled: e.target.checked })} />
+                włączona
+              </span>
+            </Field>
           </div>
         </details>
 
@@ -401,7 +405,7 @@ function TermRow({
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="flex flex-wrap items-end gap-2">
+      <div className="flex flex-wrap items-start gap-2">
         <Field label="Gdy">
           <select className={INPUT} value={term.attribute} onChange={(e) => pick(e.target.value)}>
             {attributes.map((one) => (
@@ -474,9 +478,14 @@ function TermRow({
             />
           )}
         </Field>
-        <Button size="xs" tone="muted" aria-label="usuń warunek" onClick={onRemove}>
-          ×
-        </Button>
+        <div className="flex flex-col gap-1 text-xs">
+          <span>{" "}</span>
+          <span className="flex h-8 items-center">
+            <Button size="xs" tone="muted" aria-label="usuń warunek" onClick={onRemove}>
+              ×
+            </Button>
+          </span>
+        </div>
       </div>
       {problems.map((one) => (
         <span key={one.message} role="alert" className="text-xs text-critical">
