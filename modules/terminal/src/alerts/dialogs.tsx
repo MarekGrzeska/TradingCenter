@@ -80,9 +80,10 @@ export function RuleDialog({
 }) {
   const [form, setForm] = useState<RuleForm>(start.form);
   const [defects, setDefects] = useState<Defect[]>(start.defects);
-  // A draft arrives with what is wrong with it; saving it as it stands would only be refused, so it waits for a change.
+  // A draft arrives with what is wrong in its fields; saving it as it stands would only be refused, so it waits for a
+  // change. What the model could not say about the sentence ("sentence") is a remark, not a flaw in the rule.
   const [asDrafted] = useState(() => JSON.stringify(start.form));
-  const stillAsDrafted = start.defects.length > 0 && JSON.stringify(form) === asDrafted;
+  const stillAsDrafted = start.defects.some((one) => one.field !== "sentence") && JSON.stringify(form) === asDrafted;
   const problem = formProblem(form);
   const change = (patch: Partial<RuleForm>) => setForm((current) => ({ ...current, ...patch }));
   const about = (field: string) => defectsFor(defects, field);

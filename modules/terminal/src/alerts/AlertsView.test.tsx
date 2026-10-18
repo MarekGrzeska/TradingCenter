@@ -211,6 +211,23 @@ describe("AlertsView", () => {
     expect(within(dialog).getByRole("button", { name: "Zapisz" })).toBeEnabled();
   });
 
+  it("lets a draft be saved when all the model had to say was a remark about the sentence", async () => {
+    const draft = vi.fn(async () => ({
+      understood: "Powiadom o postach.",
+      rule: { ...rule(), id: undefined, name: "Nowy post" },
+      defects: [{ field: "sentence", message: "nie da się ograniczyć reguły do Truth Social" }],
+      notes: [],
+    }));
+    render(<AlertsView api={api([], { draft })} />);
+
+    await userEvent.type(await screen.findByLabelText(/Albo opisz zdaniem/), "daj znać o postach z Truth Social");
+    await userEvent.click(screen.getByRole("button", { name: "Zaproponuj regułę" }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(within(dialog).getByText(/nie da się ograniczyć/)).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Zapisz" })).toBeEnabled();
+  });
+
   it("shows a fire the cap held back as held back, with the reason", async () => {
     const client = api([rule()], {
       history: vi.fn(async () => ({
