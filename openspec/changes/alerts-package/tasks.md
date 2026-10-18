@@ -33,11 +33,11 @@
 
 ## 5. Doręczenie
 
-- [ ] 5.1 Klient bramy w procesie, wysyłka po nazwie adresata, klasyfikacja odmowy trwała/przejściowa
-- [ ] 5.2 Ponowienie z `retry_after`, odpuszczenie po oknie, brak bramy jako stan
-- [ ] 5.3 Sufit wysyłek reguły na godzinę i jedna wiadomość o zdławieniu
-- [ ] 5.4 Tryb jednorazowy: reguła wyłącza się po pierwszym udanym doręczeniu, z powodem „odpaliła”
-- [ ] 5.5 Testy: restart między zapisem a odpowiedzią bramy nie daje drugiego odpalenia (`-m db`), zalew zdławiony do sufitu, tryb jednorazowy
+- [x] 5.1 Klient bramy w procesie, wysyłka po nazwie adresata, klasyfikacja odmowy trwała/przejściowa
+- [x] 5.2 Ponowienie z `retry_after`, odpuszczenie po oknie, brak bramy jako stan
+- [x] 5.3 Sufit wysyłek reguły na godzinę i jedna wiadomość o zdławieniu
+- [x] 5.4 Tryb jednorazowy: reguła wyłącza się po pierwszym udanym doręczeniu, z powodem „odpaliła”
+- [x] 5.5 Testy: restart między zapisem a odpowiedzią bramy nie daje drugiego odpalenia (`-m db`), zalew zdławiony do sufitu, tryb jednorazowy
 
 ## 6. Szkic ze zdania
 
