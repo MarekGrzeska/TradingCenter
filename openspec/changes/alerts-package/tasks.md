@@ -62,12 +62,12 @@ Przed przełączeniem producentów: reguły powstają z przypisań i reguł kana
 
 ## 9. Producenci publikują zdarzenia
 
-- [ ] 9.1 Klient `alerts` w procesie przekazywany przez assembly do `youtube_data`, `social_data` i `teams` (brak pakietu = `None`)
-- [ ] 9.2 YouTube: ogłoszenie `youtube.film.read`, publikacja każdego odczytanego filmu, znacznik po przyjęciu; usunięcie wysyłki do bramy, `_wanted` i narzędzia `set_alert_rule`
-- [ ] 9.3 Social: ogłoszenie `social.post.read`, publikacja każdego ocenionego posta, znacznik po przyjęciu; koniec czytania `ALERT_MIN_IMPACT_SCORE`
-- [ ] 9.4 Teams: ogłoszenie `teams.run.finished`, publikacja po stanie końcowym z ponowieniem
-- [ ] 9.5 Trasy stanu producentów mówią „nie publikuje”, gdy `alerts` nie ma
-- [ ] 9.6 Testy producentów: publikacja, znacznik po przyjęciu, ponowienie, brak pakietu
+- [x] 9.1 Klient `alerts` w procesie przekazywany przez assembly do `youtube_data`, `social_data` i `teams` (brak pakietu = `None`)
+- [x] 9.2 YouTube: ogłoszenie `youtube.film.read`, publikacja każdego odczytanego filmu, znacznik po przyjęciu; usunięcie wysyłki do bramy, `_wanted` i narzędzia `set_alert_rule`
+- [x] 9.3 Social: ogłoszenie `social.post.read`, publikacja każdego ocenionego posta, znacznik po przyjęciu; koniec czytania `ALERT_MIN_IMPACT_SCORE`
+- [x] 9.4 Teams: ogłoszenie `teams.run.finished`, publikacja po stanie końcowym z ponowieniem
+- [x] 9.5 Trasy stanu producentów mówią „nie publikuje”, gdy `alerts` nie ma
+- [x] 9.6 Testy producentów: publikacja, znacznik po przyjęciu, ponowienie, brak pakietu
 
 ## 10. Terminal
 

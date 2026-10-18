@@ -44,6 +44,7 @@ from agent.provider import OpenAIProvider as AgentProvider
 from agent.runtime import MIGRATION_LOCK_KEY as AGENT_LOCK_KEY
 from agent.runtime import MIGRATIONS as AGENT_MIGRATIONS
 from agent.tools import ToolServerRegistry
+from teams import alerts as teams_alerts_module
 from teams import store as teams_store
 from teams.models_catalogue import ModelCatalogue as TeamsCatalogue
 from teams.provider import OpenAIProvider as TeamsProvider
@@ -65,6 +66,13 @@ from .team_tools import LocalTeamsTools
 from .telegram_client import package_client, telegram_client
 
 log = logging.getLogger(__name__)
+
+
+def _alerts_client(caller: str):
+    """A producer's client over the alerts package, or nothing where the package is not part of this process."""
+    if alerts_app is None:
+        return nullcontext(None)
+    return package_client(alerts_app, caller, "http://alerts.in-process")
 
 
 @asynccontextmanager
@@ -175,24 +183,21 @@ async def lifespan(app: FastAPI):
             if alerts_app is not None and alerts_settings is not None
             else nullcontext()
         ),
-        telegram_client(telegram_app, "the post archive") as social_telegram,
+        _alerts_client("the post archive") as social_alerts,
         polymarket_data.app.serving(polymarket_app, polymarket_settings),
-        social_data.app.serving(social_app, social_settings, telegram=social_telegram),
+        social_data.app.serving(social_app, social_settings, alerts_client=social_alerts),
         # The archive's migration may wait on an index over the candle table, and its ingest opens a subscription
         # per tracked pair the moment it starts.
         market_data.app.serving(market_app, market_settings),
         # Entered only when mounted: with no database configured this is a block that does nothing, and the start-up
         # log line is what says why.
+        (_alerts_client("the YouTube archive") if youtube_app is not None else nullcontext(None)) as youtube_alerts,
         (
-            telegram_client(telegram_app, "the YouTube archive")
-            if youtube_app is not None
-            else nullcontext(None)
-        ) as youtube_telegram,
-        (
-            youtube_data.app.serving(youtube_app, youtube_settings, telegram=youtube_telegram)
+            youtube_data.app.serving(youtube_app, youtube_settings, alerts_client=youtube_alerts)
             if youtube_app is not None and youtube_settings is not None
             else nullcontext()
         ),
+        _alerts_client("the teams module") as teams_alerts,
     ):
         # Built here rather than beside the conversation's, because one of its sources is served by this process and
         # reads the teams database directly: announcing needs no pool, calling does, and this is the first point with one.
@@ -302,9 +307,16 @@ async def lifespan(app: FastAPI):
             )
             app.state.teams.clock = clock
             clock.start()
+            # Finished runs are handed to the alerts package, independently of the clock: the clock can be switched off
+            # (`SCHEDULER_ENABLED`), and a run is news whoever started it.
+            run_announcer = teams_alerts_module.build(teams_pool, teams_alerts)
+            if run_announcer is not None:
+                await run_announcer.start()
             try:
                 yield
             finally:
+                if run_announcer is not None:
+                    await run_announcer.stop()
                 await clock.aclose()
         finally:
             await teams_tool_servers.aclose()

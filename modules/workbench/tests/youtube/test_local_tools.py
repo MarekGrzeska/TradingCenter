@@ -23,14 +23,14 @@ async def server(app, pool):
     return app.state.mcp_server
 
 
-async def test_both_registries_see_the_same_ten_tools_and_know_which_of_them_write(server) -> None:
+async def test_both_registries_see_the_same_nine_tools_and_know_which_of_them_write(server) -> None:
     conversation = await ConversationLocalTools("youtube-data", server).list_tools()
     teams = await TeamsLocalTools("youtube-data", server).list_tools()
 
     assert {t.name for t in conversation} == {t.name for t in teams}
-    assert len(conversation) == 10
+    assert len(conversation) == 9
     writers = {t.name for t in conversation if t.read_only is False}
-    assert writers == {"follow_channel", "add_topic", "set_alert_rule", "analyse_video"}
+    assert writers == {"follow_channel", "add_topic", "analyse_video"}
     assert ConversationLocalTools("youtube-data", server).moves_the_account("follow_channel") is False
 
 

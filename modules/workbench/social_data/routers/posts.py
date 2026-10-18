@@ -87,6 +87,6 @@ async def state(request: Request) -> StateOut:
             conn,
             request.app.state.settings,
             now=datetime.now(UTC),
-            # Told, not merely wired: a purpose the door says nobody receives is the silence this field reports.
+            # Told, not merely wired: an alerts package that refused the last posts is the silence this field reports.
             alerts_configured=announcer is not None and announcer.telling,
         )

@@ -1,13 +1,12 @@
-"""One integration test that the real pairing works (CLAUDE.md, rule 5): a producer's own gateway client, over the door's
-application as the host builds it, hears "nobody receives this" as a state and not as a refusal, and a message under
-the same purpose arrives once the operator has assigned it. The matching rule and the refusals are tested where they live."""
+"""One integration test that the real pairing works (CLAUDE.md, rule 5): the alerts package's own client, over the door's
+application as the host builds it, lists who can be written to and delivers a message by name — and hears a refusal that
+would come again as a final answer. The routing rules and the refusals are tested where they live."""
 
 from __future__ import annotations
 
 import pytest
 
-from social_data.alerts import Gateway, GatewayUnassigned
-from telegram_gateway import store
+from alerts.gateway import Gateway
 from workbench.telegram_client import telegram_client
 
 from .fakes import FakeBotApi, RecordingWatcher
@@ -16,7 +15,7 @@ from .test_sending import ready_destination
 pytestmark = pytest.mark.db
 
 
-async def test_a_producer_over_the_in_process_door_waits_until_the_purpose_is_assigned(
+async def test_the_alerts_package_over_the_in_process_door_lists_recipients_and_delivers_by_name(
     app, pool, settings, db
 ) -> None:
     app.state.settings = settings
@@ -26,15 +25,13 @@ async def test_a_producer_over_the_in_process_door_waits_until_the_purpose_is_as
     destination = await ready_destination(db, "operator")
     assert destination is not None
 
-    async with telegram_client(app, "the post archive") as client:
+    async with telegram_client(app, "the alerts package") as client:
         door = Gateway(client)
-        await door.describe("social.post", "A post the model scored high")
 
-        with pytest.raises(GatewayUnassigned):
-            await door.send(purpose="social.post.someone", text="hello")
+        assert [one.name for one in await door.recipients()] == ["operator"]
+        delivered = await door.send("operator", "hello")
+        refused = await door.send("nobody", "hello")
 
-        await store.assign(db, key="social", destination_id=destination.id)
-        await door.send(purpose="social.post.someone", text="hello")
-
-    assert {one.name for one in await store.list_purposes(db)} == {"social.post", "social.post.someone"}
+    assert delivered.ok is True
     assert app.state.telegram.sent[0][2] == "hello"
+    assert (refused.ok, refused.transient) == (False, False)

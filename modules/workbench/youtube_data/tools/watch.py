@@ -5,7 +5,6 @@ take the one the operator cared about. What the agent can do is bounded by the s
 from __future__ import annotations
 
 from datetime import timedelta
-from typing import Literal
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
@@ -40,12 +39,6 @@ class TopicAdded(BaseModel):
     topic: TopicBrief
     created: bool
     defaults_applied: list[str] = Field(description="which limits came from the settings rather than from this call")
-
-
-class RuleSet(BaseModel):
-    kind: Literal["channel", "topic"]
-    ref: str
-    alert_rule: str
 
 
 class Queued(BaseModel):
@@ -102,17 +95,15 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         ]
 
     @mcp.tool(annotations=ADDS)
-    async def follow_channel(
-        reference: str, alert_rule: Literal["always", "threshold", "never"] = "threshold"
-    ) -> Followed | dict:
+    async def follow_channel(reference: str) -> Followed | dict:
         """Follow a channel by its `@handle`, its id (UC…) or its address. New films are found, transcribed and read.
 
-        `alert_rule` is who gets told: `always` every film, `threshold` only those a model scores high, `never` nobody.
-        Following a channel already followed changes nothing about it. Cannot remove a channel — ask the operator.
+        Who is told about its films is the operator's rule, set on their screen. Following a channel already followed
+        changes nothing about it. Cannot remove a channel — ask the operator.
         """
         try:
             followed = await watchlist.follow_channel(
-                ctx.pool, ctx.providers.source, ctx.settings, reference, added_by="agent", alert_rule=alert_rule
+                ctx.pool, ctx.providers.source, ctx.settings, reference, added_by="agent"
             )
         except WatchlistRefused as err:
             return refused(str(err), ASK_THE_OPERATOR)
@@ -124,7 +115,6 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         language: str = "",
         interval_minutes: int | None = None,
         max_videos_per_run: int | None = None,
-        alert_rule: Literal["always", "threshold", "never"] = "threshold",
     ) -> TopicAdded | dict:
         """Keep searching YouTube for a phrase, and read the new films it turns up. Each search spends the source's day, so
         leave the limits empty unless there is a reason: the answer says which came from the settings.
@@ -140,7 +130,6 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
                 language=language,
                 interval_minutes=interval_minutes,
                 max_videos_per_run=max_videos_per_run,
-                alert_rule=alert_rule,
             )
         except WatchlistRefused as err:
             return refused(str(err), ASK_THE_OPERATOR)
@@ -149,23 +138,6 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
             created=added.created,
             defaults_applied=list(added.defaults_applied),
         )
-
-    @mcp.tool(annotations=ADDS)
-    async def set_alert_rule(
-        kind: Literal["channel", "topic"], ref: str, alert_rule: Literal["always", "threshold", "never"]
-    ) -> RuleSet | dict:
-        """Change who is told about the films of one channel (`ref` its id) or one topic (`ref` its number)."""
-        async with ctx.pool.acquire() as conn:
-            if kind == "channel":
-                updated = await store.update_channel(conn, ref, alert_rule=alert_rule)
-            else:
-                topic_id = int(ref) if ref.isascii() and ref.isdigit() and len(ref) < 10 else None
-                updated = None if topic_id is None else await store.update_topic(conn, topic_id, alert_rule=alert_rule)
-        if updated is None:
-            return refused(
-                f"no {kind} {ref!r} is on the list", "youtube_archive_status lists the channels and topics with their ids"
-            )
-        return RuleSet(kind=kind, ref=ref, alert_rule=alert_rule)
 
     @mcp.tool(annotations=ADDS)
     async def analyse_video(reference: str) -> Queued | dict:
