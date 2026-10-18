@@ -3,6 +3,7 @@ hand: a test of this package does not import its neighbours."""
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from alerts.catalog import CatalogTool, ToolOutcome
@@ -99,13 +100,19 @@ class FakeTools:
 
     def __init__(self, tools: list[CatalogTool] | None = None) -> None:
         self._tools = tools if tools is not None else [tool(), tool("add_channel", read_only=False)]
-        self.price = 1.05
+        self.price: float | None = 1.05
+        self.down = False
+        self.refuses = False
 
     async def tools(self) -> list[CatalogTool]:
         return self._tools
 
     async def call(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
-        return ToolOutcome("ok", f'{{"symbol": "{arguments.get("symbol")}", "close": {self.price}}}')
+        if self.down:
+            return ToolOutcome("unavailable", "market-data could not answer")
+        if self.refuses:
+            return ToolOutcome("refused", "no such pair")
+        return ToolOutcome("ok", json.dumps({"symbol": arguments.get("symbol"), "close": self.price}))
 
 
 class FakeGateway:

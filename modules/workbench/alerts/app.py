@@ -12,12 +12,14 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI
-from tc_runtime import migrate, schema_version
+from tc_runtime import liveness, migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
+from tc_runtime.liveness import Heartbeats, LoopHeartbeat
 
 from .caller_access import RECORD, CallerAccess
 from .catalog import ToolSource
+from .clock import Clock
 from .config import Settings
 from .gateway import Gateway
 from .routers import catalog, events, meta, rules
@@ -61,8 +63,20 @@ async def serving(
             await schema_version.verify(conn, MIGRATIONS)
 
         app.state.pool = pool
+
+        # After the migration and not before it: a tick started earlier would read a schema it does not know. One
+        # heartbeat for the one loop, on the state so `/health` can answer with it and the metric can read it.
+        heartbeats = Heartbeats(LoopHeartbeat("clock", expected_seconds=settings.tick_seconds))
+        app.state.heartbeats = heartbeats
+        liveness.register_metrics("alerts", heartbeats)
+        clock = Clock(pool, settings, tools, heartbeats["clock"])
+        app.state.clock = clock
+        await clock.start()
         log.info("alerts is serving")
-        yield
+        try:
+            yield
+        finally:
+            await clock.stop()
 
 
 @asynccontextmanager
