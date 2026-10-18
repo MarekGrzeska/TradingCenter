@@ -7,22 +7,22 @@ nazwach dla tej samej osoby.
 
 ## What Changes
 
-- **Adresat to nazwa odbiorcy, a nie para z botem.** Ta sama nazwa MAY być związana przez kilka botów; każde
-  wiązanie (nazwa, bot) ma własny czat, stan i tapnięcie `/start`, bo Telegram nie pozwala botowi napisać pierwszemu.
-  Unikalność przechodzi z nazwy na parę (nazwa, bot).
-- **Wysłanie i usunięcie wskazują parę.** `POST /messages` przyjmuje adresata i nazwę bota; bot MAY zostać pominięty
-  tylko wtedy, gdy adresat ma dokładnie jednego. Usunięcie adresata usuwa wiązanie przez jednego bota, nie wszystkie.
-- **Reguła alertów nazywa adresata i bota.** Nowe pole reguły `bot`. Puste znaczy „jedyny bot tego adresata” — tak
+- **Adresat jest własną encją.** Nowa tabela `recipients` (nazwa unikalna); dotychczasowy wiersz `destinations` staje
+  się **wiązaniem** adresata z botem i zachowuje czat, stan, blokadę i tapnięcie `/start`, bo Telegram nie pozwala
+  botowi napisać pierwszemu. Adresat MAY mieć kilka wiązań, po jednym na bota; para (adresat, bot) jest unikalna.
+- **Kontrakt bramy: dwa zasoby.** `/recipients` (adresat z listą wiązań), `/recipients/{name}/bots` (dodanie i
+  usunięcie jednego wiązania) i `POST /messages` z `{recipient, bot?}`; bot MAY zostać pominięty tylko wtedy, gdy adresat
+  ma dokładnie jedno wiązanie. Trasy `/destinations` znikają.
+- **Reguła alertów nazywa adresata i bota.** Nowe pole reguły `bot`. Puste znaczy „jedyne wiązanie tego adresata” — tak
   działają wszystkie reguły sprzed zmiany, bez przepisywania. Gdy adresat zyska drugiego bota, reguła z pustym botem
   przestaje być jednoznaczna: jest oznaczona jako wadliwa i nie doręcza, dopóki operator nie wskaże bota.
-- **Terminal.** Zakładka Telegram grupuje wiązania według adresata i pozwala dodać tego samego adresata przez
-  kolejnego bota. Formularz reguły ma obok „Kogo powiadomić” pole „Którym botem”, z samymi botami, które docierają
-  do wybranego adresata.
-- **Bez zmiany:** konwersja i dotychczasowe reguły. Migracja bazy `telegram` zmienia tylko unikalność
-  (nazwa → para nazwa i bot); baza `alerts` dostaje jedną nullowalną kolumnę.
-- **BREAKING (wewnątrz procesu):** kontrakt `POST /telegram/messages` i `DELETE /telegram/destinations/{name}` dostają
-  parametr bota; jedynym wołającym wiadomości jest pakiet `alerts`, jedynym wołającym usunięcie — terminal. Kontrakt
-  terminala (`contract.telegram`, `contract.alerts`) jest regenerowany.
+- **Terminal.** Zakładka Telegram pokazuje adresatów z ich wiązaniami i pozwala dodać kolejnego bota do adresata.
+  Formularz reguły ma obok „Kogo powiadomić” pole „Którym botem”, z samymi botami wybranego adresata.
+- **Migracje addytywne.** Baza `telegram`: tabela `recipients`, `destinations.recipient_id` z uzupełnieniem po nazwie,
+  zdjęcie unikalności `name`; kolumna `name` zostaje do następnej zmiany (kontrakt rozszerz–zawęź), żeby wycofanie
+  obrazu nie było ślepą uliczką. Baza `alerts`: jedna nullowalna kolumna `bot`.
+- **BREAKING (wewnątrz procesu):** trasy `/destinations` zastąpione; jedynymi wołającymi są terminal i pakiet `alerts`,
+  oba w tym repozytorium. Kontrakty terminala (`contract.telegram`, `contract.alerts`) są regenerowane.
 
 **Poza zakresem:** kopiowanie czatu między botami (wymagałoby tego samego tapnięcia i tak), grupy adresatów („wyślij
 do wszystkich moich botów”), wiele osób w jednym adresacie, zmiana bota reguły z poziomu rozmowy.
@@ -33,8 +33,8 @@ do wszystkich moich botów”), wiele osób w jednym adresacie, zmiana bota regu
 Brak: zmiana nie wprowadza nowej zdolności, rozszerza istniejące.
 
 ### Modified Capabilities
-- `telegram-gateway-destinations`: adresat jest nazwą, którą MAY wiązać kilka botów; stan i blokada są per wiązanie;
-  usunięcie rusza jedno wiązanie.
+- `telegram-gateway-destinations`: adresat jest encją z wiązaniami przez kilka botów; stan i blokada są per wiązanie;
+  usunięcie adresata i usunięcie wiązania to dwa ruchy.
 - `telegram-gateway-delivery`: wiadomość adresuje się nazwą adresata i botem; bot MAY zostać pominięty tylko przy
   jedynym wiązaniu.
 - `alerts-rules`: reguła nazywa też bota; pusty bot to „jedyny”, a dwuznaczność jest wadą reguły, nie zgadywaniem.
@@ -54,5 +54,5 @@ jej delty dla tych trzech zdolności są `ADDED`, nie `MODIFIED`.)
 - `modules/pocket`: bez zmian (nie czyta ani adresatów, ani reguł).
 - Wdrożenie: bez kroków operatora. Obie migracje są addytywne i działają pod własnymi blokadami.
 
-`design.md` jest zapisany: zmiana ma realny wybór (jedna tabela z parą kontra osobne tabele odbiorców) i regułę
-zgodności wstecznej. `review.md` zostanie napisany po zadaniach: zmiana dotyka drogi doręczenia i usuwania.
+`design.md` jest zapisany: zmiana ma realny wybór (osobne tabele wybrane przez operatora, jedna tabela z parą jako
+alternatywa) i regułę zgodności wstecznej. `review.md` zostanie napisany po zadaniach: zmiana dotyka drogi doręczenia i usuwania.

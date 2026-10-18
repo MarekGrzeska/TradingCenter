@@ -1,3 +1,21 @@
+## ADDED Requirements
+
+### Requirement: Adresat jest nazwanym odbiorcą niezależnym od botów
+
+Adresat MUST istnieć jako osobna rzecz o unikalnej nazwie i MAY istnieć bez żadnego wiązania z botem. Adresat MAY mieć
+kilka wiązań, najwyżej jedno na bota. Usunięcie adresata MUST usuwać wszystkie jego wiązania i MUST NOT ruszać botów.
+Nazwa adresata MUST NOT zmieniać się przy dodawaniu ani usuwaniu wiązań.
+
+#### Scenario: Adresat bez wiązania
+
+- **WHEN** operator zakłada adresata, a jeszcze nie związał go z żadnym botem
+- **THEN** adresat MUST być na liście bez wiązań, a wysyłka do niego MUST zostać odmówiona z powodem „nie jest związany z żadnym botem”
+
+#### Scenario: Usunięcie adresata
+
+- **WHEN** operator usuwa adresata z dwoma wiązaniami
+- **THEN** oba wiązania MUST zniknąć, a oba boty MUST zostać
+
 ## MODIFIED Requirements
 
 ### Requirement: Adresat powstaje z tapnięcia, nie z konfiguracji
@@ -7,8 +25,8 @@ rozmowę **z tym botem**. Moduł MUST wydawać na żądanie odnośnik startowy n
 adresata z botem dopiero wtedy, gdy ten sam sekret wróci do niego w komendzie startowej.
 
 Ta sama nazwa adresata MAY być związana przez kilku botów. Każde takie wiązanie ma własny czat, własny stan i własne
-tapnięcie, bo uruchomienie rozmowy z jednym botem nie daje drugiemu prawa pisać. Para (nazwa, bot) MUST być unikalna;
-sama nazwa MUST NOT.
+tapnięcie, bo uruchomienie rozmowy z jednym botem nie daje drugiemu prawa pisać. Para (adresat, bot) MUST być unikalna;
+kilka wiązań jednego adresata MUST być dozwolone.
 
 Konfiguracja MUST NOT być drugą drogą do tego samego: identyfikator czatu wpisany ręcznie omija jedyny moment, w którym
 moduł wie, że rozmowa naprawdę istnieje.
