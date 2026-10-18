@@ -6,7 +6,9 @@ from typing import Any
 
 import asyncpg
 
+from . import reach
 from .contract import ConditionSource, Defect, EventSource, FilterTerm, RuleOut
+from .reach import Reach
 from .store import json_of
 from .validation import filter_defects
 
@@ -27,21 +29,21 @@ def source_of(row: asyncpg.Record | dict[str, Any]) -> ConditionSource | EventSo
     )
 
 
-def out(row: asyncpg.Record, *, recipients: frozenset[str] | None) -> RuleOut:
-    """`recipients` is who the door knows now, or `None` when there is no door to ask: a rule is flagged for a recipient
-    that is gone, not for one nobody could look up."""
+def out(row: asyncpg.Record, *, recipients: Reach | None) -> RuleOut:
+    """`recipients` is who the door knows now and through which bots, or `None` when there is no door to ask: a rule is
+    flagged for a recipient or a bot that is gone, not for one nobody could look up."""
     defects: list[Defect] = []
     if row["defect"]:
         defects.append(Defect(field="source.filter", message=row["defect"]))
-    if recipients is not None and row["destination"] not in recipients:
-        defects.append(
-            Defect(field="destination", message=f"{row['destination']!r} is not a recipient the door to Telegram knows any more")
-        )
+    reaching = reach.defect_of(row["destination"], row["bot"], recipients)
+    if reaching is not None:
+        defects.append(reaching)
     return RuleOut(
         id=row["id"],
         name=row["name"],
         source=source_of(row),
         destination=row["destination"],
+        bot=row["bot"],
         template=row["template"],
         cooldown_seconds=row["cooldown_seconds"],
         mode=row["mode"],

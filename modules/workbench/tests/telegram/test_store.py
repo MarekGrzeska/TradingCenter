@@ -34,7 +34,7 @@ class TestTheTokenDoesNotLeak:
             await store.list_bots(db),
             await store.bot_by_username(db, added.username),
             await store.list_destinations(db),
-            await store.destination_by_name(db, "operator"),
+            await builders.only_binding(db, "operator"),
             await store.binding_for(db, "s3cret"),
         ]
 
@@ -134,7 +134,7 @@ class TestDestinations:
         again = await store.bind_destination(db, nonce="s3cret", chat_id=9999, moment=NOON)
 
         assert again is None
-        found = await store.destination_by_name(db, "operator")
+        found = await builders.only_binding(db, "operator")
         assert found is not None and found.chat_id == 4242
 
     async def test_an_expired_secret_binds_nothing(self, db) -> None:
@@ -168,7 +168,7 @@ class TestDestinations:
 
         await store.mark_blocked(db, created.id, NOON + timedelta(days=1))
 
-        found = await store.destination_by_name(db, "operator")
+        found = await builders.only_binding(db, "operator")
         assert found is not None
         assert found.state is DestinationState.BLOCKED
         assert found.receives is False
@@ -195,7 +195,7 @@ class TestDestinations:
         await builders.destination(db, name="first", bot_id=carrier.id)
         await builders.destination(db, name="second", bot_id=carrier.id)
 
-        assert await store.remove_destination(db, "first")
+        assert await store.remove_destination(db, "first", carrier.id)
 
         assert len(await store.list_bots(db)) == 1
         assert [d.name for d in await store.list_destinations(db)] == ["second"]
@@ -225,3 +225,52 @@ class TestTheUpdateCursor:
         carrier = await builders.bot(db)
 
         assert await store.next_offset(db, carrier.id) == 0
+
+
+async def test_the_migration_turns_existing_destinations_into_recipients_and_keeps_every_conversation(postgres_url) -> None:
+    """Run for real: a database at the revision before it, holding a bound destination, brought to the next one. What the
+    operator already set up must come out the other side as the same recipient with the same conversation."""
+    import asyncio
+
+    import asyncpg
+    from alembic import command
+    from tc_runtime.db import asyncpg_dsn, sqlalchemy_url
+    from tc_runtime.migrate import alembic_config
+
+    from telegram_gateway.runtime import MIGRATIONS
+
+    admin = await asyncpg.connect(asyncpg_dsn(postgres_url))
+    try:
+        await admin.execute("DROP DATABASE IF EXISTS recipients_backfill")
+        await admin.execute("CREATE DATABASE recipients_backfill")
+    finally:
+        await admin.close()
+    url = postgres_url.rsplit("/", 1)[0] + "/recipients_backfill"
+
+    config = alembic_config(MIGRATIONS, sqlalchemy_url(url))
+    await asyncio.to_thread(command.upgrade, config, "0005")
+    conn = await asyncpg.connect(asyncpg_dsn(url))
+    try:
+        bot = await conn.fetchval(
+            "INSERT INTO bots (telegram_id, username, title, token) VALUES (1, 'oldbot', 'Old', 't') RETURNING id"
+        )
+        await conn.execute(
+            "INSERT INTO destinations (name, bot_id, chat_id, state, bound_at) VALUES ('operator', $1, 7, 'ready', now())", bot
+        )
+        await asyncio.to_thread(command.upgrade, config, "0006")
+
+        found = await conn.fetchrow(
+            "SELECT r.name, d.chat_id, d.state, d.bot_id FROM destinations d JOIN recipients r ON r.id = d.recipient_id"
+        )
+        assert (found["name"], found["chat_id"], found["state"], found["bot_id"]) == ("operator", 7, "ready", bot)
+        # the same name through a second bot is now allowed, which is the point
+        second = await conn.fetchval(
+            "INSERT INTO bots (telegram_id, username, title, token) VALUES (2, 'newbot', 'New', 't') RETURNING id"
+        )
+        await conn.execute(
+            "INSERT INTO destinations (name, recipient_id, bot_id) SELECT 'operator', id, $1 FROM recipients WHERE name = 'operator'",
+            second,
+        )
+        assert await conn.fetchval("SELECT count(*) FROM destinations") == 2
+    finally:
+        await conn.close()

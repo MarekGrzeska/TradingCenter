@@ -11,11 +11,11 @@ import pytest
 from alerts import drafts
 from alerts import known as known_module
 from alerts.drafts import Answer, Unusable
-from alerts.gateway import Recipient
+from alerts.gateway import Binding, Recipient
 
 from .builders import FILM_SCHEMA, known, said
 
-RECIPIENTS = [Recipient("phone", "@bot", True)]
+RECIPIENTS = [Recipient("phone", (Binding("bot", True),))]
 TRACKED = ["EURUSD", "XAUUSD"]
 
 
@@ -50,7 +50,7 @@ def test_a_sentence_that_names_nobody_gets_the_only_recipient_who_receives_and_s
 
 
 def test_with_several_recipients_and_none_named_the_field_is_left_empty_and_called_out() -> None:
-    draft = draft_of(said(destination=None), recipients=[*RECIPIENTS, Recipient("tablet", "@bot", True)])
+    draft = draft_of(said(destination=None), recipients=[*RECIPIENTS, Recipient("tablet", (Binding("bot", True),))])
 
     assert "destination" in fields(draft)
     assert draft.rule is not None and draft.rule.destination == ""

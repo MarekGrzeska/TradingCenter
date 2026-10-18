@@ -38,8 +38,10 @@ REST_PATHS: tuple[str, ...] = (
     "/account/login/resend",
     "/account/login/qr",
     "/account/login/password",
-    "/destinations",
-    "/destinations/{name}",
+    "/recipients",
+    "/recipients/{name}",
+    "/recipients/{name}/bots",
+    "/recipients/{name}/bots/{bot}",
     # FastAPI's own, published by the framework rather than by a router. They describe the
     # REST contract, so they belong to the caller that consumes it.
     "/docs",

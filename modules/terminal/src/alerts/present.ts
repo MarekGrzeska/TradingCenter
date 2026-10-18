@@ -166,11 +166,33 @@ export interface RuleForm {
   eventType: string;
   terms: TermForm[];
   destination: string;
+  /** The @name chosen for it; empty only where the recipient has no bot to choose. */
+  bot: string;
   template: string;
   cooldown: string;
   mode: Mode;
   maxPerHour: string;
   enabled: boolean;
+}
+
+/** The bots a recipient is reached through, receiving ones first: what the form offers once a recipient is chosen. */
+export function botsOf(destination: string, catalog: Catalog): { name: string; receives: boolean }[] {
+  return catalog.recipients
+    .filter((one) => one.name === destination)
+    .map((one) => ({ name: one.bot, receives: one.receives }))
+    .sort((a, b) => Number(b.receives) - Number(a.receives));
+}
+
+/** The names the form offers, once each: a recipient reached through three bots is one choice here and three in the next field. */
+export function recipientNames(catalog: Catalog): string[] {
+  return [...new Set(catalog.recipients.map((one) => one.name))];
+}
+
+/** The first recipient that can receive (else the first at all) and the bot to tell it through. */
+function firstRecipient(catalog: Catalog): { destination: string; bot: string } {
+  const first = catalog.recipients.find((one) => one.receives) ?? catalog.recipients[0];
+  const destination = first?.name ?? "";
+  return { destination, bot: botsOf(destination, catalog)[0]?.name ?? "" };
 }
 
 export function blankForm(catalog: Catalog): RuleForm {
@@ -186,7 +208,7 @@ export function blankForm(catalog: Catalog): RuleForm {
     interval: String(Math.max(catalog.minIntervalSeconds, 60)),
     eventType: catalog.eventTypes[0]?.name ?? "",
     terms: [],
-    destination: catalog.recipients.find((one) => one.receives)?.name ?? catalog.recipients[0]?.name ?? "",
+    ...firstRecipient(catalog),
     template: "",
     cooldown: "",
     mode: "repeat",
@@ -200,6 +222,8 @@ export function formFrom(input: RuleInput, catalog: Catalog): RuleForm {
   const common = {
     name: input.name,
     destination: input.destination,
+    // A rule written before a recipient could have several bots has none: the form shows the one it means.
+    bot: input.bot ?? (botsOf(input.destination, catalog).length === 1 ? botsOf(input.destination, catalog)[0].name : ""),
     template: input.template,
     cooldown: input.cooldownSeconds === null ? "" : String(input.cooldownSeconds),
     mode: input.mode,
@@ -272,6 +296,7 @@ export function inputFrom(form: RuleForm, catalog: Catalog): RuleInput {
   const common = {
     name: form.name.trim(),
     destination: form.destination,
+    bot: form.bot === "" ? null : form.bot,
     template: form.template,
     cooldownSeconds: numberOrNull(form.cooldown),
     mode: form.mode,
@@ -311,9 +336,10 @@ export function inputFrom(form: RuleForm, catalog: Catalog): RuleInput {
 }
 
 /** Whether the form has what a rule cannot be made without. The back end says the rest, with the field. */
-export function formProblem(form: RuleForm): string | null {
+export function formProblem(form: RuleForm, catalog: Catalog): string | null {
   if (form.name.trim() === "") return "Nazwij regułę.";
   if (form.destination === "") return "Wybierz, kogo powiadomić.";
+  if (form.bot === "" && botsOf(form.destination, catalog).length > 1) return "Wybierz bota, którym ma przyjść alert.";
   if (form.kind === "condition" && form.tool === "") return "Wybierz, co sprawdzać.";
   if (form.kind === "condition" && form.threshold.trim() === "") return "Podaj próg.";
   if (form.kind === "event" && form.eventType === "") return "Wybierz zdarzenie.";

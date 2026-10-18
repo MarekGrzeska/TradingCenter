@@ -63,7 +63,7 @@ class Deliverer:
         if await self._throttled(row, now):
             return
 
-        sent = await self._gateway.send(row["destination"], row["text"])
+        sent = await self._gateway.send(row["destination"], row["bot"], row["text"])
         async with self._pool.acquire() as conn, conn.transaction():
             if sent.ok:
                 await store.settle_fire(conn, row["id"], state="delivered", now=now)
@@ -103,7 +103,7 @@ class Deliverer:
                 f"Reguła „{row['rule_name']}” jest zdławiona: wysłała już {cap} wiadomości w ciągu godziny, "
                 f"więc kolejne odpalenia są pomijane (do tej pory: {skipped}). Nic z tego nie zostanie wysłane później."
             )
-            if not (await self._gateway.send(row["destination"], notice)).ok:
+            if not (await self._gateway.send(row["destination"], row["bot"], notice)).ok:
                 async with self._pool.acquire() as conn:
                     await store.release_throttle_notice(conn, row["rule_id"])
         return True

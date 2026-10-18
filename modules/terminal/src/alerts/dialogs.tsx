@@ -8,11 +8,13 @@ import {
   argumentFields,
   attributeKind,
   blankTerm,
+  botsOf,
   defectsFor,
   formProblem,
   inputFrom,
   opsFor,
   previewOf,
+  recipientNames,
   templateSlots,
   type RuleForm,
   type TermForm,
@@ -84,7 +86,7 @@ export function RuleDialog({
   // change. What the model could not say about the sentence ("sentence") is a remark, not a flaw in the rule.
   const [asDrafted] = useState(() => JSON.stringify(start.form));
   const stillAsDrafted = start.defects.some((one) => one.field !== "sentence") && JSON.stringify(form) === asDrafted;
-  const problem = formProblem(form);
+  const problem = formProblem(form, catalog);
   const change = (patch: Partial<RuleForm>) => setForm((current) => ({ ...current, ...patch }));
   const about = (field: string) => defectsFor(defects, field);
 
@@ -318,11 +320,34 @@ export function RuleDialog({
           }
           problems={about("destination")}
         >
-          <select className={INPUT} value={form.destination} onChange={(e) => change({ destination: e.target.value })}>
+          <select
+            className={INPUT}
+            value={form.destination}
+            onChange={(e) => change({ destination: e.target.value, bot: botsOf(e.target.value, catalog)[0]?.name ?? "" })}
+          >
             <option value="">— wybierz —</option>
-            {catalog.recipients.map((one) => (
+            {recipientNames(catalog).map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field
+          label="Którym botem"
+          hint={
+            botsOf(form.destination, catalog).length > 1
+              ? "Ten odbiorca dociera przez kilka botów — alert pójdzie tylko tym, którego wybierzesz."
+              : undefined
+          }
+          problems={about("bot")}
+        >
+          <select className={INPUT} value={form.bot} onChange={(e) => change({ bot: e.target.value })}>
+            {botsOf(form.destination, catalog).length === 0 && <option value="">— brak bota —</option>}
+            {botsOf(form.destination, catalog).map((one) => (
               <option key={one.name} value={one.name}>
-                {one.name} (@{one.bot}){one.receives ? "" : " — jeszcze nie odbiera"}
+                @{one.name}
+                {one.receives ? "" : " — jeszcze nie odbiera"}
               </option>
             ))}
           </select>

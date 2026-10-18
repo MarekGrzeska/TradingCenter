@@ -125,9 +125,9 @@ export interface TelegramApi {
   removeBot(username: string, signal: AbortSignal): Promise<void>;
   destinations(signal: AbortSignal): Promise<Destination[]>;
   offerDestination(name: string, bot: string, signal: AbortSignal): Promise<StartLink>;
-  removeDestination(name: string, signal: AbortSignal): Promise<void>;
+  removeDestination(name: string, bot: string, signal: AbortSignal): Promise<void>;
   /** One message to a recipient, now — for trying a bot out. Telegram's own id for it comes back; nothing is kept. */
-  sendMessage(destination: string, text: string, signal: AbortSignal): Promise<number>;
+  sendMessage(destination: string, bot: string, text: string, signal: AbortSignal): Promise<number>;
 }
 
 export function createTelegramApi(httpBase: string, identity: Identity = noIdentity): TelegramApi {
@@ -221,12 +221,20 @@ export function createTelegramApi(httpBase: string, identity: Identity = noIdent
     },
 
     async destinations(signal) {
-      return (await http.json<Schemas["DestinationOut"][]>(`${httpBase}/destinations`, { signal })).map(mapDestination);
+      const recipients = await http.json<Schemas["RecipientOut"][]>(`${httpBase}/recipients`, { signal });
+      return recipients.flatMap((one) => one.bindings.map(mapDestination));
     },
 
     async offerDestination(name, bot, signal) {
-      const body: Schemas["NewDestinationRequest"] = { name, bot };
-      const raw = await http.json<Schemas["StartLinkOut"]>(`${httpBase}/destinations`, { signal, method: "POST", body });
+      // The recipient is made if it is new and left as it is if it is not: adding a bot to a name that exists is the point.
+      const recipient: Schemas["NewRecipientRequest"] = { name };
+      await http.json<Schemas["RecipientOut"]>(`${httpBase}/recipients`, { signal, method: "POST", body: recipient });
+      const body: Schemas["NewBindingRequest"] = { bot };
+      const raw = await http.json<Schemas["StartLinkOut"]>(`${httpBase}/recipients/${segment(name)}/bots`, {
+        signal,
+        method: "POST",
+        body,
+      });
       return {
         destination: mapDestination(raw.destination),
         url: raw.start_link,
@@ -234,12 +242,12 @@ export function createTelegramApi(httpBase: string, identity: Identity = noIdent
       };
     },
 
-    async removeDestination(name, signal) {
-      await http.send(`${httpBase}/destinations/${segment(name)}`, { signal, method: "DELETE" });
+    async removeDestination(name, bot, signal) {
+      await http.send(`${httpBase}/recipients/${segment(name)}/bots/${segment(bot)}`, { signal, method: "DELETE" });
     },
 
-    async sendMessage(destination, text, signal) {
-      const body: Schemas["SendRequest"] = { destination, text };
+    async sendMessage(destination, bot, text, signal) {
+      const body: Schemas["SendRequest"] = { recipient: destination, bot, text };
       const raw = await http.json<Schemas["Sent"]>(`${httpBase}/messages`, { signal, method: "POST", body });
       return raw.message_id;
     },

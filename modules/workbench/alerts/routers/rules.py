@@ -11,6 +11,7 @@ from fastapi import APIRouter, Request, Response, status
 from .. import known, rules, store
 from ..contract import CheckOut, FireOut, HistoryOut, Problem, RuleIn, RuleOut, RulePatch
 from ..gateway import GatewayUnreachable
+from ..reach import Reach
 from ..validation import validate
 from . import deps
 
@@ -86,7 +87,7 @@ async def delete(request: Request, rule_id: int) -> Response:
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-async def _checked(state, conn, body: RuleIn) -> frozenset[str] | None:
+async def _checked(state, conn, body: RuleIn) -> Reach | None:
     """The rule against everything that exists, or the refusal naming each thing wrong with it. Returns who the door knows,
     for the answer — asked once, here."""
     try:

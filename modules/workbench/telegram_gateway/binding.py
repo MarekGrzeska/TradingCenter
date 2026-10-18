@@ -22,7 +22,7 @@ from tc_runtime.db import Conn
 from . import store
 from .bot_api import BotApi
 from .errors import GatewayError
-from .models import Bot, ChatIdentity, Destination
+from .models import Bot, ChatIdentity, Destination, Recipient
 
 log = logging.getLogger(__name__)
 
@@ -48,16 +48,16 @@ def start_link(bot: Bot, nonce: str) -> str:
     return f"{bot.start_link}?start={nonce}"
 
 
-async def offer(conn: Conn, *, name: str, bot: Bot, now: datetime | None = None) -> tuple[Destination, str]:
-    """Names a destination and hands back the link that will bind it.
+async def offer(
+    conn: Conn, *, recipient: Recipient, bot: Bot, now: datetime | None = None
+) -> tuple[Destination, str]:
+    """Reaches a recipient through a bot and hands back the link that will bind it.
 
-    The destination exists immediately and cannot receive yet: that gap is the honest shape of a
-    platform where a bot may not speak first.
+    The binding exists immediately and cannot receive yet: that gap is the honest shape of a platform where a bot may not
+    speak first. Asking again for the same recipient and bot issues a fresh secret and makes no second binding.
     """
     moment = now or datetime.now(UTC)
-    destination = await store.destination_by_name(conn, name)
-    if destination is None:
-        destination = await store.create_destination(conn, name=name, bot_id=bot.id)
+    destination = await store.create_destination(conn, recipient=recipient, bot_id=bot.id)
 
     nonce = secrets.token_urlsafe(NONCE_BYTES)
     await store.issue_nonce(

@@ -108,7 +108,7 @@ class TestSending:
         with pytest.raises(Blocked, match="operator"):
             await sending.send(db, api, name="operator", text="hi", max_chars=CEILING)
 
-        found = await store.destination_by_name(db, "operator")
+        found = await builders.only_binding(db, "operator")
         assert found is not None
         assert found.state is DestinationState.BLOCKED
 

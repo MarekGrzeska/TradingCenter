@@ -24,6 +24,7 @@ TABLES: tuple[str, ...] = (
     "update_offsets",
     "binding_nonces",
     "destinations",
+    "recipients",
     "bots",
 )
 

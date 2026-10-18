@@ -179,3 +179,32 @@ async def test_a_rule_that_names_a_value_and_an_event_at_once_is_refused_for_bot
     assert refused.status_code == 422
     assert "event_type" in refused.text and "condition" in refused.text
     assert (await api.get("/rules")).json() == []
+
+
+async def test_a_rule_names_its_bot_and_comes_back_with_it(api, door) -> None:
+    door.bots = {"phone": ["postsbot", "filmsbot"]}
+
+    created = await api.post("/rules", json=body(rule(condition(), bot="@filmsbot")))
+
+    assert created.status_code == 201
+    assert created.json()["bot"] == "filmsbot"
+
+
+async def test_a_recipient_with_two_bots_refuses_a_rule_that_did_not_choose_and_a_bot_the_recipient_lacks(api, door) -> None:
+    door.bots = {"phone": ["postsbot", "filmsbot"]}
+
+    unchosen = await api.post("/rules", json=body(rule(condition())))
+    stranger = await api.post("/rules", json=body(rule(condition(), bot="otherbot")))
+
+    assert [d["field"] for d in unchosen.json()["detail"]["defects"]] == ["bot"]
+    assert [d["field"] for d in stranger.json()["detail"]["defects"]] == ["bot"]
+
+
+async def test_a_rule_that_became_ambiguous_is_listed_as_defective(api, door, db) -> None:
+    created = await api.post("/rules", json=body(rule(condition())))
+    assert created.status_code == 201
+    door.bots = {"phone": ["postsbot", "filmsbot"]}
+
+    (listed,) = (await api.get("/rules")).json()
+
+    assert [d["field"] for d in listed["defects"]] == ["bot"]

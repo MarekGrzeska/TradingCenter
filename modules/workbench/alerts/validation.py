@@ -10,9 +10,10 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
-from . import template
+from . import reach, template
 from .catalog import NUMBER_TYPES, CatalogTool, json_type, number_fields, usable
 from .contract import ConditionSource, Defect, EventSource, FilterTerm, RuleIn
+from .reach import Reach
 
 # Which comparisons an attribute of each type can take. A number is not compared with `contains`, and a list is not
 # compared with `gt` — the form offers only these, and the server refuses the rest.
@@ -36,7 +37,7 @@ class Known:
     event_types: Mapping[str, dict[str, Any]]
     # `None` when there is no door to Telegram to ask — a recipient cannot be checked, and the package says it delivers
     # nothing. A rule written then is not refused for a thing nobody could verify.
-    destinations: frozenset[str] | None
+    destinations: Reach | None
     min_interval_seconds: int
 
 
@@ -48,8 +49,9 @@ def validate(rule: RuleIn, known: Known) -> list[Defect]:
     else:
         defects += _event(source, known)
 
-    if known.destinations is not None and rule.destination not in known.destinations:
-        defects.append(Defect(field="destination", message=f"{rule.destination!r} is not a recipient the door to Telegram knows"))
+    reaching = reach.defect_of(rule.destination, rule.bot, known.destinations)
+    if reaching is not None:
+        defects.append(reaching)
 
     allowed = template_slots(rule, known)
     for slot in template.unknown_slots(effective_template(rule), allowed):

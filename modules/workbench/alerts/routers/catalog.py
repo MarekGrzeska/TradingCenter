@@ -48,7 +48,11 @@ async def catalog(request: Request) -> CatalogOut:
             )
             for row in types
         ],
-        destinations=[DestinationOut(name=one.name, bot=one.bot, receives=one.receives) for one in recipients or []],
+        destinations=[
+            DestinationOut(name=one.name, bot=bound.bot, receives=bound.receives)
+            for one in recipients or []
+            for bound in one.bindings
+        ],
         gateway=recipients is not None,
         min_interval_seconds=state.settings.min_interval_seconds,
         drafting=state.drafter is not None,

@@ -40,9 +40,9 @@ A recipient or a bot can be removed freely: the rules that name it stay on their
 
 | REST | |
 |---|---|
-| `POST /messages` | one message, now, to a destination by name |
+| `POST /messages` | one message, now, to a recipient by name and, when it has several bots, through the one named |
 | `GET /bots` · `POST /bots/adopted` · `POST /bots/created` · `POST /bots/{username}/token` · `DELETE /bots/{username}` | the bots this gateway may speak as — adopted from a pasted token, created or rotated through the creator bot, removed |
-| `GET /destinations` · `POST /destinations` · `DELETE /destinations/{name}` | who can be written to, and the start link that binds one |
+| `GET /recipients` · `POST /recipients` · `DELETE /recipients/{name}` · `POST /recipients/{name}/bots` · `DELETE /recipients/{name}/bots/{bot}` | who can be written to, through which bots, and the start link that binds one of those ways (a recipient is a name; reaching it through a bot is a binding of its own, with its own conversation and state) |
 | `GET /account` · `POST /account/login` · `/login/code` · `/login/password` · `DELETE /account` | the dedicated account that owns the bots |
 | `GET /state` | the account, whether bots can be created, how many bots and recipients |
 | `GET /` · `GET /ping` · `GET /health` | the deploy probe, liveness, and the database |

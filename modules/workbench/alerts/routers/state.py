@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
-from .. import known, store
+from .. import known, reach, store
 from ..contract import ClockOut, StateOut
 from . import deps
 
@@ -17,9 +17,13 @@ async def state(request: Request) -> StateOut:
     recipients = await known.recipients_if_possible(app_state)
     async with deps.connection(app_state.pool) as conn:
         standing = await store.standing(conn)
-        # A recipient who is gone is a defect on every rule that names one.
-        missing = set() if recipients is None else (await store.destinations_in_use(conn)) - recipients
-        defective = await store.rules_with_defects(conn, missing)
+        # A recipient who is gone, a bot the recipient is not reached through, and a recipient with several bots and a
+        # rule that did not choose are each a defect of the rule, counted once per rule.
+        defective = sum(
+            1
+            for row in await store.rule_targets(conn)
+            if row["defect"] is not None or reach.defect_of(row["destination"], row["bot"], recipients) is not None
+        )
     beat = app_state.heartbeats["clock"]
     return StateOut(
         rules_enabled=standing["enabled"],

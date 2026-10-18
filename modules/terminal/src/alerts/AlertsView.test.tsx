@@ -64,6 +64,7 @@ function rule(overrides: Partial<Rule> = {}): Rule {
       pollIntervalSeconds: 60,
     },
     destination: "phone",
+    bot: null,
     template: "{rule}: {value}",
     cooldownSeconds: 900,
     mode: "repeat",
@@ -137,6 +138,7 @@ describe("AlertsView", () => {
     expect(vi.mocked(client.createRule).mock.calls[0][0]).toMatchObject({
       name: "Złoto w górę",
       destination: "phone",
+      bot: "alerts_bot",
       source: { kind: "condition", toolName: "get_last_price", arguments: { symbol: "XAUUSD" }, fieldPath: "close", threshold: "3000" },
     });
   });
@@ -169,6 +171,7 @@ describe("AlertsView", () => {
         name: "EURUSD przebił 1,10",
         source: rule().source,
         destination: "",
+        bot: null,
         template: "",
         cooldownSeconds: 3600,
         mode: "repeat" as const,
@@ -226,6 +229,29 @@ describe("AlertsView", () => {
 
     expect(within(dialog).getByText(/nie da się ograniczyć/)).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: "Zapisz" })).toBeEnabled();
+  });
+
+  it("asks which bot when a recipient is reached through several, and sends the one chosen", async () => {
+    const many: Catalog = {
+      ...CATALOG,
+      recipients: [
+        { name: "phone", bot: "posts_bot", receives: true },
+        { name: "phone", bot: "films_bot", receives: true },
+      ],
+    };
+    const client = api([], {}, many);
+    render(<AlertsView api={client} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Nowa reguła…" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getAllByRole("option", { name: /^@/ }).map((one) => one.textContent)).toEqual(["@posts_bot", "@films_bot"]);
+
+    await userEvent.type(within(dialog).getByLabelText("Nazwa"), "Filmy");
+    await userEvent.type(within(dialog).getByLabelText("Próg"), "1");
+    await userEvent.selectOptions(within(dialog).getByLabelText(/Którym botem/), "@films_bot");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Zapisz" }));
+
+    expect(vi.mocked(client.createRule).mock.calls[0][0]).toMatchObject({ destination: "phone", bot: "films_bot" });
   });
 
   it("shows a fire the cap held back as held back, with the reason", async () => {

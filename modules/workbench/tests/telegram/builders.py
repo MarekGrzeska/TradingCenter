@@ -30,8 +30,23 @@ async def bot(
 
 
 async def destination(conn, *, name: str | None = None, bot_id: int | None = None):
+    """A recipient reached through a bot: the recipient is made if it is new."""
     if bot_id is None:
         bot_id = (await bot(conn)).id
-    return await store.create_destination(
-        conn, name=name or f"operator-{next(_ids)}", bot_id=bot_id
-    )
+    recipient = await store.create_recipient(conn, name or f"operator-{next(_ids)}")
+    return await store.create_destination(conn, recipient=recipient, bot_id=bot_id)
+
+
+async def offer(conn, *, name: str, bot, now=None):
+    """What the operator's request does: the recipient is made if it is new, then the bot is added to it."""
+    from telegram_gateway import binding
+
+    recipient = await store.create_recipient(conn, name)
+    return await binding.offer(conn, recipient=recipient, bot=bot, now=now)
+
+
+async def only_binding(conn, name: str):
+    """The one binding a recipient has, or none."""
+    found = await store.destinations_of(conn, name)
+    assert len(found) <= 1, f"{name!r} has several bindings"
+    return found[0] if found else None

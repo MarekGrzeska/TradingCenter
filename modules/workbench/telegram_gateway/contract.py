@@ -33,14 +33,19 @@ class Problem(BaseModel):
 
 
 class SendRequest(BaseModel):
-    """A message, addressed by a destination's name. There is no `chat_id` and no bot here on purpose: a number every
-    caller keeps its own copy of is invalidated for all of them the day the bot is replaced. Nor is there a purpose any
+    """A message, addressed by a recipient's name and, when the recipient has several, the bot. There is no `chat_id`
+    here on purpose: a number every caller keeps its own copy of is invalidated for all of them the day the bot is
+    replaced. Nor is there a purpose any
     more — who is told what is decided by the rules of the alerts package, which name a destination — and a request that
     still sends one is refused rather than having it ignored."""
 
     model_config = ConfigDict(extra="forbid")
 
-    destination: str = Field(description="the name the destination was bound under")
+    recipient: str = Field(description="the name the recipient was given")
+    bot: str | None = Field(
+        default=None,
+        description="the @name of the bot to send through; may be left out only when the recipient is reached through one",
+    )
     text: str
 
 
@@ -48,13 +53,13 @@ class Sent(BaseModel):
     """What Telegram said about a message it accepted. Nothing is kept after the response — this is
     the whole of what this gateway can ever say about a message."""
 
-    destination: str = Field(description="the destination it went to")
+    recipient: str = Field(description="the recipient it went to")
     message_id: int = Field(description="Telegram's own identifier for the delivered message")
     chat_id: int
 
     @classmethod
     def of(cls, name: str, delivered: Delivered) -> Sent:
-        return cls(destination=name, message_id=delivered.message_id, chat_id=delivered.chat_id)
+        return cls(recipient=name, message_id=delivered.message_id, chat_id=delivered.chat_id)
 
 
 class BotOut(BaseModel):
@@ -129,9 +134,24 @@ class DestinationOut(BaseModel):
         )
 
 
-class NewDestinationRequest(BaseModel):
-    name: str = Field(description="what callers will address; it survives a change of bot")
-    bot: str = Field(description="the @name of the bot that will carry it")
+class RecipientOut(BaseModel):
+    """Somebody to tell, and every bot they can be reached through. A recipient with no binding exists and cannot be
+    written to: nobody has added a bot to it yet."""
+
+    name: str
+    bindings: list[DestinationOut]
+
+    @classmethod
+    def of(cls, name: str, bindings: list[DestinationOut]) -> RecipientOut:
+        return cls(name=name, bindings=bindings)
+
+
+class NewRecipientRequest(BaseModel):
+    name: str = Field(min_length=1, description="what callers will address; it survives a change of bot")
+
+
+class NewBindingRequest(BaseModel):
+    bot: str = Field(description="the @name of the bot that will carry messages to this recipient")
 
 
 class StartLinkOut(BaseModel):

@@ -258,6 +258,7 @@ export function AlertsView({ api }: { api?: AlertsApi } = {}) {
               <p className="text-xs text-ink-secondary">{describeSource(rule.source)}</p>
               <p className="text-xs text-ink-faint">
                 → {rule.destination}
+                {rule.bot && ` przez @${rule.bot}`}
                 {rule.lastFiredAt && ` · ostatnio odpaliła ${rule.lastFiredAt.toLocaleString("pl-PL")}`}
               </p>
               {rule.defects.map((one) => (

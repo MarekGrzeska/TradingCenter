@@ -203,7 +203,7 @@ async def test_the_doors_answers_are_read_as_final_or_ask_again(status, body, ex
     transport = httpx.MockTransport(lambda request: httpx.Response(status, json=body))
     gateway = Gateway(httpx.AsyncClient(transport=transport, base_url="http://door"))
 
-    assert await gateway.send("phone", "text") == expected
+    assert await gateway.send("phone", None, "text") == expected
 
 
 async def test_a_door_that_does_not_answer_is_asked_again() -> None:
@@ -212,6 +212,23 @@ async def test_a_door_that_does_not_answer_is_asked_again() -> None:
 
     gateway = Gateway(httpx.AsyncClient(transport=httpx.MockTransport(refuse), base_url="http://door"))
 
-    sent = await gateway.send("phone", "text")
+    sent = await gateway.send("phone", None, "text")
 
     assert (sent.ok, sent.transient) == (False, True)
+
+
+async def test_a_fire_goes_through_the_bot_its_rule_names(pool, settings, door, db) -> None:
+    candidate = rule(condition(), cooldown_seconds=0, bot="filmsbot")
+    await fire_of(pool, candidate)
+
+    await Deliverer(pool, settings, door).run(T0)
+
+    assert door.sent_via == ["filmsbot"]
+
+
+async def test_a_rule_without_a_bot_asks_the_door_to_pick_the_only_one(pool, settings, door, db) -> None:
+    await fire_of(pool)
+
+    await Deliverer(pool, settings, door).run(T0)
+
+    assert door.sent_via == [None]

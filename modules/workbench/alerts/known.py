@@ -8,6 +8,7 @@ import logging
 
 from .catalog import CatalogTool, ToolSource
 from .gateway import Gateway, GatewayUnreachable, Recipient
+from .reach import Reach
 from .store import json_of
 from .validation import Known
 
@@ -39,7 +40,7 @@ async def known(state, conn) -> Known:
     return Known(
         tools=tools,
         event_types=await event_schemas(conn),
-        destinations=None if recipients is None else frozenset(one.name for one in recipients),
+        destinations=reach_of(recipients),
         min_interval_seconds=state.settings.min_interval_seconds,
     )
 
@@ -71,11 +72,15 @@ def symbols_from(text: str) -> list[str]:
     return [str(row["symbol"]) for row in rows if isinstance(row, dict) and "symbol" in row]
 
 
-async def recipients_if_possible(state) -> frozenset[str] | None:
+def reach_of(recipients: list[Recipient] | None) -> Reach | None:
+    return None if recipients is None else {one.name: one.bots for one in recipients}
+
+
+async def recipients_if_possible(state) -> Reach | None:
     """For the list, which must still draw when the door is down: the rules are shown, unchecked."""
     try:
         recipients = await recipients_of(state.gateway)
     except GatewayUnreachable as err:
         log.info("the list of rules is shown without checking recipients: %s", err)
         return None
-    return None if recipients is None else frozenset(one.name for one in recipients)
+    return reach_of(recipients)

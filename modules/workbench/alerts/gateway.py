@@ -24,10 +24,27 @@ class Sent:
 
 
 @dataclass(frozen=True)
-class Recipient:
-    name: str
+class Binding:
+    """One way to reach a recipient: through this bot, and whether it can receive there yet."""
+
     bot: str
     receives: bool
+
+
+@dataclass(frozen=True)
+class Recipient:
+    """A name the door knows and every bot it is reached through, which may be none yet."""
+
+    name: str
+    bindings: tuple[Binding, ...] = ()
+
+    @property
+    def receives(self) -> bool:
+        return any(one.receives for one in self.bindings)
+
+    @property
+    def bots(self) -> tuple[str, ...]:
+        return tuple(one.bot for one in self.bindings)
 
 
 class Gateway:
@@ -37,17 +54,21 @@ class Gateway:
     async def recipients(self) -> list[Recipient]:
         """Everyone the door can write to, ready or not: a rule may be written for a recipient who has not tapped yet."""
         try:
-            response = await self._client.get("/destinations")
+            response = await self._client.get("/recipients")
         except httpx.RequestError as err:
             raise GatewayUnreachable(f"the door to Telegram did not answer: {err}") from err
         if response.is_error:
             raise GatewayUnreachable(f"the door to Telegram refused the list of recipients: HTTP {response.status_code}")
-        return [Recipient(one["name"], one["bot"], bool(one["receives"])) for one in response.json()]
+        return [
+            Recipient(one["name"], tuple(Binding(bind["bot"], bool(bind["receives"])) for bind in one["bindings"]))
+            for one in response.json()
+        ]
 
-    async def send(self, destination: str, text: str) -> Sent:
-        """One message to one recipient, now. Never raises for what the door answers — the answer is the result."""
+    async def send(self, destination: str, bot: str | None, text: str) -> Sent:
+        """One message to one recipient through one bot, now (the bot may be left out only where the recipient has one).
+        Never raises for what the door answers — the answer is the result."""
         try:
-            response = await self._client.post("/messages", json={"destination": destination, "text": text})
+            response = await self._client.post("/messages", json={"recipient": destination, "bot": bot, "text": text})
         except httpx.RequestError as err:
             return Sent(ok=False, transient=True, reason=f"the door to Telegram did not answer: {err}")
         if not response.is_error:
