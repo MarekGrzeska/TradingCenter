@@ -10,6 +10,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from agent.config import ModelCatalogueEntry as AgentModelCatalogueEntry
 from agent.config import Settings as AgentSettings
+from alerts.config import Settings as AlertsSettings
 from market_data.config import Settings as MarketSettings
 from polymarket_data.config import Settings as PolymarketSettings
 from social_data.config import Settings as SocialSettings
@@ -113,13 +114,16 @@ class Settings(BaseSettings):
     # The YouTube archive: the one package whose absence is a working configuration. Unset, the process runs without
     # it — no routes, no tools, no database — which is what production does until its own change enables it.
     youtube_database_url: str | None = Field(default=None, repr=False)
+    # The alerts package, optional for the same reason: unset, the process runs without it, and the archives that publish
+    # events simply do not. Production sets it in the same deploy that ships the package.
+    alerts_database_url: str | None = Field(default=None, repr=False)
     telegram_api_id: int | None = None
     telegram_api_hash: str | None = None
     telegram_session_key: str | None = Field(default=None, repr=False)
 
-    @field_validator("youtube_database_url")
+    @field_validator("youtube_database_url", "alerts_database_url")
     @classmethod
-    def _blank_youtube_means_absent(cls, value: str | None) -> str | None:
+    def _blank_optional_database_means_absent(cls, value: str | None) -> str | None:
         # `YOUTUBE_DATABASE_URL=` left in a .env is the line not being there, not a database named "".
         if value is None or not value.strip():
             return None
@@ -346,6 +350,30 @@ class Settings(BaseSettings):
         )
 
 
+    def for_alerts(self) -> AlertsSettings:
+        """The alerts package's own settings, the same way, and asked for only when `alerts_enabled()` said yes."""
+        if self.alerts_database_url is None:
+            raise ValueError(
+                "ALERTS_DATABASE_URL is not set, so the alerts package is not part of this process — "
+                "there is no settings object to build for it."
+            )
+        return AlertsSettings(
+            _env_prefix="ALERTS_",  # pyright: ignore[reportCallIssue]
+            _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
+            database_url=self.alerts_database_url,
+            database_user=self.database_user,
+            private_hosts=self.private_hosts,
+            azure_client_id=self.azure_client_id,
+            azure_client_secret=self.azure_client_secret,
+            azure_tenant_id=self.azure_tenant_id,
+            migration_lock_wait_seconds=self.migration_lock_wait_seconds,
+            require_authenticated_principal=self.require_authenticated_principal,
+            tool_caller_application_ids=self.tool_caller_application_ids,
+            # Not the process's REST list either: this package's REST writes the rules that decide who is told.
+            # Read as ALERTS_REST_CALLER_APPLICATION_IDS.
+        )
+
+
 class _YoutubeSwitch(BaseSettings):
     """The one setting the assembly reads at import time, alone: whether to mount the YouTube archive is decided before
     `Settings()` — which refuses to build without the other seven databases — has anywhere to run."""
@@ -358,4 +386,18 @@ class _YoutubeSwitch(BaseSettings):
 def youtube_enabled() -> bool:
     """Whether this process serves the YouTube archive: its database is configured, and nothing else decides it."""
     configured = _YoutubeSwitch().youtube_database_url
+    return configured is not None and bool(configured.strip())
+
+
+class _AlertsSwitch(BaseSettings):
+    """The same one setting for the alerts package, read alone and at import time."""
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    alerts_database_url: str | None = None
+
+
+def alerts_enabled() -> bool:
+    """Whether this process serves the alerts package: its database is configured, and nothing else decides it."""
+    configured = _AlertsSwitch().alerts_database_url
     return configured is not None and bool(configured.strip())

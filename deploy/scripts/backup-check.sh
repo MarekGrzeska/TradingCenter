@@ -8,7 +8,7 @@ APP_DIR="${APP_DIR:-/opt/tradingcenter}"
 # Outside /opt/tradingcenter, whose mode keeps every other account out: the backup account reads this directory and no other.
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/tradingcenter}"
 ACK_FILE="${ACK_FILE:-/var/lib/tradingcenter/backup-ack/last-ack}"
-DATABASES="${DATABASES:-agent teams market_data polymarket social telegram youtube}"
+DATABASES="${DATABASES:-agent teams market_data polymarket social telegram youtube alerts}"
 DUMP_MAX_AGE_MINUTES="${DUMP_MAX_AGE_MINUTES:-1560}"  # a day and two hours: the night's run may be slow
 ACK_MAX_AGE_MINUTES="${ACK_MAX_AGE_MINUTES:-4320}"    # three days
 ALERT="${ALERT:-$(dirname "$0")/alert}"

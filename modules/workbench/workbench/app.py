@@ -31,6 +31,7 @@ from tc_runtime.db import pool as make_pool
 from tc_runtime.openapi import require_response_fields
 
 import agent.surface
+import alerts.app
 import market_data.app
 import polymarket_data.app
 import social_data.app
@@ -54,7 +55,7 @@ from teams.tools import ToolServerRegistry as TeamsToolServerRegistry
 
 from . import model_successors
 from .assembly import mount_package
-from .config import Settings, youtube_enabled
+from .config import Settings, alerts_enabled, youtube_enabled
 from .edge import edge_config, edge_provider
 from .local_tools import ConversationLocalTools, TeamsLocalTools
 from .root_access import RootCallers
@@ -74,6 +75,7 @@ async def lifespan(app: FastAPI):
     market_settings = settings.for_market()
     telegram_settings = settings.for_telegram()
     youtube_settings = settings.for_youtube() if YOUTUBE_MOUNTED else None
+    alerts_settings = settings.for_alerts() if ALERTS_MOUNTED else None
     # Each package's tools, called as functions: the server its own `/mcp` mounts, minus the transport. The
     # archive's eleven were the first tools this process ever called, over the network; they are the last to move in.
     polymarket_tools = ConversationLocalTools("polymarket-data", polymarket_app.state.mcp_server)
@@ -124,6 +126,13 @@ async def lifespan(app: FastAPI):
         # tool session are entered here, beside this process's own two. The door to Telegram first: the post
         # archive's first pass may already have something to say.
         telegram_gateway.app.serving(telegram_app, telegram_settings),
+        # After the door, before every package that publishes: what an archive announces at start has to find the
+        # rules already there. Entered only when mounted, like the YouTube archive below.
+        (
+            alerts.app.serving(alerts_app, alerts_settings)
+            if alerts_app is not None and alerts_settings is not None
+            else nullcontext()
+        ),
         telegram_client(telegram_app, "the post archive") as social_telegram,
         polymarket_data.app.serving(polymarket_app, polymarket_settings),
         social_data.app.serving(social_app, social_settings, telegram=social_telegram),
@@ -334,6 +343,15 @@ if youtube_app is not None:
     mount_package(app, "/youtube", youtube_app)
 else:
     log.info("the YouTube archive is not part of this process: YOUTUBE_DATABASE_URL is not set")
+
+# The alerts package, whole, and only when its database is configured — for the reason the YouTube archive is: a
+# package mounted without a database is the half-state `workbench-process` refuses.
+ALERTS_MOUNTED = alerts_enabled()
+alerts_app = alerts.app.create_app() if ALERTS_MOUNTED else None
+if alerts_app is not None:
+    mount_package(app, "/alerts", alerts_app)
+else:
+    log.info("the alerts package is not part of this process: ALERTS_DATABASE_URL is not set")
 
 # After every mount, so the prefixes it lets through to each package's own record are all of them.
 app.add_middleware(

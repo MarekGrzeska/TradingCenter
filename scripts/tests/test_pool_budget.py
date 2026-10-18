@@ -28,6 +28,7 @@ MODULES = {
     "workbench/social": ("social_data/config.py", "SOCIAL_DATABASE_POOL_SIZE", 1),
     "workbench/telegram": ("telegram_gateway/config.py", "TELEGRAM_DATABASE_POOL_SIZE", 1),
     "workbench/youtube": ("youtube_data/config.py", "YOUTUBE_DATABASE_POOL_SIZE", 1),
+    "workbench/alerts": ("alerts/config.py", "ALERTS_DATABASE_POOL_SIZE", 1),
     "workbench": ("workbench/config.py", "DATABASE_POOL_SIZE", 2),
 }
 

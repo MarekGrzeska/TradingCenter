@@ -150,3 +150,11 @@ def youtube_settings() -> object:
     from workbench.config import Settings
 
     return Settings().for_youtube()  # type: ignore[call-arg]
+
+
+def alerts_settings() -> object:
+    """The alerts package's chain — the ninth, and optional like the YouTube archive's: absent from a process whose
+    `ALERTS_DATABASE_URL` is not set."""
+    from workbench.config import Settings
+
+    return Settings().for_alerts()  # type: ignore[call-arg]
