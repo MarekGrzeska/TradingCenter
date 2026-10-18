@@ -18,7 +18,7 @@ from .harness import GOLD, MARKETS, Rig
 pytestmark = pytest.mark.db
 
 READS = {"youtube_archive_status", "recent_videos", "read_video", "read_transcript", "instrument_sentiment"}
-ADDS = {"follow_channel", "add_topic", "set_alert_rule", "analyse_video"}
+ADDS = {"follow_channel", "add_topic", "analyse_video"}
 EXPECTED_TOOLS = READS | ADDS | {"search_youtube"}
 
 # Characters of the serialized `list_tools()`, read by a client before every turn — the surface a conversation pays for it.
@@ -178,11 +178,11 @@ async def test_the_status_says_what_the_archive_is_doing_before_anyone_says_noth
 
 
 async def test_the_agent_follows_a_channel_once_and_a_second_time_changes_nothing(tools) -> None:
-    first = await call(tools, "follow_channel", reference="@simzloto", alert_rule="always")
-    again = await call(tools, "follow_channel", reference=GOLD, alert_rule="never")
+    first = await call(tools, "follow_channel", reference="@simzloto")
+    again = await call(tools, "follow_channel", reference=GOLD)
 
     assert first["created"] is True and first["channel"]["added_by"] == "agent"
-    assert again["created"] is False and again["channel"]["alert_rule"] == "always"
+    assert again["created"] is False and again["channel"]["channel_id"] == first["channel"]["channel_id"]
 
 
 async def test_the_agent_meets_the_same_ceiling_the_screen_does_and_is_sent_to_the_operator(tools, rig, app) -> None:
@@ -202,16 +202,6 @@ async def test_a_topic_says_which_limits_it_took_from_the_settings(tools) -> Non
 
     assert added["defaults_applied"] == ["interval_minutes", "max_videos_per_run"]
     assert added["topic"]["added_by"] == "agent"
-
-
-async def test_an_alert_rule_is_changed_for_a_channel_and_a_topic_and_an_unknown_one_is_refused(tools) -> None:
-    await call(tools, "follow_channel", reference="@simzloto")
-    topic = await call(tools, "add_topic", phrase="gold")
-
-    assert (await call(tools, "set_alert_rule", kind="channel", ref=GOLD, alert_rule="never"))["alert_rule"] == "never"
-    changed = await call(tools, "set_alert_rule", kind="topic", ref=str(topic["topic"]["id"]), alert_rule="always")
-    assert changed["alert_rule"] == "always"
-    assert "refused" in await call(tools, "set_alert_rule", kind="channel", ref="UCnobody", alert_rule="never")
 
 
 async def test_a_film_named_by_hand_is_queued_and_a_non_film_is_refused_with_a_way_on(tools, rig) -> None:

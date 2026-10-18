@@ -153,26 +153,23 @@ async def posts_awaiting_analysis(conn: Conn, *, since: datetime, limit: int) ->
     return [_post(row) for row in rows]
 
 
-async def posts_awaiting_notification(
-    conn: Conn, *, since: datetime, min_score: int, limit: int
-) -> list[Post]:
-    """Posts worth telling the operator about that nobody has been told about yet.
+async def posts_awaiting_notification(conn: Conn, *, since: datetime, limit: int) -> list[Post]:
+    """Posts the model has read that the alerts package has not been handed yet.
 
-    A post with no reading is not a candidate: an absent score is not a low one, and announcing it
-    "just in case" would turn the threshold into its opposite in the state this module knows least
-    about. Oldest first, so a burst arrives in the order it was written.
+    A post with no reading is not a candidate: an absent score is not a low one, and handing it over "just in case" would
+    let it through every rule's threshold in the state this module knows least about. Oldest first, so a burst arrives in
+    the order it was written.
     """
     rows = await conn.fetch(
         f"""
         SELECT {_POST_COLUMNS}
         FROM posts
         WHERE notified_at IS NULL
-          AND impact_score IS NOT NULL AND impact_score >= $1
-          AND published_at >= $2
+          AND impact_score IS NOT NULL
+          AND published_at >= $1
         ORDER BY published_at
-        LIMIT $3
+        LIMIT $2
         """,
-        min_score,
         since,
         limit,
     )
@@ -180,8 +177,7 @@ async def posts_awaiting_notification(
 
 
 async def mark_notified(conn: Conn, post_id: int, *, at: datetime) -> None:
-    """Written only after the gateway answered with a success. The gateway remembers nothing it
-    sent, so this row is the only thing standing between one alert and one alert per pass."""
+    """Written only after the alerts package accepted the post, so a refusal leaves it waiting for the next pass."""
     await conn.execute("UPDATE posts SET notified_at = $2 WHERE id = $1", post_id, at)
 
 

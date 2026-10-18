@@ -34,9 +34,9 @@ log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def serving(app: FastAPI, settings: Settings, telegram: httpx.AsyncClient | None = None):
-    """Everything this package needs running, on `app.state`, for as long as the block is open. `telegram` is
-    the host's client over the door to Telegram; without it nobody is told, whatever the destination says."""
+async def serving(app: FastAPI, settings: Settings, alerts_client: httpx.AsyncClient | None = None):
+    """Everything this package needs running, on `app.state`, for as long as the block is open. `alerts_client` is
+    the host's client over the alerts package; without it nobody is told, whatever the rules say."""
     app.state.settings = settings
 
     async with (
@@ -75,12 +75,12 @@ async def serving(app: FastAPI, settings: Settings, telegram: httpx.AsyncClient 
         enricher = enrichment.build(pool, settings)
         app.state.enrichment = enricher
 
-        # `None` without a door to Telegram, and the module runs anyway: collecting without telling anybody is a
+        # `None` without an alerts package, and the module runs anyway: collecting without telling anybody is a
         # supported state, which `/state` names rather than leaving the screen to guess at.
-        announcer = alerts.build(pool, settings, telegram)
+        announcer = alerts.build(pool, settings, alerts_client)
         app.state.alerts = announcer
         if announcer is not None:
-            await announcer.announce_purposes()
+            await announcer.announce_types()
 
         # After the migration and not before it: a pass started earlier would write into a schema
         # it does not know, and a bad write is not undone by a later error response.

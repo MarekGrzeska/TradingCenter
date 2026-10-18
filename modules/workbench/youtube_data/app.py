@@ -29,9 +29,9 @@ log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def serving(app: FastAPI, settings: Settings, telegram: httpx.AsyncClient | None = None):
-    """Everything this package needs running, on `app.state`, for as long as the block is open. `telegram` is the host's
-    client over the door to Telegram; without it nobody is told, whatever the destination says."""
+async def serving(app: FastAPI, settings: Settings, alerts_client: httpx.AsyncClient | None = None):
+    """Everything this package needs running, on `app.state`, for as long as the block is open. `alerts_client` is the host's
+    client over the alerts package; without it nobody is told, whatever the rules say."""
     app.state.settings = settings
 
     async with make_pool(
@@ -69,12 +69,12 @@ async def serving(app: FastAPI, settings: Settings, telegram: httpx.AsyncClient 
             app.state.heartbeats = heartbeats
             liveness.register_metrics("youtube_data", heartbeats)
 
-            # `None` without a destination, and the package runs anyway: reading without telling anybody is a supported
+            # `None` without an alerts package, and this one runs anyway: reading without telling anybody is a supported
             # state, which `/state` names rather than leaving the screen to guess at.
-            announcer = alerts.build(pool, settings, telegram)
+            announcer = alerts.build(pool, settings, alerts_client)
             app.state.alerts = announcer
             if announcer is not None:
-                await announcer.announce_purposes()
+                await announcer.announce_types()
 
             ingest = Ingest(
                 pool,

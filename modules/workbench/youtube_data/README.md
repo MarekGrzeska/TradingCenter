@@ -2,7 +2,7 @@
 
 The YouTube archive. Channels and search topics the operator (or an agent) chose to follow, the films
 they yield, their transcripts, what a model made of each, and a Telegram message when one matters.
-Two surfaces in one process: the REST contract the terminal's **YouTube** tab reads, and ten tools at
+Two surfaces in one process: the REST contract the terminal's **YouTube** tab reads, and nine tools at
 `/mcp` that reach the conversation and the teams as functions.
 
 **The ninth package of the workbench, and the only optional one.** Served whole under `/youtube` when
@@ -108,7 +108,7 @@ REST (`contract.py`, generated into the terminal as `contract.youtube.generated.
 `GET /health`.
 
 Tools: `youtube_archive_status`, `recent_videos`, `read_video`, `read_transcript`,
-`instrument_sentiment` read; `search_youtube`, `follow_channel`, `add_topic`, `set_alert_rule`,
+`instrument_sentiment` read; `search_youtube`, `follow_channel`, `add_topic`,
 `analyse_video` write or spend. None removes anything. Lists carry an excerpt; `read_video` carries the
 reading and no words; `read_transcript` pages the words (8 000 characters at most) with a notice that
 they are data, not instructions. The two that cost say so in their description and refuse past the

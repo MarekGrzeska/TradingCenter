@@ -1,16 +1,13 @@
-"""Telling the operator about a film worth a phone's buzz.
+"""Telling the alerts package about a film the model has read.
 
-Two rules come from the gateway keeping no history of what it sent. The marker is written **after** a success, never
-before — so a failed delivery leaves the film waiting and the next pass tries again, which is the whole retry mechanism
-this system has. And a film with no reading is never announced: only a read film reaches this step, and an absent score is
-not a low one.
+This package no longer decides whether a film is worth a phone's buzz, nor whom to buzz: it says that a film was read, with
+what the model made of it, and the operator's rules in `/alerts` do the rest. What stays here is the part that has to be
+right on this side. A film is handed over **once**; the marker is written only **after** the alerts package has accepted it,
+so a refusal leaves the film waiting and the next pass tries again — which is the whole retry mechanism this system has; and
+a film with no reading is never handed over, because an absent score is not a low one.
 
-The price is named rather than hidden: a delivery that succeeded and whose marker did not get written announces the film
-twice. A repeated notification is cheaper than a lost one, and the other choice would need the gateway to remember.
-
-Two things are this package's own. What a channel or a topic asked for (`always`, `threshold`, `never`) decides per film,
-and a film that could not be announced within a couple of days is let go as quiet rather than announced late in a heap
-the day the gateway comes back."""
+Handing over twice is harmless — the alerts package takes the same film, by its id, as the same event — and a film that could
+not be handed over within a couple of days is let go as quiet rather than announced late in a heap the day the package returns."""
 
 from __future__ import annotations
 
@@ -25,7 +22,7 @@ from .config import Settings
 
 log = logging.getLogger(__name__)
 
-# Telegram's own ceiling is 4096 and the gateway refuses rather than truncating, so the message is cut here — where the cut
+# Telegram's own ceiling is 4096 and the door refuses rather than truncating, so the message is cut here — where the cut
 # can be marked as one — and a little under.
 MESSAGE_CHARS = 3500
 SUMMARY_CHARS = 900
@@ -33,80 +30,70 @@ MAX_INSTRUMENTS = 6
 # A title, a channel name and an instrument name come from strangers and carry no length of their own.
 LINE_CHARS = 300
 
-PURPOSE = "youtube.film"
-PURPOSE_DESCRIPTION = "A film the model read, by the channel's or topic's alert rule"
+EVENT_TYPE = "youtube.film.read"
+EVENT_DESCRIPTION = "A film the model read, with its impact score and the instruments it spoke about"
+EVENT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "channel": {"type": "string"},
+        "channel_slug": {"type": "string"},
+        "topic": {"type": "string"},
+        "title": {"type": "string"},
+        "video_id": {"type": "string"},
+        "impact_score": {"type": "integer"},
+        "instruments": {"type": "array", "items": {"type": "string"}},
+        "url": {"type": "string"},
+        "simulated": {"type": "boolean"},
+    },
+}
 
 
 def slug(text: str) -> str:
-    """A name as one segment of a purpose: lowercase letters, digits, `_` and `-`; the rest becomes a dash."""
+    """A name as one word of an attribute a rule can match: lowercase letters, digits, `_` and `-`; the rest becomes a dash."""
     cleaned = re.sub(r"[^a-z0-9_-]+", "-", text.lower()).strip("-_")[:60]
     return cleaned or "unknown"
-
-
-def purpose_for(video) -> str:
-    """One purpose for the archive, one segment for the channel: an assignment can move every film or a single channel."""
-    return f"{PURPOSE}.{slug(video.channel_title)}"
 
 
 ARROWS = {"bullish": "▲", "bearish": "▼", "neutral": "▬"}
 
 
-class GatewayRefused(Exception):
-    """The gateway answered, and the answer was a refusal — an unknown destination, a rate limit, a recipient who blocked
-    the bot. Never read as "delivered"."""
+class Rejected(Exception):
+    """The alerts package answered, and the answer was no. Never read as 'handed over'."""
 
 
-class GatewayUnreachable(Exception):
-    """The gateway did not answer at all."""
+class Unreachable(Exception):
+    """The alerts package did not answer at all."""
 
 
-class GatewayUnassigned(Exception):
-    """Nobody receives this purpose yet. Not a failure and never read as "delivered": the film keeps no marker, so it is
-    announced the pass after somebody is assigned - unless the window has let it go as quiet first."""
-
-    def __init__(self, purpose: str) -> None:
-        super().__init__(f"nobody receives {purpose!r}")
-        self.purpose = purpose
-
-
-class Gateway:
-    """The two routes this package calls on the door to Telegram: send under a purpose, and announce one. The client is
-    the host's, over the door's application in this process, so its refusals and its caller record read here exactly as
-    they did over HTTP."""
+class Publisher:
+    """The two routes this package calls on the alerts package: announce what it can say, and say it. The client is the
+    host's, over the package's application in this process, so its refusals and its caller record read here exactly as they
+    would over HTTP."""
 
     def __init__(self, client: httpx.AsyncClient) -> None:
         self._client = client
 
-    async def send(self, *, purpose: str, text: str) -> None:
+    async def announce(self) -> None:
         try:
-            response = await self._client.post("/messages", json={"purpose": purpose, "text": text})
+            response = await self._client.put(
+                f"/event-types/{EVENT_TYPE}", json={"description": EVENT_DESCRIPTION, "schema": EVENT_SCHEMA}
+            )
         except httpx.RequestError as err:
-            raise GatewayUnreachable(f"the gateway did not answer: {err}") from err
+            raise Unreachable(f"the alerts package did not answer: {err}") from err
         if response.is_error:
-            if _nobody_listens(response):
-                raise GatewayUnassigned(purpose)
-            raise GatewayRefused(f"the gateway refused: {_detail(response)}")
+            raise Rejected(f"the alerts package refused the announcement: {_detail(response)}")
 
-    async def describe(self, purpose: str, description: str) -> None:
-        """Tells the door this purpose exists, so the terminal lists it before the first event. Best effort."""
+    async def publish(self, *, source_key: str, attributes: dict, text: str) -> None:
+        body = {"type": EVENT_TYPE, "source_key": source_key, "attributes": attributes, "text": text}
         try:
-            await self._client.put(f"/purposes/{purpose}", json={"description": description})
+            response = await self._client.post("/events", json=body)
         except httpx.RequestError as err:
-            log.info("could not announce the purpose %s: %s", purpose, err)
-
-
-def _nobody_listens(response: httpx.Response) -> bool:
-    """The door's own code for a purpose with no recipient — not a fault, and not to be read as a refusal."""
-    try:
-        body = response.json()
-    except ValueError:
-        return False
-    detail = body.get("detail") if isinstance(body, dict) else None
-    return response.status_code == 409 and isinstance(detail, dict) and detail.get("code") == "unassigned"
+            raise Unreachable(f"the alerts package did not answer: {err}") from err
+        if response.is_error:
+            raise Rejected(f"the alerts package refused the event: {_detail(response)}")
 
 
 def _detail(response: httpx.Response) -> str:
-    """The gateway's own words, kept whole — they carry the wait on a rate limit and the reason on a block."""
     try:
         body = response.json()
     except ValueError:
@@ -115,6 +102,21 @@ def _detail(response: httpx.Response) -> str:
     if isinstance(detail, dict):
         return str(detail.get("detail") or detail)
     return str(detail or body)
+
+
+def attributes_of(item: store.ToAnnounce) -> dict:
+    video, reading = item.video, item.reading
+    return {
+        "channel": video.channel_title,
+        "channel_slug": slug(video.channel_title),
+        "topic": item.topic or "",
+        "title": video.title,
+        "video_id": video.video_id,
+        "impact_score": int(reading["impact_score"]),
+        "instruments": [str(view["name"]) for view in reading["instruments"]],
+        "url": f"https://www.youtube.com/watch?v={video.video_id}",
+        "simulated": bool(item.simulated or video.simulated),
+    }
 
 
 def message(item: store.ToAnnounce, *, limit: int = MESSAGE_CHARS) -> str:
@@ -152,87 +154,72 @@ def _clip(text: str, limit: int) -> str:
 
 
 class Alerts:
-    """The pass that says what is worth saying. Runs after the readings in the same round, because a film is only a
-    candidate once a model has read it."""
+    """The pass that hands over what was read. Runs after the readings in the same round, because a film is only worth
+    handing over once a model has read it."""
 
-    def __init__(
-        self,
-        pool,
-        gateway: Gateway,
-        *,
-        min_score: int,
-        batch_limit: int,
-        window: timedelta,
-    ) -> None:
+    def __init__(self, pool, publisher: Publisher, *, batch_limit: int, window: timedelta) -> None:
         self._pool = pool
-        self._gateway = gateway
-        # What the door last said: nobody receives these films. `/state` reports it.
-        self.unheard = False
-        self._min_score = min_score
+        self._publisher = publisher
         self._limit = batch_limit
         self._window = window
+        self._announced = False
+        # What the alerts package last said: it did not take the films. `/state` reports it.
+        self.failing = False
 
     @property
     def telling(self) -> bool:
-        return not self.unheard
+        return not self.failing
 
-    async def announce_purposes(self) -> None:
-        await self._gateway.describe(PURPOSE, PURPOSE_DESCRIPTION)
-
-    def _wanted(self, item: store.ToAnnounce) -> bool:
-        rule = item.video.alert_rule
-        if rule == "always":
-            return True
-        if rule == "threshold":
-            return int(item.reading["impact_score"]) >= self._min_score
-        return False
+    async def announce_types(self) -> None:
+        """Best effort at start: a package that cannot be reached now learns it from the first pass."""
+        try:
+            await self._publisher.announce()
+            self._announced = True
+        except (Rejected, Unreachable) as err:
+            log.info("could not announce %s yet: %s", EVENT_TYPE, err)
 
     async def run(self, now: datetime) -> int:
-        """How many films were announced this pass. One failure costs that film only — and nothing permanent, because it
+        """How many films were handed over this pass. One failure costs that film only — and nothing permanent, because it
         keeps no marker and comes back next round."""
+        if not self._announced:
+            await self.announce_types()
+            if not self._announced:
+                self.failing = True
+                return 0
         async with self._pool.acquire() as conn:
             await store.expire_unannounced(conn, before=now - self._window)
             waiting = await store.analysed_for_alert(conn, limit=self._limit)
 
-        sent = 0
-        heard = False
+        handed = 0
+        failed = False
         for item in waiting:
-            if not self._wanted(item):
-                async with self._pool.acquire() as conn:
-                    await store.set_outcome(conn, item.video.video_id, "quiet")
-                continue
             try:
-                await self._gateway.send(purpose=purpose_for(item.video), text=message(item))
-            except GatewayUnassigned as err:
-                self.unheard = True
-                log.info("film %s waits: %s", item.video.video_id, err)
+                await self._publisher.publish(
+                    source_key=item.video.video_id, attributes=attributes_of(item), text=message(item)
+                )
+            except (Rejected, Unreachable) as err:
+                # No marker, so the next pass tries again. Named at warning rather than swallowed: an alerts package
+                # refusing everything is a silence the operator has to be able to find.
+                log.warning("could not hand over %s: %s", item.video.video_id, err)
+                failed = True
                 continue
-            except (GatewayRefused, GatewayUnreachable) as err:
-                # No marker, so the next pass tries again. Named at warning rather than swallowed: a gateway refusing
-                # everything is a silence the operator has to be able to find.
-                log.warning("could not announce %s: %s", item.video.video_id, err)
-                continue
-            heard = True
             async with self._pool.acquire() as conn:
                 await store.set_outcome(conn, item.video.video_id, "notified", at=datetime.now(UTC))
-            sent += 1
-        if heard:
-            self.unheard = False
-        return sent
+            handed += 1
+        self.failing = failed
+        return handed
 
 
-def build(pool, settings: Settings, gateway: httpx.AsyncClient | None) -> Alerts | None:
-    """The alerting this deployment is configured for, or `None`.
+def build(pool, settings: Settings, alerts: httpx.AsyncClient | None) -> Alerts | None:
+    """The hand-over this deployment is configured for, or `None`.
 
-    `None` only where there is no door to Telegram at all. With a door, who hears what is the operator's to assign, and a
-    purpose nobody hears is reported by `/state` rather than refused at start."""
-    if gateway is None:
-        log.info("no door to telegram — films will be read and nobody told")
+    `None` only where there is no alerts package in the process: films are read and nobody is told, and `/state` says so."""
+    if alerts is None:
+        log.info("no alerts package — films will be read and nobody told")
         return None
     return Alerts(
         pool,
-        Gateway(gateway),
-        min_score=settings.alert_min_impact_score,
+        Publisher(alerts),
         batch_limit=settings.announce_batch_limit,
         window=timedelta(hours=settings.alert_window_hours),
     )

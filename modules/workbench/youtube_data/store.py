@@ -543,12 +543,15 @@ class ToAnnounce:
     video: Video
     reading: dict
     simulated: bool
+    # The phrase of the first topic that found this film, if one did — what a rule filters a topic's films by.
+    topic: str | None = None
 
 
 async def analysed_for_alert(conn: Conn, *, limit: int) -> list[ToAnnounce]:
     rows = await conn.fetch(
         f"""
-        SELECT {", ".join(f"v.{c.strip()}" for c in _VIDEO_COLUMNS.split(","))}, r.result, r.simulated AS r_simulated
+        SELECT {", ".join(f"v.{c.strip()}" for c in _VIDEO_COLUMNS.split(","))}, r.result, r.simulated AS r_simulated,
+               (SELECT t.phrase FROM topics t WHERE 'topic:' || t.id::text = ANY (v.origins) ORDER BY t.id LIMIT 1) AS topic_phrase
         FROM videos v JOIN readings r ON r.video_id = v.video_id AND r.profile = v.profile
         WHERE v.state = 'analysed'
         ORDER BY r.impact_score DESC, v.published_at DESC LIMIT $1
@@ -560,6 +563,7 @@ async def analysed_for_alert(conn: Conn, *, limit: int) -> list[ToAnnounce]:
             _video(row),
             _json(row["result"]),
             row["r_simulated"],
+            row["topic_phrase"],
         )
         for row in rows
     ]
