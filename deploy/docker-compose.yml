@@ -111,7 +111,6 @@ services:
       MARKET_DATABASE_URL: postgresql://market_data:${MARKET_DB_PASSWORD:?}@postgres:5432/market_data
       POLYMARKET_DATABASE_URL: postgresql://polymarket:${POLYMARKET_DB_PASSWORD:?}@postgres:5432/polymarket
       SOCIAL_DATABASE_URL: postgresql://social:${SOCIAL_DB_PASSWORD:?}@postgres:5432/social
-      STRATEGY_DATABASE_URL: postgresql://strategy:${STRATEGY_DB_PASSWORD:?}@postgres:5432/strategy
       TELEGRAM_DATABASE_URL: postgresql://telegram:${TELEGRAM_DB_PASSWORD:?}@postgres:5432/telegram
       YOUTUBE_DATABASE_URL: postgresql://youtube:${YOUTUBE_DB_PASSWORD:?}@postgres:5432/youtube
       DATABASE_POOL_SIZE: "4"
@@ -226,7 +225,6 @@ services:
       MARKET_DB_PASSWORD: ${MARKET_DB_PASSWORD:?}
       POLYMARKET_DB_PASSWORD: ${POLYMARKET_DB_PASSWORD:?}
       SOCIAL_DB_PASSWORD: ${SOCIAL_DB_PASSWORD:?}
-      STRATEGY_DB_PASSWORD: ${STRATEGY_DB_PASSWORD:?}
       TELEGRAM_DB_PASSWORD: ${TELEGRAM_DB_PASSWORD:?}
       YOUTUBE_DB_PASSWORD: ${YOUTUBE_DB_PASSWORD:?}
     volumes:
