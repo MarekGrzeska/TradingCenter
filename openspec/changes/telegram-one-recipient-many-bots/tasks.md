@@ -1,0 +1,29 @@
+## 1. Brama Telegrama: wiązanie (nazwa, bot)
+
+- [ ] 1.1 Migracja `telegram`: zdjęcie unikalności samej nazwy, `UNIQUE (name, bot_id)`; test migracji na bazie z istniejącymi wiązaniami
+- [ ] 1.2 `store`: wyszukiwanie wiązania po (nazwa, bot), lista wiązań nazwy, usunięcie jednego wiązania; `destination_by_name` zastąpione
+- [ ] 1.3 `POST /destinations` tworzy drugie wiązanie tej samej nazwy przez innego bota; znika odmowa „należy do innego bota”
+- [ ] 1.4 `POST /messages` przyjmuje `bot`; pominięty przy jednym wiązaniu, `409` z listą botów przy kilku, odmowa dla bota spoza adresata
+- [ ] 1.5 `DELETE /destinations/{name}?bot=` usuwa jedno wiązanie; bez `bot` odmowa przy kilku
+- [ ] 1.6 Blokada i stan per wiązanie (test: zablokowany jeden bot nie rusza drugiego); `contract.py`, `openapi.py`, narzędzia MCP bramy
+
+## 2. Pakiet alertów: reguła z botem
+
+- [ ] 2.1 Migracja `alerts`: `rules.bot text NULL`
+- [ ] 2.2 `contract`, `store`, `rules`: pole `bot` w regule i w odpowiedziach
+- [ ] 2.3 `gateway.send(destination, bot, text)`; `delivery` przekazuje bota; odmowa dwuznaczności jest ostateczna z powodem nazywającym boty
+- [ ] 2.4 `validation`: bot spoza adresata i brak bota przy kilku wiązaniach to wady przy polu `bot`, razem z pozostałymi; `known` niesie wiązania
+- [ ] 2.5 Wada stanu reguły: `rules_with_defects` liczy dwuznaczny adres i bota, którego adresat już nie ma
+- [ ] 2.6 Szkic ze zdania: prompt zna boty adresata, model może zwrócić bota, ten sam walidator
+
+## 3. Terminal
+
+- [ ] 3.1 Zakładka Telegram: adresaci grupowani według nazwy, wiązania ze stanem, „dodaj przez kolejnego bota” z odnośnikiem startowym i komunikatem o tapnięciu; ostrzeżenie o regułach bez bota
+- [ ] 3.2 Usunięcie wiązania z nazwą bota w potwierdzeniu
+- [ ] 3.3 Formularz reguły: „Którym botem” z botami wybranego adresata; lista reguł mówi, przez którego bota; edycja starej reguły wypełnia jedynego bota
+- [ ] 3.4 Regeneracja kontraktów `telegram` i `alerts` (`contract-sync`), testy widoków wg „How much test is enough”
+
+## 4. Dokumentacja i wdrożenie
+
+- [ ] 4.1 README bramy i pakietu `alerts`, `docs/architecture.md` jeśli opisuje adresata
+- [ ] 4.2 Po scaleniu `deploy-watch`; dopiero po wdrożeniu dodanie drugiego bota przez operatora (Migration Plan, pkt 3)
