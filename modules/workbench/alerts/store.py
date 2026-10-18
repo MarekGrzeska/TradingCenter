@@ -202,3 +202,87 @@ async def list_event_types(conn: Conn) -> list[asyncpg.Record]:
             "SELECT name, description, schema, announced_by, last_announced_at FROM event_types ORDER BY name"
         )
     )
+
+
+# --- looking at values ----------------------------------------------------------------------------------------------
+
+
+async def claim_due(conn: Conn, *, limit: int, now: datetime) -> list[asyncpg.Record]:
+    """The value rules whose turn has come, each moved on by its own interval in the same statement. Claiming is what
+    stops two instances — or a slow look and the next tick — from looking at one rule twice; the price is that a look
+    lost to a crash is lost for one interval, which is the cheap side of that trade."""
+    return list(
+        await conn.fetch(
+            f"""
+            UPDATE rules
+               SET next_check_at = $1::timestamptz + make_interval(secs => poll_interval_seconds)
+             WHERE id IN (
+                    SELECT id FROM rules
+                     WHERE enabled AND kind = 'condition' AND next_check_at <= $1::timestamptz
+                     ORDER BY next_check_at
+                     LIMIT $2
+                       FOR UPDATE SKIP LOCKED
+                   )
+            RETURNING {RULE_COLUMNS}
+            """,
+            now,
+            limit,
+        )
+    )
+
+
+async def record_look(conn: Conn, rule_id: int, *, result: bool | None, now: datetime) -> None:
+    """What a look found. `last_result` is the last look's answer, empty when none was had; `last_known_result` only ever
+    takes a real answer, so it survives an outage and is what the next edge is measured against."""
+    await conn.execute(
+        """
+        UPDATE rules
+           SET last_result = $2,
+               last_known_result = COALESCE($2, last_known_result),
+               last_checked_at = $3
+         WHERE id = $1
+        """,
+        rule_id,
+        result,
+        now,
+    )
+
+
+async def record_check(conn: Conn, rule_id: int, *, outcome: str, reason: str, now: datetime) -> None:
+    await conn.execute(
+        "INSERT INTO rule_checks (rule_id, outcome, reason, checked_at) VALUES ($1, $2, $3, $4)",
+        rule_id,
+        outcome,
+        reason,
+        now,
+    )
+
+
+async def last_check(conn: Conn, rule_id: int) -> asyncpg.Record | None:
+    return await conn.fetchrow(
+        "SELECT outcome, reason, checked_at FROM rule_checks WHERE rule_id = $1 ORDER BY checked_at DESC, id DESC LIMIT 1",
+        rule_id,
+    )
+
+
+async def record_fire(
+    conn: Conn, rule_id: int, *, edge_at: datetime, text: str, value: float | None, now: datetime
+) -> int | None:
+    """The rule went off. One per rule and edge — a repeat of the same edge, from another instance or a retried tick, is
+    refused by the table and returns nothing — and the rule remembers when, for its cool-down."""
+    fire_id = await conn.fetchval(
+        """
+        INSERT INTO fires (rule_id, edge_at, state, text, value, next_attempt_at, created_at)
+        VALUES ($1, $2, 'pending', $3, $4, $5, $5)
+        ON CONFLICT (rule_id, edge_at) DO NOTHING
+        RETURNING id
+        """,
+        rule_id,
+        edge_at,
+        text,
+        None if value is None else Decimal(str(value)),
+        now,
+    )
+    if fire_id is not None:
+        await conn.execute("UPDATE rules SET last_fired_at = $2 WHERE id = $1", rule_id, now)
+    return fire_id

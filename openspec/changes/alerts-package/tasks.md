@@ -18,11 +18,11 @@
 
 ## 3. Źródło „stan”
 
-- [ ] 3.1 `conditions.py`: kopia chodzenia po polu, porównania, zbocza i czasu martwego z `teams/scheduler/clock.py`, z trzecim stanem porównywanym z ostatnim znanym wynikiem
-- [ ] 3.2 Zegar: zajęcie należnych reguł (`SKIP LOCKED`), wywołanie narzędzia, zapis `rule_checks`, odpalenie przy zboczu
-- [ ] 3.3 Tryb jednorazowy wyłącza regułę po pierwszym doręczeniu
-- [ ] 3.4 Testy: zbocze raz, miganie w czasie martwym, niedostępność ≠ fałsz, powrót po niedostępności bez fałszywego zbocza, zero wywołań modelu
-- [ ] 3.5 `db-cost-check` dla zajęcia reguł i odczytu `get_last_price` przy 20 regułach co 30 s
+- [x] 3.1 `conditions.py`: kopia chodzenia po polu, porównania, zbocza i czasu martwego z `teams/scheduler/clock.py`, z trzecim stanem porównywanym z ostatnim znanym wynikiem
+- [x] 3.2 Zegar: zajęcie należnych reguł (`SKIP LOCKED`), wywołanie narzędzia, zapis `rule_checks`, odpalenie przy zboczu
+- [x] 3.3 Zegar w lifespanie pakietu: tętno w `/health` i w metryce, zatrzymanie przy zamknięciu, pobudka z zewnątrz
+- [x] 3.4 Testy: zbocze raz, miganie w czasie martwym, niedostępność ≠ fałsz, powrót po niedostępności bez fałszywego zbocza, zero wywołań modelu
+- [x] 3.5 `db-cost-check` dla zajęcia reguł i odczytu `get_last_price` przy 20 regułach co 30 s
 
 ## 4. Źródło „zdarzenie”
 
@@ -36,7 +36,8 @@
 - [ ] 5.1 Klient bramy w procesie, wysyłka po nazwie adresata, klasyfikacja odmowy trwała/przejściowa
 - [ ] 5.2 Ponowienie z `retry_after`, odpuszczenie po oknie, brak bramy jako stan
 - [ ] 5.3 Sufit wysyłek reguły na godzinę i jedna wiadomość o zdławieniu
-- [ ] 5.4 Testy: restart między zapisem a odpowiedzią bramy nie daje drugiego odpalenia (`-m db`), zalew zdławiony do sufitu
+- [ ] 5.4 Tryb jednorazowy: reguła wyłącza się po pierwszym udanym doręczeniu, z powodem „odpaliła”
+- [ ] 5.5 Testy: restart między zapisem a odpowiedzią bramy nie daje drugiego odpalenia (`-m db`), zalew zdławiony do sufitu, tryb jednorazowy
 
 ## 6. Szkic ze zdania
 

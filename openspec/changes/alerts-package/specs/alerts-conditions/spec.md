@@ -31,6 +31,12 @@ przesuwać początku czasu martwego.
 - **WHEN** warunek przechodzi w spełniony i pozostaje taki przez dziesięć sprawdzeń
 - **THEN** reguła MUST odpalić dokładnie raz
 
+#### Scenario: Reguła zapisana, gdy warunek już jest spełniony
+
+- **WHEN** operator zapisuje regułę „cena powyżej 1,10”, a cena wynosi już 1,12
+- **THEN** pierwsze sprawdzenie MUST ustalić punkt wyjścia i MUST NOT odpalić
+- **AND** reguła MUST odpalić dopiero po tym, jak warunek przestanie być spełniony i spełni się ponownie
+
 #### Scenario: Cena miga wokół progu
 
 - **WHEN** warunek przestaje być spełniony i spełnia się ponownie przed upływem czasu martwego
