@@ -20,13 +20,22 @@ wynikiem. Reguła z wadą MUST być wyróżniona, a liczba takich reguł MUST by
 
 Kreator MUST dawać wybór, a nie pole tekstowe, dla: źródła, typu zdarzenia, atrybutu, narzędzia,
 instrumentu, pola wyniku, porównania i adresata. Wartości wybiera się z katalogu pakietu. Pola
-filtra MUST powstawać ze schematu typu zdarzenia albo argumentów narzędzia. Wpisywane są wyłącznie
-liczby, nazwa reguły i szablon. Odmowa zapisu MUST być pokazana przy polu, którego dotyczy.
+filtra MUST powstawać ze schematu typu zdarzenia albo argumentów narzędzia. Wartość atrybutu
+tekstowego, który producent oznaczył jako mający kilka wartości wartych wyboru (kanał, autor, zespół),
+MUST być wybierana spośród wartości widzianych w zachowanych zdarzeniach; wartość jeszcze niewidziana
+wpisuje się wyłącznie przez wyraźną opcję „inna wartość”. Wpisywane są liczby, nazwa reguły i szablon.
+Odmowa zapisu MUST być pokazana przy polu, którego dotyczy.
 
 #### Scenario: Reguła na kanał YouTube
 
 - **WHEN** operator wybiera typ „film odczytany”
-- **THEN** kreator MUST pokazać listę kanałów z archiwum do wyboru i pole oceny jako liczbę, bez pola na nazwę kanału
+- **THEN** kreator MUST pokazać kanały widziane w filmach do wyboru i pole oceny jako liczbę
+- **AND** nazwa kanału spoza tej listy MUST wymagać wyboru „inna wartość”
+
+#### Scenario: Instrument spoza śledzonych
+
+- **WHEN** archiwum podaje listę śledzonych instrumentów
+- **THEN** argument `symbol` MUST być listą wyboru z tych instrumentów
 
 ### Requirement: Szablon ma podgląd
 

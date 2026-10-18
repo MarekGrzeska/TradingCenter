@@ -169,6 +169,9 @@ class EventTypeOut(BaseModel):
     schema_: dict[str, Any] = Field(alias="schema")
     announced_by: str | None
     last_announced_at: datetime
+    # The values a text attribute has had in the events kept — only for the attributes whose schema asks for it
+    # (`"x-seen-values": true`), which are the ones with a handful of values worth choosing between.
+    seen: dict[str, list[str]] = Field(default_factory=dict)
 
     model_config = {"populate_by_name": True}
 
@@ -190,6 +193,27 @@ class EventAccepted(BaseModel):
     duplicate: bool
     # How many rules went off because of it.
     fires: int
+
+
+class FireOut(BaseModel):
+    at: datetime
+    state: Literal["pending", "delivered", "refused", "abandoned", "throttled", "undeliverable"]
+    reason: str | None
+    text: str
+
+
+class CheckOut(BaseModel):
+    at: datetime
+    outcome: Literal["unavailable", "refused", "cooldown"]
+    reason: str
+
+
+class HistoryOut(BaseModel):
+    """What became of a rule lately, newest first: every time it went off and whether the message arrived, and every time it
+    could not look at its value or crossed its level inside the cool-down."""
+
+    fires: list[FireOut]
+    checks: list[CheckOut]
 
 
 class ClockOut(BaseModel):
@@ -232,5 +256,7 @@ class CatalogOut(BaseModel):
     # `False` when the process has no door to Telegram: rules can be written, and nothing is delivered.
     gateway: bool
     min_interval_seconds: int
+    # The pairs the archive follows, for the instrument field; empty where the archive cannot be asked.
+    symbols: list[str]
     # `False` without ALERTS_OPENAI_API_KEY: the sentence box says why it is switched off.
     drafting: bool

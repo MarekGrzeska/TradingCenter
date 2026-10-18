@@ -71,16 +71,17 @@ Przed przełączeniem producentów: reguły powstają z przypisań i reguł kana
 
 ## 10. Terminal
 
-- [ ] 10.1 `contract.alerts.generated.ts` i regeneracja kontraktów `telegram`, `youtube` (skill `contract-sync`)
-- [ ] 10.2 Zakładka Alerty: lista reguł ze stanem i wadami, historia odpaleń
-- [ ] 10.3 Kreator z wyborami z katalogu, pola filtra ze schematu, podgląd szablonu, odmowa przy polu
-- [ ] 10.4 Pole na zdanie: szkic otwiera kreator z wadami przy polach; stan „szkice niedostępne”
-- [ ] 10.5 Zakładka Telegram bez celów i przypisań, ostrzeżenie przy usuwaniu bota/adresata; zakładka YouTube bez reguły alertu, odesłanie do Alertów
-- [ ] 10.6 Testy wg reguły CRUD (szczęśliwa ścieżka, błąd, odmowa) dla reguł; jeden test szkicu
+- [x] 10.1 `contract.alerts.generated.ts` i regeneracja kontraktów `telegram`, `youtube` (skill `contract-sync`)
+- [x] 10.2 Zakładka Alerty: lista reguł ze stanem i wadami, historia odpaleń
+- [x] 10.3 Kreator z wyborami z katalogu, pola filtra ze schematu, podgląd szablonu, odmowa przy polu
+- [x] 10.4 Pole na zdanie: szkic otwiera kreator z wadami przy polach; stan „szkice niedostępne”
+- [x] 10.5 Zakładki Telegram i YouTube mówią, że przypisania i reguła alertu przestały decydować i odsyłają do Alertów (pełne usunięcie w grupie 11, razem z trasami)
+- [x] 10.6 Testy wg reguły CRUD (szczęśliwa ścieżka, błąd, odmowa) dla reguł; jeden test szkicu
 
 ## 11. Wdrożenie 2 i dokumentacja
 
 - [ ] 11.1 Migracje usuwające `purposes`, `assignments` (telegram) i `alert_rule` (youtube); usunięcie kodu celów i przypisań oraz ich tras, `POST /telegram/messages` z celem jest odmową
+- [ ] 11.1a Zakładka Telegram bez celów i przypisań, ostrzeżenie przy usuwaniu bota i adresata; zakładka YouTube bez reguły alertu; regeneracja kontraktów `telegram` i `youtube`
 - [ ] 11.2 `ALERT_MIN_IMPACT_SCORE` w `RETIRED_SETTINGS`
 - [ ] 11.3 `alerts/README.md`; aktualizacja README `telegram_gateway`, `modules/workbench/README.md`, tabeli w `CLAUDE.md` (dziewięć pakietów) i `docs/architecture.md`
 - [ ] 11.4 Po każdym wdrożeniu skill `deploy-watch`

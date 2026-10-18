@@ -134,3 +134,37 @@ async def test_a_new_schema_that_loses_an_attribute_flags_the_rule_that_used_it_
     assert "source.filter.0.attribute" in listed[0]["defects"][0]["message"]
     await inside.put("/event-types/youtube.film.read", json=TOOLS_TEXT)
     assert (await api.get("/rules")).json()[0]["defects"] == []
+
+
+async def test_the_history_of_a_rule_says_what_it_did_and_why_it_could_not(api, pool) -> None:
+    from datetime import UTC, datetime
+
+    from alerts import store
+
+    saved = (await api.post("/rules", json=body(rule()))).json()
+    now = datetime(2026, 10, 18, 12, 0, tzinfo=UTC)
+    async with pool.acquire() as conn:
+        await store.record_check(conn, saved["id"], outcome="unavailable", reason="market-data could not answer", now=now)
+        await store.record_fire(conn, saved["id"], edge_at=now, text="EURUSD is over 1.10", value=1.1, now=now)
+
+    shown = (await api.get(f"/rules/{saved['id']}/history")).json()
+
+    assert [(one["state"], one["text"]) for one in shown["fires"]] == [("pending", "EURUSD is over 1.10")]
+    assert [(one["outcome"], one["reason"]) for one in shown["checks"]] == [("unavailable", "market-data could not answer")]
+    assert (await api.get("/rules/999/history")).status_code == 404
+
+
+async def test_the_catalogue_offers_the_pairs_the_archive_follows_and_the_values_an_attribute_has_had(api, inside, tools) -> None:
+    schema = {"type": "object", "properties": {"channel": {"type": "string", "x-seen-values": True}, "title": {"type": "string"}}}
+    await inside.put("/event-types/youtube.film.read", json={"description": "a film", "schema": schema})
+    for key, channel in (("a", "Gold Talk"), ("b", "Gold Talk"), ("c", "Macro")):
+        await inside.post("/events", json={"type": "youtube.film.read", "source_key": key, "attributes": {"channel": channel, "title": key}, "text": "x"})
+
+    from .builders import tool
+
+    tools.add(tool("list_tracked_symbols", input_schema={"type": "object", "properties": {}}, output_schema={}))
+
+    offered = (await api.get("/catalog")).json()
+
+    assert offered["event_types"][0]["seen"] == {"channel": ["Gold Talk", "Macro"]}
+    assert offered["symbols"] == ["EURUSD", "XAUUSD"]

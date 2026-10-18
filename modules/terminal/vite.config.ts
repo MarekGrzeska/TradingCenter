@@ -112,6 +112,15 @@ export default defineConfig(({ mode }) => {
           configure: quietProxyErrors("workbench", workbench),
         },
 
+        // The alerts package, served by the workbench under /alerts when its database is configured — absent is a working
+        // configuration, so this prefix too may answer 404 for want of the package.
+        "/alerts-api": {
+          target: workbench,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/alerts-api/, "/alerts"),
+          configure: quietProxyErrors("workbench", workbench),
+        },
+
         // The door to Telegram, served by the workbench under /telegram. Reached with the workbench's token, but only the
         // terminal's and the operator's applications are admitted to it.
         "/telegram-api": {

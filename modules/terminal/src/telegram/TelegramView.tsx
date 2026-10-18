@@ -152,6 +152,10 @@ export function TelegramView({ api }: { api?: TelegramApi } = {}) {
         {ready && <span className="text-xs text-ink-faint">{headline(gate)}</span>}
       </header>
 
+      <p className="rounded bg-warning-soft px-3 py-1 text-sm text-warning">
+        Przypisania poniżej nie decydują już, kto o czym słyszy — od teraz robią to reguły w zakładce Alerty (te z przypisań
+        już tam są). Znikną stąd w następnej zmianie.
+      </p>
       {state.error !== null && <UnreachableNotice onRetry={state.reload}>{state.error}</UnreachableNotice>}
       {failure !== null && <p className="text-sm text-critical">{failure}</p>}
       {ready && nobodyHears.length > 0 && (

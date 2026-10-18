@@ -209,3 +209,11 @@ describe("YoutubeView", () => {
     expect(client.unfollowChannel).toHaveBeenCalledWith("UC1", expect.anything());
   });
 });
+
+describe("YoutubeView and the rules that replaced the alert rule", () => {
+  it("points to the Alerts tab, because the rule on a channel no longer changes anything", async () => {
+    render(<YoutubeView api={api([film()])} />);
+
+    expect(await screen.findByText(/ustawiają teraz reguły w zakładce Alerty/)).toBeInTheDocument();
+  });
+});

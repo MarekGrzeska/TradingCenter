@@ -226,15 +226,3 @@ def _unique(defects: list[Defect]) -> list[Defect]:
 
 def _first_line(error: Exception) -> str:
     return str(error).splitlines()[0] if str(error) else error.__class__.__name__
-
-
-def symbols_from(text: str) -> list[str]:
-    """The symbols out of what `list_tracked_symbols` answered, or none if it answered in a way this cannot read."""
-    try:
-        payload = json.loads(text)
-    except (TypeError, ValueError):
-        return []
-    rows = payload.get("result") if isinstance(payload, dict) else payload
-    if not isinstance(rows, list):
-        return []
-    return [str(row["symbol"]) for row in rows if isinstance(row, dict) and "symbol" in row]

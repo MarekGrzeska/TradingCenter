@@ -94,6 +94,20 @@ const SOURCES = [
 `,
   },
   {
+    name: "alerts",
+    moduleDir: resolve(terminal, "..", "workbench"),
+    pythonModule: "alerts.openapi",
+    output: join(terminal, "src", "data", "contract.alerts.generated.ts"),
+    banner: `/**
+ * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
+ *
+ * Printed from the alerts package's models by \`python -m alerts.openapi\` — a package of the workbench, served under
+ * /alerts when its database is configured. A rule is written and read in one shape, and a refusal names every field at
+ * fault in \`defects\`, so the form can put each reason beside its field.
+ */
+`,
+  },
+  {
     name: "telegram-gateway",
     moduleDir: resolve(terminal, "..", "workbench"),
     pythonModule: "telegram_gateway.openapi",
