@@ -8,7 +8,7 @@ and not otherwise — and enters `serving` from its own lifespan, because a moun
 from __future__ import annotations
 
 import logging
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 
 import httpx
 from fastapi import FastAPI
@@ -37,34 +37,41 @@ async def serving(
     *,
     tools: ToolSource | None = None,
     telegram: httpx.AsyncClient | None = None,
+    hold_clock: bool = False,
 ):
     """Everything this package needs running, on `app.state`, for as long as the block is open. `tools` is the process's
     tool surface and `telegram` the host's client over the door to Telegram; without either, rules can still be written —
-    against nothing the package can check, which the catalogue says."""
+    against nothing the package can check, which the catalogue says. With `hold_clock` no rule is looked at until the host
+    calls `app.state.clock.release()` — once the packages the rules read are serving."""
     app.state.settings = settings
     app.state.tools = tools
     app.state.gateway = None if telegram is None else Gateway(telegram)
     # `None` without a key: every route but drafting works, and the catalogue says drafting does not.
     app.state.drafter = drafter_module.build(settings)
 
-    async with make_pool(
-        settings.database_url,
-        user=settings.database_user,
-        client_id=settings.azure_client_id,
-        client_secret=settings.azure_client_secret,
-        tenant_id=settings.azure_tenant_id,
-        max_size=settings.database_pool_size,
-    ) as pool:
-        # One connection held for the whole of it: the advisory lock is session scoped, so handing the connection back
-        # to the pool in between would release it early.
-        async with pool.acquire() as conn:
-            async with advisory_lock(
-                conn, MIGRATION_LOCK_KEY, wait=settings.migration_lock_wait_seconds
-            ):
-                await migrate.run(MIGRATIONS)
-            # Still checked after migrating, for the pair a migration cannot fix: an upgrade that reported success
-            # without arriving, and an image older than the schema it found.
-            await schema_version.verify(conn, MIGRATIONS)
+    async with AsyncExitStack() as stack:
+        try:
+            pool = await stack.enter_async_context(
+                make_pool(
+                    settings.database_url,
+                    user=settings.database_user,
+                    client_id=settings.azure_client_id,
+                    client_secret=settings.azure_client_secret,
+                    tenant_id=settings.azure_tenant_id,
+                    max_size=settings.database_pool_size,
+                )
+            )
+            # One connection held for the whole of it: the advisory lock is session scoped, so handing the connection
+            # back to the pool in between would release it early.
+            async with pool.acquire() as conn:
+                async with advisory_lock(conn, MIGRATION_LOCK_KEY, wait=settings.migration_lock_wait_seconds):
+                    await migrate.run(MIGRATIONS)
+                # Still checked after migrating, for the pair a migration cannot fix: an upgrade that reported success
+                # without arriving, and an image older than the schema it found.
+                await schema_version.verify(conn, MIGRATIONS)
+        except Exception as err:
+            # Named, because the first thing in the log is otherwise a socket error that says nothing of whose database.
+            raise RuntimeError(f"the alerts database could not be opened or migrated: {type(err).__name__}: {err}") from err
 
         app.state.pool = pool
 
@@ -73,7 +80,7 @@ async def serving(
         heartbeats = Heartbeats(LoopHeartbeat("clock", expected_seconds=settings.tick_seconds))
         app.state.heartbeats = heartbeats
         liveness.register_metrics("alerts", heartbeats)
-        clock = Clock(pool, settings, tools, heartbeats["clock"], app.state.gateway)
+        clock = Clock(pool, settings, tools, heartbeats["clock"], app.state.gateway, held=hold_clock)
         app.state.clock = clock
         await clock.start()
         # The tool surface's session manager: a mounted application's lifespan is never run, so the task group has to be

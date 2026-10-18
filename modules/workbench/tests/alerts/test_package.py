@@ -91,3 +91,17 @@ def test_a_missing_model_key_is_a_supported_state_and_a_blank_one_is_a_missing_o
     assert Settings(database_url=url, _env_file=None).drafting is False
     assert Settings(database_url=url, openai_api_key="   ", _env_file=None).drafting is False
     assert Settings(database_url=url, openai_api_key="sk-test", _env_file=None).drafting is True
+
+
+async def test_a_configured_database_that_does_not_answer_stops_the_start_and_names_the_alerts_database(settings, app) -> None:
+    import pytest as _pytest
+
+    from alerts.app import serving
+
+    unreachable = settings.model_copy(update={"database_url": "postgresql://alerts@127.0.0.1:1/alerts"})
+
+    with _pytest.raises(Exception) as refused:
+        async with serving(app, unreachable):
+            pass
+
+    assert "alerts" in str(refused.value).lower()

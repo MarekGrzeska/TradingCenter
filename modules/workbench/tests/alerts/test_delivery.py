@@ -135,6 +135,17 @@ async def test_a_one_time_rule_is_switched_off_when_its_one_message_is_delivered
     assert (row["enabled"], row["disabled_reason"]) == (False, "fired")
 
 
+async def test_a_one_time_rule_switched_on_again_may_tell_again(deliverer, pool, db) -> None:
+    rule_id, _ = await fire_of(pool, rule(condition(), mode="once"))
+    await deliverer.run(T0)
+
+    async with pool.acquire() as conn:
+        await store.set_enabled(conn, rule_id, True, now=T0)
+
+    row = await db.fetchrow("SELECT enabled, last_fired_at FROM rules WHERE id = $1", rule_id)
+    assert (row["enabled"], row["last_fired_at"]) == (True, None)
+
+
 async def test_a_one_time_rule_whose_message_never_arrives_may_fire_again(deliverer, pool, door, db) -> None:
     rule_id, _ = await fire_of(pool, rule(condition(), mode="once"))
     door.answers = [Sent(ok=False, reason="no such recipient")]

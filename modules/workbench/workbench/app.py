@@ -159,7 +159,9 @@ async def lifespan(app: FastAPI):
             else nullcontext(None)
         ) as alerts_telegram,
         (
-            alerts.app.serving(alerts_app, alerts_settings, tools=alert_tools, telegram=alerts_telegram)
+            alerts.app.serving(
+                alerts_app, alerts_settings, tools=alert_tools, telegram=alerts_telegram, hold_clock=True
+            )
             if alerts_app is not None and alerts_settings is not None
             else nullcontext()
         ),
@@ -179,6 +181,10 @@ async def lifespan(app: FastAPI):
         ),
         _alerts_client("the teams module") as teams_alerts,
     ):
+        # Every package is serving: what the alerts' clock reads can answer now.
+        if alerts_app is not None and alerts_settings is not None:
+            alerts_app.state.clock.release()
+
         # Built here rather than beside the conversation's, because one of its sources is served by this process and
         # reads the teams database directly: announcing needs no pool, calling does, and this is the first point with one.
         teams_tool_servers = TeamsToolServerRegistry.from_settings(

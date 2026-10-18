@@ -168,3 +168,14 @@ async def test_the_catalogue_offers_the_pairs_the_archive_follows_and_the_values
 
     assert offered["event_types"][0]["seen"] == {"channel": ["Gold Talk", "Macro"]}
     assert offered["symbols"] == ["EURUSD", "XAUUSD"]
+
+
+async def test_a_rule_that_names_a_value_and_an_event_at_once_is_refused_for_both(api) -> None:
+    mixed = body(rule(condition()))
+    mixed["source"]["event_type"] = "youtube.film.read"
+
+    refused = await api.post("/rules", json=mixed)
+
+    assert refused.status_code == 422
+    assert "event_type" in refused.text and "condition" in refused.text
+    assert (await api.get("/rules")).json() == []

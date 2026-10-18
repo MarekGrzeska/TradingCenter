@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -25,6 +26,7 @@ log = logging.getLogger(__name__)
 # Telegram's own ceiling is 4096 and the door refuses rather than truncating, so the message is cut here — where the cut
 # can be marked as one — and a little under.
 MESSAGE_CHARS = 3500
+SULK_SECONDS = 600.0
 SUMMARY_CHARS = 900
 MAX_INSTRUMENTS = 6
 # A title, a channel name and an instrument name come from strangers and carry no length of their own.
@@ -168,6 +170,9 @@ class Alerts:
         self._announced = False
         # What the alerts package last said: it did not take the films. `/state` reports it.
         self.failing = False
+        # A film the alerts package refused is passed over for a while, so a few refused ones cannot hold up every film
+        # behind them.
+        self._sulking: dict[str, float] = {}
 
     @property
     def telling(self) -> bool:
@@ -191,7 +196,10 @@ class Alerts:
                 return 0
         async with self._pool.acquire() as conn:
             await store.expire_unannounced(conn, before=now - self._window)
-            waiting = await store.analysed_for_alert(conn, limit=self._limit)
+            clock = time.monotonic()
+            self._sulking = {film: until for film, until in self._sulking.items() if until > clock}
+            fetched = await store.analysed_for_alert(conn, limit=self._limit + len(self._sulking))
+        waiting = [item for item in fetched if item.video.video_id not in self._sulking][: self._limit]
 
         handed = 0
         failed = False
@@ -210,6 +218,8 @@ class Alerts:
                 # refusing everything is a silence the operator has to be able to find.
                 log.warning("could not hand over %s: %s", item.video.video_id, err)
                 failed = True
+                if isinstance(err, Rejected):
+                    self._sulking[item.video.video_id] = clock + SULK_SECONDS
                 continue
             async with self._pool.acquire() as conn:
                 await store.set_outcome(conn, item.video.video_id, "notified", at=datetime.now(UTC))

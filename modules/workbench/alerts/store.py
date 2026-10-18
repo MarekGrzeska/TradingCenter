@@ -103,7 +103,8 @@ async def replace_rule(conn: Conn, rule_id: int, rule: RuleIn, *, now: datetime)
             tool_name = $10, arguments = $11::jsonb, field_path = $12, comparison = $13, threshold = $14,
             poll_interval_seconds = $15, event_type = $16, filter = $17::jsonb,
             defect = NULL, next_check_at = $18, last_result = NULL, last_known_result = NULL,
-            throttle_notified_at = NULL, updated_at = now()
+            throttle_notified_at = NULL, updated_at = now(),
+            last_fired_at = CASE WHEN $7 = 'once' THEN NULL ELSE last_fired_at END
          WHERE id = $1
         RETURNING {RULE_COLUMNS}
         """,
@@ -131,7 +132,8 @@ async def replace_rule(conn: Conn, rule_id: int, rule: RuleIn, *, now: datetime)
 async def set_enabled(
     conn: Conn, rule_id: int, enabled: bool, *, now: datetime
 ) -> asyncpg.Record | None:
-    """Switched on, a value rule is looked at again at once and starts from no memory of its last result; switched off,
+    """Switched on, a value rule is looked at again at once and starts from no memory of its last result (a one-time rule
+    also from its 'already told', or it would never tell again); switched off,
     it says by whom, so a rule that stopped on its own and one that was stopped read differently."""
     return await conn.fetchrow(
         f"""
@@ -141,6 +143,7 @@ async def set_enabled(
             next_check_at = CASE WHEN $2 AND kind = 'condition' THEN $3::timestamptz ELSE NULL END,
             last_result = CASE WHEN $2 THEN NULL ELSE last_result END,
             last_known_result = CASE WHEN $2 THEN NULL ELSE last_known_result END,
+            last_fired_at = CASE WHEN $2 AND mode = 'once' THEN NULL ELSE last_fired_at END,
             updated_at = now()
          WHERE id = $1
         RETURNING {RULE_COLUMNS}
@@ -518,6 +521,15 @@ async def standing(conn: Conn) -> asyncpg.Record:
 
 async def destinations_in_use(conn: Conn) -> set[str]:
     return {row["destination"] for row in await conn.fetch("SELECT DISTINCT destination FROM rules")}
+
+
+async def rules_with_defects(conn: Conn, missing: set[str]) -> int:
+    """The rules with something wrong: a schema that moved under them, or a recipient the door no longer knows. Counted as
+    rules, once each, whatever the number of things wrong with one."""
+    counted = await conn.fetchval(
+        "SELECT count(*) FROM rules WHERE defect IS NOT NULL OR destination = ANY($1::text[])", sorted(missing)
+    )
+    return int(counted or 0)
 
 
 async def seen_values(conn: Conn, event_type: str, attribute: str, limit: int = 50) -> list[str]:

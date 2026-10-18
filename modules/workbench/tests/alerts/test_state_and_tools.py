@@ -59,6 +59,18 @@ async def test_a_recipient_who_is_gone_and_a_schema_that_moved_both_count_as_rul
     assert (await api.get("/state")).json()["rules_with_defects"] == 1
 
 
+async def test_a_rule_is_one_defect_however_many_things_are_wrong_and_many_rules_naming_one_gone_recipient_are_many(
+    api, pool, door, db
+) -> None:
+    for _ in range(3):
+        await saved(pool, rule(destination="gone"))
+    await saved(pool)
+    await db.execute("UPDATE rules SET defect = 'the schema moved' WHERE id = (SELECT min(id) FROM rules)")
+    door.names = ["phone"]
+
+    assert (await api.get("/state")).json()["rules_with_defects"] == 3
+
+
 async def test_fires_waiting_to_be_retried_are_counted(api, pool, db) -> None:
     rule_id = await saved(pool)
     async with pool.acquire() as conn:
@@ -114,3 +126,14 @@ async def test_an_event_rule_is_described_by_its_filter(server, pool, db) -> Non
     row = json.loads((await ConversationLocalTools("alerts", server).call("alert_rules", {})).text)["rules"][0]
 
     assert row["watches"] == "every youtube.film.read"
+
+
+async def test_a_clock_that_stopped_says_how_long_ago_and_is_told_apart_from_a_rule_that_never_fired(api, beating) -> None:
+    from datetime import timedelta
+
+    beating.beat(datetime.now(UTC) - timedelta(seconds=60))
+
+    clock = (await api.get("/state")).json()["clock"]
+
+    assert clock["ran"] is True
+    assert clock["age_seconds"] >= 60 > 3 * clock["expected_seconds"]

@@ -78,6 +78,9 @@ export function RuleDialog({
 }) {
   const [form, setForm] = useState<RuleForm>(start.form);
   const [defects, setDefects] = useState<Defect[]>(start.defects);
+  // A draft arrives with what is wrong with it; saving it as it stands would only be refused, so it waits for a change.
+  const [asDrafted] = useState(() => JSON.stringify(start.form));
+  const stillAsDrafted = start.defects.length > 0 && JSON.stringify(form) === asDrafted;
   const problem = formProblem(form);
   const change = (patch: Partial<RuleForm>) => setForm((current) => ({ ...current, ...patch }));
   const about = (field: string) => defectsFor(defects, field);
@@ -104,7 +107,7 @@ export function RuleDialog({
       title={editing ? "Edytuj regułę" : "Nowa reguła"}
       confirmLabel="Zapisz"
       busyLabel="Zapisuję…"
-      confirmDisabled={problem !== null}
+      confirmDisabled={problem !== null || stillAsDrafted}
       fallbackError="nie udało się zapisać reguły"
       size="wide"
       onConfirm={save}

@@ -192,8 +192,11 @@ class TestAMessageStillAddressedByPurpose:
         assert app.state.telegram.sent == []
 
 
-async def test_the_door_keeps_no_purposes_and_no_assignments_any_more(db) -> None:
-    """Dropped by migration 0005: who is told what is decided by rules in the alerts package, which name a destination."""
-    tables = {row["tablename"] for row in await db.fetch("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")}
+async def test_a_destination_goes_with_the_assignments_nothing_reads_any_more(db) -> None:
+    """The old tables stay until the conversion is known to have run; until then they must not stop a destination going."""
+    destination = await builders.destination(db)
+    await db.execute("INSERT INTO assignments (key, destination_id) VALUES ('youtube.film', $1)", destination.id)
 
-    assert not tables & {"purposes", "assignments"}
+    await db.execute("DELETE FROM destinations WHERE id = $1", destination.id)
+
+    assert await db.fetchval("SELECT count(*) FROM assignments") == 0

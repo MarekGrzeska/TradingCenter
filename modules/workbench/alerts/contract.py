@@ -7,11 +7,26 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 Comparison = Literal["gt", "gte", "lt", "lte", "eq"]
 FilterOp = Literal["eq", "ne", "in", "gt", "gte", "lt", "lte", "contains"]
 Mode = Literal["once", "repeat"]
+
+_VALUE_FIELDS = ("tool_name", "arguments", "field_path", "comparison", "threshold", "poll_interval_seconds")
+_EVENT_FIELDS = ("event_type", "filter")
+
+
+def _one_source(data: Any, kind: str, other: tuple[str, ...]) -> Any:
+    """A rule watches a value or an event, never both: a body that carries the other kind's fields is refused naming both,
+    instead of the extra half being dropped and the rule saved as something the operator did not mean."""
+    if isinstance(data, dict):
+        stray = [name for name in other if name in data]
+        if stray:
+            raise ValueError(
+                f"a rule has one source: this one is a {kind} source, but it also carries {', '.join(stray)} of the other kind"
+            )
+    return data
 
 
 class Defect(BaseModel):
@@ -48,6 +63,11 @@ class ConditionSource(BaseModel):
     threshold: str
     poll_interval_seconds: int = 60
 
+    @model_validator(mode="before")
+    @classmethod
+    def _not_also_an_event(cls, data: Any) -> Any:
+        return _one_source(data, "condition (a value)", _EVENT_FIELDS)
+
     @field_validator("tool_name", "field_path")
     @classmethod
     def _not_blank(cls, value: str) -> str:
@@ -70,6 +90,11 @@ class EventSource(BaseModel):
     kind: Literal["event"] = "event"
     event_type: str
     filter: list[FilterTerm] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _not_also_a_value(cls, data: Any) -> Any:
+        return _one_source(data, "event", _VALUE_FIELDS)
 
     @field_validator("event_type")
     @classmethod

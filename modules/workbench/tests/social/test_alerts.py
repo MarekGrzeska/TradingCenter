@@ -129,6 +129,24 @@ async def test_a_failed_hand_over_leaves_no_marker_and_the_next_pass_retries(
     assert len(working.sent) == 1
 
 
+async def test_a_post_the_alerts_package_refused_does_not_hold_up_the_posts_behind_it(pool) -> None:
+    await _post(pool, "first", score=9)
+    await _post(pool, "second", score=10)
+
+    class RefusesTheFirst(RecordingPublisher):
+        async def publish(self, *, source_key: str, attributes: dict, text: str) -> None:
+            await super().publish(source_key=source_key, attributes=attributes, text=text)
+            if len(self.sent) == 1:
+                raise Rejected("does not fit")
+
+    publisher = RefusesTheFirst()
+    handing = Alerts(pool, publisher, batch_limit=1)  # type: ignore[arg-type]
+
+    assert await handing.run(SINCE) == 0
+    assert await handing.run(SINCE) == 1
+    assert len({key for key, _, _ in publisher.sent}) == 2
+
+
 async def test_one_post_failing_does_not_stop_the_rest(pool) -> None:
     await _post(pool, "first", score=9)
     await _post(pool, "second", score=10)

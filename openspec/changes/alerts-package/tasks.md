@@ -80,8 +80,9 @@ Przed przełączeniem producentów: reguły powstają z przypisań i reguł kana
 
 ## 11. Wdrożenie 2 i dokumentacja
 
-- [x] 11.1 Migracje usuwające `purposes`, `assignments` (telegram) i `alert_rule` (youtube); usunięcie kodu celów i przypisań oraz ich tras, `POST /telegram/messages` z celem jest odmową
+- [x] 11.1 Usunięcie kodu celów i przypisań oraz ich tras, `POST /telegram/messages` z celem jest odmową; klucz `assignments` kaskaduje z adresatem (tabele i kolumny `alert_rule` zostają do 11.5)
 - [x] 11.1a Zakładka Telegram bez celów i przypisań, ostrzeżenie przy usuwaniu bota i adresata; zakładka YouTube bez reguły alertu; regeneracja kontraktów `telegram` i `youtube`
 - [x] 11.2 `ALERT_MIN_IMPACT_SCORE` w `RETIRED_SETTINGS`
 - [x] 11.3 `alerts/README.md`; aktualizacja README `telegram_gateway`, `modules/workbench/README.md`, tabeli w `CLAUDE.md` (dziewięć pakietów) i `docs/architecture.md`
 - [ ] 11.4 Po każdym wdrożeniu skill `deploy-watch`
+- [ ] 11.5 Osobny PR (`alerts/12-drop-old-data`), scalany po wdrożeniu #318 i sprawdzeniu, że konwersja zadziałała: migracje usuwające `purposes`, `assignments` (telegram), `alert_rule` (youtube) i `migrations_done` (alerts)
