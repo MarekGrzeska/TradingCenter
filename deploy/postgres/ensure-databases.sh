@@ -30,14 +30,24 @@ ensure() {
   echo "database $name: ready"
 }
 
+# A database whose module is gone: dropped with its role, so no deploy is left holding data nothing reads. FORCE ends
+# connections a stale container may still hold; the last nightly dump is the way back.
+retire() {
+  name="$1"
+  psql_q -d postgres -c "DROP DATABASE IF EXISTS $name WITH (FORCE)"
+  psql_q -d postgres -c "DROP ROLE IF EXISTS $name"
+  echo "database $name: retired"
+}
+
 ensure agent        "${AGENT_DB_PASSWORD:-}"
 ensure teams        "${TEAMS_DB_PASSWORD:-}"
 ensure market_data  "${MARKET_DB_PASSWORD:-}"
 ensure polymarket   "${POLYMARKET_DB_PASSWORD:-}"
 ensure social       "${SOCIAL_DB_PASSWORD:-}"
-ensure strategy     "${STRATEGY_DB_PASSWORD:-}"
 ensure telegram     "${TELEGRAM_DB_PASSWORD:-}"
 ensure youtube      "${YOUTUBE_DB_PASSWORD:-}"
+
+retire strategy
 
 # Where the operator asks what loads the server (`prod-health`): the statistics are cluster-wide, the view is per database.
 psql_q -d postgres -c "CREATE EXTENSION IF NOT EXISTS pg_stat_statements"

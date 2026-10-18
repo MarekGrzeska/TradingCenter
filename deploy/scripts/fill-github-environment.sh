@@ -70,7 +70,7 @@ gh api -X PUT "repos/$REPO/environments/$ENVIRONMENT" >/dev/null && echo "enviro
 
 # --- generated, once -----------------------------------------------------------------------------------------------------
 for name in POSTGRES_PASSWORD AGENT_DB_PASSWORD TEAMS_DB_PASSWORD MARKET_DB_PASSWORD POLYMARKET_DB_PASSWORD \
-            SOCIAL_DB_PASSWORD STRATEGY_DB_PASSWORD TELEGRAM_DB_PASSWORD YOUTUBE_DB_PASSWORD GATEWAY_API_KEY; do
+            SOCIAL_DB_PASSWORD TELEGRAM_DB_PASSWORD YOUTUBE_DB_PASSWORD GATEWAY_API_KEY; do
   if [ "$ROTATE" = 1 ] || ! have_secret "$name"; then
     random_secret | set_secret "$name"
   else
