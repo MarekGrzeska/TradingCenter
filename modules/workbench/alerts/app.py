@@ -17,12 +17,13 @@ from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 from tc_runtime.liveness import Heartbeats, LoopHeartbeat
 
+from . import drafter as drafter_module
 from .caller_access import RECORD, CallerAccess
 from .catalog import ToolSource
 from .clock import Clock
 from .config import Settings
 from .gateway import Gateway
-from .routers import catalog, events, meta, rules
+from .routers import catalog, drafts, events, meta, rules
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
 log = logging.getLogger(__name__)
@@ -42,6 +43,8 @@ async def serving(
     app.state.settings = settings
     app.state.tools = tools
     app.state.gateway = None if telegram is None else Gateway(telegram)
+    # `None` without a key: every route but drafting works, and the catalogue says drafting does not.
+    app.state.drafter = drafter_module.build(settings)
 
     async with make_pool(
         settings.database_url,
@@ -98,6 +101,7 @@ def create_app() -> FastAPI:
     app.include_router(catalog.router)
     app.include_router(rules.router)
     app.include_router(events.router)
+    app.include_router(drafts.router)
 
     # In front of the whole application: nothing decides who may call after routing has begun.
     app.add_middleware(CallerAccess, state=app.state, record=RECORD)

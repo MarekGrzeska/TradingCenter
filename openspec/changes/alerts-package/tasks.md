@@ -41,9 +41,9 @@
 
 ## 6. Szkic ze zdania
 
-- [ ] 6.1 `POST /alerts/drafts`: katalog przycięty do promptu, jedno wywołanie ze schematem `RuleIn` + `defects`, walidacja zapisu na wyniku
-- [ ] 6.2 Zapis zużycia, dobowy sufit, brak klucza jako odmowa nazywająca ustawienie
-- [ ] 6.3 Testy na zapisanych odpowiedziach modelu: szkic poprawny, szkic z nieśledzonym instrumentem, domyślny adresat nazwany
+- [x] 6.1 `POST /alerts/drafts`: katalog przycięty do promptu, jedno wywołanie ze schematem `RuleIn` + `defects`, walidacja zapisu na wyniku
+- [x] 6.2 Zapis zużycia, dobowy sufit, brak klucza jako odmowa nazywająca ustawienie
+- [x] 6.3 Testy na zapisanych odpowiedziach modelu: szkic poprawny, szkic z nieśledzonym instrumentem, domyślny adresat nazwany
 
 ## 7. Trasa stanu i narzędzia
 

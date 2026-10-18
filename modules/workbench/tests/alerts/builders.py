@@ -8,6 +8,7 @@ from typing import Any
 
 from alerts.catalog import CatalogTool, ToolOutcome
 from alerts.contract import ConditionSource, EventSource, FilterTerm, RuleIn
+from alerts.drafts import Answer
 from alerts.gateway import Recipient, Sent
 from alerts.validation import Known
 
@@ -135,3 +136,42 @@ class FakeGateway:
     async def send(self, destination: str, text: str) -> Sent:
         self.sent.append((destination, text))
         return self.answers.pop(0) if self.answers else Sent(ok=True)
+
+
+class FakeDrafter:
+    """The model: what it is asked, and what it answers, in the order the test queued it."""
+
+    def __init__(self) -> None:
+        self.asked: list[tuple[str, str]] = []
+        self.answers: list[Answer | Exception] = []
+
+    async def draft(self, system: str, sentence: str) -> Answer:
+        self.asked.append((system, sentence))
+        answer = self.answers.pop(0)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+
+def said(**overrides: Any) -> Answer:
+    """What the model returns for the price sentence, with whatever a test wants different."""
+    payload: dict[str, Any] = {
+        "understood": "Powiadom, gdy EURUSD przekroczy 1,10 w górę.",
+        "name": "EURUSD powyżej 1,10",
+        "kind": "condition",
+        "tool_name": "get_last_price",
+        "arguments_json": json.dumps({"symbol": "EURUSD"}),
+        "field_path": "close",
+        "comparison": "gt",
+        "threshold": "1.10",
+        "poll_interval_seconds": 60,
+        "event_type": None,
+        "filter": [],
+        "destination": "phone",
+        "template": None,
+        "cooldown_seconds": 3600,
+        "mode": "repeat",
+        "problems": [],
+    }
+    return Answer(json.dumps({**payload, **overrides}), "test-model", 1200, 300)
+

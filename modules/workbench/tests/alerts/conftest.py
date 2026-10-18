@@ -103,6 +103,13 @@ def tools():
 
 
 @pytest.fixture
+def drafter():
+    from .builders import FakeDrafter
+
+    return FakeDrafter()
+
+
+@pytest.fixture
 def door():
     from .builders import FakeGateway
 
@@ -110,7 +117,7 @@ def door():
 
 
 @pytest.fixture
-async def api(app, pool, settings, tools, door):
+async def api(app, pool, settings, tools, door, drafter):
     """The application as the terminal reaches it — no identity required, as locally — over the migrated database."""
     import httpx
 
@@ -118,6 +125,7 @@ async def api(app, pool, settings, tools, door):
     app.state.settings = settings
     app.state.tools = tools
     app.state.gateway = door
+    app.state.drafter = drafter
     app.state.clock = _idle_clock(pool, settings, tools)
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://tests") as client:
@@ -125,7 +133,7 @@ async def api(app, pool, settings, tools, door):
 
 
 @pytest.fixture
-async def inside(app, pool, settings, tools, door):
+async def inside(app, pool, settings, tools, door, drafter):
     """The same application as another package of the process reaches it."""
     import httpx
     from tc_runtime.caller_access import in_process
@@ -134,6 +142,7 @@ async def inside(app, pool, settings, tools, door):
     app.state.settings = settings
     app.state.tools = tools
     app.state.gateway = door
+    app.state.drafter = drafter
     app.state.clock = _idle_clock(pool, settings, tools)
     transport = httpx.ASGITransport(app=in_process(app, "the youtube archive"))
     async with httpx.AsyncClient(transport=transport, base_url="http://tests") as client:

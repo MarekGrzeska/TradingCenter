@@ -104,6 +104,20 @@ class RuleIn(BaseModel):
         return stripped
 
 
+class DraftIn(BaseModel):
+    sentence: str = Field(min_length=3, max_length=1000)
+
+
+class DraftOut(BaseModel):
+    """A proposal. `rule` is what the form is filled with, `defects` is everything wrong with it as it stands — the
+    sentence's own problems and the same refusals a saved rule would meet — and nothing is stored."""
+
+    understood: str
+    rule: RuleIn | None
+    defects: list[Defect]
+    notes: list[str]
+
+
 class RulePatch(BaseModel):
     enabled: bool
 
@@ -193,3 +207,5 @@ class CatalogOut(BaseModel):
     # `False` when the process has no door to Telegram: rules can be written, and nothing is delivered.
     gateway: bool
     min_interval_seconds: int
+    # `False` without ALERTS_OPENAI_API_KEY: the sentence box says why it is switched off.
+    drafting: bool
