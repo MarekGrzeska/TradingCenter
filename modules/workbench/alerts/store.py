@@ -286,3 +286,70 @@ async def record_fire(
     if fire_id is not None:
         await conn.execute("UPDATE rules SET last_fired_at = $2 WHERE id = $1", rule_id, now)
     return fire_id
+
+
+# --- events ---------------------------------------------------------------------------------------------------------
+
+
+async def insert_event(
+    conn: Conn, *, type_: str, source_key: str, attributes: dict[str, Any], text: str, now: datetime
+) -> tuple[int, bool]:
+    """`(id, duplicate)`. An occurrence already published is not stored again and is not an error: a producer that did not
+    hear the first answer asks again, and the second answer must be the same yes."""
+    created = await conn.fetchval(
+        """
+        INSERT INTO events (type, source_key, attributes, text, occurred_at)
+        VALUES ($1, $2, $3::jsonb, $4, $5)
+        ON CONFLICT (type, source_key) DO NOTHING
+        RETURNING id
+        """,
+        type_,
+        source_key,
+        json.dumps(attributes),
+        text,
+        now,
+    )
+    if created is not None:
+        return created, False
+    existing = await conn.fetchval("SELECT id FROM events WHERE type = $1 AND source_key = $2", type_, source_key)
+    # Absent only if retention removed the row between the two statements, thirty days after it was published.
+    assert existing is not None
+    return existing, True
+
+
+async def event_rules(conn: Conn, event_type: str) -> list[asyncpg.Record]:
+    """The rules that could go off for an event of this type — switched on, and of the event kind."""
+    return list(
+        await conn.fetch(
+            f"SELECT {RULE_COLUMNS} FROM rules WHERE enabled AND kind = 'event' AND event_type = $1 ORDER BY id",
+            event_type,
+        )
+    )
+
+
+async def record_event_fire(
+    conn: Conn, rule_id: int, *, event_id: int, text: str, now: datetime
+) -> int | None:
+    """The rule went off for this event. One per rule and event, whoever asks twice."""
+    fire_id = await conn.fetchval(
+        """
+        INSERT INTO fires (rule_id, event_id, state, text, next_attempt_at, created_at)
+        VALUES ($1, $2, 'pending', $3, $4, $4)
+        ON CONFLICT (rule_id, event_id) DO NOTHING
+        RETURNING id
+        """,
+        rule_id,
+        event_id,
+        text,
+        now,
+    )
+    if fire_id is not None:
+        await conn.execute("UPDATE rules SET last_fired_at = $2 WHERE id = $1", rule_id, now)
+    return fire_id
+
+
+async def delete_events_before(conn: Conn, before: datetime) -> int:
+    """Events past their retention. The fires they caused are kept: the text that was sent is the record."""
+    result = await conn.execute("DELETE FROM events WHERE occurred_at < $1", before)
+    return int(result.rsplit(" ", 1)[-1])
+

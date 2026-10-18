@@ -159,6 +159,25 @@ class EventTypeOut(BaseModel):
     model_config = {"populate_by_name": True}
 
 
+class EventIn(BaseModel):
+    """Something that happened, as the package it happened in reports it. `source_key` is the producer's own name for this
+    occurrence (a film's id, a post's id): the same key published twice is one event, so a producer may retry until it hears yes."""
+
+    type: str = Field(min_length=1)
+    source_key: str = Field(min_length=1, max_length=200)
+    attributes: dict[str, Any] = Field(default_factory=dict)
+    # The message the producer would send on its own, ready — what a rule that writes no template of its own says.
+    text: str = Field(min_length=1, max_length=4000)
+
+
+class EventAccepted(BaseModel):
+    id: int
+    # `True` when this occurrence had been published before; nothing new was decided about it.
+    duplicate: bool
+    # How many rules went off because of it.
+    fires: int
+
+
 class DestinationOut(BaseModel):
     name: str
     bot: str
