@@ -58,6 +58,7 @@ describe("resolveEndpoints", () => {
         VITE_SOCIAL_HTTP: "/social-api",
         VITE_YOUTUBE_HTTP: "/youtube-api",
         VITE_TELEGRAM_HTTP: "/telegram-api",
+        VITE_ALERTS_HTTP: "/alerts-api",
       },
       devLoc,
     );
@@ -70,6 +71,7 @@ describe("resolveEndpoints", () => {
       socialHttp: "/social-api",
       youtubeHttp: "/youtube-api",
       telegramHttp: "/telegram-api",
+      alertsHttp: "/alerts-api",
     });
   });
 
@@ -84,6 +86,7 @@ describe("resolveEndpoints", () => {
         VITE_SOCIAL_HTTP: "https://social.example.com",
         VITE_YOUTUBE_HTTP: "https://youtube.example.com",
         VITE_TELEGRAM_HTTP: "https://telegram.example.com",
+        VITE_ALERTS_HTTP: "https://alerts.example.com",
       },
       { protocol: "https:", host: "terminal.example.com" },
     );
@@ -96,6 +99,7 @@ describe("resolveEndpoints", () => {
       socialHttp: "https://social.example.com",
       youtubeHttp: "https://youtube.example.com",
       telegramHttp: "https://telegram.example.com",
+      alertsHttp: "https://alerts.example.com",
     });
   });
 
@@ -109,6 +113,7 @@ describe("resolveEndpoints", () => {
       socialHttp: "/social-api",
       youtubeHttp: "/youtube-api",
       telegramHttp: "/telegram-api",
+      alertsHttp: "/alerts-api",
     });
   });
 
@@ -124,6 +129,7 @@ describe("resolveEndpoints", () => {
       socialHttp,
       youtubeHttp,
       telegramHttp,
+      alertsHttp,
     } = resolveEndpoints({}, devLoc);
     const routes = new Set(TABS.map((tab) => tab.path));
 
@@ -136,6 +142,7 @@ describe("resolveEndpoints", () => {
       socialHttp,
       youtubeHttp,
       telegramHttp,
+      alertsHttp,
     ]
       .filter((base) => base.startsWith("/"))
       .map((base) => base.split("/")[1]);
@@ -166,6 +173,7 @@ describe("resolveEntra", () => {
         social: null,
         youtube: null,
         telegram: null,
+        alerts: null,
       },
     });
   });
@@ -180,6 +188,7 @@ describe("resolveEntra", () => {
         VITE_ENTRA_SCOPE_SOCIAL: "api://social/access_as_user",
         VITE_ENTRA_SCOPE_YOUTUBE: "api://youtube/access_as_user",
         VITE_ENTRA_SCOPE_TELEGRAM: "api://telegram/access_as_user",
+        VITE_ENTRA_SCOPE_ALERTS: "api://alerts/access_as_user",
       })?.scopes,
     ).toEqual({
       archive: "api://market-data/access_as_user",
@@ -189,6 +198,7 @@ describe("resolveEntra", () => {
       social: "api://social/access_as_user",
       youtube: "api://youtube/access_as_user",
       telegram: "api://telegram/access_as_user",
+      alerts: "api://alerts/access_as_user",
     });
   });
 

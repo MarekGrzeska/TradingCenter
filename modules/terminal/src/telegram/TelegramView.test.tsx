@@ -386,3 +386,12 @@ describe("TelegramView", () => {
     expect(within(done.closest("div") as HTMLElement).getByText("phone")).toBeInTheDocument();
   });
 });
+
+describe("TelegramView and the rules that replaced the assignments", () => {
+  it("says the assignments no longer decide who is told, and where that is decided now", async () => {
+    render(<TelegramView api={api()} />);
+
+    expect(await screen.findByText(/nie decydują już, kto o czym słyszy/)).toBeInTheDocument();
+    expect(screen.getByText(/zakładce Alerty/)).toBeInTheDocument();
+  });
+});

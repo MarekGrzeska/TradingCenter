@@ -35,9 +35,9 @@ EVENT_DESCRIPTION = "A film the model read, with its impact score and the instru
 EVENT_SCHEMA = {
     "type": "object",
     "properties": {
-        "channel": {"type": "string"},
+        "channel": {"type": "string", "x-seen-values": True},
         "channel_slug": {"type": "string"},
-        "topic": {"type": "string"},
+        "topic": {"type": "string", "x-seen-values": True},
         "title": {"type": "string"},
         "video_id": {"type": "string"},
         "impact_score": {"type": "integer"},

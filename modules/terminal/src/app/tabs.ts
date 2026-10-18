@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { AccountsView } from "../accounts/AccountsView";
+import { AlertsView } from "../alerts/AlertsView";
 import { AgentSettingsView } from "../agent/settings/AgentSettingsView";
 import { CollectionHistoryView } from "../history/CollectionHistoryView";
 import { GridView } from "../grid/GridView";
@@ -36,6 +37,7 @@ export const TABS: TabDefinition[] = [
   { id: "social", label: "Social", path: "social", Component: SocialView },
   { id: "news", label: "News", path: "news", Component: NewsView },
   { id: "youtube", label: "YouTube", path: "youtube", Component: YoutubeView },
+  { id: "alerts", label: "Alerts", path: "alerts", Component: AlertsView },
   { id: "telegram", label: "Telegram", path: "telegram", Component: TelegramView },
   { id: "accounts", label: "Accounts", path: "accounts", Component: AccountsView },
   {

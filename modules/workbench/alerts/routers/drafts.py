@@ -16,11 +16,6 @@ log = logging.getLogger(__name__)
 
 router = APIRouter(tags=["drafts"])
 
-# The one tool read for the model's prompt: which pairs the archive follows. Optional — a process without it drafts without
-# checking instruments, and the draft says nothing about it either way.
-SYMBOLS_TOOL = "list_tracked_symbols"
-
-
 @router.post(
     "/drafts",
     response_model=DraftOut,
@@ -51,7 +46,7 @@ async def draft(request: Request, body: DraftIn) -> DraftOut:
             raise deps.refusal(status.HTTP_503_SERVICE_UNAVAILABLE, str(err)) from err
 
     tools = await known.tools_of(state.tools)
-    symbols = await _symbols(state)
+    symbols = await known.symbols(state)
     prompt = drafts.system_prompt(everything, tools, recipients, symbols)
     try:
         answer = await state.drafter.draft(prompt, body.sentence)
@@ -68,13 +63,3 @@ async def draft(request: Request, body: DraftIn) -> DraftOut:
         return drafts.convert(answer, recipients=recipients, known=everything, symbols=symbols)
     except drafts.Unusable as err:
         raise deps.refusal(status.HTTP_502_BAD_GATEWAY, str(err)) from err
-
-
-async def _symbols(state) -> list[str]:
-    if state.tools is None:
-        return []
-    offered = {tool.name for tool in await state.tools.tools()}
-    if SYMBOLS_TOOL not in offered:
-        return []
-    outcome = await state.tools.call(SYMBOLS_TOOL, {})
-    return drafts.symbols_from(outcome.text) if outcome.kind == "ok" else []

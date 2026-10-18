@@ -92,6 +92,9 @@ export type MarketDataErrorKind =
  *  "Zapytanie o dane nazywa swoją porażkę". */
 export class MarketDataError extends Error {
   readonly kind: MarketDataErrorKind;
+  /** The refusal's own body when it had more to say than a sentence — the fields a rule was refused for, say. Whatever
+   *  the back end wrote, so a caller that reads it checks its shape; the message stays the sentence. */
+  problem?: unknown;
 
   constructor(kind: MarketDataErrorKind, message: string) {
     super(message);

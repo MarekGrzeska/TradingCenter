@@ -34,7 +34,7 @@ EVENT_DESCRIPTION = "A post the model read, with its impact score and topics"
 EVENT_SCHEMA = {
     "type": "object",
     "properties": {
-        "author": {"type": "string"},
+        "author": {"type": "string", "x-seen-values": True},
         "author_slug": {"type": "string"},
         "impact_score": {"type": "integer"},
         "topics": {"type": "array", "items": {"type": "string"}},

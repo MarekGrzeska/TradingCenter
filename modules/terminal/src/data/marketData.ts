@@ -57,6 +57,9 @@ export const youtubeIdentity: Identity = scopeFor((s) => s.youtube);
 /** The door to Telegram, for the Telegram tab. */
 export const telegramIdentity: Identity = scopeFor((s) => s.telegram);
 
+/** The alerts package, for the Alerts tab. */
+export const alertsIdentity: Identity = scopeFor((s) => s.alerts);
+
 const archiveSource = createArchiveSource(archiveHttp, archiveWs, identity);
 const gateway = createGatewaySource(archiveHttp, identity);
 

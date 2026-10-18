@@ -43,6 +43,7 @@ const config: EntraConfig = {
     social: "api://social/access_as_user",
     youtube: "api://youtube/access_as_user",
     telegram: "api://telegram/access_as_user",
+    alerts: "api://alerts/access_as_user",
   },
 };
 

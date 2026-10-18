@@ -3,6 +3,7 @@ recipients. Read on every save and every catalogue — each of the three changes
 
 from __future__ import annotations
 
+import json
 import logging
 
 from .catalog import CatalogTool, ToolSource
@@ -41,6 +42,33 @@ async def known(state, conn) -> Known:
         destinations=None if recipients is None else frozenset(one.name for one in recipients),
         min_interval_seconds=state.settings.min_interval_seconds,
     )
+
+
+# The one tool read for the pairs the archive follows. Optional: a process without it offers no instrument list, and the
+# form then takes the symbol as typed.
+SYMBOLS_TOOL = "list_tracked_symbols"
+
+
+async def symbols(state) -> list[str]:
+    """The instruments the archive follows, or none where it cannot be asked."""
+    if state.tools is None:
+        return []
+    if SYMBOLS_TOOL not in {tool.name for tool in await state.tools.tools()}:
+        return []
+    outcome = await state.tools.call(SYMBOLS_TOOL, {})
+    return symbols_from(outcome.text) if outcome.kind == "ok" else []
+
+
+def symbols_from(text: str) -> list[str]:
+    """The symbols out of what `list_tracked_symbols` answered, or none if it answered in a way this cannot read."""
+    try:
+        payload = json.loads(text)
+    except (TypeError, ValueError):
+        return []
+    rows = payload.get("result") if isinstance(payload, dict) else payload
+    if not isinstance(rows, list):
+        return []
+    return [str(row["symbol"]) for row in rows if isinstance(row, dict) and "symbol" in row]
 
 
 async def recipients_if_possible(state) -> frozenset[str] | None:

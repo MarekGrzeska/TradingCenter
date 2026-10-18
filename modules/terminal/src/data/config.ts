@@ -55,6 +55,9 @@ export interface Endpoints {
    *  whom. The workbench's address plus `/telegram`, and the workbench's scope — but a route record of its own, where the
    *  operator's terminal is admitted next to `az` and nobody else is. */
   telegramHttp: string;
+  /** `alerts`, for the rules that decide who is told what: the workbench's address plus `/alerts`, when the workbench has the
+   *  package — like the YouTube archive, it may be absent, and the tab says so rather than showing no rules. */
+  alertsHttp: string;
   /** `capital-gateway`, for the account. It used to have no address here at all; what changed is that the
    *  gateway recognises an authenticated browser. In dev this is a prefix the dev server proxies. */
   gatewayHttp: string;
@@ -70,6 +73,7 @@ const DEFAULT_POLYMARKET_HTTP = "/polymarket-api";
 const DEFAULT_SOCIAL_HTTP = "/social-api";
 const DEFAULT_YOUTUBE_HTTP = "/youtube-api";
 const DEFAULT_TELEGRAM_HTTP = "/telegram-api";
+const DEFAULT_ALERTS_HTTP = "/alerts-api";
 
 export interface EnvVars {
   VITE_ARCHIVE_HTTP?: string;
@@ -80,6 +84,7 @@ export interface EnvVars {
   VITE_SOCIAL_HTTP?: string;
   VITE_YOUTUBE_HTTP?: string;
   VITE_TELEGRAM_HTTP?: string;
+  VITE_ALERTS_HTTP?: string;
   VITE_ENTRA_CLIENT_ID?: string;
   VITE_ENTRA_TENANT_ID?: string;
   VITE_ENTRA_SCOPE?: string;
@@ -89,6 +94,7 @@ export interface EnvVars {
   VITE_ENTRA_SCOPE_SOCIAL?: string;
   VITE_ENTRA_SCOPE_YOUTUBE?: string;
   VITE_ENTRA_SCOPE_TELEGRAM?: string;
+  VITE_ENTRA_SCOPE_ALERTS?: string;
 }
 
 /** One scope per module, because each accepts a token minted for its **own** audience. `archive` keeps
@@ -101,6 +107,7 @@ export interface ModuleScopes {
   social: string | null;
   youtube: string | null;
   telegram: string | null;
+  alerts: string | null;
 }
 
 /** Which Entra registration the terminal signs the operator in against, and what it asks
@@ -140,6 +147,7 @@ export function resolveEntra(env: EnvVars = import.meta.env): EntraConfig | null
       social: env.VITE_ENTRA_SCOPE_SOCIAL?.trim() || null,
       youtube: env.VITE_ENTRA_SCOPE_YOUTUBE?.trim() || null,
       telegram: env.VITE_ENTRA_SCOPE_TELEGRAM?.trim() || null,
+      alerts: env.VITE_ENTRA_SCOPE_ALERTS?.trim() || null,
     },
   };
 }
@@ -157,5 +165,6 @@ export function resolveEndpoints(
     socialHttp: resolveHttpBase(env.VITE_SOCIAL_HTTP || DEFAULT_SOCIAL_HTTP),
     youtubeHttp: resolveHttpBase(env.VITE_YOUTUBE_HTTP || DEFAULT_YOUTUBE_HTTP),
     telegramHttp: resolveHttpBase(env.VITE_TELEGRAM_HTTP || DEFAULT_TELEGRAM_HTTP),
+    alertsHttp: resolveHttpBase(env.VITE_ALERTS_HTTP || DEFAULT_ALERTS_HTTP),
   };
 }

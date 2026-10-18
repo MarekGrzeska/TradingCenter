@@ -9,12 +9,14 @@ from typing import Any
 from fastapi import APIRouter, Request, Response, status
 
 from .. import known, rules, store
-from ..contract import Problem, RuleIn, RuleOut, RulePatch
+from ..contract import CheckOut, FireOut, HistoryOut, Problem, RuleIn, RuleOut, RulePatch
 from ..gateway import GatewayUnreachable
 from ..validation import validate
 from . import deps
 
 router = APIRouter(tags=["rules"])
+
+HISTORY_ROWS = 30
 
 _REFUSED: dict[int | str, dict[str, Any]] = {404: {"model": Problem}, 422: {"model": Problem}, 503: {"model": Problem}}
 
@@ -60,6 +62,20 @@ async def switch(request: Request, rule_id: int, body: RulePatch) -> RuleOut:
     if switched is None:
         raise deps.not_found(f"there is no rule {rule_id}")
     return rules.out(switched, recipients=recipients)
+
+
+@router.get("/rules/{rule_id}/history", response_model=HistoryOut, responses={404: {"model": Problem}})
+async def history(request: Request, rule_id: int) -> HistoryOut:
+    """What became of the rule lately — the first place to look when an alert did not come."""
+    async with deps.connection(request.app.state.pool) as conn:
+        if await store.get_rule(conn, rule_id) is None:
+            raise deps.not_found(f"there is no rule {rule_id}")
+        fired = await store.recent_fires(conn, rule_id, HISTORY_ROWS)
+        looked = await store.recent_checks(conn, rule_id, HISTORY_ROWS)
+    return HistoryOut(
+        fires=[FireOut(at=row["created_at"], state=row["state"], reason=row["reason"], text=row["text"]) for row in fired],
+        checks=[CheckOut(at=row["checked_at"], outcome=row["outcome"], reason=row["reason"]) for row in looked],
+    )
 
 
 @router.delete("/rules/{rule_id}", status_code=status.HTTP_204_NO_CONTENT, responses={404: {"model": Problem}})

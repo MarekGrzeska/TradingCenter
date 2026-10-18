@@ -105,10 +105,15 @@ class FakeTools:
         self.down = False
         self.refuses = False
 
+    def add(self, one: CatalogTool) -> None:
+        self._tools = [*self._tools, one]
+
     async def tools(self) -> list[CatalogTool]:
         return self._tools
 
     async def call(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
+        if name == "list_tracked_symbols":
+            return ToolOutcome("ok", json.dumps({"result": [{"symbol": "EURUSD"}, {"symbol": "XAUUSD"}]}))
         if self.down:
             return ToolOutcome("unavailable", "market-data could not answer")
         if self.refuses:

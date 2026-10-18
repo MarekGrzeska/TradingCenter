@@ -28,6 +28,7 @@ REST_PATHS: tuple[str, ...] = (
     "/catalog",
     "/rules",
     "/rules/{rule_id}",
+    "/rules/{rule_id}/history",
     "/event-types/{name}",
     "/events",
     "/drafts",

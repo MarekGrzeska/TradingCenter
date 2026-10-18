@@ -542,3 +542,21 @@ async def done(conn: Conn, name: str) -> bool:
 async def mark_done(conn: Conn, name: str) -> None:
     await conn.execute("INSERT INTO migrations_done (name) VALUES ($1) ON CONFLICT DO NOTHING", name)
 
+
+async def seen_values(conn: Conn, event_type: str, attribute: str, limit: int = 50) -> list[str]:
+    """The values this attribute has had in retained events, most frequent first: what the form offers instead of a blank."""
+    rows = await conn.fetch(
+        """
+        SELECT attributes ->> $2 AS value
+          FROM events
+         WHERE type = $1 AND attributes ->> $2 IS NOT NULL AND attributes ->> $2 <> ''
+         GROUP BY 1
+         ORDER BY count(*) DESC, 1
+         LIMIT $3
+        """,
+        event_type,
+        attribute,
+        limit,
+    )
+    return [row["value"] for row in rows]
+

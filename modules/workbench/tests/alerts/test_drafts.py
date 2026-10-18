@@ -9,6 +9,7 @@ import json
 import pytest
 
 from alerts import drafts
+from alerts import known as known_module
 from alerts.drafts import Answer, Unusable
 from alerts.gateway import Recipient
 
@@ -111,9 +112,9 @@ def test_the_prompt_offers_what_exists_and_only_that() -> None:
 
 
 def test_the_tracked_symbols_are_read_out_of_the_tools_answer_however_it_is_wrapped() -> None:
-    assert drafts.symbols_from('{"result": [{"symbol": "A", "collection": "x"}, {"symbol": "B"}]}') == ["A", "B"]
-    assert drafts.symbols_from('[{"symbol": "A"}]') == ["A"]
-    assert drafts.symbols_from("nonsense") == []
+    assert known_module.symbols_from('{"result": [{"symbol": "A", "collection": "x"}, {"symbol": "B"}]}') == ["A", "B"]
+    assert known_module.symbols_from('[{"symbol": "A"}]') == ["A"]
+    assert known_module.symbols_from("nonsense") == []
 
 
 @pytest.mark.db

@@ -25,12 +25,12 @@ EVENT_DESCRIPTION = "A team's run reached its end, whichever way it ended"
 EVENT_SCHEMA = {
     "type": "object",
     "properties": {
-        "team": {"type": "string"},
+        "team": {"type": "string", "x-seen-values": True},
         "team_id": {"type": "integer"},
         "run_id": {"type": "integer"},
-        "status": {"type": "string"},
+        "status": {"type": "string", "enum": ["completed", "failed", "cancelled"]},
         "stopped_reason": {"type": "string"},
-        "started_by": {"type": "string"},
+        "started_by": {"type": "string", "enum": ["operator", "schedule", "trigger"]},
     },
 }
 
