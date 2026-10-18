@@ -11,7 +11,7 @@ Telegram. Moduł MUST NOT kolejkować wiadomości, MUST NOT ponawiać jej samodz
 przechowywać treści po zakończeniu żądania.
 
 To jest wybór, nie uproszczenie, i ma nazwaną cenę: skoro brama nie pamięta, to deduplikacja i
-ponowienie należą do wywołującego — `social-data-alerts` i `strategy-alerts` mówią, jak je robią.
+ponowienie należą do wywołującego — `social-data-alerts` mówi, jak je robi.
 
 #### Scenario: Wiadomość dochodzi
 
