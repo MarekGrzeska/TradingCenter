@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { safeLocalStorage } from "../data/storage";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import { botUsernameProblem, freeNameFor, keyProblem } from "./present";
+import { botUsernameProblem, freeNameFor } from "./present";
 import { QrCode } from "./QrCode";
 import type { Bot, CodeDelivery, Destination, StartLink, TelegramApi } from "./telegramApi";
 
@@ -684,57 +684,6 @@ export function ConfirmRemoval({
       onClose={onClose}
     >
       <div className="flex flex-col gap-2 text-xs text-ink-secondary">{body}</div>
-    </ConfirmDialog>
-  );
-}
-
-export function AssignDialog({
-  api,
-  destinations,
-  initialKey = "",
-  onClose,
-  onDone,
-}: {
-  api: TelegramApi;
-  destinations: Destination[];
-  initialKey?: string;
-  onClose(): void;
-  onDone(): void;
-}) {
-  const [key, setKey] = useState(initialKey);
-  const [destination, setDestination] = useState(destinations[0]?.name ?? "");
-  const problem = keyProblem(key.trim());
-
-  return (
-    <ConfirmDialog
-      title="Dodaj przypisanie"
-      confirmLabel="Przypisz"
-      busyLabel="Przypisuję…"
-      confirmDisabled={key.trim() === "" || destination === "" || problem !== null}
-      fallbackError="nie udało się przypisać"
-      onConfirm={async () => {
-        await api.assign(key.trim(), destination, signal());
-        onDone();
-      }}
-      onClose={onClose}
-    >
-      <div className="flex flex-col gap-3">
-        <Field
-          label="Cel, przedrostek albo *"
-          hint={problem ?? "Przedrostek obejmuje całe segmenty: „youtube” łapie youtube.film.cokolwiek, ale nie youtubers. * to wszystko, czego nic nie złapało."}
-        >
-          <input className={INPUT} value={key} autoFocus placeholder="youtube.film" onChange={(e) => setKey(e.target.value)} />
-        </Field>
-        <Field label="Kto ma o tym słyszeć">
-          <select className={INPUT} value={destination} onChange={(e) => setDestination(e.target.value)}>
-            {destinations.map((one) => (
-              <option key={one.name} value={one.name}>
-                {one.name} (@{one.bot}) — {one.receives ? "odbiera" : "jeszcze nie odbiera"}
-              </option>
-            ))}
-          </select>
-        </Field>
-      </div>
     </ConfirmDialog>
   );
 }

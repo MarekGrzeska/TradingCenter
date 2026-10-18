@@ -523,11 +523,6 @@ export interface components {
          */
         StateOut: {
             /**
-             * Alert Min Impact Score
-             * @description the reading a post needs before it is worth a notification
-             */
-            alert_min_impact_score: number;
-            /**
              * Alerts Configured
              * @description whether this archive can notify the operator at all — false means it collects and says nothing by configuration, which is a supported state
              */

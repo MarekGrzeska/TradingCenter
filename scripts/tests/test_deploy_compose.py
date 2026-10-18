@@ -59,7 +59,7 @@ def test_every_name_the_compose_file_demands_is_one_the_deploy_checks() -> None:
 def test_the_optional_names_are_blank_by_default_and_not_required() -> None:
     text = (DEPLOY / "docker-compose.yml").read_text(encoding="utf-8")
     optional = set(re.findall(r"\$\{([A-Z][A-Z0-9_]*):-\}", text))
-    assert optional == {"ALERT_DESTINATION", "TELEGRAM_API_ID", "TELEGRAM_API_HASH", "TELEGRAM_SESSION_KEY"}
+    assert optional == {"TELEGRAM_API_ID", "TELEGRAM_API_HASH", "TELEGRAM_SESSION_KEY"}
     assert not optional & required_names()
 
 

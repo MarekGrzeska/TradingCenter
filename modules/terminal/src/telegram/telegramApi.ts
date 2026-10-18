@@ -33,9 +33,6 @@ export interface GateState {
   bots: number;
   destinations: number;
   destinationsReady: number;
-  defaultAssignment: boolean;
-  /** Known purposes no assignment matches: collected and told to nobody. */
-  purposesUnheard: number;
 }
 
 export interface Bot {
@@ -59,25 +56,6 @@ export interface StartLink {
   destination: Destination;
   url: string;
   expiresAt: Date;
-}
-
-export interface Purpose {
-  name: string;
-  description: string | null;
-  firstSeen: Date;
-  lastSeen: Date;
-  lastCaller: string | null;
-  /** Who hears it today, or null when nobody does. */
-  destination: string | null;
-  /** The assignment key that decides it: the purpose itself, a prefix, or `*`. */
-  assignedBy: string | null;
-}
-
-export interface Assignment {
-  key: string;
-  destination: string;
-  bot: string;
-  receives: boolean;
 }
 
 /** Where Telegram said the login code went. `app` is a message from "Telegram" in an app already logged in to the account. */
@@ -150,10 +128,6 @@ export interface TelegramApi {
   removeDestination(name: string, signal: AbortSignal): Promise<void>;
   /** One message to a recipient, now — for trying a bot out. Telegram's own id for it comes back; nothing is kept. */
   sendMessage(destination: string, text: string, signal: AbortSignal): Promise<number>;
-  purposes(signal: AbortSignal): Promise<Purpose[]>;
-  assignments(signal: AbortSignal): Promise<Assignment[]>;
-  assign(key: string, destination: string, signal: AbortSignal): Promise<Assignment>;
-  unassign(key: string, signal: AbortSignal): Promise<void>;
 }
 
 export function createTelegramApi(httpBase: string, identity: Identity = noIdentity): TelegramApi {
@@ -183,8 +157,6 @@ export function createTelegramApi(httpBase: string, identity: Identity = noIdent
         bots: raw.bots,
         destinations: raw.destinations,
         destinationsReady: raw.destinations_ready,
-        defaultAssignment: raw.default_assignment,
-        purposesUnheard: raw.purposes_unheard,
       };
     },
 
@@ -270,38 +242,6 @@ export function createTelegramApi(httpBase: string, identity: Identity = noIdent
       const body: Schemas["SendRequest"] = { destination, text };
       const raw = await http.json<Schemas["Sent"]>(`${httpBase}/messages`, { signal, method: "POST", body });
       return raw.message_id;
-    },
-
-    async purposes(signal) {
-      const raw = await http.json<Schemas["PurposeOut"][]>(`${httpBase}/purposes`, { signal });
-      return raw.map((one) => ({
-        name: one.name,
-        description: one.description ?? null,
-        firstSeen: new Date(one.first_seen),
-        lastSeen: new Date(one.last_seen),
-        lastCaller: one.last_caller ?? null,
-        destination: one.destination ?? null,
-        assignedBy: one.assigned_by ?? null,
-      }));
-    },
-
-    async assignments(signal) {
-      const raw = await http.json<Schemas["AssignmentOut"][]>(`${httpBase}/assignments`, { signal });
-      return raw.map((one) => ({ key: one.key, destination: one.destination, bot: one.bot, receives: one.receives }));
-    },
-
-    async assign(key, destination, signal) {
-      const body: Schemas["AssignRequest"] = { destination };
-      const raw = await http.json<Schemas["AssignmentOut"]>(`${httpBase}/assignments/${segment(key)}`, {
-        signal,
-        method: "PUT",
-        body,
-      });
-      return { key: raw.key, destination: raw.destination, bot: raw.bot, receives: raw.receives };
-    },
-
-    async unassign(key, signal) {
-      await http.send(`${httpBase}/assignments/${segment(key)}`, { signal, method: "DELETE" });
     },
   };
 }

@@ -41,6 +41,15 @@ def test_the_first_look_sets_the_baseline_even_when_the_value_is_already_over() 
     assert (first.fire, first.baseline) == (False, True)
 
 
+def test_a_one_time_rule_does_not_fire_a_second_time_while_the_first_is_still_on_its_way() -> None:
+    last = NOW - timedelta(seconds=5000)
+
+    second = decide(MET, known=False, last_fired_at=last, cooldown_seconds=900, now=NOW, once=True)
+
+    assert (second.fire, second.cooled) == (False, False)
+    assert decide(MET, known=False, last_fired_at=None, cooldown_seconds=900, now=NOW, once=True).fire is True
+
+
 def test_a_crossing_inside_the_cooldown_is_cooled_not_fired() -> None:
     cooled = verdict(MET, known=False, fired_ago=60)
 

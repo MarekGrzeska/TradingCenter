@@ -22,7 +22,6 @@ class ChannelBrief(BaseModel):
     channel_id: str
     title: str
     handle: str | None
-    alert_rule: str
     active: bool
     added_by: str
     last_discovery_at: datetime | None
@@ -37,7 +36,6 @@ class TopicBrief(BaseModel):
     phrase: str
     interval_minutes: int
     max_videos_per_run: int
-    alert_rule: str
     active: bool
     added_by: str
     last_run_at: datetime | None

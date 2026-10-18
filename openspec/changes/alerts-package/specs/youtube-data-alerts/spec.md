@@ -18,6 +18,11 @@ publikowany.
 - **WHEN** film jest przetranskrybowany, a model nie jest skonfigurowany
 - **THEN** moduł MUST NOT opublikować o nim niczego
 
+#### Scenario: Film wskazany ręcznie
+
+- **WHEN** film, który wskazał operator albo agent, zostaje odczytany, a jego jedynym źródłem jest wskazanie
+- **THEN** moduł MUST NOT go publikować, a film MUST zakończyć jako cichy
+
 ### Requirement: Wiadomość prowadzi do filmu
 
 Moduł MUST ogłosić typ zdarzenia „film odczytany” z atrybutami: kanał, temat (gdy film przyszedł z

@@ -111,11 +111,11 @@ async def test_a_film_named_by_hand_is_queued_and_a_non_film_is_refused(api, rig
 
 
 async def test_a_channel_is_followed_paused_and_taken_off(api) -> None:
-    added = await api.post("/channels", json={"reference": "@simzloto", "alert_rule": "always"})
-    again = await api.post("/channels", json={"reference": GOLD, "alert_rule": "never"})
+    added = await api.post("/channels", json={"reference": "@simzloto", "language": "pl"})
+    again = await api.post("/channels", json={"reference": GOLD, "language": "de"})
 
     assert added.json()["created"] is True and again.json()["created"] is False
-    assert again.json()["channel"]["alert_rule"] == "always", "following again does not change what was set"
+    assert again.json()["channel"]["language"] == "pl", "following again does not change what was set"
 
     paused = await api.patch(f"/channels/{GOLD}", json={"active": False})
     assert paused.json()["active"] is False

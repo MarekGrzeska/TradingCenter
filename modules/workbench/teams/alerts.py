@@ -38,6 +38,8 @@ EVENT_SCHEMA = {
 BATCH = 20
 SWEEP_SECONDS = 15.0
 WINDOW = timedelta(hours=6)
+# How long a run the alerts package refused is passed over, so a few refused ones cannot hold up every run behind them.
+SULK = timedelta(minutes=10)
 
 _WORDS = {"completed": "zakończony", "failed": "nieudany", "cancelled": "przerwany"}
 
@@ -125,6 +127,7 @@ class RunAnnouncer:
         self._task: asyncio.Task[None] | None = None
         # The alerts package last refused the runs. `/state` could say so; for now it is a log line and the next sweep.
         self.failing = False
+        self._sulking: dict[int, datetime] = {}
 
     async def start(self) -> None:
         self._task = asyncio.create_task(self._loop(), name="teams-run-announcer")
@@ -159,8 +162,10 @@ class RunAnnouncer:
                 self.failing = True
                 log.info("could not announce %s yet: %s", EVENT_TYPE, err)
                 return 0
+        self._sulking = {run: until for run, until in self._sulking.items() if until > now}
         async with self._pool.acquire() as conn:
-            waiting = await conn.fetch(_UNTOLD, now - WINDOW, BATCH)
+            fetched = await conn.fetch(_UNTOLD, now - WINDOW, BATCH + len(self._sulking))
+        waiting = [row for row in fetched if row["id"] not in self._sulking][:BATCH]
         handed = 0
         failed = False
         for row in waiting:
@@ -169,6 +174,8 @@ class RunAnnouncer:
             except (Rejected, Unreachable) as err:
                 log.warning("could not hand over run %s: %s", row["id"], err)
                 failed = True
+                if isinstance(err, Rejected):
+                    self._sulking[row["id"]] = now + SULK
                 continue
             async with self._pool.acquire() as conn:
                 await conn.execute("UPDATE runs SET announced_at = $2 WHERE id = $1", row["id"], now)

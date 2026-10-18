@@ -160,3 +160,26 @@ async def test_the_runs_that_finished_before_the_marker_existed_are_marked_as_to
         assert await conn.fetchval("SELECT count(*) FROM runs WHERE announced_at IS NULL") == 0
     finally:
         await conn.close()
+
+
+async def test_a_run_the_alerts_package_refused_does_not_hold_up_the_runs_behind_it(db, pool, monkeypatch) -> None:
+    monkeypatch.setattr(alerts, "BATCH", 1)
+    await a_run(db, "completed", finished=NOW - timedelta(minutes=2))
+    await a_run(db, "failed", "boom", finished=NOW - timedelta(minutes=1))
+
+    class RefusesTheFirst(RecordingPublisher):
+        async def publish(self, *, source_key: str, attributes: dict, text: str) -> None:
+            await super().publish(source_key=source_key, attributes=attributes, text=text)
+            if len(self.sent) == 1:
+                raise alerts.Rejected("does not fit")
+
+    publisher = RefusesTheFirst()
+    sweeping = announcer(pool, publisher)
+
+    assert await sweeping.run(NOW) == 0
+    assert await sweeping.run(NOW + timedelta(seconds=15)) == 1
+    assert len({key for key, _, _ in publisher.sent}) == 2
+
+
+def test_no_alerts_package_builds_no_announcer(pool) -> None:
+    assert alerts.build(pool, None) is None

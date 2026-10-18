@@ -41,3 +41,10 @@ async def test_no_name_is_offered_twice_and_no_writing_tool_can_be_called(tools:
 
 async def test_an_unknown_name_is_refused_rather_than_raised(tools: AlertTools) -> None:
     assert (await tools.call("no_such_tool", {})).kind == "refused"
+
+
+async def test_a_read_that_asks_a_provider_each_time_is_not_offered_to_a_rule(tools: AlertTools) -> None:
+    from workbench.alert_tools import LIVE_READS
+
+    assert not {tool.name for tool in await tools.tools()} & LIVE_READS
+    assert (await tools.call("search_events", {"query": "x"})).kind == "refused"

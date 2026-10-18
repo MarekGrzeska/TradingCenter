@@ -17,7 +17,7 @@ async def test_the_migration_creates_every_table(db) -> None:
         for row in await db.fetch("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
     }
 
-    assert {"event_types", "events", "rules", "rule_checks", "fires", "draft_usage", "migrations_done"} <= found
+    assert {"event_types", "events", "rules", "rule_checks", "fires", "draft_usage"} <= found
 
 
 async def test_a_rule_with_both_sources_is_refused(db) -> None:

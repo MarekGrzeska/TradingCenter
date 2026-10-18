@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 from datetime import UTC, datetime
 
 import httpx
@@ -24,6 +25,8 @@ log = logging.getLogger(__name__)
 
 # How many posts one pass may hand over. The rest are still there on the next pass.
 BATCH_LIMIT = 50
+# How long a post the alerts package refused is passed over, so a few refused ones cannot hold up every post behind them.
+SULK_SECONDS = 600.0
 
 # Telegram's own ceiling is 4096 and the door refuses rather than truncating, so the excerpt is cut here — where the cut
 # can be marked as one.
@@ -149,6 +152,7 @@ class Alerts:
         self._announced = False
         # What the alerts package last said: it did not take the posts. `/state` reports it.
         self.failing = False
+        self._sulking: dict[int, float] = {}
 
     @property
     def telling(self) -> bool:
@@ -170,8 +174,11 @@ class Alerts:
             if not self._announced:
                 self.failing = True
                 return 0
+        clock = time.monotonic()
+        self._sulking = {post: until for post, until in self._sulking.items() if until > clock}
         async with self._pool.acquire() as conn:
-            waiting = await store.posts_awaiting_notification(conn, since=since, limit=self._limit)
+            fetched = await store.posts_awaiting_notification(conn, since=since, limit=self._limit + len(self._sulking))
+        waiting = [post for post in fetched if post.id not in self._sulking][: self._limit]
         handed = 0
         failed = False
         for post in waiting:
@@ -182,6 +189,8 @@ class Alerts:
                 # refusing everything is a silence the operator has to be able to find.
                 log.warning("could not hand over post %s: %s", post.id, err)
                 failed = True
+                if isinstance(err, Rejected):
+                    self._sulking[post.id] = clock + SULK_SECONDS
                 continue
             async with self._pool.acquire() as conn:
                 await store.mark_notified(conn, post.id, at=datetime.now(UTC))

@@ -29,6 +29,4 @@ async def state(request: Request) -> StateOut:
             bots=await store.count_bots(conn),
             destinations=await store.count_destinations(conn),
             destinations_ready=await store.count_destinations(conn, receiving=True),
-            default_assignment=any(a.key == "*" for a, _ in await store.list_assignments(conn)),
-            purposes_unheard=await store.count_unheard(conn),
         )

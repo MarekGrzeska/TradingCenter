@@ -100,11 +100,6 @@ class Settings(BaseSettings):
     tool_caller_application_ids: str = ""
     rest_caller_application_ids: str = ""
 
-    # What used to decide, for every producer, who is told. Producers send under a purpose now and the operator assigns
-    # purposes in the terminal; this survives one more release only to seed the door's `*` assignment from a name that
-    # already exists (`telegram-bots-from-the-terminal`), and is retired in the deploy that follows.
-    alert_destination: str | None = None
-
     # The door to Telegram, a package of this process since stage 4 of `one-process-per-security-boundary`: its
     # database — bots, their tokens, and who receives — and the operator's own account session, unprefixed as it
     # always was. All three or none; none is a gateway that sends and refuses to create bots. Everything else it
@@ -159,7 +154,6 @@ class Settings(BaseSettings):
         "database_user",
         "trading_mcp_url",
         "trading_mcp_scope",
-        "alert_destination",
         "telegram_api_hash",
         "telegram_session_key",
         "gateway_scope",
@@ -322,7 +316,6 @@ class Settings(BaseSettings):
             telegram_api_id=self.telegram_api_id,
             telegram_api_hash=self.telegram_api_hash,
             telegram_session_key=self.telegram_session_key,
-            seed_default_destination=self.alert_destination,
         )
 
     def for_youtube(self) -> YoutubeSettings:

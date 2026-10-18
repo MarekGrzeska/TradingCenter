@@ -7,9 +7,8 @@ and not otherwise — and enters `serving` from its own lifespan, because a moun
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 
 import httpx
 from fastapi import FastAPI
@@ -18,14 +17,13 @@ from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 from tc_runtime.liveness import Heartbeats, LoopHeartbeat
 
-from . import conversion, mcp_app
 from . import drafter as drafter_module
+from . import mcp_app
 from .caller_access import RECORD, CallerAccess
 from .catalog import ToolSource
 from .clock import Clock
 from .config import Settings
 from .gateway import Gateway
-from .legacy import LegacySource
 from .routers import catalog, drafts, events, meta, rules, state
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
@@ -39,48 +37,50 @@ async def serving(
     *,
     tools: ToolSource | None = None,
     telegram: httpx.AsyncClient | None = None,
-    legacy: LegacySource | None = None,
+    hold_clock: bool = False,
 ):
     """Everything this package needs running, on `app.state`, for as long as the block is open. `tools` is the process's
     tool surface and `telegram` the host's client over the door to Telegram; without either, rules can still be written —
-    against nothing the package can check, which the catalogue says."""
+    against nothing the package can check, which the catalogue says. With `hold_clock` no rule is looked at until the host
+    calls `app.state.clock.release()` — once the packages the rules read are serving."""
     app.state.settings = settings
     app.state.tools = tools
     app.state.gateway = None if telegram is None else Gateway(telegram)
     # `None` without a key: every route but drafting works, and the catalogue says drafting does not.
     app.state.drafter = drafter_module.build(settings)
 
-    async with make_pool(
-        settings.database_url,
-        user=settings.database_user,
-        client_id=settings.azure_client_id,
-        client_secret=settings.azure_client_secret,
-        tenant_id=settings.azure_tenant_id,
-        max_size=settings.database_pool_size,
-    ) as pool:
-        # One connection held for the whole of it: the advisory lock is session scoped, so handing the connection back
-        # to the pool in between would release it early.
-        async with pool.acquire() as conn:
-            async with advisory_lock(
-                conn, MIGRATION_LOCK_KEY, wait=settings.migration_lock_wait_seconds
-            ):
-                await migrate.run(MIGRATIONS)
-            # Still checked after migrating, for the pair a migration cannot fix: an upgrade that reported success
-            # without arriving, and an image older than the schema it found.
-            await schema_version.verify(conn, MIGRATIONS)
+    async with AsyncExitStack() as stack:
+        try:
+            pool = await stack.enter_async_context(
+                make_pool(
+                    settings.database_url,
+                    user=settings.database_user,
+                    client_id=settings.azure_client_id,
+                    client_secret=settings.azure_client_secret,
+                    tenant_id=settings.azure_tenant_id,
+                    max_size=settings.database_pool_size,
+                )
+            )
+            # One connection held for the whole of it: the advisory lock is session scoped, so handing the connection
+            # back to the pool in between would release it early.
+            async with pool.acquire() as conn:
+                async with advisory_lock(conn, MIGRATION_LOCK_KEY, wait=settings.migration_lock_wait_seconds):
+                    await migrate.run(MIGRATIONS)
+                # Still checked after migrating, for the pair a migration cannot fix: an upgrade that reported success
+                # without arriving, and an image older than the schema it found.
+                await schema_version.verify(conn, MIGRATIONS)
+        except Exception as err:
+            # Named, because the first thing in the log is otherwise a socket error that says nothing of whose database.
+            raise RuntimeError(f"the alerts database could not be opened or migrated: {type(err).__name__}: {err}") from err
 
         app.state.pool = pool
-
-        # Once: what the operator set before this package becomes rules. Started here and not awaited — the neighbours it
-        # reads are entered after this package, so it asks until they answer.
-        converting = asyncio.create_task(conversion.run_when_ready(pool, legacy), name="alerts-conversion")
 
         # After the migration and not before it: a tick started earlier would read a schema it does not know. One
         # heartbeat for the one loop, on the state so `/health` can answer with it and the metric can read it.
         heartbeats = Heartbeats(LoopHeartbeat("clock", expected_seconds=settings.tick_seconds))
         app.state.heartbeats = heartbeats
         liveness.register_metrics("alerts", heartbeats)
-        clock = Clock(pool, settings, tools, heartbeats["clock"], app.state.gateway)
+        clock = Clock(pool, settings, tools, heartbeats["clock"], app.state.gateway, held=hold_clock)
         app.state.clock = clock
         await clock.start()
         # The tool surface's session manager: a mounted application's lifespan is never run, so the task group has to be
@@ -90,8 +90,6 @@ async def serving(
             try:
                 yield
             finally:
-                converting.cancel()
-                await asyncio.gather(converting, return_exceptions=True)
                 await clock.stop()
 
 

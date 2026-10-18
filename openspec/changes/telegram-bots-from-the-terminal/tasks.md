@@ -39,7 +39,7 @@
 - [x] 5.1 `deploy/docker-compose.yml`: `TERMINAL_APPLICATION_ID` w `TELEGRAM_REST_CALLER_APPLICATION_IDS`, `TELEGRAM_SESSION_KEY`; `assemble_env.py` (opcjonalne), `fill-github-environment.sh`, `.env.example` workbencha
 - [x] 5.2 `telegram_gateway/README.md` przepisany pod VPS i terminal (zamiast `curl` z `az`)
 - [ ] 5.3 Merge, `deploy-watch`, potem w terminalu: przypisanie `*` zasiane, alert dochodzi
-- [ ] 5.4 Drugie wdrożenie: `ALERT_DESTINATION` z Compose, `assemble_env.py`, `vps`, `.env.example` i z `seed_default_destination`; do `RETIRED_SETTINGS` w `scripts/dev.py` (`TELEGRAM_SESSION` zdjęte już w 5.1 — nic go nie czytało)
+- [x] 5.4 Drugie wdrożenie (zrobione w `alerts-package`, grupa 11): `ALERT_DESTINATION` z Compose, `assemble_env.py`, `vps`, `.env.example` i z `seed_default_destination`; do `RETIRED_SETTINGS` w `scripts/dev.py` (`TELEGRAM_SESSION` zdjęte już w 5.1 — nic go nie czytało)
 - [ ] 5.5 Operator: konto dedykowane z 2FA, `api_id`/`api_hash` z niego w `vps`, `TELEGRAM_SESSION_KEY`; logowanie w zakładce, nowy bot, aktywacja, przypisania; stare boty zrotowane albo usunięte
 - [x] 5.6 `review.md`
 

@@ -191,6 +191,57 @@ describe("AlertsView", () => {
     expect(client.createRule).not.toHaveBeenCalled();
   });
 
+  it("keeps saving out of reach of a draft with a flaw until the operator has changed something", async () => {
+    const draft = vi.fn(async () => ({
+      understood: "Powiadom, gdy DOGE przekroczy 1.",
+      rule: { ...rule(), id: undefined, name: "DOGE powyżej 1" },
+      defects: [{ field: "source.arguments.symbol", message: "archiwum nie śledzi DOGE" }],
+      notes: [],
+    }));
+    render(<AlertsView api={api([], { draft })} />);
+
+    await userEvent.type(await screen.findByLabelText(/Albo opisz zdaniem/), "daj znać, gdy DOGE przebije 1");
+    await userEvent.click(screen.getByRole("button", { name: "Zaproponuj regułę" }));
+    const dialog = await screen.findByRole("dialog");
+
+    expect(within(dialog).getByRole("button", { name: "Zapisz" })).toBeDisabled();
+
+    await userEvent.type(within(dialog).getByLabelText("Nazwa"), "!");
+
+    expect(within(dialog).getByRole("button", { name: "Zapisz" })).toBeEnabled();
+  });
+
+  it("shows a fire the cap held back as held back, with the reason", async () => {
+    const client = api([rule()], {
+      history: vi.fn(async () => ({
+        fires: [{ at: new Date("2026-10-18T12:00:00Z"), state: "throttled" as const, reason: "the rule has already told 20 times in the last hour", text: "EURUSD powyżej 1,10: 1.1021" }],
+        checks: [],
+      })),
+    });
+    render(<AlertsView api={client} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Historia" }));
+
+    expect(await screen.findByText(/zdławiona \(the rule has already told 20 times/)).toBeInTheDocument();
+  });
+
+  it("offers a channel outside the ones seen only by choosing \"inna wartość\"", async () => {
+    const film = rule({
+      id: 2,
+      name: "filmy",
+      source: { kind: "event", eventType: "youtube.film.read", filter: [{ attribute: "channel", op: "eq", value: "Gold Talk" }] },
+    });
+    render(<AlertsView api={api([film])} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Edytuj…" }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByLabelText("inna wartość")).not.toBeInTheDocument();
+
+    await userEvent.selectOptions(within(dialog).getByDisplayValue("Gold Talk"), "inna wartość…");
+
+    expect(within(dialog).getByLabelText("inna wartość")).toBeInTheDocument();
+  });
+
   it("switches the sentence box off, with the setting that would turn it on, when there is no key", async () => {
     render(<AlertsView api={api([], {}, { ...CATALOG, drafting: false })} />);
 

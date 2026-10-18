@@ -122,9 +122,6 @@ class Settings(BaseSettings):
     daily_source_units: int = 8000
     daily_token_limit: int = 2_000_000
 
-    # How impactful a film must be to be worth a notification under a `threshold` rule. Eight, for the reason the post
-    # archive gives: the operator reads these on a phone, and a channel that speaks daily is one nobody looks at.
-    alert_min_impact_score: int = 8
     # A film not announced within this long of being read is let go as quiet rather than announced in a heap later.
     alert_window_hours: int = 48
 
@@ -170,15 +167,6 @@ class Settings(BaseSettings):
         if not value.strip():
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()
-
-    @field_validator("alert_min_impact_score")
-    @classmethod
-    def _within_the_score_range(cls, value: int) -> int:
-        # The reading is 1..10, so a threshold outside it is a channel that is either silent for ever or one that says
-        # everything — both of which look like a working configuration.
-        if not 1 <= value <= 10:
-            raise ValueError(f"ALERT_MIN_IMPACT_SCORE must be between 1 and 10; got {value}")
-        return value
 
     @field_validator("data_api_key", "gemini_api_key", "openai_api_key", "openai_base_url")
     @classmethod

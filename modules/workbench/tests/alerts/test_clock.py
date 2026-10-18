@@ -10,6 +10,7 @@ from tc_runtime.liveness import LoopHeartbeat
 
 from alerts import store
 from alerts.clock import Clock
+from alerts.gateway import Sent
 
 from .builders import condition, rule
 
@@ -83,6 +84,24 @@ async def test_a_crossing_inside_the_cooldown_is_recorded_and_not_sent(clock, to
     assert await checks(db, rule_id) == ["cooldown"]
 
 
+async def test_a_one_time_rule_whose_first_alert_is_still_waiting_does_not_fire_again_on_the_next_crossing(
+    pool, settings, tools, door, db
+) -> None:
+    door.answers = [Sent(ok=False, transient=True, reason="busy")] * 10
+    clock = Clock(pool, settings, tools, LoopHeartbeat("clock", expected_seconds=5), door)
+    rule_id = await saved(pool, rule(condition(poll_interval_seconds=60), mode="once", cooldown_seconds=0))
+    await at(clock, 0)
+    tools.price = 1.12
+    await at(clock, 60)
+    tools.price = 1.05
+    await at(clock, 120)
+    tools.price = 1.13
+
+    await at(clock, 180)
+
+    assert len(await fires(db, rule_id)) == 1
+
+
 async def test_an_outage_is_one_line_and_never_a_crossing(clock, tools, pool, db) -> None:
     rule_id = await saved(pool)
     tools.price = 1.12
@@ -145,3 +164,35 @@ async def test_the_clock_beats_its_heartbeat_and_stops_cleanly(pool, settings, t
     await running.stop()
 
     assert beat.has_run
+
+
+async def test_a_held_clock_looks_at_nothing_until_it_is_let_go(pool, settings, tools) -> None:
+    import asyncio
+
+    ticks: list[int] = []
+    held = Clock(pool, settings, tools, LoopHeartbeat("clock", expected_seconds=5), held=True)
+
+    async def counted(now=None) -> int:
+        ticks.append(1)
+        return 0
+
+    held.tick = counted  # type: ignore[method-assign]
+    await held.start()
+    await asyncio.sleep(0.05)
+    assert ticks == []
+
+    held.release()
+    await asyncio.sleep(0.05)
+    await held.stop()
+
+    assert ticks != []
+
+
+async def test_a_thousand_looks_that_never_fire_cost_no_model_and_leave_no_usage(clock, tools, pool, db) -> None:
+    rule_id = await saved(pool)
+
+    for second in range(0, 60 * 50, 60):
+        await at(clock, second)
+
+    assert await fires(db, rule_id) == []
+    assert await db.fetchval("SELECT count(*) FROM draft_usage") == 0

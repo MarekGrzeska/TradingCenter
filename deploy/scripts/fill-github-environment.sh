@@ -104,8 +104,6 @@ for name in AGENT_MODELS TEAMS_MODELS AGENT_DEFAULT_MODEL_ID; do
   [ -n "$value" ] || { echo "the Azure app has no $name; cannot copy it" >&2; exit 1; }
   set_variable "$name" "$value"
 done
-alert="$(app_setting ALERT_DESTINATION || true)"
-[ -z "$alert" ] || set_variable ALERT_DESTINATION "$alert"
 
 # --- public facts --------------------------------------------------------------------------------------------------------
 repo_var() { gh variable list --json name,value -q ".[] | select(.name==\"$1\") | .value"; }

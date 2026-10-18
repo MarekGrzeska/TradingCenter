@@ -40,10 +40,6 @@ REST_PATHS: tuple[str, ...] = (
     "/account/login/password",
     "/destinations",
     "/destinations/{name}",
-    "/purposes",
-    "/purposes/{name}",
-    "/assignments",
-    "/assignments/{key}",
     # FastAPI's own, published by the framework rather than by a router. They describe the
     # REST contract, so they belong to the caller that consumes it.
     "/docs",

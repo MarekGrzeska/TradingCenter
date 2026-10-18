@@ -263,7 +263,7 @@ function valueOf(term: TermForm, type: CatalogEventType | undefined): FilterTerm
     return [...new Set([...term.picked, ...typed])];
   }
   if (kind === "number") return numberOrNull(term.value) ?? term.value;
-  if (kind === "boolean") return term.value === "true";
+  if (kind === "boolean") return term.value !== "false"; // a blank is what the form shows: "tak"
   return term.value;
 }
 

@@ -150,6 +150,15 @@ describe("the form and the rule it builds", () => {
     expect(built).toMatchObject({ mode: "once", maxPerHour: 5, cooldownSeconds: null });
   });
 
+  it("saves a flag the operator left as the form showed it, which is yes", () => {
+    const form = formFrom(FILMS, CATALOG);
+    const blank = { attribute: "simulated", op: "eq" as const, value: "", picked: [] };
+
+    const built = inputFrom({ ...form, terms: [blank] }, CATALOG);
+
+    expect(built.source).toMatchObject({ filter: [{ attribute: "simulated", op: "eq", value: true }] });
+  });
+
   it("leaves a number that is not one as it was typed, so the back end names it", () => {
     const form = { ...formFrom(PRICE, CATALOG), threshold: "wysoko", interval: "często" };
 

@@ -1,43 +1,6 @@
-import type { Account, Assignment, Bot, Destination, GateState, Purpose } from "./telegramApi";
+import type { Account, Bot, Destination, GateState } from "./telegramApi";
 
 /** What the screen says, decided here so the decisions can be tested without a DOM. */
-
-export type Origin = { kind: "own" | "prefix" | "default"; key: string } | { kind: "none" };
-
-/** Where a purpose gets its recipient from: its own assignment, a prefix of it, the default — or nowhere. The operator has
- *  to see which, because a literal typo in a prefix assigns nothing and looks the same as an assignment that works. */
-export function originOf(purpose: Purpose): Origin {
-  if (purpose.destination === null || purpose.assignedBy === null) return { kind: "none" };
-  if (purpose.assignedBy === purpose.name) return { kind: "own", key: purpose.assignedBy };
-  if (purpose.assignedBy === "*") return { kind: "default", key: "*" };
-  return { kind: "prefix", key: purpose.assignedBy };
-}
-
-export function originLabel(origin: Origin): string {
-  switch (origin.kind) {
-    case "own":
-      return "przypisane wprost";
-    case "prefix":
-      return `z przypisania „${origin.key}”`;
-    case "default":
-      return "z przypisania domyślnego (*)";
-    case "none":
-      return "nikt nie słucha";
-  }
-}
-
-/** Purposes nobody hears come first — they are what the operator opened the tab to fix — then by name. */
-export function orderedPurposes(purposes: Purpose[]): Purpose[] {
-  return [...purposes].sort((a, b) => {
-    const heardA = a.destination === null ? 0 : 1;
-    const heardB = b.destination === null ? 0 : 1;
-    return heardA - heardB || a.name.localeCompare(b.name);
-  });
-}
-
-export function unheard(purposes: Purpose[]): Purpose[] {
-  return purposes.filter((one) => one.destination === null);
-}
 
 /** The destinations of one bot, in the order they were made (the door lists them that way). */
 export function destinationsOf(bot: Bot, destinations: Destination[]): Destination[] {
@@ -60,11 +23,6 @@ export function freeNameFor(wanted: string, bot: Bot, destinations: Destination[
   for (let n = 2; ; n++) {
     if (free(`${qualified}-${n}`)) return `${qualified}-${n}`;
   }
-}
-
-/** The assignments that end at one of this bot's recipients. */
-export function assignmentsOf(bot: Bot, assignments: Assignment[]): Assignment[] {
-  return assignments.filter((one) => one.bot === bot.username);
 }
 
 /** Who a recipient is, the way a person would say it: `@nick · Name`, a group by its title, and the label it was given
@@ -97,13 +55,7 @@ export function missingSettings(account: Account): string[] {
 
 /** One line under the title: what the operator needs to know before reading anything else. */
 export function headline(state: GateState): string {
-  const parts = [`${state.bots} ${plural(state.bots, "bot", "boty", "botów")}`, `${state.destinationsReady} odbiera`];
-  if (state.purposesUnheard > 0) {
-    parts.push(
-      `${state.purposesUnheard} ${plural(state.purposesUnheard, "cel", "cele", "celów")} bez odbiorcy`,
-    );
-  }
-  return parts.join(" · ");
+  return [`${state.bots} ${plural(state.bots, "bot", "boty", "botów")}`, `${state.destinationsReady} odbiera`].join(" · ");
 }
 
 function plural(n: number, one: string, few: string, many: string): string {
@@ -122,11 +74,3 @@ export function botUsernameProblem(username: string): string | null {
   return null;
 }
 
-/** A purpose or assignment key as the door will accept it — told here, so the dialog says what is wrong with it. */
-export function keyProblem(key: string): string | null {
-  if (key === "" || key === "*") return null;
-  if (key.length > 120 || !/^[a-z0-9][a-z0-9_-]*(\.[a-z0-9][a-z0-9_-]*)*$/.test(key)) {
-    return "małe litery, cyfry, _ i - w niepustych segmentach oddzielonych kropką, albo samo *";
-  }
-  return null;
-}

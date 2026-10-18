@@ -1,6 +1,6 @@
 """The two ends of the hand-over, held against each other. Each package tests its own end in its own suite (what it publishes,
-when it writes its marker); what no single package can show is that they agree — that what a producer announces is a type a
-converted rule can stand on, and that what it publishes is something the alerts package takes."""
+when it writes its marker); what no single package can show is that they agree — that what a producer publishes fits the type
+it announced, and that the alerts package takes it."""
 
 from __future__ import annotations
 
@@ -9,44 +9,10 @@ from datetime import UTC, datetime
 import httpx
 import pytest
 
-from alerts import legacy
-from alerts.legacy import Legacy, WatchedChannel, WatchedTopic, plan
-from alerts.validation import validate
 from social_data import alerts as social
 from social_data.models import Post
-from youtube_data import alerts as youtube
-
-from .builders import known
 
 NOW = datetime(2026, 10, 18, 12, 0, tzinfo=UTC)
-
-
-def converted_rules():
-    old = Legacy(
-        assignments={"*": "phone", "social.post.realdonaldtrump": "phone"},
-        channels=[WatchedChannel("Gold Talk", "threshold", True), WatchedChannel("Macro", "always", True)],
-        topics=[WatchedTopic("gold outlook", "always", True)],
-        social_min_score=8,
-    )
-    return plan(old)
-
-
-@pytest.mark.parametrize(
-    ("announced", "schema"),
-    [(youtube.EVENT_TYPE, youtube.EVENT_SCHEMA), (social.EVENT_TYPE, social.EVENT_SCHEMA)],
-)
-def test_the_converted_rules_stand_on_exactly_what_the_producer_announces(announced, schema) -> None:
-    """If a producer renamed an attribute the conversion filters on, every converted rule would go quiet at once."""
-    rules = [rule for rule in converted_rules() if rule.source.event_type == announced]  # pyright: ignore[reportAttributeAccessIssue]
-    assert rules, "the conversion makes rules for this producer"
-
-    on_what_it_announces = known(event_types={announced: schema}, destinations=frozenset({"phone"}))
-
-    assert [validate(rule, on_what_it_announces) for rule in rules] == [[] for _ in rules]
-
-
-def test_the_types_the_conversion_stands_rules_on_are_the_ones_the_producers_announce() -> None:
-    assert set(legacy.PLACEHOLDER_TYPES) == {youtube.EVENT_TYPE, social.EVENT_TYPE}
 
 
 def test_what_a_post_publishes_fits_the_schema_it_announced() -> None:

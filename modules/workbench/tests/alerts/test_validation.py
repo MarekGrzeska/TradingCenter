@@ -83,3 +83,11 @@ def test_a_template_may_fill_only_what_the_rule_has(template: str, refused: bool
 def test_an_event_template_may_fill_the_attributes_of_its_type() -> None:
     assert "template" not in fields_of(rule(event(), template="{channel}: {impact_score} — {text}"))
     assert set(FILM_SCHEMA["properties"]) >= {"channel", "impact_score"}
+
+
+def test_an_interval_below_the_floor_names_the_floor() -> None:
+    [defect] = [
+        d for d in validate(rule(condition(poll_interval_seconds=5)), known(min_interval_seconds=45)) if d.field.endswith("poll_interval_seconds")
+    ]
+
+    assert "45 s" in defect.message

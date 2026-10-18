@@ -111,6 +111,7 @@ def decide(
     last_fired_at: datetime | None,
     cooldown_seconds: int,
     now: datetime,
+    once: bool = False,
 ) -> Verdict:
     """Fire on the step from no to yes — not on every look that finds yes. `known` is the last answer actually had, so an
     outage in between neither counts as a no nor hides that the value was already over."""
@@ -121,5 +122,7 @@ def decide(
         return Verdict(fire=False, baseline=True)
     if not result or known:
         return Verdict(fire=False)
+    if once and last_fired_at is not None:
+        return Verdict(fire=False)  # its one alert is already on its way (or told); a second crossing is not another
     cooling = last_fired_at is not None and (now - last_fired_at).total_seconds() < cooldown_seconds
     return Verdict(fire=not cooling, cooled=cooling)

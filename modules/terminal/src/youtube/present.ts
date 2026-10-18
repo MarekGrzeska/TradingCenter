@@ -3,7 +3,7 @@
  * not reached through the DOM. Polish, like the social tab.
  */
 
-import type { AlertRule, ArchiveState, Film, ProviderState, Sentiment } from "./youtubeApi";
+import type { ArchiveState, Film, ProviderState, Sentiment } from "./youtubeApi";
 
 /** Where a film is on its road, in words. A film with a reading is said to be read; one without says why not. */
 export function stateLabel(film: Film): string {
@@ -37,14 +37,6 @@ export const SENTIMENT_ARROW: Record<Sentiment, string> = {
   bearish: "▼",
   neutral: "▬",
 };
-
-export const ALERT_RULE_LABEL: Record<AlertRule, string> = {
-  always: "zawsze",
-  threshold: "od progu wpływu",
-  never: "nigdy",
-};
-
-export const ALERT_RULES: AlertRule[] = ["always", "threshold", "never"];
 
 /** `12:34` for a film under an hour or `1 h 02 min`, or nothing where the source could not say — a feed does not. */
 export function duration(seconds: number | null): string | null {

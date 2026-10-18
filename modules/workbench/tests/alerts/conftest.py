@@ -21,7 +21,6 @@ TABLES: tuple[str, ...] = (
     "events",
     "event_types",
     "draft_usage",
-    "migrations_done",
 )
 
 

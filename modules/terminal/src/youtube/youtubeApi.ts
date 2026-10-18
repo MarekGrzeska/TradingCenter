@@ -11,7 +11,6 @@ import { jsonClient, statusMapper } from "../data/http";
 
 type Schemas = components["schemas"];
 
-export type AlertRule = Schemas["ChannelIn"]["alert_rule"];
 export type FilmState = Schemas["VideoOut"]["state"];
 export type Sentiment = Schemas["InstrumentOut"]["sentiment"];
 
@@ -86,7 +85,6 @@ export interface Channel {
   channelId: string;
   title: string;
   handle: string | null;
-  alertRule: AlertRule;
   active: boolean;
   addedBy: "operator" | "agent";
   lastDiscoveryAt: Date | null;
@@ -98,7 +96,6 @@ export interface Topic {
   language: string;
   intervalMinutes: number;
   maxVideosPerRun: number;
-  alertRule: AlertRule;
   active: boolean;
   addedBy: "operator" | "agent";
   lastRunAt: Date | null;
@@ -142,7 +139,6 @@ export interface TopicRequest {
   language?: string;
   intervalMinutes?: number;
   maxVideosPerRun?: number;
-  alertRule: AlertRule;
 }
 
 export interface TopicResult {
@@ -205,7 +201,6 @@ function mapChannel(raw: Schemas["ChannelOut"]): Channel {
     channelId: raw.channel_id,
     title: raw.title,
     handle: raw.handle ?? null,
-    alertRule: raw.alert_rule,
     active: raw.active,
     addedBy: raw.added_by,
     lastDiscoveryAt: optionalDate(raw.last_discovery_at),
@@ -219,7 +214,6 @@ function mapTopic(raw: Schemas["TopicOut"]): Topic {
     language: raw.language,
     intervalMinutes: raw.interval_minutes,
     maxVideosPerRun: raw.max_videos_per_run,
-    alertRule: raw.alert_rule,
     active: raw.active,
     addedBy: raw.added_by,
     lastRunAt: optionalDate(raw.last_run_at),
@@ -256,10 +250,10 @@ export interface YoutubeApi {
   state(signal: AbortSignal): Promise<ArchiveState>;
   transcript(videoId: string, offset: number, signal: AbortSignal): Promise<TranscriptPage>;
   channels(signal: AbortSignal): Promise<{ channels: Channel[]; ceiling: number }>;
-  followChannel(reference: string, alertRule: AlertRule, signal: AbortSignal): Promise<FollowResult>;
+  followChannel(reference: string, signal: AbortSignal): Promise<FollowResult>;
   setChannel(
     channelId: string,
-    patch: { alertRule?: AlertRule; active?: boolean },
+    patch: { active?: boolean },
     signal: AbortSignal,
   ): Promise<Channel>;
   unfollowChannel(channelId: string, signal: AbortSignal): Promise<void>;
@@ -267,7 +261,7 @@ export interface YoutubeApi {
   addTopic(request: TopicRequest, signal: AbortSignal): Promise<TopicResult>;
   setTopic(
     id: number,
-    patch: { alertRule?: AlertRule; active?: boolean },
+    patch: { active?: boolean },
     signal: AbortSignal,
   ): Promise<Topic>;
   removeTopic(id: number, signal: AbortSignal): Promise<void>;
@@ -317,9 +311,9 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
       return { channels: raw.channels.map(mapChannel), ceiling: raw.ceiling };
     },
 
-    async followChannel(reference, alertRule, signal) {
+    async followChannel(reference, signal) {
       // The contract lists the defaulted fields as required in a request body, so they are said.
-      const body: Schemas["ChannelIn"] = { reference, alert_rule: alertRule, language: "", profile: "market" };
+      const body: Schemas["ChannelIn"] = { reference, language: "", profile: "market" };
       const raw = await http.json<Schemas["ChannelAddedOut"]>(`${httpBase}/channels`, {
         signal,
         method: "POST",
@@ -330,7 +324,6 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
 
     async setChannel(channelId, patch, signal) {
       const body: Schemas["ChannelPatch"] = {
-        ...(patch.alertRule === undefined ? {} : { alert_rule: patch.alertRule }),
         ...(patch.active === undefined ? {} : { active: patch.active }),
       };
       return mapChannel(
@@ -356,7 +349,6 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
     async addTopic(request, signal) {
       const body: Schemas["TopicIn"] = {
         phrase: request.phrase,
-        alert_rule: request.alertRule,
         language: request.language ?? "",
         profile: "market",
         ...(request.intervalMinutes === undefined ? {} : { interval_minutes: request.intervalMinutes }),
@@ -372,7 +364,6 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
 
     async setTopic(id, patch, signal) {
       const body: Schemas["TopicPatch"] = {
-        ...(patch.alertRule === undefined ? {} : { alert_rule: patch.alertRule }),
         ...(patch.active === undefined ? {} : { active: patch.active }),
       };
       return mapTopic(

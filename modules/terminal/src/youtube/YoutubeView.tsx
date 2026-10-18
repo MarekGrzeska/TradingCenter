@@ -131,10 +131,6 @@ export function YoutubeView({ api }: { api?: YoutubeApi } = {}) {
       </header>
 
       {state.error !== null && <UnreachableNotice onRetry={state.reload}>{state.error}</UnreachableNotice>}
-      <p className="text-xs text-ink-faint">
-        Kto jest powiadamiany o filmach, ustawiają teraz reguły w zakładce Alerty; „reguła alertu” przy kanale i temacie już
-        niczego nie zmienia i zniknie w następnej zmianie.
-      </p>
 
       {/* Said for as long as it is true, not once: a screen that shows films which do not exist must not be mistaken for one
           that shows films. */}

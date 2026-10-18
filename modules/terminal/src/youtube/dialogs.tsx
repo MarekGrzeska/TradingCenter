@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
-import { ALERT_RULES, ALERT_RULE_LABEL } from "./present";
-import type { AlertRule, YoutubeApi } from "./youtubeApi";
+import type { YoutubeApi } from "./youtubeApi";
 
 /**
  * The four questions this tab asks the operator. A refusal from the module — a ceiling, a channel that does not exist, a
@@ -9,21 +8,6 @@ import type { AlertRule, YoutubeApi } from "./youtubeApi";
  */
 
 const INPUT = "rounded border border-border bg-sunken px-2 py-1 text-ink";
-
-function RuleSelect({ value, onChange }: { value: AlertRule; onChange(value: AlertRule): void }) {
-  return (
-    <label className="flex flex-col gap-1 text-xs">
-      <span className="text-ink-secondary">Kogo powiadamiać o filmach</span>
-      <select className={INPUT} value={value} onChange={(e) => onChange(e.target.value as AlertRule)}>
-        {ALERT_RULES.map((rule) => (
-          <option key={rule} value={rule}>
-            {ALERT_RULE_LABEL[rule]}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
 
 export function FollowChannelDialog({
   client,
@@ -35,7 +19,6 @@ export function FollowChannelDialog({
   onDone(): void;
 }) {
   const [reference, setReference] = useState("");
-  const [rule, setRule] = useState<AlertRule>("threshold");
   const [already, setAlready] = useState<string | null>(null);
 
   if (already !== null) {
@@ -49,8 +32,7 @@ export function FollowChannelDialog({
         onClose={onClose}
       >
         <p className="text-xs text-ink-secondary">
-          <span className="text-ink">{already}</span> jest już obserwowany. Nic nie zmieniono — reguła powiadomień
-          zostaje taka, jaką ustawiono.
+          <span className="text-ink">{already}</span> jest już obserwowany. Nic nie zmieniono.
         </p>
       </ConfirmDialog>
     );
@@ -65,7 +47,7 @@ export function FollowChannelDialog({
       fallbackError="nie udało się dodać kanału"
       closeOnSuccess={false}
       onConfirm={async () => {
-        const result = await client.followChannel(reference.trim(), rule, new AbortController().signal);
+        const result = await client.followChannel(reference.trim(), new AbortController().signal);
         onDone();
         if (!result.created) {
           setAlready(result.channel.title);
@@ -86,7 +68,6 @@ export function FollowChannelDialog({
             onChange={(e) => setReference(e.target.value)}
           />
         </label>
-        <RuleSelect value={rule} onChange={setRule} />
       </div>
     </ConfirmDialog>
   );
@@ -102,7 +83,6 @@ export function AddTopicDialog({
   onDone(): void;
 }) {
   const [phrase, setPhrase] = useState("");
-  const [rule, setRule] = useState<AlertRule>("threshold");
   const [interval, setInterval] = useState("");
   const [max, setMax] = useState("");
 
@@ -117,7 +97,6 @@ export function AddTopicDialog({
         await client.addTopic(
           {
             phrase: phrase.trim(),
-            alertRule: rule,
             ...(interval.trim() === "" ? {} : { intervalMinutes: wholeNumber(interval, "co ile minut") }),
             ...(max.trim() === "" ? {} : { maxVideosPerRun: wholeNumber(max, "ile filmów") }),
           },
@@ -148,7 +127,6 @@ export function AddTopicDialog({
             <input className={INPUT} inputMode="numeric" value={max} onChange={(e) => setMax(e.target.value)} />
           </label>
         </div>
-        <RuleSelect value={rule} onChange={setRule} />
         <p className="text-xs text-ink-faint">
           Każde wyszukiwanie zużywa dzienny limit źródła (sto jednostek z dziesięciu tysięcy klucza YouTube). Puste pola
           biorą wartości z ustawień.

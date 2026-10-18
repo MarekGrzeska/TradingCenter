@@ -5,14 +5,14 @@ REST contract the terminal and pocket read, and four tools at `/mcp` the workben
 
 A post is a market input the way a candle is: it happened at a moment, it is worth keeping after
 everybody has scrolled past it, and the question asked of it later is not the question asked at the
-time. This module keeps them. It decides nothing and alerts on nothing.
+time. This module keeps them. It decides nothing and alerts on nothing — it hands every post a model has read to the alerts package, whose rules decide whether anybody is told.
 
 **A package of the workbench since `one-process-per-security-boundary`**, served whole under
 `/social` of that process — its REST contract, its `/mcp`, its caller record — with its own database
 and its own migration chain (`alembic-social.ini`, lock key 8090, the port it used to have). Its four
 tools reach the conversation and the teams as functions, so there is no `SOCIAL_MCP_URL` anywhere. What
-is the archive's alone is read under `SOCIAL_` in the workbench's `.env`; who it tells
-(`ALERT_DESTINATION`) is the process's, unprefixed, and the door to Telegram is a client the host hands in.
+is the archive's alone is read under `SOCIAL_` in the workbench's `.env`; who is told is no setting at all — a rule in the Alerts tab — and the
+alerts package is a client the host hands in.
 
 ```bash
 # from modules/workbench

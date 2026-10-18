@@ -147,7 +147,7 @@ async def _stored_view(rig: Rig, video_id: str, sentiment: str, conviction: int)
         }
     )
     async with rig.pool.acquire() as conn:
-        await store.upsert_films(conn, [store.Discovery(ref, "manual", "market", "never")])
+        await store.upsert_films(conn, [store.Discovery(ref, "manual", "market")])
         await store.save_reading(conn, video_id, profile="market", reading=reading, model="m", simulated=False)
 
 

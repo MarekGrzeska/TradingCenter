@@ -17,7 +17,6 @@ SKIPPED = "skipped"
 
 STATES = (DISCOVERED, NO_TRANSCRIPT, TRANSCRIBED, ANALYSED, NOTIFIED, QUIET, GAVE_UP, SKIPPED)
 
-ALERT_RULES = ("always", "threshold", "never")
 ADDED_BY = ("operator", "agent")
 
 
@@ -29,7 +28,6 @@ class Channel:
     uploads_playlist_id: str | None
     language: str
     profile: str
-    alert_rule: str
     active: bool
     added_by: str
     added_at: datetime
@@ -44,7 +42,6 @@ class Topic:
     interval_minutes: int
     max_videos_per_run: int
     profile: str
-    alert_rule: str
     active: bool
     added_by: str
     added_at: datetime
@@ -63,7 +60,6 @@ class Video:
     origins: tuple[str, ...]
     audio_language: str | None
     profile: str
-    alert_rule: str
     state: str
     skip_reason: str | None
     attempts: int

@@ -38,6 +38,8 @@ class Clock:
         tools: ToolSource | None,
         heartbeat: LoopHeartbeat,
         gateway: Gateway | None = None,
+        *,
+        held: bool = False,
     ) -> None:
         self._pool = pool
         self._settings = settings
@@ -45,6 +47,11 @@ class Clock:
         self._heartbeat = heartbeat
         self.deliverer = Deliverer(pool, settings, gateway)
         self._woken = asyncio.Event()
+        # Held, the loop waits to be let go: a value rule read before the packages it reads are serving is an outage in
+        # its history that never happened.
+        self._released = asyncio.Event()
+        if not held:
+            self._released.set()
         self._last_cleanup: datetime | None = None
         self._task: asyncio.Task[None] | None = None
 
@@ -61,10 +68,14 @@ class Clock:
             pass
         self._task = None
 
+    def release(self) -> None:
+        self._released.set()
+
     def wake(self) -> None:
         self._woken.set()
 
     async def _run(self) -> None:
+        await self._released.wait()
         while True:
             try:
                 await self.tick()
@@ -128,6 +139,7 @@ class Clock:
             last_fired_at=row["last_fired_at"],
             cooldown_seconds=row["cooldown_seconds"],
             now=now,
+            once=row["mode"] == "once",
         )
         async with self._pool.acquire() as conn, conn.transaction():
             await store.record_look(conn, row["id"], result=seen.result, now=now)

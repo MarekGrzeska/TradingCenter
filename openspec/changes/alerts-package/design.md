@@ -150,6 +150,13 @@ Wycofanie kroku 1 lub 2: `deploy.sh` przywraca poprzednie obrazy. Tabele celów 
 kroku 3, więc stara brama działa jak przedtem, a reguły w bazie `alerts` czekają nieużywane. Krok 3 jest
 nieodwracalny tylko dla tabel, których od kroku 2 nikt nie czyta.
 
+Krok 3 jest rozdzielony na dwa wdrożenia (review, 18.10.2026): migracja nie widzi bazy `alerts`, więc nie potrafi sprawdzić,
+że konwersja się odbyła, a usunięcie kodu konwersji razem z kasowaniem danych (jedno wdrożenie) zostawia po sobie ciszę bez
+śladu. 3a: usunięcie kodu, ustawień i ekranów; tabele zostają, a klucz `assignments → destinations` dostaje `ON DELETE
+CASCADE`, żeby usunięcie adresata nie padło na starym wierszu. 3b: osobna zmiana, scalana dopiero po sprawdzeniu w bazie
+`alerts`, że `SELECT * FROM rules WHERE created_by = 'conversion'` zwraca reguły z przypisań — kasuje `purposes`,
+`assignments`, `alert_rule` i `migrations_done`.
+
 ## Open Questions
 
 - Domyślne liczby: najkrótszy interwał (proponowane 30 s), okno ponowień (6 h), sufit wysyłek reguły

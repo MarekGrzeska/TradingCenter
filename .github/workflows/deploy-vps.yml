@@ -229,7 +229,6 @@ jobs:
           AGENT_DEFAULT_MODEL_ID: ${{ vars.AGENT_DEFAULT_MODEL_ID }}
           YOUTUBE_DATA_API_KEY: ${{ secrets.YOUTUBE_DATA_API_KEY }}
           YOUTUBE_GEMINI_API_KEY: ${{ secrets.YOUTUBE_GEMINI_API_KEY }}
-          ALERT_DESTINATION: ${{ vars.ALERT_DESTINATION }}
           TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
           TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
           TELEGRAM_SESSION_KEY: ${{ secrets.TELEGRAM_SESSION_KEY }}

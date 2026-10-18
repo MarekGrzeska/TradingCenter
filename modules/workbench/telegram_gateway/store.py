@@ -11,17 +11,14 @@ from datetime import datetime
 
 from tc_runtime.db import Conn, fetch_one
 
-from . import purposes as purpose_rules
 from .models import (
     AccountRecord,
-    Assignment,
     Binding,
     Bot,
     BotCredential,
     ChatIdentity,
     Destination,
     DestinationState,
-    Purpose,
 )
 
 # Every column of `bots` except the one. Written once and reused, so that adding a column here is a
@@ -308,133 +305,11 @@ async def note_offset(conn: Conn, bot_id: int, offset: int) -> None:
     )
 
 
-# --- purposes and who hears them -----------------------------------------------------------------
+# --- destinations as they are read ---------------------------------------------------------------
 
 _DESTINATION_COLUMNS = (
     "d.id, d.name, d.bot_id, d.chat_id, d.state, d.bound_at, d.blocked_at, d.chat_username, d.chat_title, d.chat_kind"
 )
-
-
-def _purpose(row) -> Purpose:
-    return Purpose(
-        name=row["name"],
-        description=row["description"],
-        first_seen=row["first_seen"],
-        last_seen=row["last_seen"],
-        last_caller=row["last_caller"],
-    )
-
-
-async def note_purpose(
-    conn: Conn, name: str, *, caller: str | None, description: str | None = None
-) -> None:
-    """A purpose seen, or announced. One upsert on the primary key per message — a handful an hour — and
-    a description once given is kept when a later message brings none."""
-    await conn.execute(
-        """
-        INSERT INTO purposes (name, description, last_caller) VALUES ($1, $2, $3)
-        ON CONFLICT (name) DO UPDATE SET
-            last_seen = now(),
-            last_caller = COALESCE(EXCLUDED.last_caller, purposes.last_caller),
-            description = COALESCE(EXCLUDED.description, purposes.description)
-        """,
-        name,
-        description,
-        caller,
-    )
-
-
-async def list_purposes(conn: Conn) -> list[Purpose]:
-    rows = await conn.fetch(
-        "SELECT name, description, first_seen, last_seen, last_caller FROM purposes ORDER BY name"
-    )
-    return [_purpose(row) for row in rows]
-
-
-async def list_assignments(conn: Conn) -> list[tuple[Assignment, Destination]]:
-    rows = await conn.fetch(
-        f"""
-        SELECT a.key, a.destination_id, a.assigned_at, {_DESTINATION_COLUMNS}
-        FROM assignments a JOIN destinations d ON d.id = a.destination_id
-        ORDER BY (a.key = '*') DESC, a.key
-        """
-    )
-    return [
-        (
-            Assignment(row["key"], row["destination_id"], row["assigned_at"]),
-            _destination(row),
-        )
-        for row in rows
-    ]
-
-
-async def assign(conn: Conn, *, key: str, destination_id: int) -> Assignment:
-    """Points a key at a destination, replacing whatever it pointed at: one key, one recipient."""
-    row = await fetch_one(
-        conn,
-        """
-        INSERT INTO assignments (key, destination_id) VALUES ($1, $2)
-        ON CONFLICT (key) DO UPDATE SET destination_id = EXCLUDED.destination_id, assigned_at = now()
-        RETURNING key, destination_id, assigned_at
-        """,
-        key,
-        destination_id,
-    )
-    return Assignment(row["key"], row["destination_id"], row["assigned_at"])
-
-
-async def unassign(conn: Conn, key: str) -> bool:
-    result = await conn.execute("DELETE FROM assignments WHERE key = $1", key)
-    return result.endswith(" 1")
-
-
-async def assigned_to(conn: Conn, destination_id: int) -> list[str]:
-    """The keys a destination is still the recipient of."""
-    rows = await conn.fetch(
-        "SELECT key FROM assignments WHERE destination_id = $1 ORDER BY key", destination_id
-    )
-    return [row["key"] for row in rows]
-
-
-async def assigned_to_bot(conn: Conn, bot_id: int) -> list[str]:
-    """The keys any destination of this bot still receives."""
-    rows = await conn.fetch(
-        """
-        SELECT a.key FROM assignments a JOIN destinations d ON d.id = a.destination_id
-        WHERE d.bot_id = $1 ORDER BY a.key
-        """,
-        bot_id,
-    )
-    return [row["key"] for row in rows]
-
-
-async def recipient_of(conn: Conn, purpose: str) -> Destination | None:
-    """The destination whose assignment matches this purpose most closely, or `None`.
-
-    One statement: the candidates are the purpose and its prefixes by whole segment plus `*`, and the
-    longest present key wins with `*` always last.
-    """
-    row = await conn.fetchrow(
-        f"""
-        SELECT {_DESTINATION_COLUMNS}
-        FROM assignments a JOIN destinations d ON d.id = a.destination_id
-        WHERE a.key = ANY($1::text[])
-        ORDER BY (a.key = '*'), length(a.key) DESC
-        LIMIT 1
-        """,
-        purpose_rules.candidates(purpose),
-    )
-    return _destination(row) if row is not None else None
-
-
-async def count_unheard(conn: Conn) -> int:
-    """How many known purposes have no recipient — the number a state route reports so that a silent
-    gateway can be told from one with nothing to say."""
-    seen = await list_purposes(conn)
-    keys = {a.key for a, _ in await list_assignments(conn)}
-    if purpose_rules.DEFAULT_KEY in keys:
-        return 0
-    return sum(1 for one in seen if purpose_rules.deciding_key(one.name, keys) is None)
 
 
 # --- the account that owns the bots ----------------------------------------------------------------

@@ -72,7 +72,7 @@ async def read_film(pool, video_id: str, *, score: int, origin: str = "channel:U
         simulated=simulated,
     )
     async with pool.acquire() as conn:
-        await store.upsert_films(conn, [store.Discovery(ref, origin, "market", "threshold")])
+        await store.upsert_films(conn, [store.Discovery(ref, origin, "market")])
         await store.save_reading(conn, video_id, profile="market", reading=reading(score), model="m", simulated=simulated)
 
 
@@ -114,6 +114,41 @@ async def test_a_film_is_handed_over_once_and_a_refused_one_is_tried_again(pool)
     await handing(pool, fine).run(NOW)
     assert len(fine.sent) == 1
     assert await state_of(pool, "v1") == "notified"
+
+
+async def test_a_film_no_model_has_read_is_published_as_nothing(pool) -> None:
+    ref = VideoRef(
+        video_id="unread",
+        channel_id="UC1",
+        channel_title="Gold Talk",
+        title="Gold to 3000?",
+        published_at=NOW - timedelta(hours=2),
+        simulated=False,
+    )
+    async with pool.acquire() as conn:
+        await store.upsert_films(conn, [store.Discovery(ref, "channel:UC1", "market")])
+    publisher = RecordingPublisher()
+
+    assert await handing(pool, publisher).run(NOW) == 0
+    assert publisher.sent == []
+
+
+async def test_a_film_the_alerts_package_refused_does_not_hold_up_the_films_behind_it(pool) -> None:
+    await read_film(pool, "v1", score=9)
+    await read_film(pool, "v2", score=9)
+
+    class RefusesTheFirst(RecordingPublisher):
+        async def publish(self, *, source_key: str, attributes: dict, text: str) -> None:
+            await super().publish(source_key=source_key, attributes=attributes, text=text)
+            if len(self.sent) == 1:
+                raise Rejected("does not fit")
+
+    publisher = RefusesTheFirst()
+    one_at_a_time = Alerts(pool, publisher, batch_limit=1, window=timedelta(hours=48))  # type: ignore[arg-type]
+
+    assert await one_at_a_time.run(NOW) == 0
+    assert await one_at_a_time.run(NOW) == 1
+    assert len({key for key, _, _ in publisher.sent}) == 2
 
 
 @pytest.mark.parametrize("failure", [Rejected("no such type"), Unreachable("no answer")])
@@ -165,8 +200,8 @@ def test_a_channel_is_one_word_of_the_attribute() -> None:
 async def test_a_film_carries_the_channel_the_topic_and_the_score_a_rule_filters_by(pool) -> None:
     async with pool.acquire() as conn:
         topic = await conn.fetchval(
-            "INSERT INTO topics (phrase, language, interval_minutes, max_videos_per_run, profile, alert_rule, added_by) "
-            "VALUES ('gold outlook', '', 60, 3, 'market', 'threshold', 'operator') RETURNING id"
+            "INSERT INTO topics (phrase, language, interval_minutes, max_videos_per_run, profile, added_by) "
+            "VALUES ('gold outlook', '', 60, 3, 'market', 'operator') RETURNING id"
         )
     await read_film(pool, "v1", score=9, origin=f"topic:{topic}")
     publisher = RecordingPublisher()
@@ -222,7 +257,6 @@ def _item(**overrides) -> store.ToAnnounce:
         origins=("channel:UC1",),
         audio_language=None,
         profile="market",
-        alert_rule="threshold",
         state="analysed",
         skip_reason=None,
         attempts=0,
@@ -296,3 +330,13 @@ async def test_an_alerts_package_that_does_not_answer_is_not_a_hand_over() -> No
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://alerts") as client:
         with pytest.raises(Unreachable):
             await Publisher(client).publish(source_key="v1", attributes={}, text="hello")
+
+
+async def test_a_film_named_by_hand_ends_quiet_because_whoever_asked_is_already_looking(pool) -> None:
+    await read_film(pool, "v1", score=9, origin="manual")
+    publisher = RecordingPublisher()
+
+    await handing(pool, publisher).run(NOW)
+
+    assert publisher.sent == []
+    assert await state_of(pool, "v1") == "quiet"

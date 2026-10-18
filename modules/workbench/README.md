@@ -10,7 +10,7 @@ reason to exist was that the conversation built teams at a neighbour's address. 
 is the same behaviour with one process, one image and one App Service under it
 (`openspec/changes/agent-and-teams-one-workbench`).
 
-## The nine packages, and the rule between them
+## The ten packages, and the rule between them
 
 | Package | What |
 |---|---|
@@ -20,8 +20,9 @@ is the same behaviour with one process, one image and one App Service under it
 | `market_data/` | the candle archive, under `/market`: what the gateway saw and does not keep, its indicators, the candle stream (the one WebSocket this process serves), the largest table here, and eleven read-only tools — its own README beside it |
 | `polymarket_data/` | the prediction-market archive, under `/polymarket`, and the only door to Polymarket. Five of its tools **write** — the watch list and its groups, never a sample; removing an observation is REST-only |
 | `social_data/` | the post archive and the news, under `/social`: what was said, when, and what a model made of it — and headlines from 15 RSS feeds with the delay each arrived with. The door to Truth Social and to those feeds; **nothing on the tool surface writes, and the one REST route that does only marks a headline to keep**; a reading is stamped with its model and overwritten, never versioned; no backfill |
-| `telegram_gateway/` | the one door to Telegram, under `/telegram`: two tools (send, and who can be sent to), and bots and destinations that only the operator's `az` reaches. It remembers nothing it sent — its own README beside it |
+| `telegram_gateway/` | the one door to Telegram, under `/telegram`: two tools (send, and who can be sent to), and bots and destinations that only the operator's `az` reaches. It remembers nothing it sent, and decides nobody is told — its own README beside it |
 | `youtube_data/` | the YouTube archive, under `/youtube`: channels and topics the operator follows, their films, transcripts and what a model made of them. **Optional** — mounted only when `YOUTUBE_DATABASE_URL` is set; absent, the process runs without it |
+| `alerts/` | who is told what, and when, under `/alerts`: the rules the operator sets (a value a read-only tool reports crossing a level, or an event another package announced), the clock that looks, delivery through the door to Telegram with its retries and caps, and a rule from a sentence a model drafts for the operator to check. **Optional** — mounted only when `ALERTS_DATABASE_URL` is set. Two read-only tools; **no tool writes a rule** — its own README beside it |
 | `workbench/` | the assembly: one settings read, one FastAPI, one lifespan, and `root_access.py`, the caller record of the routes no package owns |
 
 **No package imports another; `workbench/` may import all of them and is the only place that may.** That is

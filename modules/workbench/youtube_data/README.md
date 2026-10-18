@@ -1,7 +1,7 @@
 # youtube-data
 
 The YouTube archive. Channels and search topics the operator (or an agent) chose to follow, the films
-they yield, their transcripts, what a model made of each, and a Telegram message when one matters.
+they yield, their transcripts, what a model made of each — and each read film handed to the alerts package, whose rules say whether anybody is told.
 Two surfaces in one process: the REST contract the terminal's **YouTube** tab reads, and nine tools at
 `/mcp` that reach the conversation and the teams as functions.
 
@@ -26,7 +26,7 @@ when the line is set.
 
 | Table | What | Who writes it |
 |---|---|---|
-| `channels`, `topics` | the watch list, each row with `added_by` (`operator` / `agent`), an alert rule and a profile | REST and tools add; **only REST removes** |
+| `channels`, `topics` | the watch list, each row with `added_by` (`operator` / `agent`) and a profile | REST and tools add; **only REST removes** |
 | `videos` | one row per film however many doors it came through (`origins`), its state and retry schedule | the loop; `POST /videos` and `analyse_video` enqueue one |
 | `transcripts` | the words, apart from `videos` so a list never reads TOAST | the loop |
 | `readings` | one per film and profile, stamped with its model and moment, overwritten on a re-read | the loop |
@@ -54,13 +54,13 @@ One pass every `YOUTUBE_POLL_INTERVAL_SECONDS`, four steps, each with a batch li
 3. **read** — one model call per film, no tools, no history, a strict JSON schema, the transcript marked
    as a stranger's data. An answer the schema rejects is one of the film's `READING_MAX_FAILURES`; a
    provider that could not be reached is none of them.
-4. **tell** — `analysed` → `notified` or `quiet`, by the rule of the channel or topic that found it:
-   `always`, `threshold` (`ALERT_MIN_IMPACT_SCORE`, 8) or `never`. The marker is written **after** a
-   successful send; a film not announced within `ALERT_WINDOW_HOURS` is let go as quiet. Without
-   `ALERT_DESTINATION` every read film ends quiet.
+4. **tell** — `analysed` → `notified` or `quiet`. Every read film is handed to the alerts package as a `youtube.film.read`
+   event (channel, topic, score, instruments, link and the message to send); what it does with it — tell nobody, tell one
+   person, tell another about this channel only — is a rule the operator sets in the Alerts tab, not something this
+   archive decides. The marker is written **after** the alerts package accepts the film; a film not handed over within
+   `ALERT_WINDOW_HOURS` is let go as quiet. Without an alerts package every read film ends quiet.
 
-A film named by hand (`POST /videos`, `analyse_video`) does not wait for a pass: it is transcribed, read and
-announced at once, in the background, under the same ceilings, prices and rests and under the same lock as the loop, so
+A film named by hand (`POST /videos`, `analyse_video`) does not wait for a pass: it is transcribed and read at once, and ends quiet (whoever asked is already looking), in the background, under the same ceilings, prices and rests and under the same lock as the loop, so
 the two never spend one day twice. Naming a film again skips the date of its last miss; a film already read is left alone.
 
 Every provider call is counted in `usage`, and daily ceilings stop the step that would exceed them, not

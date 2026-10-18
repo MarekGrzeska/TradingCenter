@@ -109,9 +109,9 @@ describe("the watch list", () => {
       }),
     );
 
-    const result = await createYoutubeApi(BASE).followChannel("@simzloto", "always", signal());
+    const result = await createYoutubeApi(BASE).followChannel("@simzloto", signal());
 
-    expect(seen).toEqual({ reference: "@simzloto", alert_rule: "always", language: "", profile: "market" });
+    expect(seen).toEqual({ reference: "@simzloto", language: "", profile: "market" });
     expect(result.created).toBe(false);
     expect(result.channel.lastDiscoveryAt).toBeNull();
   });
@@ -129,7 +129,7 @@ describe("the watch list", () => {
       ),
     );
 
-    await expect(createYoutubeApi(BASE).followChannel("@x", "never", signal())).rejects.toMatchObject({
+    await expect(createYoutubeApi(BASE).followChannel("@x", signal())).rejects.toMatchObject({
       kind: "refused",
       message: expect.stringContaining("the watch list holds 100 channels"),
     });

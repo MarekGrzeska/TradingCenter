@@ -16,6 +16,10 @@ from .local_tools import _InProcess
 
 log = logging.getLogger(__name__)
 
+# Reads that ask a provider each time they are called. A rule looks every few seconds, so these would spend Polymarket's
+# patience or Capital's per-account request budget (shared with the gateway's own stream) on a question the archive answers.
+LIVE_READS = frozenset({"search_events", "browse_events", "search_instruments"})
+
 
 class AlertTools:
     def __init__(self, servers: Mapping[str, FastMCP]) -> None:
@@ -41,6 +45,8 @@ class AlertTools:
             found: dict[str, CatalogTool] = {}
             for label, core in self._cores.items():
                 for tool in await core.tools():
+                    if tool.name in LIVE_READS:
+                        continue
                     if tool.name in found:
                         # Two packages with one name would make a rule's `tool_name` ambiguous; the first keeps it.
                         log.warning("tool %s is offered by %s and by %s; a rule reads the first", tool.name, self._owner[tool.name], label)

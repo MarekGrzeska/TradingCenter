@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from . import budget, store
 from .analysis import PROFILES
 from .config import Settings
-from .models import ADDED_BY, ALERT_RULES, DISCOVERED, NO_TRANSCRIPT, TRANSCRIBED, Channel, Topic
+from .models import ADDED_BY, DISCOVERED, NO_TRANSCRIPT, TRANSCRIBED, Channel, Topic
 from .providers.base import ChannelInfo, SourceError, VideoSource
 from .providers.refs import video_id
 
@@ -47,11 +47,9 @@ async def follow_channel(
     reference: str,
     *,
     added_by: str,
-    alert_rule: str = "threshold",
     profile: str = "market",
     language: str = "",
 ) -> Followed:
-    _check_choice("alert_rule", alert_rule, ALERT_RULES)
     _check_choice("profile", profile, tuple(PROFILES))
     _check_choice("added_by", added_by, ADDED_BY)
     try:
@@ -69,7 +67,7 @@ async def follow_channel(
                 "to take one off; adding another would need a decision about which"
             )
         channel = await store.add_channel(
-            conn, info, language=language, profile=profile, alert_rule=alert_rule, added_by=added_by
+            conn, info, language=language, profile=profile, added_by=added_by
         )
     return Followed(channel, created=True)
 
@@ -91,13 +89,11 @@ async def add_topic(
     language: str = "",
     interval_minutes: int | None = None,
     max_videos_per_run: int | None = None,
-    alert_rule: str = "threshold",
     profile: str = "market",
 ) -> AddedTopic:
     text = " ".join(phrase.split())
     if not text or len(text) > MAX_PHRASE_CHARS:
         raise WatchlistRefused(f"a topic is a phrase of 1 to {MAX_PHRASE_CHARS} characters")
-    _check_choice("alert_rule", alert_rule, ALERT_RULES)
     _check_choice("profile", profile, tuple(PROFILES))
     _check_choice("added_by", added_by, ADDED_BY)
 
@@ -138,7 +134,6 @@ async def add_topic(
             interval_minutes=interval_minutes,
             max_videos_per_run=max_videos_per_run,
             profile=profile,
-            alert_rule=alert_rule,
             added_by=added_by,
         )
     return AddedTopic(topic, created=True, defaults_applied=tuple(defaults))
@@ -161,13 +156,11 @@ async def analyse_film(
     reference: str,
     *,
     profile: str = "market",
-    alert_rule: str = "never",
 ) -> Queued:
     """One film named by hand. Costs what asking the source about it costs, counted against the same day as everything
     else; the caller then has it processed at once (`Ingest.start_now`) rather than left to the loop's next pass. Not an
-    alert by default: whoever asked is already looking."""
+    alert: a film named by hand ends quiet, because whoever asked is already looking."""
     _check_choice("profile", profile, tuple(PROFILES))
-    _check_choice("alert_rule", alert_rule, ALERT_RULES)
     try:
         wanted = video_id(reference)
     except SourceError as err:
@@ -202,7 +195,7 @@ async def analyse_film(
 
     async with pool.acquire() as conn:
         await store.upsert_films(
-            conn, [store.Discovery(found[0], origin="manual", profile=profile, alert_rule=alert_rule)]
+            conn, [store.Discovery(found[0], origin="manual", profile=profile)]
         )
         await store.add_usage(conn, providers.meter.drain(), day=budget.utc_day(providers.clock.now()))
     return Queued(found[0].video_id, found[0].title, created=True, process=True)
