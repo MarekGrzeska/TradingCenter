@@ -89,6 +89,11 @@ async def lifespan(app: FastAPI):
         else ConversationLocalTools("youtube-data", youtube_app.state.mcp_server)
     )
 
+    alerts_tools = (
+        None
+        if alerts_app is None
+        else ConversationLocalTools("alerts", alerts_app.state.mcp_server)
+    )
     # What a rule can read: every package's read-only tools, called as functions. The door to Telegram has nothing to read.
     alert_tools = AlertTools(
         {
@@ -113,6 +118,7 @@ async def lifespan(app: FastAPI):
             social_tools,
             telegram_tools,
             *([] if youtube_tools is None else [youtube_tools]),
+            *([] if alerts_tools is None else [alerts_tools]),
         ],
     )
 
@@ -189,6 +195,9 @@ async def lifespan(app: FastAPI):
             teams_tool_servers.local["youtube-data"] = TeamsLocalTools(
                 "youtube-data", youtube_app.state.mcp_server
             )
+
+        if alerts_app is not None:
+            teams_tool_servers.local["alerts"] = TeamsLocalTools("alerts", alerts_app.state.mcp_server)
 
         # The `try` opens before the schema checks, not after: `ToolServer.__init__` already holds a credential when a
         # scope is configured, and a refused start is exactly the path that would otherwise leak it.

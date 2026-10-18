@@ -18,12 +18,13 @@ from tc_runtime.db import pool as make_pool
 from tc_runtime.liveness import Heartbeats, LoopHeartbeat
 
 from . import drafter as drafter_module
+from . import mcp_app
 from .caller_access import RECORD, CallerAccess
 from .catalog import ToolSource
 from .clock import Clock
 from .config import Settings
 from .gateway import Gateway
-from .routers import catalog, drafts, events, meta, rules
+from .routers import catalog, drafts, events, meta, rules, state
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
 log = logging.getLogger(__name__)
@@ -75,11 +76,14 @@ async def serving(
         clock = Clock(pool, settings, tools, heartbeats["clock"], app.state.gateway)
         app.state.clock = clock
         await clock.start()
-        log.info("alerts is serving")
-        try:
-            yield
-        finally:
-            await clock.stop()
+        # The tool surface's session manager: a mounted application's lifespan is never run, so the task group has to be
+        # started here or every tool call fails.
+        async with mcp_app.tool_surface_session(app):
+            log.info("alerts is serving")
+            try:
+                yield
+            finally:
+                await clock.stop()
 
 
 @asynccontextmanager
@@ -102,8 +106,14 @@ def create_app() -> FastAPI:
     app.include_router(rules.router)
     app.include_router(events.router)
     app.include_router(drafts.router)
+    app.include_router(state.router)
+
+    server, tool_app = mcp_app.build_mcp_app(app)
+    app.state.mcp_server = server
+    app.mount(mcp_app.MOUNT_PATH, tool_app)
 
     # In front of the whole application: nothing decides who may call after routing has begun.
+    app.add_middleware(mcp_app.ToolSurfaceAddress)
     app.add_middleware(CallerAccess, state=app.state, record=RECORD)
     return app
 
