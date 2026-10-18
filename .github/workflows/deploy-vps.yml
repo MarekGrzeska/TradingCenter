@@ -238,9 +238,10 @@ jobs:
       - name: Send the environment and the server's files
         run: |
           set -euo pipefail
+          # Files first: `env` is checked against the server's env.required, which must be this commit's, not the last one's.
+          tar -C deploy -cf - docker-compose.yml Caddyfile env.required postgres/ensure-databases.sh | ssh vps sync
           ssh vps env < "$RUNNER_TEMP/server.env"
           rm -f "$RUNNER_TEMP/server.env"
-          tar -C deploy -cf - docker-compose.yml Caddyfile env.required postgres/ensure-databases.sh | ssh vps sync
           tar -C modules/terminal/dist -cf - . | ssh vps www terminal
           tar -C modules/pocket/dist -cf - . | ssh vps www pocket
 
