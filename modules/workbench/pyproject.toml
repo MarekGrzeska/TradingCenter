@@ -26,6 +26,8 @@ dependencies = [
     # The MCP client half of the SDK market-data and trading-mcp serve with, pinned exactly for the reason all of
     # them pin it: `mcp` shipped a 2.0.0 that moved public names during a minor series.
     "mcp==1.27.0",
+    # A rule's arguments are checked against the input schema of the tool it names, as that tool published it.
+    "jsonschema>=4.20",
     # `tools/client.py` builds its session's HTTP client and per-request auth flow against httpx directly, and
     # `teams_tools/client.py` speaks to the teams routers through `httpx.ASGITransport` — no network, same process.
     "httpx>=0.27",

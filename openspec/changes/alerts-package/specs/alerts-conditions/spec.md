@@ -75,17 +75,3 @@ sprawdzana co najwyżej raz naraz, także przy wielu instancjach procesu.
 
 - **WHEN** operator zapisuje regułę z interwałem krótszym niż granica
 - **THEN** zapis MUST zostać odrzucony, a komunikat MUST podawać granicę
-
-### Requirement: Przebicie poziomu nie ginie między sprawdzeniami
-
-Reguła stanu nad ceną MAY porównywać ekstremum bieżącego okresu (najwyższą albo najniższą cenę
-tworzącej się świecy) zamiast ceny ostatniej. Kreator MUST proponować ekstremum jako domyślne dla
-porównań „powyżej” i „poniżej” ceny.
-
-Szpilka, która przebiła poziom i wróciła między dwoma sprawdzeniami, to ten alert, na który operator
-czekał.
-
-#### Scenario: Szpilka między sprawdzeniami
-
-- **WHEN** cena przebija 1,10 i wraca poniżej, zanim nastąpi następne sprawdzenie, a reguła porównuje najwyższą cenę okresu
-- **THEN** reguła MUST odpalić przy tym sprawdzeniu

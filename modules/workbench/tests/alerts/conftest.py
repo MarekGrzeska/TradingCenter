@@ -84,3 +84,46 @@ def app():
     """A fresh application per test. A fixture rather than an import: while the module-level `app` was in scope, a test
     that forgot to ask for this one still found something to mutate."""
     return create_app()
+
+
+@pytest.fixture
+def tools():
+    from .builders import FakeTools
+
+    return FakeTools()
+
+
+@pytest.fixture
+def door():
+    from .builders import FakeGateway
+
+    return FakeGateway()
+
+
+@pytest.fixture
+async def api(app, pool, settings, tools, door):
+    """The application as the terminal reaches it — no identity required, as locally — over the migrated database."""
+    import httpx
+
+    app.state.pool = pool
+    app.state.settings = settings
+    app.state.tools = tools
+    app.state.gateway = door
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://tests") as client:
+        yield client
+
+
+@pytest.fixture
+async def inside(app, pool, settings, tools, door):
+    """The same application as another package of the process reaches it."""
+    import httpx
+    from tc_runtime.caller_access import in_process
+
+    app.state.pool = pool
+    app.state.settings = settings
+    app.state.tools = tools
+    app.state.gateway = door
+    transport = httpx.ASGITransport(app=in_process(app, "the youtube archive"))
+    async with httpx.AsyncClient(transport=transport, base_url="http://tests") as client:
+        yield client

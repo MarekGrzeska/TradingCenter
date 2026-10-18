@@ -9,18 +9,18 @@
 
 ## 2. Katalog i reguły
 
-- [ ] 2.1 Katalog narzędzi: podzbiór `local_tools` z `READ_ONLY` przekazany przez assembly, pola liczbowe wyliczane z `outputSchema`
-- [ ] 2.2 `PUT /alerts/event-types/{name}` (tylko w procesie) i oznaczanie reguł, którym nowy schemat zabrał pole
-- [ ] 2.3 Model `RuleIn` i walidacja zapisu wobec katalogu i listy adresatów bramy (`alerts-rules`)
-- [ ] 2.4 REST reguł: lista ze stanem i wadami, tworzenie, zmiana, włącz/wyłącz, usunięcie
-- [ ] 2.5 Podstawiacz szablonu `{name}` (bez `str.format`), cięcie do limitu bramy, podgląd
-- [ ] 2.6 Testy jednostkowe walidacji (każdy powód odrzucenia raz) i szablonu; jeden test REST na trasę
+- [x] 2.1 Katalog narzędzi: podzbiór `local_tools` z `READ_ONLY` przekazany przez assembly, pola liczbowe wyliczane z `outputSchema`
+- [x] 2.2 `PUT /alerts/event-types/{name}` (tylko w procesie) i oznaczanie reguł, którym nowy schemat zabrał pole
+- [x] 2.3 Model `RuleIn` i walidacja zapisu wobec katalogu i listy adresatów bramy (`alerts-rules`)
+- [x] 2.4 REST reguł: lista ze stanem i wadami, tworzenie, zmiana, włącz/wyłącz, usunięcie
+- [x] 2.5 Podstawiacz szablonu `{name}` (bez `str.format`), cięcie do limitu bramy, podgląd
+- [x] 2.6 Testy jednostkowe walidacji (każdy powód odrzucenia raz) i szablonu; jeden test REST na trasę
 
 ## 3. Źródło „stan”
 
 - [ ] 3.1 `conditions.py`: kopia chodzenia po polu, porównania, zbocza i czasu martwego z `teams/scheduler/clock.py`, z trzecim stanem porównywanym z ostatnim znanym wynikiem
 - [ ] 3.2 Zegar: zajęcie należnych reguł (`SKIP LOCKED`), wywołanie narzędzia, zapis `rule_checks`, odpalenie przy zboczu
-- [ ] 3.3 Kreator proponuje high/low tworzącej się świecy dla porównań ceny; tryb jednorazowy wyłącza regułę po doręczeniu
+- [ ] 3.3 Tryb jednorazowy wyłącza regułę po pierwszym doręczeniu
 - [ ] 3.4 Testy: zbocze raz, miganie w czasie martwym, niedostępność ≠ fałsz, powrót po niedostępności bez fałszywego zbocza, zero wywołań modelu
 - [ ] 3.5 `db-cost-check` dla zajęcia reguł i odczytu `get_last_price` przy 20 regułach co 30 s
 
