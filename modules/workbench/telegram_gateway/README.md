@@ -30,8 +30,8 @@ It remembers no message, and no purpose either: who is told what is not decided 
 This door says **how** to reach somebody, never **whether** to. A message is addressed to a destination by name, and what
 decides that a message is sent at all — and to whom — is a rule in the **alerts** package (`modules/workbench/alerts/`):
 the operator sets rules in the terminal's Alerts tab, and the package sends through `POST /messages` by name. Until
-`alerts-package` this door held purposes and assignments of its own; they were converted into rules and nothing reads the tables any more. The tables (`purposes`, `assignments`)
-go in a later migration, once the conversion is verified in production. A request that still sends a `purpose` is refused
+`alerts-package` this door held purposes and assignments of its own; they were converted into rules and the tables are gone
+(migration `0006`). A request that still sends a `purpose` is refused
 with `422`, not ignored.
 
 A recipient or a bot can be removed freely: the rules that name it stay on their list, flagged, and stop delivering.

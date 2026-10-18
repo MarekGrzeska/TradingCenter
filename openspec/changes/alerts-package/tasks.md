@@ -85,4 +85,4 @@ Przed przełączeniem producentów: reguły powstają z przypisań i reguł kana
 - [x] 11.2 `ALERT_MIN_IMPACT_SCORE` w `RETIRED_SETTINGS`
 - [x] 11.3 `alerts/README.md`; aktualizacja README `telegram_gateway`, `modules/workbench/README.md`, tabeli w `CLAUDE.md` (dziewięć pakietów) i `docs/architecture.md`
 - [ ] 11.4 Po każdym wdrożeniu skill `deploy-watch`
-- [ ] 11.5 Osobny PR (`alerts/12-drop-old-data`), scalany po wdrożeniu #318 i sprawdzeniu, że konwersja zadziałała: migracje usuwające `purposes`, `assignments` (telegram), `alert_rule` (youtube) i `migrations_done` (alerts)
+- [x] 11.5 Osobny PR (`alerts/12-drop-old-data`), scalany po wdrożeniu #318 i sprawdzeniu, że konwersja zadziałała: migracje usuwające `purposes`, `assignments` (telegram), `alert_rule` (youtube) i `migrations_done` (alerts)

@@ -18,6 +18,7 @@ async def test_the_migration_creates_every_table(db) -> None:
     }
 
     assert {"event_types", "events", "rules", "rule_checks", "fires", "draft_usage"} <= found
+    assert "migrations_done" not in found
 
 
 async def test_a_rule_with_both_sources_is_refused(db) -> None:
