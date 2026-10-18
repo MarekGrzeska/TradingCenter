@@ -1,0 +1,150 @@
+"""Logging the owner account in, from the terminal, and out again. REST alone: a session outlives the
+conversation that asked for it, and whoever holds it can write as the bots the operator trusts.
+
+The steps are Telegram's and so is the wording of every refusal. Nothing here logs, echoes or stores a code or a
+password; the session leaves `account.py` only into `session_crypto`.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from fastapi import APIRouter, Request, status
+
+from .. import account
+from ..contract import (
+    AccountOut,
+    LoginCodeRequest,
+    LoginPasswordRequest,
+    LoginStartRequest,
+    LoginStepOut,
+    LogoutOut,
+    Problem,
+    QrLoginOut,
+)
+from ..errors import GatewayError
+from . import deps
+
+router = APIRouter(prefix="/account", tags=["account"])
+
+_REFUSALS: dict[int | str, dict[str, Any]] = {409: {"model": Problem}, 501: {"model": Problem}}
+
+
+async def account_out(conn, settings) -> AccountOut:
+    current = await account.view(conn, settings)
+    return AccountOut(
+        status=current.status.value,  # pyright: ignore[reportArgumentType]
+        username=current.username,
+        phone=current.phone_masked,
+        reason=current.reason,
+        session_key_configured=settings.session_key_configured,
+        api_credentials_configured=settings.api_credentials_configured,
+    )
+
+
+@router.get("", response_model=AccountOut)
+async def read(request: Request) -> AccountOut:
+    async with deps.connection(request.app.state.pool) as conn:
+        return await account_out(conn, request.app.state.settings)
+
+
+@router.post("/login", response_model=LoginStepOut, responses=_REFUSALS)
+async def begin(request: Request, body: LoginStartRequest) -> LoginStepOut:
+    """Asks Telegram to send a code to the number. Replaces a login already in progress."""
+    settings = request.app.state.settings
+    try:
+        api_id, api_hash, _ = account.require_login_settings(settings)
+        delivery = await request.app.state.login.begin(body.phone, api_id=api_id, api_hash=api_hash)
+    except GatewayError as err:
+        raise deps.refusal(err) from err
+    return LoginStepOut(
+        step="code",
+        delivery=delivery.delivery,  # pyright: ignore[reportArgumentType]
+        can_resend=delivery.can_resend,
+    )
+
+
+@router.post("/login/resend", response_model=LoginStepOut, responses=_REFUSALS)
+async def resend(request: Request) -> LoginStepOut:
+    """The code did not come: asks Telegram for another way of delivering it (an app message, then SMS, then a call) and
+    says which. The login stays the one that is open, so the code that arrives is accepted by it."""
+    try:
+        delivery = await request.app.state.login.resend()
+    except GatewayError as err:
+        raise deps.refusal(err) from err
+    return LoginStepOut(
+        step="code",
+        delivery=delivery.delivery,  # pyright: ignore[reportArgumentType]
+        can_resend=delivery.can_resend,
+    )
+
+
+@router.post("/login/qr", response_model=QrLoginOut, responses=_REFUSALS)
+async def begin_qr(request: Request) -> QrLoginOut:
+    """Starts a login by QR code: nothing is sent to the account, an app logged in to it scans the code (Settings →
+    Devices → Link Desktop Device). Replaces a login already in progress."""
+    settings = request.app.state.settings
+    try:
+        api_id, api_hash, _ = account.require_login_settings(settings)
+        ticket = await request.app.state.login.begin_qr(api_id=api_id, api_hash=api_hash)
+    except GatewayError as err:
+        raise deps.refusal(err) from err
+    return QrLoginOut(status="waiting", url=ticket.url, expires_at=ticket.expires_at)
+
+
+@router.get("/login/qr", response_model=QrLoginOut, responses=_REFUSALS)
+async def qr_state(request: Request) -> QrLoginOut:
+    """Where the QR login is — asked every few seconds while the code is on screen. A scan without a password saves the
+    account here, once."""
+    settings = request.app.state.settings
+    try:
+        state = await request.app.state.login.qr_state()
+    except GatewayError as err:
+        raise deps.refusal(err) from err
+    if state.status == "done" and state.identity is not None:
+        async with deps.connection(request.app.state.pool) as conn:
+            await account.save_login(conn, settings, state.identity)
+            return QrLoginOut(status="done", account=await account_out(conn, settings))
+    return QrLoginOut(
+        status=state.status,  # pyright: ignore[reportArgumentType]
+        url=state.ticket.url if state.ticket and state.status == "waiting" else None,
+        expires_at=state.ticket.expires_at if state.ticket and state.status == "waiting" else None,
+        reason=state.reason,
+    )
+
+
+@router.post("/login/code", response_model=LoginStepOut, responses=_REFUSALS)
+async def code(request: Request, body: LoginCodeRequest) -> LoginStepOut:
+    """The code Telegram sent. A wrong one leaves the login open for another; an account with a password
+    answers `step: password`."""
+    settings = request.app.state.settings
+    try:
+        identity = await request.app.state.login.code(body.code)
+        if identity is None:
+            return LoginStepOut(step="password")
+        async with deps.connection(request.app.state.pool) as conn:
+            await account.save_login(conn, settings, identity)
+            return LoginStepOut(step="done", account=await account_out(conn, settings))
+    except GatewayError as err:
+        raise deps.refusal(err) from err
+
+
+@router.post("/login/password", response_model=LoginStepOut, responses=_REFUSALS)
+async def password(request: Request, body: LoginPasswordRequest) -> LoginStepOut:
+    settings = request.app.state.settings
+    try:
+        identity = await request.app.state.login.password(body.password)
+        async with deps.connection(request.app.state.pool) as conn:
+            await account.save_login(conn, settings, identity)
+            return LoginStepOut(step="done", account=await account_out(conn, settings))
+    except GatewayError as err:
+        raise deps.refusal(err) from err
+
+
+@router.delete("", response_model=LogoutOut, status_code=status.HTTP_200_OK)
+async def log_out(request: Request) -> LogoutOut:
+    """Forgets the account here and ends its session at Telegram when Telegram can be reached. The bots stay;
+    only the ability to create, delete and rotate them goes until the account is logged in again."""
+    async with deps.connection(request.app.state.pool) as conn:
+        told = await account.log_out(conn, request.app.state.settings, request.app.state.platform)
+    return LogoutOut(ended_at_telegram=told)

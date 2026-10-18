@@ -11,7 +11,18 @@ from datetime import datetime
 
 from tc_runtime.db import Conn, fetch_one
 
-from .models import Binding, Bot, BotCredential, Destination, DestinationState
+from . import purposes as purpose_rules
+from .models import (
+    AccountRecord,
+    Assignment,
+    Binding,
+    Bot,
+    BotCredential,
+    ChatIdentity,
+    Destination,
+    DestinationState,
+    Purpose,
+)
 
 # Every column of `bots` except the one. Written once and reused, so that adding a column here is a
 # deliberate act rather than something `SELECT *` did on somebody's behalf.
@@ -38,6 +49,9 @@ def _destination(row) -> Destination:
         chat_id=row["chat_id"],
         bound_at=row["bound_at"],
         blocked_at=row["blocked_at"],
+        chat_username=row["chat_username"],
+        chat_title=row["chat_title"],
+        chat_kind=row["chat_kind"],
     )
 
 
@@ -121,7 +135,7 @@ async def create_destination(conn: Conn, *, name: str, bot_id: int) -> Destinati
         """
         INSERT INTO destinations (name, bot_id)
         VALUES ($1, $2)
-        RETURNING id, name, bot_id, chat_id, state, bound_at, blocked_at
+        RETURNING id, name, bot_id, chat_id, state, bound_at, blocked_at, chat_username, chat_title, chat_kind
         """,
         name,
         bot_id,
@@ -131,7 +145,7 @@ async def create_destination(conn: Conn, *, name: str, bot_id: int) -> Destinati
 
 async def list_destinations(conn: Conn) -> list[Destination]:
     rows = await conn.fetch(
-        "SELECT id, name, bot_id, chat_id, state, bound_at, blocked_at "
+        "SELECT id, name, bot_id, chat_id, state, bound_at, blocked_at, chat_username, chat_title, chat_kind "
         "FROM destinations ORDER BY created_at, id"
     )
     return [_destination(row) for row in rows]
@@ -139,7 +153,7 @@ async def list_destinations(conn: Conn) -> list[Destination]:
 
 async def destination_by_name(conn: Conn, name: str) -> Destination | None:
     row = await conn.fetchrow(
-        "SELECT id, name, bot_id, chat_id, state, bound_at, blocked_at "
+        "SELECT id, name, bot_id, chat_id, state, bound_at, blocked_at, chat_username, chat_title, chat_kind "
         "FROM destinations WHERE name = $1",
         name,
     )
@@ -203,7 +217,12 @@ async def binding_for(conn: Conn, nonce: str) -> Binding | None:
 
 
 async def bind_destination(
-    conn: Conn, *, nonce: str, chat_id: int, moment: datetime
+    conn: Conn,
+    *,
+    nonce: str,
+    chat_id: int,
+    moment: datetime,
+    who: ChatIdentity | None = None,
 ) -> Destination | None:
     """Spends the secret and turns the intention into an address, or neither.
 
@@ -226,15 +245,38 @@ async def bind_destination(
             conn,
             """
             UPDATE destinations
-            SET chat_id = $2, state = 'ready', bound_at = $3, blocked_at = NULL
+            SET chat_id = $2, state = 'ready', bound_at = $3, blocked_at = NULL,
+                chat_username = $4, chat_title = $5, chat_kind = $6
             WHERE id = $1
-            RETURNING id, name, bot_id, chat_id, state, bound_at, blocked_at
+            RETURNING id, name, bot_id, chat_id, state, bound_at, blocked_at, chat_username, chat_title, chat_kind
             """,
             spent["destination_id"],
             chat_id,
             moment,
+            who.username if who else None,
+            who.title if who else None,
+            who.kind if who else None,
         )
     return _destination(row)
+
+
+async def note_identity(conn: Conn, destination_id: int, who: ChatIdentity) -> None:
+    """Who a destination bound before this was recorded turns out to be — asked of Telegram once, after the fact."""
+    await conn.execute(
+        "UPDATE destinations SET chat_username = $2, chat_title = $3, chat_kind = $4 WHERE id = $1",
+        destination_id,
+        who.username,
+        who.title,
+        who.kind,
+    )
+
+
+async def destinations_without_identity(conn: Conn) -> list[Destination]:
+    rows = await conn.fetch(
+        "SELECT id, name, bot_id, chat_id, state, bound_at, blocked_at, chat_username, chat_title, chat_kind "
+        "FROM destinations WHERE chat_id IS NOT NULL AND chat_kind IS NULL"
+    )
+    return [_destination(row) for row in rows]
 
 
 async def mark_blocked(conn: Conn, destination_id: int, moment: datetime) -> None:
@@ -264,3 +306,187 @@ async def note_offset(conn: Conn, bot_id: int, offset: int) -> None:
         bot_id,
         offset,
     )
+
+
+# --- purposes and who hears them -----------------------------------------------------------------
+
+_DESTINATION_COLUMNS = (
+    "d.id, d.name, d.bot_id, d.chat_id, d.state, d.bound_at, d.blocked_at, d.chat_username, d.chat_title, d.chat_kind"
+)
+
+
+def _purpose(row) -> Purpose:
+    return Purpose(
+        name=row["name"],
+        description=row["description"],
+        first_seen=row["first_seen"],
+        last_seen=row["last_seen"],
+        last_caller=row["last_caller"],
+    )
+
+
+async def note_purpose(
+    conn: Conn, name: str, *, caller: str | None, description: str | None = None
+) -> None:
+    """A purpose seen, or announced. One upsert on the primary key per message — a handful an hour — and
+    a description once given is kept when a later message brings none."""
+    await conn.execute(
+        """
+        INSERT INTO purposes (name, description, last_caller) VALUES ($1, $2, $3)
+        ON CONFLICT (name) DO UPDATE SET
+            last_seen = now(),
+            last_caller = COALESCE(EXCLUDED.last_caller, purposes.last_caller),
+            description = COALESCE(EXCLUDED.description, purposes.description)
+        """,
+        name,
+        description,
+        caller,
+    )
+
+
+async def list_purposes(conn: Conn) -> list[Purpose]:
+    rows = await conn.fetch(
+        "SELECT name, description, first_seen, last_seen, last_caller FROM purposes ORDER BY name"
+    )
+    return [_purpose(row) for row in rows]
+
+
+async def list_assignments(conn: Conn) -> list[tuple[Assignment, Destination]]:
+    rows = await conn.fetch(
+        f"""
+        SELECT a.key, a.destination_id, a.assigned_at, {_DESTINATION_COLUMNS}
+        FROM assignments a JOIN destinations d ON d.id = a.destination_id
+        ORDER BY (a.key = '*') DESC, a.key
+        """
+    )
+    return [
+        (
+            Assignment(row["key"], row["destination_id"], row["assigned_at"]),
+            _destination(row),
+        )
+        for row in rows
+    ]
+
+
+async def assign(conn: Conn, *, key: str, destination_id: int) -> Assignment:
+    """Points a key at a destination, replacing whatever it pointed at: one key, one recipient."""
+    row = await fetch_one(
+        conn,
+        """
+        INSERT INTO assignments (key, destination_id) VALUES ($1, $2)
+        ON CONFLICT (key) DO UPDATE SET destination_id = EXCLUDED.destination_id, assigned_at = now()
+        RETURNING key, destination_id, assigned_at
+        """,
+        key,
+        destination_id,
+    )
+    return Assignment(row["key"], row["destination_id"], row["assigned_at"])
+
+
+async def unassign(conn: Conn, key: str) -> bool:
+    result = await conn.execute("DELETE FROM assignments WHERE key = $1", key)
+    return result.endswith(" 1")
+
+
+async def assigned_to(conn: Conn, destination_id: int) -> list[str]:
+    """The keys a destination is still the recipient of."""
+    rows = await conn.fetch(
+        "SELECT key FROM assignments WHERE destination_id = $1 ORDER BY key", destination_id
+    )
+    return [row["key"] for row in rows]
+
+
+async def assigned_to_bot(conn: Conn, bot_id: int) -> list[str]:
+    """The keys any destination of this bot still receives."""
+    rows = await conn.fetch(
+        """
+        SELECT a.key FROM assignments a JOIN destinations d ON d.id = a.destination_id
+        WHERE d.bot_id = $1 ORDER BY a.key
+        """,
+        bot_id,
+    )
+    return [row["key"] for row in rows]
+
+
+async def recipient_of(conn: Conn, purpose: str) -> Destination | None:
+    """The destination whose assignment matches this purpose most closely, or `None`.
+
+    One statement: the candidates are the purpose and its prefixes by whole segment plus `*`, and the
+    longest present key wins with `*` always last.
+    """
+    row = await conn.fetchrow(
+        f"""
+        SELECT {_DESTINATION_COLUMNS}
+        FROM assignments a JOIN destinations d ON d.id = a.destination_id
+        WHERE a.key = ANY($1::text[])
+        ORDER BY (a.key = '*'), length(a.key) DESC
+        LIMIT 1
+        """,
+        purpose_rules.candidates(purpose),
+    )
+    return _destination(row) if row is not None else None
+
+
+async def count_unheard(conn: Conn) -> int:
+    """How many known purposes have no recipient — the number a state route reports so that a silent
+    gateway can be told from one with nothing to say."""
+    seen = await list_purposes(conn)
+    keys = {a.key for a, _ in await list_assignments(conn)}
+    if purpose_rules.DEFAULT_KEY in keys:
+        return 0
+    return sum(1 for one in seen if purpose_rules.deciding_key(one.name, keys) is None)
+
+
+# --- the account that owns the bots ----------------------------------------------------------------
+
+
+async def get_account(conn: Conn) -> AccountRecord | None:
+    """Who is logged in. **Not the session**: that is `encrypted_session`, alone, like a bot's token."""
+    row = await conn.fetchrow(
+        "SELECT username, phone_masked, logged_in_at, rejected_at FROM account_session WHERE id = 1"
+    )
+    if row is None:
+        return None
+    return AccountRecord(
+        username=row["username"],
+        phone_masked=row["phone_masked"],
+        logged_in_at=row["logged_in_at"],
+        rejected_at=row["rejected_at"],
+    )
+
+
+async def encrypted_session(conn: Conn) -> str | None:
+    """The stored session, still encrypted. The only statement in this module that selects it."""
+    return await conn.fetchval("SELECT session_encrypted FROM account_session WHERE id = 1")
+
+
+async def save_account(
+    conn: Conn, *, session_encrypted: str, username: str, phone_masked: str
+) -> None:
+    """One account: a second login replaces the first, and clears a rejection."""
+    await conn.execute(
+        """
+        INSERT INTO account_session (id, session_encrypted, username, phone_masked)
+        VALUES (1, $1, $2, $3)
+        ON CONFLICT (id) DO UPDATE SET
+            session_encrypted = EXCLUDED.session_encrypted,
+            username = EXCLUDED.username,
+            phone_masked = EXCLUDED.phone_masked,
+            logged_in_at = now(),
+            rejected_at = NULL
+        """,
+        session_encrypted,
+        username,
+        phone_masked,
+    )
+
+
+async def delete_account(conn: Conn) -> bool:
+    result = await conn.execute("DELETE FROM account_session WHERE id = 1")
+    return result.endswith(" 1")
+
+
+async def mark_account_rejected(conn: Conn) -> None:
+    """Telegram refused the session when it was used. Kept as a fact so the state route can say so without
+    asking Telegram again."""
+    await conn.execute("UPDATE account_session SET rejected_at = now() WHERE id = 1")

@@ -99,8 +99,9 @@ class Settings(BaseSettings):
     tool_caller_application_ids: str = ""
     rest_caller_application_ids: str = ""
 
-    # Who the post archive tells, by the name the operator bound at the door to Telegram.
-    # Unset is a working configuration in which it collects and nobody is told. Unprefixed: there is one destination.
+    # What used to decide, for every producer, who is told. Producers send under a purpose now and the operator assigns
+    # purposes in the terminal; this survives one more release only to seed the door's `*` assignment from a name that
+    # already exists (`telegram-bots-from-the-terminal`), and is retired in the deploy that follows.
     alert_destination: str | None = None
 
     # The door to Telegram, a package of this process since stage 4 of `one-process-per-security-boundary`: its
@@ -114,7 +115,7 @@ class Settings(BaseSettings):
     youtube_database_url: str | None = Field(default=None, repr=False)
     telegram_api_id: int | None = None
     telegram_api_hash: str | None = None
-    telegram_session: str | None = None
+    telegram_session_key: str | None = Field(default=None, repr=False)
 
     @field_validator("youtube_database_url")
     @classmethod
@@ -156,7 +157,7 @@ class Settings(BaseSettings):
         "trading_mcp_scope",
         "alert_destination",
         "telegram_api_hash",
-        "telegram_session",
+        "telegram_session_key",
         "gateway_scope",
         "entra_tenant_id",
         "trading_mcp_api_key",
@@ -274,7 +275,6 @@ class Settings(BaseSettings):
             require_authenticated_principal=self.require_authenticated_principal,
             tool_caller_application_ids=self.tool_caller_application_ids,
             rest_caller_application_ids=self.rest_caller_application_ids,
-            alert_destination=self.alert_destination,
         )
 
     def for_market(self) -> MarketSettings:
@@ -317,7 +317,8 @@ class Settings(BaseSettings):
             tool_caller_application_ids=self.tool_caller_application_ids,
             telegram_api_id=self.telegram_api_id,
             telegram_api_hash=self.telegram_api_hash,
-            telegram_session=self.telegram_session,
+            telegram_session_key=self.telegram_session_key,
+            seed_default_destination=self.alert_destination,
         )
 
     def for_youtube(self) -> YoutubeSettings:
@@ -342,7 +343,6 @@ class Settings(BaseSettings):
             tool_caller_application_ids=self.tool_caller_application_ids,
             # Not the process's list, which holds the pocket: this package's REST writes and spends. Read as
             # YOUTUBE_REST_CALLER_APPLICATION_IDS, like `/telegram`'s.
-            alert_destination=self.alert_destination,
         )
 
 

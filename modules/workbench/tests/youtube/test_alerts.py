@@ -10,7 +10,14 @@ import httpx
 import pytest
 
 from youtube_data import alerts, store
-from youtube_data.alerts import Alerts, Gateway, GatewayRefused, GatewayUnreachable
+from youtube_data.alerts import (
+    Alerts,
+    Gateway,
+    GatewayRefused,
+    GatewayUnassigned,
+    GatewayUnreachable,
+    slug,
+)
 from youtube_data.analysis import Reading
 from youtube_data.providers.base import VideoRef
 
@@ -28,8 +35,8 @@ class RecordingGateway:
         self.fails = fails
         self.sent: list[tuple[str, str]] = []
 
-    async def send(self, *, destination: str, text: str) -> None:
-        self.sent.append((destination, text))
+    async def send(self, *, purpose: str, text: str) -> None:
+        self.sent.append((purpose, text))
         if self.fails is not None:
             raise self.fails
 
@@ -66,7 +73,6 @@ def announcing(pool, gateway, *, min_score: int = 8, window_hours: int = 48) -> 
     return Alerts(
         pool,
         gateway,  # type: ignore[arg-type]
-        destination="operator",
         min_score=min_score,
         batch_limit=10,
         window=timedelta(hours=window_hours),
@@ -128,11 +134,31 @@ async def test_a_film_the_gateway_could_not_announce_in_time_is_let_go_not_annou
     assert await state_of(pool, "v1") == "quiet"
 
 
-async def test_no_destination_is_a_working_configuration_and_says_nothing(pool) -> None:
+async def test_no_door_to_telegram_is_a_working_configuration_and_says_nothing(pool) -> None:
     rig = Rig(pool)
 
     assert alerts.build(pool, rig.settings, None) is None
-    assert alerts.build(pool, rig.settings, httpx.AsyncClient()) is None, "a client but no adresat"
+    assert alerts.build(pool, rig.settings, httpx.AsyncClient()) is not None, "who hears it is the operator's to assign"
+
+
+async def test_a_purpose_nobody_hears_waits_without_a_marker_and_the_state_says_so(pool) -> None:
+    await read_film(pool, "v1", score=9)
+    deaf = RecordingGateway(fails=GatewayUnassigned("youtube.film.gold-talk"))
+    announcer = announcing(pool, deaf)
+
+    assert await announcer.run(NOW) == 0
+
+    assert announcer.telling is False
+    assert await state_of(pool, "v1") == "analysed"
+    announcer._gateway = RecordingGateway()  # type: ignore[assignment]
+    assert await announcer.run(NOW) == 1
+    assert announcer.telling is True
+
+
+def test_a_channel_is_one_segment_of_the_purpose() -> None:
+    assert slug("Gold Talk") == "gold-talk"
+    assert slug("Łukasz — Rynki") == "ukasz-rynki"
+    assert slug("???") == "unknown"
 
 
 async def test_the_whole_road_announces_a_loud_film_once_and_a_quiet_one_never(pool) -> None:
@@ -149,8 +175,8 @@ async def test_the_whole_road_announces_a_loud_film_once_and_a_quiet_one_never(p
     await rig.tick()
 
     assert len(gateway.sent) == 1
-    destination, text = gateway.sent[0]
-    assert destination == "operator"
+    purpose, text = gateway.sent[0]
+    assert purpose.startswith("youtube.film.")
     assert "Wpływ 9/10" in text and "simfilm0004" in text
     assert text.startswith("[SYMULACJA"), "a film that does not exist says so on its first line"
     states = await rig.states()
@@ -224,7 +250,7 @@ def test_a_simulated_film_read_by_a_real_model_is_still_announced_as_a_simulatio
     assert "SYMULACJA" in alerts.message(replace(item, video=replace(item.video, simulated=True)))
 
 
-async def test_the_gateway_client_posts_the_destination_and_says_why_it_was_refused() -> None:
+async def test_the_gateway_client_posts_the_purpose_and_says_why_it_was_refused() -> None:
     seen: list[dict] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
@@ -237,11 +263,20 @@ async def test_the_gateway_client_posts_the_destination_and_says_why_it_was_refu
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://door") as client:
         gateway = Gateway(client)
-        await gateway.send(destination="operator", text="hello")
+        await gateway.send(purpose="youtube.film.x", text="hello")
         with pytest.raises(GatewayRefused, match="wait 30 seconds"):
-            await gateway.send(destination="operator", text="again")
+            await gateway.send(purpose="youtube.film.x", text="again")
 
-    assert seen[0] == {"destination": "operator", "text": "hello"}
+    assert seen[0] == {"purpose": "youtube.film.x", "text": "hello"}
+
+
+async def test_the_doors_unassigned_code_is_told_apart_from_a_refusal() -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(409, json={"detail": {"detail": "nobody receives", "code": "unassigned"}})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://door") as client:
+        with pytest.raises(GatewayUnassigned):
+            await Gateway(client).send(purpose="youtube.film.x", text="hello")
 
 
 async def test_a_gateway_that_does_not_answer_is_not_a_delivery() -> None:
@@ -250,4 +285,4 @@ async def test_a_gateway_that_does_not_answer_is_not_a_delivery() -> None:
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler), base_url="http://door") as client:
         with pytest.raises(GatewayUnreachable):
-            await Gateway(client).send(destination="operator", text="hello")
+            await Gateway(client).send(purpose="youtube.film.x", text="hello")

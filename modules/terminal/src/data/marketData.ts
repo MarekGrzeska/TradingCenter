@@ -54,6 +54,9 @@ export const socialIdentity: Identity = scopeFor((s) => s.social);
 /** `youtube-data`, for the films tab. */
 export const youtubeIdentity: Identity = scopeFor((s) => s.youtube);
 
+/** The door to Telegram, for the Telegram tab. */
+export const telegramIdentity: Identity = scopeFor((s) => s.telegram);
+
 const archiveSource = createArchiveSource(archiveHttp, archiveWs, identity);
 const gateway = createGatewaySource(archiveHttp, identity);
 

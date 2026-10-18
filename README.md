@@ -86,9 +86,9 @@ including when it still carries a setting a merge stopped reading, such as `TEAM
 `POLYMARKET_MCP_URL`, `SOCIAL_MCP_URL`, `STRATEGY_MCP_URL` (the platform is gone), `TELEGRAM_MCP_URL` or `TELEGRAM_GATEWAY_URL`. The consequence of each absence differs,
 which is why the messages do: the conversation without a tool server's tools answers from the
 model alone, while a team whose agents were *assigned* tools refuses to run at all rather than
-guess. The workbench's post archive reaches the door to Telegram inside the process;
-`ALERT_DESTINATION` says who it tells, and unset is a process that collects as usual and
-says nothing.
+guess. The workbench's post archive and YouTube archive reach the door to Telegram inside the process; the
+operator's assignments in the terminal's Telegram tab say who hears what, and a purpose nobody hears is a process that
+collects as usual and says nothing.
 
 `trading-mcp` is the one module that needs a credential even locally: the gateway checks
 its `X-Gateway-Key` on every caller, loopback included, so `CAPITAL_GATEWAY_API_KEY` there

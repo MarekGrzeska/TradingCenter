@@ -51,6 +51,10 @@ export interface Endpoints {
   /** `youtube-data`, for the films: what was said in the videos the operator follows, and what a model made of it. The
    *  workbench's address plus `/youtube`, when the workbench has the package — it is the one back end that may be absent. */
   youtubeHttp: string;
+  /** `telegram_gateway`, for the door to Telegram: the owner account, the bots, who receives and which purpose goes to
+   *  whom. The workbench's address plus `/telegram`, and the workbench's scope — but a route record of its own, where the
+   *  operator's terminal is admitted next to `az` and nobody else is. */
+  telegramHttp: string;
   /** `capital-gateway`, for the account. It used to have no address here at all; what changed is that the
    *  gateway recognises an authenticated browser. In dev this is a prefix the dev server proxies. */
   gatewayHttp: string;
@@ -65,6 +69,7 @@ const DEFAULT_GATEWAY_HTTP = "/gateway-api";
 const DEFAULT_POLYMARKET_HTTP = "/polymarket-api";
 const DEFAULT_SOCIAL_HTTP = "/social-api";
 const DEFAULT_YOUTUBE_HTTP = "/youtube-api";
+const DEFAULT_TELEGRAM_HTTP = "/telegram-api";
 
 export interface EnvVars {
   VITE_ARCHIVE_HTTP?: string;
@@ -74,6 +79,7 @@ export interface EnvVars {
   VITE_POLYMARKET_HTTP?: string;
   VITE_SOCIAL_HTTP?: string;
   VITE_YOUTUBE_HTTP?: string;
+  VITE_TELEGRAM_HTTP?: string;
   VITE_ENTRA_CLIENT_ID?: string;
   VITE_ENTRA_TENANT_ID?: string;
   VITE_ENTRA_SCOPE?: string;
@@ -82,6 +88,7 @@ export interface EnvVars {
   VITE_ENTRA_SCOPE_POLYMARKET?: string;
   VITE_ENTRA_SCOPE_SOCIAL?: string;
   VITE_ENTRA_SCOPE_YOUTUBE?: string;
+  VITE_ENTRA_SCOPE_TELEGRAM?: string;
 }
 
 /** One scope per module, because each accepts a token minted for its **own** audience. `archive` keeps
@@ -93,6 +100,7 @@ export interface ModuleScopes {
   polymarket: string | null;
   social: string | null;
   youtube: string | null;
+  telegram: string | null;
 }
 
 /** Which Entra registration the terminal signs the operator in against, and what it asks
@@ -131,6 +139,7 @@ export function resolveEntra(env: EnvVars = import.meta.env): EntraConfig | null
       polymarket: env.VITE_ENTRA_SCOPE_POLYMARKET?.trim() || null,
       social: env.VITE_ENTRA_SCOPE_SOCIAL?.trim() || null,
       youtube: env.VITE_ENTRA_SCOPE_YOUTUBE?.trim() || null,
+      telegram: env.VITE_ENTRA_SCOPE_TELEGRAM?.trim() || null,
     },
   };
 }
@@ -147,5 +156,6 @@ export function resolveEndpoints(
     polymarketHttp: resolveHttpBase(env.VITE_POLYMARKET_HTTP || DEFAULT_POLYMARKET_HTTP),
     socialHttp: resolveHttpBase(env.VITE_SOCIAL_HTTP || DEFAULT_SOCIAL_HTTP),
     youtubeHttp: resolveHttpBase(env.VITE_YOUTUBE_HTTP || DEFAULT_YOUTUBE_HTTP),
+    telegramHttp: resolveHttpBase(env.VITE_TELEGRAM_HTTP || DEFAULT_TELEGRAM_HTTP),
   };
 }

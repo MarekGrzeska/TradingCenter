@@ -12,6 +12,7 @@ from fastapi import APIRouter, Request
 from .. import store
 from ..contract import StateOut
 from . import deps
+from .account import account_out
 
 router = APIRouter(tags=["meta"])
 
@@ -21,9 +22,13 @@ async def state(request: Request) -> StateOut:
     """Whether bots can be created, how many there are, and how many destinations receive."""
     settings = request.app.state.settings
     async with deps.connection(request.app.state.pool) as conn:
+        owner = await account_out(conn, settings)
         return StateOut(
-            account_session_configured=settings.can_create_bots,
+            account=owner,
+            can_create_bots=owner.status == "logged_in" and settings.api_credentials_configured,
             bots=await store.count_bots(conn),
             destinations=await store.count_destinations(conn),
             destinations_ready=await store.count_destinations(conn, receiving=True),
+            default_assignment=any(a.key == "*" for a, _ in await store.list_assignments(conn)),
+            purposes_unheard=await store.count_unheard(conn),
         )

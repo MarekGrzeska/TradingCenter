@@ -59,6 +59,9 @@ dependencies = [
     # means talking to @BotFather, which only a *user account* may; imported inside the method that uses it, so a
     # deployment with no account session never loads it.
     "telethon>=1.44.0",
+    # The owner account's session is encrypted at rest (`telegram_gateway/session_crypto.py`); already in the lock
+    # through other packages, named here because this one imports it.
+    "cryptography>=42",
     "google-genai>=2.29.0",
 ]
 

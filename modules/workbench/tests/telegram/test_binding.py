@@ -208,3 +208,44 @@ class TestTheWatcher:
             await store.remove_bot(conn, bot.id)
 
         assert await binding.Watcher(pool, fakes.FakeBotApi()).poll_once(bot) == 0
+
+
+class TestWhoReceives:
+    async def test_the_person_who_tapped_is_recorded_by_name(self, db) -> None:
+        bot = await builders.bot(db, username="alertsbot")
+        _, link = await binding.offer(db, name="operator", bot=bot)
+        nonce = link.split("start=")[1]
+
+        await binding.consume(
+            db, bot, [fakes.start_update(1, chat_id=4242, payload=nonce, username="marek", first_name="Marek")]
+        )
+
+        found = await store.destination_by_name(db, "operator")
+        assert found is not None
+        assert (found.chat_username, found.chat_title, found.chat_kind) == ("marek", "Marek", "private")
+
+    async def test_a_group_is_recorded_by_its_title(self, db) -> None:
+        bot = await builders.bot(db, username="alertsbot")
+        _, link = await binding.offer(db, name="desk", bot=bot)
+        nonce = link.split("start=")[1]
+        update = fakes.start_update(1, chat_id=-100123, payload=nonce)
+        update["message"]["chat"] = {"id": -100123, "type": "supergroup", "title": "Trading desk"}
+        update["message"]["text"] = f"/start@alertsbot {nonce}"
+
+        await binding.consume(db, bot, [update])
+
+        found = await store.destination_by_name(db, "desk")
+        assert found is not None
+        assert (found.chat_title, found.chat_kind, found.receives) == ("Trading desk", "supergroup", True)
+
+    async def test_a_destination_bound_before_this_was_recorded_is_asked_about_once(self, db, pool) -> None:
+        from .test_sending import ready_destination
+
+        await ready_destination(db, "operator")
+        api = fakes.FakeBotApi(chat={"id": 4242, "type": "private", "username": "marek", "first_name": "Marek"})
+
+        assert await binding.backfill_identities(pool, api) == 1
+        assert await binding.backfill_identities(pool, api) == 0
+
+        found = await store.destination_by_name(db, "operator")
+        assert found is not None and found.chat_username == "marek"

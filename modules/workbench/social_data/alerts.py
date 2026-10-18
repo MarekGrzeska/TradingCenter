@@ -14,6 +14,7 @@ the other choice would need the gateway to remember messages.
 from __future__ import annotations
 
 import logging
+import re
 from datetime import UTC, datetime
 
 import httpx
@@ -41,26 +42,52 @@ class GatewayUnreachable(Exception):
     """The gateway did not answer at all."""
 
 
+class GatewayUnassigned(Exception):
+    """Nobody receives this purpose yet. Not a failure and never read as "delivered": the marker stays unset, so the
+    first pass after the operator assigns it says what is waiting."""
+
+    def __init__(self, purpose: str) -> None:
+        super().__init__(f"nobody receives {purpose!r}")
+        self.purpose = purpose
+
+
 
 class Gateway:
-    """The one route this module calls on telegram-gateway. It does not read the gateway's other
-    routes: creating a bot and binding a destination are the operator's, through their own screen.
+    """The two routes this package calls on the door to Telegram: send under a purpose, and announce one.
 
-    The client is the host's, over the gateway's application in this process, so the gateway's refusals
-    and its caller record read here exactly as they did over HTTP."""
+    It does not choose who hears: the operator's assignments do, in the terminal. The client is the host's, over the
+    door's application in this process, so its refusals and its caller record read here exactly as they did over HTTP."""
 
     def __init__(self, client: httpx.AsyncClient) -> None:
         self._client = client
 
-    async def send(self, *, destination: str, text: str) -> None:
+    async def send(self, *, purpose: str, text: str) -> None:
         try:
-            response = await self._client.post(
-                "/messages", json={"destination": destination, "text": text}
-            )
+            response = await self._client.post("/messages", json={"purpose": purpose, "text": text})
         except httpx.RequestError as err:
             raise GatewayUnreachable(f"the gateway did not answer: {err}") from err
         if response.is_error:
+            if _nobody_listens(response):
+                raise GatewayUnassigned(purpose)
             raise GatewayRefused(f"the gateway refused: {_detail(response)}")
+
+    async def describe(self, purpose: str, description: str) -> None:
+        """Tells the door this purpose exists, so the terminal lists it before the first event. Best effort: a door
+        that cannot be reached now learns it from the first message."""
+        try:
+            await self._client.put(f"/purposes/{purpose}", json={"description": description})
+        except httpx.RequestError as err:
+            log.info("could not announce the purpose %s: %s", purpose, err)
+
+
+def _nobody_listens(response: httpx.Response) -> bool:
+    """The door's own code for a purpose with no recipient — not a fault, and not to be read as a refusal."""
+    try:
+        body = response.json()
+    except ValueError:
+        return False
+    detail = body.get("detail") if isinstance(body, dict) else None
+    return response.status_code == 409 and isinstance(detail, dict) and detail.get("code") == "unassigned"
 
 
 def _detail(response: httpx.Response) -> str:
@@ -74,6 +101,23 @@ def _detail(response: httpx.Response) -> str:
     if isinstance(detail, dict):
         return str(detail.get("detail") or detail)
     return str(detail or body)
+
+
+def slug(text: str) -> str:
+    """A name as one segment of a purpose: lowercase letters, digits, `_` and `-`. Whatever else it holds becomes a
+    dash, and a name with nothing usable in it is still a segment."""
+    cleaned = re.sub(r"[^a-z0-9_-]+", "-", text.lower()).strip("-_")[:60]
+    return cleaned or "unknown"
+
+
+PURPOSE = "social.post"
+PURPOSE_DESCRIPTION = "A post the model scored at or above the threshold"
+
+
+def purpose_for(post: Post) -> str:
+    """Where a post is announced: one purpose for the archive, one segment for who wrote it, so an assignment can move
+    all of them or a single author."""
+    return f"{PURPOSE}.{slug(post.author)}"
 
 
 def message(post: Post) -> str:
@@ -114,15 +158,23 @@ class Alerts:
         pool,
         gateway: Gateway,
         *,
-        destination: str,
         min_score: int,
         batch_limit: int = BATCH_LIMIT,
     ) -> None:
         self._pool = pool
         self._gateway = gateway
-        self._destination = destination
         self._min_score = min_score
         self._limit = batch_limit
+        # What the door last said: nobody receives these posts. `/state` reports it, so that a silent archive can be
+        # told from one with nothing to say.
+        self.unheard = False
+
+    @property
+    def telling(self) -> bool:
+        return not self.unheard
+
+    async def announce_purposes(self) -> None:
+        await self._gateway.describe(PURPOSE, PURPOSE_DESCRIPTION)
 
     async def run(self, since: datetime) -> int:
         """How many posts were announced this pass. One failure costs that post only — and costs it
@@ -132,33 +184,37 @@ class Alerts:
                 conn, since=since, min_score=self._min_score, limit=self._limit
             )
         sent = 0
+        heard = False
         for post in waiting:
             try:
-                await self._gateway.send(destination=self._destination, text=message(post))
+                await self._gateway.send(purpose=purpose_for(post), text=message(post))
+            except GatewayUnassigned as err:
+                # Nobody listens to this author yet: not a fault, and no marker, so it is announced the pass after
+                # somebody is assigned (within the window and the batch limit).
+                self.unheard = True
+                log.info("post %s waits: %s", post.id, err)
+                continue
             except (GatewayRefused, GatewayUnreachable) as err:
                 # No marker, so the next pass tries again. Named at warning rather than swallowed:
                 # a gateway refusing everything is a silence the operator has to be able to find.
                 log.warning("could not announce post %s: %s", post.id, err)
                 continue
+            heard = True
             async with self._pool.acquire() as conn:
                 await store.mark_notified(conn, post.id, at=datetime.now(UTC))
             sent += 1
+        if heard:
+            self.unheard = False
         return sent
 
 
 def build(pool, settings, gateway: httpx.AsyncClient | None) -> Alerts | None:
     """The alerting this deployment is configured for, or `None`.
 
-    `None` is a supported state, and the reason it is a return value rather than a refusal is the
-    one `enrichment.build` gives: without a destination the module collects and reads normally and
-    says nothing, which `/state` reports rather than leaving anybody to guess at.
-    """
-    if settings.alert_destination is None or gateway is None:
-        log.info("no telegram destination is configured — posts will be collected and nobody told")
+    `None` only where there is no door to Telegram at all (standalone, or a host that did not hand one in). With a door,
+    who hears what is the operator's to assign, so there is nothing here to configure — and a purpose nobody hears is
+    reported by `/state` rather than refused at start."""
+    if gateway is None:
+        log.info("no door to telegram — posts will be collected and nobody told")
         return None
-    return Alerts(
-        pool,
-        Gateway(gateway),
-        destination=settings.alert_destination,
-        min_score=settings.alert_min_impact_score,
-    )
+    return Alerts(pool, Gateway(gateway), min_score=settings.alert_min_impact_score)

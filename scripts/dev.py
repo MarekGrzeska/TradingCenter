@@ -409,6 +409,14 @@ ADVISORIES: tuple[tuple[str, str, str, str], ...] = (
 # than ignored, for the reason the advisories above exist: a line read by nothing looks like one that works.
 RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
     (
+        "TELEGRAM_SESSION",
+        (
+            "the owner account is logged in from the terminal's Telegram tab since "
+            "`telegram-bots-from-the-terminal`, and its session lives in the database, encrypted with "
+            "TELEGRAM_SESSION_KEY — this line is read by nothing"
+        ),
+    ),
+    (
         "TEAMS_MCP_URL",
         (
             "the team tools are a layer in the workbench now, reached without a port — "

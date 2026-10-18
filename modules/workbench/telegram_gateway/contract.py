@@ -30,13 +30,25 @@ class Problem(BaseModel):
         default=None,
         description="how long Telegram asked this gateway to wait; present only on a rate limit",
     )
+    code: Literal["unassigned"] | None = Field(
+        default=None,
+        description="'unassigned' when a purpose has no recipient: nothing is wrong, nobody listens yet, "
+        "and a caller keeps its own marker unset",
+    )
 
 
 class SendRequest(BaseModel):
-    """A message, addressed by name. There is no `chat_id` and no bot here on purpose: a number
-    every caller keeps its own copy of is invalidated for all of them the day the bot is replaced."""
+    """A message, addressed by a destination's name or by a purpose — exactly one of the two. There is
+    no `chat_id` and no bot here on purpose: a number every caller keeps its own copy of is invalidated
+    for all of them the day the bot is replaced."""
 
-    destination: str = Field(description="the name the destination was bound under")
+    destination: str | None = Field(
+        default=None, description="the name the destination was bound under"
+    )
+    purpose: str | None = Field(
+        default=None,
+        description="a dotted name for the kind of event; the operator's assignments decide who hears it",
+    )
     text: str
 
 
@@ -44,14 +56,18 @@ class Sent(BaseModel):
     """What Telegram said about a message it accepted. Nothing is kept after the response — this is
     the whole of what this gateway can ever say about a message."""
 
-    destination: str
+    destination: str = Field(description="the destination it went to — for a purpose, the one resolved")
     message_id: int = Field(description="Telegram's own identifier for the delivered message")
     chat_id: int
+    purpose: str | None = Field(default=None, description="echoed when the message was sent by purpose")
 
     @classmethod
-    def of(cls, name: str, delivered: Delivered) -> Sent:
+    def of(cls, name: str, delivered: Delivered, *, purpose: str | None = None) -> Sent:
         return cls(
-            destination=name, message_id=delivered.message_id, chat_id=delivered.chat_id
+            destination=name,
+            message_id=delivered.message_id,
+            chat_id=delivered.chat_id,
+            purpose=purpose,
         )
 
 
@@ -108,6 +124,9 @@ class DestinationOut(BaseModel):
     receives: bool
     bound_at: datetime | None = None
     blocked_at: datetime | None = None
+    username: str | None = Field(default=None, description="the @name of who receives, as Telegram reported it")
+    title: str | None = Field(default=None, description="their display name, or the group's title")
+    kind: str | None = Field(default=None, description="private, group, supergroup or channel")
 
     @classmethod
     def of(cls, destination: Destination, bot_username: str) -> DestinationOut:
@@ -118,6 +137,9 @@ class DestinationOut(BaseModel):
             receives=destination.receives,
             bound_at=destination.bound_at,
             blocked_at=destination.blocked_at,
+            username=destination.chat_username,
+            title=destination.chat_title,
+            kind=destination.chat_kind,
         )
 
 
@@ -138,16 +160,118 @@ class StartLinkOut(BaseModel):
     expires_in_seconds: int
 
 
+class AccountOut(BaseModel):
+    """The account that owns the bots. Never the session, the code or the password; the number only masked."""
+
+    status: Literal["logged_out", "logged_in", "needs_login"]
+    username: str | None = None
+    phone: str | None = Field(default=None, description="masked: at most the last four digits are shown")
+    reason: str | None = Field(
+        default=None, description="why a stored account cannot be used; present with 'needs_login'"
+    )
+    session_key_configured: bool = Field(description="whether TELEGRAM_SESSION_KEY is set")
+    api_credentials_configured: bool = Field(
+        description="whether TELEGRAM_API_ID and TELEGRAM_API_HASH are set"
+    )
+
+
+class LoginStartRequest(BaseModel):
+    phone: str = Field(description="international form, like +48123456789")
+
+
+class LoginCodeRequest(BaseModel):
+    code: str
+
+
+class LoginPasswordRequest(BaseModel):
+    password: str
+
+
+class LoginStepOut(BaseModel):
+    """Where the login is. `code` and `password` mean the next thing Telegram wants; `done` carries the account."""
+
+    step: Literal["code", "password", "done"]
+    account: AccountOut | None = None
+    delivery: Literal["app", "sms", "call", "other"] | None = Field(
+        default=None,
+        description="where Telegram sent the code, present with step 'code': 'app' is a message from Telegram in an "
+        "app already logged in to the account, 'sms' a text to the number, 'call' a phone call",
+    )
+    can_resend: bool | None = Field(
+        default=None,
+        description="whether Telegram offers another way of sending the code; false means the code is only where "
+        "`delivery` says",
+    )
+
+
+class QrLoginOut(BaseModel):
+    """A login by QR code. `waiting` carries the code to show (it changes about every half minute); `password` wants the
+    two-step password next; `done` carries the account; `failed` says why."""
+
+    status: Literal["waiting", "password", "done", "failed"]
+    url: str | None = Field(default=None, description="tg://login?token=… — draw it as a QR code; never log it")
+    expires_at: datetime | None = None
+    account: AccountOut | None = None
+    reason: str | None = None
+
+
+class LogoutOut(BaseModel):
+    ended_at_telegram: bool = Field(
+        description="false when Telegram could not be told: the stored session is gone either way, "
+        "and the device should be ended from the phone's settings"
+    )
+
+
 class StateOut(BaseModel):
     """What this gateway is able to do at all. Read before concluding it is broken: a gateway with
     no destination and one that cannot reach Telegram answer the same nothing without this."""
 
-    account_session_configured: bool = Field(
-        description="whether creating bots is available; false is a supported configuration, and "
-        "sending works either way"
+    account: AccountOut = Field(
+        description="the account that owns the bots, and whether it can be used; logged out is a "
+        "supported configuration, and sending works either way"
+    )
+    can_create_bots: bool = Field(
+        description="whether creating, deleting and rotating bots would be attempted right now"
     )
     bots: int
     destinations: int
     destinations_ready: int = Field(
         description="how many can actually receive — the rest are waiting on a tap or blocked"
     )
+    default_assignment: bool = Field(
+        description="whether '*' is assigned, so that a purpose nobody mentioned still reaches somebody"
+    )
+    purposes_unheard: int = Field(
+        description="known purposes no assignment matches — what is being collected and told to nobody"
+    )
+
+
+class PurposeOut(BaseModel):
+    """A kind of event the gateway has seen or been told about, and who hears it today."""
+
+    name: str
+    description: str | None = None
+    first_seen: datetime
+    last_seen: datetime
+    last_caller: str | None = None
+    destination: str | None = Field(
+        description="the destination that receives it now, or null when nobody does"
+    )
+    assigned_by: str | None = Field(
+        description="the assignment key that decides it: the purpose itself, a prefix, or '*'"
+    )
+
+
+class DescribePurposeRequest(BaseModel):
+    description: str = Field(max_length=300)
+
+
+class AssignmentOut(BaseModel):
+    key: str = Field(description="a purpose, a prefix of one cut at a dot, or '*'")
+    destination: str
+    bot: str
+    receives: bool
+
+
+class AssignRequest(BaseModel):
+    destination: str = Field(description="the name of the destination that is to hear this key")

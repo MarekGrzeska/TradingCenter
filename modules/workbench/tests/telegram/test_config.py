@@ -10,42 +10,43 @@ from telegram_gateway.config import Settings
 
 LOCAL = "postgresql://telegram:change-me@127.0.0.1:55432/telegram"
 REMOTE = "postgresql://psql.example.net:5432/telegram?sslmode=require"
+KEY = "NPaSFWjv9LBWO9H7PecpB7pmGeKWx4OF1CwOnRUOFA0="
 
 
 def settings(**overrides) -> Settings:
     return Settings(database_url=overrides.pop("database_url", LOCAL), _env_file=None, **overrides)
 
 
-class TestTheAccountSession:
-    def test_all_three_absent_is_a_working_configuration(self) -> None:
-        """The module sends without them and refuses only to create bots. Treating this as a
-        configuration error would make a credential to a personal account a condition of starting."""
-        assert settings().can_create_bots is False
+class TestTheAccountSettings:
+    def test_nothing_set_is_a_working_configuration(self) -> None:
+        """The module sends without them and refuses only to log an account in or create bots. Treating this as a
+        configuration error would make a credential to a Telegram account a condition of starting."""
+        bare = settings()
 
-    def test_all_three_present_enables_creating(self) -> None:
+        assert bare.api_credentials_configured is False
+        assert bare.session_key_configured is False
+
+    def test_the_application_credentials_and_a_key_enable_logging_in(self) -> None:
         configured = settings(
-            telegram_api_id=12345, telegram_api_hash="hash", telegram_session="session"
+            telegram_api_id=12345, telegram_api_hash="hash", telegram_session_key=KEY
         )
 
-        assert configured.can_create_bots is True
+        assert configured.api_credentials_configured is True
+        assert configured.session_key_configured is True
 
-    @pytest.mark.parametrize(
-        "given",
-        [
-            {"telegram_api_id": 12345},
-            {"telegram_api_hash": "hash"},
-            {"telegram_api_id": 12345, "telegram_session": "session"},
-        ],
-    )
-    def test_a_partial_session_is_refused_at_startup(self, given: dict) -> None:
-        """Two of the three looks configured and fails at the moment the operator asks for a bot,
-        pointing at a variable nobody remembers leaving blank."""
+    @pytest.mark.parametrize("given", [{"telegram_api_id": 12345}, {"telegram_api_hash": "hash"}])
+    def test_half_of_the_application_credentials_is_refused_at_startup(self, given: dict) -> None:
+        """One of two looks configured and fails at the moment the operator logs the account in."""
         with pytest.raises(ValidationError, match="together or not at all"):
             settings(**given)
 
+    def test_a_key_that_is_not_a_fernet_key_is_refused_by_name(self) -> None:
+        with pytest.raises(ValidationError, match="TELEGRAM_SESSION_KEY is not a Fernet key"):
+            settings(telegram_session_key="hunter2")
+
     def test_a_blank_line_reads_as_absent(self) -> None:
-        """`TELEGRAM_SESSION=` left in a .env is the same intent as the line being gone."""
-        assert settings(telegram_api_hash="", telegram_session="  ").can_create_bots is False
+        """`TELEGRAM_SESSION_KEY=` left in a .env is the same intent as the line being gone."""
+        assert settings(telegram_api_hash="", telegram_session_key="  ").session_key_configured is False
 
 
 class TestTheDatabaseConnection:

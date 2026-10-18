@@ -111,6 +111,15 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/youtube-api/, "/youtube"),
           configure: quietProxyErrors("workbench", workbench),
         },
+
+        // The door to Telegram, served by the workbench under /telegram. Reached with the workbench's token, but only the
+        // terminal's and the operator's applications are admitted to it.
+        "/telegram-api": {
+          target: workbench,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/telegram-api/, "/telegram"),
+          configure: quietProxyErrors("workbench", workbench),
+        },
       },
     },
     test: {

@@ -73,6 +73,8 @@ async def serving(app: FastAPI, settings: Settings, telegram: httpx.AsyncClient 
             # state, which `/state` names rather than leaving the screen to guess at.
             announcer = alerts.build(pool, settings, telegram)
             app.state.alerts = announcer
+            if announcer is not None:
+                await announcer.announce_purposes()
 
             ingest = Ingest(
                 pool,

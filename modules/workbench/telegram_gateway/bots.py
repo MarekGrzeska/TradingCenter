@@ -14,6 +14,7 @@ from tc_runtime.db import Conn
 from . import creator, store
 from .bot_api import BotApi
 from .creator import CreatedBot, CreatorBot
+from .errors import CreatorBotUnreadable
 from .models import Bot
 
 log = logging.getLogger(__name__)
@@ -65,6 +66,30 @@ async def create(
     # a log that gets shipped somewhere.
     log.info("created bot @%s through the creator bot", stored.username)
     return stored
+
+
+async def rotate(conn: Conn, api: BotApi, bot: CreatorBot, *, existing: Bot) -> Bot:
+    """A new token for a bot this module already holds, through the creator bot.
+
+    The order mirrors `create`: the token is read out of the reply and checked with Telegram — it must belong to the
+    same bot — before the old one is replaced, so a reply that merely looked like a token cannot cost the bot its
+    working credential. The destinations hang off the bot row, which is untouched, so nobody has to tap again.
+    """
+    reply = await bot.revoke(username=existing.username)
+    token = creator.token_in(reply)
+    identity = await api.get_me(token)
+    if int(identity["id"]) != existing.telegram_id:
+        raise CreatorBotUnreadable(reply=reply)
+    rotated = await store.add_bot(
+        conn,
+        telegram_id=existing.telegram_id,
+        username=existing.username,
+        title=existing.title,
+        token=token,
+        created_here=existing.created_here,
+    )
+    log.warning("rotated the token of bot @%s", rotated.username)
+    return rotated
 
 
 async def destroy(

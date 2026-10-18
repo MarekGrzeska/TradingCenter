@@ -114,6 +114,12 @@ release() {
   printf 'GATEWAY_TAG=%s\nTRADING_MCP_TAG=%s\nWORKBENCH_TAG=%s\n' "$sha" "$sha" "$sha" > tags.env
   $COMPOSE pull --quiet gateway trading-mcp workbench || { cp tags.env.prev tags.env; die "pull failed; nothing changed"; }
   $COMPOSE up -d --remove-orphans
+  # The Caddyfile is a bind mount that `sync` rewrote in place; Caddy reads it only when told. A refused config keeps the old.
+  if $COMPOSE exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
+    echo "caddy: reloaded"
+  else
+    echo "caddy: reload refused, the previous configuration stays"
+  fi
   if wait_healthy; then
     echo "release: $sha is up"
     running_images
