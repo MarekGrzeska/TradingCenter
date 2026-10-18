@@ -50,19 +50,24 @@
 - [x] 7.1 `GET /alerts/state` (`alerts-api`)
 - [x] 7.2 Narzędzia `alert_rules` i `alert_fires` podpięte w `workbench/local_tools.py`; test, że brak narzędzia zapisującego
 
-## 8. Producenci
+## 8. Przeniesienie tego, co operator już ustawił
 
-- [ ] 8.1 Klient `alerts` w procesie przekazywany przez assembly do `youtube_data`, `social_data` i `teams` (brak pakietu = `None`)
-- [ ] 8.2 YouTube: ogłoszenie `youtube.film.read`, publikacja każdego odczytanego filmu, znacznik po przyjęciu; usunięcie `_wanted`
-- [ ] 8.3 Social: ogłoszenie `social.post.read`, publikacja każdego ocenionego posta, znacznik po przyjęciu; koniec czytania `ALERT_MIN_IMPACT_SCORE`
-- [ ] 8.4 Teams: ogłoszenie `teams.run.finished`, publikacja po stanie końcowym z ponowieniem
-- [ ] 8.5 Trasy stanu producentów mówią „nie publikuje”, gdy `alerts` nie ma
+Przed przełączeniem producentów: reguły powstają z przypisań i reguł kanałów, kiedy stare drogi jeszcze działają, więc
+żaden alert nie milknie między wdrożeniami.
 
-## 9. Migracja danych (wdrożenie 1)
+- [x] 8.1 `legacy.py`: czysta funkcja zamieniająca przypisania, kanały, tematy i progi na reguły (rozstrzyganie po najdłuższym przedrostku, grupowanie po adresacie i regule)
+- [x] 8.2 Typy zdarzeń `youtube.film.read` i `social.post.read` wstawiane przez konwersję w minimalnym kształcie, żeby reguły miały na czym stać; ogłoszenie producenta zastąpi je
+- [x] 8.3 Jednorazowa konwersja w lifespanie `alerts` z danych sąsiadów (klient z assembly), znacznik w `migrations_done`; stare drogi producentów działają dalej
+- [x] 8.4 Testy: `*`, przedrostek, kanał „zawsze”, „od progu” i „nigdy”, temat, autor szczególny; ponowny start nie dubluje reguł (`-m db`)
 
-- [ ] 9.1 Jednorazowa migracja w lifespanie `alerts`: przypisania → reguły, reguły kanałów/tematów → reguły z filtrem, próg postów → filtr; znacznik w `migrations_done`
-- [ ] 9.2 Trasy celów i przypisań bramy odpowiadają `410`; `POST /telegram/messages` z celem jest odmową
-- [ ] 9.3 Test migracji na danych z `*`, przedrostka, kanału „zawsze”, „od progu” i „nigdy” (`-m db`)
+## 9. Producenci publikują zdarzenia
+
+- [ ] 9.1 Klient `alerts` w procesie przekazywany przez assembly do `youtube_data`, `social_data` i `teams` (brak pakietu = `None`)
+- [ ] 9.2 YouTube: ogłoszenie `youtube.film.read`, publikacja każdego odczytanego filmu, znacznik po przyjęciu; usunięcie wysyłki do bramy, `_wanted` i narzędzia `set_alert_rule`
+- [ ] 9.3 Social: ogłoszenie `social.post.read`, publikacja każdego ocenionego posta, znacznik po przyjęciu; koniec czytania `ALERT_MIN_IMPACT_SCORE`
+- [ ] 9.4 Teams: ogłoszenie `teams.run.finished`, publikacja po stanie końcowym z ponowieniem
+- [ ] 9.5 Trasy stanu producentów mówią „nie publikuje”, gdy `alerts` nie ma
+- [ ] 9.6 Testy producentów: publikacja, znacznik po przyjęciu, ponowienie, brak pakietu
 
 ## 10. Terminal
 
@@ -75,7 +80,7 @@
 
 ## 11. Wdrożenie 2 i dokumentacja
 
-- [ ] 11.1 Migracje usuwające `purposes`, `assignments` (telegram) i `alert_rule` (youtube); usunięcie kodu celów i przypisań
+- [ ] 11.1 Migracje usuwające `purposes`, `assignments` (telegram) i `alert_rule` (youtube); usunięcie kodu celów i przypisań oraz ich tras, `POST /telegram/messages` z celem jest odmową
 - [ ] 11.2 `ALERT_MIN_IMPACT_SCORE` w `RETIRED_SETTINGS`
 - [ ] 11.3 `alerts/README.md`; aktualizacja README `telegram_gateway`, `modules/workbench/README.md`, tabeli w `CLAUDE.md` (dziewięć pakietów) i `docs/architecture.md`
 - [ ] 11.4 Po każdym wdrożeniu skill `deploy-watch`

@@ -7,6 +7,7 @@ and not otherwise — and enters `serving` from its own lifespan, because a moun
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -17,13 +18,14 @@ from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 from tc_runtime.liveness import Heartbeats, LoopHeartbeat
 
+from . import conversion, mcp_app
 from . import drafter as drafter_module
-from . import mcp_app
 from .caller_access import RECORD, CallerAccess
 from .catalog import ToolSource
 from .clock import Clock
 from .config import Settings
 from .gateway import Gateway
+from .legacy import LegacySource
 from .routers import catalog, drafts, events, meta, rules, state
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
@@ -37,6 +39,7 @@ async def serving(
     *,
     tools: ToolSource | None = None,
     telegram: httpx.AsyncClient | None = None,
+    legacy: LegacySource | None = None,
 ):
     """Everything this package needs running, on `app.state`, for as long as the block is open. `tools` is the process's
     tool surface and `telegram` the host's client over the door to Telegram; without either, rules can still be written —
@@ -68,6 +71,10 @@ async def serving(
 
         app.state.pool = pool
 
+        # Once: what the operator set before this package becomes rules. Started here and not awaited — the neighbours it
+        # reads are entered after this package, so it asks until they answer.
+        converting = asyncio.create_task(conversion.run_when_ready(pool, legacy), name="alerts-conversion")
+
         # After the migration and not before it: a tick started earlier would read a schema it does not know. One
         # heartbeat for the one loop, on the state so `/health` can answer with it and the metric can read it.
         heartbeats = Heartbeats(LoopHeartbeat("clock", expected_seconds=settings.tick_seconds))
@@ -83,6 +90,8 @@ async def serving(
             try:
                 yield
             finally:
+                converting.cancel()
+                await asyncio.gather(converting, return_exceptions=True)
                 await clock.stop()
 
 

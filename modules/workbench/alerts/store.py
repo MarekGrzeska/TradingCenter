@@ -519,3 +519,26 @@ async def standing(conn: Conn) -> asyncpg.Record:
 async def destinations_in_use(conn: Conn) -> set[str]:
     return {row["destination"] for row in await conn.fetch("SELECT DISTINCT destination FROM rules")}
 
+
+# --- conversion of what was set before this package ----------------------------------------------------------------------
+
+
+async def ensure_event_type(conn: Conn, name: str, *, description: str, schema: dict[str, Any]) -> None:
+    """A type that is there stays as it is. The conversion needs a type for its rules to stand on, and a producer's own
+    announcement — which may be there already — is the better word about what it carries."""
+    await conn.execute(
+        "INSERT INTO event_types (name, description, schema, announced_by) VALUES ($1, $2, $3::jsonb, 'conversion') "
+        "ON CONFLICT (name) DO NOTHING",
+        name,
+        description,
+        json.dumps(schema),
+    )
+
+
+async def done(conn: Conn, name: str) -> bool:
+    return bool(await conn.fetchval("SELECT EXISTS (SELECT 1 FROM migrations_done WHERE name = $1)", name))
+
+
+async def mark_done(conn: Conn, name: str) -> None:
+    await conn.execute("INSERT INTO migrations_done (name) VALUES ($1) ON CONFLICT DO NOTHING", name)
+
