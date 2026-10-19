@@ -7,7 +7,7 @@ from typing import Any
 import asyncpg
 
 from . import reach
-from .contract import ConditionSource, Defect, EventSource, FilterTerm, RuleOut
+from .contract import ConditionSource, Defect, EventSource, FilterTerm, RuleIn, RuleOut
 from .reach import Reach
 from .store import json_of
 from .validation import filter_defects
@@ -26,6 +26,21 @@ def source_of(row: asyncpg.Record | dict[str, Any]) -> ConditionSource | EventSo
     return EventSource(
         event_type=row["event_type"],
         filter=[FilterTerm(**term) for term in json_of(row["filter"]) or []],
+    )
+
+
+def as_input(row: asyncpg.Record) -> RuleIn:
+    """The stored rule as the form submits it — what a change to it starts from."""
+    return RuleIn(
+        name=row["name"],
+        source=source_of(row),
+        destination=row["destination"],
+        bot=row["bot"],
+        template=row["template"],
+        cooldown_seconds=row["cooldown_seconds"],
+        mode=row["mode"],
+        max_per_hour=row["max_per_hour"],
+        enabled=row["enabled"],
     )
 
 

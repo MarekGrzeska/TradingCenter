@@ -293,8 +293,9 @@ export interface AlertsApi {
   replaceRule(id: number, input: RuleInput, signal: AbortSignal): Promise<Rule>;
   setEnabled(id: number, enabled: boolean, signal: AbortSignal): Promise<Rule>;
   deleteRule(id: number, signal: AbortSignal): Promise<void>;
-  /** A proposal from a sentence. Nothing is stored; the rule exists only when the form is saved. */
-  draft(sentence: string, signal: AbortSignal): Promise<Draft>;
+  /** A proposal from a sentence — with `ruleId`, that rule as the sentence would change it. Nothing is stored; the rule
+   * exists, or changes, only when the form is saved. */
+  draft(sentence: string, signal: AbortSignal, ruleId?: number): Promise<Draft>;
 }
 
 export function createAlertsApi(httpBase: string, identity: Identity = noIdentity): AlertsApi {
@@ -392,8 +393,8 @@ export function createAlertsApi(httpBase: string, identity: Identity = noIdentit
       await http.send(`${httpBase}/rules/${id}`, { signal, method: "DELETE" });
     },
 
-    async draft(sentence, signal) {
-      const body: Schemas["DraftIn"] = { sentence };
+    async draft(sentence, signal, ruleId) {
+      const body: Schemas["DraftIn"] = ruleId === undefined ? { sentence } : { sentence, rule_id: ruleId };
       const raw = await http.json<Schemas["DraftOut"]>(`${httpBase}/drafts`, { signal, method: "POST", body });
       return {
         understood: raw.understood,

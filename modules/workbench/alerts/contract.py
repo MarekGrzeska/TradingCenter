@@ -140,6 +140,8 @@ class RuleIn(BaseModel):
 
 class DraftIn(BaseModel):
     sentence: str = Field(min_length=3, max_length=1000)
+    # With a rule's id the sentence is a change to that rule, and the draft is the rule as it would then stand.
+    rule_id: int | None = None
 
 
 class DraftOut(BaseModel):
