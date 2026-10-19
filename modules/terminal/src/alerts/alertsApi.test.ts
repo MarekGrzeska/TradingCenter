@@ -180,6 +180,20 @@ describe("drafts", () => {
     expect(draft.notes).toEqual(["wybrano domyślnie"]);
   });
 
+  it("names the rule a sentence is a change to", async () => {
+    let sent: unknown;
+    server.use(
+      http.post(`${BASE}/drafts`, async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json({ understood: "", rule: null, defects: [], notes: [] });
+      }),
+    );
+
+    await createAlertsApi(BASE).draft("podnieś próg", signal(), 4);
+
+    expect(sent).toEqual({ sentence: "podnieś próg", rule_id: 4 });
+  });
+
   it("reads a sentence that made no rule as a draft with none", async () => {
     server.use(
       http.post(`${BASE}/drafts`, () =>

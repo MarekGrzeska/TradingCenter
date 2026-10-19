@@ -99,9 +99,14 @@ threshold, comparison, tool, field and any scalar argument (e.g. {symbol}); for 
 - name is a short label in Polish; `understood` is one sentence in Polish saying how you read the request.
 - Prices: the "close" of a pair's latest candle is the price; "above" is gt, "below" is lt."""
 
+CHANGE_INSTRUCTIONS = """The sentence is not a new rule: it is a change to the CURRENT RULE below. Return that rule in full, with exactly what the sentence changes and nothing else — the same tool, arguments, event type, filter, recipient, template, cool-down and mode unless the sentence says otherwise. `understood` says in one Polish sentence what was changed. A change the lists cannot support goes in `problems`, with the field left as it was."""
 
-def system_prompt(known: Known, tools: list[CatalogTool], recipients: list[Recipient], symbols: list[str]) -> str:
-    """The instructions, then everything that exists, trimmed to what the model needs to choose from."""
+
+def system_prompt(
+    known: Known, tools: list[CatalogTool], recipients: list[Recipient], symbols: list[str], current: RuleIn | None = None
+) -> str:
+    """The instructions, then everything that exists, trimmed to what the model needs to choose from. With `current`, the
+    sentence is a change to that rule."""
     offered = [
         {
             "name": tool.name,
@@ -124,9 +129,11 @@ def system_prompt(known: Known, tools: list[CatalogTool], recipients: list[Recip
         }
         for name, schema in sorted(known.event_types.items())
     ]
+    changing = [CHANGE_INSTRUCTIONS, "CURRENT RULE:\n" + current.model_dump_json()] if current else []
     return "\n\n".join(
         [
             INSTRUCTIONS,
+            *changing,
             f"Minimum poll_interval_seconds: {known.min_interval_seconds}",
             "TOOLS (condition rules):\n" + json.dumps(offered, ensure_ascii=False),
             "EVENT TYPES (event rules):\n" + json.dumps(events, ensure_ascii=False),
@@ -136,8 +143,11 @@ def system_prompt(known: Known, tools: list[CatalogTool], recipients: list[Recip
     )
 
 
-def convert(answer: Answer, *, recipients: list[Recipient], known: Known, symbols: list[str]) -> DraftOut:
-    """The model's answer as a draft: a rule when it can be one, and every reason it cannot be right as it stands."""
+def convert(
+    answer: Answer, *, recipients: list[Recipient], known: Known, symbols: list[str], current: RuleIn | None = None
+) -> DraftOut:
+    """The model's answer as a draft: a rule when it can be one, and every reason it cannot be right as it stands. For a
+    change, what the model is not asked for (bot, hourly ceiling, switch) is the current rule's."""
     try:
         said = json.loads(answer.payload)
     except (TypeError, ValueError) as err:
@@ -154,6 +164,8 @@ def convert(answer: Answer, *, recipients: list[Recipient], known: Known, symbol
         return DraftOut(understood=understood, rule=None, defects=defects, notes=notes)
 
     destination = said.get("destination")
+    if not destination and current is not None:
+        destination = current.destination
     if not destination:
         ready = [one for one in recipients if one.receives]
         if len(ready) == 1:
@@ -176,6 +188,14 @@ def convert(answer: Answer, *, recipients: list[Recipient], known: Known, symbol
         defects.append(Defect(field="sentence", message=f"the draft could not be read as a rule: {_first_line(err)}"))
         return DraftOut(understood=understood, rule=None, defects=defects, notes=notes)
 
+    if current is not None:
+        rule = rule.model_copy(
+            update={
+                "bot": current.bot if rule.destination == current.destination else None,
+                "max_per_hour": current.max_per_hour,
+                "enabled": current.enabled,
+            }
+        )
     if destination is None:
         # No recipient to check, and the one reason for it is already above; the form is given an empty field, not a placeholder.
         known = Known(known.tools, known.event_types, None, known.min_interval_seconds)

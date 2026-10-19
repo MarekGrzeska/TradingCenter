@@ -194,6 +194,26 @@ describe("AlertsView", () => {
     expect(client.createRule).not.toHaveBeenCalled();
   });
 
+  it("opens the edit form of a rule filled with what a sentence about it would change, and saves nothing", async () => {
+    const draft = vi.fn(async () => ({
+      understood: "Próg podniesiony do 1,12.",
+      rule: { ...rule(), name: "EURUSD powyżej 1,12" },
+      defects: [],
+      notes: [],
+    }));
+    const client = api([rule({ id: 4 })], { draft });
+    render(<AlertsView api={client} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Zmień zdaniem…" }));
+    await userEvent.type(screen.getByLabelText(/Co zmienić w regule/), "podnieś próg do 1,12");
+    await userEvent.click(screen.getByRole("button", { name: "Zaproponuj zmianę" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText("Nazwa")).toHaveValue("EURUSD powyżej 1,12");
+    expect(draft).toHaveBeenCalledWith("podnieś próg do 1,12", expect.anything(), 4);
+    expect(client.replaceRule).not.toHaveBeenCalled();
+  });
+
   it("keeps saving out of reach of a draft with a flaw until the operator has changed something", async () => {
     const draft = vi.fn(async () => ({
       understood: "Powiadom, gdy DOGE przekroczy 1.",

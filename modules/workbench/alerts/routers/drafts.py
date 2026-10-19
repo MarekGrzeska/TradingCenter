@@ -1,4 +1,5 @@
-"""A sentence in, a proposed rule out. Nothing is stored but the tokens it cost."""
+"""A sentence in, a proposed rule out — a new one, or an existing one as the sentence would change it. Nothing is stored but
+the tokens it cost."""
 
 from __future__ import annotations
 
@@ -7,7 +8,7 @@ from datetime import UTC, datetime
 
 from fastapi import APIRouter, Request, status
 
-from .. import drafts, known, store
+from .. import drafts, known, rules, store
 from ..contract import DraftIn, DraftOut, Problem
 from ..gateway import GatewayUnreachable
 from . import deps
@@ -19,7 +20,7 @@ router = APIRouter(tags=["drafts"])
 @router.post(
     "/drafts",
     response_model=DraftOut,
-    responses={429: {"model": Problem}, 501: {"model": Problem}, 502: {"model": Problem}, 503: {"model": Problem}},
+    responses={404: {"model": Problem}, 429: {"model": Problem}, 501: {"model": Problem}, 502: {"model": Problem}, 503: {"model": Problem}},
 )
 async def draft(request: Request, body: DraftIn) -> DraftOut:
     state = request.app.state
@@ -39,6 +40,12 @@ async def draft(request: Request, body: DraftIn) -> DraftOut:
                 f"today's drafts have used {spent} tokens of the {state.settings.draft_daily_token_limit} ALERTS_DRAFT_DAILY_TOKEN_LIMIT "
                 "allows; the form still works",
             )
+        current = None
+        if body.rule_id is not None:
+            row = await store.get_rule(conn, body.rule_id)
+            if row is None:
+                raise deps.not_found(f"there is no rule {body.rule_id}")
+            current = rules.as_input(row)
         try:
             everything = await known.known(state, conn)
             recipients = await known.recipients_of(state.gateway) or []
@@ -47,7 +54,7 @@ async def draft(request: Request, body: DraftIn) -> DraftOut:
 
     tools = await known.tools_of(state.tools)
     symbols = await known.symbols(state)
-    prompt = drafts.system_prompt(everything, tools, recipients, symbols)
+    prompt = drafts.system_prompt(everything, tools, recipients, symbols, current)
     try:
         answer = await state.drafter.draft(prompt, body.sentence)
     except Exception as err:
@@ -60,6 +67,6 @@ async def draft(request: Request, body: DraftIn) -> DraftOut:
             conn, model=answer.model, input_tokens=answer.input_tokens, output_tokens=answer.output_tokens, now=now
         )
     try:
-        return drafts.convert(answer, recipients=recipients, known=everything, symbols=symbols)
+        return drafts.convert(answer, recipients=recipients, known=everything, symbols=symbols, current=current)
     except drafts.Unusable as err:
         raise deps.refusal(status.HTTP_502_BAD_GATEWAY, str(err)) from err

@@ -71,6 +71,8 @@ export function AlertsView({ api }: { api?: AlertsApi } = {}) {
   const [drafting, setDrafting] = useState(false);
   const [unreadable, setUnreadable] = useState<{ understood: string; defects: Defect[] } | null>(null);
   const [open, setOpen] = useState<number | null>(null);
+  // The rule a sentence is being written about, and the sentence.
+  const [changing, setChanging] = useState<{ id: number; sentence: string } | null>(null);
 
   const state = useRead<StateRead>({
     key: ["alerts", "state"],
@@ -127,12 +129,13 @@ export function AlertsView({ api }: { api?: AlertsApi } = {}) {
   const notes = state.status === "ready" ? warnings(found) : [];
   const ready = catalog.status === "ready";
 
-  async function propose(): Promise<void> {
+  async function propose(about?: Rule): Promise<void> {
     setFailure(null);
     setUnreadable(null);
     setDrafting(true);
     try {
-      const draft = await client.draft(sentence.trim(), signal());
+      const said = about ? (changing?.sentence ?? "") : sentence;
+      const draft = await client.draft(said.trim(), signal(), about?.id);
       if (draft.rule === null) {
         setUnreadable({ understood: draft.understood, defects: draft.defects });
         return;
@@ -140,7 +143,9 @@ export function AlertsView({ api }: { api?: AlertsApi } = {}) {
       setDialog({
         kind: "rule",
         start: { form: formFrom(draft.rule, catalog.value), defects: draft.defects, understood: draft.understood, notes: draft.notes },
+        editing: about,
       });
+      setChanging(null);
     } catch (cause: unknown) {
       setFailure(messageOf(cause, "nie udało się zaproponować reguły"));
     } finally {
@@ -243,6 +248,17 @@ export function AlertsView({ api }: { api?: AlertsApi } = {}) {
                   >
                     Edytuj…
                   </Button>
+                  {catalog.value.drafting && (
+                    <Button
+                      size="2xs"
+                      tone="muted"
+                      disabled={!ready}
+                      aria-expanded={changing?.id === rule.id}
+                      onClick={() => setChanging(changing?.id === rule.id ? null : { id: rule.id, sentence: "" })}
+                    >
+                      Zmień zdaniem…
+                    </Button>
+                  )}
                   <Button
                     size="2xs"
                     tone="muted"
@@ -266,6 +282,21 @@ export function AlertsView({ api }: { api?: AlertsApi } = {}) {
                   {one.message}
                 </p>
               ))}
+              {changing?.id === rule.id && (
+                <div className="flex gap-2">
+                  <textarea
+                    aria-label={`Co zmienić w regule ${rule.name}`}
+                    className="min-w-0 flex-1 rounded border border-border bg-sunken px-2 py-1 text-sm text-ink"
+                    rows={2}
+                    placeholder="np. podnieś próg do 1,12 albo niech odzywa się najwyżej raz na dwie godziny"
+                    value={changing.sentence}
+                    onChange={(e) => setChanging({ id: rule.id, sentence: e.target.value })}
+                  />
+                  <Button size="sm" disabled={drafting || changing.sentence.trim().length < 3} onClick={() => void propose(rule)}>
+                    {drafting ? "Czytam…" : "Zaproponuj zmianę"}
+                  </Button>
+                </div>
+              )}
               {open === rule.id && <HistoryPanel api={client} rule={rule} />}
             </li>
           );

@@ -329,6 +329,8 @@ export interface components {
         };
         /** DraftIn */
         DraftIn: {
+            /** Rule Id */
+            rule_id?: number | null;
             /** Sentence */
             sentence: string;
         };
@@ -709,6 +711,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DraftOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
             /** @description Validation Error */

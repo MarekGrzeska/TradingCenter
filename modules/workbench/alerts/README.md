@@ -54,6 +54,8 @@ occurrence published twice (`type` + `source_key`) is one event and one alert.
 pairs the archive follows) and asks for one structured answer. The answer goes through the same validation as a saved
 rule and comes back as a **proposal** — a rule to fill the form with, and every reason it is wrong; nothing is stored but
 the tokens, which have a daily ceiling. It has its own key (`ALERTS_OPENAI_API_KEY`); without one everything else works.
+With `rule_id` the sentence is a change to that rule: the model also sees it, and the proposal is the whole rule as it
+would then stand (bot, hourly ceiling and switch carried over); the operator still saves it with `PUT`.
 
 ## Configuration
 

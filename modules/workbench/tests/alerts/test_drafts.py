@@ -5,6 +5,7 @@ that it costs what it costs and stops at the ceiling."""
 from __future__ import annotations
 
 import json
+from decimal import Decimal
 
 import pytest
 
@@ -13,7 +14,7 @@ from alerts import known as known_module
 from alerts.drafts import Answer, Unusable
 from alerts.gateway import Binding, Recipient
 
-from .builders import FILM_SCHEMA, known, said
+from .builders import FILM_SCHEMA, known, rule, said
 
 RECIPIENTS = [Recipient("phone", (Binding("bot", True),))]
 TRACKED = ["EURUSD", "XAUUSD"]
@@ -88,6 +89,35 @@ def test_an_event_sentence_becomes_an_event_rule_with_a_filter() -> None:
     assert draft.defects == []
     assert draft.rule is not None and draft.rule.source.filter[0].value == 8  # pyright: ignore[reportAttributeAccessIssue]
     assert set(FILM_SCHEMA["properties"]) >= {"impact_score"}
+
+
+def test_a_change_keeps_what_the_model_is_not_asked_for_and_what_the_sentence_leaves_alone() -> None:
+    current = rule(bot="bot", max_per_hour=4, enabled=False)
+
+    draft = drafts.convert(
+        said(threshold="1.12", destination=None), recipients=RECIPIENTS, known=known(), symbols=TRACKED, current=current
+    )
+
+    assert draft.defects == [] and draft.notes == []
+    assert draft.rule is not None
+    assert (draft.rule.source.threshold, draft.rule.destination) == ("1.12", "phone")  # pyright: ignore[reportAttributeAccessIssue]
+    assert (draft.rule.bot, draft.rule.max_per_hour, draft.rule.enabled) == ("bot", 4, False)
+
+
+def test_a_change_of_recipient_drops_the_bot_that_belonged_to_the_old_one() -> None:
+    tablet = Recipient("tablet", (Binding("other", True),))
+    draft = drafts.convert(
+        said(destination="tablet"), recipients=[*RECIPIENTS, tablet], known=known(), symbols=TRACKED, current=rule(bot="bot")
+    )
+
+    assert draft.rule is not None and (draft.rule.destination, draft.rule.bot) == ("tablet", None)
+
+
+def test_the_prompt_for_a_change_carries_the_rule_being_changed() -> None:
+    prompt = drafts.system_prompt(known(), [], RECIPIENTS, TRACKED, rule(name="moja reguła"))
+
+    assert "CURRENT RULE" in prompt and "moja reguła" in prompt
+    assert "CURRENT RULE" not in drafts.system_prompt(known(), [], RECIPIENTS, TRACKED)
 
 
 @pytest.mark.parametrize("payload", ["not json", "[]", '{"no": "kind"}'])
@@ -167,3 +197,18 @@ class TestTheRoute:
         assert (down.status_code, nonsense.status_code) == (502, 502)
         # The second was paid for, the first was not.
         assert await db.fetchval("SELECT count(*) FROM draft_usage") == 1
+
+    async def test_a_sentence_about_a_rule_shows_the_model_that_rule_and_stores_nothing(self, api, drafter, db) -> None:
+        saved = (await api.post("/rules", json=rule().model_dump(mode="json"))).json()
+        drafter.answers = [said(threshold="1.12")]
+
+        got = await api.post("/drafts", json={"sentence": "podnieś próg do 1,12", "rule_id": saved["id"]})
+
+        assert got.status_code == 200 and got.json()["rule"]["source"]["threshold"] == "1.12"
+        assert "CURRENT RULE" in drafter.asked[0][0] and '"threshold":"1.10"' in drafter.asked[0][0]
+        assert await db.fetchval("SELECT threshold FROM rules WHERE id = $1", saved["id"]) == Decimal("1.10")
+
+    async def test_a_sentence_about_a_rule_that_is_not_there_is_refused_without_asking_the_model(self, api, drafter) -> None:
+        refused = await api.post("/drafts", json={"sentence": "podnieś próg", "rule_id": 99})
+
+        assert refused.status_code == 404 and drafter.asked == []
