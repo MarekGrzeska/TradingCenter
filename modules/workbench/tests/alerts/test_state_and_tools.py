@@ -1,9 +1,11 @@
-"""How the package says it is doing, and the two tools through which a conversation reads what became of a rule."""
+"""How the package says it is doing, and the tools through which a conversation reads what became of a rule and asks what a
+change would make of one."""
 
 from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from decimal import Decimal
 
 import pytest
 from tc_runtime.liveness import Heartbeats, LoopHeartbeat
@@ -11,7 +13,7 @@ from tc_runtime.liveness import Heartbeats, LoopHeartbeat
 from alerts import store
 from workbench.local_tools import ConversationLocalTools, TeamsLocalTools
 
-from .builders import condition, event, rule
+from .builders import condition, event, rule, said
 
 pytestmark = pytest.mark.db
 
@@ -93,12 +95,31 @@ def server(app, pool):
     return app.state.mcp_server
 
 
-async def test_both_registries_see_the_same_two_tools_and_neither_writes(server) -> None:
+async def test_both_registries_see_the_same_tools_and_only_the_reading_ones_claim_to_be_read_only(server) -> None:
     conversation = await ConversationLocalTools("alerts", server).list_tools()
     teams = await TeamsLocalTools("alerts", server).list_tools()
 
-    assert {tool.name for tool in conversation} == {tool.name for tool in teams} == {"alert_rules", "alert_fires"}
-    assert all(tool.read_only is True for tool in conversation)
+    assert {tool.name for tool in conversation} == {tool.name for tool in teams} == {"alert_rules", "alert_fires", "propose_alert_change"}
+    # A proposal costs tokens, and a read-only tool with a number in its answer is one the catalogue offers to watch.
+    assert {tool.name for tool in conversation if tool.read_only} == {"alert_rules", "alert_fires"}
+
+
+async def test_a_change_is_proposed_to_the_conversation_and_no_rule_moves(server, api, pool, drafter) -> None:
+    rule_id = await saved(pool)
+    drafter.answers = [said(threshold="1.12")]
+
+    answer = await ConversationLocalTools("alerts", server).call("propose_alert_change", {"rule_id": rule_id, "change": "podnieś próg do 1,12"})
+
+    got = json.loads(answer.text)
+    assert got["rule"]["source"]["threshold"] == "1.12" and got["applied"] is False and "NOT been changed" in got["next_step"]
+    async with pool.acquire() as conn:
+        assert (await store.get_rule(conn, rule_id))["threshold"] == Decimal("1.10")
+
+
+async def test_a_change_the_package_cannot_ask_for_comes_back_as_a_refusal_the_model_can_read(server, api, drafter) -> None:
+    answer = await ConversationLocalTools("alerts", server).call("propose_alert_change", {"rule_id": 99, "change": "podnieś próg"})
+
+    assert answer.kind != "ok" and "there is no rule 99" in answer.text and drafter.asked == []
 
 
 async def test_the_rules_are_read_with_what_each_watches(server, pool, db, door, app) -> None:
