@@ -39,6 +39,7 @@ EVENT_TYPE = "youtube.film.read"
 EVENT_DESCRIPTION = "A film the model read, with its impact score and the instruments it spoke about"
 EVENT_SCHEMA = {
     "type": "object",
+    "description": "`text` is the ready message: score and channel, the title, the summary in Polish, what was said of each instrument and the link.",
     "properties": {
         "channel": {"type": "string", "x-seen-values": True},
         "channel_slug": {"type": "string"},

@@ -24,6 +24,7 @@ EVENT_TYPE = "teams.run.finished"
 EVENT_DESCRIPTION = "A team's run reached its end, whichever way it ended"
 EVENT_SCHEMA = {
     "type": "object",
+    "description": "`text` is the ready message: the team's name, how the run ended and the reason it stopped.",
     "properties": {
         "team": {"type": "string", "x-seen-values": True},
         "team_id": {"type": "integer"},

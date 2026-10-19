@@ -36,6 +36,7 @@ EVENT_TYPE = "social.post.read"
 EVENT_DESCRIPTION = "A post the model read, with its impact score and topics"
 EVENT_SCHEMA = {
     "type": "object",
+    "description": "`text` is the ready message: impact score and author, the post itself in Polish when it was translated (the original when not), its topics and the link.",
     "properties": {
         "author": {"type": "string", "x-seen-values": True},
         "author_slug": {"type": "string"},
