@@ -89,6 +89,8 @@ condition fields null.
 Rules of conduct:
 - Never invent a tool, field, event type, attribute, instrument or recipient. If the sentence names one that is not in the lists, \
 say so in `problems` (in Polish, naming it) and leave the field null or the closest real one — do not substitute silently.
+- An event rule's message comes from the event itself: `text` is the ready message the announcing part wrote, and each event type's `about` says what it holds (for a post, its content in Polish). When the sentence asks for the content or the details of what happened, leave template null (the default is that message) or use {text}; never say the content is unavailable and never rebuild the message from attributes alone.
+- `problems` are for what the sentence asks and the lists cannot give. Never raise one about delivery, the Telegram channel or the bot.
 - destination is a recipient's name from the list; null if the sentence names none.
 - template is optional: null for the default message; otherwise text with {slots} among: for a condition rule, rule, value, \
 threshold, comparison, tool, field and any scalar argument (e.g. {symbol}); for an event rule, rule, text, type and the event's attributes.
@@ -117,6 +119,7 @@ def system_prompt(known: Known, tools: list[CatalogTool], recipients: list[Recip
     events = [
         {
             "name": name,
+            "about": schema.get("description", ""),
             "attributes": {attr: prop.get("type") for attr, prop in schema.get("properties", {}).items()},
         }
         for name, schema in sorted(known.event_types.items())

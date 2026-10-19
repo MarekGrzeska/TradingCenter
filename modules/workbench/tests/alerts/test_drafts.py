@@ -111,6 +111,15 @@ def test_the_prompt_offers_what_exists_and_only_that() -> None:
     assert "youtube.film.read" in prompt and "EURUSD" in prompt and "phone" in prompt
 
 
+def test_the_model_is_told_what_the_text_of_an_event_holds_so_it_does_not_claim_the_content_is_missing() -> None:
+    schema = {"type": "object", "description": "`text` is the ready message: the post in Polish.", "properties": {"author": {"type": "string"}}}
+
+    prompt = drafts.system_prompt(known(event_types={"social.post.read": schema}), [], RECIPIENTS, [])
+
+    assert "`text` is the ready message: the post in Polish." in prompt
+    assert "never say the content is unavailable" in prompt
+
+
 def test_the_tracked_symbols_are_read_out_of_the_tools_answer_however_it_is_wrapped() -> None:
     assert known_module.symbols_from('{"result": [{"symbol": "A", "collection": "x"}, {"symbol": "B"}]}') == ["A", "B"]
     assert known_module.symbols_from('[{"symbol": "A"}]') == ["A"]
