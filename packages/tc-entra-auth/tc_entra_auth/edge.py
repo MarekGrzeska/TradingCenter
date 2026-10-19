@@ -18,6 +18,7 @@ from typing import Any
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp, Receive, Scope, Send
 
+from .roles import INTERNAL_ROLE, ROLES_HEADER, RolePolicy, roles_header_value
 from .verifier import InvalidToken, TokenVerifier, application_of
 
 log = logging.getLogger(__name__)
@@ -54,6 +55,9 @@ class EdgeConfig:
     key_header: bytes = DEFAULT_KEY_HEADER
     exempt_paths: frozenset[str] = frozenset()
     key_paths: frozenset[str] = frozenset()
+    # What a person's role may reach. `None` is a process with no roles (the gateway before this existed, a test): the
+    # token or key is the whole credential, as before.
+    role_policy: RolePolicy | None = None
 
 
 # Returns the config once the process has read its settings, `None` when it is not a server (local work, or Azure
@@ -89,7 +93,12 @@ class EdgeAuth:
 
         raw: list[tuple[bytes, bytes]] = list(scope.get("headers", []))
         headers = {name.lower(): value for name, value in raw}
-        clean = [(n, v) for n, v in raw if not n.lower().startswith(PRINCIPAL_HEADER)]
+        # The roles header is the process's own to write, like the principal: whatever the client sent is gone.
+        clean = [
+            (n, v)
+            for n, v in raw
+            if not n.lower().startswith(PRINCIPAL_HEADER) and n.lower() != ROLES_HEADER
+        ]
         path = scope.get("path", "")
 
         if path in config.exempt_paths or path in config.key_paths:
@@ -104,7 +113,13 @@ class EdgeAuth:
             await _refuse(scope, receive, send, 401, "not authenticated")
             return
 
-        application, person, name = identity
+        application, person, name, roles = identity
+        policy = config.role_policy
+        if policy is not None and not policy.allows(roles, scope.get("method", ""), path):
+            log.warning("refused %s %s: roles %s have no access", scope.get("method", ""), path, sorted(roles))
+            await _refuse(scope, receive, send, 403, "this person has no access")
+            return
+        clean.append((ROLES_HEADER, roles_header_value(roles)))
         clean.append((PRINCIPAL_HEADER, principal_blob(application)))
         clean.append((PRINCIPAL_ID_HEADER, person.encode()))
         clean.append((PRINCIPAL_NAME_HEADER, name.encode()))
@@ -113,7 +128,7 @@ class EdgeAuth:
     @staticmethod
     async def _from_token(
         config: EdgeConfig, headers: dict[bytes, bytes], path: str
-    ) -> tuple[str, str, str] | None:
+    ) -> tuple[str, str, str, frozenset[str]] | None:
         authorization = headers.get(b"authorization", b"").decode("latin-1")
         scheme, _, token = authorization.partition(" ")
         if scheme.lower() != "bearer" or not token.strip():
@@ -133,12 +148,12 @@ class EdgeAuth:
             return None
         person = _text(claims.get("oid")) or _text(claims.get("sub")) or application
         name = _text(claims.get("preferred_username")) or _text(claims.get("upn")) or person
-        return application, person, name
+        return application, person, name, _roles_of(claims)
 
     @staticmethod
     def _from_key(
         config: EdgeConfig, headers: dict[bytes, bytes], path: str
-    ) -> tuple[str, str, str] | None:
+    ) -> tuple[str, str, str, frozenset[str]] | None:
         provided = headers.get(config.key_header.lower(), b"")
         expected = config.service_key.encode() if config.service_key else None
         # Compared as bytes: `compare_digest` raises on a non-ASCII `str`, and a garbage header must be a 401.
@@ -146,7 +161,15 @@ class EdgeAuth:
             log.warning("refused %s: no valid service key on an internal request", path)
             return None
         internal = config.internal_application_id
-        return internal, internal, internal
+        return internal, internal, internal, frozenset({INTERNAL_ROLE})
+
+
+def _roles_of(claims: dict[str, Any]) -> frozenset[str]:
+    """The token's `roles` claim, a list of app-role values. Anything else is no roles — never a reading that allows."""
+    value = claims.get("roles")
+    if not isinstance(value, list):
+        return frozenset()
+    return frozenset(item for item in value if isinstance(item, str))
 
 
 def _text(value: Any) -> str:

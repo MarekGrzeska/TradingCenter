@@ -30,3 +30,15 @@ variable "scope" {
   default = null
 }
 
+
+variable "app_roles" {
+  description = <<-EOT
+    Roles a signed-in person can be given on this API, keyed by the value that appears in the token's `roles` claim.
+    Assigned to users (`azuread_app_role_assignment`, or Microsoft Graph from the terminal's Users tab), never to applications.
+  EOT
+  type = map(object({
+    display_name = string
+    description  = string
+  }))
+  default = {}
+}

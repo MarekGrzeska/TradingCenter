@@ -30,7 +30,15 @@ function expiry(item: NewsItem, now: Date): string | null {
     : `Disappears ${item.expiresAt.toLocaleString([], { dateStyle: "short", timeStyle: "short" })}`;
 }
 
-function NewsCard({ item, now, onKeep }: { item: NewsItem; now: Date; onKeep: (item: NewsItem) => void }) {
+function NewsCard({
+  item,
+  now,
+  onKeep,
+}: {
+  item: NewsItem;
+  now: Date;
+  onKeep: ((item: NewsItem) => void) | null;
+}) {
   const [open, setOpen] = useState(false);
   const kept = item.keptAt !== null;
   const note = expiry(item, now);
@@ -63,14 +71,16 @@ function NewsCard({ item, now, onKeep }: { item: NewsItem; now: Date; onKeep: (i
         ) : (
           <span />
         )}
-        <button
-          type="button"
-          className={kept ? styles.keepOn : styles.keep}
-          aria-pressed={kept}
-          onClick={() => onKeep(item)}
-        >
-          {kept ? "Kept" : "Keep"}
-        </button>
+        {onKeep === null ? null : (
+          <button
+            type="button"
+            className={kept ? styles.keepOn : styles.keep}
+            aria-pressed={kept}
+            onClick={() => onKeep(item)}
+          >
+            {kept ? "Kept" : "Keep"}
+          </button>
+        )}
       </div>
       {note !== null && !kept && <p className={styles.expiry}>{note}</p>}
     </article>
@@ -106,7 +116,15 @@ function SourceRow({ source, now }: { source: NewsSource; now: Date }) {
 
 /** Headlines with the delay they arrived with, on a phone. The sources are one tap away because
  *  "can I trust this list" is asked less often than "what happened". */
-export function NewsScreen({ api, active = true }: { api: NewsApi; active?: boolean }) {
+export function NewsScreen({
+  api,
+  active = true,
+  readOnly = false,
+}: {
+  api: NewsApi;
+  active?: boolean;
+  readOnly?: boolean;
+}) {
   const [minutes, setMinutes] = useState<number>(DEFAULT_MINUTES);
   const [sortKey, setSortKey] = useState<SortKey>("published");
   const [direction, setDirection] = useState<SortDirection>("desc");
@@ -263,7 +281,7 @@ export function NewsScreen({ api, active = true }: { api: NewsApi; active?: bool
 
         <div className={styles.list}>
           {items.map((item) => (
-            <NewsCard key={`${item.source}:${item.externalId}`} item={item} now={now} onKeep={news.toggleKeep} />
+            <NewsCard key={`${item.source}:${item.externalId}`} item={item} now={now} onKeep={readOnly ? null : news.toggleKeep} />
           ))}
         </div>
       </div>

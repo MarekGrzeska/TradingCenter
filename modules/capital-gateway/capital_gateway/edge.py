@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from fastapi import FastAPI
-from tc_entra_auth import EdgeConfig, TokenVerifier
+from tc_entra_auth import EdgeConfig, RolePolicy, TokenVerifier
 
 from .config import API_KEY_HEADER, Settings
 
@@ -26,6 +26,8 @@ def edge_config(settings: Settings) -> EdgeConfig | None:
         key_header=API_KEY_HEADER.lower().encode(),
         exempt_paths=frozenset({HEALTH_PATH}),
         key_paths=frozenset({STREAM_PATH}),
+        # A person reaches the gateway only as `admin`; the services that call it prove themselves with the key.
+        role_policy=RolePolicy(open_paths=frozenset()),
     )
 
 

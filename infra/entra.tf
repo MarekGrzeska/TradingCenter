@@ -36,12 +36,79 @@ resource "azuread_application" "terminal" {
     }
   }
 
+  # Microsoft Graph, for the Users tab: delegated, so the call is the signed-in admin's own and a person without a
+  # directory role is refused by Graph even holding this token. Consent is granted below, once, for everyone.
+  required_resource_access {
+    resource_app_id = data.azuread_service_principal.msgraph.client_id
+
+    dynamic "resource_access" {
+      for_each = local.terminal_graph_scopes
+
+      content {
+        id   = data.azuread_service_principal.msgraph.oauth2_permission_scope_ids[resource_access.value]
+        type = "Scope"
+      }
+    }
+  }
+
   # **No block for any package of the workbench, and that is the pattern rather than an omission**: a `resource_access.id`
   # must be concrete at plan time, and a scope this same apply creates is not.
 }
 
 resource "azuread_service_principal" "terminal" {
   client_id = azuread_application.terminal.client_id
+}
+
+# `data.azuread_service_principal.msgraph` is declared in github-oidc.tf.
+locals {
+  terminal_graph_scopes = ["User.Invite.All", "User.Read.All", "AppRoleAssignment.ReadWrite.All"]
+}
+
+# Admin consent for everyone, so no prompt reaches the operator. What a person can actually do is the intersection of
+# this and their own directory roles.
+resource "azuread_service_principal_delegated_permission_grant" "terminal_graph" {
+  service_principal_object_id          = azuread_service_principal.terminal.object_id
+  resource_service_principal_object_id = data.azuread_service_principal.msgraph.object_id
+  claim_values                         = local.terminal_graph_scopes
+}
+
+locals {
+  admin_user_object_ids = toset(concat([var.operator_object_id], var.admin_user_object_ids))
+}
+
+# The existing operators keep what they have: without this the gate (fail-closed) would refuse them on the day it ships.
+# Apply this *before* the code that reads `roles` is merged — an old process ignores the claim.
+resource "azuread_app_role_assignment" "admin_workbench" {
+  for_each            = local.admin_user_object_ids
+  app_role_id         = module.workbench_easy_auth.role_ids["admin"]
+  principal_object_id = each.value
+  resource_object_id  = module.workbench_easy_auth.service_principal_object_id
+}
+
+resource "azuread_app_role_assignment" "admin_gateway" {
+  for_each            = local.admin_user_object_ids
+  app_role_id         = module.capital_gateway_easy_auth.role_ids["admin"]
+  principal_object_id = each.value
+  resource_object_id  = module.capital_gateway_easy_auth.service_principal_object_id
+}
+
+output "workbench_service_principal_object_id" {
+  description = "Resource id of the workbench's app roles, for the terminal's Users tab."
+  value       = module.workbench_easy_auth.service_principal_object_id
+}
+
+output "gateway_service_principal_object_id" {
+  description = "Resource id of the gateway's app roles, for the terminal's Users tab."
+  value       = module.capital_gateway_easy_auth.service_principal_object_id
+}
+
+output "app_role_ids" {
+  description = "Role GUIDs the Users tab assigns: workbench admin and viewer, gateway admin."
+  value = {
+    workbench_admin  = module.workbench_easy_auth.role_ids["admin"]
+    workbench_viewer = module.workbench_easy_auth.role_ids["viewer"]
+    gateway_admin    = module.capital_gateway_easy_auth.role_ids["admin"]
+  }
 }
 
 # The same for the gateway's own API, standing ready rather than in use: it is what makes asking for the gateway by name
@@ -62,6 +129,7 @@ module "workbench_easy_auth" {
 
   display_name   = "app-tradingcenter-agent-easyauth"
   identifier_uri = local.workbench_api_uri
+  app_roles      = local.app_roles
 
   scope = {
     value                      = local.workbench_api_scope

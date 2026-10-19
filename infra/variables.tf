@@ -26,3 +26,13 @@ variable "vps_pocket_origins" {
   type        = list(string)
   default     = ["https://pocket.57-129-181-251.sslip.io"]
 }
+
+variable "admin_user_object_ids" {
+  description = <<-EOT
+    Object ids of people besides `operator_object_id` who hold the `admin` role from Terraform. Usually empty: later admins
+    are made from the terminal's Users tab, and a role given there is removed by the next apply if it is listed here
+    but not the other way round.
+  EOT
+  type        = list(string)
+  default     = []
+}

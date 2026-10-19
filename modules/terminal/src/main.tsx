@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
+import { AccessGate } from "./access/AccessGate";
 import { App } from "./App";
 import { startSignInIfNeeded } from "./auth/autoSignIn";
 import { identity, initializeIdentity } from "./data/marketData";
@@ -27,7 +28,9 @@ async function start(): Promise<void> {
 
   createRoot(container!).render(
     <StrictMode>
-      <App />
+      <AccessGate>
+        <App />
+      </AccessGate>
     </StrictMode>,
   );
 }

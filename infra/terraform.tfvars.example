@@ -29,3 +29,7 @@ youtube_enabled = false
 # The name the workbench's post archive and YouTube archive send their alerts to, bound in the gateway by hand. Empty leaves both silent,
 # which is a working configuration and the rollback lever.
 telegram_alert_destination = ""
+
+# `operator_object_id` is made an admin on both APIs. Apply BEFORE merging the code that reads roles
+# (openspec/changes/admin-panel-users-and-roles). Others who use the terminal today, if any:
+# admin_user_object_ids = []

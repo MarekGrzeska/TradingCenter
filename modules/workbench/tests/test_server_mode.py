@@ -45,7 +45,7 @@ async def _published_keys() -> dict:
     return {"keys": [{**jwk, "kid": "k1"}]}
 
 
-def _bearer(application: str) -> dict[str, str]:
+def _bearer(application: str, roles: tuple[str, ...] = ("admin",)) -> dict[str, str]:
     now = int(time.time())
     claims = {
         "iss": f"https://login.microsoftonline.com/{TENANT}/v2.0",
@@ -53,6 +53,7 @@ def _bearer(application: str) -> dict[str, str]:
         "exp": now + 600,
         "nbf": now - 5,
         "azp": application,
+        "roles": list(roles),
     }
     token = jwt.encode(claims, SIGNING_KEY, algorithm="RS256", headers={"kid": "k1"})
     return {**EDGE, "Authorization": f"Bearer {token}"}

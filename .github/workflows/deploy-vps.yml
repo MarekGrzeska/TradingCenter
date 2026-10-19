@@ -140,6 +140,14 @@ jobs:
           VITE_ENTRA_SCOPE_ALERTS: api://tradingcenter-agent/access_as_user
           # The owner account's number, pre-filled in the login dialog; a variable of the environment, not a line in git.
           VITE_TELEGRAM_OWNER_PHONE: ${{ vars.TELEGRAM_OWNER_PHONE }}
+          # The Users tab: which directory objects carry the roles, and where an invited viewer lands. Public ids; empty
+          # leaves the tab saying it is not set up (`fill-github-environment.sh` writes them).
+          VITE_ACCESS_WORKBENCH_PRINCIPAL: ${{ vars.ACCESS_WORKBENCH_PRINCIPAL }}
+          VITE_ACCESS_GATEWAY_PRINCIPAL: ${{ vars.ACCESS_GATEWAY_PRINCIPAL }}
+          VITE_ACCESS_ROLE_WORKBENCH_ADMIN: ${{ vars.ACCESS_ROLE_WORKBENCH_ADMIN }}
+          VITE_ACCESS_ROLE_WORKBENCH_VIEWER: ${{ vars.ACCESS_ROLE_WORKBENCH_VIEWER }}
+          VITE_ACCESS_ROLE_GATEWAY_ADMIN: ${{ vars.ACCESS_ROLE_GATEWAY_ADMIN }}
+          VITE_POCKET_URL: https://${{ vars.POCKET_HOST }}/
         run: |
           pnpm install --frozen-lockfile
           VITE_ARCHIVE_HTTP="$API/market" \

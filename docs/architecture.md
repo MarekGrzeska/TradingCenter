@@ -364,6 +364,18 @@ module never installed its own redaction filter, and `httpx` had logged 61 027 r
 whole bot token to Application Insights. The package installs it in `serving`, and the host quiets
 `httpx` besides.
 
+## Who is calling, and as what
+
+Two questions, answered in two places. *Which application* is the caller records' (`caller_access.py` in every package, the
+workbench's `root_access.py`): they hold application ids from `azp`/`appid`. *Which person, and as what* is the door's
+(`tc-entra-auth`): the token's `roles` claim, an Entra app role on the workbench's and the gateway's registration. The split
+exists because the terminal and the pocket are public single-page clients: any guest of the tenant can sign in to either and get
+a token whose application is on the list. A person with no role is refused on every route but `GET /me`; a `viewer` reads
+under `/social` and `/polymarket` and nothing else — the conversation's tools reach the account, so the agent is closed to them
+whole. The roles are managed in the directory through Microsoft Graph by the terminal's Users tab, with the admin's own
+delegated token: no process of this system holds a credential that writes the directory, which is what keeps this from being a
+new security boundary. A role change reaches a person when their token next renews. (`openspec/changes/admin-panel-users-and-roles`.)
+
 ## The order path
 
 The workbench's teams surface has one more edge than the diagram above draws, and it is

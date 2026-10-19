@@ -37,7 +37,7 @@ async def _published_keys() -> dict:
     return {"keys": [{**jwk, "kid": "k1"}]}
 
 
-def _token(application: str, *, audience: str = AUDIENCE) -> str:
+def _token(application: str, *, audience: str = AUDIENCE, roles: tuple[str, ...] = ("admin",)) -> str:
     now = int(time.time())
     claims = {
         "iss": f"https://login.microsoftonline.com/{TENANT}/v2.0",
@@ -45,6 +45,7 @@ def _token(application: str, *, audience: str = AUDIENCE) -> str:
         "exp": now + 600,
         "nbf": now - 5,
         "azp": application,
+        "roles": list(roles),
     }
     return jwt.encode(claims, SIGNING_KEY, algorithm="RS256", headers={"kid": "k1"})
 
@@ -101,6 +102,14 @@ def _provider_answers() -> None:
 def test_a_browser_token_through_the_edge_reaches_the_account(server: TestClient) -> None:
     _provider_answers()
     assert server.get("/accounts", headers=_bearer(TERMINAL_APP)).status_code == 200
+
+
+@pytest.mark.parametrize("roles", [("viewer",), ()], ids=["viewer", "no-role"])
+@respx.mock
+def test_a_person_who_is_not_an_admin_does_not_reach_the_account(server: TestClient, roles) -> None:
+    # The terminal's registration hands a token for this audience to any guest of the tenant; the role is what refuses it.
+    _provider_answers()
+    assert server.get("/accounts", headers=_bearer(TERMINAL_APP, roles=roles)).status_code == 403
 
 
 @respx.mock
