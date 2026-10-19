@@ -1,4 +1,10 @@
-## ADDED Requirements
+# alerts-api Specification
+
+## Purpose
+Kontrakt pakietu alertów z terminalem i z resztą procesu: kto co może wołać, co mówi trasa stanu i co
+widzi rozmowa.
+
+## Requirements
 
 ### Requirement: Rozmowa może zapytać, co zmiana zrobiłaby z regułą
 

@@ -1,4 +1,10 @@
-## ADDED Requirements
+# alerts-drafts Specification
+
+## Purpose
+Reguła opisana zdaniem: model zamienia zdanie operatora na szkic reguły z katalogu, a operator zatwierdza
+go jak każdą inną regułę. Model pomaga ją napisać, ale nigdy nie decyduje, że reguła powstaje.
+
+## Requirements
 
 ### Requirement: Zdanie może zmieniać istniejącą regułę
 
