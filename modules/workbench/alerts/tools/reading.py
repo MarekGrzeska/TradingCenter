@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from .. import known, rules, store
 from ..contract import ConditionSource
+from ..template import CONDITION_DEFAULT, EVENT_DEFAULT
 from ._shared import READ_ONLY, ToolContext
 
 MAX_FIRES = 30
@@ -22,6 +23,15 @@ class RuleOut(BaseModel):
     kind: Literal["condition", "event"]
     watches: str = Field(description="the rule in one line: what it looks at and when it goes off")
     destination: str
+    bot: str | None = Field(default=None, description="the bot the message goes through; null is the recipient's only bot")
+    message_template: str = Field(
+        description="the message as the rule is set to send it now, with {slots} — an event rule's default {text} is the ready "
+        "message the announcing part wrote, so what the operator reads is that text, not this template"
+    )
+    uses_default_message: bool = Field(description="true when the rule sets no template of its own")
+    cooldown_seconds: int
+    mode: str = Field(description="repeat, or once (it tells a single time and then stops)")
+    max_per_hour: int | None = None
     enabled: bool
     disabled_reason: str | None = None
     problems: list[str] = Field(default_factory=list, description="what is wrong with the rule now, if anything")
@@ -66,6 +76,9 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
     async def alert_rules() -> RulesOut:
         """Every notification rule the operator has set, with what it watches, who it tells and whether it is working.
 
+        `message_template` is what the rule sends *now*, read from the rule as it stands; `alert_fires` shows what was sent
+        in the past, which may predate a change. For what a message looked like, use the template; for what arrived, the history.
+
         `problems` is what is wrong with a rule now — its recipient is gone, or an event type no longer carries what it
         filters on. A rule with problems is quiet for a reason that is not the market's.
         """
@@ -82,6 +95,12 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
                     kind=row["kind"],
                     watches=describe(row),
                     destination=row["destination"],
+                    bot=row["bot"],
+                    message_template=row["template"],
+                    uses_default_message=row["template"] == (CONDITION_DEFAULT if row["kind"] == "condition" else EVENT_DEFAULT),
+                    cooldown_seconds=row["cooldown_seconds"],
+                    mode=row["mode"],
+                    max_per_hour=row["max_per_hour"],
                     enabled=row["enabled"],
                     disabled_reason=row["disabled_reason"],
                     problems=[defect.message for defect in shown.defects],

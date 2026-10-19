@@ -131,6 +131,8 @@ async def test_the_rules_are_read_with_what_each_watches(server, pool, db, door,
     row = json.loads(answer.text)["rules"][0]
     assert row["name"] == "EURUSD over 1.10"
     assert row["watches"] == "get_last_price(symbol=EURUSD).close gt 1.10, looked at every 60 s"
+    # What the rule sends now, read from the rule — the history can predate a change to it.
+    assert (row["message_template"], row["uses_default_message"], row["cooldown_seconds"], row["mode"]) == ("{rule}: {value}", True, 900, "repeat")
     assert row["problems"] == []
 
 
