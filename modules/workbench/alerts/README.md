@@ -43,7 +43,7 @@ delivered, and takes its "already told" back if the message never arrives.
 |---|---|
 | the terminal (`ALERTS_REST_CALLER_APPLICATION_IDS`) | `GET /catalog` (everything a rule can be made of), `GET/POST /rules`, `PUT/PATCH/DELETE /rules/{id}`, `GET /rules/{id}/history`, `POST /drafts`, `GET /state` |
 | the packages of this process, as this process | `PUT /event-types/{name}` and `POST /events`. **Only these two refuse the operator's application** — an event accepted from the internet is a message on the phone written by a stranger |
-| the conversation and the teams, as functions | `alert_rules` and `alert_fires` — **read-only**: no tool makes, changes or removes a rule |
+| the conversation and the teams, as functions | `alert_rules` and `alert_fires` (read-only) and `propose_alert_change` (what a described change would make of a rule; costs tokens, so not read-only) — no tool makes, changes or removes a rule |
 
 The producers keep their own *already told* marker and write it only after this package accepts an event; the same
 occurrence published twice (`type` + `source_key`) is one event and one alert.

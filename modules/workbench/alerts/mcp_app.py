@@ -31,7 +31,8 @@ __all__ = [
 
 INSTRUCTIONS = (
     "The notification rules the operator has set — what is watched, who is told, and what became of each time a rule went "
-    "off. Read-only: a rule is made, changed and removed on the operator's screen. When the operator asks why an alert did "
+    "off. A rule is made, changed and removed on the operator's screen; propose_alert_change shows what a described change "
+    "would make of a rule and saves nothing. When the operator asks why an alert did "
     "not come, call alert_fires for that rule: a rule that is quiet because nothing happened and one that is quiet because "
     "the tool it reads was down, or because it was inside its cool-down, look the same until the history is read."
 )
