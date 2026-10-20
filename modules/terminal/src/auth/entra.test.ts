@@ -154,6 +154,20 @@ describe("createEntraIdentities", () => {
     });
   });
 
+  it("leaves the automatic sign-in off after a sign-out, and asks which account at the next one", async () => {
+    window.sessionStorage.clear();
+    const identities = await signedIn();
+
+    identities.shared.signOut();
+    expect(window.sessionStorage.getItem("tc.terminal.sign-in-attempted")).not.toBeNull();
+
+    identities.shared.signIn();
+    expect(loginRedirect).toHaveBeenCalledWith({
+      scopes: [config.scopes.archive],
+      prompt: "select_account",
+    });
+  });
+
   it("refreshes on the same audience it first asked for", async () => {
     const identities = await signedIn();
 
