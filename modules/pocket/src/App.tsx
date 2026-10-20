@@ -57,7 +57,7 @@ export function App({
     return <SignInScreen onSignIn={archive.signIn} />;
   }
   if (role === "loading") return null;
-  if (role === "none") return <NoAccessScreen onSignIn={archive.signIn} />;
+  if (role === "none") return <NoAccessScreen onSignOut={archive.signOut} />;
 
   // A viewer reads: no agent, and no screen offers an action that writes.
   const readOnly = role === "viewer";
@@ -85,6 +85,7 @@ export function App({
 
       <TabBar
         tabs={tabs}
+        onSignOut={state === "unconfigured" ? undefined : archive.signOut}
         current={shown}
         onChange={(next) => {
           setTab(next);

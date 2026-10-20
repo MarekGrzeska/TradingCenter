@@ -27,6 +27,28 @@ export interface EntraIdentities {
   posts: Identity;
 }
 
+/** Set by a sign-out and spent by the next sign-in: Entra keeps its own session, and without a prompt it signs the same
+ *  account straight back in, which reads as "sign out did nothing". */
+const PICK_ACCOUNT_KEY = "tc.pocket.pick-account";
+
+function setMarker(): void {
+  try {
+    window.sessionStorage.setItem(PICK_ACCOUNT_KEY, "1");
+  } catch {
+    /* blocked storage: the account is still asked for by Entra's own chooser when it has two */
+  }
+}
+
+function takeMarker(): boolean {
+  try {
+    const found = window.sessionStorage.getItem(PICK_ACCOUNT_KEY) !== null;
+    window.sessionStorage.removeItem(PICK_ACCOUNT_KEY);
+    return found;
+  } catch {
+    return false;
+  }
+}
+
 export function createEntraIdentities(config: EntraConfig): EntraIdentities {
   const listeners = new Set<(state: IdentityState) => void>();
 
@@ -96,7 +118,19 @@ export function createEntraIdentities(config: EntraConfig): EntraIdentities {
       refresh: () => acquire(scope, true),
       // The archive's scope, because sign-in has to name one resource and this is the one every
       // deployment configures. The other is acquired silently, which the pre-authorization allows.
-      signIn: () => void msal.loginRedirect({ scopes: [config.scopes.archive] }),
+      signIn: () =>
+        void msal.loginRedirect({
+          scopes: [config.scopes.archive],
+          ...(takeMarker() ? { prompt: "select_account" } : {}),
+        }),
+      signOut: () => {
+        setMarker();
+        // The registered redirect URI, so Entra accepts it; the sessionStorage cache goes with the logout.
+        void msal.logoutRedirect({
+          ...(account ? { account } : {}),
+          postLogoutRedirectUri: `${window.location.origin}/`,
+        });
+      },
     };
   }
 
