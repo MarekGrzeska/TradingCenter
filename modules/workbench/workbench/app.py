@@ -22,9 +22,10 @@ os.environ.setdefault("OTEL_PYTHON_FASTAPI_EXCLUDED_URLS", UNTRACED_URLS)
 # archives register (`liveness.register_metrics`) were never exported and both loop alerts went without data.
 telemetry.configure(quiet=("httpx", "httpcore", "urllib3"))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from pydantic import BaseModel
 from starlette.routing import Mount
-from tc_entra_auth import EdgeAuth
+from tc_entra_auth import ADMIN_ROLE, ROLES_HEADER, EdgeAuth, roles_from_header
 from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
@@ -359,6 +360,24 @@ async def health() -> dict[str, str]:
     `infra/app-service.tf` and read by the deploy probe. It says the process answers and
     nothing else: no count of sessions, no team, no operator."""
     return {"status": "ok"}
+
+
+class MeOut(BaseModel):
+    roles: list[str]
+    # The signed-in person's directory object id, so the Users tab can refuse to remove its own admin role. Empty where
+    # there is no door (local work).
+    person: str
+
+
+@app.get("/me", response_model=MeOut)
+async def me(request: Request) -> MeOut:
+    """What the door made of the caller's token, for the screens to show "no access" and hide what would be refused. The
+    screens do not enforce anything: the door does. No roles header at all is a process with no door (local work)."""
+    headers = {name.lower(): value for name, value in request.scope.get("headers", [])}
+    if ROLES_HEADER not in headers:
+        return MeOut(roles=[ADMIN_ROLE], person="")
+    person = headers.get(b"x-ms-client-principal-id", b"").decode("latin-1")
+    return MeOut(roles=sorted(roles_from_header(headers)), person=person)
 
 
 agent.surface.include(app)

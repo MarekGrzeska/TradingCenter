@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { loadTab, saveTab, TABS } from "./tabs";
+import { allowedTab, loadTab, saveTab, TABS, tabsFor } from "./tabs";
 
 /** A phone is opened for seconds at a time, so the screen it opens on is the one it was closed on —
  *  and a value stored before a screen existed must not open on nothing. */
@@ -35,5 +35,12 @@ describe("the remembered tab", () => {
 
   it("offers the four screens this app has", () => {
     expect([...TABS]).toEqual(["markets", "social", "news", "agent"]);
+  });
+
+  it("offers a viewer the archive and not the agent, and moves a remembered agent tab off it", () => {
+    expect([...tabsFor("viewer")]).toEqual(["markets", "social", "news"]);
+    expect(allowedTab("agent", tabsFor("viewer"))).toBe("markets");
+    expect(allowedTab("news", tabsFor("viewer"))).toBe("news");
+    expect(allowedTab("agent", tabsFor("admin"))).toBe("agent");
   });
 });

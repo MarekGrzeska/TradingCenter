@@ -36,6 +36,21 @@ resource "azuread_application" "this" {
     }
   }
 
+  # Roles a person can hold on this API. They travel in the token's `roles` claim, which is what the process's door reads
+  # (`access-roles`); a role id is a stable GUID for the reason the scope's is.
+  dynamic "app_role" {
+    for_each = var.app_roles
+
+    content {
+      id                   = random_uuid.role[app_role.key].result
+      value                = app_role.key
+      display_name         = app_role.value.display_name
+      description          = app_role.value.description
+      allowed_member_types = ["User"]
+      enabled              = true
+    }
+  }
+
   # No web redirect and no implicit grant since the platform authenticator went with Azure: nothing signs in *to* this
   # registration any more, and a redirect URI on a hostname nobody holds is one somebody else could register.
 }
@@ -44,6 +59,10 @@ resource "azuread_application" "this" {
 # revoke the terminal's permission and grant a different one on every apply.
 resource "random_uuid" "scope" {
   count = var.scope == null ? 0 : 1
+}
+
+resource "random_uuid" "role" {
+  for_each = var.app_roles
 }
 
 resource "azuread_service_principal" "this" {

@@ -126,6 +126,12 @@ operator's `az` reaches only `/telegram`'s bots and destinations
 deploying the opposite and refusing every request the terminal made. A package reading another's
 REST goes through `tc_runtime.caller_access.in_process`, never through the door.
 
+**Caller records say which application, the role says which person.** A guest of the tenant can sign in to the terminal's
+registration, so `tc-entra-auth` also reads the token's `roles` (`admin` · `viewer`, Entra app roles on the workbench and the
+gateway) and refuses a person with none, and a `viewer` anywhere but a `GET` under `/social` and `/polymarket`. Fail-closed:
+**Terraform `apply` first** (it assigns the existing operator `admin`), then merge, or the operator is locked out.
+`openspec/changes/admin-panel-users-and-roles`.
+
 **Capital sessions coexist.** What constrains parallel work is the rate budget — 10 req/s counted
 against the **account**, so two stacks starve each other. `modules/capital-gateway/README.md`.
 

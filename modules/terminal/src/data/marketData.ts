@@ -60,6 +60,14 @@ export const telegramIdentity: Identity = scopeFor((s) => s.telegram);
 /** The alerts package, for the Alerts tab. */
 export const alertsIdentity: Identity = scopeFor((s) => s.alerts);
 
+/** Microsoft Graph, for the Users tab alone. `.default` is every delegated permission the administrator consented to for this
+ *  registration, which is what a token for several Graph scopes has to ask for. The token is the signed-in admin's own and
+ *  goes to Graph and nowhere else: no module of this system is sent it. */
+export const graphIdentity: Identity =
+  entraConfig === null
+    ? noIdentity
+    : (identities?.for("https://graph.microsoft.com/.default") ?? noIdentity);
+
 const archiveSource = createArchiveSource(archiveHttp, archiveWs, identity);
 const gateway = createGatewaySource(archiveHttp, identity);
 

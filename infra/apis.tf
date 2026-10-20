@@ -14,12 +14,29 @@ locals {
   azure_cli_client_id = "04b07795-8ddb-461a-bbee-02f9e1bf7b46"
 }
 
+# The two roles (`access-roles`). A person with neither is refused everywhere but `GET /me`.
+locals {
+  app_roles = {
+    admin = {
+      display_name = "Admin"
+      description  = "Full access: the terminal, the conversation, the archives and the gateway."
+    }
+    viewer = {
+      display_name = "Viewer"
+      description  = "Read-only access to the archive from the pocket: Polymarket, posts and news."
+    }
+  }
+}
+
 # The gateway's API: the terminal reads the account from it with the operator's own token.
 module "capital_gateway_easy_auth" {
   source = "./modules/easy-auth-app"
 
   display_name   = "app-tradingcenter-gateway-easyauth"
   identifier_uri = local.capital_gateway_api_uri
+
+  # Only `admin`: the viewer role has no business on the gateway, and a viewer's token for it carries no role at all.
+  app_roles = { for key in ["admin"] : key => local.app_roles[key] }
 
   scope = {
     value                      = local.capital_gateway_api_scope

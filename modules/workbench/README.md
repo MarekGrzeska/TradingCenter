@@ -113,6 +113,15 @@ way to wipe its own mistake out of the record. Three ceilings live in the code b
 notes returned per read, notes written per run — because they bound the shape in which this
 module hands anything to a model, and that is not the operator's budget to move.
 
+## Who may reach what
+
+`GET /me` answers any verified token with the person's roles. The door (`tc-entra-auth`, `workbench/edge.py`) refuses a
+person with no role on every other route, and lets a `viewer` through only on `GET` under `/social` and `/polymarket` — never
+a path with an `mcp` segment, which is how the conversation reaches the account. Every package not on that list is closed to
+a viewer by omission. `tests/test_roles.py` freezes the `GET`s of the two archives: a new one fails until somebody has read it
+as a read. Roles are Entra app roles, managed from the terminal's Users tab through Microsoft Graph with the admin's own
+token; this process holds no credential that writes the directory.
+
 ## Route surface
 
 Every path is where it was, except the two that collided. `GET /models` and `GET /usage`

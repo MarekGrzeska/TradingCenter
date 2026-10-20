@@ -10,6 +10,7 @@ import { PolymarketView } from "../polymarket/PolymarketView";
 import { SocialView } from "../social/SocialView";
 import { TeamsView } from "../teams/TeamsView";
 import { TelegramView } from "../telegram/TelegramView";
+import { UsersView } from "../users/UsersView";
 import { YoutubeView } from "../youtube/YoutubeView";
 
 /**
@@ -40,6 +41,7 @@ export const TABS: TabDefinition[] = [
   { id: "alerts", label: "Alerts", path: "alerts", Component: AlertsView },
   { id: "telegram", label: "Telegram", path: "telegram", Component: TelegramView },
   { id: "accounts", label: "Accounts", path: "accounts", Component: AccountsView },
+  { id: "users", label: "Users", path: "users", Component: UsersView },
   {
     id: "agent-settings",
     label: "Agent Settings",

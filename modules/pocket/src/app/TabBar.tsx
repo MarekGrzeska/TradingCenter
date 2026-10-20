@@ -1,4 +1,4 @@
-import type { Tab } from "./tabs";
+import { TABS, type Tab } from "./tabs";
 import styles from "./TabBar.module.css";
 
 const LABELS: Record<Tab, string> = { markets: "Markets", social: "Posts", news: "News", agent: "Agent" };
@@ -8,13 +8,15 @@ const LABELS: Record<Tab, string> = { markets: "Markets", social: "Posts", news:
 export function TabBar({
   current,
   onChange,
+  tabs = TABS,
 }: {
   current: Tab;
   onChange: (tab: Tab) => void;
+  tabs?: readonly Tab[];
 }) {
   return (
     <nav className={styles.bar} aria-label="Screens">
-      {(Object.keys(LABELS) as Tab[]).map((tab) => (
+      {tabs.map((tab) => (
         <button
           key={tab}
           type="button"
