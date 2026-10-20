@@ -35,6 +35,11 @@ async function parseErrorDetail(response: Response): Promise<{ detail: string; p
         return { detail: inner, problem: body.detail };
       }
     }
+    // Microsoft Graph's refusals are `{ error: { code, message } }`, and the message is the only place it says what was missing.
+    const graph = (body as { error?: { message?: unknown } }).error?.message;
+    if (typeof graph === "string") {
+      return { detail: graph };
+    }
     // FastAPI's own validation-error shape (a 422 from a bad query param) is a
     // list of {loc, msg, type} objects, not a plain string.
     if (Array.isArray(body.detail)) {

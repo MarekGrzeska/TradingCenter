@@ -61,7 +61,7 @@ resource "azuread_service_principal" "terminal" {
 
 # `data.azuread_service_principal.msgraph` is declared in github-oidc.tf.
 locals {
-  terminal_graph_scopes = ["User.Invite.All", "User.Read.All", "AppRoleAssignment.ReadWrite.All"]
+  terminal_graph_scopes = ["User.Invite.All", "User.Read.All", "Application.Read.All", "AppRoleAssignment.ReadWrite.All"]
 }
 
 # Admin consent for everyone, so no prompt reaches the operator. What a person can actually do is the intersection of
