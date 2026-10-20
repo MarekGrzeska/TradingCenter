@@ -5,6 +5,7 @@ import {
   type AccountInfo,
 } from "@azure/msal-browser";
 import type { EntraConfig } from "../data/config";
+import { SIGN_IN_ATTEMPTED_KEY } from "./autoSignIn";
 import {
   createListeners,
   noIdentity,
@@ -27,6 +28,26 @@ export interface EntraIdentities {
   /** The shared sign-in state, for the shell. Any module's identity would answer the
    *  same; this one is named so nothing has to pick a module to ask. */
   shared: Identity;
+}
+
+const PICK_ACCOUNT_KEY = "tc.terminal.pick-account";
+
+function setMarker(key: string): void {
+  try {
+    window.sessionStorage.setItem(key, "1");
+  } catch {
+    /* blocked storage: the person is asked at sign-in anyway, only the extra prompt is lost */
+  }
+}
+
+function takeMarker(key: string): boolean {
+  try {
+    const found = window.sessionStorage.getItem(key) !== null;
+    window.sessionStorage.removeItem(key);
+    return found;
+  } catch {
+    return false;
+  }
 }
 
 export function createEntraIdentities(config: EntraConfig): EntraIdentities {
@@ -115,10 +136,20 @@ export function createEntraIdentities(config: EntraConfig): EntraIdentities {
   function signIn(): void {
     // The archive's scope, because sign-in has to name one resource and this is the one every deployment
     // configures. The rest are acquired silently, which the pre-authorizations are what make possible.
-    void msal.loginRedirect({ scopes: [config.scopes.archive] });
+    // After a sign-out the account is asked for: Entra keeps its own session, and without this it signs the same
+    // account straight back in, which reads as "sign out did nothing".
+    const afterSignOut = takeMarker(PICK_ACCOUNT_KEY);
+    void msal.loginRedirect({
+      scopes: [config.scopes.archive],
+      ...(afterSignOut ? { prompt: "select_account" } : {}),
+    });
   }
 
   function signOut(): void {
+    // The page comes back from Entra signed out and stays that way until the person chooses to sign in: the automatic
+    // sign-in would otherwise undo this before anything was seen.
+    setMarker(SIGN_IN_ATTEMPTED_KEY);
+    setMarker(PICK_ACCOUNT_KEY);
     // `postLogoutRedirectUri` is the registered redirect URI, so Entra accepts it; the sessionStorage cache — every token
     // this tab holds, Graph's included — goes with the logout.
     void msal.logoutRedirect({
