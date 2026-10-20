@@ -125,11 +125,11 @@ export function createEntraIdentities(config: EntraConfig): EntraIdentities {
         }),
       signOut: () => {
         setMarker();
-        // The registered redirect URI, so Entra accepts it; the sessionStorage cache goes with the logout.
-        void msal.logoutRedirect({
-          ...(account ? { account } : {}),
-          postLogoutRedirectUri: `${window.location.origin}/`,
-        });
+        // Cleared here and not at Entra: its logout page did not always send the phone back, and what a person wants
+        // from "sign out" is to be asked which account next. The reload shows the sign-in screen, whose button prompts.
+        void msal
+          .clearCache(account ? { account } : undefined)
+          .finally(() => window.location.assign(`${window.location.origin}/`));
       },
     };
   }

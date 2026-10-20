@@ -29,7 +29,7 @@ export interface Identity {
   refresh(): Promise<string | null>;
   /** Sends the operator through sign-in. Resolves nothing: with the redirect flow the page is gone. */
   signIn(): void;
-  /** Ends the session here and at Entra, then returns to the sign-in screen, which asks which account. */
+  /** Ends the session in this app, then returns to the sign-in screen, which asks which account. */
   signOut(): void;
 }
 
