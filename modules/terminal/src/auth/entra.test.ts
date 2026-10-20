@@ -10,6 +10,7 @@ import { SignedOut, type IdentityState } from "./identity";
 
 const acquireTokenSilent = vi.fn();
 const loginRedirect = vi.fn();
+const logoutRedirect = vi.fn();
 const setActiveAccount = vi.fn();
 const account = { homeAccountId: "an-account" };
 
@@ -26,6 +27,7 @@ vi.mock("@azure/msal-browser", async () => {
       setActiveAccount = setActiveAccount;
       acquireTokenSilent = acquireTokenSilent;
       loginRedirect = loginRedirect;
+      logoutRedirect = logoutRedirect;
     },
   };
 });
@@ -139,6 +141,17 @@ describe("createEntraIdentities", () => {
     identities.shared.signIn();
 
     expect(loginRedirect).toHaveBeenCalledWith({ scopes: [config.scopes.archive] });
+  });
+
+  it("signs out of the session at Entra and comes back to the terminal", async () => {
+    const identities = await signedIn();
+
+    identities.shared.signOut();
+
+    expect(logoutRedirect).toHaveBeenCalledWith({
+      account,
+      postLogoutRedirectUri: `${window.location.origin}/`,
+    });
   });
 
   it("refreshes on the same audience it first asked for", async () => {

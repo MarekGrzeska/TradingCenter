@@ -108,6 +108,7 @@ export function createEntraIdentities(config: EntraConfig): EntraIdentities {
       token: () => acquire(scope, false),
       refresh: () => acquire(scope, true),
       signIn,
+      signOut,
     };
   }
 
@@ -115,6 +116,15 @@ export function createEntraIdentities(config: EntraConfig): EntraIdentities {
     // The archive's scope, because sign-in has to name one resource and this is the one every deployment
     // configures. The rest are acquired silently, which the pre-authorizations are what make possible.
     void msal.loginRedirect({ scopes: [config.scopes.archive] });
+  }
+
+  function signOut(): void {
+    // `postLogoutRedirectUri` is the registered redirect URI, so Entra accepts it; the sessionStorage cache — every token
+    // this tab holds, Graph's included — goes with the logout.
+    void msal.logoutRedirect({
+      ...(account ? { account } : {}),
+      postLogoutRedirectUri: `${window.location.origin}/`,
+    });
   }
 
   return {

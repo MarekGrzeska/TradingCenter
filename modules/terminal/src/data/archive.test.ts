@@ -871,6 +871,7 @@ describe("archive.subscribe (the ticket the handshake costs)", () => {
       token: async () => "operator-token",
       refresh: async () => "operator-token",
       signIn: () => {},
+      signOut: () => {},
     };
 
     installFakeWebSocket(spy.factory);

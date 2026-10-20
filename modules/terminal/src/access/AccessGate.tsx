@@ -15,7 +15,7 @@ type Verdict = "asking" | "allowed" | "refused";
 export function AccessGate({
   children,
   api,
-  signOut = () => workbenchIdentity.signIn(),
+  signOut = () => workbenchIdentity.signOut(),
 }: {
   children: ReactNode;
   api?: AccessApi;
@@ -52,7 +52,7 @@ export function AccessGate({
         for the admin role, then sign in again.
       </p>
       <Button size="md" onClick={signOut}>
-        Sign in again
+        Sign out
       </Button>
     </main>
   );

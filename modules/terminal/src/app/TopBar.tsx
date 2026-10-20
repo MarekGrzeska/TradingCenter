@@ -66,6 +66,9 @@ function SignInState({ signedIn }: { signedIn: boolean }) {
       <span className="flex items-center gap-2 rounded-full px-2 py-0.5">
         <span className="h-2 w-2 rounded-full bg-good" aria-hidden />
         <span>signed in</span>
+        <Button tone="muted" size="xs" onClick={() => identity.signOut()}>
+          Sign out
+        </Button>
       </span>
     );
   }

@@ -41,6 +41,10 @@ export interface Identity {
   /** Sends the operator through sign-in. Returns nothing and resolves nothing:
    *  with the redirect flow the page is gone before this returns. */
   signIn(): void;
+
+  /** Ends the session here and at Entra, then returns to the terminal — which asks who is signing in, so this is also how
+   *  one changes account. Like `signIn`, the page is gone before it returns. */
+  signOut(): void;
 }
 
 /**
@@ -53,6 +57,7 @@ export const noIdentity: Identity = {
   token: async () => null,
   refresh: async () => null,
   signIn: () => {},
+  signOut: () => {},
 };
 
 /** Bookkeeping every implementation needs and none should write twice. */
