@@ -33,6 +33,9 @@ class SimVideo(BaseModel):
     # What the simulated transcriber hears. Blank is a film with nothing said — music over a chart.
     speech: str = ""
     language: str = "en"
+    description: str = ""
+    # What the simulated screening makes of the film when a topic's search finds it. Blank is a film worth proposing.
+    screening: Literal["proposed", "rejected"] | None = None
     # A prepared reading, the word `unusable` for a model that answers with something the schema refuses, or nothing
     # for the neutral one.
     reading: dict | Literal["unusable"] | None = None

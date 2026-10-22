@@ -16,7 +16,6 @@ const SEEDED: Prompt = {
   createdAt: new Date("2026-10-22T09:00:00Z"),
   updatedAt: new Date("2026-10-22T10:00:00Z"),
   channels: [],
-  topics: [],
 };
 const TECHNICAL: Prompt = {
   ...SEEDED,
@@ -26,7 +25,6 @@ const TECHNICAL: Prompt = {
   version: 1,
   body: "Levels only.",
   channels: ["Sim Złoto PL"],
-  topics: ["bitcoin"],
 };
 
 function api(overrides: Partial<YoutubeApi> = {}): YoutubeApi {
@@ -49,7 +47,7 @@ describe("PromptsPanel", () => {
     expect(within(seeded).getByText("v2")).toBeInTheDocument();
     expect(within(seeded).getByText("domyślny")).toBeInTheDocument();
     expect(within(seeded).queryByRole("button", { name: "Usuń" })).not.toBeInTheDocument();
-    expect(within(technical).getByText(/kanały: Sim Złoto PL · tematy: bitcoin/)).toBeInTheDocument();
+    expect(within(technical).getByText(/kanały: Sim Złoto PL/)).toBeInTheDocument();
   });
 
   it("sends only what changed when a prompt is edited", async () => {

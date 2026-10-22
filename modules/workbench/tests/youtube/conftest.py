@@ -15,6 +15,8 @@ from youtube_data.config import Settings
 # Emptied between tests so one test's rows are never another's premise. Named in full rather than left to CASCADE, so the
 # statement says what it empties.
 TABLES: tuple[str, ...] = (
+    "candidates",
+    "ignored_channels",
     "readings",
     "transcripts",
     "videos",

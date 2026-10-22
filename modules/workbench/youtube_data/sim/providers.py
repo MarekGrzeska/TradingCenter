@@ -21,6 +21,7 @@ from ..providers.base import (
     stamp,
 )
 from ..providers.refs import channel_ref, uploads_playlist
+from ..screening import Screening
 from .world import World
 
 UNIT = "sim_units"
@@ -166,3 +167,24 @@ class SimAnalyser:
             output_tokens=len(reading.summary_pl) // 4 + 40,
             simulated=True,
         )
+
+
+class SimScreener:
+    """The model that screens search results. The verdict is the scenario's, never the description's: a film whose
+    description tells the model what to answer is judged the way the scenario says."""
+
+    model = "sim"
+
+    def __init__(self, world: World) -> None:
+        self._world = world
+
+    async def screen(self, phrase: str, films: Sequence[VideoRef]) -> Screening:
+        verdicts: dict[str, tuple[str, str]] = {}
+        for film in films:
+            video = self._world.video(film.video_id)
+            verdict = (video.screening if video is not None else None) or "proposed"
+            verdicts[film.video_id] = (
+                verdict,
+                "Symulowany przesiew: film pasuje do tematu." if verdict == "proposed" else "Symulowany przesiew: film obok tematu.",
+            )
+        return Screening(verdicts, self.model, input_tokens=60 * len(films), output_tokens=30 * len(films))

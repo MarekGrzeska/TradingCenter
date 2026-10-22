@@ -67,8 +67,7 @@ async def test_removing_a_channel_leaves_its_films(db) -> None:
 
 async def test_the_same_phrase_in_another_case_is_the_same_topic(db) -> None:
     insert = (
-        "INSERT INTO topics (phrase, interval_minutes, max_videos_per_run, added_by, prompt_id) "
-        "VALUES ($1, 360, 3, 'agent', (SELECT id FROM prompts WHERE seeded))"
+        "INSERT INTO topics (phrase, interval_minutes, max_videos_per_run, added_by) VALUES ($1, 360, 3, 'agent')"
     )
     await db.execute(insert, "Gold outlook")
 

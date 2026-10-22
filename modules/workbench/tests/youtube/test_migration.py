@@ -75,7 +75,7 @@ async def test_a_reading_in_the_old_shape_keeps_everything_it_said_and_everythin
     conn = await asyncpg.connect(asyncpg_dsn(old_database))
     try:
         seeded = await conn.fetchval("SELECT id FROM prompts WHERE seeded")
-        for table in ("channels", "topics", "videos", "readings"):
+        for table in ("channels", "videos", "readings"):
             assert await conn.fetchval(f"SELECT DISTINCT prompt_id FROM {table}") == seeded, table
         row = await conn.fetchrow("SELECT result, impact_score, prompt_version FROM readings")
         result = json.loads(row["result"])
@@ -100,5 +100,22 @@ async def test_the_migration_comes_back_down_and_up_again(old_database: str) -> 
     conn = await asyncpg.connect(asyncpg_dsn(old_database))
     try:
         assert await applied_heads(conn) == expected_heads(MIGRATIONS)
+    finally:
+        await conn.close()
+
+
+async def test_a_topic_outlives_the_migration_that_takes_its_prompt_and_the_candidate_tables_are_there(old_database: str) -> None:
+    config = alembic_config(MIGRATIONS, sqlalchemy_url(old_database))
+
+    await asyncio.to_thread(command.upgrade, config, "head")
+
+    conn = await asyncpg.connect(asyncpg_dsn(old_database))
+    try:
+        assert await conn.fetchval("SELECT phrase FROM topics") == "gold"
+        columns = {r["column_name"] for r in await conn.fetch(
+            "SELECT column_name FROM information_schema.columns WHERE table_name = 'topics'"
+        )}
+        assert "prompt_id" not in columns
+        assert await conn.fetchval("SELECT count(*) FROM candidates") == await conn.fetchval("SELECT count(*) FROM ignored_channels") == 0
     finally:
         await conn.close()

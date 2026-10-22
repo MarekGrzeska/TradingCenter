@@ -1,11 +1,12 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { PromptSelect } from "./PromptSelect";
 import { usePrompts } from "./usePrompts";
 import type { YoutubeApi } from "./youtubeApi";
 
 /**
- * The four questions this tab asks the operator. A refusal from the module — a ceiling, a channel that does not exist, a
+ * The questions this tab asks the operator. A refusal from the module — a ceiling, a channel that does not exist, a
  * limit out of range — stays in the dialog with its reason: it is an answer to what was asked, not a failure of the screen.
  */
 
@@ -93,8 +94,6 @@ export function AddTopicDialog({
   const [phrase, setPhrase] = useState("");
   const [interval, setInterval] = useState("");
   const [max, setMax] = useState("");
-  const [promptId, setPromptId] = useState<number | null>(null);
-  const prompts = usePrompts(client);
 
   return (
     <ConfirmDialog
@@ -109,7 +108,6 @@ export function AddTopicDialog({
             phrase: phrase.trim(),
             ...(interval.trim() === "" ? {} : { intervalMinutes: wholeNumber(interval, "co ile minut") }),
             ...(max.trim() === "" ? {} : { maxVideosPerRun: wholeNumber(max, "ile filmów") }),
-            ...(promptId === null ? {} : { promptId }),
           },
           new AbortController().signal,
         );
@@ -134,16 +132,13 @@ export function AddTopicDialog({
             <input className={INPUT} inputMode="numeric" value={interval} onChange={(e) => setInterval(e.target.value)} />
           </label>
           <label className="flex flex-1 flex-col gap-1 text-xs">
-            <span className="text-ink-secondary">Filmów na wyszukanie (opcjonalnie)</span>
+            <span className="text-ink-secondary">Wyników na wyszukanie (opcjonalnie)</span>
             <input className={INPUT} inputMode="numeric" value={max} onChange={(e) => setMax(e.target.value)} />
           </label>
         </div>
-        <label className="flex flex-col gap-1 text-xs">
-          <span className="text-ink-secondary">Prompt, którym czytane są nowe filmy</span>
-          <PromptSelect label="Prompt" prompts={prompts.value.prompts} value={promptId} onChange={setPromptId} />
-        </label>
         <p className="text-xs text-ink-faint">
-          Każde wyszukiwanie zużywa dzienny limit źródła (sto jednostek z dziesięciu tysięcy klucza YouTube). Puste pola
+          Wyniki trafiają do zakładki Kandydaci i nie są czytane, dopóki nie zdecydujesz. Każde wyszukiwanie zużywa dzienny
+          limit źródła (sto jednostek z dziesięciu tysięcy klucza YouTube), a przesiew modelem — trochę tokenów. Puste pola
           biorą wartości z ustawień.
         </p>
       </div>
@@ -213,6 +208,55 @@ export function AnalyseDialog({
         <span className="text-ink-secondary">Prompt (dla filmu, którego jeszcze nie ma w archiwum)</span>
         <PromptSelect label="Prompt" prompts={prompts.value.prompts} value={promptId} onChange={setPromptId} />
       </label>
+    </ConfirmDialog>
+  );
+}
+
+/** A decision about a candidate that takes a prompt: following its channel, or reading its film. */
+export function CandidateChoiceDialog({
+  client,
+  title,
+  confirmLabel,
+  busyLabel,
+  choosing,
+  onConfirm,
+  onClose,
+  onDone,
+  children,
+}: {
+  client: YoutubeApi;
+  title: string;
+  confirmLabel: string;
+  busyLabel: string;
+  /** What the prompt will be used for, in the label of its choice. */
+  choosing: string;
+  onConfirm(promptId: number | null): Promise<void>;
+  onClose(): void;
+  onDone(): void;
+  children: ReactNode;
+}) {
+  const [promptId, setPromptId] = useState<number | null>(null);
+  const prompts = usePrompts(client);
+
+  return (
+    <ConfirmDialog
+      title={title}
+      confirmLabel={confirmLabel}
+      busyLabel={busyLabel}
+      fallbackError="nie udało się wykonać decyzji"
+      onConfirm={async () => {
+        await onConfirm(promptId);
+        onDone();
+      }}
+      onClose={onClose}
+    >
+      <div className="flex flex-col gap-3">
+        <p className="text-xs text-ink-secondary">{children}</p>
+        <label className="flex flex-col gap-1 text-xs">
+          <span className="text-ink-secondary">{choosing}</span>
+          <PromptSelect label="Prompt" prompts={prompts.value.prompts} value={promptId} onChange={setPromptId} />
+        </label>
+      </div>
     </ConfirmDialog>
   );
 }

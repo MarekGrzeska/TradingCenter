@@ -18,7 +18,7 @@ from .providers.refs import video_id
 _STILL_ON_ITS_ROAD = (DISCOVERED, NO_TRANSCRIPT, TRANSCRIBED)
 
 MAX_PHRASE_CHARS = 200
-# A topic that may send forty films to be read every pass is a bill, not a topic.
+# A topic that may send forty results to be screened every pass is a bill, not a topic.
 MAX_VIDEOS_PER_RUN = 20
 MIN_INTERVAL_MINUTES = 15
 MAX_INTERVAL_MINUTES = 7 * 24 * 60
@@ -96,13 +96,11 @@ async def add_topic(
     language: str = "",
     interval_minutes: int | None = None,
     max_videos_per_run: int | None = None,
-    prompt: int | str | None = None,
 ) -> AddedTopic:
     text = " ".join(phrase.split())
     if not text or len(text) > MAX_PHRASE_CHARS:
         raise WatchlistRefused(f"a topic is a phrase of 1 to {MAX_PHRASE_CHARS} characters")
     _check_choice("added_by", added_by, ADDED_BY)
-    prompt_id = await _prompt_id(pool, prompt)
 
     defaults: list[str] = []
     if interval_minutes is None:
@@ -116,7 +114,7 @@ async def add_topic(
             f"a topic is searched every {MIN_INTERVAL_MINUTES} to {MAX_INTERVAL_MINUTES} minutes (a week)"
         )
     if not 1 <= max_videos_per_run <= MAX_VIDEOS_PER_RUN:
-        raise WatchlistRefused(f"a topic sends between 1 and {MAX_VIDEOS_PER_RUN} films to be read per search")
+        raise WatchlistRefused(f"a topic offers between 1 and {MAX_VIDEOS_PER_RUN} films per search")
 
     async with pool.acquire() as conn:
         existing = next(
@@ -140,7 +138,6 @@ async def add_topic(
             language=language,
             interval_minutes=interval_minutes,
             max_videos_per_run=max_videos_per_run,
-            prompt_id=prompt_id,
             added_by=added_by,
         )
     return AddedTopic(topic, created=True, defaults_applied=tuple(defaults))

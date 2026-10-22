@@ -46,9 +46,8 @@ export interface Prompt {
   body: string;
   createdAt: Date;
   updatedAt: Date;
-  /** The channels and the topics whose new films it reads. */
+  /** The channels whose new films it reads. */
   channels: string[];
-  topics: string[];
 }
 
 export interface PromptsPage {
@@ -115,8 +114,40 @@ export interface Topic {
   maxVideosPerRun: number;
   active: boolean;
   addedBy: "operator" | "agent";
-  promptId: number;
   lastRunAt: Date | null;
+}
+
+export type CandidateVerdict = Schemas["CandidateOut"]["verdict"];
+export type CandidateDecision = NonNullable<Schemas["CandidateOut"]["decision"]>;
+export type CandidateView = Schemas["CandidatesOut"]["view"];
+export type CandidateSort = Schemas["CandidatesOut"]["sort"];
+
+/** A film a topic's search found, offered and not read: nothing is transcribed for it until the operator says so. */
+export interface Candidate {
+  videoId: string;
+  /** The film on YouTube. */
+  url: string;
+  title: string;
+  channelId: string | null;
+  channelTitle: string;
+  /** The phrase that found it. */
+  topic: string;
+  publishedAt: Date;
+  durationSeconds: number | null;
+  foundAt: Date;
+  /** `unscreened` where no model could look at it — offered all the same. */
+  verdict: CandidateVerdict;
+  /** One sentence from the model on why the film may be worth watching, or why not. */
+  reason: string | null;
+  /** What the operator did with it; `null` is not decided yet. */
+  decision: CandidateDecision | null;
+  simulated: boolean;
+}
+
+export interface IgnoredChannel {
+  channelId: string;
+  title: string;
+  ignoredAt: Date;
 }
 
 export interface ProviderState {
@@ -157,8 +188,6 @@ export interface TopicRequest {
   language?: string;
   intervalMinutes?: number;
   maxVideosPerRun?: number;
-  /** Absent takes the seeded prompt. */
-  promptId?: number;
 }
 
 export interface TopicResult {
@@ -215,7 +244,6 @@ function mapPrompt(raw: Schemas["PromptOut"]): Prompt {
     createdAt: new Date(raw.created_at),
     updatedAt: new Date(raw.updated_at),
     channels: raw.channels,
-    topics: raw.topics,
   };
 }
 
@@ -240,8 +268,25 @@ function mapTopic(raw: Schemas["TopicOut"]): Topic {
     maxVideosPerRun: raw.max_videos_per_run,
     active: raw.active,
     addedBy: raw.added_by,
-    promptId: raw.prompt_id,
     lastRunAt: optionalDate(raw.last_run_at),
+  };
+}
+
+function mapCandidate(raw: Schemas["CandidateOut"]): Candidate {
+  return {
+    videoId: raw.video_id,
+    url: raw.url,
+    title: raw.title,
+    channelId: raw.channel_id ?? null,
+    channelTitle: raw.channel_title,
+    topic: raw.topic,
+    publishedAt: new Date(raw.published_at),
+    durationSeconds: raw.duration_seconds ?? null,
+    foundAt: new Date(raw.found_at),
+    verdict: raw.verdict,
+    reason: raw.reason ?? null,
+    decision: raw.decision ?? null,
+    simulated: raw.simulated,
   };
 }
 
@@ -284,12 +329,21 @@ export interface YoutubeApi {
   unfollowChannel(channelId: string, signal: AbortSignal): Promise<void>;
   topics(signal: AbortSignal): Promise<{ topics: Topic[]; ceiling: number }>;
   addTopic(request: TopicRequest, signal: AbortSignal): Promise<TopicResult>;
-  setTopic(
-    id: number,
-    patch: { active?: boolean; promptId?: number },
-    signal: AbortSignal,
-  ): Promise<Topic>;
+  setTopic(id: number, patch: { active?: boolean }, signal: AbortSignal): Promise<Topic>;
   removeTopic(id: number, signal: AbortSignal): Promise<void>;
+  candidates(query: { view: CandidateView; sort: CandidateSort }, signal: AbortSignal): Promise<Candidate[]>;
+  /** Follows the candidate's channel; the channel's other open candidates are settled with it. */
+  followCandidateChannel(videoId: string, promptId: number | null, signal: AbortSignal): Promise<FollowResult>;
+  /** Names the candidate's film for analysis, as if its address had been pasted. */
+  analyseCandidate(
+    videoId: string,
+    promptId: number | null,
+    signal: AbortSignal,
+  ): Promise<{ videoId: string; title: string; created: boolean }>;
+  dismissCandidate(videoId: string, signal: AbortSignal): Promise<void>;
+  ignoreCandidateChannel(videoId: string, signal: AbortSignal): Promise<void>;
+  ignoredChannels(signal: AbortSignal): Promise<IgnoredChannel[]>;
+  unignoreChannel(channelId: string, signal: AbortSignal): Promise<void>;
   analyse(
     reference: string,
     promptId: number | null,
@@ -387,7 +441,6 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
       const body: Schemas["TopicIn"] = {
         phrase: request.phrase,
         language: request.language ?? "",
-        prompt_id: request.promptId ?? null,
         ...(request.intervalMinutes === undefined ? {} : { interval_minutes: request.intervalMinutes }),
         ...(request.maxVideosPerRun === undefined ? {} : { max_videos_per_run: request.maxVideosPerRun }),
       };
@@ -400,10 +453,7 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
     },
 
     async setTopic(id, patch, signal) {
-      const body: Schemas["TopicPatch"] = {
-        ...(patch.active === undefined ? {} : { active: patch.active }),
-        ...(patch.promptId === undefined ? {} : { prompt_id: patch.promptId }),
-      };
+      const body: Schemas["TopicPatch"] = patch.active === undefined ? {} : { active: patch.active };
       return mapTopic(
         await http.json<Schemas["TopicOut"]>(`${httpBase}/topics/${id}`, { signal, method: "PATCH", body }),
       );
@@ -411,6 +461,55 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
 
     async removeTopic(id, signal) {
       await http.send(`${httpBase}/topics/${id}`, { signal, method: "DELETE" });
+    },
+
+    async candidates({ view, sort }, signal) {
+      const raw = await http.json<Schemas["CandidatesOut"]>(`${httpBase}/candidates?view=${view}&sort=${sort}&limit=100`, {
+        signal,
+      });
+      return raw.candidates.map(mapCandidate);
+    },
+
+    async followCandidateChannel(videoId, promptId, signal) {
+      const body: Schemas["CandidateChoice"] = { prompt_id: promptId };
+      const raw = await http.json<Schemas["CandidateChannelOut"]>(
+        `${httpBase}/candidates/${encodeURIComponent(videoId)}/follow-channel`,
+        { signal, method: "POST", body },
+      );
+      return { channel: mapChannel(raw.channel), created: raw.created };
+    },
+
+    async analyseCandidate(videoId, promptId, signal) {
+      const body: Schemas["CandidateChoice"] = { prompt_id: promptId };
+      const raw = await http.json<Schemas["QueuedOut"]>(
+        `${httpBase}/candidates/${encodeURIComponent(videoId)}/analyse`,
+        { signal, method: "POST", body },
+      );
+      return { videoId: raw.video_id, title: raw.title, created: raw.created };
+    },
+
+    async dismissCandidate(videoId, signal) {
+      await http.send(`${httpBase}/candidates/${encodeURIComponent(videoId)}/dismiss`, { signal, method: "POST" });
+    },
+
+    async ignoreCandidateChannel(videoId, signal) {
+      await http.send(`${httpBase}/candidates/${encodeURIComponent(videoId)}/ignore-channel`, {
+        signal,
+        method: "POST",
+      });
+    },
+
+    async ignoredChannels(signal) {
+      const raw = await http.json<Schemas["IgnoredChannelsOut"]>(`${httpBase}/ignored-channels`, { signal });
+      return raw.channels.map((channel) => ({
+        channelId: channel.channel_id,
+        title: channel.channel_title,
+        ignoredAt: new Date(channel.ignored_at),
+      }));
+    },
+
+    async unignoreChannel(channelId, signal) {
+      await http.send(`${httpBase}/ignored-channels/${encodeURIComponent(channelId)}`, { signal, method: "DELETE" });
     },
 
     async analyse(reference, promptId, signal) {

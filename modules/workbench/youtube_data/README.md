@@ -1,8 +1,8 @@
 # youtube-data
 
-The YouTube archive. Channels and search topics the operator (or an agent) chose to follow, the films
+The YouTube archive. Channels the operator (or an agent) chose to follow, the films
 they yield, their transcripts, the prompts a model reads them by, what it made of each — and each read film handed to the alerts package, whose rules say whether anybody is told.
-Two surfaces in one process: the REST contract the terminal's **YouTube** tab (Films, Channels, Topics, Prompts) reads, and eight tools at
+Two surfaces in one process: the REST contract the terminal's **YouTube** tab (Films, Channels, Topics, Candidates, Prompts) reads, and eight tools at
 `/mcp` that reach the conversation and the teams as functions.
 
 **The ninth package of the workbench, and the only optional one.** Served whole under `/youtube` when
@@ -26,7 +26,9 @@ when the line is set.
 
 | Table | What | Who writes it |
 |---|---|---|
-| `channels`, `topics` | the watch list, each row with `added_by` (`operator` / `agent`) and the prompt its new films are read by | REST and tools add; **only REST removes** |
+| `channels`, `topics` | the watch list, each row with `added_by` (`operator` / `agent`); a channel also holds the prompt its new films are read by, a topic holds none | REST and tools add; **only REST removes** |
+| `candidates` | what a topic's search found and a model screened by its metadata: a verdict and a sentence on why, and — once the operator has decided — which decision | the loop; **only REST decides** |
+| `ignored_channels` | channels whose films never become candidates | **only REST** |
 | `videos` | one row per film however many doors it came through (`origins`), its state and retry schedule | the loop; `POST /videos` and `analyse_video` enqueue one |
 | `transcripts` | the words, apart from `videos` so a list never reads TOAST | the loop |
 | `prompts`, `prompt_versions` | what a model is told to look for in a film; new words are a new version, never an overwrite; a deleted prompt keeps its row | **only REST** writes; the seeded one is edited, never deleted |
@@ -41,7 +43,11 @@ transcript or a reading.
 
 One pass every `YOUTUBE_POLL_INTERVAL_SECONDS`, four steps, each with a batch limit:
 
-1. **discover** — the latest films of each active channel, and a search for each topic that is due.
+1. **discover** — the latest films of each active channel, and a search for each topic that is due. **A topic's results are
+   not films of the archive**: those that pass the length floor and ceiling and are not already known (in `videos`, from a
+   followed or an ignored channel, or already a candidate) are screened by one model call on their title, description,
+   channel and length, and stored as **candidates** — nothing is transcribed or read for them. Without a model, or a day
+   with tokens left, they are stored `unscreened` and offered all the same.
    Shorts (under `MIN_VIDEO_SECONDS`, 180) and films over `MAX_VIDEO_SECONDS` are **not kept at all** —
    never stored when the source lists them, deleted if their length arrives after they were stored, refused with the
    reason when named by hand. A stream still live waits until it has ended.
@@ -73,7 +79,7 @@ says what is spent, what is blocked, and how many intervals ago the last complet
 
 A prompt is the operator's words about what to look for in a film and how to lay the text out. The seeded one (`Rynkowy`,
 from migration `0003`) is a row like any other with one lock: it cannot be deleted, so there is always a prompt to read by.
-A channel or a topic holds one prompt, and a film takes it when it is noticed — changing it is for films noticed after. Another
+A channel holds one prompt (a topic holds none: it reads nothing), and a film takes it when it is noticed — changing it is for films noticed after. Another
 prompt reads a film already transcribed on request (`POST /videos/{id}/readings`): no words are asked for, the day's tokens
 are spent, the film does not move, and nobody is told.
 
@@ -112,16 +118,29 @@ start of the process, randomness is seeded, so a run replays.
   banner and a badge, and a Telegram message starts with `[SYMULACJA — ten film nie istnieje]`.
 - **Refused wherever `DATABASE_USER` is set**, naming the setting: a simulation cannot reach a deployment.
 
+## Candidates
+
+A topic is for finding what the operator did not know to look for, so what it finds is **offered, never read**. The tab's
+*Candidates* section lists them newest find first (or newest film first), each with a link to the film on YouTube, its channel
+and the model's sentence. Four decisions, each made once and none of them the agent's: *follow the channel* (under the
+watch list's ceiling, with a prompt), *analyse the film* (the path of a film named by hand), *dismiss* (the same film is not
+offered again) and *ignore the channel* (its films stop becoming candidates until it is let back). The two channel decisions
+settle the channel's other open candidates with it. A candidate the model rejected is stored and shown on request, so the
+screening can be checked and the same film is never paid for twice.
+
+Screening shares the analyser's key, model and day (`DAILY_TOKEN_LIMIT`); `GET /state` names the missing model or the spent day.
+
 ## Surfaces
 
 REST (`contract.py`, generated into the terminal as `contract.youtube.generated.ts`):
 `GET /videos` (window, channel, topic, score, state; a reading without its text) · `GET /videos/{id}` (every reading, with its text) · `POST /videos/{id}/readings` · `GET|POST /prompts` · `PATCH|DELETE /prompts/{id}` ·
 `GET /videos/{id}/transcript` (pages) · `POST /videos` (one film named by hand: accepted at once, transcribed and read in the background ahead of the queue) · `GET|POST /channels` ·
-`PATCH|DELETE /channels/{id}` · `GET|POST /topics` · `PATCH|DELETE /topics/{id}` · `GET /state` ·
+`PATCH|DELETE /channels/{id}` · `GET|POST /topics` · `PATCH|DELETE /topics/{id}` · `GET /candidates` (`view` open · rejected · decided, `sort` found · published, `topic_id`) ·
+`POST /candidates/{id}/follow-channel|analyse|dismiss|ignore-channel` · `GET /ignored-channels` · `DELETE /ignored-channels/{id}` · `GET /state` ·
 `GET /health`.
 
 Tools: `youtube_archive_status` (with the prompts on offer), `recent_videos`, `read_video`, `read_transcript` read;
-`search_youtube`, `follow_channel`, `add_topic`, `analyse_video` write or spend — the three that add take an optional prompt name. None removes anything. Lists carry an excerpt; `read_video` carries the
+`search_youtube`, `follow_channel`, `add_topic`, `analyse_video` write or spend — `follow_channel` and `analyse_video` take an optional prompt name, `add_topic` none. None removes anything and none decides about a candidate: a topic proposes, the operator decides. Lists carry an excerpt; `read_video` carries the
 readings (each text cut at 8 000 characters) and no transcript; `read_transcript` pages the words (8 000 characters at most) with a notice that
 they are data, not instructions. The two that cost say so in their description and refuse past the
 day's ceiling.

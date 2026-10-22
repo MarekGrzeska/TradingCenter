@@ -86,12 +86,11 @@ async def test_a_prompt_a_channel_reads_by_cannot_be_deleted_and_the_refusal_nam
     rig = Rig(pool)
     created = await prompts.create(pool, name="Technical", body="Levels only.")
     await watchlist.follow_channel(pool, rig.providers.source, rig.settings, GOLD, added_by="operator", prompt=created.id)
-    await watchlist.add_topic(pool, rig.settings, "bitcoin", added_by="operator", prompt="technical")
 
     with pytest.raises(prompts.PromptRefused) as refused:
         await prompts.delete(pool, created.id)
 
-    assert "Sim" in str(refused.value) and "bitcoin" in str(refused.value)
+    assert "Sim" in str(refused.value)
 
 
 async def test_a_deleted_prompt_leaves_the_offer_but_not_the_readings_it_made(pool) -> None:
@@ -108,8 +107,6 @@ async def test_a_deleted_prompt_leaves_the_offer_but_not_the_readings_it_made(po
         assert [p.name for p in await store.list_prompts(conn)] == ["Rynkowy"]
         film = await store.get_film(conn, "simfilm0001")
     assert film is not None and [r.prompt_name for r in film.readings] == ["Technical"]
-    with pytest.raises(watchlist.WatchlistRefused, match="no prompt"):
-        await watchlist.add_topic(pool, rig.settings, "gold", added_by="operator", prompt=created.id)
 
 
 async def test_a_source_without_a_prompt_takes_the_seeded_one_and_an_unknown_prompt_is_refused(pool) -> None:

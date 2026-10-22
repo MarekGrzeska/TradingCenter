@@ -60,6 +60,7 @@ class World:
             live_status=self.live_status(video),
             audio_language=video.language or None,
             simulated=True,
+            description=video.description,
         )
 
     # --- what is spent ----------------------------------------------------------------------------------------------

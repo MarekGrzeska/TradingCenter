@@ -207,9 +207,8 @@ def test_a_channel_is_one_word_of_the_attribute() -> None:
 async def test_a_film_carries_the_channel_the_topic_and_the_score_a_rule_filters_by(pool) -> None:
     async with pool.acquire() as conn:
         topic = await conn.fetchval(
-            "INSERT INTO topics (phrase, language, interval_minutes, max_videos_per_run, prompt_id, added_by) "
-            "VALUES ('gold outlook', '', 60, 3, $1, 'operator') RETURNING id",
-            SEEDED_PROMPT_ID,
+            "INSERT INTO topics (phrase, language, interval_minutes, max_videos_per_run, added_by) "
+            "VALUES ('gold outlook', '', 60, 3, 'operator') RETURNING id"
         )
     await read_film(pool, "v1", score=9, origin=f"topic:{topic}")
     publisher = RecordingPublisher()

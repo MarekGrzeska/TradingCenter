@@ -164,7 +164,7 @@ async def test_the_agent_chooses_a_prompt_by_name_and_cannot_invent_one(tools, p
     await prompts.create(pool, name="Technical", body="Levels only.")
 
     chosen = await call(tools, "follow_channel", reference="@simzloto", prompt="technical")
-    unknown = await call(tools, "add_topic", phrase="gold", prompt="made up")
+    unknown = await call(tools, "follow_channel", reference="@simmarkets", prompt="made up")
 
     assert chosen["created"] is True
     async with pool.acquire() as conn:

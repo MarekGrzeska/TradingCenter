@@ -128,12 +128,11 @@ export function TopicsPanel({ client, onChanged }: { client: YoutubeApi; onChang
     fallbackMessage: "nie udało się wczytać tematów",
     pollMs: POLL_MS,
   });
-  const prompts = usePrompts(client).value.prompts;
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<Topic | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
-  async function change(topic: Topic, patch: { active?: boolean; promptId?: number }) {
+  async function change(topic: Topic, patch: { active?: boolean }) {
     setFailure(null);
     try {
       await client.setTopic(topic.id, patch, new AbortController().signal);
@@ -166,18 +165,10 @@ export function TopicsPanel({ client, onChanged }: { client: YoutubeApi; onChang
               <span className="text-sm text-ink">{topic.phrase}</span> <Origin by={topic.addedBy} />
               {!topic.active && <span className="ml-2 text-xs text-warning">wstrzymany</span>}
               <span className="block text-xs text-ink-faint">
-                co {topic.intervalMinutes} min · do {topic.maxVideosPerRun} filmów · ostatnio:{" "}
+                co {topic.intervalMinutes} min · do {topic.maxVideosPerRun} wyników · ostatnio:{" "}
                 {topic.lastRunAt?.toLocaleString("pl-PL") ?? "jeszcze nie szukano"}
               </span>
             </span>
-            <PromptSelect
-              label={`Prompt tematu ${topic.phrase}`}
-              prompts={prompts}
-              value={prompts.find((p) => p.seeded)?.id === topic.promptId ? null : topic.promptId}
-              onChange={(id) => void change(topic, { promptId: id ?? prompts.find((p) => p.seeded)?.id })}
-              className="rounded border border-border bg-sunken px-1 py-0.5 text-xs text-ink"
-              disabled={prompts.length === 0}
-            />
             <Button size="xs" tone="muted" onClick={() => void change(topic, { active: !topic.active })}>
               {topic.active ? "Wstrzymaj" : "Wznów"}
             </Button>

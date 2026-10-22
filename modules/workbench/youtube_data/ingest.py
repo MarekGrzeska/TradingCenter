@@ -19,6 +19,7 @@ from tc_runtime.liveness import LoopHeartbeat
 from . import budget, store
 from .analysis import Film
 from .config import Settings
+from .models import UNSCREENED
 from .providers.base import (
     Blocked,
     ChannelInfo,
@@ -29,6 +30,7 @@ from .providers.base import (
     Transcript,
     TranscriptRequest,
     TranscriptResult,
+    VideoRef,
 )
 from .providers.build import Providers
 
@@ -235,13 +237,7 @@ class Ingest:
                 log.warning("topic %r could not be searched: %s", topic.phrase, err)
                 left = await self._remaining(ceiling)
                 continue
-            async with self._pool.acquire() as conn:
-                await store.upsert_films(
-                    conn,
-                    [store.Discovery(film, f"topic:{topic.id}", topic.prompt_id) for film in films],
-                    bounds=self._bounds,
-                )
-                await store.record_topic_run(conn, topic.id, at=now)
+            await self._propose(topic, films, now)
             left = await self._remaining(ceiling)
 
         async with self._pool.acquire() as conn:
@@ -251,6 +247,59 @@ class Ingest:
             live = await store.live_pending(conn, self._settings.discover_batch_limit)
         if live and left > 0:
             await self._refresh_live(live)
+
+    async def _propose(self, topic, films: list[VideoRef], now: datetime) -> None:
+        """What a search found, offered to the operator instead of sent to be read: the results the archive and the operator
+        have not already settled, screened by a model on their metadata in one call, and stored as candidates."""
+        async with self._pool.acquire() as conn:
+            known = await store.already_known(conn, [film.video_id for film in films])
+            settled = {channel.channel_id for channel in await store.list_channels(conn)}
+            settled |= await store.ignored_channel_ids(conn)
+        fresh = [
+            film
+            for film in films
+            if film.video_id not in known
+            and film.channel_id not in settled
+            and film.live_status == "none"
+            and store.unwanted_reason(film, self._bounds) is None
+        ]
+        verdicts, model = await self._screen(topic.phrase, fresh)
+        async with self._pool.acquire() as conn:
+            await store.add_candidates(
+                conn,
+                topic.id,
+                topic.phrase,
+                [
+                    store.Screened(film, *verdicts.get(film.video_id, (UNSCREENED, None)), model=model if film.video_id in verdicts else None)
+                    for film in fresh
+                ],
+                at=now,
+            )
+            await store.record_topic_run(conn, topic.id, at=now)
+
+    async def _screen(self, phrase: str, films: list[VideoRef]) -> tuple[dict[str, tuple[str, str]], str | None]:
+        """The verdicts a model gave for these films, or none where it could not be asked: no model, a day without tokens, a
+        refusal, an answer that breaks the schema. The films are then offered unscreened; nothing here stops the pass."""
+        screener = self._providers.screener
+        if screener is None or not films:
+            return {}, None
+        ceiling = budget.Ceiling(budget.ANALYSER, budget.TOKENS, self._settings.daily_token_limit)
+        if await self._remaining(ceiling) <= 0:
+            log.warning("the day's tokens are spent; search results are offered unscreened")
+            return {}, None
+        try:
+            screening = await screener.screen(phrase, films)
+        except asyncio.CancelledError:
+            raise
+        except ReadingUnusable as err:
+            self._providers.meter.record(budget.ANALYSER, budget.TOKENS, err.tokens)
+            log.warning("screening %r is unusable: %s", phrase, err)
+            return {}, None
+        except Exception as err:  # noqa: BLE001 - whatever a model provider raises must not stop the pass
+            log.warning("screening %r failed: %s", phrase, err)
+            return {}, None
+        self._providers.meter.record(budget.ANALYSER, budget.TOKENS, screening.input_tokens + screening.output_tokens)
+        return screening.verdicts, screening.model
 
     async def _refresh_live(self, video_ids: list[str]) -> None:
         """A stream listed as live is asked about until it is not: it may have dropped out of the channel's latest fifteen

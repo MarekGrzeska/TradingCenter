@@ -31,6 +31,106 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Candidates
+         * @description Films a topic's search found, newest first in the order asked for. Reading it asks nobody anything.
+         */
+        get: operations["list_candidates_candidates_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/candidates/{video_id}/analyse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Analyse
+         * @description Have the candidate's film transcribed and read now, as if its address had been pasted.
+         */
+        post: operations["analyse_candidates__video_id__analyse_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/candidates/{video_id}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss
+         * @description Take the film off the list for good: the same film is not offered again.
+         */
+        post: operations["dismiss_candidates__video_id__dismiss_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/candidates/{video_id}/follow-channel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Follow Channel
+         * @description Follow the candidate's channel. The channel's other open candidates are settled with it.
+         */
+        post: operations["follow_channel_candidates__video_id__follow_channel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/candidates/{video_id}/ignore-channel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ignore Channel
+         * @description Stop offering the candidate's channel: its open candidates leave the list and its next films do not join it.
+         */
+        post: operations["ignore_channel_candidates__video_id__ignore_channel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/channels": {
         parameters: {
             query?: never;
@@ -93,6 +193,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ignored-channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ignored Channels */
+        get: operations["ignored_channels_ignored_channels_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ignored-channels/{channel_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unignore Channel
+         * @description Offer the channel's next films again. What was already decided about stays decided.
+         */
+        delete: operations["unignore_channel_ignored_channels__channel_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ping": {
         parameters: {
             query?: never;
@@ -144,7 +281,7 @@ export interface paths {
         post?: never;
         /**
          * Delete Prompt
-         * @description Refused for the seeded prompt and for one a channel or a topic still reads by. The readings it made stay.
+         * @description Refused for the seeded prompt and for one a channel still reads by. The readings it made stay.
          */
         delete: operations["delete_prompt_prompts__prompt_id__delete"];
         options?: never;
@@ -315,6 +452,101 @@ export interface components {
              */
             reference: string;
         };
+        /** CandidateChannelOut */
+        CandidateChannelOut: {
+            channel: components["schemas"]["ChannelOut"];
+            /**
+             * Created
+             * @description false where the channel was already on the list
+             */
+            created: boolean;
+        };
+        /** CandidateChoice */
+        CandidateChoice: {
+            /**
+             * Prompt Id
+             * @description the prompt to read the film or the channel's films by; null takes the seeded one
+             */
+            prompt_id?: number | null;
+        };
+        /** CandidateOut */
+        CandidateOut: {
+            /** Channel Id */
+            channel_id: string | null;
+            /** Channel Title */
+            channel_title: string;
+            /** Decided At */
+            decided_at: string | null;
+            /**
+             * Decision
+             * @description what the operator did with it; null is not decided yet
+             */
+            decision: ("dismissed" | "analysed" | "channel_followed" | "channel_ignored") | null;
+            /** Duration Seconds */
+            duration_seconds: number | null;
+            /**
+             * Found At
+             * Format: date-time
+             */
+            found_at: string;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /**
+             * Reason
+             * @description one sentence in Polish on why it may be worth watching, or why not
+             */
+            reason: string | null;
+            /**
+             * Simulated
+             * @description a film of the simulation, which does not exist
+             */
+            simulated: boolean;
+            /** Title */
+            title: string;
+            /**
+             * Topic
+             * @description the phrase that found it
+             */
+            topic: string;
+            /**
+             * Topic Id
+             * @description null where the topic that found it has been taken off the list
+             */
+            topic_id: number | null;
+            /**
+             * Url
+             * @description the film on YouTube
+             */
+            url: string;
+            /**
+             * Verdict
+             * @description what a model made of the film's title, description and channel; unscreened where nothing could
+             * @enum {string}
+             */
+            verdict: "proposed" | "rejected" | "unscreened";
+            /** Video Id */
+            video_id: string;
+        };
+        /** CandidatesOut */
+        CandidatesOut: {
+            /** Candidates */
+            candidates: components["schemas"]["CandidateOut"][];
+            /**
+             * Sort
+             * @description found: newest find first · published: newest film first
+             * @enum {string}
+             */
+            sort: "found" | "published";
+            /**
+             * View
+             * @description open: on offer · rejected: turned down by the model · decided: the operator has decided
+             * @enum {string}
+             */
+            view: "open" | "rejected" | "decided";
+        };
         /** ChannelAddedOut */
         ChannelAddedOut: {
             channel: components["schemas"]["ChannelOut"];
@@ -397,6 +629,23 @@ export interface components {
             /** Detail */
             detail: components["schemas"]["ValidationError"][];
         };
+        /** IgnoredChannelOut */
+        IgnoredChannelOut: {
+            /** Channel Id */
+            channel_id: string;
+            /** Channel Title */
+            channel_title: string;
+            /**
+             * Ignored At
+             * Format: date-time
+             */
+            ignored_at: string;
+        };
+        /** IgnoredChannelsOut */
+        IgnoredChannelsOut: {
+            /** Channels */
+            channels: components["schemas"]["IgnoredChannelOut"][];
+        };
         /** LoopOut */
         LoopOut: {
             /**
@@ -463,11 +712,6 @@ export interface components {
              * @description the one that is always there: it can be edited and never deleted
              */
             seeded: boolean;
-            /**
-             * Topics
-             * @description the topics whose new films it reads
-             */
-            topics: string[];
             /**
              * Updated At
              * Format: date-time
@@ -650,7 +894,7 @@ export interface components {
             loop: components["schemas"]["LoopOut"] | null;
             /**
              * Model Configured
-             * @description false means no reading is being made, by configuration
+             * @description false means no reading is being made and no search result is screened, by configuration
              */
             model_configured: boolean;
             /** Providers */
@@ -714,11 +958,6 @@ export interface components {
             max_videos_per_run?: number | null;
             /** Phrase */
             phrase: string;
-            /**
-             * Prompt Id
-             * @description null takes the seeded prompt
-             */
-            prompt_id?: number | null;
         };
         /** TopicOut */
         TopicOut: {
@@ -742,22 +981,18 @@ export interface components {
             language: string;
             /** Last Run At */
             last_run_at: string | null;
-            /** Max Videos Per Run */
+            /**
+             * Max Videos Per Run
+             * @description the most results one search sends to be screened
+             */
             max_videos_per_run: number;
             /** Phrase */
             phrase: string;
-            /** Prompt Id */
-            prompt_id: number;
         };
         /** TopicPatch */
         TopicPatch: {
             /** Active */
             active?: boolean | null;
-            /**
-             * Prompt Id
-             * @description read the topic's films from now on by this prompt
-             */
-            prompt_id?: number | null;
         };
         /** TopicsOut */
         TopicsOut: {
@@ -1004,6 +1239,208 @@ export interface operations {
             };
         };
     };
+    list_candidates_candidates_get: {
+        parameters: {
+            query?: {
+                view?: string;
+                sort?: string;
+                topic_id?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidatesOut"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    analyse_candidates__video_id__analyse_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                video_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateChoice"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueuedOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    dismiss_candidates__video_id__dismiss_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                video_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    follow_channel_candidates__video_id__follow_channel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                video_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CandidateChoice"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateChannelOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    ignore_channel_candidates__video_id__ignore_channel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                video_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     channels_channels_get: {
         parameters: {
             query?: never;
@@ -1157,6 +1594,64 @@ export interface operations {
                     "application/json": {
                         [key: string]: unknown;
                     };
+                };
+            };
+        };
+    };
+    ignored_channels_ignored_channels_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IgnoredChannelsOut"];
+                };
+            };
+        };
+    };
+    unignore_channel_ignored_channels__channel_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                channel_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

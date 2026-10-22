@@ -9,9 +9,9 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from .models import Channel, Prompt, Topic
+from .models import Candidate, Channel, IgnoredChannel, Prompt, Topic
 from .store import Film, ReadingRow
 
 SCORE = "what a model made of this film's market impact, 1..10 — 1 is commentary with nothing new, 10 a global event"
@@ -204,8 +204,7 @@ class TopicOut(BaseModel):
     phrase: str
     language: str
     interval_minutes: int
-    max_videos_per_run: int
-    prompt_id: int
+    max_videos_per_run: int = Field(description="the most results one search sends to be screened")
     active: bool
     added_by: Literal["operator", "agent"]
     added_at: datetime
@@ -219,7 +218,6 @@ class TopicOut(BaseModel):
             language=topic.language,
             interval_minutes=topic.interval_minutes,
             max_videos_per_run=topic.max_videos_per_run,
-            prompt_id=topic.prompt_id,
             active=topic.active,
             added_by=topic.added_by,  # type: ignore[arg-type]
             added_at=topic.added_at,
@@ -233,16 +231,19 @@ class TopicsOut(BaseModel):
 
 
 class TopicIn(BaseModel):
+    # A topic reads nothing, so a prompt sent with one is refused rather than dropped without a word.
+    model_config = ConfigDict(extra="forbid")
+
     phrase: str
     language: str = ""
     interval_minutes: int | None = Field(default=None, description="null takes the setting's default")
     max_videos_per_run: int | None = Field(default=None, description="null takes the setting's default")
-    prompt_id: int | None = Field(default=None, description="null takes the seeded prompt")
 
 
 class TopicPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     active: bool | None = None
-    prompt_id: int | None = Field(default=None, description="read the topic's films from now on by this prompt")
 
 
 class TopicAddedOut(BaseModel):
@@ -269,10 +270,9 @@ class PromptOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     channels: list[str] = Field(description="the channels whose new films it reads")
-    topics: list[str] = Field(description="the topics whose new films it reads")
 
     @classmethod
-    def of(cls, prompt: Prompt, channels: list[str], topics: list[str]) -> PromptOut:
+    def of(cls, prompt: Prompt, channels: list[str]) -> PromptOut:
         return cls(
             id=prompt.id,
             name=prompt.name,
@@ -282,7 +282,6 @@ class PromptOut(BaseModel):
             created_at=prompt.created_at,
             updated_at=prompt.updated_at,
             channels=channels,
-            topics=topics,
         )
 
 
@@ -300,6 +299,81 @@ class PromptIn(BaseModel):
 class PromptPatch(BaseModel):
     name: str | None = None
     body: str | None = Field(default=None, description="new words make a new version")
+
+
+CANDIDATE_VIEWS = Literal["open", "rejected", "decided"]
+CANDIDATE_SORTS = Literal["found", "published"]
+
+
+class CandidateOut(BaseModel):
+    video_id: str
+    url: str = Field(description="the film on YouTube")
+    title: str
+    channel_id: str | None = None
+    channel_title: str
+    topic_id: int | None = Field(default=None, description="null where the topic that found it has been taken off the list")
+    topic: str = Field(description="the phrase that found it")
+    published_at: datetime
+    duration_seconds: int | None = None
+    found_at: datetime
+    verdict: Literal["proposed", "rejected", "unscreened"] = Field(
+        description="what a model made of the film's title, description and channel; unscreened where nothing could"
+    )
+    reason: str | None = Field(default=None, description="one sentence in Polish on why it may be worth watching, or why not")
+    decision: Literal["dismissed", "analysed", "channel_followed", "channel_ignored"] | None = Field(
+        default=None, description="what the operator did with it; null is not decided yet"
+    )
+    decided_at: datetime | None = None
+    simulated: bool = Field(description="a film of the simulation, which does not exist")
+
+    @classmethod
+    def of(cls, candidate: Candidate) -> CandidateOut:
+        return cls(
+            video_id=candidate.video_id,
+            url=f"{WATCH}{candidate.video_id}",
+            title=candidate.title,
+            channel_id=candidate.channel_id,
+            channel_title=candidate.channel_title,
+            topic_id=candidate.topic_id,
+            topic=candidate.phrase,
+            published_at=candidate.published_at,
+            duration_seconds=candidate.duration_seconds,
+            found_at=candidate.found_at,
+            verdict=candidate.verdict,  # type: ignore[arg-type]
+            reason=candidate.reason,
+            decision=candidate.decision,  # type: ignore[arg-type]
+            decided_at=candidate.decided_at,
+            simulated=candidate.simulated,
+        )
+
+
+class CandidatesOut(BaseModel):
+    candidates: list[CandidateOut]
+    view: CANDIDATE_VIEWS = Field(description="open: on offer · rejected: turned down by the model · decided: the operator has decided")
+    sort: CANDIDATE_SORTS = Field(description="found: newest find first · published: newest film first")
+
+
+class CandidateChoice(BaseModel):
+    prompt_id: int | None = Field(default=None, description="the prompt to read the film or the channel's films by; null takes the seeded one")
+
+
+class CandidateChannelOut(BaseModel):
+    channel: ChannelOut
+    created: bool = Field(description="false where the channel was already on the list")
+
+
+class IgnoredChannelOut(BaseModel):
+    channel_id: str
+    channel_title: str
+    ignored_at: datetime
+
+    @classmethod
+    def of(cls, ignored: IgnoredChannel) -> IgnoredChannelOut:
+        return cls(channel_id=ignored.channel_id, channel_title=ignored.channel_title, ignored_at=ignored.ignored_at)
+
+
+class IgnoredChannelsOut(BaseModel):
+    channels: list[IgnoredChannelOut]
 
 
 class QueuedOut(BaseModel):
@@ -333,7 +407,9 @@ class StateOut(BaseModel):
 
     day: date = Field(description="the UTC day the budgets are counted in")
     simulating: bool = Field(description="some provider here is the simulation — films may not exist")
-    model_configured: bool = Field(description="false means no reading is being made, by configuration")
+    model_configured: bool = Field(
+        description="false means no reading is being made and no search result is screened, by configuration"
+    )
     alerts_configured: bool = Field(description="false means nobody is told, by configuration")
     channels_active: int
     topics_active: int

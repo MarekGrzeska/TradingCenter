@@ -68,7 +68,6 @@ async def test_a_topic_added_by_phrase_alone_gets_the_settings_limits_and_says_s
         ({"phrase": "gold", "interval_minutes": 5}, "searched every"),
         ({"phrase": "gold", "interval_minutes": 10**9}, "searched every"),
         ({"phrase": "gold", "max_videos_per_run": 99}, "between 1 and"),
-        ({"phrase": "gold", "prompt": "sometimes"}, "no prompt"),
     ],
 )
 async def test_a_topic_without_sensible_limits_is_refused(pool, kwargs, match) -> None:

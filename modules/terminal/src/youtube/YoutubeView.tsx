@@ -5,6 +5,7 @@ import { useRead } from "../data/query";
 import { MarketDataError } from "../data/types";
 import { Button } from "../ui/Button";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
+import { CandidatesPanel } from "./CandidatesPanel";
 import { AnalyseDialog } from "./dialogs";
 import { FilmCard } from "./FilmCard";
 import { PromptsPanel } from "./PromptsPanel";
@@ -36,8 +37,14 @@ const NO_STATE: ArchiveState = {
   loopAgeSeconds: null,
 };
 
-type TabId = "films" | "channels" | "topics" | "prompts";
-const TAB_LABEL: Record<TabId, string> = { films: "Filmy", channels: "Kanały", topics: "Tematy", prompts: "Prompty" };
+type TabId = "films" | "channels" | "topics" | "candidates" | "prompts";
+const TAB_LABEL: Record<TabId, string> = {
+  films: "Filmy",
+  channels: "Kanały",
+  topics: "Tematy",
+  candidates: "Kandydaci",
+  prompts: "Prompty",
+};
 
 interface StateRead {
   present: boolean;
@@ -171,6 +178,7 @@ export function YoutubeView({ api }: { api?: YoutubeApi } = {}) {
         )}
         {tab === "channels" && <ChannelsPanel client={client} onChanged={refresh} />}
         {tab === "topics" && <TopicsPanel client={client} onChanged={refresh} />}
+        {tab === "candidates" && <CandidatesPanel client={client} onChanged={refresh} />}
         {tab === "prompts" && <PromptsPanel client={client} />}
       </div>
 

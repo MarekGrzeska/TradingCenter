@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { queryClient } from "../data/query";
 import { MarketDataError } from "../data/types";
 import { YoutubeView } from "./YoutubeView";
-import type { ArchiveState, Channel, Film, FilmsPage, Prompt, Reading, YoutubeApi } from "./youtubeApi";
+import type { ArchiveState, Candidate, Channel, Film, FilmsPage, Prompt, Reading, YoutubeApi } from "./youtubeApi";
 
 /**
  * The tab from the operator's seat: that a film shows its score and summary and, opened, each reading under its prompt, that an unread film
@@ -66,6 +66,22 @@ const CHANNEL: Channel = {
   lastDiscoveryAt: null,
 };
 
+const CANDIDATE: Candidate = {
+  videoId: "c1",
+  url: "https://www.youtube.com/watch?v=c1",
+  title: "Nowy autor o złocie",
+  channelId: "UC9",
+  channelTitle: "Nieznany Kanał",
+  topic: "gold",
+  publishedAt: new Date("2026-10-21T08:00:00Z"),
+  durationSeconds: 1200,
+  foundAt: new Date("2026-10-22T06:00:00Z"),
+  verdict: "proposed",
+  reason: "Konkretne poziomy i uzasadnienie, bez clickbaitu.",
+  decision: null,
+  simulated: false,
+};
+
 const SEEDED: Prompt = {
   id: 1,
   name: "Rynkowy",
@@ -75,7 +91,6 @@ const SEEDED: Prompt = {
   createdAt: new Date("2026-10-22T09:00:00Z"),
   updatedAt: new Date("2026-10-22T09:00:00Z"),
   channels: ["Sim Złoto PL"],
-  topics: [],
 };
 const TECHNICAL: Prompt = { ...SEEDED, id: 2, name: "Technical", seeded: false, body: "Levels only.", channels: [] };
 
@@ -97,6 +112,13 @@ function api(films: Film[], overrides: Partial<YoutubeApi> = {}): YoutubeApi {
     addTopic: vi.fn(),
     setTopic: vi.fn(),
     removeTopic: vi.fn(),
+    candidates: vi.fn(async () => [CANDIDATE]),
+    followCandidateChannel: vi.fn(async () => ({ channel: CHANNEL, created: true })),
+    analyseCandidate: vi.fn(),
+    dismissCandidate: vi.fn(async () => undefined),
+    ignoreCandidateChannel: vi.fn(async () => undefined),
+    ignoredChannels: vi.fn(async () => []),
+    unignoreChannel: vi.fn(async () => undefined),
     analyse: vi.fn(),
     film: vi.fn(async () => ({
       film: film(),
@@ -264,5 +286,61 @@ describe("YoutubeView", () => {
 
     expect(await screen.findByText("Technical")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Nowy prompt" })).toBeInTheDocument();
+  });
+
+  it("lists candidates with a link to the film and the model's reason, and asks again in the other order", async () => {
+    const client = api([]);
+    render(<YoutubeView api={client} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Kandydaci" }));
+
+    expect(await screen.findByRole("link", { name: "Nowy autor o złocie" })).toHaveAttribute(
+      "href",
+      "https://www.youtube.com/watch?v=c1",
+    );
+    expect(screen.getByText(/Konkretne poziomy/)).toBeInTheDocument();
+    expect(client.candidates).toHaveBeenLastCalledWith({ view: "open", sort: "found" }, expect.anything());
+
+    await userEvent.click(screen.getByRole("button", { name: "Ostatnio opublikowane" }));
+
+    await vi.waitFor(() =>
+      expect(client.candidates).toHaveBeenLastCalledWith({ view: "open", sort: "published" }, expect.anything()),
+    );
+  });
+
+  it("follows a candidate's channel by the prompt chosen, and keeps the reason in the dialog when the list is full", async () => {
+    const followCandidateChannel = vi
+      .fn()
+      .mockRejectedValueOnce(new MarketDataError("refused", "the watch list holds 100 channels, which is its ceiling"))
+      .mockResolvedValueOnce({ channel: CHANNEL, created: true });
+    render(<YoutubeView api={api([], { followCandidateChannel })} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Kandydaci" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Obserwuj kanał" }));
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Prompt" }), "Technical");
+    await userEvent.click(screen.getByRole("button", { name: "Obserwuj" }));
+
+    expect(await screen.findByText(/which is its ceiling/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Nowy autor o złocie" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Obserwuj" }));
+
+    await vi.waitFor(() => expect(followCandidateChannel).toHaveBeenCalledTimes(2));
+    expect(followCandidateChannel).toHaveBeenLastCalledWith("c1", 2, expect.anything());
+  });
+
+  it("dismisses a candidate at once and ignores a channel only after asking", async () => {
+    const client = api([]);
+    render(<YoutubeView api={client} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Kandydaci" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Odrzuć" }));
+    expect(client.dismissCandidate).toHaveBeenCalledWith("c1", expect.anything());
+
+    await userEvent.click(screen.getByRole("button", { name: "Ignoruj kanał" }));
+    expect(client.ignoreCandidateChannel).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Ignoruj" }));
+
+    await vi.waitFor(() => expect(client.ignoreCandidateChannel).toHaveBeenCalledWith("c1", expect.anything()));
   });
 });
