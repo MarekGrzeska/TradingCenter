@@ -7,6 +7,7 @@ import { Button } from "../ui/Button";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { AnalyseDialog } from "./dialogs";
 import { FilmCard } from "./FilmCard";
+import { PromptsPanel } from "./PromptsPanel";
 import { usageLine, warnings } from "./present";
 import { ChannelsPanel, TopicsPanel } from "./WatchPanels";
 import { createYoutubeApi, type ArchiveState, type FilmsPage, type YoutubeApi } from "./youtubeApi";
@@ -35,8 +36,8 @@ const NO_STATE: ArchiveState = {
   loopAgeSeconds: null,
 };
 
-type TabId = "films" | "channels" | "topics";
-const TAB_LABEL: Record<TabId, string> = { films: "Filmy", channels: "Kanały", topics: "Tematy" };
+type TabId = "films" | "channels" | "topics" | "prompts";
+const TAB_LABEL: Record<TabId, string> = { films: "Filmy", channels: "Kanały", topics: "Tematy", prompts: "Prompty" };
 
 interface StateRead {
   present: boolean;
@@ -170,6 +171,7 @@ export function YoutubeView({ api }: { api?: YoutubeApi } = {}) {
         )}
         {tab === "channels" && <ChannelsPanel client={client} onChanged={refresh} />}
         {tab === "topics" && <TopicsPanel client={client} onChanged={refresh} />}
+        {tab === "prompts" && <PromptsPanel client={client} />}
       </div>
 
       {analysing && <AnalyseDialog client={client} onClose={() => setAnalysing(false)} onDone={refresh} />}

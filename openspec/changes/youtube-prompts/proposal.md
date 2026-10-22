@@ -8,7 +8,7 @@ innego dla jednego filmu — bez zmiany kodu i wdrożenia. Pola schematu, z któ
 
 ## What Changes
 
-- **Prompty jako dane**, nie kod: nowa zakładka **Prompts** w terminalu (grupa Data), w której operator tworzy,
+- **Prompty jako dane**, nie kod: nowa sekcja **Prompty** w zakładce YouTube terminala (obok Filmów, Kanałów i Tematów), w której operator tworzy,
   edytuje i usuwa prompty analizy filmów. Edycja tworzy nową wersję; odczyt pamięta, którą wersją powstał.
 - **Pierwszy prompt jest zasiany migracją** i nie da się go usunąć — zawsze istnieje co najmniej jeden — ale da się
   go edytować jak każdy inny. Nie ma pojęcia „promptu domyślnego” w kodzie; zasiany prompt jest zwykłym wierszem
@@ -45,7 +45,7 @@ po niej** i po `alerts-package`, która modyfikuje `youtube-data-alerts`, `youtu
 - `youtube-data-api`: zawężenie po instrumencie znika; film niesie listę odczytów; trasy promptów.
 - `youtube-data-tools`: bez sentymentu per instrument; `read_video` niesie odczyty, `analyse_video` przyjmuje prompt.
 - `youtube-data-alerts`: wiadomość i zdarzenie bez instrumentów; ogłaszany jest tylko odczyt promptem filmu.
-- `terminal-youtube`: karta filmu pokazuje tekst odczytu i jego odczyty obok siebie; zakładka Prompts.
+- `terminal-youtube`: karta filmu pokazuje tekst odczytu i jego odczyty obok siebie; sekcja Prompty w zakładce YouTube.
 
 `review.md` powstanie po zadaniach: migracja przepisuje istniejące odczyty, a to jest ryzyko warte zapisu.
 
@@ -54,8 +54,8 @@ po niej** i po `alerts-package`, która modyfikuje `youtube-data-alerts`, `youtu
 - `modules/workbench/youtube_data`: `analysis.py` (ramka i schemat), `store.py`, `models.py`, `ingest.py`,
   `watchlist.py`, `alerts.py`, `contract.py`, `routers/` (nowy `prompts.py`), `tools/`, `sim/` (scenariusz z nowym
   kształtem), README; migracja `0003` w łańcuchu `youtube` (tabele promptów, wiersz zasiany, przepisanie odczytów).
-- `modules/terminal`: wygenerowany `contract.youtube.generated.ts` (skill `contract-sync`), `youtube/`, nowa zakładka
-  w `app/tabs.ts`. Pocket nie czyta YouTube — bez zmian.
+- `modules/terminal`: wygenerowany `contract.youtube.generated.ts` (skill `contract-sync`), `youtube/` (nowa sekcja Prompty w `YoutubeView`).
+  Pocket nie czyta YouTube — bez zmian.
 - Produkcja: przed wdrożeniem sprawdzić, czy jakaś reguła w Alerts filtruje `youtube.film.read` po `instruments`;
   bez zmian infrastruktury i sekretów. Koszt: dłuższy tekst odpowiedzi to więcej tokenów wyjścia na odczyt, w
   istniejącym `DAILY_TOKEN_LIMIT`.

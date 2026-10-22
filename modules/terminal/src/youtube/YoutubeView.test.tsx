@@ -256,4 +256,13 @@ describe("YoutubeView", () => {
 
     expect(followChannel).toHaveBeenCalledWith("@nowy", 2, expect.anything());
   });
+
+  it("keeps the prompts a section away inside the tab, not in a tab of their own", async () => {
+    render(<YoutubeView api={api([])} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Prompty" }));
+
+    expect(await screen.findByText("Technical")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Nowy prompt" })).toBeInTheDocument();
+  });
 });

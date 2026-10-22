@@ -32,10 +32,10 @@ NOT decydować o powiadomieniach z kanału ani tematu — MUST natomiast odsyła
 
 ## ADDED Requirements
 
-### Requirement: Zakładka Prompts zarządza promptami
+### Requirement: Sekcja Prompty zarządza promptami
 
-Terminal MUST mieć zakładkę Prompts w grupie Data, pokazującą prompty z nazwą, numerem wersji i kanałami oraz
-tematami, do których każdy jest przypisany. Zakładka MUST pozwalać utworzyć prompt, zmienić jego nazwę i treść oraz
+Zakładka YouTube MUST mieć sekcję Prompty obok Filmów, Kanałów i Tematów, pokazującą prompty z nazwą, numerem wersji i kanałami oraz
+tematami, do których każdy jest przypisany. Sekcja MUST pozwalać utworzyć prompt, zmienić jego nazwę i treść oraz
 usunąć go. Zasiany prompt MUST NOT oferować usunięcia. Odmowa kontraktu — zajęta nazwa, prompt przypisany do kanału
 — MUST być pokazana z powodem.
 
@@ -47,4 +47,4 @@ usunąć go. Zasiany prompt MUST NOT oferować usunięcia. Odmowa kontraktu — 
 #### Scenario: Zasiany prompt
 
 - **WHEN** operator otwiera zasiany prompt
-- **THEN** zakładka MUST pozwolić go edytować i MUST NOT pokazać akcji usunięcia
+- **THEN** sekcja MUST pozwolić go edytować i MUST NOT pokazać akcji usunięcia

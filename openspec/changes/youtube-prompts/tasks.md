@@ -30,7 +30,7 @@
 - [x] 4.1 `contract-sync`: regeneracja `contract.youtube.generated.ts`
 - [x] 4.2 Karta filmu: streszczenie i ocena na liście; szczegół z odczytami (prompt filmu pierwszy) w markdown i akcją „odczytaj innym promptem”; bez instrumentów i filtra instrumentu
 - [x] 4.3 Dialogi kanału, tematu i filmu: wybór promptu
-- [x] 4.4 Zakładka Prompts w grupie Data: lista z wersją i przypisaniami, tworzenie, edycja, usunięcie (brak dla zasianego), odmowy z powodem — trzy testy widoku
+- [x] 4.4 Sekcja Prompty w zakładce YouTube: lista z wersją i przypisaniami, tworzenie, edycja, usunięcie (brak dla zasianego), odmowy z powodem — trzy testy widoku
 
 ## 5. Wydanie
 

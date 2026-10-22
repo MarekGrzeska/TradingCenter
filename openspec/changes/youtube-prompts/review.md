@@ -1,7 +1,7 @@
 ## Verdict
 
 Prompty są danymi: tabele `prompts` i `prompt_versions`, zasiany prompt `Rynkowy` bez usuwania, jeden kształt odczytu
-(`summary_pl`, `text`, `impact_score`), kolejny odczyt filmu wybranym promptem, zakładka Prompts i wybór promptu w dialogach.
+(`summary_pl`, `text`, `impact_score`), kolejny odczyt filmu wybranym promptem, sekcja Prompty w zakładce YouTube i wybór promptu w dialogach.
 Wiedza o instrumentach zniknęła wszędzie (filtr, `instrument_sentiment`, atrybut zdarzenia, linia w wiadomości). Świadomie
 niedokończone: wdrożenie (zadanie 5.2) i poprawa reguł alertów po wdrożeniu — na produkcji jest jedna reguła `youtube.film.read`
 z pustym filtrem i szablonem `{text}`, więc nic nie wymaga poprawy (sprawdzone 22 października 2026).
@@ -61,7 +61,7 @@ z pustym filtrem i szablonem `{text}`, więc nic nie wymaga poprawy (sprawdzone 
 | Wiadomość prowadzi do filmu / Długie streszczenie | `test_alerts.py::test_a_long_summary_is_cut_by_this_package_so_the_door_never_has_to_refuse_it` |
 | terminal-youtube: Zakładka pokazuje filmy z odczytem / Film bez odczytu, Film z dwoma odczytami | `YoutubeView.test.tsx` (film bez odczytu; odczyt pod nazwą promptu), `youtubeApi.test.ts::maps a film's readings…` |
 | Operator edytuje listę obserwacji / Kanał nie istnieje | `YoutubeView.test.tsx::adds a channel from the tab, and keeps the module's reason…`, `…follows a channel by the prompt chosen in the dialog` |
-| Zakładka Prompts zarządza promptami / Usunięcie przypisanego, Zasiany prompt | `PromptsView.test.tsx` (trzy testy) |
+| Sekcja Prompty zarządza promptami / Usunięcie przypisanego, Zasiany prompt | `PromptsPanel.test.tsx` (trzy testy) |
 
 ## Gaps
 

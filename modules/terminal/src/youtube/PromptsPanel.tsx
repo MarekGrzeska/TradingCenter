@@ -1,11 +1,9 @@
-import { useMemo, useState } from "react";
-import { resolveEndpoints } from "../data/config";
-import { youtubeIdentity } from "../data/marketData";
+import { useState } from "react";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { usePrompts } from "./usePrompts";
-import { createYoutubeApi, type Prompt, type YoutubeApi } from "./youtubeApi";
+import type { Prompt, YoutubeApi } from "./youtubeApi";
 
 /**
  * What a model is told to look for in a film. The operator writes, edits and — alone — deletes: the agent only chooses one by
@@ -15,11 +13,7 @@ import { createYoutubeApi, type Prompt, type YoutubeApi } from "./youtubeApi";
 
 const INPUT = "rounded border border-border bg-sunken px-2 py-1 text-ink";
 
-export function PromptsView({ api }: { api?: YoutubeApi } = {}) {
-  const client = useMemo(
-    () => api ?? createYoutubeApi(resolveEndpoints().youtubeHttp, youtubeIdentity),
-    [api],
-  );
+export function PromptsPanel({ client }: { client: YoutubeApi }) {
   const list = usePrompts(client);
   const [editing, setEditing] = useState<Prompt | "new" | null>(null);
   const [removing, setRemoving] = useState<Prompt | null>(null);
@@ -27,18 +21,17 @@ export function PromptsView({ api }: { api?: YoutubeApi } = {}) {
   const { prompts, maxChars, ceiling } = list.value;
 
   return (
-    <section className="flex h-full min-h-0 flex-col gap-4 p-4">
-      <header className="flex flex-wrap items-center gap-3">
-        <h1 className="text-base font-semibold text-ink">Prompty</h1>
+    <div className="flex flex-col gap-2">
+      <div className="flex items-center gap-3">
         <Button tone="primary" size="xs" onClick={() => setEditing("new")}>
           Nowy prompt
         </Button>
         <span className="text-xs text-ink-faint">
-          {prompts.length}/{ceiling || "—"} promptów · analiza filmów z archiwum YouTube
+          {prompts.length}/{ceiling || "—"} promptów
         </span>
-      </header>
+      </div>
       {list.error !== null && <UnreachableNotice onRetry={list.reload}>{list.error}</UnreachableNotice>}
-      <ul className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto">
+      <ul className="flex flex-col gap-2">
         {prompts.map((prompt) => (
           <li key={prompt.id} className="flex flex-col gap-2 rounded border border-border bg-panel px-3 py-2">
             <div className="flex flex-wrap items-center gap-3">
@@ -94,7 +87,7 @@ export function PromptsView({ api }: { api?: YoutubeApi } = {}) {
           </p>
         </ConfirmDialog>
       )}
-    </section>
+    </div>
   );
 }
 

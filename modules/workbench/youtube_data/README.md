@@ -2,7 +2,7 @@
 
 The YouTube archive. Channels and search topics the operator (or an agent) chose to follow, the films
 they yield, their transcripts, the prompts a model reads them by, what it made of each — and each read film handed to the alerts package, whose rules say whether anybody is told.
-Two surfaces in one process: the REST contract the terminal's **YouTube** and **Prompts** tabs read, and eight tools at
+Two surfaces in one process: the REST contract the terminal's **YouTube** tab (Films, Channels, Topics, Prompts) reads, and eight tools at
 `/mcp` that reach the conversation and the teams as functions.
 
 **The ninth package of the workbench, and the only optional one.** Served whole under `/youtube` when
