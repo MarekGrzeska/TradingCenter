@@ -15,6 +15,7 @@ async def _film(db, video_id: str = "v1", **overrides) -> None:
         "title": "a film",
         "published_at": "2026-09-27T10:00:00+00",
         "origins": ["manual"],
+        "prompt_id": await db.fetchval("SELECT id FROM prompts WHERE seeded"),
         **overrides,
     }
     names = ", ".join(columns)
@@ -46,15 +47,16 @@ async def test_a_reading_is_one_to_ten(db) -> None:
 
     with pytest.raises(asyncpg.CheckViolationError):
         await db.execute(
-            "INSERT INTO readings (video_id, profile, result, impact_score, model) "
-            "VALUES ('v1', 'market', '{}', 11, 'm')"
+            "INSERT INTO readings (video_id, prompt_id, prompt_version, result, impact_score, model) "
+            "VALUES ('v1', (SELECT id FROM prompts WHERE seeded), 1, '{}', 11, 'm')"
         )
 
 
 async def test_removing_a_channel_leaves_its_films(db) -> None:
     """The watch list is why we looked, not what we keep: nothing references `channels`."""
     await db.execute(
-        "INSERT INTO channels (channel_id, title, added_by) VALUES ('UC1', 'a channel', 'operator')"
+        "INSERT INTO channels (channel_id, title, added_by, prompt_id) "
+        "VALUES ('UC1', 'a channel', 'operator', (SELECT id FROM prompts WHERE seeded))"
     )
     await _film(db, channel_id="UC1")
 
@@ -65,8 +67,8 @@ async def test_removing_a_channel_leaves_its_films(db) -> None:
 
 async def test_the_same_phrase_in_another_case_is_the_same_topic(db) -> None:
     insert = (
-        "INSERT INTO topics (phrase, interval_minutes, max_videos_per_run, added_by) "
-        "VALUES ($1, 360, 3, 'agent')"
+        "INSERT INTO topics (phrase, interval_minutes, max_videos_per_run, added_by, prompt_id) "
+        "VALUES ($1, 360, 3, 'agent', (SELECT id FROM prompts WHERE seeded))"
     )
     await db.execute(insert, "Gold outlook")
 

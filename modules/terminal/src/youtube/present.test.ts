@@ -19,6 +19,7 @@ function film(overrides: Partial<Film> = {}): Film {
     attempts: 0,
     nextAttemptAt: null,
     simulated: false,
+    promptId: 1,
     reading: null,
     ...overrides,
   };

@@ -207,7 +207,7 @@ class Ingest:
                 await store.upsert_films(
                     conn,
                     [
-                        store.Discovery(film, f"channel:{channel.channel_id}", channel.profile)
+                        store.Discovery(film, f"channel:{channel.channel_id}", channel.prompt_id)
                         for film in films
                     ],
                     bounds=self._bounds,
@@ -236,7 +236,7 @@ class Ingest:
             async with self._pool.acquire() as conn:
                 await store.upsert_films(
                     conn,
-                    [store.Discovery(film, f"topic:{topic.id}", topic.profile) for film in films],
+                    [store.Discovery(film, f"topic:{topic.id}", topic.prompt_id) for film in films],
                     bounds=self._bounds,
                 )
                 await store.record_topic_run(conn, topic.id, at=now)
@@ -352,41 +352,71 @@ class Ingest:
             if await self._remaining(ceiling) <= 0:
                 log.warning("the day's tokens are spent; readings wait for tomorrow")
                 break
-            video = item.video
-            film = Film(
-                video_id=video.video_id,
-                title=video.title,
-                channel_title=video.channel_title,
-                published_on=video.published_at.date(),
-                language=item.language,
-            )
+            await self._read_with(item.video, item.transcript, item.language, item.video.prompt_id)
+
+    async def read_with(self, video_id: str, prompt_id: int) -> None:
+        """One more reading of a film already transcribed, by a prompt somebody chose: no transcript is asked for, the
+        film does not move on, and the day's tokens are spent as for any reading — under the loop's own lock."""
+        if self._providers.analyser is None:
+            return
+        async with self._busy:
             try:
-                analysis = await analyser.read(film, item.transcript, profile=video.profile)
+                async with self._pool.acquire() as conn:
+                    found = await store.reading_input(conn, video_id)
+                if found is not None:
+                    await self._read_with(*found, prompt_id)
             except asyncio.CancelledError:
                 raise
-            except ReadingUnusable as err:
-                # An answer about this film that will not be stored: paid for, and one of the film's attempts.
-                self._providers.meter.record(budget.ANALYSER, budget.TOKENS, err.tokens)
-                log.warning("reading %s is unusable: %s", video.video_id, err)
-                async with self._pool.acquire() as conn:
-                    await store.record_reading_failure(conn, video.video_id)
-                continue
-            except Exception as err:  # noqa: BLE001 - whatever a model provider raises must not stop the batch
-                # A key, a quota, a rate limit or a dropped connection says nothing about the film, so it spends none of
-                # the film's attempts — an hour's outage would otherwise strand every film it touched for good.
-                log.warning("reading %s failed: %s", video.video_id, err)
-                continue
-            self._providers.meter.record(budget.ANALYSER, budget.TOKENS, analysis.input_tokens + analysis.output_tokens)
+            except Exception:
+                log.exception("the film %s could not be read again", video_id)
+            finally:
+                await self._flush()
+
+    def start_reading(self, video_id: str, prompt_id: int) -> None:
+        task = asyncio.create_task(self.read_with(video_id, prompt_id), name=f"youtube-reading-{video_id}")
+        self._named.add(task)
+        task.add_done_callback(self._named.discard)
+
+    async def _read_with(self, video, transcript: str, language: str, prompt_id: int) -> None:
+        analyser = self._providers.analyser
+        assert analyser is not None
+        film = Film(
+            video_id=video.video_id,
+            title=video.title,
+            channel_title=video.channel_title,
+            published_on=video.published_at.date(),
+            language=language,
+        )
+        async with self._pool.acquire() as conn:
+            version, prompt = await store.prompt_to_read_with(conn, prompt_id)
+        try:
+            analysis = await analyser.read(film, transcript, prompt=prompt)
+        except asyncio.CancelledError:
+            raise
+        except ReadingUnusable as err:
+            # An answer about this film that will not be stored: paid for, and one of the film's attempts.
+            self._providers.meter.record(budget.ANALYSER, budget.TOKENS, err.tokens)
+            log.warning("reading %s is unusable: %s", video.video_id, err)
             async with self._pool.acquire() as conn:
-                await store.save_reading(
-                    conn,
-                    video.video_id,
-                    profile=video.profile,
-                    reading=analysis.reading,
-                    model=analysis.model,
-                    simulated=analysis.simulated or video.simulated,
-                    at=self._clock.now(),
-                )
+                await store.record_reading_failure(conn, video.video_id)
+            return
+        except Exception as err:  # noqa: BLE001 - whatever a model provider raises must not stop the batch
+            # A key, a quota, a rate limit or a dropped connection says nothing about the film, so it spends none of
+            # the film's attempts — an hour's outage would otherwise strand every film it touched for good.
+            log.warning("reading %s failed: %s", video.video_id, err)
+            return
+        self._providers.meter.record(budget.ANALYSER, budget.TOKENS, analysis.input_tokens + analysis.output_tokens)
+        async with self._pool.acquire() as conn:
+            await store.save_reading(
+                conn,
+                video.video_id,
+                prompt_id=prompt_id,
+                prompt_version=version,
+                reading=analysis.reading,
+                model=analysis.model,
+                simulated=analysis.simulated or video.simulated,
+                at=self._clock.now(),
+            )
 
     # --- tell --------------------------------------------------------------------------------------------------------
 

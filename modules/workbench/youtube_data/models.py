@@ -27,7 +27,7 @@ class Channel:
     handle: str | None
     uploads_playlist_id: str | None
     language: str
-    profile: str
+    prompt_id: int
     active: bool
     added_by: str
     added_at: datetime
@@ -41,7 +41,7 @@ class Topic:
     language: str
     interval_minutes: int
     max_videos_per_run: int
-    profile: str
+    prompt_id: int
     active: bool
     added_by: str
     added_at: datetime
@@ -59,7 +59,7 @@ class Video:
     live_status: str
     origins: tuple[str, ...]
     audio_language: str | None
-    profile: str
+    prompt_id: int
     state: str
     skip_reason: str | None
     attempts: int
@@ -68,3 +68,16 @@ class Video:
     simulated: bool
     discovered_at: datetime
     notified_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class Prompt:
+    """What the operator tells a model to look for in a film, at its latest version."""
+
+    id: int
+    name: str
+    seeded: bool
+    version: int
+    body: str
+    created_at: datetime
+    updated_at: datetime

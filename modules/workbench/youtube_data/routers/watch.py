@@ -5,8 +5,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Request, Response, status
 
-from .. import store, watchlist
-from ..analysis import PROFILES
+from .. import prompts, store, watchlist
 from ..contract import (
     ChannelAddedOut,
     ChannelIn,
@@ -36,6 +35,13 @@ def _missing(what: str) -> HTTPException:
     return HTTPException(status.HTTP_404_NOT_FOUND, detail=Problem(detail=what).model_dump())
 
 
+async def _prompt_on_offer(conn, prompt_id: int) -> None:
+    try:
+        await prompts.resolve(conn, prompt_id)
+    except prompts.PromptRefused as err:
+        raise _refuse(str(err)) from err
+
+
 @router.get("/channels", response_model=ChannelsOut)
 async def channels(request: Request) -> ChannelsOut:
     async with connection(request.app.state.pool) as conn:
@@ -56,7 +62,7 @@ async def follow(request: Request, body: ChannelIn) -> ChannelAddedOut:
             state.settings,
             body.reference,
             added_by="operator",
-            profile=body.profile,
+            prompt=body.prompt_id,
             language=body.language,
         )
     except WatchlistRefused as err:
@@ -70,12 +76,10 @@ async def follow(request: Request, body: ChannelIn) -> ChannelAddedOut:
     responses={404: {"model": Problem}, 422: {"model": Problem}},
 )
 async def patch_channel(request: Request, channel_id: str, body: ChannelPatch) -> ChannelOut:
-    if body.profile is not None and body.profile not in PROFILES:
-        raise _refuse(f"profile must be one of {', '.join(PROFILES)}; got {body.profile!r}")
     async with connection(request.app.state.pool) as conn:
-        updated = await store.update_channel(
-            conn, channel_id, profile=body.profile, active=body.active
-        )
+        if body.prompt_id is not None:
+            await _prompt_on_offer(conn, body.prompt_id)
+        updated = await store.update_channel(conn, channel_id, prompt_id=body.prompt_id, active=body.active)
     if updated is None:
         raise _missing(f"no channel {channel_id!r} on the list")
     return ChannelOut.of(updated)
@@ -118,7 +122,7 @@ async def add_topic(request: Request, body: TopicIn) -> TopicAddedOut:
             language=body.language,
             interval_minutes=body.interval_minutes,
             max_videos_per_run=body.max_videos_per_run,
-            profile=body.profile,
+            prompt=body.prompt_id,
         )
     except WatchlistRefused as err:
         raise _refuse(str(err)) from err
@@ -130,7 +134,9 @@ async def add_topic(request: Request, body: TopicIn) -> TopicAddedOut:
 @router.patch("/topics/{topic_id}", response_model=TopicOut, responses={404: {"model": Problem}})
 async def patch_topic(request: Request, topic_id: int, body: TopicPatch) -> TopicOut:
     async with connection(request.app.state.pool) as conn:
-        updated = await store.update_topic(conn, topic_id, active=body.active)
+        if body.prompt_id is not None:
+            await _prompt_on_offer(conn, body.prompt_id)
+        updated = await store.update_topic(conn, topic_id, active=body.active, prompt_id=body.prompt_id)
     if updated is None:
         raise _missing(f"no topic {topic_id} on the list")
     return TopicOut.of(updated)

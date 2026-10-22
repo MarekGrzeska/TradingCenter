@@ -1,12 +1,17 @@
 import { useState } from "react";
+import { MessageBody } from "../agent/MessageBody";
+import { messageOf, useRead } from "../data/query";
 import { formatInstant } from "../ui/formatTime";
+import { Button } from "../ui/Button";
 import { bandOf } from "../social/impact";
-import { SENTIMENT_ARROW, SENTIMENT_LABEL, duration, stateLabel } from "./present";
-import type { Film, TranscriptPage, YoutubeApi } from "./youtubeApi";
+import { duration, stateLabel } from "./present";
+import { usePrompts } from "./usePrompts";
+import type { Film, FilmDetail, TranscriptPage, YoutubeApi } from "./youtubeApi";
 
 /**
- * One film, folded. A film with a reading shows its score and what was said about each instrument; one without shows where
- * it is on its road — never a zero or a dash, because unread and unimportant are different facts.
+ * One film, folded. A film with a reading shows its score and a short summary; one without shows where it is on its road —
+ * never a zero or a dash, because unread and unimportant are different facts. Unfolded it shows every reading the film has, each
+ * under the name of the prompt that made it.
  */
 
 const BAND_CLASS: Record<string, string> = {
@@ -15,11 +20,7 @@ const BAND_CLASS: Record<string, string> = {
   low: "bg-raised text-ink-muted",
 };
 
-const SENTIMENT_CLASS = {
-  bullish: "bg-raised text-ink",
-  bearish: "bg-raised text-ink",
-  neutral: "bg-raised text-ink-muted",
-} as const;
+const NO_DETAIL: FilmDetail | null = null;
 
 export function FilmCard({ film, client }: { film: Film; client: YoutubeApi }) {
   const [open, setOpen] = useState(false);
@@ -57,72 +58,138 @@ export function FilmCard({ film, client }: { film: Film; client: YoutubeApi }) {
             {length !== null && ` · ${length}`}
             {reading === null && ` · ${stateLabel(film)}`}
           </span>
-          {reading !== null && reading.instruments.length > 0 && (
-            <span className="mt-1 flex flex-wrap gap-1">
-              {reading.instruments.map((view, index) => (
-                <span
-                  // A model may name one instrument twice, with two horizons.
-                  key={`${view.name}:${view.horizon}:${index}`}
-                  className={`rounded px-1.5 py-0.5 text-[11px] ${SENTIMENT_CLASS[view.sentiment]}`}
-                  title={`${SENTIMENT_LABEL[view.sentiment]}, pewność mówiącego ${view.conviction}/5, horyzont: ${view.horizon}`}
-                >
-                  {view.name} {SENTIMENT_ARROW[view.sentiment]} {view.conviction}/5
-                </span>
-              ))}
-            </span>
-          )}
+          {reading !== null && <span className="mt-1 line-clamp-2 block text-xs text-ink-secondary">{reading.summary}</span>}
         </span>
         <span className="shrink-0 text-xs text-ink-faint" aria-hidden>
           {open ? "▲" : "▼"}
         </span>
       </button>
 
-      {open && (
-        <div className="flex flex-col gap-2 border-t border-border px-3 py-2 text-sm text-ink">
-          {reading === null ? (
-            <p className="text-ink-muted">Ten film nie ma odczytu: {stateLabel(film)}.</p>
-          ) : (
-            <>
-              <p className="whitespace-pre-wrap">{reading.summary}</p>
-              {reading.keyPoints.length > 0 && (
-                <ul className="list-disc pl-5 text-ink-secondary">
-                  {reading.keyPoints.map((point, index) => (
-                    <li key={index}>{point}</li>
-                  ))}
-                </ul>
-              )}
-              {reading.predictions.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-semibold text-ink-secondary">Prognozy</h3>
-                  <ul className="list-disc pl-5 text-ink-secondary">
-                    {reading.predictions.map((p) => (
-                      <li key={`${p.instrument}:${p.claim}`}>
-                        {p.instrument}: {p.claim}
-                        {p.level !== null && ` (poziom ${p.level})`}
-                        {p.by !== null && ` do ${p.by}`}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              <p className="text-xs text-ink-faint">
-                odczyt: {reading.model} · {reading.analysedAt.toLocaleString("pl-PL")}
-                {reading.simulated && " · symulowany"}
-              </p>
-            </>
-          )}
-          <div className="flex items-center gap-3 text-xs text-ink-faint">
-            {/* The link back to the film is not decoration: YouTube's terms ask for it wherever its data is shown. */}
-            <a className="text-accent underline" href={film.url} target="_blank" rel="noopener noreferrer">
-              obejrzyj na YouTube
-            </a>
-          </div>
-          {film.state !== "discovered" && film.state !== "skipped" && film.state !== "gave_up" && (
-            <Transcript film={film} client={client} />
-          )}
-        </div>
-      )}
+      {open && <Unfolded film={film} client={client} />}
     </article>
+  );
+}
+
+function Unfolded({ film, client }: { film: Film; client: YoutubeApi }) {
+  const detail = useRead<FilmDetail | null>({
+    key: ["youtube", "film", film.videoId],
+    read: (signal) => client.film(film.videoId, signal),
+    initial: NO_DETAIL,
+    fallbackMessage: "nie udało się wczytać odczytów filmu",
+  });
+
+  return (
+    <div className="flex flex-col gap-3 border-t border-border px-3 py-2 text-sm text-ink">
+      {detail.error !== null && <p className="text-xs text-critical">{detail.error}</p>}
+      {detail.status === "loading" && <p className="text-xs text-ink-faint">Wczytuję odczyty…</p>}
+      {detail.status === "ready" && detail.value !== null && detail.value.readings.length === 0 && (
+        <p className="text-ink-muted">Ten film nie ma odczytu: {stateLabel(film)}.</p>
+      )}
+      {detail.value?.readings.map((reading, index) => (
+        <section key={reading.promptId} className="flex flex-col gap-1">
+          <h3 className="text-xs font-semibold text-ink-secondary">
+            {reading.promptName} <span className="font-normal text-ink-faint">v{reading.promptVersion}</span>
+            {index === 0 && reading.promptId === film.promptId && (
+              <span className="ml-2 font-normal text-ink-faint">prompt filmu</span>
+            )}
+          </h3>
+          <p className="whitespace-pre-wrap text-ink-secondary">{reading.summary}</p>
+          <div className="text-ink-secondary">
+            <MessageBody text={reading.text} />
+          </div>
+          <p className="text-xs text-ink-faint">
+            wpływ {reading.impactScore}/10 · odczyt: {reading.model} · {reading.analysedAt.toLocaleString("pl-PL")}
+            {reading.simulated && " · symulowany"}
+          </p>
+        </section>
+      ))}
+      <div className="flex flex-wrap items-center gap-3 text-xs text-ink-faint">
+        {/* The link back to the film is not decoration: YouTube's terms ask for it wherever its data is shown. */}
+        <a className="text-accent underline" href={film.url} target="_blank" rel="noopener noreferrer">
+          obejrzyj na YouTube
+        </a>
+      </div>
+      {hasWords(film) && (
+        <ReadAgain film={film} client={client} read={detail.value?.readings.map((r) => r.promptId) ?? []} onRead={detail.reload} />
+      )}
+      {hasWords(film) && <Transcript film={film} client={client} />}
+    </div>
+  );
+}
+
+/** A film that has been transcribed has words to read again; one still waiting for them has none, and the module says so. */
+function hasWords(film: Film): boolean {
+  return film.state !== "discovered" && film.state !== "skipped" && film.state !== "gave_up" && film.state !== "no_transcript";
+}
+
+/**
+ * Another prompt reads the film that is already here. Nothing is asked of the transcriber, the day's tokens are spent, and the
+ * answer comes a little later — so the card says it was accepted and offers a refresh rather than waiting for a reading.
+ */
+function ReadAgain({
+  film,
+  client,
+  read,
+  onRead,
+}: {
+  film: Film;
+  client: YoutubeApi;
+  read: number[];
+  onRead(): void;
+}) {
+  const prompts = usePrompts(client);
+  const [choice, setChoice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+  const offered = prompts.value.prompts;
+
+  async function order() {
+    setBusy(true);
+    setFailure(null);
+    setNote(null);
+    try {
+      await client.readAgain(film.videoId, Number(choice), new AbortController().signal);
+      setNote("Przyjęte — odczyt powstaje w tle. Odśwież za chwilę.");
+    } catch (cause: unknown) {
+      setFailure(messageOf(cause, "nie udało się zamówić odczytu"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (offered.length < 2) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <label className="flex items-center gap-2 text-ink-secondary">
+        Odczytaj innym promptem
+        <select
+          className="rounded border border-border bg-sunken px-2 py-1 text-ink"
+          value={choice}
+          onChange={(event) => setChoice(event.target.value)}
+        >
+          <option value="">wybierz…</option>
+          {offered.map((prompt) => (
+            <option key={prompt.id} value={prompt.id}>
+              {prompt.name}
+              {read.includes(prompt.id) ? " (odświeży odczyt)" : ""}
+            </option>
+          ))}
+        </select>
+      </label>
+      <Button size="xs" tone="quiet" disabled={choice === "" || busy} onClick={() => void order()}>
+        {busy ? "Zamawiam…" : "Zamów"}
+      </Button>
+      {note !== null && (
+        <>
+          <span className="text-ink-faint">{note}</span>
+          <Button size="xs" tone="muted" onClick={onRead}>
+            Odśwież
+          </Button>
+        </>
+      )}
+      {failure !== null && <span className="text-critical">{failure}</span>}
+    </div>
   );
 }
 

@@ -8,6 +8,7 @@ from youtube_data import budget, store, watchlist
 from youtube_data.providers.base import ReadingUnusable
 from youtube_data.sim.scenario import Scenario
 
+from .builders import SEEDED_PROMPT_ID
 from .harness import CRYPTO, GOLD, MARKETS, Rig
 
 pytestmark = pytest.mark.db
@@ -206,7 +207,7 @@ async def test_a_model_that_cannot_be_reached_spends_none_of_a_films_attempts(po
     class Down:
         model = "down"
 
-        async def read(self, film, transcript, *, profile):
+        async def read(self, film, transcript, *, prompt):
             raise ConnectionError("the provider is down")
 
     rig = Rig(pool, analyser=Down(), reading_max_failures=1)
@@ -223,7 +224,7 @@ async def test_an_answer_that_is_thrown_away_is_still_counted_against_the_days_t
     class Unusable:
         model = "m"
 
-        async def read(self, film, transcript, *, profile):
+        async def read(self, film, transcript, *, prompt):
             raise ReadingUnusable("breaks the schema", tokens=500)
 
     rig = Rig(pool, analyser=Unusable(), analyse_batch_limit=1)
@@ -296,7 +297,7 @@ async def test_a_step_that_breaks_does_not_stop_the_ones_after_it_but_the_pass_i
     async with pool.acquire() as conn:
         await store.upsert_films(
             conn,
-            [store.Discovery(_ref("late01"), "manual", "market")],
+            [store.Discovery(_ref("late01"), "manual", SEEDED_PROMPT_ID)],
         )
     real = rig.providers.source.latest_videos
 

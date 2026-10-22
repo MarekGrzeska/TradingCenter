@@ -23,6 +23,7 @@ from youtube_data.alerts import (
 from youtube_data.analysis import Reading
 from youtube_data.providers.base import VideoRef
 
+from .builders import SEEDED_PROMPT_ID
 from .harness import MARKETS, Rig
 
 pytestmark = pytest.mark.db
@@ -51,10 +52,7 @@ class RecordingPublisher:
 def reading(score: int, **overrides) -> Reading:
     body = {
         "summary_pl": "Prowadzący uważa, że złoto wzrośnie.",
-        "key_points": [],
-        "instruments": [{"name": "Gold", "epic": "GOLD", "sentiment": "bullish", "conviction": 4, "horizon": "swing"}],
-        "predictions": [],
-        "topics": [],
+        "text": "## Tezy\n- złoto rośnie",
         "impact_score": score,
     }
     body.update(overrides)
@@ -72,8 +70,17 @@ async def read_film(pool, video_id: str, *, score: int, origin: str = "channel:U
         simulated=simulated,
     )
     async with pool.acquire() as conn:
-        await store.upsert_films(conn, [store.Discovery(ref, origin, "market")])
-        await store.save_reading(conn, video_id, profile="market", reading=reading(score), model="m", simulated=simulated)
+        await store.upsert_films(conn, [store.Discovery(ref, origin, SEEDED_PROMPT_ID)])
+        await conn.execute("UPDATE videos SET state = 'transcribed' WHERE video_id = $1", video_id)
+        await store.save_reading(
+            conn,
+            video_id,
+            prompt_id=SEEDED_PROMPT_ID,
+            prompt_version=1,
+            reading=reading(score),
+            model="m",
+            simulated=simulated,
+        )
 
 
 def handing(pool, publisher, *, window_hours: int = 48) -> Alerts:
@@ -126,7 +133,7 @@ async def test_a_film_no_model_has_read_is_published_as_nothing(pool) -> None:
         simulated=False,
     )
     async with pool.acquire() as conn:
-        await store.upsert_films(conn, [store.Discovery(ref, "channel:UC1", "market")])
+        await store.upsert_films(conn, [store.Discovery(ref, "channel:UC1", SEEDED_PROMPT_ID)])
     publisher = RecordingPublisher()
 
     assert await handing(pool, publisher).run(NOW) == 0
@@ -200,8 +207,9 @@ def test_a_channel_is_one_word_of_the_attribute() -> None:
 async def test_a_film_carries_the_channel_the_topic_and_the_score_a_rule_filters_by(pool) -> None:
     async with pool.acquire() as conn:
         topic = await conn.fetchval(
-            "INSERT INTO topics (phrase, language, interval_minutes, max_videos_per_run, profile, added_by) "
-            "VALUES ('gold outlook', '', 60, 3, 'market', 'operator') RETURNING id"
+            "INSERT INTO topics (phrase, language, interval_minutes, max_videos_per_run, prompt_id, added_by) "
+            "VALUES ('gold outlook', '', 60, 3, $1, 'operator') RETURNING id",
+            SEEDED_PROMPT_ID,
         )
     await read_film(pool, "v1", score=9, origin=f"topic:{topic}")
     publisher = RecordingPublisher()
@@ -215,7 +223,8 @@ async def test_a_film_carries_the_channel_the_topic_and_the_score_a_rule_filters
         "gold outlook",
         9,
     )
-    assert attributes["instruments"] == ["Gold"] and attributes["url"].endswith("v1")
+    assert attributes["prompt"] == "Rynkowy" and attributes["url"].endswith("v1")
+    assert "instruments" not in attributes
 
 
 async def test_the_whole_road_hands_over_every_read_film_once(pool) -> None:
@@ -256,7 +265,7 @@ def _item(**overrides) -> store.ToAnnounce:
         live_status="none",
         origins=("channel:UC1",),
         audio_language=None,
-        profile="market",
+        prompt_id=SEEDED_PROMPT_ID,
         state="analysed",
         skip_reason=None,
         attempts=0,
@@ -266,14 +275,13 @@ def _item(**overrides) -> store.ToAnnounce:
         discovered_at=NOW,
         notified_at=None,
     )
-    return store.ToAnnounce(stored, reading(9, **overrides).model_dump(mode="json"), simulated=False)
+    return store.ToAnnounce(stored, reading(9, **overrides).model_dump(mode="json"), simulated=False, prompt="Rynkowy")
 
 
-def test_a_message_names_the_channel_the_views_and_the_way_to_the_film() -> None:
+def test_a_message_names_the_channel_the_score_and_the_way_to_the_film() -> None:
     text = alerts.message(_item())
 
     assert "Wpływ 9/10 — Gold Talk" in text
-    assert "Gold ▲ (4/5, swing)" in text
     assert text.endswith("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
     assert "SYMULACJA" not in text
 
@@ -340,3 +348,24 @@ async def test_a_film_named_by_hand_ends_quiet_because_whoever_asked_is_already_
 
     assert publisher.sent == []
     assert await state_of(pool, "v1") == "quiet"
+
+
+async def test_a_reading_ordered_by_another_prompt_is_never_the_one_handed_over(pool) -> None:
+    await read_film(pool, "v1", score=3)
+    async with pool.acquire() as conn:
+        other = await store.create_prompt(conn, name="Technical", body="Levels only.")
+        await store.save_reading(
+            conn,
+            "v1",
+            prompt_id=other.id,
+            prompt_version=1,
+            reading=reading(10),
+            model="m",
+            simulated=False,
+        )
+    publisher = RecordingPublisher()
+
+    await handing(pool, publisher).run(NOW)
+
+    [(_, attributes, _)] = publisher.sent
+    assert (attributes["impact_score"], attributes["prompt"]) == (3, "Rynkowy")

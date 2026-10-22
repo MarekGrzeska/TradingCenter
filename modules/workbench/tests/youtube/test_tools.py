@@ -5,24 +5,21 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import timedelta
 
 import pytest
 
 from youtube_data import store
-from youtube_data.analysis import Reading
-from youtube_data.providers.base import VideoRef
 
 from .harness import GOLD, MARKETS, Rig
 
 pytestmark = pytest.mark.db
 
-READS = {"youtube_archive_status", "recent_videos", "read_video", "read_transcript", "instrument_sentiment"}
+READS = {"youtube_archive_status", "recent_videos", "read_video", "read_transcript"}
 ADDS = {"follow_channel", "add_topic", "analyse_video"}
 EXPECTED_TOOLS = READS | ADDS | {"search_youtube"}
 
 # Characters of the serialized `list_tools()`, read by a client before every turn — the surface a conversation pays for it.
-# Measured 18 381 on 29 September 2026 for ten tools — the post archive's four were 7 771, the prediction markets' twelve
+# Measured 18 381 on 29 September 2026 for ten tools, and less since `instrument_sentiment` left — the post archive's four were 7 771, the prediction markets' twelve
 # 18 250 — with headroom of about a tenth.
 SURFACE_CEILING_CHARS = 20_500
 
@@ -68,7 +65,7 @@ async def test_the_surface_adds_and_never_removes(tools) -> None:
         assert tool.annotations is not None, tool.name
         assert tool.annotations.destructiveHint is False, tool.name
         assert (tool.annotations.readOnlyHint is False) == (tool.name in ADDS), tool.name
-    forbidden = ("remove", "delete", "unfollow", "drop", "purge")
+    forbidden = ("remove", "delete", "unfollow", "drop", "purge", "prompt")
     assert not [t.name for t in await tools.list_tools() if any(word in t.name for word in forbidden)]
 
 
@@ -99,7 +96,7 @@ async def test_a_list_carries_an_excerpt_and_never_a_transcript_and_says_which_f
 
     by_id = {film["video_id"]: film for film in listed}
     assert by_id["simfilm0001"]["impact_score"] == 6 and by_id["simfilm0001"]["simulated"] is True
-    assert by_id["simfilm0001"]["instruments"] == ["Gold bullish 4/5 swing"]
+    assert by_id["simfilm0001"]["prompt"] == "Rynkowy"
     assert by_id["simfilm0008"]["impact_score"] is None and by_id["simfilm0008"]["summary"] is None
     assert all("transcript" not in film and "content" not in film for film in listed)
 
@@ -110,8 +107,9 @@ async def test_a_film_is_read_whole_without_its_words_and_an_unknown_one_says_wh
     film = await call(tools, "read_video", video_id="simfilm0001")
     unknown = await call(tools, "read_video", video_id="nothing")
 
-    assert film["reading"]["predictions"][0]["claim"].startswith("cena")
-    assert "text" not in film and "content" not in film
+    (reading,) = film["readings"]
+    assert reading["prompt"] == "Rynkowy" and "cena" in reading["text"] and reading["text_cut"] is False
+    assert "content" not in film
     assert "refused" in unknown and "recent_videos" in unknown["do_first"]
 
 
@@ -126,44 +124,6 @@ async def test_the_words_come_a_page_at_a_time_and_are_marked_as_a_strangers(too
     assert "refused" in refusal
 
 
-async def _stored_view(rig: Rig, video_id: str, sentiment: str, conviction: int) -> None:
-    ref = VideoRef(
-        video_id=video_id,
-        channel_id="UC1",
-        channel_title="A Channel",
-        title=f"film {video_id}",
-        published_at=rig.clock.now() - timedelta(hours=3),
-    )
-    reading = Reading.model_validate(
-        {
-            "summary_pl": "x",
-            "key_points": [],
-            "instruments": [
-                {"name": "Gold", "epic": "XAUUSD", "sentiment": sentiment, "conviction": conviction, "horizon": "swing"}
-            ],
-            "predictions": [],
-            "topics": [],
-            "impact_score": 4,
-        }
-    )
-    async with rig.pool.acquire() as conn:
-        await store.upsert_films(conn, [store.Discovery(ref, "manual", "market")])
-        await store.save_reading(conn, video_id, profile="market", reading=reading, model="m", simulated=False)
-
-
-async def test_what_channels_say_of_an_instrument_is_weighted_by_how_sure_they_sounded(tools, rig) -> None:
-    for video_id, sentiment, conviction in (("a", "bullish", 4), ("b", "bearish", 2), ("c", "neutral", 3)):
-        await _stored_view(rig, video_id, sentiment, conviction)
-
-    summary = await call(tools, "instrument_sentiment", instrument="xauusd", days=7)
-
-    assert (summary["views"], summary["bullish"], summary["bearish"], summary["neutral"]) == (3, 1, 1, 1)
-    assert summary["weighted_lean"] == pytest.approx((4 - 2) / 9, abs=0.001)
-    assert summary["lean"] == "mixed", "a lean needs to be more than a quarter of the conviction spoken"
-    assert "not a signal" in summary["note"]
-    assert (await call(tools, "instrument_sentiment", instrument="unheard-of"))["lean"] == "none"
-
-
 async def test_the_status_says_what_the_archive_is_doing_before_anyone_says_nothing_was_said(tools, rig) -> None:
     await follow_and_read(tools, rig, GOLD)
 
@@ -172,6 +132,7 @@ async def test_the_status_says_what_the_archive_is_doing_before_anyone_says_noth
     assert status["simulating"] is True and status["model_configured"] is True
     assert [c["channel_id"] for c in status["channels"]] == [GOLD]
     assert {p["role"] for p in status["providers"]} == {"source", "transcripts", "analyser"}
+    assert status["prompts"] == [{"name": "Rynkowy", "seeded": True}]
 
 
 # --- adding ---------------------------------------------------------------------------------------------------------
@@ -195,6 +156,20 @@ async def test_the_agent_meets_the_same_ceiling_the_screen_does_and_is_sent_to_t
 
     assert "ceiling" in channel["refused"] and "operator" in channel["do_first"]
     assert "ceiling" in topic["refused"] and "operator" in topic["do_first"]
+
+
+async def test_the_agent_chooses_a_prompt_by_name_and_cannot_invent_one(tools, pool) -> None:
+    from youtube_data import prompts
+
+    await prompts.create(pool, name="Technical", body="Levels only.")
+
+    chosen = await call(tools, "follow_channel", reference="@simzloto", prompt="technical")
+    unknown = await call(tools, "add_topic", phrase="gold", prompt="made up")
+
+    assert chosen["created"] is True
+    async with pool.acquire() as conn:
+        assert (await conn.fetchval("SELECT p.name FROM channels c JOIN prompts p ON p.id = c.prompt_id")) == "Technical"
+    assert "no prompt" in unknown["refused"] and "operator" in unknown["do_first"]
 
 
 async def test_a_topic_says_which_limits_it_took_from_the_settings(tools) -> None:

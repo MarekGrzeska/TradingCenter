@@ -46,12 +46,22 @@ def migrated_url(postgres_url: str) -> str:
     return postgres_url
 
 
+# The seeded prompt is the migration's and stays; every other prompt is a test's and goes with the rows that read by it.
+CLEAN = (
+    f"TRUNCATE {', '.join(TABLES)}; "
+    "DELETE FROM prompt_versions WHERE prompt_id IN (SELECT id FROM prompts WHERE NOT seeded); "
+    "DELETE FROM prompts WHERE NOT seeded; "
+    "DELETE FROM prompt_versions WHERE version > 1; "
+    "UPDATE prompts SET name = 'Rynkowy', deleted_at = NULL WHERE seeded"
+)
+
+
 @pytest.fixture
 async def db(migrated_url: str) -> AsyncIterator[asyncpg.Connection]:
     """A connection to the migrated database, with the tables emptied first."""
     conn = await asyncpg.connect(asyncpg_dsn(migrated_url))
     try:
-        await conn.execute(f"TRUNCATE {', '.join(TABLES)}")
+        await conn.execute(CLEAN)
         yield conn
     finally:
         await conn.close()
@@ -81,7 +91,7 @@ async def pool(migrated_url: str):
 
     async with make_pool(migrated_url, max_size=5) as created:
         async with created.acquire() as conn:
-            await conn.execute(f"TRUNCATE {', '.join(TABLES)}")
+            await conn.execute(CLEAN)
         yield created
 
 

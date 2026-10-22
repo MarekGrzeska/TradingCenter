@@ -7,14 +7,15 @@ from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query, Request, status
 
-from .. import store, views, watchlist
+from .. import prompts, store, views, watchlist
 from ..contract import (
     AnalyseIn,
     Problem,
     QueuedOut,
+    ReadIn,
     StateOut,
     TranscriptPageOut,
-    VideoOut,
+    VideoDetailOut,
     VideosOut,
 )
 from ..models import STATES
@@ -41,7 +42,6 @@ async def videos(
     until: datetime | None = Query(default=None),
     channel_id: str | None = Query(default=None),
     topic_id: int | None = Query(default=None),
-    instrument: str | None = Query(default=None, description="a name or ticker a reading mentions"),
     min_score: int | None = Query(default=None, ge=1, le=10),
     state: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=MAX_LIMIT),
@@ -62,20 +62,19 @@ async def videos(
             end=end,
             channel_id=channel_id,
             topic_id=topic_id,
-            instrument=instrument,
             min_score=min_score,
             state=state,
             limit=limit,
         )
 
 
-@router.get("/videos/{video_id}", response_model=VideoOut, responses={404: {"model": Problem}})
-async def video(request: Request, video_id: str) -> VideoOut:
+@router.get("/videos/{video_id}", response_model=VideoDetailOut, responses={404: {"model": Problem}})
+async def video(request: Request, video_id: str) -> VideoDetailOut:
     async with connection(request.app.state.pool) as conn:
         found = await store.get_film(conn, video_id)
     if found is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, detail=Problem(detail=f"no film {video_id!r}").model_dump())
-    return VideoOut.of(found)
+    return VideoDetailOut.of(found)
 
 
 @router.get(
@@ -116,12 +115,36 @@ async def analyse(request: Request, body: AnalyseIn) -> QueuedOut:
     loop's next pass. Costs what asking the source about it costs; the answer does not wait for the reading."""
     state = request.app.state
     try:
-        queued = await watchlist.analyse_film(state.pool, state.providers, state.settings, body.reference)
+        queued = await watchlist.analyse_film(
+            state.pool, state.providers, state.settings, body.reference, prompt=body.prompt_id
+        )
     except WatchlistRefused as err:
         raise _refuse(str(err)) from err
     if queued.process and getattr(state, "ingest", None) is not None:
         state.ingest.start_now(queued.video_id)
     return QueuedOut(video_id=queued.video_id, title=queued.title, created=queued.created)
+
+
+@router.post(
+    "/videos/{video_id}/readings",
+    response_model=QueuedOut,
+    status_code=status.HTTP_202_ACCEPTED,
+    responses={422: {"model": Problem}},
+)
+async def read_again(request: Request, video_id: str, body: ReadIn) -> QueuedOut:
+    """Read a film already transcribed once more, by another prompt, in the background. Asks Gemini for nothing; spends the
+    day's tokens like any reading, and leaves the film where it is."""
+    state = request.app.state
+    try:
+        prompt_id = await prompts.order_reading(state.pool, state.settings, state.providers.clock, video_id, body.prompt_id)
+    except prompts.PromptRefused as err:
+        raise _refuse(str(err)) from err
+    if getattr(state, "ingest", None) is not None:
+        state.ingest.start_reading(video_id, prompt_id)
+    async with connection(state.pool) as conn:
+        found = await store.get_video(conn, video_id)
+    assert found is not None
+    return QueuedOut(video_id=video_id, title=found.title, created=False)
 
 
 def _telling(announcer) -> bool:

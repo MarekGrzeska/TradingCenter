@@ -5,6 +5,8 @@ from __future__ import annotations
 CHANNEL_ID = "UC" + "a" * 22
 OTHER_CHANNEL_ID = "UC" + "b" * 22
 VIDEO_ID = "dQw4w9WgXcQ"
+# The prompt the migration seeds: the first row of `prompts`, and the one every test that names none reads by.
+SEEDED_PROMPT_ID = 1
 
 
 def api_video(video_id: str = VIDEO_ID, **overrides) -> dict:

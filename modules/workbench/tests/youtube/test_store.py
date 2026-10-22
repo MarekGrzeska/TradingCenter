@@ -12,6 +12,8 @@ from youtube_data.analysis import Reading
 from youtube_data.providers.base import ChannelInfo, VideoRef
 from youtube_data.store import Discovery, ProviderState
 
+from .builders import SEEDED_PROMPT_ID
+
 pytestmark = pytest.mark.db
 
 NOW = datetime(2026, 9, 27, 8, 0, tzinfo=UTC)
@@ -29,14 +31,14 @@ def film(video_id: str = "v1", **overrides) -> VideoRef:
 
 
 def discovery(video_id: str = "v1", origin: str = "channel:UC1", **overrides) -> Discovery:
-    return Discovery(film(video_id, **overrides), origin, "market")
+    return Discovery(film(video_id, **overrides), origin, SEEDED_PROMPT_ID)
 
 
 async def test_following_a_channel_twice_keeps_what_the_operator_set(db) -> None:
     info = ChannelInfo(channel_id="UC1", title="A Channel")
-    first = await store.add_channel(db, info, language="pl", profile="market", added_by="operator")
+    first = await store.add_channel(db, info, language="pl", prompt_id=SEEDED_PROMPT_ID, added_by="operator")
 
-    again = await store.add_channel(db, info, language="", profile="market", added_by="agent")
+    again = await store.add_channel(db, info, language="", prompt_id=SEEDED_PROMPT_ID, added_by="agent")
 
     assert again == first
     assert again.language == "pl" and again.added_by == "operator"
@@ -44,7 +46,7 @@ async def test_following_a_channel_twice_keeps_what_the_operator_set(db) -> None
 
 async def test_pausing_a_channel_is_not_removing_it(db) -> None:
     info = ChannelInfo(channel_id="UC1", title="A Channel")
-    await store.add_channel(db, info, language="", profile="market", added_by="operator")
+    await store.add_channel(db, info, language="", prompt_id=SEEDED_PROMPT_ID, added_by="operator")
 
     paused = await store.update_channel(db, "UC1", active=False)
 
@@ -95,8 +97,11 @@ async def test_only_films_whose_length_is_known_and_out_of_bounds_are_dropped(db
     assert {row["video_id"] for row in await db.fetch("SELECT video_id FROM videos")} == {"fine", "unknown", "live"}
 
     await db.execute("UPDATE videos SET duration_seconds = 30 WHERE video_id = 'unknown'")
-    await db.execute("INSERT INTO videos (video_id, title, published_at, origins, state, skip_reason) "
-                     "VALUES ('old', 'x', now(), ARRAY['manual'], 'skipped', 'older version')")
+    await db.execute(
+        "INSERT INTO videos (video_id, title, published_at, origins, state, skip_reason, prompt_id) "
+        "VALUES ('old', 'x', now(), ARRAY['manual'], 'skipped', 'older version', $1)",
+        SEEDED_PROMPT_ID,
+    )
 
     assert await store.drop_unwanted(db, minimum=60, maximum=10_800) == 2
 
@@ -117,28 +122,66 @@ async def test_the_queue_holds_what_is_due_and_not_what_is_live_or_finished(db) 
     assert sorted(later) == ["ready", "waiting"]
 
 
-async def test_a_reading_overwrites_the_last_one_and_names_its_instruments_in_lower_case(db) -> None:
+async def test_a_reading_overwrites_the_last_one_by_the_same_prompt_and_sits_beside_another_prompts(db) -> None:
     await store.upsert_films(db, [discovery()])
-    reading = Reading.model_validate(
-        {
-            "summary_pl": "x",
-            "key_points": [],
-            "instruments": [{"name": "Gold", "epic": "XAUUSD", "sentiment": "bullish", "conviction": 3, "horizon": "swing"}],
-            "predictions": [],
-            "topics": [],
-            "impact_score": 4,
-        }
-    )
+    other = await store.create_prompt(db, name="Technical", body="Levels only.")
+    reading = Reading(summary_pl="x", text="## Tezy\n- a", impact_score=4)
 
-    await store.save_reading(db, "v1", profile="market", reading=reading, model="m1", simulated=False)
     await store.save_reading(
-        db, "v1", profile="market", reading=reading.model_copy(update={"impact_score": 8}), model="m2", simulated=True
+        db, "v1", prompt_id=SEEDED_PROMPT_ID, prompt_version=1, reading=reading, model="m1", simulated=False
     )
+    await store.save_reading(
+        db,
+        "v1",
+        prompt_id=SEEDED_PROMPT_ID,
+        prompt_version=2,
+        reading=reading.model_copy(update={"impact_score": 8}),
+        model="m2",
+        simulated=True,
+    )
+    await store.save_reading(db, "v1", prompt_id=other.id, prompt_version=1, reading=reading, model="m3", simulated=False)
 
-    rows = await db.fetch("SELECT impact_score, model, instruments, simulated FROM readings")
-    assert len(rows) == 1
-    assert (rows[0]["impact_score"], rows[0]["model"], rows[0]["simulated"]) == (8, "m2", True)
-    assert rows[0]["instruments"] == ["gold", "xauusd"]
+    rows = await db.fetch("SELECT prompt_id, prompt_version, impact_score, model, simulated FROM readings ORDER BY model")
+    assert [(r["prompt_id"], r["prompt_version"], r["impact_score"], r["model"], r["simulated"]) for r in rows] == [
+        (SEEDED_PROMPT_ID, 2, 8, "m2", True),
+        (other.id, 1, 4, "m3", False),
+    ]
+
+
+async def test_a_film_moves_on_only_by_the_reading_of_its_own_prompt(db) -> None:
+    await store.upsert_films(db, [discovery()])
+    await db.execute("UPDATE videos SET state = 'transcribed'")
+    other = await store.create_prompt(db, name="Technical", body="Levels only.")
+    reading = Reading(summary_pl="x", text="t", impact_score=4)
+
+    await store.save_reading(db, "v1", prompt_id=other.id, prompt_version=1, reading=reading, model="m", simulated=False)
+    assert (await store.get_video(db, "v1")).state == "transcribed"  # type: ignore[union-attr]
+
+    await store.save_reading(
+        db, "v1", prompt_id=SEEDED_PROMPT_ID, prompt_version=1, reading=reading, model="m", simulated=False
+    )
+    assert (await store.get_video(db, "v1")).state == "analysed"  # type: ignore[union-attr]
+
+
+async def test_a_list_carries_no_text_and_one_film_carries_every_reading_the_films_own_first(db) -> None:
+    await store.upsert_films(db, [discovery()])
+    other = await store.create_prompt(db, name="Technical", body="Levels only.")
+    for prompt_id, text in ((other.id, "levels"), (SEEDED_PROMPT_ID, "theses")):
+        await store.save_reading(
+            db,
+            "v1",
+            prompt_id=prompt_id,
+            prompt_version=1,
+            reading=Reading(summary_pl="s", text=text, impact_score=3),
+            model="m",
+            simulated=False,
+        )
+
+    (listed,) = await store.list_films(db, start=NOW - timedelta(days=1), end=NOW, limit=10)
+    one = await store.get_film(db, "v1")
+
+    assert listed.reading is not None and "text" not in listed.reading.result
+    assert one is not None and [r.result["text"] for r in one.readings] == ["theses", "levels"]
 
 
 async def test_usage_adds_up_within_a_day_and_keeps_days_apart(db) -> None:
