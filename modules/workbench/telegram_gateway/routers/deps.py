@@ -15,14 +15,20 @@ from tc_runtime.db import Conn
 
 from ..contract import Problem
 from ..errors import (
+    AmbiguousBot,
     Blocked,
     CreatingBotsUnavailable,
     CreatorBotUnreadable,
     DestinationNotReady,
     GatewayError,
+    LoginNotInProgress,
+    LoginRefused,
+    LoginUnavailable,
     MessageTooLong,
+    NoBotForRecipient,
     NoSuchDestination,
     RateLimited,
+    SessionRejected,
     TelegramRefused,
     TelegramUnreachable,
     TooManyBots,
@@ -36,9 +42,15 @@ ACQUIRE_TIMEOUT_SECONDS = 5.0
 # the number: 502 for "Telegram said no" separates a bad request here from a bad answer there.
 _STATUS: tuple[tuple[type[GatewayError], int, str, bool], ...] = (
     (NoSuchDestination, status.HTTP_404_NOT_FOUND, "request", False),
+    (NoBotForRecipient, status.HTTP_404_NOT_FOUND, "request", False),
+    (AmbiguousBot, status.HTTP_409_CONFLICT, "request", False),
     (DestinationNotReady, status.HTTP_409_CONFLICT, "module", False),
     (Blocked, status.HTTP_409_CONFLICT, "telegram", False),
     (MessageTooLong, status.HTTP_422_UNPROCESSABLE_CONTENT, "request", False),
+    (LoginUnavailable, status.HTTP_501_NOT_IMPLEMENTED, "module", False),
+    (LoginNotInProgress, status.HTTP_409_CONFLICT, "module", False),
+    (LoginRefused, status.HTTP_409_CONFLICT, "telegram", False),
+    (SessionRejected, status.HTTP_409_CONFLICT, "telegram", False),
     (RateLimited, status.HTTP_429_TOO_MANY_REQUESTS, "telegram", True),
     (TooManyBots, status.HTTP_409_CONFLICT, "module", False),
     # Not 500: this deployment cannot create bots at all, which is a configuration the module

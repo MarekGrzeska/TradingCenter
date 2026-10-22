@@ -1,19 +1,19 @@
-"""Telling the operator about a post worth waking them for.
+"""Telling the alerts package about a post the model has read.
 
-Two rules shape this file, and both come from the gateway keeping no history of what it sent. The
-marker is written **after** a success, never before — so a failed delivery leaves the post waiting
-and the next collection pass tries again, which is the whole retry mechanism this system has. And a
-post with no reading is never announced: an absent score is not a low one, and "just in case" would
-turn the threshold into its opposite exactly where this module knows least.
+This package no longer decides whether a post is worth waking anybody for, nor whom: it says that a post was read, with what
+the model made of it, and the operator's rules in `/alerts` do the rest. What stays here is the part that has to be right
+on this side: a post is handed over **once**, the marker is written only **after** the alerts package has accepted it — so a
+refusal leaves the post waiting and the next collection pass tries again, which is the whole retry mechanism — and a post
+with no reading is never handed over, because an absent score is not a low one.
 
-The price is named rather than hidden: a delivery that succeeded and whose marker did not get
-written announces the post a second time. A repeated notification is cheaper than a lost one, and
-the other choice would need the gateway to remember messages.
+Handing over twice is harmless: the alerts package takes the same post, by its id, as the same event.
 """
 
 from __future__ import annotations
 
 import logging
+import re
+import time
 from datetime import UTC, datetime
 
 import httpx
@@ -23,49 +23,68 @@ from .models import Post
 
 log = logging.getLogger(__name__)
 
-# How many posts one pass may announce. A day that produces forty alerts is a day the operator
-# stops reading them, and the rest are still there on the next pass.
-BATCH_LIMIT = 10
+# How many posts one pass may hand over. The rest are still there on the next pass.
+BATCH_LIMIT = 50
+# How long a post the alerts package refused is passed over, so a few refused ones cannot hold up every post behind them.
+SULK_SECONDS = 600.0
 
-# Telegram's own ceiling is 4096 and the gateway refuses rather than truncating, so the excerpt is
-# cut here — where the cut can be marked as one.
+# Telegram's own ceiling is 4096 and the door refuses rather than truncating, so the excerpt is cut here — where the cut
+# can be marked as one.
 EXCERPT_CHARS = 900
 
+EVENT_TYPE = "social.post.read"
+EVENT_DESCRIPTION = "A post the model read, with its impact score and topics"
+EVENT_SCHEMA = {
+    "type": "object",
+    "description": "`text` is the ready message: impact score and author, the post itself in Polish when it was translated (the original when not), its topics and the link.",
+    "properties": {
+        "author": {"type": "string", "x-seen-values": True},
+        "author_slug": {"type": "string"},
+        "impact_score": {"type": "integer"},
+        "topics": {"type": "array", "items": {"type": "string"}},
+        "url": {"type": "string"},
+        "translated": {"type": "boolean"},
+    },
+}
 
-class GatewayRefused(Exception):
-    """The gateway answered, and the answer was a refusal — an unknown destination, a rate limit,
-    a recipient who blocked the bot. Never read as "delivered"."""
+
+class Rejected(Exception):
+    """The alerts package answered, and the answer was no. Never read as 'handed over'."""
 
 
-class GatewayUnreachable(Exception):
-    """The gateway did not answer at all."""
+class Unreachable(Exception):
+    """The alerts package did not answer at all."""
 
 
-
-class Gateway:
-    """The one route this module calls on telegram-gateway. It does not read the gateway's other
-    routes: creating a bot and binding a destination are the operator's, through their own screen.
-
-    The client is the host's, over the gateway's application in this process, so the gateway's refusals
-    and its caller record read here exactly as they did over HTTP."""
+class Publisher:
+    """The two routes this package calls on the alerts package: announce what it can say, and say it. The client is the
+    host's, over the package's application in this process, so its refusals and its caller record read here exactly as they
+    would over HTTP."""
 
     def __init__(self, client: httpx.AsyncClient) -> None:
         self._client = client
 
-    async def send(self, *, destination: str, text: str) -> None:
+    async def announce(self) -> None:
         try:
-            response = await self._client.post(
-                "/messages", json={"destination": destination, "text": text}
+            response = await self._client.put(
+                f"/event-types/{EVENT_TYPE}", json={"description": EVENT_DESCRIPTION, "schema": EVENT_SCHEMA}
             )
         except httpx.RequestError as err:
-            raise GatewayUnreachable(f"the gateway did not answer: {err}") from err
+            raise Unreachable(f"the alerts package did not answer: {err}") from err
         if response.is_error:
-            raise GatewayRefused(f"the gateway refused: {_detail(response)}")
+            raise Rejected(f"the alerts package refused the announcement: {_detail(response)}")
+
+    async def publish(self, *, source_key: str, attributes: dict, text: str) -> None:
+        body = {"type": EVENT_TYPE, "source_key": source_key, "attributes": attributes, "text": text}
+        try:
+            response = await self._client.post("/events", json=body)
+        except httpx.RequestError as err:
+            raise Unreachable(f"the alerts package did not answer: {err}") from err
+        if response.is_error:
+            raise Rejected(f"the alerts package refused the event: {_detail(response)}")
 
 
 def _detail(response: httpx.Response) -> str:
-    """The gateway's own words, kept whole — they carry the wait on a rate limit and the reason on
-    a block, which is what makes this log worth reading."""
     try:
         body = response.json()
     except ValueError:
@@ -74,6 +93,24 @@ def _detail(response: httpx.Response) -> str:
     if isinstance(detail, dict):
         return str(detail.get("detail") or detail)
     return str(detail or body)
+
+
+def slug(text: str) -> str:
+    """A name as one word of an attribute a rule can match: lowercase letters, digits, `_` and `-`. Whatever else it holds
+    becomes a dash, and a name with nothing usable in it is still a word."""
+    cleaned = re.sub(r"[^a-z0-9_-]+", "-", text.lower()).strip("-_")[:60]
+    return cleaned or "unknown"
+
+
+def attributes_of(post: Post) -> dict:
+    return {
+        "author": post.author,
+        "author_slug": slug(post.author),
+        "impact_score": post.impact_score,
+        "topics": list(post.topics),
+        "url": post.url or "",
+        "translated": post.translated_content is not None,
+    }
 
 
 def message(post: Post) -> str:
@@ -106,59 +143,69 @@ def message(post: Post) -> str:
 
 
 class Alerts:
-    """The pass that says what is worth saying. Runs after enrichment in the same round, because a
-    post is only a candidate once a model has read it."""
+    """The pass that hands over what was read. Runs after enrichment in the same round, because a post is only worth handing
+    over once a model has read it."""
 
-    def __init__(
-        self,
-        pool,
-        gateway: Gateway,
-        *,
-        destination: str,
-        min_score: int,
-        batch_limit: int = BATCH_LIMIT,
-    ) -> None:
+    def __init__(self, pool, publisher: Publisher, *, batch_limit: int = BATCH_LIMIT) -> None:
         self._pool = pool
-        self._gateway = gateway
-        self._destination = destination
-        self._min_score = min_score
+        self._publisher = publisher
         self._limit = batch_limit
+        self._announced = False
+        # What the alerts package last said: it did not take the posts. `/state` reports it.
+        self.failing = False
+        self._sulking: dict[int, float] = {}
+
+    @property
+    def telling(self) -> bool:
+        return not self.failing
+
+    async def announce_types(self) -> None:
+        """Best effort at start: a package that cannot be reached now learns it from the first pass."""
+        try:
+            await self._publisher.announce()
+            self._announced = True
+        except (Rejected, Unreachable) as err:
+            log.info("could not announce %s yet: %s", EVENT_TYPE, err)
 
     async def run(self, since: datetime) -> int:
-        """How many posts were announced this pass. One failure costs that post only — and costs it
-        nothing permanent, because the post keeps no marker and comes back next round."""
+        """How many posts were handed over this pass. One failure costs that post only — and costs it nothing permanent,
+        because the post keeps no marker and comes back next round."""
+        if not self._announced:
+            await self.announce_types()
+            if not self._announced:
+                self.failing = True
+                return 0
+        clock = time.monotonic()
+        self._sulking = {post: until for post, until in self._sulking.items() if until > clock}
         async with self._pool.acquire() as conn:
-            waiting = await store.posts_awaiting_notification(
-                conn, since=since, min_score=self._min_score, limit=self._limit
-            )
-        sent = 0
+            fetched = await store.posts_awaiting_notification(conn, since=since, limit=self._limit + len(self._sulking))
+        waiting = [post for post in fetched if post.id not in self._sulking][: self._limit]
+        handed = 0
+        failed = False
         for post in waiting:
             try:
-                await self._gateway.send(destination=self._destination, text=message(post))
-            except (GatewayRefused, GatewayUnreachable) as err:
-                # No marker, so the next pass tries again. Named at warning rather than swallowed:
-                # a gateway refusing everything is a silence the operator has to be able to find.
-                log.warning("could not announce post %s: %s", post.id, err)
+                await self._publisher.publish(source_key=str(post.id), attributes=attributes_of(post), text=message(post))
+            except (Rejected, Unreachable) as err:
+                # No marker, so the next pass tries again. Named at warning rather than swallowed: an alerts package
+                # refusing everything is a silence the operator has to be able to find.
+                log.warning("could not hand over post %s: %s", post.id, err)
+                failed = True
+                if isinstance(err, Rejected):
+                    self._sulking[post.id] = clock + SULK_SECONDS
                 continue
             async with self._pool.acquire() as conn:
                 await store.mark_notified(conn, post.id, at=datetime.now(UTC))
-            sent += 1
-        return sent
+            handed += 1
+        self.failing = failed
+        return handed
 
 
-def build(pool, settings, gateway: httpx.AsyncClient | None) -> Alerts | None:
-    """The alerting this deployment is configured for, or `None`.
+def build(pool, settings, alerts: httpx.AsyncClient | None) -> Alerts | None:
+    """The hand-over this deployment is configured for, or `None`.
 
-    `None` is a supported state, and the reason it is a return value rather than a refusal is the
-    one `enrichment.build` gives: without a destination the module collects and reads normally and
-    says nothing, which `/state` reports rather than leaving anybody to guess at.
-    """
-    if settings.alert_destination is None or gateway is None:
-        log.info("no telegram destination is configured — posts will be collected and nobody told")
+    `None` only where there is no alerts package in the process (standalone, or a host that did not hand one in): posts are
+    collected and read, and `/state` says nobody is told."""
+    if alerts is None:
+        log.info("no alerts package — posts will be collected and nobody told")
         return None
-    return Alerts(
-        pool,
-        Gateway(gateway),
-        destination=settings.alert_destination,
-        min_score=settings.alert_min_impact_score,
-    )
+    return Alerts(pool, Publisher(alerts))

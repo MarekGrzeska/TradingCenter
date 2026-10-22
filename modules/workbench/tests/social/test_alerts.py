@@ -1,7 +1,7 @@
-"""What gets said, and what happens when saying it fails.
+"""What gets handed over, and what happens when handing over fails.
 
-The rule with the quiet failure is the marker: written after a success and only then, because the
-gateway keeps no history and this column is both the deduplication and the whole retry mechanism.
+The rule with the quiet failure is the marker: written after the alerts package has accepted the post and only then,
+because this column is both the deduplication and the whole retry mechanism.
 """
 
 from __future__ import annotations
@@ -12,7 +12,15 @@ import httpx
 import pytest
 
 from social_data import alerts, store
-from social_data.alerts import Alerts, GatewayRefused, GatewayUnreachable
+from social_data.alerts import (
+    EVENT_TYPE,
+    Alerts,
+    Publisher,
+    Rejected,
+    Unreachable,
+    attributes_of,
+    slug,
+)
 from social_data.ingest import Ingest
 
 from .builders import TRUTH_SOCIAL, raw_post
@@ -23,15 +31,22 @@ pytestmark = pytest.mark.db
 SINCE = datetime.now(UTC) - timedelta(hours=24)
 
 
-class RecordingGateway:
-    """The gateway as this module uses it: one call, and whatever it was told to do with it."""
+class RecordingPublisher:
+    """The alerts package as this module uses it: an announcement, an event, and whatever it was told to do with them."""
 
-    def __init__(self, fails: Exception | None = None) -> None:
+    def __init__(self, fails: Exception | None = None, refuses_announcing: bool = False) -> None:
         self._fails = fails
-        self.sent: list[tuple[str, str]] = []
+        self.refuses_announcing = refuses_announcing
+        self.announced = 0
+        self.sent: list[tuple[str, dict, str]] = []
 
-    async def send(self, *, destination: str, text: str) -> None:
-        self.sent.append((destination, text))
+    async def announce(self) -> None:
+        self.announced += 1
+        if self.refuses_announcing:
+            raise Unreachable("no answer")
+
+    async def publish(self, *, source_key: str, attributes: dict, text: str) -> None:
+        self.sent.append((source_key, attributes, text))
         if self._fails is not None:
             raise self._fails
 
@@ -50,77 +65,114 @@ async def _post(pool, external_id: str, *, score: int | None, content: str = "TA
     return stored.id
 
 
-def _alerts(pool, gateway, *, min_score: int = 8) -> Alerts:
-    return Alerts(pool, gateway, destination="operator", min_score=min_score)  # type: ignore[arg-type]
+def _alerts(pool, publisher) -> Alerts:
+    return Alerts(pool, publisher)  # type: ignore[arg-type]
 
 
-async def test_a_post_over_the_threshold_is_announced_once(pool) -> None:
+async def test_a_post_is_handed_over_once_with_what_a_rule_filters_by(pool) -> None:
     post_id = await _post(pool, "loud", score=9)
-    gateway = RecordingGateway()
-    announcing = _alerts(pool, gateway)
+    publisher = RecordingPublisher()
+    handing = _alerts(pool, publisher)
 
-    assert await announcing.run(SINCE) == 1
-    assert await announcing.run(SINCE) == 0
+    assert await handing.run(SINCE) == 1
+    assert await handing.run(SINCE) == 0
 
-    [(destination, text)] = gateway.sent
-    assert destination == "operator"
+    [(key, attributes, text)] = publisher.sent
+    assert key == str(post_id)
+    assert (attributes["author_slug"], attributes["impact_score"], attributes["topics"]) == (
+        "realdonaldtrump",
+        9,
+        ["tariffs"],
+    )
     assert "9/10" in text
     async with pool.acquire() as conn:
-        assert await store.post_by_external_id(conn, TRUTH_SOCIAL, "loud") is not None
         assert await conn.fetchval("SELECT notified_at FROM posts WHERE id = $1", post_id)
 
 
-async def test_a_post_under_the_threshold_is_not_announced(pool) -> None:
+async def test_a_post_of_any_score_is_handed_over_because_the_threshold_is_a_rule_now(pool) -> None:
     await _post(pool, "quiet", score=3)
-    gateway = RecordingGateway()
+    publisher = RecordingPublisher()
 
-    assert await _alerts(pool, gateway).run(SINCE) == 0
-    assert gateway.sent == []
+    assert await _alerts(pool, publisher).run(SINCE) == 1
+    assert publisher.sent[0][1]["impact_score"] == 3
 
 
-async def test_a_post_no_model_has_read_is_not_announced(pool) -> None:
-    """An absent score is not a low one. Announcing it "just in case" would turn the threshold
-    into its opposite in the state this module knows least about."""
+async def test_a_post_no_model_has_read_is_not_handed_over(pool) -> None:
+    """An absent score is not a low one. Handing it over "just in case" would let it through every rule's threshold in the
+    state this module knows least about."""
     await _post(pool, "unread", score=None)
-    gateway = RecordingGateway()
+    publisher = RecordingPublisher()
 
-    assert await _alerts(pool, gateway).run(SINCE) == 0
-    assert gateway.sent == []
+    assert await _alerts(pool, publisher).run(SINCE) == 0
+    assert publisher.sent == []
 
 
 @pytest.mark.parametrize(
     "failure",
-    [GatewayRefused("the gateway refused: rate limited, 42s"), GatewayUnreachable("no answer")],
+    [Rejected("the alerts package refused the event: no type"), Unreachable("no answer")],
     ids=["refused", "unreachable"],
 )
-async def test_a_failed_delivery_leaves_no_marker_and_the_next_pass_retries(
+async def test_a_failed_hand_over_leaves_no_marker_and_the_next_pass_retries(
     pool, failure: Exception
 ) -> None:
     post_id = await _post(pool, "loud", score=9)
-    failing = RecordingGateway(fails=failure)
+    failing = RecordingPublisher(fails=failure)
+    handing = _alerts(pool, failing)
 
-    assert await _alerts(pool, failing).run(SINCE) == 0
+    assert await handing.run(SINCE) == 0
+    assert handing.telling is False
     async with pool.acquire() as conn:
         assert await conn.fetchval("SELECT notified_at FROM posts WHERE id = $1", post_id) is None
 
-    working = RecordingGateway()
+    working = RecordingPublisher()
     assert await _alerts(pool, working).run(SINCE) == 1
     assert len(working.sent) == 1
+
+
+async def test_a_post_the_alerts_package_refused_does_not_hold_up_the_posts_behind_it(pool) -> None:
+    await _post(pool, "first", score=9)
+    await _post(pool, "second", score=10)
+
+    class RefusesTheFirst(RecordingPublisher):
+        async def publish(self, *, source_key: str, attributes: dict, text: str) -> None:
+            await super().publish(source_key=source_key, attributes=attributes, text=text)
+            if len(self.sent) == 1:
+                raise Rejected("does not fit")
+
+    publisher = RefusesTheFirst()
+    handing = Alerts(pool, publisher, batch_limit=1)  # type: ignore[arg-type]
+
+    assert await handing.run(SINCE) == 0
+    assert await handing.run(SINCE) == 1
+    assert len({key for key, _, _ in publisher.sent}) == 2
 
 
 async def test_one_post_failing_does_not_stop_the_rest(pool) -> None:
     await _post(pool, "first", score=9)
     await _post(pool, "second", score=10)
 
-    class FailsTheFirst(RecordingGateway):
-        async def send(self, *, destination: str, text: str) -> None:
-            self.sent.append((destination, text))
+    class FailsTheFirst(RecordingPublisher):
+        async def publish(self, *, source_key: str, attributes: dict, text: str) -> None:
+            self.sent.append((source_key, attributes, text))
             if len(self.sent) == 1:
-                raise GatewayUnreachable("no answer")
+                raise Unreachable("no answer")
 
-    gateway = FailsTheFirst()
-    assert await _alerts(pool, gateway).run(SINCE) == 1
-    assert len(gateway.sent) == 2
+    publisher = FailsTheFirst()
+    assert await _alerts(pool, publisher).run(SINCE) == 1
+    assert len(publisher.sent) == 2
+
+
+async def test_nothing_is_handed_over_until_the_type_is_announced_and_the_state_says_so(pool) -> None:
+    await _post(pool, "loud", score=9)
+    publisher = RecordingPublisher(refuses_announcing=True)
+    handing = _alerts(pool, publisher)
+
+    assert await handing.run(SINCE) == 0
+
+    assert publisher.sent == [] and handing.telling is False
+    publisher.refuses_announcing = False
+    assert await handing.run(SINCE) == 1
+    assert handing.telling is True
 
 
 def test_the_message_carries_the_reading_and_where_to_read_the_rest() -> None:
@@ -216,21 +268,15 @@ class TestTheMessageSpeaksPolish:
 
 
 class TestBuild:
-    def test_no_destination_is_a_supported_state(self, pool, settings) -> None:
-        assert alerts.build(pool, settings, httpx.AsyncClient()) is None
+    def test_no_alerts_package_is_a_supported_state(self, pool, settings) -> None:
+        """Standalone, with no host to hand the package in: nobody can be told, and the module collects anyway."""
+        assert alerts.build(pool, settings, None) is None
 
-    def test_a_destination_without_the_door_tells_nobody(self, pool, settings) -> None:
-        """Standalone, with no host to hand the door in: the destination alone reaches nothing."""
-        configured = settings.model_copy(update={"alert_destination": "operator"})
-        assert alerts.build(pool, configured, None) is None
+    def test_with_the_package_it_is_built_and_there_is_nothing_else_to_configure(self, pool, settings) -> None:
+        assert alerts.build(pool, settings, httpx.AsyncClient()) is not None
 
-    def test_a_destination_and_the_door_are_built(self, pool, settings) -> None:
-        configured = settings.model_copy(update={"alert_destination": "operator"})
-        assert alerts.build(pool, configured, httpx.AsyncClient()) is not None
-
-    async def test_collection_is_untouched_where_there_is_no_gateway(self, pool) -> None:
-        """The rollback lever, and a supported state rather than a fault: clear the destination, and the
-        archive collects exactly as it did and says nothing."""
+    async def test_collection_is_untouched_where_there_is_no_alerts_package(self, pool) -> None:
+        """A supported state rather than a fault: the archive collects exactly as it did and says nothing."""
         source = FakeSource([raw_post("collected", minutes_ago=5)])
         collecting = Ingest(pool, [source], interval_seconds=300, window_hours=24, announce=None)
 
@@ -245,19 +291,40 @@ class TestBuild:
             ) is None
 
 
-class TestConfiguration:
-    def _settings(self, settings, **overrides):
-        from social_data.config import Settings
+class TestTheWords:
+    def test_an_author_is_one_word_of_the_attribute(self) -> None:
+        assert slug("Donald J. Trump (@realDonaldTrump)") == "donald-j-trump-realdonaldtrump"
+        assert slug("***") == "unknown"
+        assert len(slug("x" * 200)) == 60
 
-        return Settings(
-            **{
-                **settings.model_dump(),
-                **overrides,
-            },
-            _env_file=None,
-        )
+    def test_the_attributes_are_what_the_converted_rules_filter_on(self) -> None:
+        attributes = attributes_of(a_post(translated_content="Cokolwiek."))
 
-    def test_a_threshold_outside_the_reading_range_is_refused(self, settings) -> None:
-        with pytest.raises(ValueError) as err:
-            self._settings(settings, alert_min_impact_score=11)
-        assert "ALERT_MIN_IMPACT_SCORE" in str(err.value)
+        assert {"author", "author_slug", "impact_score"} <= set(attributes)
+        assert attributes["translated"] is True
+
+
+class TestThePublisher:
+    def _publisher(self, status_code: int, body: dict) -> Publisher:
+        def answer(request: httpx.Request) -> httpx.Response:
+            return httpx.Response(status_code, json=body)
+
+        return Publisher(httpx.AsyncClient(transport=httpx.MockTransport(answer), base_url="http://alerts"))
+
+    async def test_a_refusal_is_in_the_alerts_packages_own_words(self) -> None:
+        publisher = self._publisher(422, {"detail": {"detail": "nobody has announced an event type"}})
+
+        with pytest.raises(Rejected, match="nobody has announced"):
+            await publisher.publish(source_key="1", attributes={}, text="hi")
+
+    async def test_the_type_is_announced_with_its_schema(self) -> None:
+        seen: list[httpx.Request] = []
+
+        def answer(request: httpx.Request) -> httpx.Response:
+            seen.append(request)
+            return httpx.Response(204)
+
+        await Publisher(httpx.AsyncClient(transport=httpx.MockTransport(answer), base_url="http://alerts")).announce()
+
+        assert seen[0].url.path == f"/event-types/{EVENT_TYPE}"
+        assert b"author_slug" in seen[0].content

@@ -120,9 +120,9 @@ minutes on 23 September 2026; the verification in step 2 is where the stronger m
 |---|---|---|
 | A · candles | `modules/workbench/market_data` | `workbench/market_data` |
 | B · archives | `polymarket_data`, `social_data` | `workbench/polymarket_data`, `workbench/social_data` |
-| C · decisions | `strategy`, `teams`, `teams_tools` | `workbench/strategy`, `workbench/teams`, `workbench/teams_tools` |
+| C · decisions | `teams`, `teams_tools` | `workbench/teams`, `workbench/teams_tools` |
 | D · conversation | `agent`, `workbench/` (the assembly), `packages/tc-openai` | `workbench/agent`, `workbench/workbench`, `tc-openai` |
-| E · edges | `capital-gateway`, `trading-mcp`, `telegram-gateway`, `packages/tc-runtime`, `packages/tc-mcp-kit` | the same names |
+| E · edges | `capital-gateway`, `trading-mcp`, `packages/tc-runtime`, `packages/tc-mcp-kit` | the same names |
 | F · screens | `terminal`, `pocket` — and the SQL behind every poll | `terminal`, `pocket` |
 | G · process | CLAUDE.md, `docs/`, `openspec/`, `scripts/`, `.github/`, `infra/`, `.claude/`, tests, hygiene, skills | everything else, plus `metrics` |
 

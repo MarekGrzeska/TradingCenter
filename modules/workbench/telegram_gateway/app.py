@@ -8,6 +8,7 @@ lifespan is never run. `app` and `lifespan` below are what `python -m telegram_g
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -17,11 +18,13 @@ from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
 from . import mcp_app, redaction
-from .binding import Watcher
+from .account import LoginManager, TelethonPlatform
+from .binding import Watcher, backfill_identities
 from .bot_api import bot_api
 from .caller_access import RECORD, CallerAccess
 from .config import Settings
-from .routers import bots, destinations, messages, meta, state
+from .routers import account as account_routes
+from .routers import bots, messages, meta, recipients, state
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
 log = logging.getLogger(__name__)
@@ -59,24 +62,36 @@ async def serving(app: FastAPI, settings: Settings):
 
         app.state.pool = pool
         app.state.telegram = telegram
+        # Everything that speaks to Telegram as the owner account, behind one object so a test replaces one thing.
+        platform = TelethonPlatform()
+        app.state.platform = platform
+        app.state.login = LoginManager(platform.login_client)
 
         # After the migration and not before it: a bound destination is a write, and a write to a
         # schema this process does not know is not undone by a later error response.
         watcher = Watcher(pool, telegram)
         app.state.watcher = watcher
         await watcher.start()
+        # Bounded and best effort: a start that waited on Telegram would make Telegram a condition of starting.
+        try:
+            await asyncio.wait_for(backfill_identities(pool, telegram), timeout=15)
+        except (TimeoutError, OSError) as err:
+            log.info("asking Telegram who the destinations are did not finish: %s", type(err).__name__)
 
         # The tool surface's session manager: a mounted application's lifespan is never run, so the
         # task group has to be started here or every tool call fails.
         async with mcp_app.tool_surface_session(app):
             log.info(
-                "telegram-gateway is serving; creating bots is %s",
-                "available" if settings.can_create_bots else "unavailable (no account session)",
+                "telegram-gateway is serving; the owner account logs in from the terminal, and %s",
+                "login is available"
+                if settings.session_key_configured and settings.api_credentials_configured
+                else "login is unavailable (TELEGRAM_API_ID/_HASH or TELEGRAM_SESSION_KEY unset)",
             )
             try:
                 yield
             finally:
                 await watcher.stop()
+                await app.state.login.close()
 
 
 @asynccontextmanager
@@ -98,7 +113,8 @@ def create_app() -> FastAPI:
     app.include_router(state.router)
     app.include_router(messages.router)
     app.include_router(bots.router)
-    app.include_router(destinations.router)
+    app.include_router(recipients.router)
+    app.include_router(account_routes.router)
 
     server, tool_app = mcp_app.build_mcp_app(app)
     app.state.mcp_server = server

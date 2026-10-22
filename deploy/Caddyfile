@@ -1,0 +1,110 @@
+# The only process listening on a public port. Four names, one certificate each, obtained and renewed by Caddy itself:
+#   API_HOST       the workbench (and with it every archive, under its prefix)
+#   GATEWAY_HOST   capital-gateway, which the terminal reads the account from
+#   TERMINAL_HOST  the terminal's built files
+#   POCKET_HOST    the pocket's built files
+#
+# What this file owes the applications (`vps-edge`): every request it forwards carries `X-TC-Edge`, written here and
+# overwriting whatever came in, and none carries a platform identity header. The applications read the marker as "this
+# came from outside, so it needs a token"; its absence means another service on the internal network. HTTP is redirected
+# to HTTPS by Caddy's own default for any site with a name.
+
+{
+	email {$ACME_EMAIL}
+}
+
+# Written inside every `reverse_proxy`, which is the only place the request headers of an upstream can be set.
+(edge_headers) {
+	header_up X-TC-Edge 1
+	header_up -X-MS-CLIENT-PRINCIPAL
+	header_up -X-MS-CLIENT-PRINCIPAL-ID
+	header_up -X-MS-CLIENT-PRINCIPAL-NAME
+	header_up -X-MS-CLIENT-PRINCIPAL-IDP
+}
+
+# What App Service did for the two browsers: the platform's CORS, which the applications never carried
+# (`modules/workbench/tests/test_no_cors.py`). Credentials are not supported, as before — the token is a header.
+(cors) {
+	@terminal_origin header Origin https://{$TERMINAL_HOST}
+	@pocket_origin header Origin https://{$POCKET_HOST}
+	@preflight method OPTIONS
+
+	header @terminal_origin Access-Control-Allow-Origin "https://{$TERMINAL_HOST}"
+	header @pocket_origin Access-Control-Allow-Origin "https://{$POCKET_HOST}"
+	header Vary Origin
+
+	handle @preflight {
+		header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+		header Access-Control-Allow-Headers "Authorization, Content-Type"
+		header Access-Control-Max-Age 600
+		respond 204
+	}
+}
+
+(hardening) {
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+}
+
+# Tool surfaces are for the processes themselves; nobody outside calls an MCP endpoint, so the edge does not carry one.
+(no_tool_surface) {
+	@mcp path_regexp ^(/[A-Za-z0-9_-]+)?/mcp(/.*)?$
+	respond @mcp 404
+}
+
+{$API_HOST} {
+	import hardening
+	import cors
+	import no_tool_surface
+	reverse_proxy workbench:80 {
+		import edge_headers
+		# A chat turn and a team's run stream; buffering them would hold the answer back until it ended.
+		flush_interval -1
+	}
+}
+
+{$GATEWAY_HOST} {
+	import hardening
+	import cors
+	import no_tool_surface
+
+	# The stream's door is the shared key alone, and the workbench reaches it by name inside the network; no browser
+	# does (the candle stream is the workbench's, with its own ticket). Not carried at the edge at all.
+	@stream path /ws/stream
+	respond @stream 404
+
+	reverse_proxy gateway:80 {
+		import edge_headers
+	}
+}
+
+# The page is asked for again on every visit and the hashed assets are kept for good: without this a browser keeps an
+# index.html by heuristics from Last-Modified, and a deploy reaches the screen only after a hard refresh.
+(spa_caching) {
+	@page not path /assets/*
+	header @page Cache-Control "no-cache"
+	header /assets/* Cache-Control "public, max-age=31536000, immutable"
+}
+
+{$TERMINAL_HOST} {
+	import hardening
+	import spa_caching
+	encode zstd gzip
+	root * /srv/www/terminal
+	# A single-page application: an address that is a tab's route belongs to the page, not to a file.
+	try_files {path} /index.html
+	file_server
+}
+
+{$POCKET_HOST} {
+	import hardening
+	import spa_caching
+	encode zstd gzip
+	root * /srv/www/pocket
+	try_files {path} /index.html
+	file_server
+}

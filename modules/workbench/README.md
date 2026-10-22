@@ -10,7 +10,7 @@ reason to exist was that the conversation built teams at a neighbour's address. 
 is the same behaviour with one process, one image and one App Service under it
 (`openspec/changes/agent-and-teams-one-workbench`).
 
-## The nine packages, and the rule between them
+## The ten packages, and the rule between them
 
 | Package | What |
 |---|---|
@@ -19,9 +19,10 @@ is the same behaviour with one process, one image and one App Service under it
 | `teams_tools/` | the MCP tools that build and run a team by talking, reaching the teams routes in this same process |
 | `market_data/` | the candle archive, under `/market`: what the gateway saw and does not keep, its indicators, the candle stream (the one WebSocket this process serves), the largest table here, and eleven read-only tools — its own README beside it |
 | `polymarket_data/` | the prediction-market archive, under `/polymarket`, and the only door to Polymarket. Five of its tools **write** — the watch list and its groups, never a sample; removing an observation is REST-only |
-| `social_data/` | the post archive, under `/social`: what was said, when, and what a model made of it. The door to Truth Social; **nothing on either surface writes**; a reading is stamped with its model and overwritten, never versioned; no backfill |
-| `strategy/` | the strategy platform, under `/strategy`: a strategy is a catalogue entry — declared facts, parameters, one pure `evaluate` — code in the image or an immutable revision the operator wrote. It reads the candle archive through its own application (`workbench/archive_client.py`) and **never touches an account**: it decides, teams execute |
-| `telegram_gateway/` | the one door to Telegram, under `/telegram`: two tools (send, and who can be sent to), and bots and destinations that only the operator's `az` reaches. It remembers nothing it sent — its own README beside it |
+| `social_data/` | the post archive and the news, under `/social`: what was said, when, and what a model made of it — and headlines from 15 RSS feeds with the delay each arrived with. The door to Truth Social and to those feeds; **nothing on the tool surface writes, and the one REST route that does only marks a headline to keep**; a reading is stamped with its model and overwritten, never versioned; no backfill |
+| `telegram_gateway/` | the one door to Telegram, under `/telegram`: two tools (send, and who can be sent to), and bots and destinations that only the operator's `az` reaches. It remembers nothing it sent, and decides nobody is told — its own README beside it |
+| `youtube_data/` | the YouTube archive, under `/youtube`: channels and topics the operator follows, their films, transcripts and what a model made of them. **Optional** — mounted only when `YOUTUBE_DATABASE_URL` is set; absent, the process runs without it |
+| `alerts/` | who is told what, and when, under `/alerts`: the rules the operator sets (a value a read-only tool reports crossing a level, or an event another package announced), the clock that looks, delivery through the door to Telegram with its retries and caps, and a rule from a sentence a model drafts for the operator to check. **Optional** — mounted only when `ALERTS_DATABASE_URL` is set. Two read-only tools; **no tool writes a rule** — its own README beside it |
 | `workbench/` | the assembly: one settings read, one FastAPI, one lifespan, and `root_access.py`, the caller record of the routes no package owns |
 
 **No package imports another; `workbench/` may import all of them and is the only place that may.** That is
@@ -48,27 +49,23 @@ The model can ask **market-data** for candles, coverage, indicators and levels m
 read *and move* the demo account through **trading-mcp** — positions, balance and working
 orders on the reading side, orders sent, closed, amended and cancelled on the other — and
 ask the **prediction-market archive** what a market prices an event at, of its archive or of
-the provider live, the **post archive** what was said and what a model made of it, and the
-**strategy platform** what it decided and how many setups it stands on, and send the operator a
+the provider live, the **post archive** what was said and what a model made of it, and send the operator a
 **Telegram** message. At most eight calls per turn, a number in the code rather than a setting.
 trading-mcp is configured and fails on its own: absent or unreachable, it costs the model its tools
 and nothing else.
 
-The three archives, the strategy platform and the door to Telegram are not servers any more. Since
+The three archives and the door to Telegram are not servers any more. Since
 `one-process-per-security-boundary` each is a package of this process, mounted whole under
-`/market`, `/polymarket`, `/social`, `/strategy` and `/telegram`, and its tools reach both registries as functions
+`/market`, `/polymarket`, `/social` and `/telegram` — and `/youtube`, only when its database is
+configured — and its tools reach both registries as functions
 (`workbench/local_tools.py`) — same names, descriptions, ceilings and refusals, no address, no
 identity, no session. Five of the prediction-market archive's twelve tools write, and what they
-write is a watch list and its groups, not an account; nothing on the post archive's four or the platform's
+write is a watch list and its groups, not an account; nothing on the post archive's four
 writes at all. Nothing this system does on Polymarket touches money.
 
-The post archive and the strategy platform reach the door to Telegram the way the platform reaches the
-candle archive: its own application through `httpx.ASGITransport`, as this process
-(`workbench/telegram_client.py`) — `ALERT_DESTINATION` says who is told, and unset is silence that works.
-The platform's local source is the one the teams' clock reads: `pending_setups` on the
-strategy platform is a number a trigger compares against its threshold, and it travels the
-same road as every other reading rather than a client of its own, so the woken team reads the
-very decision that woke it.
+The post archive and the YouTube archive reach the door to Telegram through the gateway's own
+application over `httpx.ASGITransport`, as this process
+(`workbench/telegram_client.py`) — they say what kind of event it is, the operator's assignments in the terminal say who is told, and a purpose nobody hears is silence that works.
 
 The **team tools** are the other source that is not on a network at all. They keep every
 name, description, ceiling and refusal they had as a module; what went is the transport.
@@ -101,7 +98,7 @@ anything at all.
 Two tools, `memory_read` and `memory_write`, announced by **a source that is this process
 itself** — no address, no identity, no session. It is the same shape as the team tools
 above, on the other surface: those join the conversation's registry, this one joins the
-teams registry beside `market-mcp`, `trading-mcp`, the two archives and the strategy platform. Announcing them touches no database
+teams registry beside `market-mcp`, `trading-mcp` and the two archives. Announcing them touches no database
 (the descriptors are constants), which is what lets the save-time paths build a registry out
 of settings alone and still publish the names; calling them needs the pool, and by then
 there is a run. Which agent may read and which may write is the mechanism that was already
@@ -115,6 +112,15 @@ way to wipe its own mistake out of the record. Three ceilings live in the code b
 `ROUND_CEILING` rather than in settings — note length (also a CHECK in migration 0008),
 notes returned per read, notes written per run — because they bound the shape in which this
 module hands anything to a model, and that is not the operator's budget to move.
+
+## Who may reach what
+
+`GET /me` answers any verified token with the person's roles. The door (`tc-entra-auth`, `workbench/edge.py`) refuses a
+person with no role on every other route, and lets a `viewer` through only on `GET` under `/social` and `/polymarket` — never
+a path with an `mcp` segment, which is how the conversation reaches the account. Every package not on that list is closed to
+a viewer by omission. `tests/test_roles.py` freezes the `GET`s of the two archives: a new one fails until somebody has read it
+as a read. Roles are Entra app roles, managed from the terminal's Users tab through Microsoft Graph with the admin's own
+token; this process holds no credential that writes the directory.
 
 ## Route surface
 

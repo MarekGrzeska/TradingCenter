@@ -80,15 +80,44 @@ const SOURCES = [
 `,
   },
   {
-    name: "strategy",
+    name: "youtube-data",
     moduleDir: resolve(terminal, "..", "workbench"),
-    pythonModule: "strategy.openapi",
-    output: join(terminal, "src", "data", "contract.strategy.generated.ts"),
+    pythonModule: "youtube_data.openapi",
+    output: join(terminal, "src", "data", "contract.youtube.generated.ts"),
     banner: `/**
  * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
  *
- * Printed from the strategy platform's models by \`python -m strategy.openapi\`. Most of what it describes is
- * a refusal: \`reason_kind\` names the layer that said no, and an optional field is \`T | null\`, never absent.
+ * Printed from the YouTube archive's models by \`python -m youtube_data.openapi\` — a package of the workbench,
+ * served under /youtube when its database is configured. Every reading field is present and null where no model has
+ * read the film, and every film says whether it is simulated.
+ */
+`,
+  },
+  {
+    name: "alerts",
+    moduleDir: resolve(terminal, "..", "workbench"),
+    pythonModule: "alerts.openapi",
+    output: join(terminal, "src", "data", "contract.alerts.generated.ts"),
+    banner: `/**
+ * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
+ *
+ * Printed from the alerts package's models by \`python -m alerts.openapi\` — a package of the workbench, served under
+ * /alerts when its database is configured. A rule is written and read in one shape, and a refusal names every field at
+ * fault in \`defects\`, so the form can put each reason beside its field.
+ */
+`,
+  },
+  {
+    name: "telegram-gateway",
+    moduleDir: resolve(terminal, "..", "workbench"),
+    pythonModule: "telegram_gateway.openapi",
+    output: join(terminal, "src", "data", "contract.telegram.generated.ts"),
+    banner: `/**
+ * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
+ *
+ * Printed from the door to Telegram's models by \`python -m telegram_gateway.openapi\`. No model here carries a bot's
+ * token or the account's session: the contract has nowhere to put one, which is the rule the whole package is arranged around.
+ */
 `,
   },
 ];

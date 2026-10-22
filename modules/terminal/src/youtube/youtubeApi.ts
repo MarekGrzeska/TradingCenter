@@ -1,0 +1,461 @@
+/**
+ * Its own client rather than a route under another module's: a different package behind a different record, so it carries a
+ * token for **its** audience. Wire shapes stay in the generated contract; this maps them to dates and to the names the screen
+ * uses. The one thing to remember about the back end: it may not be there at all — a workbench without the YouTube database
+ * answers 404 to every route here, and the view says so rather than showing an empty archive.
+ */
+
+import { noIdentity, type Identity } from "../auth/identity";
+import type { components } from "../data/contract.youtube.generated";
+import { jsonClient, statusMapper } from "../data/http";
+
+type Schemas = components["schemas"];
+
+export type FilmState = Schemas["VideoOut"]["state"];
+
+/** A model's reading of a film, without its text — a fact about what a model said, never shown without naming the prompt. */
+export interface Reading {
+  promptId: number;
+  promptName: string;
+  /** Which version of the prompt made it; the prompt's words may have changed since. */
+  promptVersion: number;
+  summary: string;
+  impactScore: number;
+  model: string;
+  analysedAt: Date;
+  simulated: boolean;
+}
+
+/** The same with the text, laid out in Markdown as its prompt asked. Only a single film carries it. */
+export interface FullReading extends Reading {
+  text: string;
+}
+
+export interface FilmDetail {
+  film: Film;
+  /** The film's own prompt's reading first. */
+  readings: FullReading[];
+}
+
+export interface Prompt {
+  id: number;
+  name: string;
+  /** The one that is always there: it can be edited and never deleted. */
+  seeded: boolean;
+  version: number;
+  body: string;
+  createdAt: Date;
+  updatedAt: Date;
+  /** The channels and the topics whose new films it reads. */
+  channels: string[];
+  topics: string[];
+}
+
+export interface PromptsPage {
+  prompts: Prompt[];
+  maxChars: number;
+  ceiling: number;
+}
+
+export interface Film {
+  videoId: string;
+  url: string;
+  title: string;
+  channelId: string | null;
+  channelTitle: string;
+  publishedAt: Date;
+  durationSeconds: number | null;
+  liveStatus: Schemas["VideoOut"]["live_status"];
+  state: FilmState;
+  skipReason: string | null;
+  attempts: number;
+  nextAttemptAt: Date | null;
+  /** Comes from the simulation: the film does not exist. */
+  simulated: boolean;
+  /** The prompt this film is read by. */
+  promptId: number;
+  /** By the film's own prompt; `null` until a model has read it — never a zero: unread and unimportant are different facts. */
+  reading: Reading | null;
+}
+
+export interface FilmsPage {
+  films: Film[];
+  windowFrom: Date;
+  windowTo: Date;
+}
+
+export interface TranscriptPage {
+  text: string;
+  language: string;
+  provider: string;
+  automatic: boolean;
+  /** The model that listened to the film; null for captions. */
+  model: string | null;
+  simulated: boolean;
+  offset: number;
+  totalChars: number;
+  nextOffset: number | null;
+}
+
+export interface Channel {
+  channelId: string;
+  title: string;
+  handle: string | null;
+  active: boolean;
+  addedBy: "operator" | "agent";
+  promptId: number;
+  lastDiscoveryAt: Date | null;
+}
+
+export interface Topic {
+  id: number;
+  phrase: string;
+  language: string;
+  intervalMinutes: number;
+  maxVideosPerRun: number;
+  active: boolean;
+  addedBy: "operator" | "agent";
+  promptId: number;
+  lastRunAt: Date | null;
+}
+
+export interface ProviderState {
+  role: Schemas["ProviderOut"]["role"];
+  name: string;
+  unit: string;
+  spentToday: number;
+  ceiling: number;
+  /** The day's ceiling is reached, so the provider is not asked until midnight UTC. */
+  exhausted: boolean;
+  /** Refused us the last time we asked and has not answered since — a fact about us, not about any film. */
+  blocked: boolean;
+  blockedReason: string | null;
+}
+
+export interface ArchiveState {
+  /** Some provider is the simulation: films may not exist. Said on the screen for as long as it is true. */
+  simulating: boolean;
+  /** False means no reading is being made, by configuration. */
+  modelConfigured: boolean;
+  /** False means nobody is told, by configuration. */
+  alertsConfigured: boolean;
+  providers: ProviderState[];
+  /** Films still on their road, by state — exact. */
+  waiting: Record<string, number>;
+  /** The loop has not completed a pass for several intervals. */
+  stale: boolean;
+  loopAgeSeconds: number | null;
+}
+
+export interface FollowResult {
+  channel: Channel;
+  created: boolean;
+}
+
+export interface TopicRequest {
+  phrase: string;
+  language?: string;
+  intervalMinutes?: number;
+  maxVideosPerRun?: number;
+  /** Absent takes the seeded prompt. */
+  promptId?: number;
+}
+
+export interface TopicResult {
+  topic: Topic;
+  created: boolean;
+  /** Which of its limits came from the settings rather than from the request. */
+  defaultsApplied: string[];
+}
+
+function optionalDate(raw: string | null | undefined): Date | null {
+  return raw ? new Date(raw) : null;
+}
+
+function mapReading(raw: Schemas["ReadingSummary"]): Reading {
+  return {
+    promptId: raw.prompt_id,
+    promptName: raw.prompt_name,
+    promptVersion: raw.prompt_version,
+    summary: raw.summary_pl,
+    impactScore: raw.impact_score,
+    model: raw.model,
+    analysedAt: new Date(raw.analysed_at),
+    simulated: raw.simulated,
+  };
+}
+
+function mapFilm(raw: Schemas["VideoOut"]): Film {
+  return {
+    videoId: raw.video_id,
+    url: raw.url,
+    title: raw.title,
+    channelId: raw.channel_id ?? null,
+    channelTitle: raw.channel_title,
+    publishedAt: new Date(raw.published_at),
+    durationSeconds: raw.duration_seconds ?? null,
+    liveStatus: raw.live_status,
+    state: raw.state,
+    skipReason: raw.skip_reason ?? null,
+    attempts: raw.attempts,
+    nextAttemptAt: optionalDate(raw.next_attempt_at),
+    simulated: raw.simulated,
+    promptId: raw.prompt_id,
+    reading: raw.reading ? mapReading(raw.reading) : null,
+  };
+}
+
+function mapPrompt(raw: Schemas["PromptOut"]): Prompt {
+  return {
+    id: raw.id,
+    name: raw.name,
+    seeded: raw.seeded,
+    version: raw.version,
+    body: raw.body,
+    createdAt: new Date(raw.created_at),
+    updatedAt: new Date(raw.updated_at),
+    channels: raw.channels,
+    topics: raw.topics,
+  };
+}
+
+function mapChannel(raw: Schemas["ChannelOut"]): Channel {
+  return {
+    channelId: raw.channel_id,
+    title: raw.title,
+    handle: raw.handle ?? null,
+    active: raw.active,
+    addedBy: raw.added_by,
+    promptId: raw.prompt_id,
+    lastDiscoveryAt: optionalDate(raw.last_discovery_at),
+  };
+}
+
+function mapTopic(raw: Schemas["TopicOut"]): Topic {
+  return {
+    id: raw.id,
+    phrase: raw.phrase,
+    language: raw.language,
+    intervalMinutes: raw.interval_minutes,
+    maxVideosPerRun: raw.max_videos_per_run,
+    active: raw.active,
+    addedBy: raw.added_by,
+    promptId: raw.prompt_id,
+    lastRunAt: optionalDate(raw.last_run_at),
+  };
+}
+
+function mapState(raw: Schemas["StateOut"]): ArchiveState {
+  return {
+    simulating: raw.simulating,
+    modelConfigured: raw.model_configured,
+    alertsConfigured: raw.alerts_configured,
+    providers: raw.providers.map((provider) => ({
+      role: provider.role,
+      name: provider.name,
+      unit: provider.unit,
+      spentToday: provider.spent_today,
+      ceiling: provider.ceiling,
+      exhausted: provider.exhausted,
+      blocked: provider.blocked,
+      blockedReason: provider.blocked_reason ?? null,
+    })),
+    waiting: raw.waiting,
+    stale: raw.stale,
+    loopAgeSeconds: raw.loop?.age_seconds ?? null,
+  };
+}
+
+// 404 is "no such thing" on a route with an id in it, and "this workbench has no YouTube archive" on the rest — the view
+// tells the two apart by which call it was making.
+const mapStatus = statusMapper({ 404: "not-found", 422: "refused" });
+
+export interface YoutubeApi {
+  recentFilms(hours: number, signal: AbortSignal): Promise<FilmsPage>;
+  state(signal: AbortSignal): Promise<ArchiveState>;
+  transcript(videoId: string, offset: number, signal: AbortSignal): Promise<TranscriptPage>;
+  channels(signal: AbortSignal): Promise<{ channels: Channel[]; ceiling: number }>;
+  followChannel(reference: string, promptId: number | null, signal: AbortSignal): Promise<FollowResult>;
+  setChannel(
+    channelId: string,
+    patch: { active?: boolean; promptId?: number },
+    signal: AbortSignal,
+  ): Promise<Channel>;
+  unfollowChannel(channelId: string, signal: AbortSignal): Promise<void>;
+  topics(signal: AbortSignal): Promise<{ topics: Topic[]; ceiling: number }>;
+  addTopic(request: TopicRequest, signal: AbortSignal): Promise<TopicResult>;
+  setTopic(
+    id: number,
+    patch: { active?: boolean; promptId?: number },
+    signal: AbortSignal,
+  ): Promise<Topic>;
+  removeTopic(id: number, signal: AbortSignal): Promise<void>;
+  analyse(
+    reference: string,
+    promptId: number | null,
+    signal: AbortSignal,
+  ): Promise<{ videoId: string; title: string; created: boolean }>;
+  film(videoId: string, signal: AbortSignal): Promise<FilmDetail>;
+  /** Reads a film already transcribed once more, by another prompt, in the background. */
+  readAgain(videoId: string, promptId: number, signal: AbortSignal): Promise<void>;
+  prompts(signal: AbortSignal): Promise<PromptsPage>;
+  createPrompt(request: { name: string; body: string }, signal: AbortSignal): Promise<Prompt>;
+  updatePrompt(id: number, patch: { name?: string; body?: string }, signal: AbortSignal): Promise<Prompt>;
+  deletePrompt(id: number, signal: AbortSignal): Promise<void>;
+}
+
+/** Characters of transcript per page: enough to read, small enough that a page is a request and not a download. */
+export const TRANSCRIPT_PAGE = 4000;
+
+export function createYoutubeApi(httpBase: string, identity: Identity = noIdentity): YoutubeApi {
+  const http = jsonClient("youtube-data", mapStatus, identity);
+
+  return {
+    async recentFilms(hours, signal) {
+      const raw = await http.json<Schemas["VideosOut"]>(`${httpBase}/videos?hours=${hours}&limit=100`, { signal });
+      return {
+        films: raw.videos.map(mapFilm),
+        windowFrom: new Date(raw.window_from),
+        windowTo: new Date(raw.window_to),
+      };
+    },
+
+    async state(signal) {
+      return mapState(await http.json<Schemas["StateOut"]>(`${httpBase}/state`, { signal }));
+    },
+
+    async transcript(videoId, offset, signal) {
+      const raw = await http.json<Schemas["TranscriptPageOut"]>(
+        `${httpBase}/videos/${encodeURIComponent(videoId)}/transcript?offset=${offset}&limit=${TRANSCRIPT_PAGE}`,
+        { signal },
+      );
+      return {
+        text: raw.text,
+        language: raw.language,
+        provider: raw.provider,
+        automatic: raw.automatic,
+        model: raw.model ?? null,
+        simulated: raw.simulated,
+        offset: raw.offset,
+        totalChars: raw.total_chars,
+        nextOffset: raw.next_offset ?? null,
+      };
+    },
+
+    async channels(signal) {
+      const raw = await http.json<Schemas["ChannelsOut"]>(`${httpBase}/channels`, { signal });
+      return { channels: raw.channels.map(mapChannel), ceiling: raw.ceiling };
+    },
+
+    async followChannel(reference, promptId, signal) {
+      // The contract lists the defaulted fields as required in a request body, so they are said.
+      const body: Schemas["ChannelIn"] = { reference, language: "", prompt_id: promptId };
+      const raw = await http.json<Schemas["ChannelAddedOut"]>(`${httpBase}/channels`, {
+        signal,
+        method: "POST",
+        body,
+      });
+      return { channel: mapChannel(raw.channel), created: raw.created };
+    },
+
+    async setChannel(channelId, patch, signal) {
+      const body: Schemas["ChannelPatch"] = {
+        ...(patch.active === undefined ? {} : { active: patch.active }),
+        ...(patch.promptId === undefined ? {} : { prompt_id: patch.promptId }),
+      };
+      return mapChannel(
+        await http.json<Schemas["ChannelOut"]>(`${httpBase}/channels/${encodeURIComponent(channelId)}`, {
+          signal,
+          method: "PATCH",
+          body,
+        }),
+      );
+    },
+
+    async unfollowChannel(channelId, signal) {
+      // `send` rather than `json`: the module answers 204 — what it could return about a thing that is no longer on the list
+      // is a shape somebody would be tempted to read.
+      await http.send(`${httpBase}/channels/${encodeURIComponent(channelId)}`, { signal, method: "DELETE" });
+    },
+
+    async topics(signal) {
+      const raw = await http.json<Schemas["TopicsOut"]>(`${httpBase}/topics`, { signal });
+      return { topics: raw.topics.map(mapTopic), ceiling: raw.ceiling };
+    },
+
+    async addTopic(request, signal) {
+      const body: Schemas["TopicIn"] = {
+        phrase: request.phrase,
+        language: request.language ?? "",
+        prompt_id: request.promptId ?? null,
+        ...(request.intervalMinutes === undefined ? {} : { interval_minutes: request.intervalMinutes }),
+        ...(request.maxVideosPerRun === undefined ? {} : { max_videos_per_run: request.maxVideosPerRun }),
+      };
+      const raw = await http.json<Schemas["TopicAddedOut"]>(`${httpBase}/topics`, {
+        signal,
+        method: "POST",
+        body,
+      });
+      return { topic: mapTopic(raw.topic), created: raw.created, defaultsApplied: raw.defaults_applied };
+    },
+
+    async setTopic(id, patch, signal) {
+      const body: Schemas["TopicPatch"] = {
+        ...(patch.active === undefined ? {} : { active: patch.active }),
+        ...(patch.promptId === undefined ? {} : { prompt_id: patch.promptId }),
+      };
+      return mapTopic(
+        await http.json<Schemas["TopicOut"]>(`${httpBase}/topics/${id}`, { signal, method: "PATCH", body }),
+      );
+    },
+
+    async removeTopic(id, signal) {
+      await http.send(`${httpBase}/topics/${id}`, { signal, method: "DELETE" });
+    },
+
+    async analyse(reference, promptId, signal) {
+      const body: Schemas["AnalyseIn"] = { reference, prompt_id: promptId };
+      const raw = await http.json<Schemas["QueuedOut"]>(`${httpBase}/videos`, { signal, method: "POST", body });
+      return { videoId: raw.video_id, title: raw.title, created: raw.created };
+    },
+
+    async film(videoId, signal) {
+      const raw = await http.json<Schemas["VideoDetailOut"]>(`${httpBase}/videos/${encodeURIComponent(videoId)}`, {
+        signal,
+      });
+      return {
+        film: mapFilm(raw),
+        readings: raw.readings.map((reading) => ({ ...mapReading(reading), text: reading.text })),
+      };
+    },
+
+    async readAgain(videoId, promptId, signal) {
+      const body: Schemas["ReadIn"] = { prompt_id: promptId };
+      await http.send(`${httpBase}/videos/${encodeURIComponent(videoId)}/readings`, { signal, method: "POST", body });
+    },
+
+    async prompts(signal) {
+      const raw = await http.json<Schemas["PromptsOut"]>(`${httpBase}/prompts`, { signal });
+      return { prompts: raw.prompts.map(mapPrompt), maxChars: raw.max_chars, ceiling: raw.ceiling };
+    },
+
+    async createPrompt(request, signal) {
+      const body: Schemas["PromptIn"] = { name: request.name, body: request.body };
+      return mapPrompt(await http.json<Schemas["PromptOut"]>(`${httpBase}/prompts`, { signal, method: "POST", body }));
+    },
+
+    async updatePrompt(id, patch, signal) {
+      const body: Schemas["PromptPatch"] = {
+        ...(patch.name === undefined ? {} : { name: patch.name }),
+        ...(patch.body === undefined ? {} : { body: patch.body }),
+      };
+      return mapPrompt(
+        await http.json<Schemas["PromptOut"]>(`${httpBase}/prompts/${id}`, { signal, method: "PATCH", body }),
+      );
+    },
+
+    async deletePrompt(id, signal) {
+      await http.send(`${httpBase}/prompts/${id}`, { signal, method: "DELETE" });
+    },
+  };
+}

@@ -1,0 +1,684 @@
+<title>Archiwum YouTube — projekt</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Projekt · research i high-level design</span>
+    <h1>Archiwum YouTube</h1>
+    <p class="lede">Obserwowane kanały i tematy, transkrypcje, streszczenia i sentyment z modelu, narzędzia dla agenta, ekran w terminalu i alerty na Telegram. <b>Dziewiąty pakiet workbencha</b>, zbudowany na wzór <code>social_data</code> i <code>polymarket_data</code>.</p>
+    <div class="strip">
+      <span>TradingCenter / propozycja</span>
+      <span>27 września 2026 · rew. <b>01</b></span>
+      <span>stan: <b>PLAN</b> — nic z tego jeszcze nie istnieje w kodzie</span>
+      <span>następny krok: <b>F0 spike</b>, potem OpenSpec</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">10k</div><div class="l">jednostek YouTube Data API na dobę, za darmo, bez możliwości dokupienia</div></div>
+      <div class="cell"><div class="v">~4,5k</div><div class="l">jednostek/dobę przy 50 kanałach i 10 tematach — mieści się</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">oficjalnych dróg do transkrypcji cudzego filmu</div></div>
+      <div class="cell"><div class="v">9.</div><div class="l">pakiet workbencha — <code>youtube_data</code> pod <code>/youtube</code></div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Cel</div>
+      <h2>Co ma umieć</h2>
+      <p class="intro">Operator (albo agent w jego imieniu) wskazuje kanały i tematy. System sam zauważa nowe filmy, zdobywa transkrypcję, puszcza ją przez model i odkłada wynik w archiwum, które czyta terminal, rozmowa, zespoły i — przy ważnym filmie — Telegram.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Zdolność</th><th>Kto uruchamia</th><th>Wynik</th></tr></thead>
+          <tbody>
+            <tr><td><b>Subskrypcja kanału</b></td><td>operator w terminalu · agent narzędziem</td><td>każdy nowy film kanału trafia do kolejki</td></tr>
+            <tr><td><b>Temat wyszukiwania</b></td><td>operator · agent</td><td>cykliczne <code>search.list</code> po frazie, nowe trafienia do kolejki (z limitem)</td></tr>
+            <tr><td><b>Analiza na żądanie</b></td><td>agent · operator wkleja URL</td><td>jednorazowa analiza dowolnego publicznego filmu</td></tr>
+            <tr><td><b>Transkrypcja</b></td><td>pętla pakietu</td><td>tekst z oznaczeniem źródła i języka</td></tr>
+            <tr><td><b>Odczyt modelu</b></td><td>pętla pakietu</td><td>streszczenie PL, tezy, sentyment per instrument, prognozy, <code>impact_score</code></td></tr>
+            <tr><td><b>Weryfikacja</b></td><td>pętla (F4) · agent</td><td>prognozy z filmów konfrontowane z <code>/market</code> — trafność kanału w czasie</td></tr>
+            <tr><td><b>Alert</b></td><td>pętla pakietu</td><td>wiadomość przez <code>/telegram</code> po regule kanału lub progu wpływu</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Weryfikacja</div>
+      <h2>Co na zewnątrz działa, a co nie</h2>
+      <p>Research z września 2026. Część metadanych jest tania i oficjalna; <span class="hl">transkrypcja cudzego filmu nie ma oficjalnej drogi</span> i to ona wyznacza kształt całego projektu.</p>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>Wykrywanie nowych filmów <span class="tag ok">tanie, oficjalne</span></h3>
+          <p>Kanał <code>UC…</code> ma playlistę uploadów <code>UU…</code>. <code>playlistItems.list</code> kosztuje 1 jednostkę; <code>videos.list</code> — 1 jednostkę za do 50 filmów naraz (czas trwania, statystyki, <code>liveBroadcastContent</code>). Wystarczy klucz API, bez OAuth.</p>
+        </div>
+        <div class="fail">
+          <h3>Wyszukiwanie po temacie <span class="tag att">drogie w jednostkach</span></h3>
+          <p><code>search.list</code> to 100 jednostek za wywołanie — ok. 100 wyszukiwań na dobę przy całym budżecie. Limitu nie da się kupić; rozszerzenie to ręczny audyt Google trwający tygodnie. Mnożenie projektów GCP łamie ToS.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Oficjalne napisy <span class="tag stop">zamknięte</span></h3>
+          <p><code>captions.download</code> wymaga OAuth <em>właściciela</em> filmu. Dla cudzych filmów bezużyteczne.</p>
+        </div>
+        <div class="fail stop">
+          <h3><code>youtube-transcript-api</code> / <code>yt-dlp</code> z Azure <span class="tag stop">blokowane</span></h3>
+          <p>YouTube blokuje po ASN całe chmury (AWS, GCP, <strong>Azure</strong>): <code>RequestBlocked</code> / <code>IpBlocked</code>, „Sign in to confirm you're not a bot”. Z domowego IP działa — dlatego lokalnie wszystko będzie wyglądać dobrze, a produkcja zamilknie. Obejście: rotujące proxy rezydencjalne (płatne) albo cudze API.</p>
+        </div>
+        <div class="fail">
+          <h3>Płatne API transkrypcji <span class="tag att">działa, kosztuje</span></h3>
+          <p>Np. Supadata: ~1 kredyt za transkrypcję, plany od ok. $5/mies., przy braku napisów fallback na transkrypcję AI (2 kredyty/min). To w praktyce odsprzedaż puli proxy. Przy 20–100 filmach/dobę rząd $5–50/mies. — <strong>ceny do potwierdzenia w F0</strong>.</p>
+        </div>
+        <div class="fail">
+          <h3>Audio + OpenAI transcribe <span class="tag att">najgorsze z obu</span></h3>
+          <p><code>gpt-4o-mini-transcribe</code> ok. $0,003/min, limit 25&nbsp;MB na plik — ale pobranie audio i tak idzie przez <code>yt-dlp</code>, więc dziedziczy blokadę IP. Tylko jako ręczny ostatni fallback, poza zakresem v1.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Gemini czyta URL YouTube bezpośrednio <span class="tag ok">omija problem</span></h3>
+          <p>Gemini API przyjmuje publiczny URL filmu jako wejście — bez pobierania i bez scrapingu. Funkcja w preview, darmowy tier 8&nbsp;h wideo/dobę. <strong>OpenAI nie ma odpowiednika.</strong> Koszt architektoniczny: drugi dostawca modeli obok <code>tc-openai</code>.</p>
+        </div>
+        <div class="fail">
+          <h3>RSS i WebSub <span class="tag att">tylko jako sygnał</span></h3>
+          <p>RSS kanału działa bez klucza, ale pokazuje 15 ostatnich pozycji i bywa niestabilny z chmury. WebSub (push) wymaga <strong>publicznej, nieuwierzytelnionej trasy</strong> na App Service — wbrew temu, że każde drzwi to własne uwierzytelnienie. W v1 odrzucone; odpytywanie co 30 min wystarcza.</p>
+        </div>
+        <div class="fail">
+          <h3>ToS danych z API <span class="tag att">30 dni</span></h3>
+          <p>Dane pobrane z YouTube Data API trzeba odświeżyć lub usunąć w ciągu 30 dni; UI pokazujące dane YouTube musi linkować do źródła. Wpływa na retencję (sekcja 07). Scraping transkrypcji to ryzyko ToS — w praktyce blokada, nie spór prawny.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Porównanie</div>
+      <h2>Skąd wziąć tekst filmu i ile to kosztuje</h2>
+      <p class="intro">Znalezienie filmów jest proste i darmowe (YouTube Data API). Problemem jest <strong>tekst filmu</strong>. Poniżej wszystkie brane pod uwagę drogi, policzone na jednym założeniu.</p>
+      <p><strong>Założenie:</strong> 50 filmów dziennie, średnio 30 minut → ok. <strong>1500 filmów i 45&nbsp;000 minut miesięcznie</strong>. Ceny orientacyjne z września 2026; pozycje oznaczone <span class="tag att">sprawdzić</span> trzeba potwierdzić u dostawcy w F0.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Metoda</th><th>Jak działa</th><th class="n">Koszt / mies.</th><th>Działa z Azure?</th><th>Ocena</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><b>YouTube Data API</b><br>(tylko wyszukiwanie)</td>
+              <td>oficjalne API: lista filmów kanału, wyszukiwanie po frazie, metadane</td>
+              <td class="n">$0</td>
+              <td>tak</td>
+              <td><span class="tag ok">bierzemy</span> — do znajdowania filmów, nie do tekstu</td>
+            </tr>
+            <tr>
+              <td><b>Oficjalne napisy</b><br><code>captions.download</code></td>
+              <td>pobranie napisów przez API</td>
+              <td class="n">—</td>
+              <td>—</td>
+              <td><span class="tag stop">odpada</span> — tylko dla właściciela filmu</td>
+            </tr>
+            <tr>
+              <td><b>youtube-transcript-api</b><br>bez proxy</td>
+              <td>biblioteka Pythona czyta napisy tak jak przeglądarka</td>
+              <td class="n">$0</td>
+              <td><span class="tag stop">nie</span> — blokada IP chmury</td>
+              <td><span class="tag ok">dev</span> — działa tylko z domowego komputera</td>
+            </tr>
+            <tr>
+              <td><b>youtube-transcript-api</b><br>+ proxy rezydencjalne</td>
+              <td>ta sama biblioteka, ruch przez domowe IP wynajęte od firmy proxy (np. Webshare)</td>
+              <td class="n">~$5–15 <span class="tag att">sprawdzić</span></td>
+              <td>zwykle tak</td>
+              <td><span class="tag att">zapas</span> — tanie, bo napisy to kilkadziesiąt KB, ale proxy też bywają blokowane</td>
+            </tr>
+            <tr>
+              <td><b>Supadata</b><br>(API transkrypcji)</td>
+              <td>płatny serwis zwraca tekst po ID filmu; sam rozwiązuje blokady</td>
+              <td class="n">~$5–50 <span class="tag att">sprawdzić</span></td>
+              <td>tak</td>
+              <td><span class="tag ok">rekomendacja</span> — najprostsze na produkcji, ~1 kredyt/film</td>
+            </tr>
+            <tr>
+              <td><b>SearchAPI.io</b><br>(API transkrypcji)</td>
+              <td>jak wyżej, endpoint <code>youtube_transcripts</code> w planie ogólnym</td>
+              <td class="n">~$40 <span class="tag att">sprawdzić</span></td>
+              <td>tak</td>
+              <td><span class="tag att">alternatywa</span> — plan ~5 tys. zapytań</td>
+            </tr>
+            <tr>
+              <td><b>Apify</b><br>(gotowe „aktory”)</td>
+              <td>płatność za wynik, różni autorzy skryptów</td>
+              <td class="n">? <span class="tag att">sprawdzić</span></td>
+              <td>tak</td>
+              <td><span class="tag att">alternatywa</span> — jakość zależy od autora</td>
+            </tr>
+            <tr>
+              <td><b>Audio + OpenAI</b><br><code>yt-dlp</code> → <code>gpt-4o-mini-transcribe</code></td>
+              <td>pobieramy dźwięk i sami zamieniamy go na tekst</td>
+              <td class="n">~$135 + proxy</td>
+              <td><span class="tag stop">nie</span> bez proxy</td>
+              <td><span class="tag stop">odpada</span> — drogo ($0,003/min) i ta sama blokada przy pobieraniu; <code>whisper-1</code> ~$270</td>
+            </tr>
+            <tr>
+              <td><b>Gemini</b><br>URL filmu wprost do modelu</td>
+              <td>model Google ogląda film sam; od razu daje streszczenie i sentyment, bez osobnej transkrypcji</td>
+              <td class="n">~$50–100 <span class="tag att">sprawdzić</span></td>
+              <td>tak</td>
+              <td><span class="tag att">później (F4)</span> — darmowe 8 h wideo/dobę to ~1/3 naszego wolumenu, reszta płatna; minus: drugi dostawca AI obok OpenAI</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px"><strong>Do tego zawsze dochodzi analiza tekstu przez OpenAI</strong> (streszczenie, sentyment) — poza wariantem Gemini, który robi oba kroki naraz. Film 30-minutowy to ok. 7–8 tys. tokenów wejścia; przy 1500 filmach ~11 mln tokenów miesięcznie, cena zależy od wybranego modelu.</p>
+      <div class="quote">Rekomendacja: lokalnie za darmo, na produkcji Supadata, proxy jako zapas, Gemini do rozważenia później.</div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Miejsce</div>
+      <h2>Nowy pakiet, nie drugi dostawca w social</h2>
+      <p class="intro"><code>youtube_data</code> jako dziewiąty pakiet workbencha, zamontowany pod <code>/youtube</code>, z własną bazą <code>youtube</code>.</p>
+      <p><strong>Dlaczego nie w <code>social_data</code>:</strong> tam wpis to krótki tekst, jeden odczyt, zero narzędzi piszących i jedno źródło bez konfiguracji. Tu jest lista obserwowanych edytowana przez operatora i agenta (jak w <code>polymarket_data</code>), tekst rzędu 60–100&nbsp;KB na film, cykl życia z ponowieniami, budżet jednostek API i dwóch płatnych dostawców. Doklejenie tego do <code>social</code> zmieniłoby jego regułę zapisu — a <span class="hl">pakiet to granica tego, co wolno pisać</span>.</p>
+      <p><strong>Dlaczego nie osobny proces:</strong> nie ma nowej granicy bezpieczeństwa. Pakiet czyta publiczne dane i pisze tylko własną bazę; rachunku nie dotyka. Zasada „jeden proces na granicę bezpieczeństwa” mówi: pakiet w workbenchu.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Element pakietu</th><th>Wzór</th><th>Wartość dla youtube_data</th></tr></thead>
+          <tbody>
+            <tr><td><b>montaż</b></td><td><code>workbench/app.py</code> · <code>mount_package</code></td><td><code>mount_package(app, "/youtube", youtube_app)</code></td></tr>
+            <tr><td><b>warstwy</b></td><td><code>tests/test_layering.py</code> · <code>PACKAGES</code></td><td>jeden nowy wpis</td></tr>
+            <tr><td><b>migracje</b></td><td><code>social_data/runtime.py</code> · klucz 8090</td><td><code>alembic-youtube.ini</code>, klucz <code>8110</code> — pierwszy klucz, który nie był nigdy portem</td></tr>
+            <tr><td><b>drzwi</b></td><td><code>social_data/caller_access.py</code></td><td><code>OPEN_PATHS</code>, <code>REST_PATHS</code> wypisane literalnie, <code>TOOLS_PREFIX="/mcp"</code></td></tr>
+            <tr><td><b>narzędzia</b></td><td><code>workbench/local_tools.py</code></td><td><code>ConversationLocalTools</code> + <code>TeamsLocalTools</code> nad tym samym FastMCP</td></tr>
+            <tr><td><b>Telegram</b></td><td><code>workbench/telegram_client.py</code> · <code>in_process</code></td><td>ten sam klient, <code>POST /messages</code></td></tr>
+            <tr><td><b>odczyt rynku (F4)</b></td><td><code>workbench/archive_client.py</code></td><td>in-process do <code>/market</code>, nigdy import</td></tr>
+            <tr><td><b>ustawienia</b></td><td><code>SOCIAL_*</code> w <code>.env.example</code></td><td>prefiks <code>YOUTUBE_</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Architektura</div>
+      <h2>Jedna pętla, czterech zewnętrznych rozmówców</h2>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 420" role="img" aria-label="Pakiet youtube_data w workbenchu: pętla odkrywa filmy w YouTube Data API, pobiera transkrypcje od dostawcy, analizuje je w OpenAI, zapisuje w bazie youtube i wysyła alerty przez pakiet telegram. Terminal i pocket czytają REST, rozmowa i zespoły wołają narzędzia.">
+            <defs>
+              <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="210" y="20" width="560" height="300" fill="none" stroke="#14306b" stroke-width="1.6"></rect>
+              <text x="222" y="40" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.1em" fill="#14306b">WORKBENCH · 8030</text>
+
+              <rect x="330" y="60" width="320" height="150" fill="#14306b"></rect>
+              <text x="490" y="84" text-anchor="middle" font-size="15" font-weight="700" fill="#ffffff">youtube_data · /youtube</text>
+              <text x="490" y="108" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#f2c313">pętla: odkryj → transkrybuj</text>
+              <text x="490" y="126" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#f2c313">→ analizuj → powiadom</text>
+              <text x="490" y="156" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#d6dcec">REST /youtube/*</text>
+              <text x="490" y="174" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#d6dcec">FastMCP /youtube/mcp</text>
+              <text x="490" y="192" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#d6dcec">własna baza · klucz 8110</text>
+
+              <rect x="230" y="250" width="120" height="48" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+              <text x="290" y="279" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">/telegram</text>
+              <rect x="370" y="250" width="120" height="48" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+              <text x="430" y="279" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">/market</text>
+              <rect x="510" y="250" width="120" height="48" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+              <text x="570" y="272" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">agent</text>
+              <text x="570" y="288" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">+ teams</text>
+              <rect x="650" y="250" width="100" height="48" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="4 3"></rect>
+              <text x="700" y="279" text-anchor="middle" font-size="12" fill="currentColor">DB youtube</text>
+
+              <line x1="370" y1="212" x2="300" y2="246" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"></line>
+              <text x="296" y="232" text-anchor="end" font-size="9.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">alert</text>
+              <line x1="440" y1="212" x2="432" y2="246" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"></line>
+              <text x="446" y="236" font-size="9.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">F4</text>
+              <line x1="568" y1="246" x2="560" y2="214" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"></line>
+              <text x="574" y="236" font-size="9.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">narzędzia</text>
+              <line x1="640" y1="212" x2="690" y2="246" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"></line>
+
+              <rect x="10" y="60" width="160" height="44" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="6 4"></rect>
+              <text x="90" y="87" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">YouTube Data API</text>
+              <rect x="10" y="120" width="160" height="44" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="6 4"></rect>
+              <text x="90" y="140" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">dostawca transkrypcji</text>
+              <text x="90" y="155" text-anchor="middle" font-size="9.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">Supadata · direct+proxy</text>
+              <rect x="10" y="180" width="160" height="44" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="6 4"></rect>
+              <text x="90" y="207" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">OpenAI · (Gemini?)</text>
+
+              <line x1="326" y1="90" x2="174" y2="82" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"></line>
+              <line x1="326" y1="140" x2="174" y2="142" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"></line>
+              <line x1="326" y1="190" x2="174" y2="202" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"></line>
+              <text x="250" y="76" text-anchor="middle" font-size="9.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">klucz w nagłówku</text>
+
+              <rect x="810" y="80" width="160" height="44" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+              <text x="890" y="107" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">terminal · 5173</text>
+              <rect x="810" y="150" width="160" height="44" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+              <text x="890" y="177" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">pocket · 5174</text>
+              <line x1="806" y1="102" x2="654" y2="120" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"></line>
+              <line x1="806" y1="172" x2="654" y2="165" stroke="currentColor" stroke-width="1.3" marker-end="url(#a1)"></line>
+              <text x="730" y="98" text-anchor="middle" font-size="9.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">REST + Easy Auth</text>
+
+              <rect x="210" y="350" width="560" height="20" fill="#f2c313"></rect>
+              <text x="490" y="364" text-anchor="middle" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.07em" fill="#14306b">TRANSKRYPCJA = DANE OBCE · MODEL ANALIZY BEZ NARZĘDZI · WYNIK PRZEZ JSON SCHEMA</text>
+              <text x="490" y="398" text-anchor="middle" font-size="11" fill="currentColor" opacity="0.7">Pakiety sąsiadów wyłącznie przez in_process REST — youtube_data nie importuje nikogo.</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — przerywane ramki po lewej to trzy zewnętrzne zależności, każda z własnym kluczem i własnym budżetem. <code>/market</code> dochodzi dopiero w F4, dla weryfikacji prognoz.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Cykl życia filmu</div>
+      <h2>Stan w wierszu, nie w pamięci pętli</h2>
+      <p>Jedna pętla <code>asyncio</code> jak w <code>social_data/ingest.py</code>, cztery kroki w stałej kolejności, każdy z własnym limitem partii. <span class="hl">Film bez napisów nie może wracać do dostawcy co 5 minut</span> — to dokładnie błąd, który naprawił PR #272 (280 płatnych wywołań na pusty post).</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 200" role="img" aria-label="Stany filmu: discovered, potem transcript_pending, z którego wychodzi transcribed albo no_transcript z ponowieniami po 1, 6 i 24 godzinach, a na końcu gave_up. Transcribed przechodzi w analysed, a analysed w notified albo quiet.">
+            <defs>
+              <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+            </defs>
+            <g font-family="Roboto Mono, monospace" font-size="11.5">
+              <rect x="10" y="40" width="120" height="40" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+              <text x="70" y="64" text-anchor="middle" fill="currentColor">discovered</text>
+              <rect x="170" y="40" width="160" height="40" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+              <text x="250" y="64" text-anchor="middle" fill="currentColor">transcript_pending</text>
+              <rect x="370" y="40" width="130" height="40" fill="#14306b"></rect>
+              <text x="435" y="64" text-anchor="middle" fill="#ffffff">transcribed</text>
+              <rect x="540" y="40" width="120" height="40" fill="#14306b"></rect>
+              <text x="600" y="64" text-anchor="middle" fill="#ffffff">analysed</text>
+              <rect x="700" y="16" width="120" height="36" fill="none" stroke="#17734c" stroke-width="1.5"></rect>
+              <text x="760" y="38" text-anchor="middle" fill="#17734c">notified</text>
+              <rect x="700" y="70" width="120" height="36" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+              <text x="760" y="92" text-anchor="middle" fill="currentColor">quiet</text>
+
+              <rect x="170" y="130" width="160" height="40" fill="#fdf3d0" stroke="#8a6708" stroke-width="1.3"></rect>
+              <text x="250" y="154" text-anchor="middle" fill="#8a6708">no_transcript</text>
+              <rect x="370" y="130" width="130" height="40" fill="#fae7e4" stroke="#b8322a" stroke-width="1.3"></rect>
+              <text x="435" y="154" text-anchor="middle" fill="#b8322a">gave_up</text>
+
+              <line x1="132" y1="60" x2="166" y2="60" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"></line>
+              <line x1="332" y1="60" x2="366" y2="60" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"></line>
+              <line x1="502" y1="60" x2="536" y2="60" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"></line>
+              <line x1="662" y1="55" x2="696" y2="38" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"></line>
+              <line x1="662" y1="66" x2="696" y2="86" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"></line>
+              <line x1="230" y1="82" x2="230" y2="126" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"></line>
+              <line x1="270" y1="128" x2="270" y2="84" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"></line>
+              <text x="280" y="110" fill="currentColor" opacity="0.7" font-size="10">retry +1h/+6h/+24h</text>
+              <line x1="332" y1="150" x2="366" y2="150" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"></line>
+              <text x="70" y="110" text-anchor="middle" fill="currentColor" opacity="0.6" font-size="10">odrzuty: short,</text>
+              <text x="70" y="124" text-anchor="middle" fill="currentColor" opacity="0.6" font-size="10">live w toku, &gt;180 min</text>
+              <text x="860" y="60" fill="currentColor" opacity="0.6" font-size="10">znacznik po</text>
+              <text x="860" y="74" fill="currentColor" opacity="0.6" font-size="10">udanej wysyłce</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 2</b> — automatyczne napisy pojawiają się często godziny po publikacji; stąd ponowienia z rosnącym odstępem i twardy koniec w <code>gave_up</code>. Transmisja na żywo czeka, aż <code>liveBroadcastContent</code> wróci do <code>none</code>.</figcaption>
+      </figure>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Krok</th><th>Źródło</th><th class="n">Częstość</th><th>Limit na przebieg</th></tr></thead>
+          <tbody>
+            <tr><td><b>odkryj · kanały</b></td><td><code>playlistItems.list</code> na <code>UU…</code>, potem <code>videos.list</code> po 50</td><td class="n">30 min</td><td>wszystkie aktywne kanały</td></tr>
+            <tr><td><b>odkryj · tematy</b></td><td><code>search.list</code>, <code>publishedAfter</code> = ostatni przebieg, <code>order=date</code></td><td class="n">per temat, np. 6 h</td><td>dzienny budżet jednostek; max N filmów/temat do analizy</td></tr>
+            <tr><td><b>transkrybuj</b></td><td>łańcuch dostawców (sekcja 08)</td><td class="n">co przebieg</td><td>np. 10 filmów</td></tr>
+            <tr><td><b>analizuj</b></td><td>OpenAI, jedno wywołanie, strict JSON schema</td><td class="n">co przebieg</td><td>np. 5 filmów + dzienny limit tokenów</td></tr>
+            <tr><td><b>powiadom</b></td><td><code>/telegram</code> in-process</td><td class="n">co przebieg</td><td>10, jak <code>social_data</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Dane</div>
+      <h2>Sześć tabel i jedna reguła retencji</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tabela</th><th>Klucz</th><th>Zawartość</th><th>Kto pisze</th></tr></thead>
+          <tbody>
+            <tr><td><b>channels</b></td><td><code>channel_id</code></td><td>tytuł, <code>uploads_playlist_id</code>, język, <code>auto_analyse</code>, <code>alert_rule</code> (always / threshold / never), <code>active</code>, ostatni odczyt</td><td>operator · agent</td></tr>
+            <tr><td><b>topics</b></td><td><code>id</code></td><td>fraza, język, co ile, <code>max_videos_per_run</code>, min. długość, <code>active</code>, ostatni przebieg</td><td>operator · agent</td></tr>
+            <tr><td><b>videos</b></td><td><code>video_id</code></td><td>kanał, tytuł, <code>published_at</code>, czas trwania, skąd (kanał / temat / żądanie), <code>state</code>, <code>attempts</code>, <code>next_attempt_at</code></td><td>pętla</td></tr>
+            <tr><td><b>transcripts</b></td><td><code>video_id</code></td><td>tekst, język, dostawca, auto/ręczne, <code>fetched_at</code></td><td>pętla</td></tr>
+            <tr><td><b>readings</b></td><td><code>video_id</code>, <code>profile</code></td><td>wynik JSON (sekcja 08), model, czas, tokeny</td><td>pętla</td></tr>
+            <tr><td><b>usage</b></td><td>dzień, rodzaj</td><td>jednostki API, kredyty transkrypcji, tokeny — budżety liczone stąd, przetrwają usunięcie treści</td><td>pętla</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px"><strong>Retencja:</strong> surowe transkrypcje i metadane z API — 30 dni (<code>YOUTUBE_TRANSCRIPT_RETENTION_DAYS</code>), zgodnie z regułą ToS i dla B1ms: 100 filmów/dobę to ~6–10&nbsp;MB tekstu dziennie. Odczyty modelu (nasza treść pochodna) zostają.</p>
+      <p><strong>Koszt bazy:</strong> każde zapytanie pętli idzie po indeksie <code>(state, next_attempt_at)</code>; odpytywanie ekranu czyta stronę, nigdy tekstu transkrypcji w liście. Przed implementacją — skill <code>db-cost-check</code>; pamiętamy o kredytach CPU z 16 września.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Transkrypcja i model</div>
+      <h2>Łańcuch dostawców za jednym interfejsem</h2>
+      <p class="intro"><code>TranscriptProvider.fetch(video_id, languages) → Transcript | NoTranscript | Blocked</code>. Łańcuch wybierany ustawieniem, nie kodem.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Dostawca</th><th>Gdzie</th><th>Koszt</th><th>Rola</th></tr></thead>
+          <tbody>
+            <tr><td><b>direct</b> · <code>youtube-transcript-api</code></td><td>dev (domowe IP)</td><td>0</td><td>domyślny lokalnie; na Azure tylko z proxy</td></tr>
+            <tr><td><b>direct + proxy</b> rezydencjalne</td><td>opcja prod</td><td>subskrypcja proxy</td><td>jeśli Supadata zawiedzie cenowo</td></tr>
+            <tr><td><b>supadata</b></td><td>prod</td><td>~1 kredyt/film</td><td><span class="tag ok">rekomendowany główny w prod</span></td></tr>
+            <tr><td><b>gemini-url</b></td><td>F4, decyzja</td><td>tokeny Gemini</td><td>film bez napisów: analiza z samego wideo</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px"><strong>Odczyt modelu</strong> — wzór <code>social_data/enrichment.py</code>: jedno wywołanie bez historii i bez narzędzi, <code>YOUTUBE_ANALYSIS_MODEL</code>, strict JSON schema, walidacja po stronie pakietu. Godzina mówionego tekstu to ~13–15 tys. tokenów — mieści się w jednym wywołaniu; dzielenie na części dopiero powyżej limitu czasu filmu.</p>
+      <pre><code><span class="c"># szkic schematu odczytu — profil "market" (domyślny)</span>
+{
+  <span class="s">"summary_pl"</span>: str,               <span class="c"># 5–10 zdań</span>
+  <span class="s">"key_points"</span>: [str],             <span class="c"># 3–8</span>
+  <span class="s">"instruments"</span>: [{ <span class="s">"name"</span>: str, <span class="s">"epic"</span>: str|null,
+                    <span class="s">"sentiment"</span>: <span class="s">"bullish|bearish|neutral"</span>,
+                    <span class="s">"conviction"</span>: 1..5, <span class="s">"horizon"</span>: <span class="s">"intraday|swing|long"</span> }],
+  <span class="s">"predictions"</span>: [{ <span class="s">"instrument"</span>: str, <span class="s">"claim"</span>: str,
+                    <span class="s">"level"</span>: float|null, <span class="s">"by"</span>: date|null }],  <span class="c"># wejście weryfikacji F4</span>
+  <span class="s">"topics"</span>: [str],
+  <span class="s">"impact_score"</span>: 1..10
+}</code></pre>
+      <p>Profile (<code>market</code>, później np. <code>macro</code>, <code>crypto</code>) to prompt + schemat; kanał lub temat wskazuje profil. Streszczenie zawsze po polsku, niezależnie od języka filmu.</p>
+      <div class="quote">Transkrypcja to tekst napisany przez obcego. Model czyta ją jako dane, nigdy jako polecenie.</div>
+      <p>Prompt analizy powtarza regułę z <code>ANALYSIS_PROMPT</code> social. Ważniejsze: <span class="hl">rozmowa ma narzędzia rachunku</span>. Narzędzie zwracające surową transkrypcję do rozmowy to kanał prompt injection w stronę zleceń (choćby demo). Dlatego domyślnie narzędzia oddają odczyt, a surowy tekst — tylko osobnym narzędziem, stronicowanym, opakowanym jako dane.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Narzędzia</div>
+      <h2>Agent konfiguruje, usuwa tylko operator</h2>
+      <p>Te same funkcje FastMCP trafiają do rozmowy i zespołów przez <code>local_tools.py</code>, a sieciowo pod <code>/youtube/mcp</code>. Precedens <code>polymarket_data</code>: agent dopisuje do listy, <strong>usunięcie tylko przez REST</strong>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Narzędzie</th><th>Rodzaj</th><th>Koszt</th><th>Do czego</th></tr></thead>
+          <tbody>
+            <tr><td><b>youtube_archive_status</b></td><td><span class="tag ok">read</span></td><td>—</td><td>kanały, tematy, zużyte jednostki i tokeny, stan dostawców</td></tr>
+            <tr><td><b>recent_videos</b></td><td><span class="tag ok">read</span></td><td>—</td><td>ostatnie filmy z odczytami; filtr kanał / temat / instrument</td></tr>
+            <tr><td><b>read_video</b></td><td><span class="tag ok">read</span></td><td>—</td><td>pełny odczyt jednego filmu</td></tr>
+            <tr><td><b>read_transcript</b></td><td><span class="tag att">read · obce dane</span></td><td>—</td><td>strona surowego tekstu</td></tr>
+            <tr><td><b>instrument_sentiment</b></td><td><span class="tag ok">read</span></td><td>—</td><td>agregat sentymentu dla instrumentu w oknie czasu</td></tr>
+            <tr><td><b>search_youtube</b></td><td><span class="tag att">read · kosztuje</span></td><td>100 jedn.</td><td>jednorazowe wyszukiwanie, liczone w dziennym budżecie</td></tr>
+            <tr><td><b>follow_channel</b></td><td><span class="tag att">write</span></td><td>1 jedn.</td><td>po URL, <code>@handle</code> lub ID</td></tr>
+            <tr><td><b>add_topic</b></td><td><span class="tag att">write</span></td><td>—</td><td>nowy temat wyszukiwania</td></tr>
+            <tr><td><b>set_alert_rule</b></td><td><span class="tag att">write</span></td><td>—</td><td>reguła alertu kanału / tematu</td></tr>
+            <tr><td><b>analyse_video</b></td><td><span class="tag att">write · kosztuje</span></td><td>transkrypcja + tokeny</td><td>wrzuca dowolny film do kolejki</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">10 · Ekran</div>
+      <h2>Widok w terminalu, odczyt w pocket</h2>
+      <p><code>modules/terminal/src/youtube/YoutubeView.tsx</code> + <code>youtubeApi.ts</code> + <code>contract.youtube.generated.ts</code> (skill <code>contract-sync</code>). Wzór edycji listy: <code>PolymarketView</code> z <code>TrackEventDialog</code>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Zakładka</th><th>Zawiera</th><th>Faza</th></tr></thead>
+          <tbody>
+            <tr><td><b>Filmy</b></td><td>lista z miniaturą, kanałem, stanem, <code>impact_score</code>, chipami sentymentu; panel szczegółu: streszczenie, tezy, prognozy, zwinięta transkrypcja, link do YouTube (wymóg ToS)</td><td>F1</td></tr>
+            <tr><td><b>Kanały</b></td><td>lista, dodawanie (URL / @handle), reguła alertu, profil, pauza, usuń</td><td>F1–F2</td></tr>
+            <tr><td><b>Tematy</b></td><td>fraza, język, częstość, limit filmów, pauza, usuń</td><td>F2</td></tr>
+            <tr><td><b>Pasek stanu</b></td><td>jednostki API dziś / 10k, tokeny dziś / limit, dostawca transkrypcji: zdrowy / blokowany</td><td>F1</td></tr>
+            <tr><td><b>pocket</b></td><td>ekran odczytów, bez edycji</td><td>F4</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">11 · Telegram</div>
+      <h2>Znacznik dopiero po wysyłce</h2>
+      <p>Ścieżka <code>social_data/alerts.py</code> bez zmian: <code>POST /messages {destination, text}</code> przez klienta in-process, <code>mark_notified</code> dopiero po sukcesie — to cały mechanizm ponowień. Brak <code>ALERT_DESTINATION</code> to działająca konfiguracja: archiwum zbiera, nikomu nie mówi.</p>
+      <ul>
+        <li><strong>always</strong> — każdy przeanalizowany film kanału (dla kilku ulubionych).</li>
+        <li><strong>threshold</strong> — <code>impact_score ≥ YOUTUBE_ALERT_MIN_IMPACT_SCORE</code> (domyślnie 8).</li>
+        <li><strong>instrument</strong> (F3) — silny sentyment dla instrumentu z listy obserwowanych.</li>
+        <li><strong>digest</strong> (F3) — jedno podsumowanie dnia zamiast serii wiadomości.</li>
+      </ul>
+      <p>Wiadomość: tytuł, kanał, 2–3 zdania streszczenia, instrumenty z kierunkiem, link. Opcjonalnie cel per kanał (inna <code>destination</code>) — do decyzji.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">12 · Koszty i limity</div>
+      <h2>Trzy budżety, każdy z twardym sufitem</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Budżet</th><th>Szacunek</th><th>Sufit w kodzie</th></tr></thead>
+          <tbody>
+            <tr><td><b>YouTube Data API</b></td><td>50 kanałów × 48 odczytów = 2400 jedn.; 10 tematów × 2/dobę × 100 = 2000 jedn.</td><td><code>YOUTUBE_DAILY_UNIT_BUDGET</code> (np. 8000), liczony w <code>usage</code>; po przekroczeniu wyszukiwania stoją, kanały idą dalej</td></tr>
+            <tr><td><b>Transkrypcje</b></td><td>20–100 filmów/dobę · ~$5–50/mies. (do potwierdzenia)</td><td>limit filmów/dobę, odrzucenie &gt;180 min i shorts</td></tr>
+            <tr><td><b>OpenAI</b></td><td>~15 tys. tokenów wejścia na film godzinny · 100 filmów = ~1,5 mln/dobę</td><td><code>YOUTUBE_DAILY_TOKEN_LIMIT</code>; tematy domyślnie bez <code>auto_analyse</code> dla wszystkiego</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <pre><code><span class="c"># .env.example — nowy blok</span>
+<span class="k">YOUTUBE_DATABASE_URL</span>=postgresql://youtube:change-me@127.0.0.1:55432/youtube
+<span class="k">YOUTUBE_DATA_API_KEY</span>=                 <span class="c"># puste = pakiet stoi, /state mówi dlaczego</span>
+<span class="k">YOUTUBE_TRANSCRIPT_PROVIDERS</span>=direct     <span class="c"># prod: supadata</span>
+<span class="k">YOUTUBE_SUPADATA_API_KEY</span>=
+<span class="k">YOUTUBE_OPENAI_API_KEY</span>=
+<span class="k">YOUTUBE_ANALYSIS_MODEL</span>=gpt-6-sol
+<span class="k">YOUTUBE_POLL_INTERVAL_SECONDS</span>=1800
+<span class="k">YOUTUBE_DAILY_UNIT_BUDGET</span>=8000
+<span class="k">YOUTUBE_DAILY_TOKEN_LIMIT</span>=2000000
+<span class="k">YOUTUBE_MAX_VIDEO_MINUTES</span>=180
+<span class="k">YOUTUBE_ALERT_MIN_IMPACT_SCORE</span>=8
+<span class="k">YOUTUBE_TRANSCRIPT_RETENTION_DAYS</span>=30</code></pre>
+    </section>
+
+    <section>
+      <div class="eyebrow">13 · Ryzyka</div>
+      <h2>Co może pójść źle</h2>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Klucz API w logach <span class="tag stop">sekret</span></h3>
+          <p>Google przyjmuje klucz jako <code>?key=</code> w URL, a <code>httpx</code> loguje URL na INFO — tak 61 tys. linii z tokenami botów trafiło do App Insights (23 września). Klucz <strong>tylko w nagłówku</strong> <code>X-goog-api-key</code>, Supadata w <code>x-api-key</code>; test, że żaden URL wychodzący nie niesie sekretu. W GCP klucz ograniczony do YouTube Data API.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Dev działa, prod milczy <span class="tag stop">cicha awaria</span></h3>
+          <p><code>direct</code> z domu przechodzi, z Azure dostaje <code>IpBlocked</code>. Stan <code>Blocked</code> osobno od <code>NoTranscript</code>, widoczny w <code>/state</code> i w pasku terminala; F0 mierzy to na prawdziwym App Service przed napisaniem pakietu.</p>
+        </div>
+        <div class="fail">
+          <h3>Prompt injection w transkrypcji <span class="tag att">bezpieczeństwo</span></h3>
+          <p>Sekcja 08: analiza bez narzędzi, schema, surowy tekst tylko osobnym narzędziem. Zespoły z przypisanymi narzędziami rachunku nie dostają <code>read_transcript</code> domyślnie.</p>
+        </div>
+        <div class="fail">
+          <h3>Pętla ponowień jak w social <span class="tag att">koszt</span></h3>
+          <p><code>attempts</code> + <code>next_attempt_at</code> + stan końcowy. Test jednostkowy na harmonogram ponowień; w <code>db</code> — że zapytanie kolejki nie łapie <code>gave_up</code>.</p>
+        </div>
+        <div class="fail">
+          <h3>Zmiana zasad po stronie Google/dostawcy <span class="tag att">zależność</span></h3>
+          <p>Supadata, preview Gemini, blokady YouTube — wszystko poza naszą kontrolą. Stąd łańcuch dostawców za jednym interfejsem i budżety liczone lokalnie.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Ustawienia przed obrazem <span class="tag ok">kolejność wdrożenia</span></h3>
+          <p>Nowa baza, rola, <code>grant-schema-ownership.sql</code> raz przez operatora, sekrety w Key Vault i <code>apply</code> — zanim obraz z pakietem wejdzie na produkcję. Pakiet bez klucza startuje i stoi (wzór social), więc brak klucza to nie awaria startu.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">14 · Fazy</div>
+      <h2>Od pomiaru do weryfikacji prognoz</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Faza</th><th>Zakres</th><th>Gotowe, gdy</th></tr></thead>
+          <tbody>
+            <tr><td><b>F0 · spike</b></td><td>skrypt w scratchpadzie, nie w repo: klucz API, <code>playlistItems</code>/<code>search</code>, transkrypcja <code>direct</code> z domu i z App Service (np. <code>az webapp ssh</code>), Supadata na 20 filmach PL/EN, jeden odczyt modelu na prawdziwym filmie</td><td>znamy odsetek blokad z Azure, cenę na film, jakość PL auto-napisów, tokeny na film</td></tr>
+            <tr><td><b>F1 · archiwum</b></td><td>OpenSpec change; pakiet, baza, kanały (REST + <code>follow_channel</code>), odkrywanie, transkrypcja, odczyt <code>market</code>, narzędzia read, zakładki Filmy + Kanały, pasek stanu, infra</td><td>kanał dodany w terminalu → w ciągu godziny film ze streszczeniem na produkcji</td></tr>
+            <tr><td><b>F2 · tematy</b></td><td>tematy, <code>search_youtube</code>, budżet jednostek, <code>add_topic</code>, <code>analyse_video</code>, zakładka Tematy</td><td>agent na prośbę „śledź tematy o złocie” zakłada temat i wraca z wynikami</td></tr>
+            <tr><td><b>F3 · Telegram</b></td><td>reguły alertów, digest dzienny, alert per instrument</td><td>ważny film przychodzi na telefon raz, po analizie</td></tr>
+            <tr><td><b>F4 · weryfikacja</b></td><td>prognozy vs <code>/market</code> in-process, trafność kanału, <code>instrument_sentiment</code> dla zespołów, pocket, decyzja o Gemini</td><td>ekran pokazuje, który kanał trafia częściej niż rzut monetą</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px"><strong>OpenSpec: tak.</strong> Nowe wymagania, nowy kontrakt terminala, infra. Rodzina capability <code>youtube-data-*</code> (<code>ingest</code>, <code>store</code>, <code>transcripts</code>, <code>enrichment</code>, <code>alerts</code>, <code>tools</code>, <code>api</code>, <code>caller-access</code>, <code>liveness</code>, <code>upstream-access</code>) + <code>terminal-youtube</code> + zmiana <code>workbench-process</code>. Rekomendacja: osobny change na F1 i na każdą kolejną fazę, nie jeden wielki.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">15 · Decyzje operatora</div>
+      <h2>Otwarte pytania</h2>
+      <div class="fails">
+        <div class="fail"><h3>Budżet na transkrypcje</h3><p>Czy płatny dostawca (Supadata, rząd $5–50/mies.) jest akceptowalny, czy najpierw proxy rezydencjalne, czy transkrypcja tylko lokalnie?</p></div>
+        <div class="fail"><h3>Drugi dostawca modeli</h3><p>Czy Gemini (URL filmu wprost) może wejść obok OpenAI? Nowy klucz, nowy pakiet w <code>packages/</code> lub klient wewnątrz <code>youtube_data</code>.</p></div>
+        <div class="fail"><h3>Zakres treści</h3><p>Shorts i transmisje na żywo: pomijać (propozycja) czy analizować? Języki: PL + EN wystarczą?</p></div>
+        <div class="fail"><h3>Retencja</h3><p>30 dni dla surowych transkrypcji — wystarczy, czy trzeba dłużej do weryfikacji prognoz? (Prognozy są w odczycie, więc zostają.)</p></div>
+        <div class="fail"><h3>Telegram</h3><p>Jeden <code>ALERT_DESTINATION</code> dla wszystkiego, czy osobny cel dla YouTube / per kanał?</p></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Archiwum YouTube · projekt wysokiego poziomu · docs/youtube-archiwum-projekt.html</span>
+    <span>Źródła: Google YouTube API docs &amp; ToS, youtube-transcript-api #593, yt-dlp, Supadata, Gemini video understanding</span>
+  </div>
+</footer>

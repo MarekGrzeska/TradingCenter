@@ -15,6 +15,7 @@ from .models import SourceState
 def window(
     *,
     hours: int | None = None,
+    minutes: int | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
     default_hours: int,
@@ -25,6 +26,8 @@ def window(
     end = until or (now or datetime.now(UTC))
     if since is not None:
         return since, end
+    if minutes is not None:
+        return end - timedelta(minutes=minutes), end
     return end - timedelta(hours=hours or default_hours), end
 
 
@@ -58,7 +61,9 @@ async def posts(
     )
 
 
-async def state(conn: Conn, settings, *, now: datetime | None = None) -> StateOut:
+async def state(
+    conn: Conn, settings, *, now: datetime | None = None, alerts_configured: bool = False
+) -> StateOut:
     moment = now or datetime.now(UTC)
     states = await store.collection_states(conn)
     counted = await store.count_in_window(
@@ -81,6 +86,5 @@ async def state(conn: Conn, settings, *, now: datetime | None = None) -> StateOu
         window_hours=settings.collect_window_hours,
         collect_interval_seconds=settings.collect_interval_seconds,
         model_configured=settings.model_configured,
-        alerts_configured=settings.alerts_configured,
-        alert_min_impact_score=settings.alert_min_impact_score,
+        alerts_configured=alerts_configured,
     )

@@ -10,6 +10,7 @@ import { SignedOut, type IdentityState } from "./identity";
 
 const acquireTokenSilent = vi.fn();
 const loginRedirect = vi.fn();
+const logoutRedirect = vi.fn();
 const setActiveAccount = vi.fn();
 const account = { homeAccountId: "an-account" };
 
@@ -26,6 +27,7 @@ vi.mock("@azure/msal-browser", async () => {
       setActiveAccount = setActiveAccount;
       acquireTokenSilent = acquireTokenSilent;
       loginRedirect = loginRedirect;
+      logoutRedirect = logoutRedirect;
     },
   };
 });
@@ -40,8 +42,10 @@ const config: EntraConfig = {
     workbench: "api://workbench/access_as_user",
     gateway: "api://gateway/access_as_user",
     polymarket: "api://polymarket/access_as_user",
-    strategy: "api://strategy/access_as_user",
     social: "api://social/access_as_user",
+    youtube: "api://youtube/access_as_user",
+    telegram: "api://telegram/access_as_user",
+    alerts: "api://alerts/access_as_user",
   },
 };
 
@@ -137,6 +141,31 @@ describe("createEntraIdentities", () => {
     identities.shared.signIn();
 
     expect(loginRedirect).toHaveBeenCalledWith({ scopes: [config.scopes.archive] });
+  });
+
+  it("signs out of the session at Entra and comes back to the terminal", async () => {
+    const identities = await signedIn();
+
+    identities.shared.signOut();
+
+    expect(logoutRedirect).toHaveBeenCalledWith({
+      account,
+      postLogoutRedirectUri: `${window.location.origin}/`,
+    });
+  });
+
+  it("leaves the automatic sign-in off after a sign-out, and asks which account at the next one", async () => {
+    window.sessionStorage.clear();
+    const identities = await signedIn();
+
+    identities.shared.signOut();
+    expect(window.sessionStorage.getItem("tc.terminal.sign-in-attempted")).not.toBeNull();
+
+    identities.shared.signIn();
+    expect(loginRedirect).toHaveBeenCalledWith({
+      scopes: [config.scopes.archive],
+      prompt: "select_account",
+    });
   });
 
   it("refreshes on the same audience it first asked for", async () => {

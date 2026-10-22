@@ -7,11 +7,12 @@ creating one needs the account session that `/state` reports on.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Request, Response, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
+from tc_runtime.db import Conn
 
-from .. import bots, creator, store
+from .. import account, bots, store
 from ..contract import AdoptBotRequest, BotOut, NewBotRequest, Problem
-from ..errors import CreatingBotsUnavailable, GatewayError
+from ..errors import GatewayError, SessionRejected
 from . import deps
 
 router = APIRouter(prefix="/bots", tags=["bots"])
@@ -47,69 +48,113 @@ async def adopt(request: Request, body: AdoptBotRequest) -> BotOut:
     return BotOut.of(adopted)
 
 
+async def owner_conversation(request: Request, conn: Conn):
+    """The conversation with the creator bot, held by the logged-in owner account - or the refusal that says which
+    step is missing. Nothing is asked of Telegram before this returns."""
+    settings = request.app.state.settings
+    session = await account.usable_session(conn, settings)
+    return request.app.state.platform.creator(
+        settings.telegram_api_id, settings.telegram_api_hash, session
+    )
+
+
+async def _rejected(conn: Conn, err: GatewayError) -> HTTPException:
+    """Telegram refused the session while it was used: remembered, so the state route says so afterwards."""
+    if isinstance(err, SessionRejected):
+        await store.mark_account_rejected(conn)
+    return deps.refusal(err)
+
+
 @router.post(
     "/created",
     response_model=BotOut,
     status_code=status.HTTP_201_CREATED,
-    responses={409: {"model": Problem}, 422: {"model": Problem}, 501: {"model": Problem}, 502: {"model": Problem}},
+    responses={
+        409: {"model": Problem},
+        422: {"model": Problem},
+        501: {"model": Problem},
+        502: {"model": Problem},
+    },
 )
 async def create(request: Request, body: NewBotRequest) -> BotOut:
-    """A new bot, through Telegram's creator bot — where an account session is configured.
+    """A new bot, through Telegram's creator bot - where the owner account is logged in.
 
     Only ever on this request: the module never creates one on its own initiative, because the
     account being automated is the operator's own and Telegram limits accounts for exactly that.
     """
     settings = request.app.state.settings
-    conversation = creator.from_settings(settings)
-    if conversation is None:
-        # The refusal `bots.create` would raise anyway; here it is also what makes a conversation
-        # object exist to pass at all.
-        raise deps.refusal(CreatingBotsUnavailable())
-
     async with deps.connection(request.app.state.pool) as conn:
         try:
+            conversation = await owner_conversation(request, conn)
             created = await bots.create(
                 conn,
                 conversation,
                 title=body.title,
                 username=body.username,
-                can_create=settings.can_create_bots,
+                can_create=True,
                 ceiling=settings.max_bots,
             )
         except ValueError as err:
             # Telegram's username rule, refused before a word was sent to the creator bot.
             raise deps.bad_request(str(err)) from err
         except GatewayError as err:
-            raise deps.refusal(err) from err
+            raise await _rejected(conn, err) from err
     request.app.state.watcher.watch(created)
     return BotOut.of(created)
+
+
+@router.post(
+    "/{username}/token",
+    response_model=BotOut,
+    responses={
+        404: {"model": Problem},
+        409: {"model": Problem},
+        501: {"model": Problem},
+        502: {"model": Problem},
+    },
+)
+async def rotate(request: Request, username: str) -> BotOut:
+    """A new token for a bot, through the creator bot. The old one stops working at once; the bot's destinations
+    and assignments are untouched, so nobody taps a link again."""
+    async with deps.connection(request.app.state.pool) as conn:
+        existing = await store.bot_by_username(conn, username)
+        if existing is None:
+            raise deps.not_found(f"@{username} is not a bot this gateway holds")
+        try:
+            conversation = await owner_conversation(request, conn)
+            rotated = await bots.rotate(
+                conn, request.app.state.telegram, conversation, existing=existing
+            )
+        except GatewayError as err:
+            raise await _rejected(conn, err) from err
+    return BotOut.of(rotated)
 
 
 @router.delete(
     "/{username}",
     status_code=status.HTTP_204_NO_CONTENT,
-    responses={404: {"model": Problem}, 501: {"model": Problem}, 502: {"model": Problem}},
+    responses={
+        404: {"model": Problem},
+        409: {"model": Problem},
+        501: {"model": Problem},
+        502: {"model": Problem},
+    },
 )
 async def remove(request: Request, username: str) -> Response:
     """Removes the bot from Telegram and from here, and its destinations with it.
 
-    The same road as creating: only the account session can delete a bot, and a row dropped here
+    The same road as creating: only the owner account can delete a bot, and a row dropped here
     while the bot lives on Telegram would still count against the account's ceiling.
     """
-    settings = request.app.state.settings
     async with deps.connection(request.app.state.pool) as conn:
         existing = await store.bot_by_username(conn, username)
         if existing is None:
             raise deps.not_found(f"@{username} is not a bot this gateway holds")
 
-        conversation = creator.from_settings(settings)
-        if conversation is None:
-            raise deps.refusal(CreatingBotsUnavailable())
         try:
-            await bots.destroy(
-                conn, conversation, existing=existing, can_create=settings.can_create_bots
-            )
+            conversation = await owner_conversation(request, conn)
+            await bots.destroy(conn, conversation, existing=existing, can_create=True)
         except GatewayError as err:
-            raise deps.refusal(err) from err
+            raise await _rejected(conn, err) from err
     request.app.state.watcher.forget(existing.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

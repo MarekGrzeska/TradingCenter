@@ -6,9 +6,7 @@ kind of failure rather than an empty day."""
 
 from __future__ import annotations
 
-import html
 import logging
-import re
 from datetime import UTC, date, datetime
 from email.utils import parsedate_to_datetime
 
@@ -16,6 +14,7 @@ import httpx
 from defusedxml.ElementTree import fromstring
 
 from ..models import RawPost
+from ..text import clean
 from . import SourceUnreachable, SourceUnreadable
 
 log = logging.getLogger(__name__)
@@ -29,19 +28,6 @@ AUTHOR = "realDonaldTrump"
 # What the mirror marks a passed-on post with. Text matching, because the document has no field for
 # it — the flag is descriptive and steers nothing, so a miss costs a badge and no data.
 _REPOST_MARKERS = ("RT by", "Retruthed", "ReTruth")
-
-_TAG = re.compile(r"<[^>]+>")
-_WHITESPACE = re.compile(r"[ \t]*\n[ \t]*")
-
-
-def clean(raw: str) -> str:
-    """The item's description as text: tags dropped, entities resolved.
-
-    Unescaping is the half the source application skipped, so every `&amp;` reached the screen and
-    the model as five characters. Done after the tags go, or an entity-encoded `&lt;b&gt;` would
-    turn into a tag nobody stripped.
-    """
-    return _WHITESPACE.sub("\n", html.unescape(_TAG.sub("", raw))).strip()
 
 
 def published_at(raw: str | None) -> datetime | None:

@@ -10,7 +10,7 @@ a diff beside the change that caused it — and CI fails when the copy is stale:
 
 | Consumer | Copies of | Regenerate |
 |---|---|---|
-| `modules/terminal` | market-data, teams, agent, polymarket-data, social-data, strategy (`src/data/contract*.generated.ts`) | `pnpm contract:generate` |
+| `modules/terminal` | market-data, teams, agent, polymarket-data, social-data (`src/data/contract*.generated.ts`) | `pnpm contract:generate` |
 | `modules/pocket` | social-data, polymarket-data, agent | `pnpm contract:generate` |
 | `modules/trading-mcp` | capital-gateway's whole OpenAPI document — routes as well as DTOs | `uv run python scripts/contract.py generate` |
 

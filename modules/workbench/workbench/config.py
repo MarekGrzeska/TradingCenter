@@ -1,22 +1,23 @@
 """The one place this process reads its environment. What stays doubled carries a prefix and is doubled on purpose:
 two schemas, two OpenAI keys so the experiments bill on their own line, and two catalogues. The four packages that
-joined this process read what is theirs alone under a prefix of their own: `POLYMARKET_`, `SOCIAL_`, `STRATEGY_`,
+joined this process read what is theirs alone under a prefix of their own: `POLYMARKET_`, `SOCIAL_`,
 `MARKET_`, `TELEGRAM_` — and the gateway, which only the archive reaches, is the process's, unprefixed."""
 
 from __future__ import annotations
 
-from pydantic import Field, ValidationInfo, field_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from agent.config import ModelCatalogueEntry as AgentModelCatalogueEntry
 from agent.config import Settings as AgentSettings
+from alerts.config import Settings as AlertsSettings
 from market_data.config import Settings as MarketSettings
 from polymarket_data.config import Settings as PolymarketSettings
 from social_data.config import Settings as SocialSettings
-from strategy.config import Settings as StrategySettings
 from teams.config import ModelCatalogueEntry as TeamsModelCatalogueEntry
 from teams.config import Settings as TeamsSettings
 from telegram_gateway.config import Settings as TelegramSettings
+from youtube_data.config import Settings as YoutubeSettings
 
 
 class Settings(BaseSettings):
@@ -24,8 +25,8 @@ class Settings(BaseSettings):
 
     # One `DATABASE_USER` for both, a consequence of one App Service rather than a simplification: the process
     # presents one identity, and that role has to exist in both databases — the one operator step this change carries.
-    agent_database_url: str
-    teams_database_url: str
+    agent_database_url: str = Field(repr=False)
+    teams_database_url: str = Field(repr=False)
     database_user: str | None = None
     azure_client_id: str | None = None
     azure_client_secret: str | None = None
@@ -53,7 +54,11 @@ class Settings(BaseSettings):
 
     trading_mcp_url: str | None = None
     trading_mcp_scope: str | None = None
+    # The gateway's own key, shown to trading-mcp on a server — where no managed identity can present a scope.
+    trading_mcp_api_key: str | None = None
     trading_mcp_request_timeout_seconds: float = 35.0
+    # Hosts on the container network of this machine, comma-separated: reached with the key alone, no token.
+    private_hosts: str = ""
 
     # No `SOCIAL_MCP_*` either: the post archive is a package of this process too, since the same change — and no
     # `TELEGRAM_MCP_*` since stage 4, when the door to Telegram became the last of them.
@@ -68,43 +73,56 @@ class Settings(BaseSettings):
 
     require_authenticated_principal: bool = False
 
+    # A server with no platform authenticator in front (`move-from-azure-to-vps`): the process verifies the Entra token
+    # of whatever came through the edge proxy itself (`tc-entra-auth`), then lets its own records decide as before.
+    # Audiences are comma-separated. Nothing calls the workbench from inside the network, so no internal key opens it.
+    server_mode: bool = False
+    entra_tenant_id: str | None = None
+    entra_audiences: str = ""
+
     # The prediction-market archive and the post archive are packages of this process
     # (`one-process-per-security-boundary`): each its own database under its own name, and the two caller lists
     # both route records read. Everything else each needs is read under `POLYMARKET_` or `SOCIAL_` by
     # `for_polymarket` and `for_social`, or is the one setting the whole process shares.
-    polymarket_database_url: str
-    social_database_url: str
-    strategy_database_url: str
+    polymarket_database_url: str = Field(repr=False)
+    social_database_url: str = Field(repr=False)
     # The candle archive's database — the largest table this repository has, and the one migration whose lock
     # wait is the archive's own (`market_data.config`), not this process's 300 seconds.
-    market_database_url: str
+    market_database_url: str = Field(repr=False)
     # The archive's only upstream, and the one door out of this process to the provider. Unprefixed: the settings
     # market-data read as a process, with the same three refusals (`market_data.config`) — never capital.com itself.
     gateway_base_url: str = "http://localhost:8010"
     gateway_stream_url: str = "ws://localhost:8010/ws/stream"
     gateway_api_key: str
     gateway_scope: str | None = None
-    # No `MARKET_DATA_URL` or `_SCOPE` either: the strategy platform reads the archive in this process, through the
-    # archive's own application (`workbench/archive_client.py`) — no address, no token, no hop through the platform.
     # Who may reach `/polymarket/mcp` and `/social/mcp` from outside — nobody today, since the conversation calls
     # those tools in this process — and which browsers reach `/polymarket` and `/social` over REST.
     tool_caller_application_ids: str = ""
     rest_caller_application_ids: str = ""
-
-    # Who the post archive and the strategy platform tell, by the name the operator bound at the door to Telegram.
-    # Unset is a working configuration in which both collect and decide and nobody is told. Unprefixed, because both
-    # read it, and there is one destination.
-    alert_destination: str | None = None
 
     # The door to Telegram, a package of this process since stage 4 of `one-process-per-security-boundary`: its
     # database — bots, their tokens, and who receives — and the operator's own account session, unprefixed as it
     # always was. All three or none; none is a gateway that sends and refuses to create bots. Everything else it
     # reads is its own, under `TELEGRAM_`, and that includes the REST caller list: its bots and destinations answer
     # the operator's `az` alone, never the browsers the other packages share one list for.
-    telegram_database_url: str
+    telegram_database_url: str = Field(repr=False)
+    # The YouTube archive: the one package whose absence is a working configuration. Unset, the process runs without
+    # it — no routes, no tools, no database — which is what production does until its own change enables it.
+    youtube_database_url: str | None = Field(default=None, repr=False)
+    # The alerts package, optional for the same reason: unset, the process runs without it, and the archives that publish
+    # events simply do not. Production sets it in the same deploy that ships the package.
+    alerts_database_url: str | None = Field(default=None, repr=False)
     telegram_api_id: int | None = None
     telegram_api_hash: str | None = None
-    telegram_session: str | None = None
+    telegram_session_key: str | None = Field(default=None, repr=False)
+
+    @field_validator("youtube_database_url", "alerts_database_url")
+    @classmethod
+    def _blank_optional_database_means_absent(cls, value: str | None) -> str | None:
+        # `YOUTUBE_DATABASE_URL=` left in a .env is the line not being there, not a database named "".
+        if value is None or not value.strip():
+            return None
+        return value.strip()
 
     @field_validator("database_pool_size")
     @classmethod
@@ -118,7 +136,6 @@ class Settings(BaseSettings):
         "teams_database_url",
         "polymarket_database_url",
         "social_database_url",
-        "strategy_database_url",
         "market_database_url",
         "telegram_database_url",
         "gateway_api_key",
@@ -137,10 +154,11 @@ class Settings(BaseSettings):
         "database_user",
         "trading_mcp_url",
         "trading_mcp_scope",
-        "alert_destination",
         "telegram_api_hash",
-        "telegram_session",
+        "telegram_session_key",
         "gateway_scope",
+        "entra_tenant_id",
+        "trading_mcp_api_key",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -149,6 +167,25 @@ class Settings(BaseSettings):
         if value is None or not value.strip():
             return None
         return value.strip()
+
+    @model_validator(mode="after")
+    def _server_mode_is_coherent(self) -> Settings:
+        if not self.server_mode:
+            return self
+        if not self.require_authenticated_principal:
+            # Every record lets a caller through when this is off; a server must never be that.
+            raise ValueError(
+                "SERVER_MODE needs REQUIRE_AUTHENTICATED_PRINCIPAL=true — the records admit anybody without it"
+            )
+        if self.entra_tenant_id is None or not self.audiences:
+            raise ValueError(
+                "SERVER_MODE needs ENTRA_TENANT_ID and ENTRA_AUDIENCES — without them no token could be checked"
+            )
+        return self
+
+    @property
+    def audiences(self) -> list[str]:
+        return [part.strip() for part in self.entra_audiences.split(",") if part.strip()]
 
     @field_validator("telegram_api_id", mode="before")
     @classmethod
@@ -162,6 +199,7 @@ class Settings(BaseSettings):
         return AgentSettings(
             database_url=self.agent_database_url,
             database_user=self.database_user,
+            private_hosts=self.private_hosts,
             azure_client_id=self.azure_client_id,
             azure_client_secret=self.azure_client_secret,
             azure_tenant_id=self.azure_tenant_id,
@@ -173,6 +211,7 @@ class Settings(BaseSettings):
             # used to fill are gone from `agent.config.Settings` with them.
             trading_mcp_url=self.trading_mcp_url,
             trading_mcp_scope=self.trading_mcp_scope,
+            trading_mcp_api_key=self.trading_mcp_api_key,
             trading_mcp_request_timeout_seconds=self.trading_mcp_request_timeout_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
         )
@@ -182,6 +221,7 @@ class Settings(BaseSettings):
         return TeamsSettings(
             database_url=self.teams_database_url,
             database_user=self.database_user,
+            private_hosts=self.private_hosts,
             azure_client_id=self.azure_client_id,
             azure_client_secret=self.azure_client_secret,
             azure_tenant_id=self.azure_tenant_id,
@@ -190,6 +230,7 @@ class Settings(BaseSettings):
             models=self.teams_models,
             trading_mcp_url=self.trading_mcp_url,
             trading_mcp_scope=self.trading_mcp_scope,
+            trading_mcp_api_key=self.trading_mcp_api_key,
             trading_mcp_request_timeout_seconds=self.trading_mcp_request_timeout_seconds,
             run_timeout_seconds=self.run_timeout_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
@@ -206,6 +247,7 @@ class Settings(BaseSettings):
             _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
             database_url=self.polymarket_database_url,
             database_user=self.database_user,
+            private_hosts=self.private_hosts,
             azure_client_id=self.azure_client_id,
             azure_client_secret=self.azure_client_secret,
             azure_tenant_id=self.azure_tenant_id,
@@ -223,6 +265,7 @@ class Settings(BaseSettings):
             _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
             database_url=self.social_database_url,
             database_user=self.database_user,
+            private_hosts=self.private_hosts,
             azure_client_id=self.azure_client_id,
             azure_client_secret=self.azure_client_secret,
             azure_tenant_id=self.azure_tenant_id,
@@ -230,27 +273,6 @@ class Settings(BaseSettings):
             require_authenticated_principal=self.require_authenticated_principal,
             tool_caller_application_ids=self.tool_caller_application_ids,
             rest_caller_application_ids=self.rest_caller_application_ids,
-            alert_destination=self.alert_destination,
-        )
-
-    def for_strategy(self) -> StrategySettings:
-        """The strategy platform's own settings, the same way. What is the platform's alone is read under
-        `STRATEGY_`; the archive it reads is not a setting at all any more, but a client the host builds."""
-        return StrategySettings(
-            _env_prefix="STRATEGY_",  # pyright: ignore[reportCallIssue]
-            _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
-            database_url=self.strategy_database_url,
-            database_user=self.database_user,
-            azure_client_id=self.azure_client_id,
-            azure_client_secret=self.azure_client_secret,
-            azure_tenant_id=self.azure_tenant_id,
-            migration_lock_wait_seconds=self.migration_lock_wait_seconds,
-            require_authenticated_principal=self.require_authenticated_principal,
-            tool_caller_application_ids=self.tool_caller_application_ids,
-            rest_caller_application_ids=self.rest_caller_application_ids,
-            # No archive address and no gateway address: the host hands the platform a client over each one's
-            # own application.
-            alert_destination=self.alert_destination,
         )
 
     def for_market(self) -> MarketSettings:
@@ -262,6 +284,7 @@ class Settings(BaseSettings):
             _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
             database_url=self.market_database_url,
             database_user=self.database_user,
+            private_hosts=self.private_hosts,
             azure_client_id=self.azure_client_id,
             azure_client_secret=self.azure_client_secret,
             azure_tenant_id=self.azure_tenant_id,
@@ -283,6 +306,7 @@ class Settings(BaseSettings):
             _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
             database_url=self.telegram_database_url,
             database_user=self.database_user,
+            private_hosts=self.private_hosts,
             azure_client_id=self.azure_client_id,
             azure_client_secret=self.azure_client_secret,
             azure_tenant_id=self.azure_tenant_id,
@@ -291,5 +315,82 @@ class Settings(BaseSettings):
             tool_caller_application_ids=self.tool_caller_application_ids,
             telegram_api_id=self.telegram_api_id,
             telegram_api_hash=self.telegram_api_hash,
-            telegram_session=self.telegram_session,
+            telegram_session_key=self.telegram_session_key,
         )
+
+    def for_youtube(self) -> YoutubeSettings:
+        """The YouTube archive's own settings, the same way. Only asked for when `youtube_enabled()` said yes, so a
+        missing database here is a caller that skipped the question — refused by name rather than by pydantic."""
+        if self.youtube_database_url is None:
+            raise ValueError(
+                "YOUTUBE_DATABASE_URL is not set, so the YouTube archive is not part of this process — "
+                "there is no settings object to build for it."
+            )
+        return YoutubeSettings(
+            _env_prefix="YOUTUBE_",  # pyright: ignore[reportCallIssue]
+            _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
+            database_url=self.youtube_database_url,
+            database_user=self.database_user,
+            private_hosts=self.private_hosts,
+            azure_client_id=self.azure_client_id,
+            azure_client_secret=self.azure_client_secret,
+            azure_tenant_id=self.azure_tenant_id,
+            migration_lock_wait_seconds=self.migration_lock_wait_seconds,
+            require_authenticated_principal=self.require_authenticated_principal,
+            tool_caller_application_ids=self.tool_caller_application_ids,
+            # Not the process's list, which holds the pocket: this package's REST writes and spends. Read as
+            # YOUTUBE_REST_CALLER_APPLICATION_IDS, like `/telegram`'s.
+        )
+
+
+    def for_alerts(self) -> AlertsSettings:
+        """The alerts package's own settings, the same way, and asked for only when `alerts_enabled()` said yes."""
+        if self.alerts_database_url is None:
+            raise ValueError(
+                "ALERTS_DATABASE_URL is not set, so the alerts package is not part of this process — "
+                "there is no settings object to build for it."
+            )
+        return AlertsSettings(
+            _env_prefix="ALERTS_",  # pyright: ignore[reportCallIssue]
+            _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
+            database_url=self.alerts_database_url,
+            database_user=self.database_user,
+            private_hosts=self.private_hosts,
+            azure_client_id=self.azure_client_id,
+            azure_client_secret=self.azure_client_secret,
+            azure_tenant_id=self.azure_tenant_id,
+            migration_lock_wait_seconds=self.migration_lock_wait_seconds,
+            require_authenticated_principal=self.require_authenticated_principal,
+            tool_caller_application_ids=self.tool_caller_application_ids,
+            # Not the process's REST list either: this package's REST writes the rules that decide who is told.
+            # Read as ALERTS_REST_CALLER_APPLICATION_IDS.
+        )
+
+
+class _YoutubeSwitch(BaseSettings):
+    """The one setting the assembly reads at import time, alone: whether to mount the YouTube archive is decided before
+    `Settings()` — which refuses to build without the other seven databases — has anywhere to run."""
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    youtube_database_url: str | None = None
+
+
+def youtube_enabled() -> bool:
+    """Whether this process serves the YouTube archive: its database is configured, and nothing else decides it."""
+    configured = _YoutubeSwitch().youtube_database_url
+    return configured is not None and bool(configured.strip())
+
+
+class _AlertsSwitch(BaseSettings):
+    """The same one setting for the alerts package, read alone and at import time."""
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    alerts_database_url: str | None = None
+
+
+def alerts_enabled() -> bool:
+    """Whether this process serves the alerts package: its database is configured, and nothing else decides it."""
+    configured = _AlertsSwitch().alerts_database_url
+    return configured is not None and bool(configured.strip())

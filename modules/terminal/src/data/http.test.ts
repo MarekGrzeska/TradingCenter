@@ -35,6 +35,7 @@ function identityOf(...tokens: (string | SignedOut)[]): Identity & { refreshes: 
       return state.token();
     },
     signIn: () => {},
+    signOut: () => {},
   };
   return state;
 }

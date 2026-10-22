@@ -1,18 +1,16 @@
 import { Outlet } from "react-router";
-import { TopBar } from "./TopBar";
-import { TabBar } from "./TabBar";
+import { SideNav } from "./SideNav";
 import { AgentChat } from "../agent/AgentChat";
 import { Toaster } from "../ui/Toaster";
 
 export function Shell() {
   return (
     <div className="flex h-screen bg-canvas text-ink">
+      <SideNav />
       {/* `min-w-0`, or the grid's charts refuse to give width back when the agent panel
           opens: a flex item's default `min-width: auto` is its content, and a canvas that
           has been sized once counts as content. */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar />
-        <TabBar />
         {/* Testing: the triad stated once, at the seam between chrome and content. */}
         <div className="h-px shrink-0 bg-gradient-to-r from-primary via-secondary to-transparent" />
         <main className="min-h-0 flex-1 overflow-auto">

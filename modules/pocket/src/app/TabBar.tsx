@@ -1,20 +1,25 @@
-import type { Tab } from "./tabs";
+import { TABS, type Tab } from "./tabs";
 import styles from "./TabBar.module.css";
 
-const LABELS: Record<Tab, string> = { markets: "Markets", social: "Posts", agent: "Agent" };
+const LABELS: Record<Tab, string> = { markets: "Markets", social: "Posts", news: "News", agent: "Agent" };
 
 /** At the bottom, because that is where a thumb is. A row of tabs at the top of a phone screen is a
  *  reach for every switch, and this app is opened for seconds at a time. */
 export function TabBar({
   current,
   onChange,
+  tabs = TABS,
+  onSignOut,
 }: {
   current: Tab;
   onChange: (tab: Tab) => void;
+  tabs?: readonly Tab[];
+  /** Absent where there is no identity to end (the local stack). */
+  onSignOut?: () => void;
 }) {
   return (
     <nav className={styles.bar} aria-label="Screens">
-      {(Object.keys(LABELS) as Tab[]).map((tab) => (
+      {tabs.map((tab) => (
         <button
           key={tab}
           type="button"
@@ -43,6 +48,11 @@ export function TabBar({
                 />
                 <path d="M7 7.5h6M7 10h4" strokeWidth="1.4" strokeLinecap="round" />
               </svg>
+            ) : tab === "news" ? (
+              <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor">
+                <path d="M4 4.5h9v11H5.5a1.5 1.5 0 0 1-1.5-1.5z" strokeWidth="1.6" strokeLinejoin="round" />
+                <path d="M13 8h3v6a1.5 1.5 0 0 1-3 0M6.5 7.5h4M6.5 10h4M6.5 12.5h4" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
             ) : (
               <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor">
                 <path
@@ -56,6 +66,21 @@ export function TabBar({
           {LABELS[tab]}
         </button>
       ))}
+      {onSignOut === undefined ? null : (
+        <button type="button" className={styles.off} onClick={onSignOut}>
+          <span className={styles.icon} aria-hidden>
+            <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor">
+              <path
+                d="M8 4H5.5A1.5 1.5 0 0 0 4 5.5v9A1.5 1.5 0 0 0 5.5 16H8M12 6.5 15.5 10 12 13.5M15.5 10H8"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </span>
+          Sign out
+        </button>
+      )}
     </nav>
   );
 }

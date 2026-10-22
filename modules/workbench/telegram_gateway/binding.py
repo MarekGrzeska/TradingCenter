@@ -22,7 +22,7 @@ from tc_runtime.db import Conn
 from . import store
 from .bot_api import BotApi
 from .errors import GatewayError
-from .models import Bot, Destination
+from .models import Bot, ChatIdentity, Destination, Recipient
 
 log = logging.getLogger(__name__)
 
@@ -48,16 +48,16 @@ def start_link(bot: Bot, nonce: str) -> str:
     return f"{bot.start_link}?start={nonce}"
 
 
-async def offer(conn: Conn, *, name: str, bot: Bot, now: datetime | None = None) -> tuple[Destination, str]:
-    """Names a destination and hands back the link that will bind it.
+async def offer(
+    conn: Conn, *, recipient: Recipient, bot: Bot, now: datetime | None = None
+) -> tuple[Destination, str]:
+    """Reaches a recipient through a bot and hands back the link that will bind it.
 
-    The destination exists immediately and cannot receive yet: that gap is the honest shape of a
-    platform where a bot may not speak first.
+    The binding exists immediately and cannot receive yet: that gap is the honest shape of a platform where a bot may not
+    speak first. Asking again for the same recipient and bot issues a fresh secret and makes no second binding.
     """
     moment = now or datetime.now(UTC)
-    destination = await store.destination_by_name(conn, name)
-    if destination is None:
-        destination = await store.create_destination(conn, name=name, bot_id=bot.id)
+    destination = await store.create_destination(conn, recipient=recipient, bot_id=bot.id)
 
     nonce = secrets.token_urlsafe(NONCE_BYTES)
     await store.issue_nonce(
@@ -69,8 +69,19 @@ async def offer(conn: Conn, *, name: str, bot: Bot, now: datetime | None = None)
     return destination, start_link(bot, nonce)
 
 
-def _start_payload(update: dict) -> tuple[int, str] | None:
-    """`(chat_id, payload)` from an update that is a `/start` carrying an argument, else `None`.
+def identity_of(chat: dict, sender: dict | None = None) -> ChatIdentity:
+    """Who a chat is, from Telegram's own description of it: for a person their @name and full name, for a group or a
+    channel its title and its public @name if it has one."""
+    kind = chat.get("type")
+    if kind == "private":
+        source = sender or chat
+        full = " ".join(part for part in (source.get("first_name"), source.get("last_name")) if part)
+        return ChatIdentity(username=source.get("username") or chat.get("username"), title=full or None, kind=kind)
+    return ChatIdentity(username=chat.get("username"), title=chat.get("title"), kind=kind)
+
+
+def _start_payload(update: dict) -> tuple[int, str, ChatIdentity] | None:
+    """`(chat_id, payload, who)` from an update that is a `/start` carrying an argument, else `None`.
 
     Every other update is ignored rather than parsed: this module reads Telegram for exactly one
     reason, and `telegram-gateway-upstream-access` keeps it that way.
@@ -87,7 +98,8 @@ def _start_payload(update: dict) -> tuple[int, str] | None:
     chat_id = chat.get("id")
     if chat_id is None:
         return None
-    return int(chat_id), parts[1].strip()
+    # A group start arrives as `/start@thebot <payload>`: the payload is still the last word.
+    return int(chat_id), parts[1].strip().split()[-1], identity_of(chat, message.get("from"))
 
 
 async def consume(conn: Conn, bot: Bot, updates: list[dict], *, now: datetime | None = None) -> int:
@@ -104,9 +116,9 @@ async def consume(conn: Conn, bot: Bot, updates: list[dict], *, now: datetime | 
         start = _start_payload(update)
         if start is None:
             continue
-        chat_id, payload = start
+        chat_id, payload, who = start
         destination = await store.bind_destination(
-            conn, nonce=payload, chat_id=chat_id, moment=moment
+            conn, nonce=payload, chat_id=chat_id, moment=moment, who=who
         )
         if destination is None:
             # Expired, already spent, or never issued. Not logged with the payload: it is a secret,
@@ -195,3 +207,27 @@ class Watcher:
 
         async with self._pool.acquire() as conn:
             return await consume(conn, bot, updates)
+
+
+async def backfill_identities(pool, api) -> int:
+    """Asks Telegram who each bound destination is, for the ones bound before that was recorded. Best effort and once,
+    at start: a destination Telegram will not describe stays as it is, and is still somebody to send to."""
+    from .errors import GatewayError
+
+    async with pool.acquire() as conn:
+        missing = await store.destinations_without_identity(conn)
+    filled = 0
+    for destination in missing:
+        async with pool.acquire() as conn:
+            credential = await store.credential_of(conn, destination.bot_id)
+        if credential is None or destination.chat_id is None:
+            continue
+        try:
+            chat = await api.get_chat(credential.token, chat_id=destination.chat_id)
+        except GatewayError as err:
+            log.info("could not ask Telegram who %s is: %s", destination.name, err)
+            continue
+        async with pool.acquire() as conn:
+            await store.note_identity(conn, destination.id, identity_of(chat))
+        filled += 1
+    return filled

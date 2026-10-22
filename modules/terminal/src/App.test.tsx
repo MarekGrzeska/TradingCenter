@@ -64,7 +64,7 @@ beforeEach(() => {
   window.history.pushState({}, "", "/");
 });
 
-// The top bar's health check resolves asynchronously right after mount, so waiting for it once keeps that
+// The side nav's health check resolves asynchronously right after mount, so waiting for it once keeps that
 // update inside `act()` rather than leaking a warning into whichever test happens to be running.
 async function renderApp() {
   const view = render(<App />);
@@ -87,6 +87,7 @@ describe("App routing (terminal-shell spec)", () => {
     expect(window.location.pathname).toBe("/instruments");
     expect(screen.getByText("instruments stub")).toBeInTheDocument();
 
+    await user.click(screen.getByRole("button", { name: "Data" }));
     await user.click(screen.getByRole("link", { name: "Data History" }));
 
     expect(window.location.pathname).toBe("/data-history");
@@ -139,6 +140,20 @@ describe("App routing (terminal-shell spec)", () => {
     expect(screen.queryByRole("link", { name: "Orders" })).not.toBeInTheDocument();
   });
 
+  it("opens one group at a time and follows the address into its group", async () => {
+    const user = userEvent.setup();
+    await renderApp();
+
+    expect(screen.getByRole("button", { name: "Trading" })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByRole("link", { name: "News" })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Data" }));
+
+    expect(screen.getByRole("button", { name: "Trading" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("link", { name: "News" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Instruments" })).not.toBeInTheDocument();
+  });
+
   it("shows a way back to the default tab for an unknown address", async () => {
     window.history.pushState({}, "", "/nope");
     await renderApp();
@@ -166,6 +181,7 @@ describe("App agent chat", () => {
     expect(screen.getByRole("complementary", { name: /agent chat/i })).toBeInTheDocument();
 
     // A tab switch re-renders the outlet; the panel is a sibling of it and stays open.
+    await user.click(screen.getByRole("button", { name: "Data" }));
     await user.click(screen.getByRole("link", { name: "Data History" }));
 
     expect(screen.getByText("data history stub")).toBeInTheDocument();
@@ -173,7 +189,7 @@ describe("App agent chat", () => {
   });
 });
 
-describe("App top bar (terminal-shell spec, source status)", () => {
+describe("App side status (terminal-shell spec, source status)", () => {
   // Two back ends, two indicators: the archive keeps the candles and the gateway keeps the catalogue, and
   // they go down separately. One combined light would send an operator looking in the wrong place.
   it("names each back end and reports it reachable once it answers", async () => {

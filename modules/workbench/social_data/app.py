@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 from contextlib import asynccontextmanager
+from datetime import timedelta
 
 import httpx
 from fastapi import FastAPI
@@ -22,17 +23,20 @@ from . import alerts, enrichment, mcp_app
 from .caller_access import RECORD, CallerAccess
 from .config import Settings
 from .ingest import Ingest
+from .news.collector import NewsCollector
+from .news.fetch import FeedClient
+from .news.sources import SOURCES as NEWS_SOURCES
 from .providers.truth_social import TruthSocialFeed
-from .routers import meta, posts
+from .routers import meta, news, posts
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
 log = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def serving(app: FastAPI, settings: Settings, telegram: httpx.AsyncClient | None = None):
-    """Everything this package needs running, on `app.state`, for as long as the block is open. `telegram` is
-    the host's client over the door to Telegram; without it nobody is told, whatever the destination says."""
+async def serving(app: FastAPI, settings: Settings, alerts_client: httpx.AsyncClient | None = None):
+    """Everything this package needs running, on `app.state`, for as long as the block is open. `alerts_client` is
+    the host's client over the alerts package; without it nobody is told, whatever the rules say."""
     app.state.settings = settings
 
     async with (
@@ -71,16 +75,21 @@ async def serving(app: FastAPI, settings: Settings, telegram: httpx.AsyncClient 
         enricher = enrichment.build(pool, settings)
         app.state.enrichment = enricher
 
-        # `None` without a destination, and the module runs anyway: collecting without telling anybody
-        # is a supported state, which `/state` names rather than leaving the screen to guess at.
-        announcer = alerts.build(pool, settings, telegram)
+        # `None` without an alerts package, and the module runs anyway: collecting without telling anybody is a
+        # supported state, which `/state` names rather than leaving the screen to guess at.
+        announcer = alerts.build(pool, settings, alerts_client)
         app.state.alerts = announcer
+        if announcer is not None:
+            await announcer.announce_types()
 
         # After the migration and not before it: a pass started earlier would write into a schema
         # it does not know, and a bad write is not undone by a later error response.
         # One heartbeat per loop, on the state so `/health` can answer with it and so the metric's
         # callback can read it without awaiting. "collect" is what the alert's `loop` dimension says.
-        heartbeats = Heartbeats(LoopHeartbeat("collect", expected_seconds=settings.collect_interval_seconds))
+        heartbeats = Heartbeats(
+            LoopHeartbeat("collect", expected_seconds=settings.collect_interval_seconds),
+            LoopHeartbeat("news", expected_seconds=settings.news_tick_seconds),
+        )
         app.state.heartbeats = heartbeats
         liveness.register_metrics("social_data", heartbeats)
 
@@ -96,6 +105,17 @@ async def serving(app: FastAPI, settings: Settings, telegram: httpx.AsyncClient 
         app.state.ingest = ingest
         await ingest.start()
 
+        news_collector = NewsCollector(
+            pool,
+            FeedClient(http),
+            NEWS_SOURCES,
+            tick_seconds=settings.news_tick_seconds,
+            retention=timedelta(days=settings.news_retention_days),
+            heartbeat=heartbeats["news"],
+        )
+        app.state.news = news_collector
+        await news_collector.start()
+
         # The tool surface's session manager: a mounted application's lifespan is never run, so the
         # task group has to be started here or every tool call fails.
         async with mcp_app.tool_surface_session(app):
@@ -103,6 +123,7 @@ async def serving(app: FastAPI, settings: Settings, telegram: httpx.AsyncClient 
             try:
                 yield
             finally:
+                await news_collector.stop()
                 await ingest.stop()
 
 
@@ -123,6 +144,7 @@ def create_app() -> FastAPI:
     )
     app.include_router(meta.router)
     app.include_router(posts.router)
+    app.include_router(news.router)
 
     server, tool_app = mcp_app.build_mcp_app(app)
     app.state.mcp_server = server

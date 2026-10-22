@@ -11,7 +11,6 @@ import httpx
 import pytest
 
 from telegram_gateway.bot_api import Delivered
-from telegram_gateway.config import Settings
 from telegram_gateway.errors import RateLimited
 
 from . import builders
@@ -44,10 +43,14 @@ class TestSending:
         )
         app.state.telegram = FakeBotApi(send=Delivered(message_id=77, chat_id=5))
 
-        response = await api.post("/messages", json={"destination": "operator", "text": "hi"})
+        response = await api.post("/messages", json={"recipient": "operator", "text": "hi"})
 
         assert response.status_code == 200
-        assert response.json() == {"destination": "operator", "message_id": 77, "chat_id": 5}
+        assert response.json() == {
+            "recipient": "operator",
+            "message_id": 77,
+            "chat_id": 5,
+        }
 
     async def test_a_rate_limit_reaches_the_caller_with_the_wait_telegram_asked_for(
         self, api, app, db
@@ -62,7 +65,7 @@ class TestSending:
         )
         app.state.telegram = FakeBotApi(send=RateLimited(retry_after_seconds=42))
 
-        response = await api.post("/messages", json={"destination": "operator", "text": "hi"})
+        response = await api.post("/messages", json={"recipient": "operator", "text": "hi"})
 
         assert response.status_code == 429
         problem = response.json()["detail"]
@@ -70,7 +73,7 @@ class TestSending:
         assert problem["retryable"] is True
 
     async def test_an_unknown_name_is_refused_and_nothing_is_sent(self, api, app) -> None:
-        response = await api.post("/messages", json={"destination": "nobody", "text": "hi"})
+        response = await api.post("/messages", json={"recipient": "nobody", "text": "hi"})
 
         assert response.status_code == 404
         assert "nobody" in response.json()["detail"]["detail"]
@@ -102,13 +105,11 @@ class TestBots:
         # Watched from now rather than from the next restart — binding a destination needs a poll.
         assert app.state.watcher.watching == ["pastedbot"]
 
-    async def test_creating_one_without_an_account_session_names_the_missing_setting(
-        self, api
-    ) -> None:
+    async def test_creating_one_with_no_account_logged_in_says_so(self, api) -> None:
         response = await api.post("/bots/created", json={"title": "Alerts", "username": "abot"})
 
         assert response.status_code == 501
-        assert "TELEGRAM_SESSION" in response.json()["detail"]["detail"]
+        assert "logged in" in response.json()["detail"]["detail"]
 
     async def test_deleting_a_bot_this_gateway_does_not_hold_is_a_refusal_about_the_name(
         self, api
@@ -119,11 +120,12 @@ class TestBots:
         assert "nosuchbot" in response.json()["detail"]["detail"]
 
 
-class TestDestinations:
-    async def test_asking_for_a_destination_answers_with_a_link_to_tap(self, api, db) -> None:
+class TestRecipients:
+    async def test_adding_a_bot_to_a_recipient_answers_with_a_link_to_tap(self, api, db) -> None:
         bot = await builders.bot(db, username="alertsbot")
+        await api.post("/recipients", json={"name": "operator"})
 
-        response = await api.post("/destinations", json={"name": "operator", "bot": "alertsbot"})
+        response = await api.post("/recipients/operator/bots", json={"bot": "alertsbot"})
 
         assert response.status_code == 201
         body = response.json()
@@ -132,23 +134,91 @@ class TestDestinations:
         assert body["start_link"].startswith(f"https://t.me/{bot.username}?start=")
         assert body["expires_in_seconds"] > 0
 
-    async def test_a_bot_this_gateway_does_not_hold_is_refused(self, api) -> None:
-        response = await api.post("/destinations", json={"name": "operator", "bot": "nosuchbot"})
+    async def test_a_bot_this_gateway_does_not_hold_and_a_recipient_nobody_named_are_refused(self, api, db) -> None:
+        await builders.bot(db, username="alertsbot")
+        await api.post("/recipients", json={"name": "operator"})
 
-        assert response.status_code == 404
+        assert (await api.post("/recipients/operator/bots", json={"bot": "nosuchbot"})).status_code == 404
+        assert (await api.post("/recipients/nobody/bots", json={"bot": "alertsbot"})).status_code == 404
 
-    async def test_removing_a_destination_leaves_the_bot_and_its_others_standing(
-        self, api, db
-    ) -> None:
+    async def test_the_same_recipient_can_be_reached_through_two_bots_each_with_its_own_state(self, api, db) -> None:
+        await builders.bot(db, username="postsbot")
+        await builders.bot(db, username="filmsbot")
+        await api.post("/recipients", json={"name": "operator"})
+
+        await api.post("/recipients/operator/bots", json={"bot": "postsbot"})
+        await api.post("/recipients/operator/bots", json={"bot": "filmsbot"})
+        await api.post("/recipients/operator/bots", json={"bot": "filmsbot"})  # asked twice: still one binding
+
+        (operator,) = (await api.get("/recipients")).json()
+        assert sorted(one["bot"] for one in operator["bindings"]) == ["filmsbot", "postsbot"]
+        assert {one["state"] for one in operator["bindings"]} == {"pending"}
+
+    async def test_removing_one_binding_leaves_the_bot_the_recipient_and_its_other_binding(self, api, db) -> None:
+        first = await builders.bot(db, username="postsbot")
+        second = await builders.bot(db, username="filmsbot")
+        await builders.destination(db, name="operator", bot_id=first.id)
+        await builders.destination(db, name="operator", bot_id=second.id)
+
+        removed = await api.delete("/recipients/operator/bots/postsbot")
+
+        assert removed.status_code == 204
+        (operator,) = (await api.get("/recipients")).json()
+        assert [one["bot"] for one in operator["bindings"]] == ["filmsbot"]
+        assert sorted(one["username"] for one in (await api.get("/bots")).json()) == ["filmsbot", "postsbot"]
+
+    async def test_removing_a_recipient_takes_every_binding_and_leaves_the_bots(self, api, db) -> None:
         bot = await builders.bot(db, username="alertsbot")
         await builders.destination(db, name="operator", bot_id=bot.id)
         await builders.destination(db, name="risk", bot_id=bot.id)
 
-        removed = await api.delete("/destinations/operator")
+        removed = await api.delete("/recipients/operator")
 
         assert removed.status_code == 204
-        assert [one["name"] for one in (await api.get("/destinations")).json()] == ["risk"]
+        assert [one["name"] for one in (await api.get("/recipients")).json()] == ["risk"]
         assert [one["username"] for one in (await api.get("/bots")).json()] == ["alertsbot"]
+
+    async def test_a_message_goes_through_the_named_bot_and_is_refused_when_it_would_have_to_guess(
+        self, api, app, db
+    ) -> None:
+        first = await builders.bot(db, username="postsbot")
+        second = await builders.bot(db, username="filmsbot")
+        for bot in (first, second):
+            made = await builders.destination(db, name="operator", bot_id=bot.id)
+            await db.execute("UPDATE destinations SET chat_id = 5, state = 'ready' WHERE id = $1", made.id)
+        app.state.telegram = FakeBotApi(send=Delivered(message_id=1, chat_id=5))
+
+        guessing = await api.post("/messages", json={"recipient": "operator", "text": "hi"})
+        named = await api.post("/messages", json={"recipient": "operator", "bot": "filmsbot", "text": "hi"})
+        stranger = await api.post("/messages", json={"recipient": "operator", "bot": "otherbot", "text": "hi"})
+
+        assert guessing.status_code == 409
+        assert "postsbot" in guessing.text and "filmsbot" in guessing.text
+        assert named.status_code == 200
+        assert stranger.status_code == 404
+        assert len(app.state.telegram.sent) == 1
+
+    async def test_a_recipient_with_no_bot_yet_cannot_be_written_to(self, api, app) -> None:
+        await api.post("/recipients", json={"name": "operator"})
+
+        refused = await api.post("/messages", json={"recipient": "operator", "text": "hi"})
+
+        assert refused.status_code == 404
+        assert "not bound through any bot" in refused.text
+
+    async def test_blocking_one_bot_leaves_the_same_recipient_reachable_through_another(self, api, app, db) -> None:
+        first = await builders.bot(db, username="postsbot")
+        second = await builders.bot(db, username="filmsbot")
+        for bot in (first, second):
+            made = await builders.destination(db, name="operator", bot_id=bot.id)
+            await db.execute("UPDATE destinations SET chat_id = 5, state = 'ready' WHERE id = $1", made.id)
+        await db.execute("UPDATE destinations SET state = 'blocked' WHERE bot_id = $1", first.id)
+        app.state.telegram = FakeBotApi(send=Delivered(message_id=2, chat_id=5))
+
+        through_blocked = await api.post("/messages", json={"recipient": "operator", "bot": "postsbot", "text": "hi"})
+        through_other = await api.post("/messages", json={"recipient": "operator", "bot": "filmsbot", "text": "hi"})
+
+        assert (through_blocked.status_code, through_other.status_code) == (409, 200)
 
 
 class TestState:
@@ -159,24 +229,43 @@ class TestState:
 
         assert response.status_code == 200
         assert response.json() == {
-            "account_session_configured": False,
+            "account": {
+                "status": "logged_out",
+                "username": None,
+                "phone": None,
+                "reason": None,
+                "session_key_configured": False,
+                "api_credentials_configured": False,
+            },
+            "can_create_bots": False,
             "bots": 0,
             "destinations": 0,
             "destinations_ready": 0,
         }
 
-    async def test_it_reports_the_account_session_when_there_is_one(self, api, app, db) -> None:
-        app.state.settings = Settings(
-            database_url="postgresql://localhost:5432/test?sslmode=require",
-            database_user="test-user",
-            telegram_api_id=1,
-            telegram_api_hash="hash",
-            telegram_session="session",
-            _env_file=None,
-        )
+    async def test_it_counts_the_bots_it_holds(self, api, db) -> None:
         await builders.bot(db)
 
         body = (await api.get("/state")).json()
 
-        assert body["account_session_configured"] is True
         assert body["bots"] == 1
+
+
+class TestAMessageStillAddressedByPurpose:
+    async def test_a_request_that_sends_a_purpose_is_refused_and_sends_nothing(self, api, app) -> None:
+        """Who is told what is a rule of the alerts package now; a producer that still sends under a purpose hears no, in
+        words, rather than being sent to nobody."""
+        refused = await api.post("/messages", json={"recipient": "operator", "purpose": "youtube.film", "text": "hi"})
+
+        assert refused.status_code == 422
+        assert app.state.telegram.sent == []
+
+
+async def test_a_destination_goes_with_the_assignments_nothing_reads_any_more(db) -> None:
+    """The old tables stay until the conversion is known to have run; until then they must not stop a destination going."""
+    destination = await builders.destination(db)
+    await db.execute("INSERT INTO assignments (key, destination_id) VALUES ('youtube.film', $1)", destination.id)
+
+    await db.execute("DELETE FROM destinations WHERE id = $1", destination.id)
+
+    assert await db.fetchval("SELECT count(*) FROM assignments") == 0

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>A Publisher</title>
+    <item>
+      <title>US-Iran talks in New York: What&#8217;s the latest?</title>
+      <link>https://example.com/talks</link>
+      <guid isPermaLink="false">guid-talks</guid>
+      <pubDate>Tue, 29 Sep 2026 15:09:00 +0000</pubDate>
+      <description>&lt;p&gt;Delegations met &amp;amp; adjourned.&lt;/p&gt;</description>
+    </item>
+    <item>
+      <title>Dublin Core dated item</title>
+      <link>https://example.com/dc</link>
+      <dc:date>2026-09-29T15:00:00+02:00</dc:date>
+    </item>
+    <item>
+      <title>No guid, the link is the identity</title>
+      <link>https://example.com/only-link</link>
+      <pubDate>not a date</pubDate>
+    </item>
+    <item>
+      <title></title>
+      <link>https://example.com/no-title</link>
+    </item>
+    <item>
+      <title>No identity at all</title>
+    </item>
+  </channel>
+</rss>

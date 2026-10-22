@@ -1,0 +1,284 @@
+<title>Do zrobienia po migracji na VPS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Lista · po przeniesieniu</span>
+    <h1>Co jeszcze zostało po migracji na VPS</h1>
+    <p class="lede">System działa na jednym serwerze od 14 października 2026, Azure jest usunięty. Ta lista zbiera <b>wszystko, co jeszcze nie jest zrobione</b> — z podziałem na to, co musisz zrobić ty, i to, co robię ja.</p>
+    <div class="strip">
+      <span>TradingCenter / produkcja na VPS</span>
+      <span>16 października 2026</span>
+      <span>openspec/changes/<b>move-from-azure-to-vps</b> · 35 z 42 zadań</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">5</div><div class="l">spraw pilnych, do kilku dni</div></div>
+      <div class="cell"><div class="v">5</div><div class="l">do zrobienia w tym miesiącu</div></div>
+      <div class="cell"><div class="v">5</div><div class="l">porządków po Azure</div></div>
+      <div class="cell"><div class="v">~14.11</div><div class="l">kiedy kończy się wynajęty VPS</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">00 · Stan</div>
+      <h2>Co działa, żeby nie liczyć tego dwa razy</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Obszar</th><th>Stan</th><th>Jak sprawdzone</th></tr></thead>
+          <tbody>
+            <tr><td><b>Aplikacje</b></td><td><span class="tag ok">działa</span></td><td>pięć kontenerów zdrowych; cztery adresy odpowiadają 200; nieważny token → 401 z zewnątrz; sprawdzone przez operatora (lista dymna 7.4)</td></tr>
+            <tr><td><b>Dane</b></td><td><span class="tag ok">przeniesione</span></td><td>osiem baz, liczby wierszy zgodne tabela po tabeli (polymarket 36,5 mln)</td></tr>
+            <tr><td><b>Wdrożenia</b></td><td><span class="tag ok">działa</span></td><td><code>deploy-vps</code> po zielonych testach na <code>main</code>; sonda sama cofnęła złe wydanie (próba i prawdziwy przypadek z 404)</td></tr>
+            <tr><td><b>Kopie</b></td><td><span class="tag ok">działa</span></td><td>nocne zrzuty z 15 i 16 października (cron 2:30); zadanie w Harmonogramie odebrało je 15.10 o 10:52 i 16.10 o 9:44 (komputer był wtedy wyłączony o 9:00 — zadziałało „uruchom przy najbliższej okazji”); potwierdzenie na serwerze z 16.10 07:44 UTC; dysk 11% zajęty</td></tr>
+            <tr><td><b>Azure</b></td><td><span class="tag ok">usunięty</span></td><td>grupa zasobów nie istnieje, plan Terraform: „No changes”; zostały Entra i konto ze stanem</td></tr>
+            <tr><td><b>Alerty i monitoring</b></td><td><span class="tag stop">brak</span></td><td>patrz niżej: nikt z zewnątrz nie zauważy awarii serwera</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">01 · Pilne</div>
+      <h2>Do kilku dni</h2>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Alerty i monitor z zewnątrz <span class="tag stop">7.5</span> <span class="tag att">ty + ja</span></h3>
+          <p>Nic nie alarmuje, gdy serwer padnie, a alerty z samego serwera (dysk, brak zrzutu, brak odbioru kopii) nie mają bota Telegrama. Opcje i rekomendacja: <a href="monitor-z-zewnatrz-opcje.html">monitor-z-zewnatrz-opcje.html</a> (HetrixTools z zewnątrz, Healthchecks.io od środka). <strong>Ty:</strong> bot u @BotFather, konta i klucze API do plików w <code>.local/</code>. <strong>Ja:</strong> sekrety i <code>alert.env</code> w wdrożeniu, skrypt zakładający monitory, próba zatrzymanym kontenerem.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Przedłużenie albo przeniesienie VPS-a <span class="tag att">ty, do ok. 14 listopada</span></h3>
+          <p>Maszyna OVH jest wynajęta na miesiąc. Zdecyduj, czy zostaje (wtedy przedłuż), czy przenosisz się gdzie indziej. Przenosiny są kodem: nowy serwer, <code>deploy/ansible/site.yml</code>, odtworzenie z kopii, nowy adres w Terraformie (<code>vps_terminal_origins</code>, <code>vps_pocket_origins</code>) i <code>fill-github-environment.sh</code>. Przy okazji: adres jest w Wielkiej Brytanii, mimo że chciałeś Polskę, a YouTube blokuje jego napisy (zostaje Gemini).</p>
+        </div>
+        <div class="fail">
+          <h3>Obserwacja kilku dni i raport końcowy <span class="tag ok">7.6</span> <span class="tag ok">ja</span></h3>
+          <p>Kilka dni pracy w tle: przeglądam logi (skill <code>prod-health</code>) pod kątem błędów i pętli, które ucichły, i piszę <code>review.md</code>, wymagany przez tę zmianę, zanim da się ją zarchiwizować.</p>
+        </div>
+        <div class="fail">
+          <h3>Błąd w zbieraczu newsów <span class="tag ok">ja</span></h3>
+          <p>W logach: <code>index row size 3208 exceeds btree version 4 maximum 2704 for index "news_items_source_external_id_key"</code>. Któryś news ma identyfikator za długi na indeks, więc jedno przejście zbierania kończy się błędem. To nie wina migracji (ta sama wersja Postgresa i kod), ale trzeba naprawić: skrócić klucz (hash) albo odrzucić zbyt długi.</p>
+        </div>
+        <div class="fail">
+          <h3>Port 22 z całego internetu i mój klucz na serwerze <span class="tag att">ty + ja</span></h3>
+          <p>SSH przyjmuje tylko klucze, ale jest otwarty dla każdego adresu. Zawęź do swojego adresu lub zakresów GitHub Actions (<code>ssh_allowed_cidrs</code> w Ansible). Klucz <code>tc-vps-claude</code> w <code>authorized_keys</code> konta <code>ubuntu</code> usuń, gdy skończymy pracę (powiedz, to zrobię).</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · W tym miesiącu</div>
+      <h2>Rzeczy, które domykają zmianę</h2>
+      <div class="fails">
+        <div class="fail">
+          <h3>Próba odtworzenia z kopii <span class="tag att">6.2 · 6.3</span> <span class="tag ok">ja</span></h3>
+          <p>Kopie mają sens dopiero, gdy ktoś je odtworzył. Odtworzę osiem zrzutów z twojego komputera na czystym Postgresie, uruchomię na nich aplikacje i zapiszę czas w <code>design.md</code>. Potem comiesięczna próba w cronie z alertem przy porażce. (Dobry kandydat do wykonania razem z pierwszym nocnym zrzutem.)</p>
+        </div>
+        <div class="fail">
+          <h3>Drugi egzemplarz kopii <span class="tag att">ty, decyzja</span></h3>
+          <p>Kopie są dziś w dwóch miejscach: na serwerze (14 dni) i na jednym komputerze. Awaria dysku komputera przy utracie serwera zostawia tylko ostateczne zrzuty z Azure. Rozważ kopię na zewnętrznym dysku albo migawki OVH jako tani drugi poziom.</p>
+        </div>
+        <div class="fail">
+          <h3>Własna domena <span class="tag att">ty, kupno · ja, konfiguracja</span></h3>
+          <p>Adresy <code>*.57-129-181-251.sslip.io</code> to rozwiązanie zastępcze: zależą od adresu IP (nowy serwer to nowe nazwy i nowe adresy przekierowań w Entra) i od cudzej usługi. Z własną domeną wystarczy przestawić rekordy DNS. Wymaga <code>terraform apply</code> przekierowań (ja przygotuję, ty zastosujesz albo zatwierdzisz mnie).</p>
+        </div>
+        <div class="fail">
+          <h3>Test na prawdziwych tokenach Entra <span class="tag att">1.4</span> <span class="tag att">ty + ja</span></h3>
+          <p>Weryfikator tokenu jest testowany tokenami podpisanymi wygenerowanym kluczem RS256, tak jak robi Entra. Brakuje pary nagranych tokenów z twojego tenanta (v1 i v2). Daj po jednym (z przeglądarki, narzędzia deweloperskie → nagłówek <code>Authorization</code>; po teście wygasają same), ja dopiszę test.</p>
+        </div>
+        <div class="fail">
+          <h3>Martwy kod Azure w modułach <span class="tag att">reszta 9.4</span> <span class="tag ok">ja, osobna zmiana</span></h3>
+          <p>Na serwerze nieużywane: tryb tożsamości bazy (<code>DATABASE_USER</code> + token Entra) w ośmiu konfiguracjach, <code>*_SCOPE</code> i <code>ManagedIdentityAuth</code> w klientach, <code>azure-identity</code> i <code>azure-monitor-opentelemetry</code> w zależnościach, telemetria i metryki dla App Insights, komentarze o Easy Auth. Usunięcie dotyka ośmiu konfiguracji i ich testów, więc robię je osobną zmianą z własnym testem, nie przy okazji.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Porządki po Azure</div>
+      <h2>Resztki, które nie szkodzą, ale warto uprzątnąć</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Co</th><th>Gdzie</th><th>Co zrobić</th><th>Kto</th></tr></thead>
+          <tbody>
+            <tr><td><b>Sekrety Static Web Apps</b></td><td>GitHub → Settings → Secrets (repozytorium): <code>AZURE_STATIC_WEB_APPS_API_TOKEN</code>, <code>…_POCKET</code></td><td>usunąć: aplikacje, do których były tokenem, już nie istnieją</td><td>ty albo ja po zgodzie</td></tr>
+            <tr><td><b>Zmienne i środowisko</b></td><td>GitHub: <code>TF_VAR_DEVELOPER_IP_ADDRESS</code>, <code>TF_VAR_POSTGRES_ADMIN_OBJECT_ID</code>, <code>TF_VAR_POSTGRES_ADMIN_UPN</code>, <code>TERMINAL_ENTRA_SCOPE</code>, środowisko <code>production</code></td><td>usunąć po sprawdzeniu, że żaden workflow ich nie czyta (<code>terraform.yml</code> jeszcze przekazuje dwie z nich — do przycięcia)</td><td>ja, po twojej zgodzie</td></tr>
+            <tr><td><b>Key Vault w koszu</b></td><td>Azure: <code>kv-tradingctr-58hw</code> (soft-delete)</td><td>zniknie sam za 90 dni; można wyczyścić od razu poleceniem <code>purge</code>, jeśli nie ma w nim już nic potrzebnego</td><td>ty, opcjonalnie</td></tr>
+            <tr><td><b>Dokumenty z opisem Azure</b></td><td><code>docs/migracja-azure-vps-plan.html</code> (wspomina zewnętrzny magazyn), README modułów, <code>docs/architecture.md</code> poniżej nowej sekcji</td><td>przejrzeć, oznaczyć jako historyczne albo poprawić</td><td>ja</td></tr>
+            <tr><td><b>Tokeny botów Telegrama</b></td><td>stara sprawa z 23 września</td><td>logi z tokenami w App Insights zniknęły razem z Azure, ale same tokeny nigdy nie były rotowane — zrób to u @BotFather i w <code>/telegram</code></td><td>ty</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Na koniec</div>
+      <h2>Zamknięcie zmiany</h2>
+      <p>Gdy wszystkie punkty z sekcji 01 i 02 są odhaczone: archiwum zmiany (<code>/opsx:archive move-from-azure-to-vps</code>), które zachowuje <code>proposal.md</code>, <code>design.md</code> i <code>review.md</code>, a reszta idzie do skrótu. Do tego czasu zmiana zostaje w <code>openspec/changes/</code> z siedmioma niezamkniętymi zadaniami: 1.4, 6.2, 6.3, 7.5, 7.6, 9.4 i 9.6.</p>
+      <div class="quote">Jedyna rzecz, która boli, jeśli ją pominiesz: monitor z zewnątrz.</div>
+      <p>Wszystko inne to higiena. Brak alarmu przy padnięciu serwera oznacza, że o awarii dowiesz się z terminala, który nie otwiera się rano.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>TradingCenter · po migracji na VPS · stan na 16 października 2026</span>
+    <span>openspec/changes/move-from-azure-to-vps/tasks.md</span>
+  </div>
+</footer>
+

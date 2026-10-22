@@ -6,7 +6,7 @@ One repository, three processes, no shared runtime. A module is a directory unde
 that runs on its own and publishes a contract, and it is a process because it has a rule of
 writing nobody else has: the gateway is the only door to the provider, `trading-mcp` the only
 thing that moves an account, and the `workbench` everything else — the conversation, the teams,
-three archives, the strategy platform and the door to Telegram, as packages of one process. Nothing imports across a process boundary at runtime; source may be
+three archives and the door to Telegram, as packages of one process. Nothing imports across a process boundary at runtime; source may be
 shared at build time through `packages/`, under the conditions in "What may be shared, and what
 may not".
 
@@ -28,9 +28,8 @@ may not".
   │  market_data      /market      candles · /ws       │
   │  polymarket_data  /polymarket  the other archive   │──▶ Telegram
   │  social_data      /social      the post archive    │
-  │  strategy         /strategy    reads /market in-   │
-  │                                process             │
   │  telegram_gateway /telegram    the door out        │
+  │  alerts           /alerts      who is told what    │
   │  seven databases · one identity · one Easy Auth    │◀── OpenAI ×2
   └───────────┬───────────────────────────┬────────────┘
               │ REST + WS, the operator's │ REST, the operator's token
@@ -66,7 +65,8 @@ like "collected beats computed" from being made twice. Those tools stood in a mo
 until 19 August 2026, and what that module was made of turned out to be mostly the separation
 itself; the archive itself stood in a module of its own until 6 September, and so did the other
 two archives and the strategy platform — "One process per security boundary" below is that
-story, with the numbers.
+story, with the numbers. The strategy platform has since been removed (`remove-strategy-platform`, October
+2026) to be written again differently; the sections below that name it describe the road, not the state.
 
 A gate in front of an application authorizes the **application**, so admitting a caller for
 eleven read-only tools would admit it to `POST /pairs` and `DELETE /pairs/{symbol}` as well. What
@@ -111,6 +111,19 @@ packages of which none imports a neighbour, and one assembly that imports all of
 `workbench/` — held by a test that reads the imports (`tests/test_layering.py`), not by an
 understanding. The first convenient dependency is written in a hurry, and a rule with no failing
 case is a preference. Between processes the old sentence holds unchanged.
+
+## Where it runs
+
+**Since 14 October 2026 the whole system is one server** (`openspec/changes/move-from-azure-to-vps`): Docker Compose
+with Caddy, the three processes and PostgreSQL 17 holding the eight databases (`deploy/`). Only Caddy publishes ports;
+the applications and the database sit on internal networks, the database's with no route out. The boundary between
+processes is unchanged — it is still one process per rule of writing, reached only through a contract — but what checks
+a caller moved into the processes themselves: `packages/tc-entra-auth` verifies the Entra token of anything that came
+through the edge, and takes the shared key from anything that came from another service, then writes the identity the
+caller records already read. Entra stays for sign-in (the registrations in `infra/`); everything else Azure ran is gone.
+
+Where the sections below speak of App Services, Easy Auth, managed identities or Application Insights, they describe the
+road to here: the processes, packages and records are the same, the platform around them is not.
 
 ## The prediction-market archive
 
@@ -206,7 +219,9 @@ history here is the post, and nobody reconstructs what a model thought last week
 from last month. The judgement that stays the workbench's is the other one — whether any of it
 changes a position.
 
-**Nothing on either surface writes.** `polymarket-data` publishes writing tools because it has
+**Nothing on the tool surface writes, and on REST one route does: `PUT /news/keep`.** It marks a
+headline to survive the 28-day retention and changes nothing else — the exception is named in
+`social-data-api`, not slipped in. `polymarket-data` publishes writing tools because it has
 a list of observations an operator curates and a model may add to; here the source is collected
 whole and there is nothing to add. The caller record (`social_data/caller_access.py`) still
 splits the two surfaces for the reason it does there: the platform authorizes an application,
@@ -340,7 +355,7 @@ and skipped. A week with open markets is what the plan's alert at 92% is still w
 86–90% — but it was also the week the database ran out of CPU credits, and queued requests weigh on
 memory. After the database was fixed the peaks sat at 84%, touching 85% only while a deploy ran two
 containers side by side. On that borderline the operator chose to fold: one App Service, one Easy Auth
-registration, one identity and ~230 MB fewer. The post archive and the strategy platform reach
+registration, one identity and ~230 MB fewer. The post archive and the strategy platform (since removed) reach
 `POST /telegram/messages` the way the platform reaches the archive (`workbench/telegram_client.py`), and
 the operator's `az` — the one caller that is a person — is admitted to the whole workbench by Easy
 Auth and answered by `/telegram`'s bots and destinations alone: the root routes keep a caller record
@@ -348,6 +363,18 @@ of their own since that day (`workbench/root_access.py`). Folding also found a l
 module never installed its own redaction filter, and `httpx` had logged 61 027 request lines with a
 whole bot token to Application Insights. The package installs it in `serving`, and the host quiets
 `httpx` besides.
+
+## Who is calling, and as what
+
+Two questions, answered in two places. *Which application* is the caller records' (`caller_access.py` in every package, the
+workbench's `root_access.py`): they hold application ids from `azp`/`appid`. *Which person, and as what* is the door's
+(`tc-entra-auth`): the token's `roles` claim, an Entra app role on the workbench's and the gateway's registration. The split
+exists because the terminal and the pocket are public single-page clients: any guest of the tenant can sign in to either and get
+a token whose application is on the list. A person with no role is refused on every route but `GET /me`; a `viewer` reads
+under `/social` and `/polymarket` and nothing else — the conversation's tools reach the account, so the agent is closed to them
+whole. The roles are managed in the directory through Microsoft Graph by the terminal's Users tab, with the admin's own
+delegated token: no process of this system holds a credential that writes the directory, which is what keeps this from being a
+new security boundary. A role change reaches a person when their token next renews. (`openspec/changes/admin-panel-users-and-roles`.)
 
 ## The order path
 

@@ -140,7 +140,7 @@ SERVICES: tuple[Service, ...] = (
             "conversation and the teams catalogue are one process here — 8050 has belonged "
             "to nobody since `agent-and-teams-one-workbench`, and 8070 to nobody since "
             "`one-process-per-security-boundary` folded polymarket-data into this process, "
-            "8090 since it folded social-data in, 8080 since strategy, 8020 since market-data, "
+            "8090 since it folded social-data in, 8080 since the strategy platform was removed, 8020 since market-data, "
             "8100 since telegram-gateway. "
             "The archive inside it opens a subscription per tracked pair the moment it starts, "
             "so a gateway not listening yet costs it a round of backoff. It calls one tool "
@@ -192,13 +192,18 @@ MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
     ("workbench", "alembic-teams.ini"),
     ("workbench", "alembic-polymarket.ini"),
     ("workbench", "alembic-social.ini"),
-    ("workbench", "alembic-strategy.ini"),
     ("workbench", "alembic-telegram.ini"),
 )
 
+# Optional, and so kept out of the tuple above: its chain reads `YOUTUBE_DATABASE_URL`, and an unset one is the package
+# not being part of the process — migrating it would fail on a database nobody asked for.
+YOUTUBE_CHAIN: tuple[str, str] = ("workbench", "alembic-youtube.ini")
+# The alerts package's chain is optional for the same reason, and reads `ALERTS_DATABASE_URL`.
+ALERTS_CHAIN: tuple[str, str] = ("workbench", "alembic-alerts.ini")
+
 # Created here if missing rather than through docker-entrypoint-initdb.d, which only runs against
 # an empty volume and would never fire for a container from before these modules existed.
-LOGICAL_DATABASES = ("agent", "teams", "polymarket", "social", "strategy", "telegram")
+LOGICAL_DATABASES = ("agent", "teams", "polymarket", "social", "telegram", "youtube", "alerts")
 
 
 
@@ -406,6 +411,14 @@ ADVISORIES: tuple[tuple[str, str, str, str], ...] = (
 # than ignored, for the reason the advisories above exist: a line read by nothing looks like one that works.
 RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
     (
+        "TELEGRAM_SESSION",
+        (
+            "the owner account is logged in from the terminal's Telegram tab since "
+            "`telegram-bots-from-the-terminal`, and its session lives in the database, encrypted with "
+            "TELEGRAM_SESSION_KEY — this line is read by nothing"
+        ),
+    ),
+    (
         "TEAMS_MCP_URL",
         (
             "the team tools are a layer in the workbench now, reached without a port — "
@@ -429,10 +442,19 @@ RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
     ),
     (
         "STRATEGY_MCP_URL",
-        (
-            "the strategy platform is a package of this process since the same change; its tools "
-            "need no address, and STRATEGY_DATABASE_URL is the line this file needs instead"
-        ),
+        "the strategy platform is gone (`remove-strategy-platform`); nothing reads this",
+    ),
+    (
+        "STRATEGY_DATABASE_URL",
+        "the strategy platform is gone (`remove-strategy-platform`); nothing reads this",
+    ),
+    (
+        "STRATEGY_DATABASE_POOL_SIZE",
+        "the strategy platform is gone (`remove-strategy-platform`); nothing reads this",
+    ),
+    (
+        "STRATEGY_EVALUATION_INTERVAL_SECONDS",
+        "the strategy platform is gone (`remove-strategy-platform`); nothing reads this",
     ),
     (
         "MARKET_MCP_URL",
@@ -453,15 +475,15 @@ RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
     (
         "TELEGRAM_GATEWAY_URL",
         (
-            "the post archive and the strategy platform reach the door to Telegram inside this "
-            "process since the same stage; ALERT_DESTINATION alone says who they tell"
+            "the post archive and the YouTube archive no longer reach the door to Telegram at all: they hand "
+            "what they read to the alerts package, whose rules say who is told"
         ),
     ),
     (
         "DATABASE_URL",
         (
-            "the workbench owns seven databases: MARKET_, AGENT_, TEAMS_, POLYMARKET_, SOCIAL_, "
-            "STRATEGY_ and TELEGRAM_DATABASE_URL"
+            "the workbench owns six databases (seven with YouTube): MARKET_, AGENT_, TEAMS_, "
+            "POLYMARKET_, SOCIAL_ and TELEGRAM_DATABASE_URL"
         ),
     ),
     (
@@ -471,6 +493,35 @@ RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
     (
         "MODELS",
         "the two surfaces keep separate catalogues: AGENT_MODELS and TEAMS_MODELS",
+    ),
+    (
+        "YOUTUBE_TRANSCRIPT_PROVIDERS",
+        "the YouTube archive has one transcriber since `youtube-gemini-only` — YOUTUBE_TRANSCRIBER (gemini or sim)",
+    ),
+    (
+        "YOUTUBE_TRANSCRIPT_LANGUAGES",
+        "YouTube's captions are not read any more, so there is no language to ask them in",
+    ),
+    (
+        "YOUTUBE_PROVIDER_COOLDOWN_MINUTES",
+        "the captions provider it rested is gone; Gemini's rest is YOUTUBE_TRANSCRIBER_COOLDOWN_MINUTES",
+    ),
+    (
+        "YOUTUBE_LISTENER_COOLDOWN_MINUTES",
+        "renamed YOUTUBE_TRANSCRIBER_COOLDOWN_MINUTES when the captions provider went",
+    ),
+    ("YOUTUBE_DAILY_TRANSCRIPT_UNITS", "it was the captions provider's day; Gemini's is YOUTUBE_GEMINI_DAILY_VIDEO_SECONDS"),
+    (
+        "ALERT_DESTINATION",
+        "who is told is decided by the rules in the terminal's Alerts tab (`alerts-package`); the old assignment it seeded is gone",
+    ),
+    (
+        "SOCIAL_ALERT_MIN_IMPACT_SCORE",
+        "the post archive hands over every read post; the score a rule asks for is part of the rule (`alerts-package`)",
+    ),
+    (
+        "YOUTUBE_ALERT_MIN_IMPACT_SCORE",
+        "the YouTube archive hands over every read film; the score a rule asks for is part of the rule (`alerts-package`)",
     ),
 )
 
@@ -716,6 +767,18 @@ def ensure_databases(names: Iterable[str] = LOGICAL_DATABASES) -> bool:
     return True
 
 
+def migration_chains(env: Environment) -> tuple[tuple[str, str | None], ...]:
+    """Every chain this checkout runs: the seven every workbench has, and the YouTube archive's and the alerts
+    package's only when the workbench's `.env` names their database."""
+    workbench_env = env.read_env("workbench") or ""
+    optional = [
+        chain
+        for variable, chain in (("YOUTUBE_DATABASE_URL", YOUTUBE_CHAIN), ("ALERTS_DATABASE_URL", ALERTS_CHAIN))
+        if env_value(workbench_env, variable)
+    ]
+    return (*MIGRATION_CHAINS, *optional)
+
+
 def apply_migrations(chains: Iterable[tuple[str, str | None]] = MIGRATION_CHAINS) -> bool:
     """Applied every run, not only on a fresh one: a checkout that has just pulled a migration is exactly
     where forgetting this produces an error reading like a bug in the module."""
@@ -868,10 +931,9 @@ def ready_lines(*, start_front_ends: bool) -> list[str]:
         f"  Workbench docs      http://{LOOPBACK}:8030/docs",
         f"  Polymarket docs     http://{LOOPBACK}:8030/polymarket/docs",
         f"  Social docs         http://{LOOPBACK}:8030/social/docs",
-        f"  Strategy docs       http://{LOOPBACK}:8030/strategy/docs",
         f"  Telegram docs       http://{LOOPBACK}:8030/telegram/docs",
         (
-            "  Database            market_data, agent, teams, polymarket, social, strategy, "
+            "  Database            market_data, agent, teams, polymarket, social, "
             "telegram @ localhost:55432 "
             "(compose.yaml; 'docker compose down' keeps the data)"
         ),
@@ -896,7 +958,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     for line in advisories(env):
         note(line)
 
-    if not start_database() or not ensure_databases() or not apply_migrations():
+    if not start_database() or not ensure_databases() or not apply_migrations(migration_chains(env)):
         return 1
 
     stack = Stack()

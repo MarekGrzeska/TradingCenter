@@ -92,14 +92,14 @@ def test_the_tool_mount_and_its_trailing_slash_are_the_same_surface() -> None:
 
 @pytest.mark.db
 async def test_a_request_with_no_identity_is_refused(guarded) -> None:
-    assert (await guarded.get("/destinations")).status_code == 401
+    assert (await guarded.get("/recipients")).status_code == 401
 
 
 @pytest.mark.db
 async def test_a_stranger_is_refused_on_both_surfaces(guarded) -> None:
     headers = principal_header(STRANGER)
 
-    assert (await guarded.get("/destinations", headers=headers)).status_code == 403
+    assert (await guarded.get("/recipients", headers=headers)).status_code == 403
     assert (await guarded.get("/mcp/", headers=headers)).status_code == 403
 
 
@@ -110,7 +110,7 @@ async def test_the_tool_caller_does_not_reach_the_routes_that_manage_bots(guarde
 
     assert (await guarded.get("/bots", headers=headers)).status_code == 403
     assert (
-        await guarded.post("/destinations", json={"name": "o", "bot": "b"}, headers=headers)
+        await guarded.post("/recipients", json={"name": "o", "bot": "b"}, headers=headers)
     ).status_code == 403
 
 
@@ -123,7 +123,7 @@ async def test_the_rest_caller_does_not_reach_the_tool_surface(guarded) -> None:
 
 @pytest.mark.db
 async def test_the_recorded_rest_caller_reaches_the_contract(guarded) -> None:
-    answer = await guarded.get("/destinations", headers=principal_header(OPERATOR_TOOLING))
+    answer = await guarded.get("/recipients", headers=principal_header(OPERATOR_TOOLING))
 
     assert answer.status_code == 200
 
@@ -132,14 +132,14 @@ async def test_the_recorded_rest_caller_reaches_the_contract(guarded) -> None:
 async def test_the_person_signed_in_never_stands_in_for_the_application(guarded) -> None:
     """Measured on 19 August 2026 in another module by deploying the opposite assumption: the
     principal header names a person, and reading it as an application refuses every real caller."""
-    answer = await guarded.get("/destinations", headers=person_header(OPERATOR_TOOLING))
+    answer = await guarded.get("/recipients", headers=person_header(OPERATOR_TOOLING))
 
     assert answer.status_code == 401
 
 
 @pytest.mark.db
 async def test_an_empty_record_refuses_everyone(unconfigured) -> None:
-    rest = await unconfigured.get("/destinations", headers=principal_header(OPERATOR_TOOLING))
+    rest = await unconfigured.get("/recipients", headers=principal_header(OPERATOR_TOOLING))
     tools = await unconfigured.get("/mcp/", headers=principal_header(WORKBENCH))
 
     assert rest.status_code == 403

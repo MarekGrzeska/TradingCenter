@@ -19,7 +19,7 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 # label -> the package's path under `modules/`. Explicit rather than globbed, so a new module is a
 # line here — and `test_measure_duplication.py` fails when it is not, because this list naming three
 # deleted modules and none of the four newest is how the measurement read zero for twelve days.
-# The workbench contributes eight: its packages may not import each other, so they copy like modules.
+# The workbench contributes nine: its packages may not import each other, so they copy like modules.
 MODULES = {
     "capital-gateway": "capital-gateway/capital_gateway",
     "trading-mcp": "trading-mcp/trading_mcp",
@@ -28,9 +28,10 @@ MODULES = {
     "workbench:teams_tools": "workbench/teams_tools",
     "workbench:polymarket_data": "workbench/polymarket_data",
     "workbench:social_data": "workbench/social_data",
-    "workbench:strategy": "workbench/strategy",
     "workbench:market_data": "workbench/market_data",
     "workbench:telegram_gateway": "workbench/telegram_gateway",
+    "workbench:youtube_data": "workbench/youtube_data",
+    "workbench:alerts": "workbench/alerts",
     "workbench": "workbench/workbench",
 }
 

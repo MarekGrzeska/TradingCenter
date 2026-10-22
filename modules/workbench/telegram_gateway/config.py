@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlparse
 
-from pydantic import ValidationInfo, field_validator, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # `prefer`/`allow` still let the client fall back to plaintext if the server does not
@@ -27,8 +27,12 @@ class Settings(BaseSettings):
 
     # `database_user` selects between the two connection modes and is the only switch: set means
     # identity mode over TLS with no credential in the URL, unset means the URL as given, on loopback.
-    database_url: str
+    # Out of the repr: a server's URL carries its role's password, and a failed validation prints the model.
+    database_url: str = Field(repr=False)
     database_user: str | None = None
+    # Hosts on the container network of this machine (`PRIVATE_HOSTS`, comma-separated), reached with the password in the
+    # URL — a database that is not on loopback and still never leaves the machine. Empty everywhere but a server.
+    private_hosts: str = ""
 
     # Identity mode only, and unset even there when running in Azure — the App Service's
     # system-assigned managed identity needs no configuration.
@@ -40,16 +44,18 @@ class Settings(BaseSettings):
     # polymarket-data: no migration here comes close to the length of a start.
     migration_lock_wait_seconds: float = 300.0
 
-    # Four: this module's work is one HTTP call per message, not a query per row. Seven logical
-    # databases share one `B_Standard_B1ms` whose `max_connections` is 50, so every module's number
-    # here is one budget — `scripts/tests/test_pool_budget.py` refuses a total above 30.
+    # Four again: this module's work is one HTTP call per message, not a query per row. It was three while the logical
+    # databases shared a `B_Standard_B1ms` whose `max_connections` is 50; on the server's own PostgreSQL (100) the
+    # budget is 60 — `scripts/tests/test_pool_budget.py` counts every module's number as one.
     database_pool_size: int = 4
 
-    # Creating a bot means talking to Telegram's creator bot, and only a *user account* may. All three
-    # together enable it; absent, the module sends normally and refuses to create — a supported state.
+    # Creating a bot means talking to Telegram's creator bot, and only a *user account* may. The application
+    # credentials (my.telegram.org) come from the environment; the account itself is logged in from the terminal and
+    # its session lives in the database, encrypted with `telegram_session_key`. Absent, the module sends normally
+    # and refuses to log in or create — a supported state, and the one every deployment starts in.
     telegram_api_id: int | None = None
     telegram_api_hash: str | None = None
-    telegram_session: str | None = None
+    telegram_session_key: str | None = Field(default=None, repr=False)
 
     # Telegram's own ceiling on how many bots one account may hold. A setting because Telegram raises it
     # on request, and checking it before speaking costs an attempt that counts against the account.
@@ -74,14 +80,14 @@ class Settings(BaseSettings):
         return _identifiers(self.rest_caller_application_ids)
 
     @property
-    def can_create_bots(self) -> bool:
-        """Whether the account session needed to reach the creator bot is configured. Its absence is a
-        configuration this module supports, so this is a question asked at runtime, not at startup."""
-        return (
-            self.telegram_api_id is not None
-            and bool(self.telegram_api_hash)
-            and bool(self.telegram_session)
-        )
+    def api_credentials_configured(self) -> bool:
+        """Whether Telegram's application id and hash are set — what logging an account in needs before anything
+        is asked of Telegram. Whether an account *is* logged in is the database's to say, at runtime."""
+        return self.telegram_api_id is not None and bool(self.telegram_api_hash)
+
+    @property
+    def session_key_configured(self) -> bool:
+        return self.telegram_session_key is not None
 
     @field_validator("bot_api_base_url")
     @classmethod
@@ -104,36 +110,43 @@ class Settings(BaseSettings):
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()
 
-    @field_validator("database_user", "telegram_api_hash", "telegram_session")
+    @field_validator(
+        "database_user", "telegram_api_hash", "telegram_session_key"
+    )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
-        # `TELEGRAM_SESSION=` left in a .env is the same intent as the line being absent, and for
+        # `TELEGRAM_SESSION_KEY=` left in a .env is the same intent as the line being absent, and for
         # DATABASE_USER it is local mode — not a role named "".
         if value is None or not value.strip():
             return None
         return value.strip()
 
+    @field_validator("telegram_session_key")
+    @classmethod
+    def _usable_session_key(cls, value: str | None) -> str | None:
+        """A key that is not a Fernet key would start the process and fail at the first login, in the middle of a
+        conversation with Telegram. Caught here, by name."""
+        if value is not None:
+            from .session_crypto import check_key
+
+            check_key(value)
+        return value
+
     @model_validator(mode="after")
-    def _account_session_is_whole_or_absent(self) -> Settings:
-        """Two of the three is the failure worth naming: it looks configured, refuses at the moment the
-        operator asks for a bot, and the reason is a variable nobody remembers leaving blank."""
-        given = [
-            name
-            for name, value in (
-                ("TELEGRAM_API_ID", self.telegram_api_id),
-                ("TELEGRAM_API_HASH", self.telegram_api_hash),
-                ("TELEGRAM_SESSION", self.telegram_session),
-            )
-            if value
-        ]
-        if given and len(given) < 3:
+    def _application_credentials_are_whole_or_absent(self) -> Settings:
+        """One of the two is the failure worth naming: it looks configured, refuses at the moment the operator
+        logs the account in, and the reason is a variable nobody remembers leaving blank."""
+        if (self.telegram_api_id is None) != (not self.telegram_api_hash):
             raise ValueError(
-                "TELEGRAM_API_ID, TELEGRAM_API_HASH and TELEGRAM_SESSION must be given "
-                f"together or not at all — only {given} were set, which reaches nothing. "
-                "All three absent is a supported configuration: the module sends, and "
-                "refuses to create bots."
+                "TELEGRAM_API_ID and TELEGRAM_API_HASH must be given together or not at all — only one was set, "
+                "which reaches nothing. Both absent is a supported configuration: the module sends, and refuses "
+                "to log an account in or create bots."
             )
         return self
+
+    @property
+    def private_host_names(self) -> frozenset[str]:
+        return frozenset(h.strip().lower() for h in self.private_hosts.split(",") if h.strip())
 
     @model_validator(mode="after")
     def _connection_mode_is_coherent(self) -> Settings:
@@ -159,13 +172,19 @@ class Settings(BaseSettings):
             return self
 
         host = (parsed.hostname or "").lower()
-        if not (host == "localhost" or host.startswith("127.") or host == "::1"):
+        loopback = host == "localhost" or host.startswith("127.") or host == "::1"
+        if not (loopback or host in self.private_host_names):
             raise ValueError(
                 f"DATABASE_URL points at {host!r} with no DATABASE_USER set. Without an "
                 "identity this module only connects to a database on this machine's "
-                "loopback — a remote database (production included) needs DATABASE_USER "
+                "loopback, or a host of PRIVATE_HOSTS — a remote database (production included) needs DATABASE_USER "
                 "and an Entra identity, and local work belongs on the compose.yaml "
                 "container."
+            )
+        if not loopback and not (parsed.username and parsed.password):
+            raise ValueError(
+                f"DATABASE_URL points at the private host {host!r} without a role and password. On a server "
+                "this module connects as its own role, which owns its database — the URL must name it."
             )
         return self
 

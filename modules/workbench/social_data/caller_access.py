@@ -1,4 +1,4 @@
-"""Which caller may reach which surface. Nothing on either of them writes, so what this record protects is not the
+"""Which caller may reach which surface. Nothing on either of them writes but one news flag, so what this record protects is mostly not the
 archive but the split: Easy Auth authorizes an application, so a caller admitted to the tools is otherwise past every
 REST route in the same process — including the ones the operator's screens were the audience for."""
 
@@ -27,6 +27,9 @@ REST_PATHS: tuple[str, ...] = (
     "/health",
     "/posts",
     "/posts/{source}/{external_id}",
+    "/news",
+    "/news/sources",
+    "/news/keep",
     "/state",
     # FastAPI's own, published by the framework rather than by a router. They describe the
     # REST contract, so they belong to the caller that consumes it.

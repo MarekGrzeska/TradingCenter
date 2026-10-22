@@ -57,7 +57,7 @@ def test_a_record_written_for_the_package_still_reads_under_the_hosts_prefix() -
 
 
 def test_this_process_asking_itself_is_admitted_and_a_header_saying_so_is_not() -> None:
-    """The workbench's strategy platform reads the archive through `ASGITransport`, naming itself on the scope.
+    """The workbench reads an archive through `ASGITransport`, naming itself on the scope.
     The name travels on the scope alone: a request carrying it as a header is a request from the network."""
     package = FastAPI()
 

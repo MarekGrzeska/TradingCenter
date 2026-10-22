@@ -1,0 +1,302 @@
+<title>Supadata — koszty</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Research · koszty dostawcy</span>
+    <h1>Supadata w liczbach</h1>
+    <p class="lede">Ile kosztuje pobieranie transkrypcji YouTube przez Supadata przy naszym wolumenie. Krótko: <b>$17 miesięcznie wystarcza z zapasem</b>, pod warunkiem że wyłączymy jedną domyślną opcję.</p>
+    <div class="strip">
+      <span>TradingCenter / archiwum YouTube</span>
+      <span>27 września 2026 · rew. <b>01</b></span>
+      <span>uzupełnia <b>docs/youtube-archiwum-projekt.html</b>, sekcja 03</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">1</div><div class="l">kredyt za transkrypcję z istniejących napisów</div></div>
+      <div class="cell"><div class="v">2/min</div><div class="l">kredyty za transkrypcję generowaną przez AI</div></div>
+      <div class="cell"><div class="v">$17</div><div class="l">plan Pro · 3000 kredytów · ~2500 filmów/mies.</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">kredytów przechodzi na kolejny miesiąc</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Cennik</div>
+      <h2>Plany</h2>
+      <p class="intro">Płaci się abonamentem za pulę kredytów na miesiąc. Niewykorzystane przepadają; ponad pulę dokupuje się paczki.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Plan</th><th class="n">Cena / mies.</th><th class="n">Kredyty / mies.</th><th class="n">Limit zapytań</th><th class="n">Dokupienie</th><th class="n">Koszt kredytu</th></tr></thead>
+          <tbody>
+            <tr><td><b>Free</b></td><td class="n">$0</td><td class="n">100</td><td class="n">1/s</td><td class="n">—</td><td class="n">—</td></tr>
+            <tr><td><b>Basic</b> <span class="tag att">tylko rocznie</span></td><td class="n">$5 ($60/rok)</td><td class="n">300</td><td class="n">10/s</td><td class="n">$10 / 1000</td><td class="n">$0,0167</td></tr>
+            <tr><td><b>Pro</b></td><td class="n">$17</td><td class="n">3 000</td><td class="n">10/s</td><td class="n">$10 / 1000</td><td class="n">$0,0057</td></tr>
+            <tr><td><b>Mega</b></td><td class="n">$47</td><td class="n">30 000</td><td class="n">50/s</td><td class="n">$10 / 5000</td><td class="n">$0,0016</td></tr>
+            <tr><td><b>Giga</b></td><td class="n">$297</td><td class="n">300 000</td><td class="n">100/s</td><td class="n">$20 / 20 000</td><td class="n">$0,0010</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px">Plany Pro i wyżej mają wariant roczny ze zniżką (wysokości zniżki cennik nie podaje). Istnieje też Supa ($897) i Enterprise — dla nas bez znaczenia.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Co zjada kredyty</div>
+      <h2>Nie każde zapytanie kosztuje tyle samo</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Operacja</th><th class="n">Kredyty</th><th>Uwagi</th></tr></thead>
+          <tbody>
+            <tr><td><b>Transkrypcja z napisów</b> (<code>mode=native</code>)</td><td class="n">1</td><td>napisy autora lub automatyczne YouTube — nasz główny przypadek</td></tr>
+            <tr><td><b>Brak napisów</b> (HTTP 206)</td><td class="n">1</td><td><span class="tag att">płatne mimo braku wyniku</span> — każde ponowienie kosztuje</td></tr>
+            <tr><td><b>Transkrypcja AI</b> (<code>mode=generate</code>)</td><td class="n">2 / min</td><td>film 30-min = 60 kredytów, 60× drożej niż z napisów; film &gt;20 min → zadanie asynchroniczne (HTTP 202)</td></tr>
+            <tr><td><b>Sprawdzenie statusu zadania</b></td><td class="n">0</td><td>odpytywanie <code>/transcript/{jobId}</code> darmowe</td></tr>
+            <tr><td><b>Wyszukiwanie YouTube</b></td><td class="n">1 / 20 wyników</td><td>alternatywa dla <code>search.list</code> (100 jednostek Google)</td></tr>
+            <tr><td><b>Filmy kanału</b></td><td class="n">1 / zapytanie</td><td>do odpytywania kanałów za drogie — to robi darmowe YouTube Data API</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Nasz rachunek</div>
+      <h2>Trzy scenariusze</h2>
+      <p class="intro">Tylko transkrypcje z napisów. Dokupienie liczę w paczkach (Pro: $10 za 1000) — cennik nie mówi wprost, czy da się kupić mniej. Doliczamy <strong>20% narzutu</strong> na filmy, którym napisy jeszcze się nie pojawiły i które ponawiamy (każda próba = 1 kredyt).</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Scenariusz</th><th class="n">Filmy / mies.</th><th class="n">Kredyty</th><th>Najtańszy plan</th><th class="n">Koszt / mies.</th></tr></thead>
+          <tbody>
+            <tr><td><b>Mały</b> · 10 filmów/dobę</td><td class="n">300</td><td class="n">~360</td><td>Basic, a po przekroczeniu paczka 1000</td><td class="n">$5–15</td></tr>
+            <tr><td><b>Średni</b> · 50 filmów/dobę</td><td class="n">1 500</td><td class="n">~1 800</td><td>Pro</td><td class="n">$17</td></tr>
+            <tr><td><b>Duży</b> · 100 filmów/dobę</td><td class="n">3 000</td><td class="n">~3 600</td><td>Pro + paczka 1000</td><td class="n">~$27</td></tr>
+            <tr><td><b>F0 / dev</b> · kilka filmów/dobę</td><td class="n">~80</td><td class="n">≤100</td><td>Free</td><td class="n">$0</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px"><strong>A gdyby włączyć transkrypcję AI</strong> dla filmów bez napisów (średni scenariusz, filmy po 30 min):</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Udział filmów bez napisów</th><th class="n">Kredyty</th><th>Najtańszy plan</th><th class="n">Koszt / mies.</th></tr></thead>
+          <tbody>
+            <tr><td>0% (tylko napisy)</td><td class="n">~1 800</td><td>Pro</td><td class="n">$17</td></tr>
+            <tr><td>10% → 150 filmów × 60</td><td class="n">~10 800</td><td>Mega</td><td class="n">$47</td></tr>
+            <tr class="void"><td>100% (wszystko przez AI)</td><td class="n">~90 000</td><td>Mega + 60 000 dokupionych</td><td class="n">~$167</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px">Dla porównania: własna transkrypcja przez OpenAI <code>gpt-4o-mini-transcribe</code> to ~$0,09 za film 30-min (~$135 za 1500 filmów), ale wymaga pobrania audio, które z Azure jest blokowane. Transkrypcja AI w Supadata na planie Mega kosztuje podobnie (~$0,09), a na Pro przez dokupione kredyty już ~$0,60 za film.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Pułapki</div>
+      <h2>Cztery rzeczy, które podbiją rachunek</h2>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Domyślny tryb to <code>auto</code> <span class="tag stop">ukryty koszt</span></h3>
+          <p>Bez parametru <code>mode</code> Supadata przy braku napisów <strong>sama generuje transkrypcję AI</strong> i liczy 2 kredyty za minutę. Jeden dwugodzinny film bez napisów = 240 kredytów, czyli 8% miesięcznej puli Pro. Zawsze wysyłamy <code>mode=native</code>; generowanie tylko jawnie, z limitem minut.</p>
+        </div>
+        <div class="fail">
+          <h3>Brak napisów też kosztuje <span class="tag att">ponowienia</span></h3>
+          <p>Odpowiedź 206 zabiera 1 kredyt. Harmonogram ponowień z projektu (+1h, +6h, +24h, potem koniec) to maksymalnie 4 kredyty na film bez napisów — bez twardego końca byłaby to powtórka błędu z #272.</p>
+        </div>
+        <div class="fail">
+          <h3>Kredyty nie przechodzą <span class="tag att">planowanie</span></h3>
+          <p>Niewykorzystana pula przepada. Nie ma sensu kupować Mega „na zapas” — lepiej Pro i dokupić, jeśli miesiąc był wyjątkowy.</p>
+        </div>
+        <div class="fail">
+          <h3>Długie filmy odpowiadają asynchronicznie <span class="tag att">kod</span></h3>
+          <p>Zapytanie może zwrócić HTTP 202 z <code>jobId</code> zamiast tekstu — klient musi obsłużyć oba warianty i odpytywać status (darmowo).</p>
+        </div>
+        <div class="fail ok">
+          <h3>Liczenie po naszej stronie <span class="tag ok">łatwe</span></h3>
+          <p>Każda odpowiedź niesie nagłówek <code>x-billable-requests</code> — zapisujemy go w tabeli <code>usage</code> i mamy dzienny sufit kredytów niezależny od panelu Supadata. Klucz idzie w nagłówku <code>x-api-key</code>, więc nie wycieknie z URL do logów.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Rekomendacja</div>
+      <h2>Free na test, Pro na produkcję</h2>
+      <div class="quote">~$17 miesięcznie za 50 filmów dziennie, jeśli pobieramy tylko istniejące napisy.</div>
+      <ol>
+        <li><strong>F0:</strong> plan Free (100 kredytów). Sprawdzić na ~50 filmach PL/EN z App Service: ile ma napisy, czy działa z Azure, jakość polskich auto-napisów.</li>
+        <li><strong>Produkcja:</strong> Pro, $17/mies., <code>mode=native</code>, dzienny sufit kredytów w ustawieniu (np. <code>YOUTUBE_SUPADATA_DAILY_CREDITS=100</code>).</li>
+        <li><strong>Transkrypcja AI:</strong> domyślnie wyłączona. Jeśli potrzebna — per kanał, z limitem długości filmu; przy większym udziale przejść na Mega ($47).</li>
+        <li><strong>Wyszukiwanie tematów:</strong> opcjonalnie przez Supadata (1 kredyt / 20 wyników) zamiast drogiego <code>search.list</code>; 10 tematów × 4 razy dziennie = ~1200 kredytów/mies. — razem z transkrypcjami średniego scenariusza to ~3000, czyli Pro na styk.</li>
+      </ol>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Czego nie wiemy</div>
+      <h2>Do sprawdzenia w F0</h2>
+      <div class="fails">
+        <div class="fail"><h3>Skuteczność z Azure</h3><p>Supadata sama omija blokady YouTube, ale nie publikuje odsetka udanych pobrań. Mierzymy sami.</p></div>
+        <div class="fail"><h3>Odsetek filmów z napisami</h3><p>20% narzutu to założenie. Kanały PL o rynkach mogą mieć mniej auto-napisów niż anglojęzyczne.</p></div>
+        <div class="fail"><h3>Zniżka roczna</h3><p>Cennik mówi o zniżce, nie podaje ile. Przy stałym użyciu warto sprawdzić po miesiącu na Pro.</p></div>
+        <div class="fail"><h3>Konkurencja</h3><p>TranscriptAPI podaje ~$0,0015 za transkrypcję ($5/1000), taniej niż Pro — ale to ich własny blog porównawczy. Przy $17/mies. różnica nie uzasadnia dziś zmiany; interfejs dostawcy w projekcie pozwala ją zrobić później.</p></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Źródła: <a style="color:#f2c313" href="https://supadata.ai/pricing">supadata.ai/pricing</a> · <a style="color:#f2c313" href="https://docs.supadata.ai/get-transcript">docs.supadata.ai/get-transcript</a> · <a style="color:#f2c313" href="https://docs.supadata.ai/youtube/search">/youtube/search</a> · <a style="color:#f2c313" href="https://docs.supadata.ai/youtube/channel-videos">/youtube/channel-videos</a> · <a style="color:#f2c313" href="https://transcriptapi.com/blog/youtube-transcript-api-comparison">porównanie TranscriptAPI</a></span>
+    <span>Stan cen: 27 września 2026</span>
+  </div>
+</footer>

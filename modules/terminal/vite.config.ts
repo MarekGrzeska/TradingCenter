@@ -103,11 +103,30 @@ export default defineConfig(({ mode }) => {
           configure: quietProxyErrors("workbench", workbench),
         },
 
-        // The strategy platform, served by the workbench under /strategy, same shape and same reason as above.
-        "/strategy-api": {
+        // The YouTube archive, served by the workbench under /youtube when its database is configured — the one prefix
+        // that may answer 404 for want of the package rather than for want of a route.
+        "/youtube-api": {
           target: workbench,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/strategy-api/, "/strategy"),
+          rewrite: (path) => path.replace(/^\/youtube-api/, "/youtube"),
+          configure: quietProxyErrors("workbench", workbench),
+        },
+
+        // The alerts package, served by the workbench under /alerts when its database is configured — absent is a working
+        // configuration, so this prefix too may answer 404 for want of the package.
+        "/alerts-api": {
+          target: workbench,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/alerts-api/, "/alerts"),
+          configure: quietProxyErrors("workbench", workbench),
+        },
+
+        // The door to Telegram, served by the workbench under /telegram. Reached with the workbench's token, but only the
+        // terminal's and the operator's applications are admitted to it.
+        "/telegram-api": {
+          target: workbench,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/telegram-api/, "/telegram"),
           configure: quietProxyErrors("workbench", workbench),
         },
       },

@@ -1,6 +1,20 @@
-export const TABS = ["markets", "social", "agent"] as const;
+export const TABS = ["markets", "social", "news", "agent"] as const;
 
 export type Tab = (typeof TABS)[number];
+
+/** What the workbench's door says a person is (`GET /me`). A viewer reads the archive and does not talk to the agent. */
+export type Role = "admin" | "viewer";
+
+const VIEWER_TABS: readonly Tab[] = ["markets", "social", "news"];
+
+export function tabsFor(role: Role): readonly Tab[] {
+  return role === "viewer" ? VIEWER_TABS : TABS;
+}
+
+/** A remembered tab a role may not open becomes the first one it may: the stored value predates the role. */
+export function allowedTab(tab: Tab, tabs: readonly Tab[]): Tab {
+  return tabs.includes(tab) ? tab : (tabs[0] ?? "markets");
+}
 
 const TAB_KEY = "pocket.tab.v1";
 

@@ -24,7 +24,13 @@ type Sheet =
  *  the card, which is a different thing and reads as a different row. */
 type ChangesByEvent = Record<string, Map<number, OutcomeChanges> | null>;
 
-export function PolymarketScreen({ api }: { api: PolymarketApi }) {
+export function PolymarketScreen({
+  api,
+  readOnly = false,
+}: {
+  api: PolymarketApi;
+  readOnly?: boolean;
+}) {
   const { events, groups, status, error, lastReadAt, refreshing, now, refresh } = useArchive(api);
   const [enabled, setEnabled] = useState<Record<string, boolean>>(() => loadFilters());
   const [expanded, setExpanded] = useState<string[]>([]);
@@ -93,12 +99,14 @@ export function PolymarketScreen({ api }: { api: PolymarketApi }) {
         <div className={styles.headerTop}>
           <h1 className={styles.heading}>Polymarket</h1>
           <div className={styles.headerActions}>
-            {groups.length === 0 ? null : (
+            {readOnly || groups.length === 0 ? null : (
               <Button onClick={() => setSheet({ kind: "groups" })}>Groups</Button>
             )}
-            <Button tone="primary" onClick={() => setSheet({ kind: "track" })}>
-              Track event
-            </Button>
+            {readOnly ? null : (
+              <Button tone="primary" onClick={() => setSheet({ kind: "track" })}>
+                Track event
+              </Button>
+            )}
           </div>
         </div>
         {/* The freshness line *is* the refresh control. A button that only refreshed would duplicate
@@ -173,8 +181,8 @@ export function PolymarketScreen({ api }: { api: PolymarketApi }) {
                     expanded={expanded.includes(event.providerEventId)}
                     changes={changes[event.providerEventId] ?? null}
                     onToggle={() => toggle(event.providerEventId)}
-                    onMove={() => setSheet({ kind: "move", event })}
-                    onRemove={() => setSheet({ kind: "remove", event })}
+                    onMove={readOnly ? undefined : () => setSheet({ kind: "move", event })}
+                    onRemove={readOnly ? undefined : () => setSheet({ kind: "remove", event })}
                     now={now}
                   />
                 ))}

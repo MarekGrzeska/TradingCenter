@@ -1,0 +1,435 @@
+<title>Wyzwalacze powiadomień</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+  ul { margin: 0 0 16px; padding-left: 20px; max-width: 68ch; }
+  li { margin-bottom: 4px; }
+  .fail ul { font-size: 15px; margin: 8px 0 0; max-width: 72ch; }
+  .fail p + p { margin-top: 8px; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Telegram · research i propozycje</span>
+    <h1>Kto decyduje, że warto cię obudzić</h1>
+    <p class="lede">Dziś brama do Telegrama tylko <b>kieruje</b> wiadomości, o których wysłaniu ktoś już zdecydował. Decyzja „czy” siedzi w kodzie dwóch producentów, a przypisanie „komu” wpisuje się tekstem. Ten dokument opisuje, jak to działa, i proponuje pięć dróg do wyzwalaczy, które operator składa sam.</p>
+    <div class="strip">
+      <span>TradingCenter / workbench / telegram_gateway</span>
+      <span>18 października 2026 · rew. <b>01</b></span>
+      <span>stan: <b>main @ 00a7c2d</b></span>
+      <span><b>PROPOZYCJA</b> — nic tu nie jest jeszcze zmianą OpenSpec</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">2</div><div class="l">producenci wysyłający z celem (posty, filmy)</div></div>
+      <div class="cell"><div class="v">3</div><div class="l">miejsca, w których ustawia się jeden alert</div></div>
+      <div class="cell"><div class="v">1</div><div class="l">silnik warunków — w zespołach, nie w Telegramie</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">alertów cenowych, które da się dziś złożyć</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Jak jest dziś</div>
+      <h2>Brama kieruje, producenci decydują</h2>
+      <p class="intro">Pakiet <code>telegram_gateway</code> nie wie, co jest ważne. Dostaje gotowy tekst z <em>celem</em> (ang. <em>purpose</em>) — kropkowaną nazwą rodzaju zdarzenia — i szuka, kto ten cel słyszy.</p>
+      <p>Cel to np. <code>youtube.film.some-channel</code> albo <code>social.post.elonmusk</code>. Segmenty idą od rodzaju zdarzenia do źródła. Operator w zakładce <strong>Telegram</strong> przypisuje <em>klucz</em> do odbiorcy. Kluczem jest cały cel, jego <span class="hl">przedrostek ucięty na kropce</span> albo <code>*</code>. Wygrywa najdłuższy pasujący klucz, <code>*</code> sprawdzany jest na końcu. Na cel, którego nikt nie słyszy, brama odpowiada <code>409 unassigned</code>. Producent nie stawia wtedy znacznika „już powiedziane” i próbuje ponownie w następnym przebiegu.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 250" role="img" aria-label="Archiwum postów i archiwum YouTube same decydują o progu i wysyłają tekst z celem do bramy Telegrama; brama dopasowuje cel do przypisań i wysyła przez bota. Agent i zespoły wysyłają po nazwie odbiorcy, z pominięciem celów. Wyzwalacze zespołów uruchamiają przebieg, nie wiadomość.">
+            <defs>
+              <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path></marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="12" y="20" width="200" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="112" y="43" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">social_data</text>
+              <text x="112" y="62" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.65">ocena ≥ 8 (.env)</text>
+
+              <rect x="12" y="96" width="200" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="112" y="119" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">youtube_data</text>
+              <text x="112" y="138" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.65">always · threshold · never</text>
+
+              <rect x="12" y="172" width="200" height="56" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="5 4"></rect>
+              <text x="112" y="195" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">agent · zespoły</text>
+              <text x="112" y="214" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.65">send_telegram_message</text>
+
+              <rect x="330" y="40" width="290" height="96" fill="#14306b" stroke="#14306b"></rect>
+              <text x="475" y="66" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">telegram_gateway</text>
+              <text x="475" y="88" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#f2c313">note_purpose → recipient_of</text>
+              <text x="475" y="106" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#d6dcec">najdłuższy przedrostek, potem *</text>
+              <text x="475" y="124" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#d6dcec">bez kolejki, bez pamięci</text>
+
+              <rect x="730" y="60" width="110" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="785" y="92" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">bot</text>
+              <rect x="870" y="60" width="98" height="56" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="919" y="92" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">telefon</text>
+
+              <line x1="214" y1="48" x2="326" y2="74" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <line x1="214" y1="124" x2="326" y2="100" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="270" y="36" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">cel + tekst</text>
+              <line x1="214" y1="200" x2="326" y2="128" stroke="currentColor" stroke-width="1.4" stroke-dasharray="4 3" marker-end="url(#a1)"></line>
+              <text x="282" y="190" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">nazwa odbiorcy</text>
+              <line x1="622" y1="88" x2="726" y2="88" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <line x1="842" y1="88" x2="866" y2="88" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+
+              <rect x="330" y="172" width="290" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="475" y="195" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">teams · wyzwalacze</text>
+              <text x="475" y="214" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.65">warunek → przebieg zespołu</text>
+              <rect x="640" y="182" width="190" height="20" fill="#f2c313"></rect>
+              <text x="735" y="196" text-anchor="middle" font-size="10" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.06em" fill="#14306b">NIE WYSYŁA SAM NICZEGO</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — dwie drogi do Telegrama i trzecia, która mogłaby nią być. Próg „czy warto” stoi po lewej, u każdego producenta inny; brama pośrodku wybiera tylko odbiorcę.</figcaption>
+      </figure>
+
+      <div class="table-wrap" style="margin-top: 26px;">
+        <table>
+          <thead>
+            <tr><th>Kto</th><th>Co decyduje „czy”</th><th>Gdzie operator to ustawia</th><th>Cel</th><th>Stan</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>social_data</b></td><td>ocena wpływu posta ≥ <code>ALERT_MIN_IMPACT_SCORE</code> (8); bez oceny — nic</td><td>plik <code>.env</code>, nie terminal</td><td><code>social.post.&lt;autor&gt;</code></td><td><span class="tag ok">działa</span></td></tr>
+            <tr><td><b>youtube_data</b></td><td>reguła kanału lub tematu: <code>always</code> / <code>threshold</code> / <code>never</code></td><td>zakładka YouTube</td><td><code>youtube.film.&lt;kanał&gt;</code></td><td><span class="tag ok">działa</span></td></tr>
+            <tr><td><b>agent, zespoły</b></td><td>model, w trakcie rozmowy lub przebiegu</td><td>prompt</td><td>brak — wysyła <em>po nazwie odbiorcy</em></td><td><span class="tag att">omija przypisania</span></td></tr>
+            <tr><td><b>teams · wyzwalacze</b></td><td><code>narzędzie.pole porównanie próg</code>, krawędź, czas martwy</td><td>zakładka Zespoły</td><td>—</td><td><span class="tag att">tylko uruchamia zespół</span></td></tr>
+            <tr class="void"><td>market_data, polymarket</td><td>—</td><td>—</td><td>—</td><td><span class="tag stop">nic nie wysyła</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Diagnoza</div>
+      <h2>Dlaczego to jest niejasne</h2>
+      <p>Twoje odczucie ma konkretne przyczyny w kodzie. Dwie pierwsze dotyczą ekranu, pozostałe — modelu, który za nim stoi.</p>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Klucz wpisuje się ręcznie <span class="tag stop">ekran</span></h3>
+          <p><code>AssignDialog</code> (<code>terminal/src/telegram/dialogs.tsx</code>) to pole tekstowe z podpowiedzią <code>youtube.film</code>. Sprawdzany jest <em>kształt</em> klucza, a nie to, czy cokolwiek go kiedyś użyje: literówka <code>youtube.flim</code> daje poprawne przypisanie, które nigdy niczego nie złapie.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Konkretny cel widać dopiero po pierwszym zdarzeniu <span class="tag stop">ekran</span></h3>
+          <p>Producenci ogłaszają z góry tylko przedrostki <code>youtube.film</code> i <code>social.post</code>. <code>youtube.film.&lt;kanał&gt;</code> pojawia się na liście dopiero wtedy, gdy przyjdzie pierwszy film z kanału. Żeby skierować kanał gdzie indziej przed jego pierwszym filmem, trzeba znać jego slug i go wpisać.</p>
+        </div>
+        <div class="fail">
+          <h3>Przypisanie to routing, nie wyzwalacz <span class="tag att">model</span></h3>
+          <p>W zakładce Telegram nie da się stworzyć <em>nowego powodu</em> do alertu, można tylko przekierować istniejący. Powody są dwa i oba są zaszyte w kodzie. „Czy” i „komu” są rozrzucone po trzech miejscach: <code>.env</code> (próg postów), zakładka YouTube (reguła kanału) i zakładka Telegram (odbiorca).</p>
+        </div>
+        <div class="fail">
+          <h3>Warunków rynkowych nie ma <span class="tag att">model</span></h3>
+          <p>Alert „EURUSD powyżej 1,10” nie ma gdzie żyć. Silnik warunków istnieje — to wyzwalacze zespołów — ale jego jedyną akcją jest przebieg zespołu. To tokeny modelu za coś, co jest jednym porównaniem liczb.</p>
+        </div>
+        <div class="fail">
+          <h3>Treść należy do producenta <span class="tag att">model</span></h3>
+          <p>Tekst wiadomości buduje <code>message()</code> w każdym producencie. Operator nie ma na niego wpływu i nie istnieje żaden szablon.</p>
+        </div>
+        <div class="fail">
+          <h3>Agent idzie bokiem <span class="tag att">spójność</span></h3>
+          <p><code>send_telegram_message(destination, text)</code> wysyła po nazwie odbiorcy, z pominięciem celów. Przypisania go nie dotyczą, więc reguły „wszystko z zespołów do kanału X” nie da się dziś ustawić.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Co już mamy</div>
+      <h2>Połowa silnika już stoi — w zespołach</h2>
+      <p class="intro">Wyobrażasz sobie worker, który w kółko sprawdza warunki. Taki worker już istnieje: zegar zespołów (<code>teams/scheduler/clock.py</code>) budzi się co 15 s i sprawdza wyzwalacze, na które przyszła pora.</p>
+      <p>Wyzwalacz składa się dziś z pól <code>tool_name</code>, <code>arguments</code>, <code>field_path</code>, <code>comparison</code> (<code>gt gte lt lte eq</code>), <code>threshold</code>, <code>poll_interval_seconds</code> (domyślnie 300) i <code>cooldown_seconds</code> (domyślnie 900). Spec <code>teams-triggers</code> rozwiązał już cztery rzeczy, których potrzebuje każdy alert:</p>
+      <ul>
+        <li><strong>krawędź, nie stan</strong> — odpala przy przejściu z fałszu w prawdę, a nie przy każdym sprawdzeniu, w którym cena jest powyżej progu;</li>
+        <li><strong>czas martwy</strong> — warunek migający wokół progu nie zasypie telefonu;</li>
+        <li><strong>niedostępność to trzeci stan</strong> — narzędzie, które nie odpowiedziało, nie jest „warunkiem niespełnionym” (<code>last_result = NULL</code>);</li>
+        <li><strong>sprawdzanie nie kosztuje modelu</strong> — to jedno wywołanie narzędzia, zero tokenów; <code>claim_trigger_for_check</code> zajmuje wiersz, więc sprawdzenie się nie dubluje; historia trafia do <code>fires</code>.</li>
+      </ul>
+      <p>Do tego narzędzia archiwów są osiągalne w procesie jako funkcje — przez rejestr narzędzi, który zespoły już dostają od <code>workbench/app.py</code>. <code>get_last_price</code> zwraca cenę bieżącej, jeszcze tworzącej się świecy (<code>forming</code>) razem z jej wiekiem. <code>docs/architecture.md</code> wymienia <span class="hl">„typed events” jako dozwolony kontrakt</span> obok HTTP i MCP, więc zdarzenia między pakietami nie łamią zasady.</p>
+      <p>Słabość istniejącego formularza: narzędzie wybiera się z listy, ale <code>arguments</code> to ręcznie wpisywany JSON, a <code>field_path</code> to zwykły tekst. Ten sam problem co z kluczem w Telegramie, tylko głębiej.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Czego potrzeba</div>
+      <h2>Dwa rodzaje „kiedy”</h2>
+      <p>„W pełni elastyczny wyzwalacz” to w rzeczywistości dwa różne mechanizmy. Warto ich nie mieszać, bo wykonuje się je inaczej:</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Rodzaj</th><th>Przykład</th><th>Kto wie, że zaszło</th><th>Jak sprawdzać</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>Stan</b></td><td>EURUSD powyżej 1,10 · RSI(14) poniżej 30 · prawdopodobieństwo na Polymarkecie spadło pod 40%</td><td>nikt — trzeba zapytać</td><td>worker odpytuje narzędzie co N sekund i odpala na krawędzi</td></tr>
+            <tr><td><b>Zdarzenie</b></td><td>nowy film z kanału X · post z oceną ≥ 7 · zespół skończył przebieg · zbiórka padła · otwarto pozycję</td><td>pakiet, w którym to się stało</td><td>pakiet publikuje zdarzenie z atrybutami; nikt nic nie odpytuje</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top: 18px;">W obu przypadkach reguła ma ten sam kształt: <strong>źródło</strong> (kiedy) + <strong>filtr</strong> (atrybuty: kanał, ocena, instrument) + <strong>akcja</strong> (komu, z jaką treścią, jak często). Worker jest potrzebny tylko dla stanów. „Akcja w środku innego modułu” to zdarzenie i odpytywania nie wymaga.</p>
+      <div class="quote">Przypisanie odpowiada na pytanie „komu”. Brakuje miejsca na „kiedy” i „czy”.</div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Propozycje</div>
+      <h2>Pięć dróg, od tanich do pełnych</h2>
+      <div class="fails">
+        <div class="fail">
+          <h3>A. Wybór z drzewa zamiast pola tekstowego <span class="tag ok">mały koszt</span></h3>
+          <p>Producenci ogłaszają <em>cały</em> katalog celów, a nie tylko przedrostek. YouTube woła <code>PUT /purposes/youtube.film.&lt;kanał&gt;</code> przy dodaniu kanału, social robi to samo przy dodaniu autora (trasa już istnieje). Zakładka Telegram pokazuje drzewo <code>youtube › film › kanał</code> z listą odbiorców przy każdym węźle, a dialog z polem tekstowym znika. Kontrakt bramy się nie zmienia.</p>
+          <ul>
+            <li><strong>Plus:</strong> w kilka dni usuwa dokładnie to, co uwiera, i nie zmienia semantyki.</li>
+            <li><strong>Minus:</strong> nie daje ani cen, ani nowych powodów — dalej jest to tylko routing dwóch istniejących.</li>
+          </ul>
+        </div>
+        <div class="fail">
+          <h3>B. Wyzwalacz zespołu z akcją „tylko powiadom” <span class="tag ok">mały koszt</span></h3>
+          <p>W <code>teams.triggers</code> dochodzi pole <code>action: run | notify</code>. Przy <code>notify</code> krawędź nie uruchamia przebiegu, tylko wysyła wiadomość przez bramę pod celem <code>teams.trigger.&lt;id&gt;</code>. Cała semantyka (krawędź, czas martwy, niedostępność, historia, samowyłączenie) przychodzi gratis.</p>
+          <ul>
+            <li><strong>Plus:</strong> alert cenowy w tydzień, bez nowego silnika i bez tokenów.</li>
+            <li><strong>Minus:</strong> alert cenowy jest przyczepiony do zespołu (<code>team_id</code> jest wymagane), co pojęciowo nie pasuje. Obsługuje tylko stany, bez zdarzeń. JSON i <code>field_path</code> nadal wpisuje się tekstem. Utrwala też rozrzucenie „czy” po trzech zakładkach.</li>
+          </ul>
+        </div>
+        <div class="fail ok">
+          <h3>C. Reguły powiadomień w pakiecie Telegrama <span class="tag ok">rekomendowana</span> <span class="tag att">duży koszt</span></h3>
+          <p>Pakiet <code>telegram_gateway</code> dostaje tabelę <code>rules</code>, historię <code>rule_fires</code> i własny zegar. Reguła = źródło + filtr + odbiorca + szablon + czas martwy. Przypisania znikają; <code>*</code> zostaje jako odbiorca domyślny.</p>
+          <p><strong>Stan:</strong> zegar odpytuje narzędzie w procesie tą samą drogą co wyzwalacze zespołów, z tą samą krawędzią i tym samym trzecim stanem. Formularz składa się z katalogu: instrument wybierany z listy śledzonych par, pole z listy (<code>close</code>, <code>high</code>, wartość wskaźnika), porównanie i liczba. Zamiast wpisywanego <code>field_path</code> formularz korzysta ze schematu wyjścia narzędzia.</p>
+          <p><strong>Zdarzenie:</strong> producent przestaje wysyłać tekst z celem. Zamiast tego publikuje <em>typowane zdarzenie</em> z atrybutami (<code>youtube.film.read {channel, topic, impact_score, instruments}</code>) i ogłasza jego JSON Schema. Terminal generuje z niej filtr: listę kanałów, suwak oceny. Reguły <code>always/threshold/never</code> i <code>ALERT_MIN_IMPACT_SCORE</code> przechodzą do reguł, więc „czy” i „komu” są w jednym miejscu.</p>
+          <ul>
+            <li><strong>Plus:</strong> nowe powody bez pisania kodu — dowolny stan z dowolnego narzędzia i dowolny filtr po atrybutach ogłoszonego zdarzenia; jedna zakładka; żadnego pola tekstowego.</li>
+            <li><strong>Minus:</strong> największa zmiana. Brama zaczyna pamiętać zdarzenia i odpalenia, co świadomie odwraca decyzję „does not remember what it sent”; ponowienie przechodzi od producenta do bramy. Dwóch producentów trzeba przepisać. Potrzebna zmiana OpenSpec (<code>telegram-gateway-delivery</code>, <code>social-data-alerts</code>, reguły YouTube).</li>
+            <li><strong>Silnik krawędzi:</strong> to około 60 linii wspólnych z zespołami. Albo kopia (tania, mierzona przez <code>scripts/measure-duplication.py</code>), albo <code>packages/tc-conditions</code> — o ile spełnia trzy warunki z <code>docs/architecture.md</code>.</li>
+          </ul>
+        </div>
+        <div class="fail">
+          <h3>C′. To samo, ale jako dziewiąty pakiet <code>alerts</code> <span class="tag att">wariant</span></h3>
+          <p>Mózg osobno, drzwi osobno: <code>alerts</code> decyduje, a <code>telegram_gateway</code> zostaje prostą bramą bez pamięci. Podział jest czystszy i to jedyny sensowny wybór, jeśli reguła ma kiedyś robić coś poza Telegramem (np. uruchamiać zespół). Cena: kolejny schemat, łańcuch migracji, klucz blokady doradczej, wpis w <code>test_layering.py</code> i pula połączeń w budżecie <code>test_pool_budget.py</code>.</p>
+        </div>
+        <div class="fail">
+          <h3>D. Szyna zdarzeń dla całego workbencha <span class="tag stop">bardzo duży koszt</span></h3>
+          <p>Każdy pakiet zapisuje zdarzenia do własnej tabeli <em>outbox</em>, w tej samej transakcji co zmianę. Dyspozytor w assembly rozsyła je do subskrybentów: reguł Telegrama, wyzwalaczy zespołów („gdy zbiórka padnie, uruchom diagnostę”) i na żywo do terminala. To wariant najbardziej ogólny — „akcja w innym module” może wtedy wywołać cokolwiek.</p>
+          <ul>
+            <li><strong>Plus:</strong> jedno źródło prawdy o tym, co się działo; trwałe zdarzenia; dowolne akcje.</li>
+            <li><strong>Minus:</strong> cała infrastruktura (dyspozytor, retencja, kolejność, ponowienia) dla jednego operatora. W jednym procesie <code>LISTEN/NOTIFY</code> nie daje nic ponad zwykłe wywołanie funkcji. Ma to sens dopiero wtedy, gdy pojawi się druga akcja poza Telegramem.</li>
+          </ul>
+        </div>
+        <div class="fail">
+          <h3>E. Reguła pisana zdaniem <span class="tag att">nakładka na C</span></h3>
+          <p>Operator pisze: „daj znać, gdy EURUSD przebije 1,10 w górę, nie częściej niż raz na godzinę”. Model zwraca szkic reguły w strukturze z C, a terminal pokazuje <em>wypełniony formularz</em> do zatwierdzenia — sam niczego nie zapisuje. Model działa raz, przy tworzeniu reguły, i nigdy w pętli sprawdzania (ta sama zasada co w <code>teams-triggers</code>).</p>
+          <ul>
+            <li><strong>Plus:</strong> najwygodniejsze, także z telefonu (pocket ma czat z workbenchem).</li>
+            <li><strong>Minus:</strong> bez C nie ma na co tłumaczyć.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="table-wrap" style="margin-top: 26px;">
+        <table>
+          <thead>
+            <tr><th>Opcja</th><th>Koniec z wpisywaniem</th><th>Ceny i wskaźniki</th><th>Zdarzenia z modułów</th><th>Koszt</th><th>OpenSpec</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>A</b> drzewo celów</td><td><span class="tag ok">tak</span></td><td><span class="tag stop">nie</span></td><td><span class="tag att">tylko 2 istniejące</span></td><td>dni</td><td>raczej nie</td></tr>
+            <tr><td><b>B</b> notify w zespołach</td><td><span class="tag att">częściowo</span></td><td><span class="tag ok">tak</span></td><td><span class="tag stop">nie</span></td><td>tydzień</td><td>tak</td></tr>
+            <tr><td><b>C</b> reguły w Telegramie</td><td><span class="tag ok">tak</span></td><td><span class="tag ok">tak</span></td><td><span class="tag ok">tak</span></td><td>2–3 tygodnie, etapami</td><td>tak</td></tr>
+            <tr><td><b>D</b> szyna zdarzeń</td><td><span class="tag ok">tak</span></td><td><span class="tag ok">tak</span></td><td><span class="tag ok">tak, każde</span></td><td>miesiąc+</td><td>tak, z architekturą</td></tr>
+            <tr><td><b>E</b> zdaniem</td><td><span class="tag ok">tak</span></td><td colspan="2">tyle, ile umie C</td><td>dni ponad C</td><td>tak</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Cena wprost</div>
+      <h2>Alert cenowy: odpytywanie czy tick</h2>
+      <p>Strumień cen płynie już przez <code>market_data/ingest/live.py</code>, więc kusi, żeby sprawdzać próg na każdym ticku: dokładnie i bez bazy. Ale wtedy archiwum rynku musiałoby znać reguły Telegrama. To pakiet sięgający po wiedzę sąsiada, czyli dokładnie to, czego zabrania <code>test_layering.py</code>.</p>
+      <p><span class="hl">Rekomendacja: odpytywanie <code>get_last_price</code></span>. Zastrzeżenie, które wyszło przy wdrażaniu: to narzędzie podaje cenę bieżącej świecy (<code>close</code>), a nie jej high/low — archiwum świadomie nie podaje zakresu okresu w toku jako zakresu. Reguła widzi więc cenę z chwili sprawdzenia, i szpilka, która przebiła poziom i wróciła między dwoma sprawdzeniami, przepadnie. Najkrótszy interwał (30 s) zawęża tę lukę; ekstremum okresu wymagałoby zmiany w archiwum rynku. Koszt: jeden odczyt najnowszej świecy z indeksu na regułę na sprawdzenie, czyli przy 20 regułach co 30 s — 40 lekkich zapytań na minutę. Przed wdrożeniem trzeba to sprawdzić skillem <code>db-cost-check</code> z <code>EXPLAIN</code>.</p>
+      <p>Do ustalenia przy projektowaniu: czy alert ma być jednorazowy (wyłącza się po odpaleniu, jak w TradingView), czy powtarzalny z czasem martwym. Warto mieć oba warianty jako opcję reguły.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Rekomendacja</div>
+      <h2>C w trzech krokach, E na końcu</h2>
+      <ol>
+        <li><strong>Reguły stanu.</strong> Tabela reguł, zegar, krawędź i czas martwy, formularz z katalogu (instrument i pole wybierane z listy). Producenci zostają nietknięci, a przypisania działają dalej obok. To nowa zdolność — alerty cenowe — przy najmniejszym ryzyku.</li>
+        <li><strong>Zdarzenia.</strong> YouTube i social publikują typowane zdarzenia zamiast tekstu z celem. Reguły kanałów i próg postów przechodzą do reguł, każde istniejące przypisanie migruje do reguły automatycznie, a pole tekstowe znika. Na tym etapie zapada decyzja, że brama zaczyna pamiętać.</li>
+        <li><strong>Zdaniem (E).</strong> Gdy formularz już istnieje, model tylko go wypełnia.</li>
+      </ol>
+      <p><strong>B odradzam</strong> — szybko daje ceny, ale przykleja alert do zespołu i potem trzeba go będzie odklejać. <strong>A</strong> ma sens tylko wtedy, gdy C ma czekać miesiącami; katalog celów, który A zbuduje, i tak przyda się w kroku 2. <strong>D</strong> dopiero wtedy, gdy pojawi się akcja inna niż Telegram — i wtedy też C′ zamiast C.</p>
+      <p>Każdy krok C to zmiana OpenSpec (dotyka wymagań i kontraktu terminala), więc zaczyna się od <code>/opsx:propose</code>.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Do decyzji</div>
+      <h2>Pytania, które są twoje</h2>
+      <ul>
+        <li>Czy reguła ma kiedyś robić coś poza Telegramem — uruchomić zespół, napisać do rozmowy? (rozstrzyga między C a C′)</li>
+        <li>Czy brama ma zacząć pamiętać i ponawiać? To odwraca świadomą decyzję zapisaną w jej README.</li>
+        <li>Alert cenowy: jednorazowy, powtarzalny czy oba?</li>
+        <li>Godziny ciszy (np. w nocy żadnych alertów poza pilnymi)?</li>
+        <li>Czy reguły mają się dać zakładać także z pocketu?</li>
+      </ul>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Metoda</div>
+      <h2>Co przeczytałem, a czego nie</h2>
+      <p>Przeczytane w kodzie <code>main @ 00a7c2d</code>: <code>telegram_gateway/README.md</code>, <code>purposes.py</code>, <code>sending.py</code>, <code>routers/purposes.py</code>, <code>store.py</code> (cele i przypisania), <code>social_data/alerts.py</code>, <code>youtube_data/alerts.py</code>, <code>workbench/telegram_client.py</code>, narzędzie <code>send_telegram_message</code>, <code>teams/contract.py</code> (<code>TriggerIn</code>), <code>teams/store/triggers.py</code>, <code>teams/scheduler/clock.py</code> (ocena warunku, krawędź, czas martwy) i <code>market_data/tools/candles.py</code> (<code>get_last_price</code>). W terminalu: <code>telegram/TelegramView.tsx</code>, <code>telegram/dialogs.tsx</code> (<code>AssignDialog</code>) i <code>teams/SchedulesPanel.tsx</code>. Specyfikacje <code>teams-triggers</code> i <code>social-data-alerts</code> oraz <code>docs/architecture.md</code> (sekcja „What may be shared”).</p>
+      <p><strong>Nie sprawdzałem produkcji</strong> — ani ile celów i przypisań jest faktycznie na serwerze, ani ile wyzwalaczy zespołów ktoś założył. Szacunki kosztu (dni, tygodnie) to rząd wielkości, a nie plan.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Wyzwalacze powiadomień · research i propozycje</span>
+    <span>docs/telegram-wyzwalacze.html</span>
+  </div>
+</footer>

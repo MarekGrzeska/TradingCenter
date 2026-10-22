@@ -40,11 +40,5 @@ provider "azurerm" {
 
 provider "azuread" {}
 
-resource "azurerm_resource_group" "main" {
-  name     = "rg-tradingcenter"
-  location = var.location
-
-  tags = {
-    project = "tradingcenter"
-  }
-}
+# Who runs Terraform: the tenant for the outputs, the subscription for the state account's id in github-oidc.tf.
+data "azurerm_client_config" "current" {}

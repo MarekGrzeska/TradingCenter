@@ -28,7 +28,7 @@ server's transactions. None of it looked expensive in a diff.
 
 ```bash
 bash .claude/skills/db-cost-check/scripts/explain.sh <database> "<SQL with literals for parameters>"
-# databases: market_data agent teams polymarket social strategy telegram
+# databases: market_data agent teams polymarket social telegram
 ```
 
 It runs `EXPLAIN (ANALYZE, BUFFERS)` inside a rolled-back transaction on the **dev** database

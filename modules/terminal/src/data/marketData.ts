@@ -48,11 +48,25 @@ export const gatewayIdentity: Identity = scopeFor((s) => s.gateway);
 /** `polymarket-data`, for the prediction-market tab. */
 export const polymarketIdentity: Identity = scopeFor((s) => s.polymarket);
 
-/** `strategy`, for the strategy tab. */
-export const strategyIdentity: Identity = scopeFor((s) => s.strategy);
-
 /** `social-data`, for the posts tab. */
 export const socialIdentity: Identity = scopeFor((s) => s.social);
+
+/** `youtube-data`, for the films tab. */
+export const youtubeIdentity: Identity = scopeFor((s) => s.youtube);
+
+/** The door to Telegram, for the Telegram tab. */
+export const telegramIdentity: Identity = scopeFor((s) => s.telegram);
+
+/** The alerts package, for the Alerts tab. */
+export const alertsIdentity: Identity = scopeFor((s) => s.alerts);
+
+/** Microsoft Graph, for the Users tab alone. `.default` is every delegated permission the administrator consented to for this
+ *  registration, which is what a token for several Graph scopes has to ask for. The token is the signed-in admin's own and
+ *  goes to Graph and nowhere else: no module of this system is sent it. */
+export const graphIdentity: Identity =
+  entraConfig === null
+    ? noIdentity
+    : (identities?.for("https://graph.microsoft.com/.default") ?? noIdentity);
 
 const archiveSource = createArchiveSource(archiveHttp, archiveWs, identity);
 const gateway = createGatewaySource(archiveHttp, identity);

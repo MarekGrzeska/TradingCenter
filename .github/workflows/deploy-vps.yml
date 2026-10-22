@@ -1,0 +1,299 @@
+name: deploy-vps
+
+# The server's deployment (move-from-azure-to-vps): after a green `checks` run of the same commit — gated by
+# `scripts/deploy_gate.py` — build the three images, build the two front ends, and hand the server what it needs over SSH.
+# The key it holds may run one command (`deploy/scripts/deploy.sh`, set by `deploy/ansible/site.yml`), so everything below is
+# a verb of that script and nothing is run on the server by this workflow's own words.
+#
+# Follows `main`. `workflow_dispatch` is the operator's door around the gate.
+on:
+  workflow_run:
+    workflows: [checks]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  actions: read # deploy_gate.py lists the checks runs
+  packages: write # docker push to GHCR
+
+# One deploy at a time, and never cancelled halfway: a deploy stopped between `pull` and the health check leaves a server
+# nobody decided on.
+concurrency:
+  group: deploy-vps
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    outputs:
+      deploy: ${{ steps.gate.outputs.deploy }}
+      sha: ${{ steps.gate.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - id: gate
+        working-directory: scripts
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # Everything the server runs: the three images' sources, the packages they bake in, the front ends, and the
+          # server's own files. The Azure modules' list per image would be five gates for one machine.
+          PATHS: |
+            modules/capital-gateway
+            modules/trading-mcp
+            modules/workbench
+            modules/terminal
+            modules/pocket
+            packages
+            deploy
+            .github/workflows/deploy-vps.yml
+            scripts/vps_probe.py
+        run: uv run python deploy_gate.py --event "$EVENT" --sha "$SHA" --paths "$PATHS"
+
+  deploy:
+    needs: gate
+    if: >-
+      needs.gate.outputs.deploy == 'true' &&
+      (github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success')
+    runs-on: ubuntu-latest
+    # Holds the server's secrets (DEPLOY_SSH_KEY and everything `deploy/env.required` names) and its public facts.
+    environment: vps
+    env:
+      SHA: ${{ needs.gate.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+
+      # Lower-cased because a Docker reference cannot carry the capitals in `github.repository`.
+      - id: image
+        run: echo "prefix=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@v3
+
+      # Tagged with the commit, never `latest`: the probe asks whether this exact reference is what runs.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: modules/capital-gateway/Dockerfile
+          push: true
+          tags: ${{ steps.image.outputs.prefix }}/capital-gateway:${{ needs.gate.outputs.sha }}
+          cache-from: type=gha,scope=capital-gateway
+          cache-to: type=gha,scope=capital-gateway,mode=max
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: modules/trading-mcp/Dockerfile
+          push: true
+          tags: ${{ steps.image.outputs.prefix }}/trading-mcp:${{ needs.gate.outputs.sha }}
+          cache-from: type=gha,scope=trading-mcp
+          cache-to: type=gha,scope=trading-mcp,mode=max
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: modules/workbench/Dockerfile
+          push: true
+          tags: ${{ steps.image.outputs.prefix }}/workbench:${{ needs.gate.outputs.sha }}
+          cache-from: type=gha,scope=workbench
+          cache-to: type=gha,scope=workbench,mode=max
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: modules/terminal/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            modules/terminal/pnpm-lock.yaml
+            modules/pocket/pnpm-lock.yaml
+
+      # The addresses are the server's own, from the environment's variables; the Entra ids are public facts that travel
+      # in every authorization request. Scopes are literals, as they are in the Azure workflows.
+      - name: Build the terminal
+        working-directory: modules/terminal
+        env:
+          API: https://${{ vars.API_HOST }}
+          VITE_ENTRA_CLIENT_ID: ${{ vars.TERMINAL_ENTRA_CLIENT_ID }}
+          VITE_ENTRA_TENANT_ID: ${{ vars.ENTRA_TENANT_ID }}
+          VITE_ENTRA_SCOPE: api://tradingcenter-agent/access_as_user
+          VITE_ENTRA_SCOPE_WORKBENCH: api://tradingcenter-agent/access_as_user
+          VITE_ENTRA_SCOPE_GATEWAY: api://tradingcenter-capital-gateway/access_as_user
+          VITE_ENTRA_SCOPE_POLYMARKET: api://tradingcenter-agent/access_as_user
+          VITE_ENTRA_SCOPE_SOCIAL: api://tradingcenter-agent/access_as_user
+          VITE_ENTRA_SCOPE_YOUTUBE: api://tradingcenter-agent/access_as_user
+          VITE_ENTRA_SCOPE_TELEGRAM: api://tradingcenter-agent/access_as_user
+          VITE_ENTRA_SCOPE_ALERTS: api://tradingcenter-agent/access_as_user
+          # The owner account's number, pre-filled in the login dialog; a variable of the environment, not a line in git.
+          VITE_TELEGRAM_OWNER_PHONE: ${{ vars.TELEGRAM_OWNER_PHONE }}
+          # The Users tab: which directory objects carry the roles, and where an invited viewer lands. Public ids; empty
+          # leaves the tab saying it is not set up (`fill-github-environment.sh` writes them).
+          VITE_ACCESS_WORKBENCH_PRINCIPAL: ${{ vars.ACCESS_WORKBENCH_PRINCIPAL }}
+          VITE_ACCESS_GATEWAY_PRINCIPAL: ${{ vars.ACCESS_GATEWAY_PRINCIPAL }}
+          VITE_ACCESS_ROLE_WORKBENCH_ADMIN: ${{ vars.ACCESS_ROLE_WORKBENCH_ADMIN }}
+          VITE_ACCESS_ROLE_WORKBENCH_VIEWER: ${{ vars.ACCESS_ROLE_WORKBENCH_VIEWER }}
+          VITE_ACCESS_ROLE_GATEWAY_ADMIN: ${{ vars.ACCESS_ROLE_GATEWAY_ADMIN }}
+          VITE_POCKET_URL: https://${{ vars.POCKET_HOST }}/
+        run: |
+          pnpm install --frozen-lockfile
+          VITE_ARCHIVE_HTTP="$API/market" \
+          VITE_ARCHIVE_WS="wss://${{ vars.API_HOST }}/market/ws" \
+          VITE_WORKBENCH_HTTP="$API" \
+          VITE_GATEWAY_HTTP="https://${{ vars.GATEWAY_HOST }}" \
+          VITE_POLYMARKET_HTTP="$API/polymarket" \
+          VITE_SOCIAL_HTTP="$API/social" \
+          VITE_YOUTUBE_HTTP="$API/youtube" \
+          VITE_TELEGRAM_HTTP="$API/telegram" \
+          VITE_ALERTS_HTTP="$API/alerts" \
+          pnpm build
+
+      - name: Build the pocket
+        working-directory: modules/pocket
+        env:
+          API: https://${{ vars.API_HOST }}
+          VITE_ENTRA_CLIENT_ID: ${{ vars.POCKET_ENTRA_CLIENT_ID }}
+          VITE_ENTRA_TENANT_ID: ${{ vars.ENTRA_TENANT_ID }}
+          VITE_ENTRA_SCOPE_POLYMARKET: api://tradingcenter-agent/access_as_user
+          VITE_ENTRA_SCOPE_WORKBENCH: api://tradingcenter-agent/access_as_user
+          VITE_ENTRA_SCOPE_SOCIAL: api://tradingcenter-agent/access_as_user
+        run: |
+          pnpm install --frozen-lockfile
+          VITE_POLYMARKET_HTTP="$API/polymarket" \
+          VITE_SOCIAL_HTTP="$API/social" \
+          VITE_WORKBENCH_HTTP="$API" \
+          pnpm build
+
+      # The server's host key is pinned in a variable (`ssh-keyscan` once, from a place the operator trusts) and never
+      # learned on first use: a deploy that trusts whatever answers hands the environment's secrets to it.
+      - name: Reach the server
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host vps
+            HostName $DEPLOY_HOST
+            User deploy
+            IdentityFile ~/.ssh/id_deploy
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+            BatchMode yes
+            ServerAliveInterval 30
+          EOF
+
+      # Every name is listed, so what this step can read is readable here — not a dump of the whole secret store, which hands the step all of it
+      # and is the shape GitHub warns about. `deploy/scripts/assemble_env.py` refuses before anything is sent if one is
+      # missing, and prints names, never values. A test keeps this list and `deploy/env.required` the same.
+      - name: Assemble the environment
+        env:
+          API_HOST: ${{ vars.API_HOST }}
+          GATEWAY_HOST: ${{ vars.GATEWAY_HOST }}
+          TERMINAL_HOST: ${{ vars.TERMINAL_HOST }}
+          POCKET_HOST: ${{ vars.POCKET_HOST }}
+          ACME_EMAIL: ${{ vars.ACME_EMAIL }}
+          IMAGE_PREFIX: ${{ vars.IMAGE_PREFIX }}
+          ENTRA_TENANT_ID: ${{ vars.ENTRA_TENANT_ID }}
+          WORKBENCH_ENTRA_AUDIENCES: ${{ vars.WORKBENCH_ENTRA_AUDIENCES }}
+          GATEWAY_ENTRA_AUDIENCES: ${{ vars.GATEWAY_ENTRA_AUDIENCES }}
+          TERMINAL_APPLICATION_ID: ${{ vars.TERMINAL_APPLICATION_ID }}
+          POCKET_APPLICATION_ID: ${{ vars.POCKET_APPLICATION_ID }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          AGENT_DB_PASSWORD: ${{ secrets.AGENT_DB_PASSWORD }}
+          TEAMS_DB_PASSWORD: ${{ secrets.TEAMS_DB_PASSWORD }}
+          MARKET_DB_PASSWORD: ${{ secrets.MARKET_DB_PASSWORD }}
+          POLYMARKET_DB_PASSWORD: ${{ secrets.POLYMARKET_DB_PASSWORD }}
+          SOCIAL_DB_PASSWORD: ${{ secrets.SOCIAL_DB_PASSWORD }}
+          TELEGRAM_DB_PASSWORD: ${{ secrets.TELEGRAM_DB_PASSWORD }}
+          YOUTUBE_DB_PASSWORD: ${{ secrets.YOUTUBE_DB_PASSWORD }}
+          ALERTS_DB_PASSWORD: ${{ secrets.ALERTS_DB_PASSWORD }}
+          GATEWAY_API_KEY: ${{ secrets.GATEWAY_API_KEY }}
+          CAPITAL_API_KEY: ${{ secrets.CAPITAL_API_KEY }}
+          CAPITAL_IDENTIFIER: ${{ secrets.CAPITAL_IDENTIFIER }}
+          CAPITAL_PASSWORD: ${{ secrets.CAPITAL_PASSWORD }}
+          AGENT_OPENAI_API_KEY: ${{ secrets.AGENT_OPENAI_API_KEY }}
+          TEAMS_OPENAI_API_KEY: ${{ secrets.TEAMS_OPENAI_API_KEY }}
+          AGENT_MODELS: ${{ vars.AGENT_MODELS }}
+          TEAMS_MODELS: ${{ vars.TEAMS_MODELS }}
+          AGENT_DEFAULT_MODEL_ID: ${{ vars.AGENT_DEFAULT_MODEL_ID }}
+          YOUTUBE_DATA_API_KEY: ${{ secrets.YOUTUBE_DATA_API_KEY }}
+          YOUTUBE_GEMINI_API_KEY: ${{ secrets.YOUTUBE_GEMINI_API_KEY }}
+          TELEGRAM_API_ID: ${{ secrets.TELEGRAM_API_ID }}
+          TELEGRAM_API_HASH: ${{ secrets.TELEGRAM_API_HASH }}
+          TELEGRAM_SESSION_KEY: ${{ secrets.TELEGRAM_SESSION_KEY }}
+        run: |
+          set -euo pipefail
+          python3 deploy/scripts/assemble_env.py --from-env deploy/env.required > "$RUNNER_TEMP/server.env"
+          chmod 600 "$RUNNER_TEMP/server.env"
+
+      - name: Send the environment and the server's files
+        run: |
+          set -euo pipefail
+          # Files first: `env` is checked against the server's env.required, which must be this commit's, not the last one's.
+          tar -C deploy -cf - docker-compose.yml Caddyfile env.required postgres/ensure-databases.sh | ssh vps sync
+          ssh vps env < "$RUNNER_TEMP/server.env"
+          rm -f "$RUNNER_TEMP/server.env"
+          tar -C modules/terminal/dist -cf - . | ssh vps www terminal
+          tar -C modules/pocket/dist -cf - . | ssh vps www pocket
+
+      # The server pulls with a token that lives as long as this job; `logout` below removes it from the machine.
+      - name: Release
+        id: release
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$REGISTRY_TOKEN" | ssh vps login "$OWNER"
+          # On a failed health check the script puts the previous images back itself and exits 1.
+          ssh vps release "$SHA"
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Confirm this commit is what runs, and that the system answers from outside
+        working-directory: scripts
+        env:
+          PREFIX: ${{ steps.image.outputs.prefix }}
+          API_HOST: ${{ vars.API_HOST }}
+          GATEWAY_HOST: ${{ vars.GATEWAY_HOST }}
+          TERMINAL_HOST: ${{ vars.TERMINAL_HOST }}
+          POCKET_HOST: ${{ vars.POCKET_HOST }}
+        run: |
+          uv run python vps_probe.py \
+            --ssh-target vps \
+            --image-prefix "$PREFIX" \
+            --sha "$SHA" \
+            --check "workbench|https://$API_HOST/health|status" \
+            --check "capital-gateway|https://$GATEWAY_HOST/|capital-gateway" \
+            --check "terminal|https://$TERMINAL_HOST/|<" \
+            --check "pocket|https://$POCKET_HOST/|<"
+
+      # An answer from outside that fails after the server said yes is still a failed deploy: the previous images come back.
+      - name: Put the previous images back
+        if: failure() && steps.release.conclusion == 'success'
+        run: ssh vps rollback
+
+      - name: Remove the registry token from the server
+        if: always() && steps.release.conclusion != 'skipped'
+        run: ssh vps logout

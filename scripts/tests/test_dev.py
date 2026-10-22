@@ -15,6 +15,7 @@ from dev import (
     database_host,
     env_value,
     is_loopback,
+    migration_chains,
     parse_args,
     preflight,
     services_to_start,
@@ -32,7 +33,6 @@ GOOD_ENV: dict[str, str] = {
         "TRADING_MCP_URL=http://127.0.0.1:8060\n"
         "POLYMARKET_DATABASE_URL=postgresql://polymarket:pw@127.0.0.1:55432/polymarket\n"
         "SOCIAL_DATABASE_URL=postgresql://social:pw@127.0.0.1:55432/social\n"
-        "STRATEGY_DATABASE_URL=postgresql://strategy:pw@127.0.0.1:55432/strategy\n"
         "TELEGRAM_DATABASE_URL=postgresql://telegram:pw@127.0.0.1:55432/telegram\n"
     ),
     "trading-mcp": "CAPITAL_GATEWAY_API_KEY=shared-secret\n",
@@ -260,7 +260,7 @@ class TestStartOrder:
 
     def test_the_ports_that_stopped_being_anybodys_are_not_listened_on(self) -> None:
         """8040 went with market-mcp, 8050 with teams-mcp, 8070 with polymarket-data, 8090 with social-data, 8080
-        with strategy, 8020 with market-data and 8100 with telegram-gateway into the workbench; a `.env` still naming
+        with the strategy platform, 8020 with market-data and 8100 with telegram-gateway into the workbench; a `.env` still naming
         any of them is a tool server that reads as down."""
         assert {8020, 8040, 8050, 8070, 8080, 8090, 8100}.isdisjoint(
             {service.port for service in SERVICES}
@@ -474,3 +474,26 @@ class TestPortOwner:
         monkeypatch.setattr(dev, "_listening_pid", lambda _: 4312)
         monkeypatch.setattr(dev, "_process_name", lambda _: None)
         assert dev.real_environment().port_owner(8010) == " by a process (pid 4312)"
+
+
+class TestTheOptionalYoutubeChain:
+    """The YouTube archive's chain reads its own database URL, so running it without one would fail on a database
+    nobody asked for — and the stack would stop on a package the operator does not have."""
+
+    def test_an_env_without_the_line_migrates_the_six_every_workbench_has(self) -> None:
+        chains = migration_chains(environment())
+
+        assert ("workbench", "alembic-youtube.ini") not in chains
+        assert len(chains) == 6
+
+    def test_an_env_with_the_line_adds_the_seventh(self) -> None:
+        files = dict(GOOD_ENV)
+        files["workbench"] += "YOUTUBE_DATABASE_URL=postgresql://youtube:pw@127.0.0.1:55432/youtube\n"
+
+        assert migration_chains(environment(files=files))[-1] == ("workbench", "alembic-youtube.ini")
+
+    def test_a_line_left_blank_is_not_the_line(self) -> None:
+        files = dict(GOOD_ENV)
+        files["workbench"] += "YOUTUBE_DATABASE_URL=\n"
+
+        assert ("workbench", "alembic-youtube.ini") not in migration_chains(environment(files=files))

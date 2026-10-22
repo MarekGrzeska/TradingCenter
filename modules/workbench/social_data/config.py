@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlparse
 
-from pydantic import ValidationInfo, field_validator, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # `prefer`/`allow` still let the client fall back to plaintext if the server does not
@@ -33,8 +33,12 @@ class Settings(BaseSettings):
 
     # `database_user` selects between the two connection modes and is the only switch: set means
     # identity mode over TLS with no credential in the URL, unset means the URL as given, on loopback.
-    database_url: str
+    # Out of the repr: a server's URL carries its role's password, and a failed validation prints the model.
+    database_url: str = Field(repr=False)
     database_user: str | None = None
+    # Hosts on the container network of this machine (`PRIVATE_HOSTS`, comma-separated), reached with the password in the
+    # URL — a database that is not on loopback and still never leaves the machine. Empty everywhere but a server.
+    private_hosts: str = ""
 
     # Identity mode only, and unset even there when running in Azure — the App Service's
     # system-assigned managed identity needs no configuration.
@@ -47,7 +51,7 @@ class Settings(BaseSettings):
 
     # Three, for polymarket-data's reason: collecting is one pass, and nothing here writes on a
     # request. Seven databases share one `B_Standard_B1ms` whose `max_connections` is 50 —
-    # `scripts/tests/test_pool_budget.py` refuses a total above 30.
+    # `scripts/tests/test_pool_budget.py` refuses a total above its budget (60 on the server).
     database_pool_size: int = 3
 
     # Seconds between passes over the feed. Posts arrive in bursts and the feed is one request per
@@ -73,14 +77,12 @@ class Settings(BaseSettings):
     # a busy day must cost a bounded amount, and the rest waits for the next pass.
     enrichment_batch_limit: int = 20
 
-    # Who is told, by the name the operator bound at the door to Telegram — a package of this same process, so
-    # there is no address to set. Its *absence* is a working configuration: the module collects and reads exactly
-    # as before and tells nobody, which `/state` reports.
-    alert_destination: str | None = None
+    # The news loop wakes this often and fetches whichever feeds have passed their own interval, so a feed's
+    # delay is bounded by its interval plus this — which is why it is seconds and not the posts' minutes.
+    news_tick_seconds: int = 30
 
-    # How impactful a post must be to be worth a notification. Eight rather than five: the operator
-    # reads every one of these on a phone, and a channel that speaks daily is one nobody looks at.
-    alert_min_impact_score: int = 8
+    # How long a headline lives unless the operator kept it. News is a stream to pick from, not an archive.
+    news_retention_days: int = 28
 
     # Easy Auth authorizes an application, not a route, and both surfaces stand in one process — so
     # which caller reaches which of them is this module's own record.
@@ -99,12 +101,6 @@ class Settings(BaseSettings):
     @property
     def model_configured(self) -> bool:
         return bool(self.openai_api_key and self.openai_api_key.strip())
-
-    @property
-    def alerts_configured(self) -> bool:
-        """Whether this deployment can tell anybody anything. Asked at runtime rather than refused
-        at startup: silence is a state this module supports, and one it reports."""
-        return self.alert_destination is not None
 
     @field_validator("database_pool_size")
     @classmethod
@@ -138,7 +134,7 @@ class Settings(BaseSettings):
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()
 
-    @field_validator("database_user", "alert_destination")
+    @field_validator("database_user")
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
         # `DATABASE_USER=` left in a .env is the same intent as the line being absent —
@@ -146,6 +142,10 @@ class Settings(BaseSettings):
         if value is None or not value.strip():
             return None
         return value.strip()
+
+    @property
+    def private_host_names(self) -> frozenset[str]:
+        return frozenset(h.strip().lower() for h in self.private_hosts.split(",") if h.strip())
 
     @model_validator(mode="after")
     def _connection_mode_is_coherent(self) -> Settings:
@@ -171,13 +171,19 @@ class Settings(BaseSettings):
             return self
 
         host = (parsed.hostname or "").lower()
-        if not (host == "localhost" or host.startswith("127.") or host == "::1"):
+        loopback = host == "localhost" or host.startswith("127.") or host == "::1"
+        if not (loopback or host in self.private_host_names):
             raise ValueError(
                 f"DATABASE_URL points at {host!r} with no DATABASE_USER set. Without an "
                 "identity this module only connects to a database on this machine's "
-                "loopback — a remote database (production included) needs DATABASE_USER "
+                "loopback, or a host of PRIVATE_HOSTS — a remote database (production included) needs DATABASE_USER "
                 "and an Entra identity, and local work belongs on the compose.yaml "
                 "container."
+            )
+        if not loopback and not (parsed.username and parsed.password):
+            raise ValueError(
+                f"DATABASE_URL points at the private host {host!r} without a role and password. On a server "
+                "this module connects as its own role, which owns its database — the URL must name it."
             )
         return self
 
@@ -186,6 +192,8 @@ class Settings(BaseSettings):
         "collect_window_hours",
         "stale_after_ticks",
         "enrichment_batch_limit",
+        "news_tick_seconds",
+        "news_retention_days",
     )
     @classmethod
     def _positive(cls, value: int, info: ValidationInfo) -> int:
@@ -200,11 +208,3 @@ class Settings(BaseSettings):
             raise ValueError(f"{str(info.field_name).upper()} must be positive; got {value}")
         return value
 
-    @field_validator("alert_min_impact_score")
-    @classmethod
-    def _within_the_score_range(cls, value: int) -> int:
-        # The reading is 1..10, so a threshold outside it is a channel that is either silent for
-        # ever or one that says everything — both of which look like a working configuration.
-        if not 1 <= value <= 10:
-            raise ValueError(f"ALERT_MIN_IMPACT_SCORE must be between 1 and 10; got {value}")
-        return value

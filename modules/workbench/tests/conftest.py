@@ -138,24 +138,6 @@ def social_migrated_url(social_postgres_url: str) -> str:
 
 
 @pytest.fixture(scope="session")
-def strategy_postgres_url() -> Iterator[str]:
-    from testcontainers.community.postgres import PostgresContainer
-
-    with PostgresContainer("postgres:17-alpine", driver=None) as pg:
-        yield pg.get_connection_url()
-
-
-@pytest.fixture(scope="session")
-def strategy_migrated_url(strategy_postgres_url: str) -> str:
-    from tc_runtime.migrate import upgrade_to_head
-
-    from strategy.runtime import MIGRATIONS
-
-    upgrade_to_head(MIGRATIONS, sqlalchemy_url(strategy_postgres_url))
-    return strategy_postgres_url
-
-
-@pytest.fixture(scope="session")
 def market_postgres_url() -> Iterator[str]:
     from testcontainers.community.postgres import PostgresContainer
 
@@ -229,7 +211,6 @@ def workbench_env(
     teams_migrated_url: str,
     polymarket_migrated_url: str,
     social_migrated_url: str,
-    strategy_migrated_url: str,
     market_migrated_url: str,
     telegram_migrated_url: str,
     monkeypatch: pytest.MonkeyPatch,
@@ -240,7 +221,6 @@ def workbench_env(
     monkeypatch.setenv("TEAMS_DATABASE_URL", teams_migrated_url)
     monkeypatch.setenv("POLYMARKET_DATABASE_URL", polymarket_migrated_url)
     monkeypatch.setenv("SOCIAL_DATABASE_URL", social_migrated_url)
-    monkeypatch.setenv("STRATEGY_DATABASE_URL", strategy_migrated_url)
     monkeypatch.setenv("MARKET_DATABASE_URL", market_migrated_url)
     monkeypatch.setenv("TELEGRAM_DATABASE_URL", telegram_migrated_url)
     # No bot is bound in a fresh database, so nothing polls; a closed loopback port all the same, so no test

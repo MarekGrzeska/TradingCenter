@@ -130,13 +130,6 @@ def social_settings() -> object:
     return Settings().for_social()  # type: ignore[call-arg]
 
 
-def strategy_settings() -> object:
-    """The strategy platform's chain — the fifth."""
-    from workbench.config import Settings
-
-    return Settings().for_strategy()  # type: ignore[call-arg]
-
-
 def market_settings() -> object:
     """The candle archive's chain — the sixth, and the one with the largest table."""
     from workbench.config import Settings
@@ -149,3 +142,19 @@ def telegram_settings() -> object:
     from workbench.config import Settings
 
     return Settings().for_telegram()  # type: ignore[call-arg]
+
+
+def youtube_settings() -> object:
+    """The YouTube archive's chain — the eighth, and the only one that is optional: absent from a process whose
+    `YOUTUBE_DATABASE_URL` is not set."""
+    from workbench.config import Settings
+
+    return Settings().for_youtube()  # type: ignore[call-arg]
+
+
+def alerts_settings() -> object:
+    """The alerts package's chain — the ninth, and optional like the YouTube archive's: absent from a process whose
+    `ALERTS_DATABASE_URL` is not set."""
+    from workbench.config import Settings
+
+    return Settings().for_alerts()  # type: ignore[call-arg]

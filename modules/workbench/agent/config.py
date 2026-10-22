@@ -49,7 +49,8 @@ class ModelCatalogueEntry(BaseModel):
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    database_url: str
+    # Out of the repr: a server's URL carries its role's password, and a failed validation prints the model.
+    database_url: str = Field(repr=False)
     database_user: str | None = None
     azure_client_id: str | None = None
     azure_client_secret: str | None = None
@@ -73,6 +74,11 @@ class Settings(BaseSettings):
     # the archive, builds teams, and cannot see a position or send an order.
     trading_mcp_url: str | None = None
     trading_mcp_scope: str | None = None
+    # The gateway's key, which trading-mcp checks of the services that call it on a server — there is no managed
+    # identity there to present a scope with. Reaching a host named in `private_hosts` requires it.
+    trading_mcp_api_key: str | None = None
+    # Hosts on the container network of this machine (`PRIVATE_HOSTS`, comma-separated): reached with the key alone.
+    private_hosts: str = ""
     # trading-mcp waits on the gateway for up to 30s, and a ceiling below that would time out this side
     # of an order that had already been sent — the one failure shape this must never produce silently.
     trading_mcp_request_timeout_seconds: float = 35.0
@@ -80,6 +86,10 @@ class Settings(BaseSettings):
     # Mirrors market-data's own field and reasoning: a request without an identity, accepted because this
     # was left off, opens every session in the database — and every call that costs real money.
     require_authenticated_principal: bool = False
+
+    @property
+    def private_host_names(self) -> frozenset[str]:
+        return frozenset(h.strip().lower() for h in self.private_hosts.split(",") if h.strip())
 
     @field_validator("database_url", "openai_api_key")
     @classmethod
@@ -92,6 +102,7 @@ class Settings(BaseSettings):
         "database_user",
         "trading_mcp_url",
         "trading_mcp_scope",
+        "trading_mcp_api_key",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -125,11 +136,17 @@ class Settings(BaseSettings):
             return self
 
         host = (parsed.hostname or "").lower()
-        if not (host == "localhost" or host.startswith("127.") or host == "::1"):
+        loopback = host == "localhost" or host.startswith("127.") or host == "::1"
+        if not (loopback or host in self.private_host_names):
             raise ValueError(
                 f"DATABASE_URL points at {host!r} with no DATABASE_USER set. Without an "
                 "identity this module only connects to a database on this machine's "
-                "loopback — a remote database needs DATABASE_USER and an Entra identity."
+                "loopback, or a host of PRIVATE_HOSTS — a remote database needs DATABASE_USER and an Entra identity."
+            )
+        if not loopback and not (parsed.username and parsed.password):
+            raise ValueError(
+                f"DATABASE_URL points at the private host {host!r} without a role and password. On a server "
+                "this module connects as its own role, which owns its database — the URL must name it."
             )
         return self
 
@@ -138,7 +155,11 @@ class Settings(BaseSettings):
         """The third copy of the rule market-data set for its database: name one mode, or none, never
         both. Run once per server, and every message names the one it is about."""
         self.trading_mcp_url = _checked_server(
-            "TRADING_MCP", self.trading_mcp_url, self.trading_mcp_scope
+            "TRADING_MCP",
+            self.trading_mcp_url,
+            self.trading_mcp_scope,
+            api_key=self.trading_mcp_api_key,
+            private_hosts=self.private_host_names,
         )
         return self
 
@@ -161,7 +182,14 @@ class Settings(BaseSettings):
         return self
 
 
-def _checked_server(prefix: str, url: str | None, scope: str | None) -> str | None:
+def _checked_server(
+    prefix: str,
+    url: str | None,
+    scope: str | None,
+    *,
+    api_key: str | None = None,
+    private_hosts: frozenset[str] = frozenset(),
+) -> str | None:
     """One tool server's mode, refused rather than guessed. Returns the URL with any trailing slash
     removed, or `None` for a server this module simply does not have."""
     if url is None:
@@ -176,6 +204,19 @@ def _checked_server(prefix: str, url: str | None, scope: str | None) -> str | No
     url = url.rstrip("/")
     host = (urlparse(url).hostname or "").lower()
     is_loopback = host == "localhost" or host.startswith("127.") or host == "::1"
+
+    if host in private_hosts:
+        if scope is not None:
+            raise ValueError(
+                f"{prefix}_SCOPE is set but {prefix}_URL points at {host!r}, a private host of this machine — "
+                f"a scope names a token for a remote server; unset {prefix}_SCOPE."
+            )
+        if not api_key:
+            raise ValueError(
+                f"{prefix}_URL points at {host!r}, a private host, with no {prefix}_API_KEY — the tool server "
+                "admits a service on the internal network only by its key."
+            )
+        return url
 
     if scope is not None:
         if is_loopback:

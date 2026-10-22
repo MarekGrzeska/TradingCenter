@@ -22,23 +22,37 @@ export function statusMapper(kinds: Partial<Record<number, MarketDataErrorKind>>
   return (status, detail) => new MarketDataError(kinds[status] ?? "unknown", detail);
 }
 
-async function parseErrorDetail(response: Response): Promise<string> {
+async function parseErrorDetail(response: Response): Promise<{ detail: string; problem?: unknown }> {
   try {
     const body = (await response.json()) as { detail?: unknown };
     if (typeof body.detail === "string") {
-      return body.detail;
+      return { detail: body.detail };
+    }
+    // A package's own refusal: `HTTPException(detail=Problem(...).model_dump())` nests the reason one level down.
+    if (body.detail && typeof body.detail === "object" && "detail" in body.detail) {
+      const inner = (body.detail as { detail?: unknown }).detail;
+      if (typeof inner === "string") {
+        return { detail: inner, problem: body.detail };
+      }
+    }
+    // Microsoft Graph's refusals are `{ error: { code, message } }`, and the message is the only place it says what was missing.
+    const graph = (body as { error?: { message?: unknown } }).error?.message;
+    if (typeof graph === "string") {
+      return { detail: graph };
     }
     // FastAPI's own validation-error shape (a 422 from a bad query param) is a
     // list of {loc, msg, type} objects, not a plain string.
     if (Array.isArray(body.detail)) {
-      return body.detail
-        .map((entry) => (entry && typeof entry === "object" && "msg" in entry ? entry.msg : entry))
-        .join("; ");
+      return {
+        detail: body.detail
+          .map((entry) => (entry && typeof entry === "object" && "msg" in entry ? entry.msg : entry))
+          .join("; "),
+      };
     }
   } catch {
     // Not JSON, or no body — fall through to the status line below.
   }
-  return response.statusText || `HTTP ${response.status}`;
+  return { detail: response.statusText || `HTTP ${response.status}` };
 }
 
 /** The status that means "not you" rather than "not that". Both back ends are
@@ -100,7 +114,10 @@ export function jsonClient(label: string, mapStatus: StatusMapper, identity: Ide
       throw new MarketDataError("unauthenticated", SIGNED_OUT_MESSAGE);
     }
     if (!response.ok) {
-      throw mapStatus(response.status, await parseErrorDetail(response));
+      const { detail, problem } = await parseErrorDetail(response);
+      const refusal = mapStatus(response.status, detail);
+      refusal.problem = problem;
+      throw refusal;
     }
     return response;
   }

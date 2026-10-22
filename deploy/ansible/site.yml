@@ -1,0 +1,218 @@
+---
+# The server, after cloud-init: firewall, automatic security updates, log rotation, the application directory, and the
+# jobs that watch the machine. Idempotent — running it again is how a change here reaches the server, and how a
+# rebuilt machine becomes the old one. It does not deploy the application (that is `deploy-vps.yml`) and holds no secret.
+#
+#   ansible-playbook -i inventory.ini site.yml -e deploy_public_key="$(cat deploy_key.pub)" -e backup_public_key="$(cat backup_key.pub)"
+#
+# Variables worth overriding: `ssh_allowed_cidrs` (who may reach port 22), `disk_alert_percent`.
+- name: The trading server
+  hosts: tradingcenter
+  become: true
+  vars:
+    app_dir: /opt/tradingcenter
+    # The account the operator logs in with and Ansible runs as: `operator` where cloud-init created it, `ubuntu` on an image
+    # that arrives with its own.
+    operator_user: operator
+    # Port 22 is open to nobody until the operator names a source (design.md, decision 6): GitHub Actions' published
+    # ranges or the operator's own address, or none at all behind a tunnel.
+    ssh_allowed_cidrs: []
+    disk_alert_percent: 80
+    deploy_public_key: ""
+    backup_public_key: ""
+    # One command, and which one: the deploy script is the only thing this key can run, whatever it asks for.
+    deploy_command: "{{ app_dir }}/bin/deploy"
+
+  tasks:
+    # Everything cloud-init does on a provider that has it, done here too, so a provider without user-data (or a machine
+    # installed by hand) reaches the same state. Each task is idempotent: on a machine cloud-init already prepared, nothing changes.
+    - name: Packages - Docker, its Compose plugin, the firewall, automatic updates
+      ansible.builtin.apt:
+        name: [docker.io, docker-compose-v2, ufw, unattended-upgrades, curl]
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Docker is running and starts at boot
+      ansible.builtin.service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: The deploying user - owns the application directory, can run Docker, has no password
+      ansible.builtin.user:
+        name: deploy
+        groups: docker
+        append: true
+        shell: /bin/bash
+        password: "!"
+
+    - name: The backup user - reads dumps and nothing else
+      ansible.builtin.user:
+        name: tcbackup
+        shell: /bin/sh
+        password: "!"
+
+    - name: SSH - keys only, no root, only the named accounts
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config.d/10-tradingcenter.conf
+        mode: "0644"
+        validate: /usr/sbin/sshd -t -f %s
+        content: |
+          PermitRootLogin no
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+          AllowUsers {{ operator_user }} deploy tcbackup
+          X11Forwarding no
+      notify: reload ssh
+
+    - name: Firewall - deny by default, allow the proxy's two ports
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop: ["80", "443"]
+
+    - name: Firewall - HTTP/3 on the proxy's UDP port
+      community.general.ufw:
+        rule: allow
+        port: "443"
+        proto: udp
+
+    - name: Firewall - SSH only from the named sources
+      community.general.ufw:
+        rule: allow
+        port: "22"
+        proto: tcp
+        from_ip: "{{ item }}"
+      loop: "{{ ssh_allowed_cidrs }}"
+
+    - name: Firewall - default deny incoming, allow outgoing, on
+      community.general.ufw:
+        state: enabled
+        default: deny
+        direction: incoming
+
+    - name: Automatic security updates
+      ansible.builtin.copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        mode: "0644"
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
+          APT::Periodic::AutocleanInterval "7";
+
+    - name: Docker - rotate container logs for anything that does not say otherwise
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        mode: "0644"
+        content: |
+          {"log-driver": "json-file", "log-opts": {"max-size": "10m", "max-file": "5"}}
+      notify: restart docker
+
+    - name: The application directory, owned by the deploying user
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: deploy
+        group: deploy
+        mode: "0750"
+      loop:
+        - "{{ app_dir }}"
+        - "{{ app_dir }}/bin"
+        - "{{ app_dir }}/postgres"
+        - "{{ app_dir }}/www"
+        - "{{ app_dir }}/www/terminal"
+        - "{{ app_dir }}/www/pocket"
+
+    - name: Dumps - written by deploy, read by backup, reachable by nobody else
+      ansible.builtin.file:
+        path: /var/backups/tradingcenter
+        state: directory
+        owner: deploy
+        group: tcbackup
+        mode: "2750"
+
+    - name: Backup acknowledgements - the one place the backup account may write
+      ansible.builtin.file:
+        path: /var/lib/tradingcenter/backup-ack
+        state: directory
+        owner: tcbackup
+        group: deploy
+        mode: "0755"
+
+    - name: The window onto the dumps - root's, so the backup account cannot change what its own key runs
+      ansible.builtin.copy:
+        src: ../scripts/backup-serve.sh
+        dest: /usr/local/bin/tc-backup-serve
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Compose file, Caddyfile and database bootstrap - seeded; every deploy brings its own
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ app_dir }}/{{ item.dest }}"
+        owner: deploy
+        group: deploy
+        mode: "{{ item.mode }}"
+      loop:
+        - {src: ../docker-compose.yml, dest: docker-compose.yml, mode: "0640"}
+        - {src: ../Caddyfile, dest: Caddyfile, mode: "0640"}
+        - {src: ../postgres/ensure-databases.sh, dest: postgres/ensure-databases.sh, mode: "0750"}
+        - {src: ../env.required, dest: env.required, mode: "0640"}
+        - {src: ../scripts/deploy.sh, dest: bin/deploy, mode: "0750"}
+        - {src: ../scripts/alert.sh, dest: bin/alert, mode: "0750"}
+        - {src: ../scripts/disk-alert.sh, dest: bin/disk-alert, mode: "0750"}
+        - {src: ../scripts/backup.sh, dest: bin/backup, mode: "0750"}
+        - {src: ../scripts/backup-check.sh, dest: bin/backup-check, mode: "0750"}
+
+    - name: The deploy key may run the deploy script and nothing else
+      ansible.builtin.authorized_key:
+        user: deploy
+        key: "{{ deploy_public_key }}"
+        key_options: 'command="{{ deploy_command }}",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty'
+        exclusive: true
+      when: deploy_public_key | length > 0
+
+    - name: The backup key may list, read and acknowledge dumps and nothing else
+      ansible.builtin.authorized_key:
+        user: tcbackup
+        key: "{{ backup_public_key }}"
+        key_options: 'command="/usr/local/bin/tc-backup-serve",no-port-forwarding,no-X11-forwarding,no-agent-forwarding,no-pty'
+        exclusive: true
+      when: backup_public_key | length > 0
+
+    - name: Nightly dump of every database
+      ansible.builtin.cron:
+        name: tradingcenter backup
+        minute: "30"
+        hour: "2"
+        user: deploy
+        job: "{{ app_dir }}/bin/backup >> {{ app_dir }}/backup.log 2>&1"
+
+    - name: Morning check - a dump from the last day, a collection in the last three
+      ansible.builtin.cron:
+        name: tradingcenter backup check
+        minute: "15"
+        hour: "8"
+        user: deploy
+        job: "{{ app_dir }}/bin/backup-check"
+
+    - name: Disk alert - hourly, once a day per breach is the script's own business
+      ansible.builtin.cron:
+        name: tradingcenter disk alert
+        minute: "7"
+        user: deploy
+        job: "DISK_ALERT_PERCENT={{ disk_alert_percent }} {{ app_dir }}/bin/disk-alert"
+
+  handlers:
+    - name: reload ssh
+      ansible.builtin.service:
+        name: ssh
+        state: reloaded
+
+    - name: restart docker
+      ansible.builtin.service:
+        name: docker
+        state: restarted

@@ -95,7 +95,6 @@ async def test_the_state_says_since_when_it_collects_and_whether_a_model_is_conf
     # And whether it can tell anybody: an archive that collects and says nothing looks from
     # outside exactly like one whose gateway is broken.
     assert body["alerts_configured"] is False
-    assert body["alert_min_impact_score"] == 8
     assert body["posts_in_window"] == 1
     [source] = body["sources"]
     assert source["source"] == TRUTH_SOCIAL
@@ -122,13 +121,13 @@ async def test_an_archive_that_has_not_collected_for_a_long_time_says_so(api, po
     assert source["consecutive_failures"] == 1
 
 
-async def test_the_contract_publishes_no_route_that_writes(api):
+async def test_the_contract_publishes_no_route_that_writes_but_the_keep_flag(api):
     document = (await api.get("/openapi.json")).json()
 
-    methods = {
-        method.upper()
-        for path in document["paths"].values()
+    writes = {
+        (method.upper(), route)
+        for route, path in document["paths"].items()
         for method in path
-        if method in ("get", "post", "put", "patch", "delete")
+        if method in ("post", "put", "patch", "delete")
     }
-    assert methods == {"GET"}
+    assert writes == {("PUT", "/news/keep")}

@@ -2,14 +2,19 @@ import { useMemo, useState, useSyncExternalStore } from "react";
 import { noIdentity, type Identity } from "./auth/identity";
 import { createAgentApi } from "./agent/agentApi";
 import { AgentScreen } from "./agent/AgentScreen";
+import { createAccessApi, type AccessApi } from "./access/accessApi";
+import { NoAccessScreen } from "./access/NoAccessScreen";
+import { useRole } from "./access/useRole";
 import { archiveBase, postsBase, workbenchBase } from "./data/config";
 import { createPolymarketApi } from "./polymarket/api";
 import { PolymarketScreen } from "./polymarket/PolymarketScreen";
+import { createNewsApi } from "./news/api";
+import { NewsScreen } from "./news/NewsScreen";
 import { createSocialApi } from "./social/api";
 import { PostsScreen } from "./social/PostsScreen";
 import { SignInScreen } from "./SignInScreen";
 import { TabBar } from "./app/TabBar";
-import { loadTab, saveTab, type Tab } from "./app/tabs";
+import { allowedTab, loadTab, saveTab, tabsFor, type Tab } from "./app/tabs";
 import styles from "./App.module.css";
 
 export interface AppProps {
@@ -20,9 +25,16 @@ export interface AppProps {
   workbench?: Identity;
   /** The post archive's — a third module, a third audience. */
   posts?: Identity;
+  /** Who the workbench says the person is; built from the conversation's identity unless a test brings its own. */
+  access?: AccessApi;
 }
 
-export function App({ archive = noIdentity, workbench = noIdentity, posts = noIdentity }: AppProps) {
+export function App({
+  archive = noIdentity,
+  workbench = noIdentity,
+  posts = noIdentity,
+  access,
+}: AppProps) {
   const state = useSyncExternalStore(archive.subscribe, archive.state);
   const [tab, setTab] = useState<Tab>(() => loadTab());
 
@@ -31,29 +43,50 @@ export function App({ archive = noIdentity, workbench = noIdentity, posts = noId
   const polymarket = useMemo(() => createPolymarketApi(archiveBase(), archive), [archive]);
   const agent = useMemo(() => createAgentApi(workbenchBase(), workbench), [workbench]);
   const social = useMemo(() => createSocialApi(postsBase(), posts), [posts]);
+  const news = useMemo(() => createNewsApi(postsBase(), posts), [posts]);
+
+  const accessApi = useMemo(
+    () => access ?? createAccessApi(workbenchBase(), workbench),
+    [access, workbench],
+  );
+  const role = useRole(accessApi, state);
 
   // `unconfigured` is the local stack and renders the screens bare — only a deployment that has an
   // identity to lose can be signed out of one.
   if (state === "signed-out") {
     return <SignInScreen onSignIn={archive.signIn} />;
   }
+  if (role === "loading") return null;
+  if (role === "none") return <NoAccessScreen onSignOut={archive.signOut} />;
+
+  // A viewer reads: no agent, and no screen offers an action that writes.
+  const readOnly = role === "viewer";
+  const tabs = tabsFor(role);
+  const shown = allowedTab(tab, tabs);
 
   return (
     <div className={styles.app}>
       {/* Both mounted, one hidden: switching tabs must not throw away a half-typed question or
           restart the archive's poll, and a phone switches tabs constantly. */}
-      <div className={tab === "markets" ? styles.pane : styles.hidden}>
-        <PolymarketScreen api={polymarket} />
+      <div className={shown === "markets" ? styles.pane : styles.hidden}>
+        <PolymarketScreen api={polymarket} readOnly={readOnly} />
       </div>
-      <div className={tab === "social" ? styles.pane : styles.hidden}>
+      <div className={shown === "social" ? styles.pane : styles.hidden}>
         <PostsScreen api={social} />
       </div>
-      <div className={tab === "agent" ? styles.pane : styles.hidden}>
-        <AgentScreen api={agent} />
+      <div className={shown === "news" ? styles.pane : styles.hidden}>
+        <NewsScreen api={news} active={shown === "news"} readOnly={readOnly} />
       </div>
+      {readOnly ? null : (
+        <div className={shown === "agent" ? styles.pane : styles.hidden}>
+          <AgentScreen api={agent} />
+        </div>
+      )}
 
       <TabBar
-        current={tab}
+        tabs={tabs}
+        onSignOut={state === "unconfigured" ? undefined : archive.signOut}
+        current={shown}
         onChange={(next) => {
           setTab(next);
           saveTab(next);

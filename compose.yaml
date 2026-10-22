@@ -4,7 +4,7 @@
 #     docker compose up -d db          # or ./scripts/dev.sh, which does it for you
 #     docker compose down -v           # stop, and forget everything collected
 #
-# The credentials match `modules/market-data/.env.example` exactly, so a fresh checkout needs no further edit.
+# The credentials match `modules/workbench/.env.example` exactly, so a fresh checkout needs no further edit.
 
 name: tradingcenter
 

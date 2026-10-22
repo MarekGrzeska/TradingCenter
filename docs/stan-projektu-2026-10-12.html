@@ -1,0 +1,342 @@
+<title>Stan projektu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  h3.sub {
+    font-family: var(--head); font-weight: 700; font-size: 21px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 30px 0 10px;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+  ul { margin: 0 0 16px; padding-left: 22px; max-width: 70ch; }
+  li { margin-bottom: 6px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure pre { margin: 0; }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 12.5px; line-height: 1.5;
+  }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Stan projektu · 12 października 2026</span>
+    <h1>Co stoi, co wisi, co do sprzątnięcia</h1>
+    <p class="lede">Trzy procesy na Azure, dwa ekrany, dziewięć pakietów w workbenchu. Na gałęzi <b>archiwum YouTube</b> — gotowe w kodzie, jeszcze nie wypchnięte. Osiem dodatkowych worktree: <b>wszystkie zmergowane</b>, do usunięcia.</p>
+    <div class="strip">
+      <span>TradingCenter / przegląd stanu</span>
+      <span>gałąź <b>feat/add-youtube-archive</b></span>
+      <span>origin/main <b>c679ddf</b> · #278 · 29.09</span>
+      <span>środowisko <b>demo</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">3</div><div class="l">procesy backendu (granice bezpieczeństwa)</div></div>
+      <div class="cell"><div class="v">2</div><div class="l">ekrany React: terminal i pocket</div></div>
+      <div class="cell"><div class="v">9</div><div class="l">pakietów w workbenchu (+ youtube na gałęzi)</div></div>
+      <div class="cell"><div class="v">10</div><div class="l">commitów YouTube, niewypchniętych</div></div>
+      <div class="cell"><div class="v">8/8</div><div class="l">worktree zmergowanych</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Moduły</div>
+      <h2>Jeden proces na granicę bezpieczeństwa</h2>
+      <p class="intro">Moduł jest osobnym procesem tylko wtedy, gdy ma regułę zapisu, której nie ma nikt inny. Rozmawiają wyłącznie przez opublikowany kontrakt (HTTP/OpenAPI albo MCP). Kod wspólny — tylko w czasie budowania, przez <code>packages/</code>.</p>
+      <figure>
+        <div class="scroll">
+<pre>                  capital.com (REST + WS, demo)
+                         │
+                         ▼
+          ┌──────────────────────────────┐
+          │  capital-gateway  8010       │◀─────────────────────┐
+          │  handel · historia · stream  │                      │ REST + klucz
+          └──────────────┬───────────────┘                      │ (demo sprawdzane
+                         │ HTTP + WS                            │  przed portem)
+                         ▼                                      │
+  ┌──────────────────────────────────────────────────┐   ┌──────┴───────┐
+  │  workbench  8030  ·  app-tradingcenter-agent     │──▶│ trading-mcp  │
+  │  agent · teams · teams_tools                     │   │ 8060 · /mcp  │
+  │  market_data /market · polymarket_data /polymarket│   └──────────────┘
+  │  social_data /social · strategy /strategy        │──▶ Telegram
+  │  telegram_gateway /telegram                      │◀── OpenAI ×2
+  │  (youtube_data /youtube — na gałęzi, opcjonalny) │
+  └───────────┬──────────────────────────┬───────────┘
+              ▼                          ▼
+        terminal 5173               pocket 5174</pre>
+        </div>
+        <figcaption><b>Rys. 1</b> — trzy procesy backendu i dwa ekrany. Szczegóły i uzasadnienie: <code>docs/architecture.md</code>.</figcaption>
+      </figure>
+
+      <h3 class="sub">Procesy i ekrany</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Moduł</th><th class="n">Port</th><th>Co robi</th><th>Reguła, która czyni go osobnym</th></tr></thead>
+          <tbody>
+            <tr><td><b>capital-gateway</b></td><td class="n">8010</td><td>Jedyne drzwi do capital.com: handel na rachunku demo, głęboka historia świec, strumień na żywo (<code>/ws/stream</code>).</td><td>Jedyna sesja u dostawcy; budżet 10 req/s na rachunek.</td></tr>
+            <tr><td><b>workbench</b></td><td class="n">8030</td><td>Jeden proces, dziewięć pakietów, które się nawzajem nie importują (niżej). Rozmowa, zespoły agentów, archiwa, platforma strategii, Telegram.</td><td>Wszystko, co nie dotyka pieniędzy ani dostawcy. Siedem baz, jedna tożsamość, dwa klucze OpenAI.</td></tr>
+            <tr><td><b>trading-mcp</b></td><td class="n">8060</td><td>Narzędzia MCP nad rachunkiem demo (pozycje, zlecenia). Jeden rozmówca — workbench.</td><td>Jedyna rzecz, która rusza rachunkiem; przed otwarciem portu pyta bramkę, czy rachunek to demo.</td></tr>
+            <tr><td><b>terminal</b></td><td class="n">5173</td><td>React+TS — ekran operatora: wykresy, agent, zespoły, archiwa, strategia, news. Konsumuje, nic nie publikuje.</td><td>—</td></tr>
+            <tr><td><b>pocket</b></td><td class="n">5174</td><td>React+TS — archiwum na telefonie i czat z workbenchem. Dzieli z terminalem wygenerowany kontrakt, nie kod.</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">Pakiety w workbenchu</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Pakiet</th><th>Prefiks</th><th>Co robi</th></tr></thead>
+          <tbody>
+            <tr><td><b>agent</b></td><td><code>/</code></td><td>Rozmowa z operatorem: katalog modeli, narzędzia innych pakietów podane jako funkcje, sterowanie wykresem.</td></tr>
+            <tr><td><b>teams</b> · <b>teams_tools</b></td><td><code>/teams</code></td><td>Zespoły agentów: katalog, płótno, przebiegi, harmonogram i wyzwalacze, limity kosztu i handlu, ślad zleceń. Własny klucz OpenAI.</td></tr>
+            <tr><td><b>market_data</b></td><td><code>/market</code></td><td>Archiwum świec z bramki, rollupy, wskaźniki techniczne, <code>/ws</code> dla wykresu, własne <code>/mcp</code> (tylko odczyt).</td></tr>
+            <tr><td><b>polymarket_data</b></td><td><code>/polymarket</code></td><td>Archiwum rynków predykcyjnych Polymarket, grupy, próbki cen.</td></tr>
+            <tr><td><b>social_data</b></td><td><code>/social</code></td><td>Archiwum postów (odczyt przez model, alerty po polsku) i — od #277/#278 — <strong>News</strong>: 15 kanałów RSS, pomiar opóźnienia, retencja, zakładka News.</td></tr>
+            <tr><td><b>strategy</b></td><td><code>/strategy</code></td><td>Platforma strategii: katalog, obserwacje, decyzje, backtesty. Czyta <code>/market</code> w procesie. <strong>Nigdy nie dotyka rachunku.</strong></td></tr>
+            <tr><td><b>telegram_gateway</b></td><td><code>/telegram</code></td><td>Jedyne drzwi do Telegrama: boty i miejsca docelowe alertów.</td></tr>
+            <tr><td><b>youtube_data</b></td><td><code>/youtube</code></td><td><span class="tag att">na gałęzi</span> Archiwum filmów: lista obserwacji, odkryj → transkrybuj → odczytaj → powiadom; montowany tylko przy <code>YOUTUBE_DATABASE_URL</code>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">Reszta repozytorium</h3>
+      <ul>
+        <li><code>packages/tc-runtime</code> — baza, migracje, kontrola schematu, Easy Auth, rejestr wywołujących, reguła odpowiedzi OpenAPI.</li>
+        <li><code>packages/tc-mcp-kit</code> — tożsamość wywołującego w obie strony, odmowa z góry, odchudzanie schematów narzędzi, montaż FastMCP.</li>
+        <li><code>packages/tc-openai</code> — strumieniowane wywołanie OpenAI z narzędziami (bierze tylko workbench).</li>
+        <li><code>infra/</code> — Terraform na Azure (App Service ×3, Static Web Apps, PostgreSQL B1ms, Key Vault, monitoring). <code>apply</code> zawsze operatora.</li>
+        <li><code>openspec/</code> — specyfikacje (prawda) i zmiany; <code>docs/</code> — architektura i raporty.</li>
+      </ul>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Bieżąca gałąź</div>
+      <h2>feat/add-youtube-archive</h2>
+      <p class="intro">Kod gotowy, przegląd zrobiony, poprawki z przeglądu <span class="hl">leżą niezacommitowane</span>. Gałąź nie ma upstreamu — nic nie jest na GitHubie i nie ma PR.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Co</th><th>Stan</th><th></th></tr></thead>
+          <tbody>
+            <tr><td><b>Commity</b></td><td>10 ponad <code>913fcdc</code> (#276): propozycja OpenSpec → szkielet i schemat → dostawcy i analizator → symulacja → lista obserwacji i pętla → alerty Telegram → REST → 10 narzędzi → zakładka YouTube w terminalu.</td><td><span class="tag ok">gotowe</span></td></tr>
+            <tr><td><b>Zadania OpenSpec</b></td><td>40 z 41. Otwarte tylko <strong>9.2 — przebieg ręczny</strong> na stacku (film od odkrycia do alertu na testowym bocie, narzędzia w MCP Inspectorze). Stack jest operatora.</td><td><span class="tag att">1 otwarte</span></td></tr>
+            <tr><td><b>Przegląd</b> (<code>review.md</code>)</td><td>9 poważnych ustaleń, wszystkie naprawione z testem. Workbench: 2797 testów zielonych (207 w <code>tests/youtube</code>), terminal: 836 + <code>contract:check</code> czysty, scripts: 177.</td><td><span class="tag ok">zrobiony</span></td></tr>
+            <tr><td><b>Zmiany niezacommitowane</b></td><td>35 plików zmienionych (+359 / −70) — poprawki z przeglądu, plus nieśledzone: <code>youtube_data/README.md</code>, <code>review.md</code>, <code>docs/youtube-przebieg-reczny.html</code>, <code>docs/cowork-agenci-na-skillach.html</code>. Zmieniony też <code>CLAUDE.md</code> i <code>deploy-terminal.yml</code>.</td><td><span class="tag stop">do commita</span></td></tr>
+            <tr><td><b>Względem main</b></td><td>Gałąź jest <strong>16 commitów za</strong> <code>origin/main</code> — brakuje #277 i #278 (News w <code>social_data</code>, ~7 tys. linii). Lokalny <code>main</code> też jest 16 za.</td><td><span class="tag att">rebase</span></td></tr>
+            <tr><td><b>Wpływ na produkcję</b></td><td>Bez <code>YOUTUBE_DATABASE_URL</code> nie ma trasy, narzędzi, pętli ani bazy — merge nie zmienia produkcji.</td><td><span class="tag ok">bezpieczny</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Worktree</div>
+      <h2>Osiem worktree, żaden nie trzyma pracy</h2>
+      <p class="intro">Każda gałąź poniżej weszła do <code>main</code> — wprost albo jako PR ze zmienionymi commitami. Wszystkie pochodzą z 12–18 sierpnia.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Katalog</th><th>Gałąź</th><th>Zmergowana?</th><th>Brudne pliki</th><th>Werdykt</th></tr></thead>
+          <tbody>
+            <tr><td><b>TradingCenter-mcp</b></td><td><code>fix/market-mcp-range-tools-refuse-themselves</code></td><td>tak (0 commitów ponad main)</td><td>3 — w <code>modules/market-mcp/</code></td><td><span class="tag att">porzucić</span></td></tr>
+            <tr><td><b>TradingCenter-perf</b></td><td><code>docs/plan-status-iteration-4</code></td><td>tak</td><td>0</td><td><span class="tag ok">usunąć</span></td></tr>
+            <tr><td><b>TradingCenter-schedule-ui</b></td><td><code>feat/schedule-ui-and-run-now</code></td><td>tak</td><td>0</td><td><span class="tag ok">usunąć</span></td></tr>
+            <tr><td><b>TradingCenter-teams-docs</b></td><td><code>docs/teams-module-overview</code></td><td>PR #116 tak; 1 commit dopisany po merge (<code>dd9b381</code>, tytuły dwóch stron)</td><td>0</td><td><span class="tag ok">usunąć</span></td></tr>
+            <tr><td><b>TradingCenter-teams-infra</b></td><td><code>feat/teams-08-cost</code></td><td>tak (#115)</td><td>0</td><td><span class="tag ok">usunąć</span></td></tr>
+            <tr><td><b>TradingCenter-teams-phase2</b></td><td><code>feat/teams-terminal-trading</code></td><td>tak — PR #131 (w main jako <code>12ac0bf</code>)</td><td>0</td><td><span class="tag ok">usunąć</span></td></tr>
+            <tr><td><b>TradingCenter-teams-phase3</b></td><td><code>feat/teams-p3-config-and-infra</code></td><td>tak — PR #130</td><td>0</td><td><span class="tag ok">usunąć</span></td></tr>
+            <tr><td><b>TradingCenter-terminal</b></td><td><code>docs/plan-iteration-3-status</code></td><td>tak</td><td>0</td><td><span class="tag ok">usunąć</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="fails" style="margin-top:18px">
+        <div class="fail">
+          <h3>TradingCenter-mcp ma niezacommitowane zmiany <span class="tag att">martwy moduł</span></h3>
+          <p>Zmiany w <code>market_mcp/tools/candles.py</code>, <code>indicators.py</code> i nowy test. Moduł <code>market-mcp</code> nie istnieje już w <code>main</code> — jego narzędzia przeszły do <code>/market/mcp</code> w workbenchu. Te zmiany nie mają gdzie wylądować; jeśli idea „narzędzia zakresu odmawiają same” jest jeszcze potrzebna, trzeba ją przenieść do <code>modules/workbench/market_data</code>.</p>
+        </div>
+        <div class="fail ok">
+          <h3>teams-docs: zgubiony commit jest bez znaczenia <span class="tag ok">nieaktualny</span></h3>
+          <p><code>dd9b381</code> zmienia tytuły dwóch stron, które od tamtej pory przeszły do <code>docs/archive/</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Poza worktree</div>
+      <h2>Co jeszcze nie weszło</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Rzecz</th><th>Stan</th><th></th></tr></thead>
+          <tbody>
+            <tr><td><b>PR #275</b> <code>feat/strategy-decision-detail-and-backtests</code></td><td>Decyzja strategii otwiera się na dane, na których stała; raporty backtestów. Otwarty od 27.09.</td><td><span class="tag att">otwarty PR</span></td></tr>
+            <tr><td><b>PR #273</b> <code>feat/prediction-samples-thin-with-age</code></td><td>Próbki Polymarket starsze niż 30 dni zagęszczane do jednej na godzinę (2,93 GB, +63 MB/dobę). Zmiana OpenSpec bez <code>tasks.md</code>. Otwarty od 27.09.</td><td><span class="tag att">otwarty PR</span></td></tr>
+            <tr><td><b>OpenSpec</b> <code>one-process-per-security-boundary</code></td><td>31 z 33 zadań. Zwinięcie do trzech procesów już na produkcji; czeka na domknięcie i archiwizację.</td><td><span class="tag att">2 otwarte</span></td></tr>
+            <tr><td><b>OpenSpec</b> <code>the-screen-is-mostly-refusals</code></td><td>16 z 18 zadań — ekran strategii w terminalu.</td><td><span class="tag att">2 otwarte</span></td></tr>
+            <tr class="void"><td>Katalogi <code>modules/market-data</code>, <code>polymarket-data</code>, <code>social-data</code>, <code>strategy</code>, <code>telegram-gateway</code></td><td>0 plików śledzonych — resztki po zwinięciu (<code>.env</code>, cache pytest, <code>__pycache__</code>). Kod jest w <code>modules/workbench/</code>.</td><td><span class="tag stop">śmieci lokalne</span></td></tr>
+            <tr><td>Stare gałęzie na <code>origin</code></td><td>~230 gałęzi zdalnych; kilkadziesiąt pokazuje commity ponad main, bo PR-y były squashowane albo commity dopisano po merge. Ostatnia praca (PR-y do #278) jest zmergowana.</td><td><span class="tag att">do przycięcia</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Następne kroki</div>
+      <h2>Kolejność, w jakiej bym to zrobił</h2>
+      <ul>
+        <li><strong>YouTube:</strong> zacommitować poprawki z przeglądu i README → <code>git rebase origin/main</code> (16 commitów News) → testy workbencha i terminala → push i PR. Zadanie 9.2 (przebieg ręczny) może iść po merge, bo bez <code>YOUTUBE_DATABASE_URL</code> pakiet się nie montuje.</li>
+        <li><strong>Lokalny main:</strong> <code>git pull</code> — jest 16 commitów za.</li>
+        <li><strong>Worktree:</strong> <code>git worktree remove</code> dla siedmiu czystych; <code>TradingCenter-mcp</code> — zdecydować, czy porzucić zmiany (<code>--force</code>), czy przenieść ideę do <code>market_data</code>.</li>
+        <li><strong>PR #273 i #275</strong> — przejrzeć i zmergować albo zamknąć; oba czekają od 27.09.</li>
+        <li><strong>OpenSpec:</strong> domknąć i zarchiwizować <code>one-process-per-security-boundary</code> i <code>the-screen-is-mostly-refusals</code>.</li>
+        <li><strong>Porządki:</strong> usunąć lokalne katalogi-resztki w <code>modules/</code>; przyciąć zmergowane gałęzie zdalne.</li>
+      </ul>
+      <div class="quote">Na dziś nic nie wisi poza YouTube i dwoma PR-ami — reszta to sprzątanie.</div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Stan projektu · zebrane z git, gh i openspec 12.10.2026</span>
+    <span>Tryb jasny — jedyny</span>
+  </div>
+</footer>

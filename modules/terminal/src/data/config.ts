@@ -45,13 +45,19 @@ export interface Endpoints {
    *  the archive became a package of that process, and so the workbench's scope. Kept as its own setting,
    *  because the archive is still its own contract. */
   polymarketHttp: string;
-  /** `strategy`, for the strategy platform: the catalogue of entries, which pairs are
-   *  watched, every decision with the reason it carries, and the backtest reports that
-   *  were kept. The workbench's address plus `/strategy`, like the two archives. */
-  strategyHttp: string;
   /** `social-data`, for the posts: the archive of what was said and what a model made of it. The
    *  workbench's address plus `/social`, for the reason the prediction-market archive is. */
   socialHttp: string;
+  /** `youtube-data`, for the films: what was said in the videos the operator follows, and what a model made of it. The
+   *  workbench's address plus `/youtube`, when the workbench has the package — it is the one back end that may be absent. */
+  youtubeHttp: string;
+  /** `telegram_gateway`, for the door to Telegram: the owner account, the bots, who receives and which purpose goes to
+   *  whom. The workbench's address plus `/telegram`, and the workbench's scope — but a route record of its own, where the
+   *  operator's terminal is admitted next to `az` and nobody else is. */
+  telegramHttp: string;
+  /** `alerts`, for the rules that decide who is told what: the workbench's address plus `/alerts`, when the workbench has the
+   *  package — like the YouTube archive, it may be absent, and the tab says so rather than showing no rules. */
+  alertsHttp: string;
   /** `capital-gateway`, for the account. It used to have no address here at all; what changed is that the
    *  gateway recognises an authenticated browser. In dev this is a prefix the dev server proxies. */
   gatewayHttp: string;
@@ -64,8 +70,10 @@ const DEFAULT_ARCHIVE_WS = "/archive-api/ws";
 const DEFAULT_WORKBENCH_HTTP = "/workbench-api";
 const DEFAULT_GATEWAY_HTTP = "/gateway-api";
 const DEFAULT_POLYMARKET_HTTP = "/polymarket-api";
-const DEFAULT_STRATEGY_HTTP = "/strategy-api";
 const DEFAULT_SOCIAL_HTTP = "/social-api";
+const DEFAULT_YOUTUBE_HTTP = "/youtube-api";
+const DEFAULT_TELEGRAM_HTTP = "/telegram-api";
+const DEFAULT_ALERTS_HTTP = "/alerts-api";
 
 export interface EnvVars {
   VITE_ARCHIVE_HTTP?: string;
@@ -73,16 +81,20 @@ export interface EnvVars {
   VITE_WORKBENCH_HTTP?: string;
   VITE_GATEWAY_HTTP?: string;
   VITE_POLYMARKET_HTTP?: string;
-  VITE_STRATEGY_HTTP?: string;
   VITE_SOCIAL_HTTP?: string;
+  VITE_YOUTUBE_HTTP?: string;
+  VITE_TELEGRAM_HTTP?: string;
+  VITE_ALERTS_HTTP?: string;
   VITE_ENTRA_CLIENT_ID?: string;
   VITE_ENTRA_TENANT_ID?: string;
   VITE_ENTRA_SCOPE?: string;
   VITE_ENTRA_SCOPE_WORKBENCH?: string;
   VITE_ENTRA_SCOPE_GATEWAY?: string;
   VITE_ENTRA_SCOPE_POLYMARKET?: string;
-  VITE_ENTRA_SCOPE_STRATEGY?: string;
   VITE_ENTRA_SCOPE_SOCIAL?: string;
+  VITE_ENTRA_SCOPE_YOUTUBE?: string;
+  VITE_ENTRA_SCOPE_TELEGRAM?: string;
+  VITE_ENTRA_SCOPE_ALERTS?: string;
 }
 
 /** One scope per module, because each accepts a token minted for its **own** audience. `archive` keeps
@@ -92,8 +104,10 @@ export interface ModuleScopes {
   workbench: string | null;
   gateway: string | null;
   polymarket: string | null;
-  strategy: string | null;
   social: string | null;
+  youtube: string | null;
+  telegram: string | null;
+  alerts: string | null;
 }
 
 /** Which Entra registration the terminal signs the operator in against, and what it asks
@@ -130,8 +144,10 @@ export function resolveEntra(env: EnvVars = import.meta.env): EntraConfig | null
       workbench: env.VITE_ENTRA_SCOPE_WORKBENCH?.trim() || null,
       gateway: env.VITE_ENTRA_SCOPE_GATEWAY?.trim() || null,
       polymarket: env.VITE_ENTRA_SCOPE_POLYMARKET?.trim() || null,
-      strategy: env.VITE_ENTRA_SCOPE_STRATEGY?.trim() || null,
       social: env.VITE_ENTRA_SCOPE_SOCIAL?.trim() || null,
+      youtube: env.VITE_ENTRA_SCOPE_YOUTUBE?.trim() || null,
+      telegram: env.VITE_ENTRA_SCOPE_TELEGRAM?.trim() || null,
+      alerts: env.VITE_ENTRA_SCOPE_ALERTS?.trim() || null,
     },
   };
 }
@@ -146,7 +162,9 @@ export function resolveEndpoints(
     workbenchHttp: resolveHttpBase(env.VITE_WORKBENCH_HTTP || DEFAULT_WORKBENCH_HTTP),
     gatewayHttp: resolveHttpBase(env.VITE_GATEWAY_HTTP || DEFAULT_GATEWAY_HTTP),
     polymarketHttp: resolveHttpBase(env.VITE_POLYMARKET_HTTP || DEFAULT_POLYMARKET_HTTP),
-    strategyHttp: resolveHttpBase(env.VITE_STRATEGY_HTTP || DEFAULT_STRATEGY_HTTP),
     socialHttp: resolveHttpBase(env.VITE_SOCIAL_HTTP || DEFAULT_SOCIAL_HTTP),
+    youtubeHttp: resolveHttpBase(env.VITE_YOUTUBE_HTTP || DEFAULT_YOUTUBE_HTTP),
+    telegramHttp: resolveHttpBase(env.VITE_TELEGRAM_HTTP || DEFAULT_TELEGRAM_HTTP),
+    alertsHttp: resolveHttpBase(env.VITE_ALERTS_HTTP || DEFAULT_ALERTS_HTTP),
   };
 }

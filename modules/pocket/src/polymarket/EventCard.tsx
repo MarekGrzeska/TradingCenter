@@ -19,8 +19,9 @@ export interface EventCardProps {
   /** This event's windows, or `null` while they are still being read. */
   changes: Map<number, OutcomeChanges> | null;
   onToggle: () => void;
-  onMove: () => void;
-  onRemove: () => void;
+  /** Absent for a viewer: there is nothing to move or remove from a screen that only reads. */
+  onMove?: (() => void) | undefined;
+  onRemove?: (() => void) | undefined;
   now: Date;
 }
 
@@ -105,12 +106,16 @@ export function EventCard({
             <a className={styles.link} href={event.url} target="_blank" rel="noreferrer noopener">
               Open on polymarket.com
             </a>
-            <button type="button" className={styles.move} onClick={onMove}>
-              Move to group
-            </button>
-            <button type="button" className={styles.remove} onClick={onRemove}>
-              Remove
-            </button>
+            {onMove === undefined ? null : (
+              <button type="button" className={styles.move} onClick={onMove}>
+                Move to group
+              </button>
+            )}
+            {onRemove === undefined ? null : (
+              <button type="button" className={styles.remove} onClick={onRemove}>
+                Remove
+              </button>
+            )}
           </div>
         </div>
       )}

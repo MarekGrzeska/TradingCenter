@@ -98,13 +98,10 @@ Two collectors on a timer, and their bookkeeping.
   cost, and whether a failure makes it re-read everything.
 - Groups (#265) and alert markers: indexed lookups, or scans?
 
-## C · decisions — `strategy`, `teams`, `teams_tools`
+## C · decisions — `teams`, `teams_tools`
 
-Two loops that run with nobody looking and can multiply reads through tools.
+A loop that runs with nobody looking and can multiply reads through tools.
 
-- Strategy evaluation (60 s) × active watches: how many candles per evaluation through
-  `workbench/archive_client.py`, over what window? The `decisions` table's growth; who counts it and
-  how often?
 - The teams scheduler clock (15 s): what one tick queries when nothing is due, and whether it calls
   tool servers on every tick. The indexes on `schedules.next_fire_at` / `triggers.next_check_at` —
   used by the actual predicates?

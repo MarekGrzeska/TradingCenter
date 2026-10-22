@@ -22,7 +22,7 @@ from ._shared import READ_ONLY, SENDS, ToolContext
 # What a model is told to do when there is nobody to write to. The operator's move, named in full:
 # a bot may not open a conversation, so no amount of asking from here produces a destination.
 BINDING_IS_THE_OPERATORS = (
-    "the operator binds a destination through this gateway's REST contract (POST /destinations) "
+    "the operator binds a recipient to a bot through this gateway's REST contract (POST /recipients/{name}/bots) "
     "and hands the start link to whoever is to receive the alerts — a Telegram bot cannot open a "
     "conversation, so somebody has to tap it. Nothing in this conversation can do it."
 )
@@ -33,11 +33,13 @@ class Sent(BaseModel):
     it: this gateway keeps nothing, so there is no tool that reads a message back."""
 
     destination: str
+    bot: str | None = None
     message_id: int = Field(description="Telegram's own identifier for the delivered message")
 
 
 class DestinationSummary(BaseModel):
     name: str = Field(description="pass this as `destination` to send_telegram_message")
+    bot: str = Field(description="the @name of the bot this name is reached through; pass it as `bot` when a name is listed under several")
     receives: bool = Field(
         description="false means nothing can be delivered there yet — either nobody has tapped "
         "its start link, or the recipient blocked the bot"
@@ -55,16 +57,17 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         """
         async with ctx.pool.acquire() as conn:
             found = await store.list_destinations(conn)
+            usernames = {bot.id: bot.username for bot in await store.list_bots(conn)}
         return [
             DestinationSummary(
-                name=one.name, receives=one.receives, state=one.state.value
+                name=one.name, bot=usernames[one.bot_id], receives=one.receives, state=one.state.value
             )
             for one in found
         ]
 
     @mcp.tool(annotations=SENDS)
-    async def send_telegram_message(destination: str, text: str) -> Sent | dict:
-        """Send a Telegram message to a named destination, now.
+    async def send_telegram_message(destination: str, text: str, bot: str | None = None) -> Sent | dict:
+        """Send a Telegram message to a named destination, now. A name listed under several bots needs `bot`.
 
         This is the one thing in this system a conversation does that is visible outside it. There
         is no queue and no retry: it is delivered while this call runs, or it is refused with
@@ -76,6 +79,7 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
                     conn,
                     ctx.telegram,
                     name=destination,
+                    bot=bot,
                     text=text,
                     max_chars=ctx.settings.max_message_chars,
                 )
@@ -97,4 +101,4 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
                     "refused": str(err),
                     "retryable": isinstance(err, RateLimited | TelegramUnreachable),
                 }
-        return Sent(destination=destination, message_id=delivered.message_id)
+        return Sent(destination=destination, bot=bot, message_id=delivered.message_id)

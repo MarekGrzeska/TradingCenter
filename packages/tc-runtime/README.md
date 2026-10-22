@@ -26,7 +26,7 @@ regression you could not, unless every consumer is exercised.
 |---|---|
 | `workbench` (`agent`, `teams`) | `db`, `migrate`, `schema_version`, `auth`, `routers.models_router`, `openapi` |
 | `market-data` | `db`, `migrate`, `schema_version`, `caller_access`, `openapi` |
-| `polymarket-data`, `social-data`, `strategy`, `telegram-gateway` | `db`, `migrate`, `schema_version`, `caller_access`, `openapi` |
+| `polymarket-data`, `social-data`, `telegram-gateway` | `db`, `migrate`, `schema_version`, `caller_access`, `openapi` |
 
 The three MCP modules (`market-mcp`, `teams-mcp`, `trading-mcp`) took `network_identity`
 and `detail` from here until 18 August 2026, when both moved to `packages/tc-mcp-kit` — see

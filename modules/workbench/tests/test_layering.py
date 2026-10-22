@@ -18,9 +18,10 @@ PACKAGES = (
     "teams_tools",
     "polymarket_data",
     "social_data",
-    "strategy",
     "market_data",
     "telegram_gateway",
+    "youtube_data",
+    "alerts",
 )
 ASSEMBLY = "workbench"
 FORBIDDEN = {package: (set(PACKAGES) - {package}) | {ASSEMBLY} for package in PACKAGES}

@@ -55,8 +55,10 @@ describe("resolveEndpoints", () => {
         VITE_WORKBENCH_HTTP: "/workbench-api",
         VITE_GATEWAY_HTTP: "/gateway-api",
         VITE_POLYMARKET_HTTP: "/polymarket-api",
-        VITE_STRATEGY_HTTP: "/strategy-api",
         VITE_SOCIAL_HTTP: "/social-api",
+        VITE_YOUTUBE_HTTP: "/youtube-api",
+        VITE_TELEGRAM_HTTP: "/telegram-api",
+        VITE_ALERTS_HTTP: "/alerts-api",
       },
       devLoc,
     );
@@ -66,8 +68,10 @@ describe("resolveEndpoints", () => {
       workbenchHttp: "/workbench-api",
       gatewayHttp: "/gateway-api",
       polymarketHttp: "/polymarket-api",
-      strategyHttp: "/strategy-api",
       socialHttp: "/social-api",
+      youtubeHttp: "/youtube-api",
+      telegramHttp: "/telegram-api",
+      alertsHttp: "/alerts-api",
     });
   });
 
@@ -79,8 +83,10 @@ describe("resolveEndpoints", () => {
         VITE_WORKBENCH_HTTP: "https://workbench.example.com",
         VITE_GATEWAY_HTTP: "https://gateway.example.com",
         VITE_POLYMARKET_HTTP: "https://polymarket.example.com",
-        VITE_STRATEGY_HTTP: "https://strategy.example.com",
         VITE_SOCIAL_HTTP: "https://social.example.com",
+        VITE_YOUTUBE_HTTP: "https://youtube.example.com",
+        VITE_TELEGRAM_HTTP: "https://telegram.example.com",
+        VITE_ALERTS_HTTP: "https://alerts.example.com",
       },
       { protocol: "https:", host: "terminal.example.com" },
     );
@@ -90,8 +96,10 @@ describe("resolveEndpoints", () => {
       workbenchHttp: "https://workbench.example.com",
       gatewayHttp: "https://gateway.example.com",
       polymarketHttp: "https://polymarket.example.com",
-      strategyHttp: "https://strategy.example.com",
       socialHttp: "https://social.example.com",
+      youtubeHttp: "https://youtube.example.com",
+      telegramHttp: "https://telegram.example.com",
+      alertsHttp: "https://alerts.example.com",
     });
   });
 
@@ -102,16 +110,27 @@ describe("resolveEndpoints", () => {
       workbenchHttp: "/workbench-api",
       gatewayHttp: "/gateway-api",
       polymarketHttp: "/polymarket-api",
-      strategyHttp: "/strategy-api",
       socialHttp: "/social-api",
+      youtubeHttp: "/youtube-api",
+      telegramHttp: "/telegram-api",
+      alertsHttp: "/alerts-api",
     });
   });
 
   // The archive answered on `/archive`, which is also the Archive tab's route, so reloading returned JSON
   // instead of the app — clicking through worked, which is why nothing here noticed. Compared, not eyeballed.
   it("gives no back end a relative prefix that a tab route already claims", () => {
-    const { archiveHttp, archiveWs, workbenchHttp, gatewayHttp, polymarketHttp, socialHttp } =
-      resolveEndpoints({}, devLoc);
+    const {
+      archiveHttp,
+      archiveWs,
+      workbenchHttp,
+      gatewayHttp,
+      polymarketHttp,
+      socialHttp,
+      youtubeHttp,
+      telegramHttp,
+      alertsHttp,
+    } = resolveEndpoints({}, devLoc);
     const routes = new Set(TABS.map((tab) => tab.path));
 
     const prefixes = [
@@ -121,6 +140,9 @@ describe("resolveEndpoints", () => {
       gatewayHttp,
       polymarketHttp,
       socialHttp,
+      youtubeHttp,
+      telegramHttp,
+      alertsHttp,
     ]
       .filter((base) => base.startsWith("/"))
       .map((base) => base.split("/")[1]);
@@ -148,8 +170,10 @@ describe("resolveEntra", () => {
         workbench: null,
         gateway: null,
         polymarket: null,
-        strategy: null,
         social: null,
+        youtube: null,
+        telegram: null,
+        alerts: null,
       },
     });
   });
@@ -161,16 +185,20 @@ describe("resolveEntra", () => {
         VITE_ENTRA_SCOPE_WORKBENCH: "api://agent/access_as_user",
         VITE_ENTRA_SCOPE_GATEWAY: "api://gateway/access_as_user",
         VITE_ENTRA_SCOPE_POLYMARKET: "api://polymarket/access_as_user",
-        VITE_ENTRA_SCOPE_STRATEGY: "api://strategy/access_as_user",
         VITE_ENTRA_SCOPE_SOCIAL: "api://social/access_as_user",
+        VITE_ENTRA_SCOPE_YOUTUBE: "api://youtube/access_as_user",
+        VITE_ENTRA_SCOPE_TELEGRAM: "api://telegram/access_as_user",
+        VITE_ENTRA_SCOPE_ALERTS: "api://alerts/access_as_user",
       })?.scopes,
     ).toEqual({
       archive: "api://market-data/access_as_user",
       workbench: "api://agent/access_as_user",
       gateway: "api://gateway/access_as_user",
       polymarket: "api://polymarket/access_as_user",
-      strategy: "api://strategy/access_as_user",
       social: "api://social/access_as_user",
+      youtube: "api://youtube/access_as_user",
+      telegram: "api://telegram/access_as_user",
+      alerts: "api://alerts/access_as_user",
     });
   });
 

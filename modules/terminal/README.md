@@ -5,10 +5,10 @@ and the prediction markets. React + TypeScript, talking to four back ends over H
 WebSocket and depending on nothing else in this repository.
 
 **Two of them behind one interface, and that is the market half only.** Candles and the
-live stream come from `market-data`, the archive, which has yesterday's as well as today's.
+live stream come from the workbench's `/market` archive, which has yesterday's as well as today's.
 The instrument catalogue stays with `capital-gateway`, which owns it. Views see one
 `MarketDataSource` and never learn which call went where — the composition is
-`marketData.ts` and nothing else. The workbench and `polymarket-data` are not behind it and
+`marketData.ts` and nothing else. The workbench's conversation and `/polymarket` are not behind it and
 should not be: a conversation and a probability series share no shape with a candle.
 
 **Nothing is archived because somebody looked at a chart.** Collecting a pair holds a
@@ -98,13 +98,11 @@ cp .env.example .env      # optional; the defaults already target the dev proxy
 pnpm dev                  # http://localhost:5173
 ```
 
-`market-data` must be running on port 8020 and `capital-gateway` on 8010 — there is no
-offline mode. `agent` (8030) and `teams` (8050) are optional in the same sense every
+The workbench (8030, which holds the `/market` archive) and `capital-gateway` (8010) must be running — there is no
+offline mode. The conversation and teams tabs are optional in the same sense every
 back end here is: their tabs report what is unreachable rather than the app failing to
-start. Either being down is survivable and says so: without the archive the charts
-report that candles are stale, without the gateway the instrument search stops. From the
-repo root, `./scripts/dev.ps1` starts the gateway, waits for it, then starts the terminal
-against it; the archive is started separately (see `modules/market-data/README.md`).
+start. Without the archive the charts report that candles are stale, without the gateway
+the instrument search stops. From the repo root, `./scripts/dev.ps1` starts the whole stack.
 
 ## Test
 
@@ -123,25 +121,9 @@ The chart's canvas is not assertable, so chart and grid tests stub the charting 
 and assert what the component *asks it to draw*. What that cannot cover was checked by
 driving a real browser against the real back ends — see Findings.
 
-## Deployed routing
-
-`public/staticwebapp.config.json` tells Azure Static Web Apps to answer any address it
-has no file for with `index.html`, and the router takes it from there. Without it **every
-address except `/` is a 404** — a reload, a bookmarked tab, or anything that navigates for
-real rather than through the router.
-
-That was true from the day this was first deployed and nobody noticed, because clicking
-between tabs never asks a server anything. Signing in is what surfaced it: MSAL returns
-the operator to the address they started from, as a full navigation, and that address is a
-tab.
-
-It lives in `public/` because the deploy uploads `dist/` and that is what Vite copies
-there. `/assets/*` is excluded, so a genuinely missing bundle stays a 404 rather than
-being answered with an HTML page the browser would try to run as JavaScript.
-
 ## Signing in
 
-Deployed, the terminal and `market-data` sit on two different hostnames, so the cookie
+Deployed, the terminal and the workbench sit on two different hostnames, so the cookie
 Easy Auth would rather use never leaves the browser. The terminal holds an **Entra token**
 instead (`src/auth/`), and the shared HTTP client attaches it to every request — no
 adapter and no route mentions it, which is what stops a route added later from quietly
@@ -200,8 +182,9 @@ reads it, instead of arriving as `undefined` and showing up as a blank cell.
 The `map*` functions stay hand-written. They are not transcription: they turn ISO strings
 into epoch seconds, which is what keeps one timestamp spelling across the module.
 
-Six sources since P8: market-data, the workbench's two surfaces (`teams.openapi`,
-`agent.openapi`), polymarket-data, social-data and strategy. The conversation's was the
+Seven sources: market-data, the workbench's two surfaces (`teams.openapi`,
+`agent.openapi`), polymarket-data, social-data, youtube-data and the door to Telegram
+(`telegram_gateway.openapi`, which has no model that can carry a token or a session). The conversation's was the
 last hand-written one, and the one seam `contract:check` could not see drift across; its
 event stream (`stream.ts`) stays hand-written, because OpenAPI does not describe SSE.
 

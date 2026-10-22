@@ -11,11 +11,6 @@ variable "identifier_uri" {
   type        = string
 }
 
-variable "redirect_uri" {
-  description = "The Easy Auth callback — `https://<hostname>/.auth/login/aad/callback`."
-  type        = string
-}
-
 variable "scope" {
   description = <<-EOT
     The one delegated scope this API exposes, or null for the three registrations that expose
@@ -35,13 +30,15 @@ variable "scope" {
   default = null
 }
 
-variable "id_token_issuance_enabled" {
+
+variable "app_roles" {
   description = <<-EOT
-    The implicit `id_token` grant. On for the three registrations a browser signs in to, off
-    for the three only a managed identity reaches. It tracks `scope` today for that reason
-    and is still its own variable: the two answer different questions, and a seventh module
-    could need one without the other.
+    Roles a signed-in person can be given on this API, keyed by the value that appears in the token's `roles` claim.
+    Assigned to users (`azuread_app_role_assignment`, or Microsoft Graph from the terminal's Users tab), never to applications.
   EOT
-  type        = bool
-  default     = false
+  type = map(object({
+    display_name = string
+    description  = string
+  }))
+  default = {}
 }

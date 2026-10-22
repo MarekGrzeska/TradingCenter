@@ -15,7 +15,13 @@ from social_data.config import Settings
 
 # Emptied between tests so one test's rows are never another's premise. TRUNCATE rather than
 # re-migrating, and named in full rather than left to CASCADE, so the statement says what it empties.
-TABLES: tuple[str, ...] = ("model_usage", "posts", "collection_state")
+TABLES: tuple[str, ...] = (
+    "model_usage",
+    "posts",
+    "collection_state",
+    "news_items",
+    "news_sources",
+)
 
 
 @pytest.fixture(scope="session")

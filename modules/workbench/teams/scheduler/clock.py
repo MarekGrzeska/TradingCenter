@@ -400,8 +400,8 @@ async def _evaluate_condition(
         arguments = json.loads(arguments)
 
     # Which source owns the name is asked here rather than assumed: a trigger names one tool without saying
-    # whose, and since `one-process-per-security-boundary` the one it usually means — `pending_setups` — is a
-    # local source, not a server with an address. The list is cached, so this costs one round trip.
+    # whose, and most of the tools a trigger reads are local sources, not servers with an address. The list is
+    # cached, so this costs one round trip.
     server = await _server_announcing(tool_registry.configured(), trigger["tool_name"])
     if server is None:
         if not tool_registry.remote():
