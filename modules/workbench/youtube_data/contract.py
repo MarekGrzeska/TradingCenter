@@ -11,7 +11,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from .models import Candidate, Channel, IgnoredChannel, Prompt, Topic
+from . import loop_settings
+from .models import Candidate, Channel, IgnoredChannel, LoopSettings, Prompt, Topic
 from .store import Film, ReadingRow
 
 SCORE = "what a model made of this film's market impact, 1..10 — 1 is commentary with nothing new, 10 a global event"
@@ -299,6 +300,39 @@ class PromptIn(BaseModel):
 class PromptPatch(BaseModel):
     name: str | None = None
     body: str | None = Field(default=None, description="new words make a new version")
+
+
+class SettingsOut(BaseModel):
+    """What the loop and a new topic run by. The limits are the ones a save is checked against, so the screen can say them
+    before it is refused."""
+
+    poll_interval_minutes: int = Field(description="between two passes of the loop — channels, transcripts, readings, announcements")
+    topic_interval_minutes: int = Field(description="between two searches of a topic added without an interval of its own")
+    topic_max_videos: int = Field(description="films one search of a topic added without a number of its own may send to screening")
+    saved: bool = Field(description="false while nobody has saved: the values are the process's own settings")
+    poll_interval_range: tuple[int, int] = Field(description="minutes, inclusive")
+    topic_interval_range: tuple[int, int] = Field(description="minutes, inclusive")
+    topic_max_videos_range: tuple[int, int] = Field(description="films, inclusive")
+
+    @classmethod
+    def of(cls, value: LoopSettings, *, saved: bool) -> SettingsOut:
+        return cls(
+            poll_interval_minutes=value.poll_interval_minutes,
+            topic_interval_minutes=value.topic_interval_minutes,
+            topic_max_videos=value.topic_max_videos,
+            saved=saved,
+            poll_interval_range=(loop_settings.MIN_POLL_MINUTES, loop_settings.MAX_POLL_MINUTES),
+            topic_interval_range=(loop_settings.MIN_INTERVAL_MINUTES, loop_settings.MAX_INTERVAL_MINUTES),
+            topic_max_videos_range=(1, loop_settings.MAX_VIDEOS_PER_RUN),
+        )
+
+
+class SettingsPatch(BaseModel):
+    """What is given is changed; what is left out stays as it stands."""
+
+    poll_interval_minutes: int | None = None
+    topic_interval_minutes: int | None = None
+    topic_max_videos: int | None = None
 
 
 CANDIDATE_VIEWS = Literal["open", "rejected", "decided"]

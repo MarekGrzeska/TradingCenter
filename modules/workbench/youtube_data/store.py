@@ -26,6 +26,7 @@ from .models import (
     Candidate,
     Channel,
     IgnoredChannel,
+    LoopSettings,
     Prompt,
     Topic,
     Video,
@@ -195,6 +196,32 @@ async def remove_topic(conn: Conn, topic_id: int) -> bool:
 
 async def record_topic_run(conn: Conn, topic_id: int, *, at: datetime) -> None:
     await conn.execute("UPDATE topics SET last_run_at = $2 WHERE id = $1", topic_id, at)
+
+
+# --- loop settings --------------------------------------------------------------------------------------------------
+
+
+async def get_loop_settings(conn: Conn) -> LoopSettings | None:
+    """`None` is the process settings: nothing has been saved."""
+    row = await conn.fetchrow(
+        "SELECT poll_interval_minutes, topic_interval_minutes, topic_max_videos FROM loop_settings"
+    )
+    return None if row is None else LoopSettings(**dict(row))
+
+
+async def put_loop_settings(conn: Conn, value: LoopSettings) -> None:
+    await conn.execute(
+        """
+        INSERT INTO loop_settings (poll_interval_minutes, topic_interval_minutes, topic_max_videos)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (id) DO UPDATE SET poll_interval_minutes = EXCLUDED.poll_interval_minutes,
+            topic_interval_minutes = EXCLUDED.topic_interval_minutes, topic_max_videos = EXCLUDED.topic_max_videos,
+            updated_at = now()
+        """,
+        value.poll_interval_minutes,
+        value.topic_interval_minutes,
+        value.topic_max_videos,
+    )
 
 
 # --- films ----------------------------------------------------------------------------------------------------------

@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 
 from tc_runtime.liveness import LoopHeartbeat
 
-from . import budget, store
+from . import budget, loop_settings, store
 from .analysis import Film
 from .config import Settings
 from .models import UNSCREENED
@@ -62,6 +62,8 @@ class Ingest:
         self._task: asyncio.Task | None = None
         # One thing spends the providers' day at a time: the loop's pass, or a film somebody named by hand.
         self._busy = asyncio.Lock()
+        # Set when the operator saves a new interval, so a wait already running is cut or stretched to it.
+        self._interval_changed = asyncio.Event()
         self._named: set[asyncio.Task] = set()
         # Readings ordered by hand and not yet done, so a second click on the same one is not a second bill.
         self._ordered: set[tuple[str, int]] = set()
@@ -120,7 +122,39 @@ class Ingest:
                 # regardless would report a stopped loop as healthy.
                 if self._heartbeat is not None:
                     self._heartbeat.beat()
-            await asyncio.sleep(self._settings.poll_interval_seconds)
+            await self._rest(await self._interval())
+
+    async def _interval(self) -> float:
+        """The seconds between passes as they stand now — the operator's, or the process's while nothing is saved. The
+        heartbeat's own notion of late follows it, or a shortened loop would be judged by the old, longer one."""
+        try:
+            async with self._pool.acquire() as conn:
+                seconds = (await loop_settings.current(conn, self._settings)).poll_interval_seconds
+        except Exception:
+            log.exception("the loop's interval could not be read; the process's stands")
+            seconds = self._settings.poll_interval_seconds
+        if self._heartbeat is not None:
+            self._heartbeat.expected_seconds = seconds
+        return seconds
+
+    def interval_changed(self) -> None:
+        self._interval_changed.set()
+
+    async def _rest(self, interval: float) -> None:
+        """Waits out `interval` from the end of the pass. A new interval restarts the count from the same moment with its
+        own length, so shortening it after the wait is already longer ends the wait now, and nothing runs a pass of its own."""
+        loop = asyncio.get_running_loop()
+        began = loop.time()
+        while True:
+            self._interval_changed.clear()
+            left = began + interval - loop.time()
+            if left <= 0:
+                return
+            try:
+                await asyncio.wait_for(self._interval_changed.wait(), left)
+            except TimeoutError:
+                return
+            interval = await self._interval()
 
     async def tick(self) -> None:
         """One pass. A step that fails does not stop the ones after it — a source that will not answer costs the

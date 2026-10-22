@@ -32,6 +32,7 @@ REST_PATHS: tuple[str, ...] = (
     "/videos/{video_id}/readings",
     "/prompts",
     "/prompts/{prompt_id}",
+    "/settings",
     "/channels",
     "/channels/{channel_id}",
     "/topics",

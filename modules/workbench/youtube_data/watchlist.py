@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from . import budget, prompts, store
+from . import budget, loop_settings, prompts, store
 from .config import Settings
 from .models import ADDED_BY, DISCOVERED, NO_TRANSCRIPT, TRANSCRIBED, Channel, Topic
 from .providers.base import ChannelInfo, SourceError, VideoSource
@@ -18,10 +18,9 @@ from .providers.refs import video_id
 _STILL_ON_ITS_ROAD = (DISCOVERED, NO_TRANSCRIPT, TRANSCRIBED)
 
 MAX_PHRASE_CHARS = 200
-# A topic that may send forty results to be screened every pass is a bill, not a topic.
-MAX_VIDEOS_PER_RUN = 20
-MIN_INTERVAL_MINUTES = 15
-MAX_INTERVAL_MINUTES = 7 * 24 * 60
+MIN_INTERVAL_MINUTES = loop_settings.MIN_INTERVAL_MINUTES
+MAX_INTERVAL_MINUTES = loop_settings.MAX_INTERVAL_MINUTES
+MAX_VIDEOS_PER_RUN = loop_settings.MAX_VIDEOS_PER_RUN
 
 
 class WatchlistRefused(Exception):
@@ -103,12 +102,15 @@ async def add_topic(
     _check_choice("added_by", added_by, ADDED_BY)
 
     defaults: list[str] = []
-    if interval_minutes is None:
-        interval_minutes = settings.topic_default_interval_minutes
-        defaults.append("interval_minutes")
-    if max_videos_per_run is None:
-        max_videos_per_run = settings.topic_default_max_videos
-        defaults.append("max_videos_per_run")
+    if interval_minutes is None or max_videos_per_run is None:
+        async with pool.acquire() as conn:
+            standing = await loop_settings.current(conn, settings)
+        if interval_minutes is None:
+            interval_minutes = standing.topic_interval_minutes
+            defaults.append("interval_minutes")
+        if max_videos_per_run is None:
+            max_videos_per_run = standing.topic_max_videos
+            defaults.append("max_videos_per_run")
     if not MIN_INTERVAL_MINUTES <= interval_minutes <= MAX_INTERVAL_MINUTES:
         raise WatchlistRefused(
             f"a topic is searched every {MIN_INTERVAL_MINUTES} to {MAX_INTERVAL_MINUTES} minutes (a week)"

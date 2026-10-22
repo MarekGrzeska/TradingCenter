@@ -41,7 +41,8 @@ transcript or a reading.
 
 ## The road of a film
 
-One pass every `YOUTUBE_POLL_INTERVAL_SECONDS`, four steps, each with a batch limit:
+One pass every `YOUTUBE_POLL_INTERVAL_SECONDS` — until the operator saves another interval in the terminal's Settings (see
+*Settings* below) — four steps, each with a batch limit:
 
 1. **discover** — the latest films of each active channel, and a search for each topic that is due. **A topic's results are
    not films of the archive**: those that pass the length floor and ceiling and are not already known (in `videos`, from a
@@ -86,6 +87,14 @@ are spent, the film does not move, and nobody is told.
 What no prompt can change is in `analysis.system_message`: the transcript is data, there are no tools, and the answer is
 `{summary_pl, text, impact_score}`. An answer outside that is not stored. The agent chooses a prompt by name and cannot write,
 edit or delete one.
+
+## Settings
+
+Three numbers live in one row of `loop_settings` and are the operator's from the terminal (`GET`/`PATCH /settings`): the minutes
+between passes, and the interval and film count a topic added without limits of its own gets. With no row the environment
+stands (`YOUTUBE_POLL_INTERVAL_SECONDS`, `YOUTUBE_TOPIC_DEFAULT_*`), which is why nothing is seeded. The loop reads the interval
+after each pass; a save cuts or stretches a wait in progress and the heartbeat's `expected_seconds` follows. Topics already on
+the list keep their own limits. The agent cannot change any of it.
 
 ## Providers
 

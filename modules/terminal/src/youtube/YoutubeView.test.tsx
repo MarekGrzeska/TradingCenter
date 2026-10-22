@@ -129,6 +129,8 @@ function api(films: Film[], overrides: Partial<YoutubeApi> = {}): YoutubeApi {
     createPrompt: vi.fn(),
     updatePrompt: vi.fn(),
     deletePrompt: vi.fn(async () => undefined),
+    settings: vi.fn(),
+    updateSettings: vi.fn(),
     ...overrides,
   };
 }
