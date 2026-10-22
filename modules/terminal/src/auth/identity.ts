@@ -17,7 +17,7 @@ export class SignedOut extends Error {
   }
 }
 
-/** Said in one place because it is said in three: the chart, the top bar and
+/** Said in one place because it is said in three: the chart, the side nav and
  *  any failed request all have to phrase this the same way. */
 export const SIGNED_OUT_MESSAGE = "you are signed out — sign in to reach the archive";
 
