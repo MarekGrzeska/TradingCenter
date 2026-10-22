@@ -293,6 +293,24 @@ export interface paths {
         patch: operations["patch_prompt_prompts__prompt_id__patch"];
         trace?: never;
     };
+    "/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Settings */
+        get: operations["read_settings_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Patch Settings */
+        patch: operations["patch_settings_settings_patch"];
+        trace?: never;
+    };
     "/state": {
         parameters: {
             query?: never;
@@ -871,6 +889,69 @@ export interface components {
             simulated: boolean;
             /** Summary Pl */
             summary_pl: string;
+        };
+        /**
+         * SettingsOut
+         * @description What the loop and a new topic run by. The limits are the ones a save is checked against, so the screen can say them
+         *     before it is refused.
+         */
+        SettingsOut: {
+            /**
+             * Poll Interval Minutes
+             * @description between two passes of the loop — channels, transcripts, readings, announcements
+             */
+            poll_interval_minutes: number;
+            /**
+             * Poll Interval Range
+             * @description minutes, inclusive
+             */
+            poll_interval_range: [
+                number,
+                number
+            ];
+            /**
+             * Saved
+             * @description false while nobody has saved: the values are the process's own settings
+             */
+            saved: boolean;
+            /**
+             * Topic Interval Minutes
+             * @description between two searches of a topic added without an interval of its own
+             */
+            topic_interval_minutes: number;
+            /**
+             * Topic Interval Range
+             * @description minutes, inclusive
+             */
+            topic_interval_range: [
+                number,
+                number
+            ];
+            /**
+             * Topic Max Videos
+             * @description films one search of a topic added without a number of its own may send to screening
+             */
+            topic_max_videos: number;
+            /**
+             * Topic Max Videos Range
+             * @description films, inclusive
+             */
+            topic_max_videos_range: [
+                number,
+                number
+            ];
+        };
+        /**
+         * SettingsPatch
+         * @description What is given is changed; what is left out stays as it stands.
+         */
+        SettingsPatch: {
+            /** Poll Interval Minutes */
+            poll_interval_minutes?: number | null;
+            /** Topic Interval Minutes */
+            topic_interval_minutes?: number | null;
+            /** Topic Max Videos */
+            topic_max_videos?: number | null;
         };
         /**
          * StateOut
@@ -1800,6 +1881,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    read_settings_settings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+        };
+    };
+    patch_settings_settings_patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettingsPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
                 };
             };
             /** @description Unprocessable Entity */

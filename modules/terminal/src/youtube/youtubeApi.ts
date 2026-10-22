@@ -56,6 +56,20 @@ export interface PromptsPage {
   ceiling: number;
 }
 
+/** What the loop and a topic added without limits of its own run by; ranges are the ones a save is checked against. */
+export interface LoopSettings {
+  pollIntervalMinutes: number;
+  topicIntervalMinutes: number;
+  topicMaxVideos: number;
+  /** False while nobody has saved: the values are the workbench's own configuration. */
+  saved: boolean;
+  pollIntervalRange: readonly [number, number];
+  topicIntervalRange: readonly [number, number];
+  topicMaxVideosRange: readonly [number, number];
+}
+
+export type LoopSettingsPatch = Partial<Pick<LoopSettings, "pollIntervalMinutes" | "topicIntervalMinutes" | "topicMaxVideos">>;
+
 export interface Film {
   videoId: string;
   url: string;
@@ -247,6 +261,18 @@ function mapPrompt(raw: Schemas["PromptOut"]): Prompt {
   };
 }
 
+function mapSettings(raw: Schemas["SettingsOut"]): LoopSettings {
+  return {
+    pollIntervalMinutes: raw.poll_interval_minutes,
+    topicIntervalMinutes: raw.topic_interval_minutes,
+    topicMaxVideos: raw.topic_max_videos,
+    saved: raw.saved,
+    pollIntervalRange: raw.poll_interval_range,
+    topicIntervalRange: raw.topic_interval_range,
+    topicMaxVideosRange: raw.topic_max_videos_range,
+  };
+}
+
 function mapChannel(raw: Schemas["ChannelOut"]): Channel {
   return {
     channelId: raw.channel_id,
@@ -356,6 +382,8 @@ export interface YoutubeApi {
   createPrompt(request: { name: string; body: string }, signal: AbortSignal): Promise<Prompt>;
   updatePrompt(id: number, patch: { name?: string; body?: string }, signal: AbortSignal): Promise<Prompt>;
   deletePrompt(id: number, signal: AbortSignal): Promise<void>;
+  settings(signal: AbortSignal): Promise<LoopSettings>;
+  updateSettings(patch: LoopSettingsPatch, signal: AbortSignal): Promise<LoopSettings>;
 }
 
 /** Characters of transcript per page: enough to read, small enough that a page is a request and not a download. */
@@ -555,6 +583,21 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
 
     async deletePrompt(id, signal) {
       await http.send(`${httpBase}/prompts/${id}`, { signal, method: "DELETE" });
+    },
+
+    async settings(signal) {
+      return mapSettings(await http.json<Schemas["SettingsOut"]>(`${httpBase}/settings`, { signal }));
+    },
+
+    async updateSettings(patch, signal) {
+      const body: Schemas["SettingsPatch"] = {
+        ...(patch.pollIntervalMinutes === undefined ? {} : { poll_interval_minutes: patch.pollIntervalMinutes }),
+        ...(patch.topicIntervalMinutes === undefined ? {} : { topic_interval_minutes: patch.topicIntervalMinutes }),
+        ...(patch.topicMaxVideos === undefined ? {} : { topic_max_videos: patch.topicMaxVideos }),
+      };
+      return mapSettings(
+        await http.json<Schemas["SettingsOut"]>(`${httpBase}/settings`, { signal, method: "PATCH", body }),
+      );
     },
   };
 }

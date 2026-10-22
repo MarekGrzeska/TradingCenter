@@ -22,6 +22,7 @@ TABLES: tuple[str, ...] = (
     "videos",
     "channels",
     "topics",
+    "loop_settings",
     "usage",
     "provider_state",
 )

@@ -122,3 +122,16 @@ class IgnoredChannel:
     channel_id: str
     channel_title: str
     ignored_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class LoopSettings:
+    """What the operator turns: how often the loop passes, and what a topic added without limits of its own gets."""
+
+    poll_interval_minutes: int
+    topic_interval_minutes: int
+    topic_max_videos: int
+
+    @property
+    def poll_interval_seconds(self) -> int:
+        return self.poll_interval_minutes * 60

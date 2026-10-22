@@ -9,6 +9,7 @@ import { CandidatesPanel } from "./CandidatesPanel";
 import { AnalyseDialog } from "./dialogs";
 import { FilmCard } from "./FilmCard";
 import { PromptsPanel } from "./PromptsPanel";
+import { SettingsPanel } from "./SettingsPanel";
 import { usageLine, warnings } from "./present";
 import { ChannelsPanel, TopicsPanel } from "./WatchPanels";
 import { createYoutubeApi, type ArchiveState, type FilmsPage, type YoutubeApi } from "./youtubeApi";
@@ -37,13 +38,14 @@ const NO_STATE: ArchiveState = {
   loopAgeSeconds: null,
 };
 
-type TabId = "films" | "channels" | "topics" | "candidates" | "prompts";
+type TabId = "films" | "channels" | "topics" | "candidates" | "prompts" | "settings";
 const TAB_LABEL: Record<TabId, string> = {
   films: "Filmy",
   channels: "Kanały",
   topics: "Tematy",
   candidates: "Kandydaci",
   prompts: "Prompty",
+  settings: "Ustawienia",
 };
 
 interface StateRead {
@@ -180,6 +182,7 @@ export function YoutubeView({ api }: { api?: YoutubeApi } = {}) {
         {tab === "topics" && <TopicsPanel client={client} onChanged={refresh} />}
         {tab === "candidates" && <CandidatesPanel client={client} onChanged={refresh} />}
         {tab === "prompts" && <PromptsPanel client={client} />}
+        {tab === "settings" && <SettingsPanel client={client} />}
       </div>
 
       {analysing && <AnalyseDialog client={client} onClose={() => setAnalysing(false)} onDone={refresh} />}
