@@ -7,7 +7,6 @@ import { GridView } from "../grid/GridView";
 import { InstrumentsView } from "../instruments/InstrumentsView";
 import { NewsView } from "../news/NewsView";
 import { PolymarketView } from "../polymarket/PolymarketView";
-import { PromptsView } from "../youtube/PromptsView";
 import { SocialView } from "../social/SocialView";
 import { TeamsView } from "../teams/TeamsView";
 import { TelegramView } from "../telegram/TelegramView";
@@ -98,13 +97,6 @@ export const TABS: TabDefinition[] = [
     group: "data",
     path: "youtube",
     Component: YoutubeView,
-  },
-  {
-    id: "prompts",
-    label: "Prompts",
-    group: "data",
-    path: "prompts",
-    Component: PromptsView,
   },
   {
     id: "alerts",

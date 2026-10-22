@@ -2,10 +2,10 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { MarketDataError } from "../data/types";
-import { PromptsView } from "./PromptsView";
+import { PromptsPanel } from "./PromptsPanel";
 import type { Prompt, YoutubeApi } from "./youtubeApi";
 
-/** The Prompts tab from the operator's seat: what each prompt says about who reads by it, and that a refusal stays in view. */
+/** The Prompts section of the YouTube tab from the operator's seat: what each prompt says about who reads by it, and that a refusal stays in view. */
 
 const SEEDED: Prompt = {
   id: 1,
@@ -39,9 +39,9 @@ function api(overrides: Partial<YoutubeApi> = {}): YoutubeApi {
   } as unknown as YoutubeApi;
 }
 
-describe("PromptsView", () => {
+describe("PromptsPanel", () => {
   it("lists the prompts with their version and who reads by each, and offers no delete for the seeded one", async () => {
-    render(<PromptsView api={api()} />);
+    render(<PromptsPanel client={api()} />);
 
     const seeded = (await screen.findByText("Rynkowy")).closest("li")!;
     const technical = screen.getByText("Technical").closest("li")!;
@@ -54,7 +54,7 @@ describe("PromptsView", () => {
 
   it("sends only what changed when a prompt is edited", async () => {
     const client = api({ updatePrompt: vi.fn(async () => TECHNICAL) });
-    render(<PromptsView api={client} />);
+    render(<PromptsPanel client={client} />);
 
     const technical = (await screen.findByText("Technical")).closest("li")!;
     await userEvent.click(within(technical).getByRole("button", { name: "Edytuj" }));
@@ -68,7 +68,7 @@ describe("PromptsView", () => {
 
   it("keeps the module's reason in the dialog when it refuses to delete", async () => {
     const deletePrompt = vi.fn().mockRejectedValue(new MarketDataError("refused", "'Technical' is still read by channel Sim Złoto PL"));
-    render(<PromptsView api={api({ deletePrompt })} />);
+    render(<PromptsPanel client={api({ deletePrompt })} />);
 
     const technical = (await screen.findByText("Technical")).closest("li")!;
     await userEvent.click(within(technical).getByRole("button", { name: "Usuń" }));
