@@ -258,18 +258,19 @@ async def test_without_a_model_films_are_transcribed_and_wait_unread(pool) -> No
         assert await conn.fetchval("SELECT count(*) FROM readings") == 0
 
 
-async def test_a_film_that_a_channel_and_a_topic_both_find_is_read_once(pool) -> None:
+async def test_a_film_that_a_channel_and_a_topic_both_find_is_the_channels_and_read_once(pool) -> None:
     rig = Rig(pool)
     await follow_all(rig, GOLD)
-    topic = await watchlist.add_topic(pool, rig.settings, "gold", added_by="operator", max_videos_per_run=10)
+    await watchlist.add_topic(pool, rig.settings, "gold", added_by="operator", max_videos_per_run=10)
 
     await rig.tick()
 
     video = await rig.row("simfilm0001")
-    assert sorted(video["origins"]) == sorted([f"channel:{GOLD}", f"topic:{topic.topic.id}"])
+    assert list(video["origins"]) == [f"channel:{GOLD}"]
     async with pool.acquire() as conn:
         assert await conn.fetchval("SELECT count(*) FROM transcripts WHERE video_id = 'simfilm0001'") == 1
         assert await conn.fetchval("SELECT count(*) FROM readings WHERE video_id = 'simfilm0001'") == 1
+        assert await conn.fetchval("SELECT count(*) FROM candidates WHERE video_id = 'simfilm0001'") == 0
 
 
 async def test_a_topic_is_searched_when_it_is_due_and_not_before_and_pays_for_the_search(pool) -> None:

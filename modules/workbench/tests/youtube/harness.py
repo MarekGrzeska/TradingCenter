@@ -11,8 +11,9 @@ from youtube_data.config import Settings
 from youtube_data.ingest import Ingest
 from youtube_data.providers.base import Meter
 from youtube_data.providers.build import Providers
+from youtube_data.screening import Screener
 from youtube_data.sim import scenario as scenarios
-from youtube_data.sim.providers import SimAnalyser, SimSource, SimTranscriber
+from youtube_data.sim.providers import SimAnalyser, SimScreener, SimSource, SimTranscriber
 from youtube_data.sim.scenario import Scenario
 from youtube_data.sim.world import World
 
@@ -33,6 +34,7 @@ class Rig:
         scenario: Scenario | None = None,
         *,
         analyser: Analyser | None | str = "sim",
+        screener: Screener | None | str = "sim",
         **overrides,
     ) -> None:
         self.pool = pool
@@ -44,6 +46,7 @@ class Rig:
             source=SimSource(self.world),
             transcriber=SimTranscriber(self.world),
             analyser=SimAnalyser(self.world) if analyser == "sim" else analyser,  # type: ignore[arg-type]
+            screener=(SimScreener(self.world) if analyser is not None else None) if screener == "sim" else screener,  # type: ignore[arg-type]
             meter=self.meter,
             clock=self.clock,
         )

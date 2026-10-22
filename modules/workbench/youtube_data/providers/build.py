@@ -13,6 +13,7 @@ import httpx
 from ..analysis import Analyser, OpenAIAnalyser
 from ..clock import Clock, SimClock, SystemClock
 from ..config import Settings
+from ..screening import OpenAIScreener, Screener
 from .base import Meter, TranscriptProvider, VideoSource
 from .data_api import DataApiSource
 
@@ -24,6 +25,8 @@ class Providers:
     source: VideoSource
     transcriber: TranscriptProvider
     analyser: Analyser | None
+    # Reads a search result's metadata, on the analyser's key, model and day; absent exactly where the analyser is.
+    screener: Screener | None
     meter: Meter
     # The time everything that schedules must read: the wall clock, or the simulation's, which runs faster.
     clock: Clock
@@ -78,24 +81,32 @@ def build(settings: Settings, http: httpx.AsyncClient) -> Providers:
             timeout_seconds=settings.gemini_timeout_seconds,
         )
 
+    analyser, screener = _model(settings, world)
     return Providers(
         source=source,
         transcriber=transcriber,
-        analyser=_analyser(settings, world),
+        analyser=analyser,
+        screener=screener,
         meter=meter,
         clock=clock,
     )
 
 
-def _analyser(settings: Settings, world) -> Analyser | None:
+def _model(settings: Settings, world) -> tuple[Analyser | None, Screener | None]:
+    """The reader of films and the screener of search results: one key and one model, or neither."""
     if settings.analyser == "sim" and world is not None:
-        from ..sim.providers import SimAnalyser
+        from ..sim.providers import SimAnalyser, SimScreener
 
-        return SimAnalyser(world)
+        return SimAnalyser(world), SimScreener(world)
     if not settings.model_configured:
-        log.warning("no model is configured — films will be discovered and transcribed, and left unread")
-        return None
+        log.warning(
+            "no model is configured — films will be discovered and transcribed and left unread, and search results unscreened"
+        )
+        return None, None
     from openai import AsyncOpenAI
 
     client = AsyncOpenAI(api_key=settings.openai_api_key, base_url=settings.openai_base_url)
-    return OpenAIAnalyser(client, model=settings.analysis_model, max_chars=settings.analysis_max_chars)
+    return (
+        OpenAIAnalyser(client, model=settings.analysis_model, max_chars=settings.analysis_max_chars),
+        OpenAIScreener(client, model=settings.analysis_model),
+    )

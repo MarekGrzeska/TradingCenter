@@ -17,11 +17,15 @@ from tc_runtime.db import Conn
 
 from .analysis import Reading
 from .models import (
+    CHANNEL_FOLLOWED,
+    CHANNEL_IGNORED,
     GAVE_UP,
     NO_TRANSCRIPT,
     NOTIFIED,
     QUIET,
+    Candidate,
     Channel,
+    IgnoredChannel,
     Prompt,
     Topic,
     Video,
@@ -33,8 +37,12 @@ _CHANNEL_COLUMNS = """
     added_by, added_at, last_discovery_at
 """
 _TOPIC_COLUMNS = """
-    id, phrase, language, interval_minutes, max_videos_per_run, prompt_id, active,
+    id, phrase, language, interval_minutes, max_videos_per_run, active,
     added_by, added_at, last_run_at
+"""
+_CANDIDATE_COLUMNS = """
+    video_id, topic_id, phrase, channel_id, channel_title, title, published_at, duration_seconds, simulated,
+    found_at, verdict, reason, screened_by, decision, decided_at
 """
 _VIDEO_COLUMNS = """
     video_id, channel_id, channel_title, title, published_at, duration_seconds, live_status, origins,
@@ -155,21 +163,19 @@ async def add_topic(
     language: str,
     interval_minutes: int,
     max_videos_per_run: int,
-    prompt_id: int,
     added_by: str,
 ) -> Topic:
     """The topic, inserted — or the one that was already there under another spelling of the case, untouched."""
     await conn.execute(
         """
-        INSERT INTO topics (phrase, language, interval_minutes, max_videos_per_run, prompt_id, added_by)
-        VALUES ($1, $2, $3, $4, $5, $6)
+        INSERT INTO topics (phrase, language, interval_minutes, max_videos_per_run, added_by)
+        VALUES ($1, $2, $3, $4, $5)
         ON CONFLICT (lower(phrase), language) DO NOTHING
         """,
         phrase,
         language,
         interval_minutes,
         max_videos_per_run,
-        prompt_id,
         added_by,
     )
     row = await conn.fetchrow(
@@ -178,15 +184,8 @@ async def add_topic(
     return _topic(row)
 
 
-async def update_topic(
-    conn: Conn, topic_id: int, *, active: bool | None = None, prompt_id: int | None = None
-) -> Topic | None:
-    await conn.execute(
-        "UPDATE topics SET active = COALESCE($2, active), prompt_id = COALESCE($3, prompt_id) WHERE id = $1",
-        topic_id,
-        active,
-        prompt_id,
-    )
+async def update_topic(conn: Conn, topic_id: int, *, active: bool | None = None) -> Topic | None:
+    await conn.execute("UPDATE topics SET active = COALESCE($2, active) WHERE id = $1", topic_id, active)
     return await get_topic(conn, topic_id)
 
 
@@ -841,24 +840,21 @@ async def update_prompt(conn: Conn, prompt_id: int, *, name: str | None, body: s
 
 
 async def delete_prompt(conn: Conn, prompt_id: int) -> bool:
-    """Taken off offer, not out of the database — and only while no channel or topic reads by it, checked in the same statement."""
+    """Taken off offer, not out of the database — and only while no channel reads by it, checked in the same statement."""
     return (
         await conn.execute(
             "UPDATE prompts SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL AND NOT seeded "
-            "AND NOT EXISTS (SELECT 1 FROM channels WHERE prompt_id = $1) "
-            "AND NOT EXISTS (SELECT 1 FROM topics WHERE prompt_id = $1)",
+            "AND NOT EXISTS (SELECT 1 FROM channels WHERE prompt_id = $1)",
             prompt_id,
         )
     ) == "UPDATE 1"
 
 
-async def prompt_assignments(conn: Conn) -> dict[int, tuple[list[str], list[str]]]:
-    """For every prompt in use, the channels and the topics whose new films it reads."""
-    found: dict[int, tuple[list[str], list[str]]] = {}
+async def prompt_assignments(conn: Conn) -> dict[int, list[str]]:
+    """For every prompt in use, the channels whose new films it reads."""
+    found: dict[int, list[str]] = {}
     for row in await conn.fetch("SELECT prompt_id, title FROM channels ORDER BY title"):
-        found.setdefault(row["prompt_id"], ([], []))[0].append(row["title"])
-    for row in await conn.fetch("SELECT prompt_id, phrase FROM topics ORDER BY phrase"):
-        found.setdefault(row["prompt_id"], ([], []))[1].append(row["phrase"])
+        found.setdefault(row["prompt_id"], []).append(row["title"])
     return found
 
 
@@ -879,3 +875,142 @@ async def has_transcript(conn: Conn, video_id: str) -> bool:
 
 async def count_prompts(conn: Conn) -> int:
     return int(await conn.fetchval("SELECT count(*) FROM prompts WHERE deleted_at IS NULL") or 0)
+
+
+# --- candidates -----------------------------------------------------------------------------------------------------
+
+
+def _candidate(row) -> Candidate:
+    return Candidate(**{name: row[name] for name in Candidate.__dataclass_fields__})
+
+
+async def already_known(conn: Conn, video_ids: Sequence[str]) -> set[str]:
+    """Which of these films the archive has, or has already offered: a search result that is either is not offered again."""
+    rows = await conn.fetch(
+        "SELECT video_id FROM videos WHERE video_id = ANY($1::text[]) "
+        "UNION SELECT video_id FROM candidates WHERE video_id = ANY($1::text[])",
+        list(video_ids),
+    )
+    return {row["video_id"] for row in rows}
+
+
+@dataclass(frozen=True, slots=True)
+class Screened:
+    """A search result with what the screening made of it. `verdict` is `unscreened` where nothing could."""
+
+    ref: VideoRef
+    verdict: str
+    reason: str | None
+    model: str | None
+
+
+async def add_candidates(conn: Conn, topic_id: int, phrase: str, found: Sequence[Screened], *, at: datetime) -> None:
+    """The candidates this search had not offered before. A film offered twice stays as it was first offered."""
+    await conn.executemany(
+        """
+        INSERT INTO candidates (
+            video_id, topic_id, phrase, channel_id, channel_title, title, published_at, duration_seconds,
+            simulated, found_at, verdict, reason, screened_by
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        ON CONFLICT (video_id) DO NOTHING
+        """,
+        [
+            (
+                item.ref.video_id,
+                topic_id,
+                phrase,
+                item.ref.channel_id,
+                item.ref.channel_title,
+                item.ref.title,
+                item.ref.published_at,
+                item.ref.duration_seconds,
+                item.ref.simulated,
+                at,
+                item.verdict,
+                item.reason,
+                item.model,
+            )
+            for item in found
+        ],
+    )
+
+
+
+async def list_candidates(
+    conn: Conn, *, view: str = "open", sort: str = "found", topic_id: int | None = None, limit: int = 100
+) -> list[Candidate]:
+    """`open` is what is on offer: not rejected by the model and not yet decided about. The two orders each have a partial
+    index over exactly that set."""
+    where = {
+        # A channel followed some other way since the film was found is no longer a question to ask.
+        "open": "decision IS NULL AND verdict <> 'rejected' "
+        "AND (channel_id IS NULL OR channel_id NOT IN (SELECT channel_id FROM channels))",
+        "rejected": "decision IS NULL AND verdict = 'rejected'",
+        "decided": "decision IS NOT NULL",
+    }[view]
+    order = {"found": "found_at DESC", "published": "published_at DESC"}[sort]
+    rows = await conn.fetch(
+        f"SELECT {_CANDIDATE_COLUMNS} FROM candidates WHERE {where} AND ($1::bigint IS NULL OR topic_id = $1) "
+        f"ORDER BY {order}, video_id LIMIT $2",
+        topic_id,
+        limit,
+    )
+    return [_candidate(row) for row in rows]
+
+
+async def get_candidate(conn: Conn, video_id: str) -> Candidate | None:
+    row = await conn.fetchrow(f"SELECT {_CANDIDATE_COLUMNS} FROM candidates WHERE video_id = $1", video_id)
+    return None if row is None else _candidate(row)
+
+
+async def decide_candidate(conn: Conn, video_id: str, decision: str, *, at: datetime) -> Candidate | None:
+    """The decision on one candidate. Only a candidate nobody decided about takes one: the first decision stands."""
+    row = await conn.fetchrow(
+        f"UPDATE candidates SET decision = $2, decided_at = $3 WHERE video_id = $1 AND decision IS NULL "
+        f"RETURNING {_CANDIDATE_COLUMNS}",
+        video_id,
+        decision,
+        at,
+    )
+    return None if row is None else _candidate(row)
+
+
+async def decide_channel_candidates(conn: Conn, channel_id: str, decision: str, *, at: datetime) -> int:
+    """What a decision about a channel means for the rest of its candidates: they are decided the same way, so the list
+    does not go on offering a channel the operator has settled."""
+    assert decision in (CHANNEL_FOLLOWED, CHANNEL_IGNORED)
+    result = await conn.execute(
+        "UPDATE candidates SET decision = $2, decided_at = $3 WHERE channel_id = $1 AND decision IS NULL",
+        channel_id,
+        decision,
+        at,
+    )
+    return int(result.split()[-1])
+
+
+async def settled_channels(conn: Conn, channel_ids: Sequence[str]) -> set[str]:
+    """Which of these channels are followed or ignored: their films are not offered."""
+    rows = await conn.fetch(
+        "SELECT channel_id FROM channels WHERE channel_id = ANY($1::text[]) "
+        "UNION SELECT channel_id FROM ignored_channels WHERE channel_id = ANY($1::text[])",
+        list(channel_ids),
+    )
+    return {row["channel_id"] for row in rows}
+
+
+async def list_ignored_channels(conn: Conn) -> list[IgnoredChannel]:
+    rows = await conn.fetch("SELECT channel_id, channel_title, ignored_at FROM ignored_channels ORDER BY ignored_at DESC")
+    return [IgnoredChannel(**dict(row)) for row in rows]
+
+
+async def ignore_channel(conn: Conn, channel_id: str, title: str) -> None:
+    await conn.execute(
+        "INSERT INTO ignored_channels (channel_id, channel_title) VALUES ($1, $2) ON CONFLICT (channel_id) DO NOTHING",
+        channel_id,
+        title,
+    )
+
+
+async def unignore_channel(conn: Conn, channel_id: str) -> bool:
+    return (await conn.execute("DELETE FROM ignored_channels WHERE channel_id = $1", channel_id)) == "DELETE 1"

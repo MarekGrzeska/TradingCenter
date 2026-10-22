@@ -56,19 +56,19 @@ async def update(pool, prompt_id: int, *, name: str | None, body: str | None) ->
 
 
 async def delete(pool, prompt_id: int) -> bool:
-    """False where there is no such prompt. Refused for the seeded one and for one a channel or a topic still reads by."""
+    """False where there is no such prompt. Refused for the seeded one and for one a channel still reads by."""
     async with pool.acquire() as conn:
         found = await store.get_prompt(conn, prompt_id)
         if found is None:
             return False
         if found.seeded:
             raise PromptRefused(f"{found.name!r} is the prompt that is always there — edit it, it cannot be deleted")
-        channels, topics = (await store.prompt_assignments(conn)).get(prompt_id, ([], []))
-        if channels or topics:
-            using = [f"channel {title}" for title in channels] + [f"topic {phrase!r}" for phrase in topics]
+        channels = (await store.prompt_assignments(conn)).get(prompt_id, [])
+        if channels:
+            using = [f"channel {title}" for title in channels]
             raise PromptRefused(f"{found.name!r} is still read by {', '.join(using)} — give them another prompt first")
         if not await store.delete_prompt(conn, prompt_id):
-            raise PromptRefused(f"{found.name!r} was taken by a channel or a topic a moment ago — try again")
+            raise PromptRefused(f"{found.name!r} was taken by a channel a moment ago — try again")
         return True
 
 

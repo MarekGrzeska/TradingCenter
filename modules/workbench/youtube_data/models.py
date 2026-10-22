@@ -19,6 +19,20 @@ STATES = (DISCOVERED, NO_TRANSCRIPT, TRANSCRIBED, ANALYSED, NOTIFIED, QUIET, GAV
 
 ADDED_BY = ("operator", "agent")
 
+# What a model made of a search result by its metadata. `unscreened` is a result nobody could read: no model, no tokens left,
+# an answer that broke the schema — proposed all the same, because a candidate costs nothing to look at.
+PROPOSED = "proposed"
+REJECTED = "rejected"
+UNSCREENED = "unscreened"
+VERDICTS = (PROPOSED, REJECTED, UNSCREENED)
+
+# What the operator did with a candidate. `None` is not decided yet.
+DISMISSED = "dismissed"
+ANALYSED_BY_HAND = "analysed"
+CHANNEL_FOLLOWED = "channel_followed"
+CHANNEL_IGNORED = "channel_ignored"
+DECISIONS = (DISMISSED, ANALYSED_BY_HAND, CHANNEL_FOLLOWED, CHANNEL_IGNORED)
+
 
 @dataclass(frozen=True, slots=True)
 class Channel:
@@ -41,7 +55,6 @@ class Topic:
     language: str
     interval_minutes: int
     max_videos_per_run: int
-    prompt_id: int
     active: bool
     added_by: str
     added_at: datetime
@@ -81,3 +94,31 @@ class Prompt:
     body: str
     created_at: datetime
     updated_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class Candidate:
+    """A film a topic's search found, not yet in the archive and not to be read unless the operator says so."""
+
+    video_id: str
+    topic_id: int | None
+    phrase: str
+    channel_id: str | None
+    channel_title: str
+    title: str
+    published_at: datetime
+    duration_seconds: int | None
+    simulated: bool
+    found_at: datetime
+    verdict: str
+    reason: str | None
+    screened_by: str | None
+    decision: str | None
+    decided_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class IgnoredChannel:
+    channel_id: str
+    channel_title: str
+    ignored_at: datetime

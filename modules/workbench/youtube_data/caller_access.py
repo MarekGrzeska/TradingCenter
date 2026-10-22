@@ -36,6 +36,13 @@ REST_PATHS: tuple[str, ...] = (
     "/channels/{channel_id}",
     "/topics",
     "/topics/{topic_id}",
+    "/candidates",
+    "/candidates/{video_id}/follow-channel",
+    "/candidates/{video_id}/analyse",
+    "/candidates/{video_id}/dismiss",
+    "/candidates/{video_id}/ignore-channel",
+    "/ignored-channels",
+    "/ignored-channels/{channel_id}",
     # FastAPI's own, published by the framework rather than by a router.
     "/docs",
     "/docs/oauth2-redirect",

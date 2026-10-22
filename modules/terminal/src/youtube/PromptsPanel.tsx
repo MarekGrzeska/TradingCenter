@@ -95,9 +95,8 @@ export function PromptsPanel({ client }: { client: YoutubeApi }) {
 function usage(prompt: Prompt): string {
   const parts = [
     ...(prompt.channels.length > 0 ? [`kanały: ${prompt.channels.join(", ")}`] : []),
-    ...(prompt.topics.length > 0 ? [`tematy: ${prompt.topics.join(", ")}`] : []),
   ];
-  return parts.length === 0 ? "nieużywany przez żaden kanał ani temat" : parts.join(" · ");
+  return parts.length === 0 ? "nieużywany przez żaden kanał" : parts.join(" · ");
 }
 
 function PromptDialog({

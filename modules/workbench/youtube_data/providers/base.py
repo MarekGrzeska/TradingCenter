@@ -40,6 +40,9 @@ class VideoRef:
     live_status: str = "none"  # none | live | upcoming
     audio_language: str | None = None
     simulated: bool = False
+    # What the uploader wrote under the film, clipped. Only a search result's screening reads it: it costs nothing extra,
+    # since the details call that fills the rest of this is made for every result anyway.
+    description: str = ""
 
 
 class SourceError(Exception):

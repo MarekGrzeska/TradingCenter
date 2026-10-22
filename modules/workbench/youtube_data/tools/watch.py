@@ -118,13 +118,12 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         language: str = "",
         interval_minutes: int | None = None,
         max_videos_per_run: int | None = None,
-        prompt: str | None = None,
     ) -> TopicAdded | dict:
-        """Keep searching YouTube for a phrase, and read the new films it turns up. Each search spends the source's day, so
-        leave the limits empty unless there is a reason: the answer says which came from the settings.
+        """Keep searching YouTube for a phrase, and offer the operator what it turns up as candidates. Nothing it finds is
+        transcribed or read: the operator decides what to follow or analyse. Each search spends the source's day, so leave
+        the limits empty unless there is a reason: the answer says which came from the settings.
 
-        `prompt` names the prompt that reads its films, as in follow_channel. Topics wait where the source cannot search —
-        `youtube_archive_status` says so. Cannot remove a topic.
+        Topics wait where the source cannot search — `youtube_archive_status` says so. Cannot remove a topic.
         """
         try:
             added = await watchlist.add_topic(
@@ -135,7 +134,6 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
                 language=language,
                 interval_minutes=interval_minutes,
                 max_videos_per_run=max_videos_per_run,
-                prompt=prompt,
             )
         except WatchlistRefused as err:
             return refused(str(err), ASK_THE_OPERATOR)

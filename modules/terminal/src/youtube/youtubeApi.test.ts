@@ -138,7 +138,6 @@ describe("prompts", () => {
     created_at: "2026-10-22T09:00:00Z",
     updated_at: "2026-10-22T10:00:00Z",
     channels: ["Sim Złoto PL"],
-    topics: [],
   };
 
   it("maps a prompt with who reads by it, and sends only what changed", async () => {
@@ -184,5 +183,49 @@ describe("a workbench without the package", () => {
 
     expect(failure).toBeInstanceOf(MarketDataError);
     expect((failure as MarketDataError).kind).toBe("not-found");
+  });
+});
+
+describe("candidates", () => {
+  const CANDIDATE = {
+    video_id: "c1",
+    url: "https://www.youtube.com/watch?v=c1",
+    title: "Nowy autor",
+    channel_id: "UC9",
+    channel_title: "Nieznany Kanał",
+    topic_id: 4,
+    topic: "gold",
+    published_at: "2026-10-21T08:00:00Z",
+    duration_seconds: 1200,
+    found_at: "2026-10-22T06:00:00Z",
+    verdict: "unscreened",
+    reason: null,
+    decision: null,
+    decided_at: null,
+    simulated: false,
+  };
+
+  it("maps a candidate that no model looked at, asks in the order given and sends the prompt of a decision", async () => {
+    let asked = "";
+    let sent: unknown;
+    server.use(
+      http.get(`${BASE}/candidates`, ({ request }) => {
+        asked = new URL(request.url).search;
+        return HttpResponse.json({ candidates: [CANDIDATE], view: "open", sort: "published" });
+      }),
+      http.post(`${BASE}/candidates/c1/analyse`, async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json({ video_id: "c1", title: "Nowy autor", created: true });
+      }),
+    );
+    const api = createYoutubeApi(BASE);
+
+    const [found] = await api.candidates({ view: "open", sort: "published" }, signal());
+    await api.analyseCandidate("c1", 2, signal());
+
+    expect(asked).toBe("?view=open&sort=published&limit=100");
+    expect(found).toMatchObject({ videoId: "c1", verdict: "unscreened", reason: null, decision: null, topic: "gold" });
+    expect(found.foundAt).toEqual(new Date("2026-10-22T06:00:00Z"));
+    expect(sent).toEqual({ prompt_id: 2 });
   });
 });

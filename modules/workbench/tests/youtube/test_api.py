@@ -216,17 +216,17 @@ async def test_a_prompt_says_which_channels_read_by_it_and_cannot_be_deleted_whi
     assert refused.status_code == 422 and followed.json()["channel"]["title"] in refused.json()["detail"]["detail"]
 
 
-async def test_a_channel_and_a_topic_change_their_prompt_and_an_unknown_one_is_refused(api) -> None:
+async def test_a_channel_changes_its_prompt_an_unknown_one_is_refused_and_a_topic_has_none(api) -> None:
     prompt = (await api.post("/prompts", json={"name": "Technical", "body": "Levels only."})).json()
     await api.post("/channels", json={"reference": GOLD})
-    topic = (await api.post("/topics", json={"phrase": "gold"})).json()["topic"]
 
     channel = await api.patch(f"/channels/{GOLD}", json={"prompt_id": prompt["id"]})
-    moved = await api.patch(f"/topics/{topic['id']}", json={"prompt_id": prompt["id"]})
     unknown = await api.patch(f"/channels/{GOLD}", json={"prompt_id": 99_999})
+    topic = await api.post("/topics", json={"phrase": "gold", "prompt_id": prompt["id"]})
 
-    assert channel.json()["prompt_id"] == moved.json()["prompt_id"] == prompt["id"]
+    assert channel.json()["prompt_id"] == prompt["id"]
     assert unknown.status_code == 422 and "no prompt" in unknown.json()["detail"]["detail"]
+    assert topic.status_code == 422 and (await api.get("/topics")).json()["topics"] == []
 
 
 async def test_a_list_carries_no_text_and_one_film_carries_every_reading_by_its_prompt(api, rig) -> None:
@@ -250,3 +250,57 @@ async def test_a_reading_by_another_prompt_is_refused_with_the_reason(api) -> No
     refused = await api.post("/videos/nothing/readings", json={"prompt_id": technical["id"]})
 
     assert refused.status_code == 422 and "no film" in refused.json()["detail"]["detail"]
+
+
+# --- candidates -----------------------------------------------------------------------------------------------------
+
+
+async def found_by_a_topic(api, rig: Rig) -> None:
+    assert (await api.post("/topics", json={"phrase": "gold", "max_videos_per_run": 10})).status_code == 200
+    rig.clock.advance(minutes=60)
+    await rig.tick()
+
+
+async def test_candidates_reach_the_wire_in_the_order_asked_for_and_following_a_channel_settles_them(api, rig) -> None:
+    await found_by_a_topic(api, rig)
+
+    by_find = (await api.get("/candidates")).json()
+    by_date = (await api.get("/candidates", params={"sort": "published"})).json()
+    followed = await api.post("/candidates/simfilm0001/follow-channel", json={})
+    still_open = (await api.get("/candidates")).json()["candidates"]
+    decided = (await api.get("/candidates", params={"view": "decided"})).json()["candidates"]
+
+    assert [c["video_id"] for c in by_find["candidates"]] == ["simfilm0001", "simfilm0003", "simfilm0004", "simfilm0012"]
+    assert [c["video_id"] for c in by_date["candidates"]] == ["simfilm0012", "simfilm0004", "simfilm0003", "simfilm0001"]
+    assert (by_find["sort"], by_date["sort"]) == ("found", "published")
+    first = by_find["candidates"][0]
+    assert first["url"].endswith("simfilm0001") and first["verdict"] == "proposed" and first["topic"] == "gold"
+    assert followed.status_code == 200 and followed.json()["channel"]["channel_id"] == GOLD
+    assert still_open == [c for c in still_open if c["channel_id"] != GOLD]
+    assert {c["decision"] for c in decided} == {"channel_followed"}
+    assert (await api.get("/channels")).json()["channels"][0]["channel_id"] == GOLD
+
+
+async def test_a_candidate_decision_is_refused_for_an_unknown_film_a_second_time_and_a_bad_view(api, rig) -> None:
+    await found_by_a_topic(api, rig)
+
+    missing = await api.post("/candidates/nothing-here/dismiss")
+    first = await api.post("/candidates/simfilm0001/dismiss")
+    again = await api.post("/candidates/simfilm0001/dismiss")
+    bad_view = await api.get("/candidates", params={"view": "everything"})
+
+    assert missing.status_code == 404 and first.json()["decision"] == "dismissed"
+    assert again.status_code == 422 and "already been decided" in again.json()["detail"]["detail"]
+    assert bad_view.status_code == 422
+
+
+async def test_an_ignored_channel_is_listed_and_can_be_let_back(api, rig) -> None:
+    await found_by_a_topic(api, rig)
+
+    await api.post("/candidates/simfilm0001/ignore-channel")
+    listed = (await api.get("/ignored-channels")).json()["channels"]
+    let_back = await api.delete(f"/ignored-channels/{GOLD}")
+    again = await api.delete(f"/ignored-channels/{GOLD}")
+
+    assert [c["channel_id"] for c in listed] == [GOLD]
+    assert let_back.status_code == 204 and again.status_code == 404

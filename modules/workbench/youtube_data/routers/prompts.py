@@ -25,8 +25,8 @@ def _missing(prompt_id: int) -> HTTPException:
 
 async def _out(pool, prompt) -> PromptOut:
     async with connection(pool) as conn:
-        channels, topics = (await store.prompt_assignments(conn)).get(prompt.id, ([], []))
-    return PromptOut.of(prompt, channels, topics)
+        channels = (await store.prompt_assignments(conn)).get(prompt.id, [])
+    return PromptOut.of(prompt, channels)
 
 
 @router.get("/prompts", response_model=PromptsOut)
@@ -35,7 +35,7 @@ async def list_prompts(request: Request) -> PromptsOut:
         found = await store.list_prompts(conn)
         assigned = await store.prompt_assignments(conn)
     return PromptsOut(
-        prompts=[PromptOut.of(prompt, *assigned.get(prompt.id, ([], []))) for prompt in found],
+        prompts=[PromptOut.of(prompt, assigned.get(prompt.id, [])) for prompt in found],
         max_chars=MAX_PROMPT_CHARS,
         ceiling=prompts.MAX_PROMPTS,
     )
@@ -72,7 +72,7 @@ async def patch_prompt(request: Request, prompt_id: int, body: PromptPatch) -> P
     responses={404: {"model": Problem}, 422: {"model": Problem}},
 )
 async def delete_prompt(request: Request, prompt_id: int) -> Response:
-    """Refused for the seeded prompt and for one a channel or a topic still reads by. The readings it made stay."""
+    """Refused for the seeded prompt and for one a channel still reads by. The readings it made stay."""
     try:
         removed = await prompts.delete(request.app.state.pool, prompt_id)
     except prompts.PromptRefused as err:

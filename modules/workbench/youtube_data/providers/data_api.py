@@ -30,6 +30,9 @@ API_URL = "https://www.googleapis.com/youtube/v3"
 COST_LIST = 1
 COST_SEARCH = 100
 
+# How much of a film's description is kept: they run to pages of links, and a model reads this on every search result.
+DESCRIPTION_CHARS = 1_000
+
 # The API answers at most fifty per page for every list this module reads.
 PAGE = 50
 
@@ -166,6 +169,7 @@ class DataApiSource:
                         duration_seconds=duration_seconds(item.get("contentDetails", {}).get("duration")),
                         live_status=_live_status(snippet.get("liveBroadcastContent")),
                         audio_language=audio_language(snippet.get("defaultAudioLanguage")),
+                        description=(snippet.get("description") or "")[:DESCRIPTION_CHARS],
                     )
                 )
         return films

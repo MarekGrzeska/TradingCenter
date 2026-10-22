@@ -122,7 +122,6 @@ async def add_topic(request: Request, body: TopicIn) -> TopicAddedOut:
             language=body.language,
             interval_minutes=body.interval_minutes,
             max_videos_per_run=body.max_videos_per_run,
-            prompt=body.prompt_id,
         )
     except WatchlistRefused as err:
         raise _refuse(str(err)) from err
@@ -134,9 +133,7 @@ async def add_topic(request: Request, body: TopicIn) -> TopicAddedOut:
 @router.patch("/topics/{topic_id}", response_model=TopicOut, responses={404: {"model": Problem}})
 async def patch_topic(request: Request, topic_id: int, body: TopicPatch) -> TopicOut:
     async with connection(request.app.state.pool) as conn:
-        if body.prompt_id is not None:
-            await _prompt_on_offer(conn, body.prompt_id)
-        updated = await store.update_topic(conn, topic_id, active=body.active, prompt_id=body.prompt_id)
+        updated = await store.update_topic(conn, topic_id, active=body.active)
     if updated is None:
         raise _missing(f"no topic {topic_id} on the list")
     return TopicOut.of(updated)

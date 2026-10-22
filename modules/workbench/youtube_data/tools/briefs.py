@@ -61,7 +61,7 @@ class ProviderBrief(BaseModel):
 
 
 class PromptBrief(BaseModel):
-    name: str = Field(description="what follow_channel, add_topic and analyse_video take as `prompt`")
+    name: str = Field(description="what follow_channel and analyse_video take as `prompt`")
     seeded: bool = Field(description="the one that is always there, and the one a call without `prompt` takes")
 
 
