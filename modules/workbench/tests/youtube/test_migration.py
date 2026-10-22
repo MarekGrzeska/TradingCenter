@@ -119,3 +119,17 @@ async def test_a_topic_outlives_the_migration_that_takes_its_prompt_and_the_cand
         assert await conn.fetchval("SELECT count(*) FROM candidates") == await conn.fetchval("SELECT count(*) FROM ignored_channels") == 0
     finally:
         await conn.close()
+
+
+async def test_a_channel_from_before_the_filter_has_none_and_a_filtered_out_film_must_say_why(old_database: str) -> None:
+    config = alembic_config(MIGRATIONS, sqlalchemy_url(old_database))
+
+    await asyncio.to_thread(command.upgrade, config, "head")
+
+    conn = await asyncpg.connect(asyncpg_dsn(old_database))
+    try:
+        assert await conn.fetchval("SELECT filter FROM channels WHERE channel_id = 'UC1'") is None
+        with pytest.raises(asyncpg.CheckViolationError):
+            await conn.execute("UPDATE videos SET state = 'filtered_out' WHERE video_id = 'v1'")
+    finally:
+        await conn.close()

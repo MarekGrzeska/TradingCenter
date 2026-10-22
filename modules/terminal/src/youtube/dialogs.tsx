@@ -23,6 +23,7 @@ export function FollowChannelDialog({
 }) {
   const [reference, setReference] = useState("");
   const [promptId, setPromptId] = useState<number | null>(null);
+  const [filter, setFilter] = useState("");
   const prompts = usePrompts(client);
   const [already, setAlready] = useState<string | null>(null);
 
@@ -39,6 +40,11 @@ export function FollowChannelDialog({
         <p className="text-xs text-ink-secondary">
           <span className="text-ink">{already}</span> jest już obserwowany. Nic nie zmieniono.
         </p>
+        {filter.trim() !== "" && (
+          <p className="mt-2 text-xs text-warning">
+            Wpisany filtr nie został ustawiony — filtr kanału już obserwowanego zmienia przycisk „Filtr…” przy nim na liście.
+          </p>
+        )}
       </ConfirmDialog>
     );
   }
@@ -52,7 +58,12 @@ export function FollowChannelDialog({
       fallbackError="nie udało się dodać kanału"
       closeOnSuccess={false}
       onConfirm={async () => {
-        const result = await client.followChannel(reference.trim(), promptId, new AbortController().signal);
+        const result = await client.followChannel(
+          reference.trim(),
+          promptId,
+          filter.trim() === "" ? null : filter.trim(),
+          new AbortController().signal,
+        );
         onDone();
         if (!result.created) {
           setAlready(result.channel.title);
@@ -77,6 +88,64 @@ export function FollowChannelDialog({
           <span className="text-ink-secondary">Prompt, którym czytane są nowe filmy</span>
           <PromptSelect label="Prompt" prompts={prompts.value.prompts} value={promptId} onChange={setPromptId} />
         </label>
+        <FilterField value={filter} onChange={setFilter} />
+      </div>
+    </ConfirmDialog>
+  );
+}
+
+const FILTER_HINT =
+  "Nowe filmy kanału są oceniane po tytule i opisie, zanim zapłacimy za transkrypcję; odrzucone zostają w zakładce Filmy " +
+  "(Pominięte przez filtr). Puste pole: przetwarzane są wszystkie filmy kanału.";
+
+function FilterField({ value, onChange }: { value: string; onChange(next: string): void }) {
+  return (
+    <label className="flex flex-col gap-1 text-xs">
+      <span className="text-ink-secondary">Filtr — które filmy przetwarzać (opcjonalnie)</span>
+      <textarea
+        className={INPUT}
+        rows={3}
+        maxLength={1000}
+        value={value}
+        placeholder="np. tylko analizy makro; bez sesji Q&A i reklam"
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <span className="text-ink-faint">{FILTER_HINT}</span>
+    </label>
+  );
+}
+
+/** Sets, changes or — left empty — takes off a channel's filter. It applies to films found from now on. */
+export function ChannelFilterDialog({
+  channelTitle,
+  current,
+  onSave,
+  onClose,
+  onDone,
+}: {
+  channelTitle: string;
+  current: string | null;
+  onSave(filter: string | null): Promise<void>;
+  onClose(): void;
+  onDone(): void;
+}) {
+  const [filter, setFilter] = useState(current ?? "");
+
+  return (
+    <ConfirmDialog
+      title={`Filtr kanału ${channelTitle}`}
+      confirmLabel="Zapisz"
+      busyLabel="Zapisuję…"
+      fallbackError="nie udało się zapisać filtra"
+      onConfirm={async () => {
+        await onSave(filter.trim() === "" ? null : filter.trim());
+        onDone();
+      }}
+      onClose={onClose}
+    >
+      <div className="flex flex-col gap-3">
+        <FilterField value={filter} onChange={setFilter} />
+        <p className="text-xs text-ink-faint">Zmiana dotyczy filmów znalezionych od teraz; te już ocenione zostają, jak są.</p>
       </div>
     </ConfirmDialog>
   );

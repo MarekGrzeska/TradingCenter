@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 from . import budget, loop_settings, prompts, store
 from .config import Settings
-from .models import ADDED_BY, DISCOVERED, NO_TRANSCRIPT, TRANSCRIBED, Channel, Topic
+from .models import ADDED_BY, DISCOVERED, FILTERED_OUT, NO_TRANSCRIPT, TRANSCRIBED, Channel, Topic
 from .providers.base import ChannelInfo, SourceError, VideoSource
 from .providers.refs import video_id
 
@@ -18,6 +18,7 @@ from .providers.refs import video_id
 _STILL_ON_ITS_ROAD = (DISCOVERED, NO_TRANSCRIPT, TRANSCRIBED)
 
 MAX_PHRASE_CHARS = 200
+MAX_FILTER_CHARS = 1000
 MIN_INTERVAL_MINUTES = loop_settings.MIN_INTERVAL_MINUTES
 MAX_INTERVAL_MINUTES = loop_settings.MAX_INTERVAL_MINUTES
 MAX_VIDEOS_PER_RUN = loop_settings.MAX_VIDEOS_PER_RUN
@@ -33,6 +34,17 @@ async def _prompt_id(pool, choice: int | str | None) -> int:
             return await prompts.resolve(conn, choice)
         except prompts.PromptRefused as err:
             raise WatchlistRefused(str(err)) from err
+
+
+def clean_filter(filter: str | None) -> str | None:
+    """A channel's filter as it will be stored, or `None` for no filter. Blank is a refusal rather than "none": it would read
+    as a filter that was set, and judge every film against nothing."""
+    if filter is None:
+        return None
+    text = filter.strip()
+    if not text or len(text) > MAX_FILTER_CHARS:
+        raise WatchlistRefused(f"a filter is 1 to {MAX_FILTER_CHARS} characters saying which films to process")
+    return text
 
 
 def _check_choice(name: str, value: str, allowed) -> None:
@@ -55,9 +67,11 @@ async def follow_channel(
     added_by: str,
     prompt: int | str | None = None,
     language: str = "",
+    filter: str | None = None,
 ) -> Followed:
     prompt_id = await _prompt_id(pool, prompt)
     _check_choice("added_by", added_by, ADDED_BY)
+    criteria = clean_filter(filter)
     try:
         info: ChannelInfo = await source.resolve_channel(reference)
     except SourceError as err:
@@ -73,7 +87,7 @@ async def follow_channel(
                 "to take one off; adding another would need a decision about which"
             )
         channel = await store.add_channel(
-            conn, info, language=language, prompt_id=prompt_id, added_by=added_by
+            conn, info, language=language, prompt_id=prompt_id, added_by=added_by, filter=criteria
         )
     return Followed(channel, created=True)
 
@@ -176,6 +190,12 @@ async def analyse_film(
     ceiling = budget.Ceiling(source.name, source.unit, settings.daily_source_units)
     async with pool.acquire() as conn:
         existing = await store.get_video(conn, wanted)
+        if existing is not None and existing.state == FILTERED_OUT:
+            # Somebody looked at what the filter turned away and wants it: it goes back on the road, by the prompt named here
+            # or else the one its channel gave it. Released by another caller in between, it is on its road already.
+            if await store.release_filtered(conn, wanted, prompt_id=None if prompt is None else prompt_id):
+                return Queued(existing.video_id, existing.title, created=False, process=True)
+            existing = await store.get_video(conn, wanted)
         if existing is not None:
             return Queued(
                 existing.video_id, existing.title, created=False, process=existing.state in _STILL_ON_ITS_ROAD

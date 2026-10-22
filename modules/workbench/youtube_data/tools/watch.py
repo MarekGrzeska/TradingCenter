@@ -95,18 +95,20 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         ]
 
     @mcp.tool(annotations=ADDS)
-    async def follow_channel(reference: str, prompt: str | None = None) -> Followed | dict:
+    async def follow_channel(reference: str, prompt: str | None = None, filter: str | None = None) -> Followed | dict:
         """Follow a channel by its `@handle`, its id (UC…) or its address. New films are found, transcribed and read.
 
         `prompt` is the name of one of the prompts `youtube_archive_status` lists; without it the seeded one reads. Only the
-        operator writes prompts.
+        operator writes prompts. `filter` says in words which of the channel's new films to process (1-1000 characters);
+        their titles and descriptions are judged against it before any is transcribed. Without it every film is processed.
+        It is set only when the channel is new here.
 
         Who is told about its films is the operator's rule, set on their screen. Following a channel already followed
         changes nothing about it. Cannot remove a channel — ask the operator.
         """
         try:
             followed = await watchlist.follow_channel(
-                ctx.pool, ctx.providers.source, ctx.settings, reference, added_by="agent", prompt=prompt
+                ctx.pool, ctx.providers.source, ctx.settings, reference, added_by="agent", prompt=prompt, filter=filter
             )
         except WatchlistRefused as err:
             return refused(str(err), ASK_THE_OPERATOR)
@@ -149,7 +151,9 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         Costs what asking the source about it costs — a unit of the day, not a search — and then what the transcript and
         the reading cost. Whoever asked is not alerted: they are already looking. Ask read_video a little later.
 
-        `prompt` names the prompt that reads a film new to the archive, as in follow_channel; a film already here keeps its own."""
+        `prompt` names the prompt that reads a film new to the archive, as in follow_channel; a film already here keeps its own.
+        A film its channel's filter turned away is the exception: this overrides the operator's filter for that film, so it
+        is transcribed and read — by `prompt`, or else its channel's — and costs as a new one does."""
         try:
             queued = await watchlist.analyse_film(ctx.pool, ctx.providers, ctx.settings, reference, prompt=prompt)
         except WatchlistRefused as err:

@@ -72,9 +72,12 @@ class VideoOut(BaseModel):
     duration_seconds: int | None = Field(description="null where the source cannot say — a feed does not")
     live_status: Literal["none", "live", "upcoming"]
     state: Literal[
-        "discovered", "no_transcript", "transcribed", "analysed", "notified", "quiet", "gave_up", "skipped"
-    ] = Field(description="where the film is on its road; `gave_up` and `skipped` are never picked up again")
-    skip_reason: str | None = None
+        "discovered", "no_transcript", "transcribed", "analysed", "notified", "quiet", "gave_up", "skipped", "filtered_out"
+    ] = Field(
+        description="where the film is on its road; `gave_up` and `skipped` are never picked up again, `filtered_out` "
+        "is left out of a list unless asked for and waits for someone to analyse it anyway"
+    )
+    skip_reason: str | None = Field(default=None, description="why a film was turned away by its channel's filter")
     origins: list[str] = Field(description="the doors it came in by: channel:UC…, topic:7, manual")
     attempts: int = Field(description="how many times a transcript was asked for and turned out not to exist")
     next_attempt_at: datetime | None = None
@@ -163,6 +166,10 @@ class ChannelOut(BaseModel):
     added_by: Literal["operator", "agent"]
     added_at: datetime
     last_discovery_at: datetime | None = None
+    filter: str | None = Field(
+        default=None,
+        description="which of the channel's new films to process, in words; null processes every one of them",
+    )
 
     @classmethod
     def of(cls, channel: Channel) -> ChannelOut:
@@ -176,6 +183,7 @@ class ChannelOut(BaseModel):
             added_by=channel.added_by,  # type: ignore[arg-type]
             added_at=channel.added_at,
             last_discovery_at=channel.last_discovery_at,
+            filter=channel.filter,
         )
 
 
@@ -188,11 +196,20 @@ class ChannelIn(BaseModel):
     reference: str = Field(description="a channel id (UC…), an @handle, or a youtube.com channel address")
     prompt_id: int | None = Field(default=None, description="null takes the seeded prompt")
     language: str = ""
+    filter: str | None = Field(
+        default=None,
+        description="1 to 1000 characters saying which new films to process; their metadata is judged against it before "
+        "any is transcribed. Null processes every one",
+    )
 
 
 class ChannelPatch(BaseModel):
     prompt_id: int | None = Field(default=None, description="read the channel's films from now on by this prompt")
     active: bool | None = Field(default=None, description="false pauses discovery without taking anything off")
+    filter: str | None = Field(
+        default=None,
+        description="applies to films found from now on; null takes the filter off, and leaving it out keeps it",
+    )
 
 
 class ChannelAddedOut(BaseModel):
@@ -442,10 +459,15 @@ class StateOut(BaseModel):
     day: date = Field(description="the UTC day the budgets are counted in")
     simulating: bool = Field(description="some provider here is the simulation — films may not exist")
     model_configured: bool = Field(
-        description="false means no reading is being made and no search result is screened, by configuration"
+        description="false means no reading is being made, no search result is screened and no film of a filtered channel is "
+        "judged, by configuration"
     )
     alerts_configured: bool = Field(description="false means nobody is told, by configuration")
     channels_active: int
+    channels_filtered: int = Field(
+        description="active channels that carry a filter — their new films wait to be judged while there is no model or the "
+        "analyser's day is spent, and are not transcribed meanwhile"
+    )
     topics_active: int
     providers: list[ProviderOut]
     waiting: dict[str, int] = Field(description="films still on their road, by state — exact")

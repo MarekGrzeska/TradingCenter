@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "../ui/Button";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { messageOf, useRead } from "../data/query";
-import { AddTopicDialog, FollowChannelDialog, RemoveDialog } from "./dialogs";
+import { AddTopicDialog, ChannelFilterDialog, FollowChannelDialog, RemoveDialog } from "./dialogs";
 import { PromptSelect } from "./PromptSelect";
 import { usePrompts } from "./usePrompts";
 import type { Channel, Topic, YoutubeApi } from "./youtubeApi";
@@ -33,9 +33,10 @@ export function ChannelsPanel({ client, onChanged }: { client: YoutubeApi; onCha
   const prompts = usePrompts(client).value.prompts;
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<Channel | null>(null);
+  const [filtering, setFiltering] = useState<Channel | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
-  async function change(channel: Channel, patch: { active?: boolean; promptId?: number }) {
+  async function change(channel: Channel, patch: { active?: boolean; promptId?: number; filter?: string | null }) {
     setFailure(null);
     try {
       await client.setChannel(channel.channelId, patch, new AbortController().signal);
@@ -75,6 +76,11 @@ export function ChannelsPanel({ client, onChanged }: { client: YoutubeApi; onCha
               <span className="block text-xs text-ink-faint">
                 ostatnio sprawdzony: {channel.lastDiscoveryAt?.toLocaleString("pl-PL") ?? "jeszcze nie"}
               </span>
+              {channel.filter !== null && (
+                <span className="block whitespace-pre-wrap text-xs text-ink-secondary">
+                  <span className="rounded bg-raised px-1 text-[11px] text-ink-muted">filtr</span> {channel.filter}
+                </span>
+              )}
             </span>
             <PromptSelect
               label={`Prompt kanału ${channel.title}`}
@@ -84,6 +90,9 @@ export function ChannelsPanel({ client, onChanged }: { client: YoutubeApi; onCha
               className="rounded border border-border bg-sunken px-1 py-0.5 text-xs text-ink"
               disabled={prompts.length === 0}
             />
+            <Button size="xs" tone="muted" onClick={() => setFiltering(channel)}>
+              Filtr…
+            </Button>
             <Button size="xs" tone="muted" onClick={() => void change(channel, { active: !channel.active })}>
               {channel.active ? "Wstrzymaj" : "Wznów"}
             </Button>
@@ -94,6 +103,20 @@ export function ChannelsPanel({ client, onChanged }: { client: YoutubeApi; onCha
         ))}
       </ul>
 
+      {filtering !== null && (
+        <ChannelFilterDialog
+          channelTitle={filtering.title}
+          current={filtering.filter}
+          onSave={async (filter) => {
+            await client.setChannel(filtering.channelId, { filter }, new AbortController().signal);
+          }}
+          onClose={() => setFiltering(null)}
+          onDone={() => {
+            list.reload();
+            onChanged();
+          }}
+        />
+      )}
       {adding && (
         <FollowChannelDialog
           client={client}

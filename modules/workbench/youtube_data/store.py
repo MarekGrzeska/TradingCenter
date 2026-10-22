@@ -12,6 +12,7 @@ import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
+from typing import Any
 
 from tc_runtime.db import Conn
 
@@ -19,6 +20,8 @@ from .analysis import Reading
 from .models import (
     CHANNEL_FOLLOWED,
     CHANNEL_IGNORED,
+    DISCOVERED,
+    FILTERED_OUT,
     GAVE_UP,
     NO_TRANSCRIPT,
     NOTIFIED,
@@ -35,7 +38,7 @@ from .providers.base import ChannelInfo, Transcript, VideoRef
 
 _CHANNEL_COLUMNS = """
     channel_id, title, handle, uploads_playlist_id, language, prompt_id, active,
-    added_by, added_at, last_discovery_at
+    added_by, added_at, last_discovery_at, filter
 """
 _TOPIC_COLUMNS = """
     id, phrase, language, interval_minutes, max_videos_per_run, active,
@@ -87,14 +90,14 @@ async def list_channels(conn: Conn, *, active_only: bool = False) -> list[Channe
 
 
 async def add_channel(
-    conn: Conn, info: ChannelInfo, *, language: str, prompt_id: int, added_by: str
+    conn: Conn, info: ChannelInfo, *, language: str, prompt_id: int, added_by: str, filter: str | None = None
 ) -> Channel:
     """The channel, inserted — or the one that was already there, untouched: following it again by another spelling of
     its address is not a reason to change what the operator set."""
     await conn.execute(
         """
-        INSERT INTO channels (channel_id, title, handle, uploads_playlist_id, language, prompt_id, added_by)
-        VALUES ($1, $2, $3, $4, $5, $6, $7)
+        INSERT INTO channels (channel_id, title, handle, uploads_playlist_id, language, prompt_id, added_by, filter)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
         ON CONFLICT (channel_id) DO NOTHING
         """,
         info.channel_id,
@@ -104,10 +107,14 @@ async def add_channel(
         language,
         prompt_id,
         added_by,
+        filter,
     )
     channel = await get_channel(conn, info.channel_id)
     assert channel is not None
     return channel
+
+
+_UNSET: Any = object()
 
 
 async def update_channel(
@@ -116,17 +123,22 @@ async def update_channel(
     *,
     prompt_id: int | None = None,
     active: bool | None = None,
+    filter: str | None = _UNSET,
 ) -> Channel | None:
+    """`filter` left out keeps the channel's own; `None` takes it off."""
     await conn.execute(
         """
         UPDATE channels SET
             prompt_id = COALESCE($2, prompt_id),
-            active = COALESCE($3, active)
+            active = COALESCE($3, active),
+            filter = CASE WHEN $4 THEN $5 ELSE filter END
         WHERE channel_id = $1
         """,
         channel_id,
         prompt_id,
         active,
+        filter is not _UNSET,
+        None if filter is _UNSET else filter,
     )
     return await get_channel(conn, channel_id)
 
@@ -234,6 +246,8 @@ class Discovery:
     ref: VideoRef
     origin: str
     prompt_id: int
+    # Set where the channel's filter turned the film away: it is stored, not read, and says why.
+    filtered_reason: str | None = None
 
 
 def unwanted_reason(ref: VideoRef, bounds: tuple[int, int]) -> str | None:
@@ -266,9 +280,9 @@ async def upsert_films(
             """
             INSERT INTO videos (
                 video_id, channel_id, channel_title, title, published_at, duration_seconds, live_status,
-                origins, prompt_id, simulated, audio_language
+                origins, prompt_id, simulated, audio_language, state, skip_reason
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, ARRAY[$8]::text[], $9, $10, $11)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, ARRAY[$8]::text[], $9, $10, $11, $12, $13)
             ON CONFLICT (video_id) DO UPDATE SET
                 origins = (SELECT array_agg(DISTINCT o) FROM unnest(videos.origins || EXCLUDED.origins) AS o),
                 duration_seconds = COALESCE(videos.duration_seconds, EXCLUDED.duration_seconds),
@@ -292,6 +306,8 @@ async def upsert_films(
             found.prompt_id,
             ref.simulated,
             ref.audio_language,
+            DISCOVERED if found.filtered_reason is None else FILTERED_OUT,
+            found.filtered_reason,
         )
         new += bool(row and row["inserted"])
     return new
@@ -550,6 +566,21 @@ async def refresh_film(conn: Conn, ref: VideoRef) -> None:
     )
 
 
+async def release_filtered(conn: Conn, video_id: str, *, prompt_id: int | None) -> bool:
+    """A film the channel's filter turned away, put back on the road by somebody who looked at it. It keeps the prompt its
+    channel gave it unless one is named. False where it is not (or no longer) filtered out."""
+    released = await conn.fetchval(
+        """
+        UPDATE videos SET state = 'discovered', skip_reason = NULL, prompt_id = COALESCE($2, prompt_id),
+            origins = (SELECT array_agg(DISTINCT o) FROM unnest(origins || ARRAY['manual']) AS o)
+        WHERE video_id = $1 AND state = 'filtered_out'
+        RETURNING true
+        """,
+        video_id,
+        prompt_id,
+    )
+    return bool(released)
+
 
 async def settle_analysed(conn: Conn) -> int:
     """Read films that nobody will be told about — no adresat, or a channel that never alerts — leave the queue as
@@ -691,7 +722,7 @@ async def list_films(
           AND ($3::text IS NULL OR v.channel_id = $3)
           AND ($4::text IS NULL OR v.origins @> ARRAY[$4]::text[])
           AND ($5::int IS NULL OR r.impact_score >= $5)
-          AND ($6::text IS NULL OR v.state = $6)
+          AND CASE WHEN $6::text IS NULL THEN v.state <> 'filtered_out' ELSE v.state = $6 END
         ORDER BY v.published_at DESC LIMIT $7
         """,
         start,
@@ -918,6 +949,13 @@ async def already_known(conn: Conn, video_ids: Sequence[str]) -> set[str]:
         "UNION SELECT video_id FROM candidates WHERE video_id = ANY($1::text[])",
         list(video_ids),
     )
+    return {row["video_id"] for row in rows}
+
+
+async def in_archive(conn: Conn, video_ids: Sequence[str]) -> set[str]:
+    """Which of these films have a row, whatever its state — judged, read or turned away. Not the candidates: an offer is
+    not a film, and a channel followed since may still want it."""
+    rows = await conn.fetch("SELECT video_id FROM videos WHERE video_id = ANY($1::text[])", list(video_ids))
     return {row["video_id"] for row in rows}
 
 

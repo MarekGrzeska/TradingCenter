@@ -43,6 +43,7 @@ function state(overrides: Partial<ArchiveState> = {}): ArchiveState {
   return {
     simulating: false,
     modelConfigured: true,
+    channelsFiltered: 0,
     alertsConfigured: true,
     providers: [provider()],
     waiting: {},
@@ -58,6 +59,9 @@ describe("stateLabel", () => {
     expect(stateLabel(film({ state: "no_transcript", attempts: 2 }))).toContain("próba 2");
     expect(stateLabel(film({ state: "gave_up", attempts: 4 }))).toBe("porzucony: brak napisów po 4 próbach");
     expect(stateLabel(film({ state: "skipped", skipReason: "shorter than the 60-second floor" }))).toContain("floor");
+    expect(stateLabel(film({ state: "filtered_out", skipReason: "To sesja Q&A." }))).toBe(
+      "pominięty przez filtr kanału: To sesja Q&A.",
+    );
   });
 
   it("says a stream is being waited for before it says anything about captions", () => {
@@ -102,6 +106,16 @@ describe("warnings", () => {
 
     expect(note).toContain("północy UTC");
     expect(note).toContain("2026-09-28 00:00 UTC");
+  });
+
+  it("says the films of a filtered channel wait while no model can judge them, and only then", () => {
+    const waiting = (overrides: Partial<ArchiveState>) =>
+      warnings(state({ channelsFiltered: 2, ...overrides })).filter((note) => note.includes("Kanały z filtrem"));
+
+    expect(waiting({ modelConfigured: false })).toHaveLength(1);
+    expect(waiting({ providers: [provider({ role: "analyser", exhausted: true })] })).toHaveLength(1);
+    expect(waiting({})).toEqual([]);
+    expect(warnings(state({ modelConfigured: false })).filter((note) => note.includes("Kanały z filtrem"))).toEqual([]);
   });
 
   it("says a stopped loop and a missing model, each once", () => {

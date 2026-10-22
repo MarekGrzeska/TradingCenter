@@ -118,6 +118,8 @@ export interface Channel {
   addedBy: "operator" | "agent";
   promptId: number;
   lastDiscoveryAt: Date | null;
+  /** Which of the channel's new films to process, in the operator's words; null processes all of them. */
+  filter: string | null;
 }
 
 export interface Topic {
@@ -182,6 +184,8 @@ export interface ArchiveState {
   simulating: boolean;
   /** False means no reading is being made, by configuration. */
   modelConfigured: boolean;
+  /** Active channels with a filter: their new films wait to be judged while there is no model or the day is spent. */
+  channelsFiltered: number;
   /** False means nobody is told, by configuration. */
   alertsConfigured: boolean;
   providers: ProviderState[];
@@ -282,6 +286,7 @@ function mapChannel(raw: Schemas["ChannelOut"]): Channel {
     addedBy: raw.added_by,
     promptId: raw.prompt_id,
     lastDiscoveryAt: optionalDate(raw.last_discovery_at),
+    filter: raw.filter ?? null,
   };
 }
 
@@ -320,6 +325,7 @@ function mapState(raw: Schemas["StateOut"]): ArchiveState {
   return {
     simulating: raw.simulating,
     modelConfigured: raw.model_configured,
+    channelsFiltered: raw.channels_filtered,
     alertsConfigured: raw.alerts_configured,
     providers: raw.providers.map((provider) => ({
       role: provider.role,
@@ -342,14 +348,21 @@ function mapState(raw: Schemas["StateOut"]): ArchiveState {
 const mapStatus = statusMapper({ 404: "not-found", 422: "refused" });
 
 export interface YoutubeApi {
-  recentFilms(hours: number, signal: AbortSignal): Promise<FilmsPage>;
+  /** `state` narrows the list; `filtered_out` is the only way to see the films a channel's filter turned away. */
+  recentFilms(hours: number, signal: AbortSignal, state?: FilmState): Promise<FilmsPage>;
   state(signal: AbortSignal): Promise<ArchiveState>;
   transcript(videoId: string, offset: number, signal: AbortSignal): Promise<TranscriptPage>;
   channels(signal: AbortSignal): Promise<{ channels: Channel[]; ceiling: number }>;
-  followChannel(reference: string, promptId: number | null, signal: AbortSignal): Promise<FollowResult>;
+  followChannel(
+    reference: string,
+    promptId: number | null,
+    filter: string | null,
+    signal: AbortSignal,
+  ): Promise<FollowResult>;
   setChannel(
     channelId: string,
-    patch: { active?: boolean; promptId?: number },
+    /** `filter: null` takes the filter off; leaving it out keeps it. */
+    patch: { active?: boolean; promptId?: number; filter?: string | null },
     signal: AbortSignal,
   ): Promise<Channel>;
   unfollowChannel(channelId: string, signal: AbortSignal): Promise<void>;
@@ -393,8 +406,11 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
   const http = jsonClient("youtube-data", mapStatus, identity);
 
   return {
-    async recentFilms(hours, signal) {
-      const raw = await http.json<Schemas["VideosOut"]>(`${httpBase}/videos?hours=${hours}&limit=100`, { signal });
+    async recentFilms(hours, signal, state) {
+      const narrowed = state === undefined ? "" : `&state=${state}`;
+      const raw = await http.json<Schemas["VideosOut"]>(`${httpBase}/videos?hours=${hours}&limit=100${narrowed}`, {
+        signal,
+      });
       return {
         films: raw.videos.map(mapFilm),
         windowFrom: new Date(raw.window_from),
@@ -429,9 +445,9 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
       return { channels: raw.channels.map(mapChannel), ceiling: raw.ceiling };
     },
 
-    async followChannel(reference, promptId, signal) {
+    async followChannel(reference, promptId, filter, signal) {
       // The contract lists the defaulted fields as required in a request body, so they are said.
-      const body: Schemas["ChannelIn"] = { reference, language: "", prompt_id: promptId };
+      const body: Schemas["ChannelIn"] = { reference, language: "", prompt_id: promptId, filter };
       const raw = await http.json<Schemas["ChannelAddedOut"]>(`${httpBase}/channels`, {
         signal,
         method: "POST",
@@ -444,6 +460,7 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
       const body: Schemas["ChannelPatch"] = {
         ...(patch.active === undefined ? {} : { active: patch.active }),
         ...(patch.promptId === undefined ? {} : { prompt_id: patch.promptId }),
+        ...(patch.filter === undefined ? {} : { filter: patch.filter }),
       };
       return mapChannel(
         await http.json<Schemas["ChannelOut"]>(`${httpBase}/channels/${encodeURIComponent(channelId)}`, {

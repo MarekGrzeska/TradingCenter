@@ -23,6 +23,8 @@ export function stateLabel(film: Film): string {
       return `porzucony: brak napisów po ${film.attempts} próbach`;
     case "skipped":
       return `pominięty: ${film.skipReason ?? "bez podania powodu"}`;
+    case "filtered_out":
+      return `pominięty przez filtr kanału: ${film.skipReason ?? "bez podania powodu"}`;
   }
 }
 
@@ -67,6 +69,16 @@ export function warnings(state: ArchiveState, now: Date = new Date()): string[] 
   }
   if (!state.modelConfigured) {
     found.push("Model nie jest skonfigurowany — odczyty nie powstają. Filmy są odkrywane i transkrybowane dalej.");
+  }
+  // A filter is judged by the same model on the same day's tokens; without either, the films of a filtered channel are not
+  // stored at all, which is not the "transcribed and left unread" the line above describes.
+  const judgeAvailable =
+    state.modelConfigured && !state.providers.some((provider) => provider.role === "analyser" && provider.exhausted);
+  if (state.channelsFiltered > 0 && !judgeAvailable) {
+    found.push(
+      `Kanały z filtrem (${state.channelsFiltered}) czekają na model: ich nowe filmy nie są ani oceniane, ani transkrybowane, ` +
+        "dopóki model nie wróci.",
+    );
   }
   return found;
 }

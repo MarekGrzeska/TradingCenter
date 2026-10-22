@@ -26,6 +26,7 @@ class ChannelBrief(BaseModel):
     active: bool
     added_by: str
     last_discovery_at: datetime | None
+    filter: str | None
 
     @classmethod
     def of(cls, channel: ChannelOut) -> ChannelBrief:

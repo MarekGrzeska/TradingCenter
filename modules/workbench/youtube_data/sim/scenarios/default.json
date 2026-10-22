@@ -110,6 +110,7 @@
       "title": "Wideo bez mowy: sam wykres złota",
       "published_after_start_minutes": -10,
       "duration_seconds": 300,
+      "screening": "rejected",
       "language": "pl",
       "speech": "   "
     },

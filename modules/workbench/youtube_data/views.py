@@ -124,6 +124,7 @@ async def state(
         model_configured=providers.analyser is not None,
         alerts_configured=alerts_configured,
         channels_active=len(channels),
+        channels_filtered=sum(channel.filter is not None for channel in channels),
         topics_active=len(topics),
         providers=rows,
         waiting=counts.waiting,

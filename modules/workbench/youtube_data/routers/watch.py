@@ -64,6 +64,7 @@ async def follow(request: Request, body: ChannelIn) -> ChannelAddedOut:
             added_by="operator",
             prompt=body.prompt_id,
             language=body.language,
+            filter=body.filter,
         )
     except WatchlistRefused as err:
         raise _refuse(str(err)) from err
@@ -76,10 +77,18 @@ async def follow(request: Request, body: ChannelIn) -> ChannelAddedOut:
     responses={404: {"model": Problem}, 422: {"model": Problem}},
 )
 async def patch_channel(request: Request, channel_id: str, body: ChannelPatch) -> ChannelOut:
+    changes = {}
+    if "filter" in body.model_fields_set:
+        try:
+            changes["filter"] = watchlist.clean_filter(body.filter)
+        except WatchlistRefused as err:
+            raise _refuse(str(err)) from err
     async with connection(request.app.state.pool) as conn:
         if body.prompt_id is not None:
             await _prompt_on_offer(conn, body.prompt_id)
-        updated = await store.update_channel(conn, channel_id, prompt_id=body.prompt_id, active=body.active)
+        updated = await store.update_channel(
+            conn, channel_id, prompt_id=body.prompt_id, active=body.active, **changes
+        )
     if updated is None:
         raise _missing(f"no channel {channel_id!r} on the list")
     return ChannelOut.of(updated)

@@ -47,6 +47,7 @@ function state(overrides: Partial<ArchiveState> = {}): ArchiveState {
   return {
     simulating: false,
     modelConfigured: true,
+    channelsFiltered: 0,
     alertsConfigured: true,
     providers: [],
     waiting: {},
@@ -64,6 +65,7 @@ const CHANNEL: Channel = {
   addedBy: "operator",
   promptId: 1,
   lastDiscoveryAt: null,
+  filter: null,
 };
 
 const CANDIDATE: Candidate = {
@@ -239,7 +241,7 @@ describe("YoutubeView", () => {
     await userEvent.click(screen.getByRole("button", { name: "Obserwuj" }));
 
     expect(await screen.findByText(/which is its ceiling/)).toBeInTheDocument();
-    expect(followChannel).toHaveBeenCalledWith("@zapelniony", null, expect.anything());
+    expect(followChannel).toHaveBeenCalledWith("@zapelniony", null, null, expect.anything());
   });
 
   it("takes a channel off only after asking, and says its films stay", async () => {
@@ -278,7 +280,84 @@ describe("YoutubeView", () => {
     await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Prompt" }), "Technical");
     await userEvent.click(screen.getByRole("button", { name: "Obserwuj" }));
 
-    expect(followChannel).toHaveBeenCalledWith("@nowy", 2, expect.anything());
+    expect(followChannel).toHaveBeenCalledWith("@nowy", 2, null, expect.anything());
+  });
+
+  it("follows a channel with the filter typed in the dialog, and without one when the field is left empty", async () => {
+    const followChannel = vi.fn(async () => ({ channel: CHANNEL, created: true }));
+    render(<YoutubeView api={api([], { followChannel })} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Kanały" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Obserwuj kanał" }));
+    await userEvent.type(screen.getByPlaceholderText(/@nazwa/), "@makro");
+    await userEvent.type(screen.getByPlaceholderText(/tylko analizy makro/), "  tylko analizy makro ");
+    await userEvent.click(screen.getByRole("button", { name: "Obserwuj" }));
+
+    expect(followChannel).toHaveBeenCalledWith("@makro", null, "tylko analizy makro", expect.anything());
+  });
+
+  it("says a filter typed for a channel already followed was not set, and where it is changed", async () => {
+    const followChannel = vi.fn(async () => ({ channel: CHANNEL, created: false }));
+    render(<YoutubeView api={api([], { followChannel })} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Kanały" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Obserwuj kanał" }));
+    await userEvent.type(screen.getByPlaceholderText(/@nazwa/), "@simzloto");
+    await userEvent.type(screen.getByPlaceholderText(/tylko analizy makro/), "bez Q&A");
+    await userEvent.click(screen.getByRole("button", { name: "Obserwuj" }));
+
+    expect(await screen.findByText(/Wpisany filtr nie został ustawiony/)).toBeInTheDocument();
+  });
+
+  it("sets a channel's filter from its row, takes it off when emptied, and keeps the module's refusal in the dialog", async () => {
+    const setChannel = vi
+      .fn()
+      .mockResolvedValueOnce(CHANNEL)
+      .mockRejectedValueOnce(new MarketDataError("refused", "a filter is 1 to 1000 characters"))
+      .mockResolvedValueOnce(CHANNEL);
+    const filtered = { ...CHANNEL, filter: "tylko analizy makro" };
+    render(<YoutubeView api={api([], { setChannel, channels: vi.fn(async () => ({ channels: [filtered], ceiling: 100 })) })} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Kanały" }));
+    expect(await screen.findByText("tylko analizy makro")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Filtr…" }));
+    const field = screen.getByRole("textbox", { name: /Filtr — które filmy/ });
+    await userEvent.clear(field);
+    await userEvent.type(field, "bez Q&A");
+    await userEvent.click(screen.getByRole("button", { name: "Zapisz" }));
+    expect(setChannel).toHaveBeenLastCalledWith("UC1", { filter: "bez Q&A" }, expect.anything());
+
+    await userEvent.click(await screen.findByRole("button", { name: "Filtr…" }));
+    await userEvent.click(screen.getByRole("button", { name: "Zapisz" }));
+    expect(await screen.findByText(/1 to 1000 characters/)).toBeInTheDocument();
+
+    await userEvent.clear(screen.getByRole("textbox", { name: /Filtr — które filmy/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Zapisz" }));
+    expect(setChannel).toHaveBeenLastCalledWith("UC1", { filter: null }, expect.anything());
+  });
+
+  it("lists what a filter turned away only when asked, with the reason, and analyses it anyway", async () => {
+    const turned = film({ state: "filtered_out", reading: null, skipReason: "To sesja Q&A z widzami." });
+    const recentFilms = vi.fn(async (_hours: number, _signal: AbortSignal, state?: string) => ({
+      films: state === "filtered_out" ? [turned] : [],
+      windowFrom: new Date("2026-09-26T10:00:00Z"),
+      windowTo: new Date("2026-09-27T10:00:00Z"),
+    }));
+    const client = api([], { recentFilms, analyse: vi.fn(async () => ({ videoId: "v1", title: "Złoto do 3000?", created: false })) });
+    render(<YoutubeView api={client} />);
+
+    expect(await screen.findByText(/Brak filmów z ostatnich/)).toBeInTheDocument();
+    expect(screen.queryByText("Złoto do 3000?")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Pominięte przez filtr" }));
+    expect(await screen.findByText(/pominięty przez filtr kanału: To sesja Q&A z widzami\./)).toBeInTheDocument();
+    expect(recentFilms).toHaveBeenLastCalledWith(24, expect.anything(), "filtered_out");
+
+    await userEvent.click(screen.getByRole("button", { name: /Złoto do 3000\?/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Analizuj mimo to" }));
+
+    expect(client.analyse).toHaveBeenCalledWith("v1", null, expect.anything());
+    expect(await screen.findByText(/Przyjęte — film jest transkrybowany/)).toBeInTheDocument();
   });
 
   it("keeps the prompts a section away inside the tab, not in a tab of their own", async () => {
