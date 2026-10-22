@@ -22,7 +22,7 @@ const BAND_CLASS: Record<string, string> = {
 
 const NO_DETAIL: FilmDetail | null = null;
 
-export function FilmCard({ film, client }: { film: Film; client: YoutubeApi }) {
+export function FilmCard({ film, client, onChanged }: { film: Film; client: YoutubeApi; onChanged?(): void }) {
   const [open, setOpen] = useState(false);
   const reading = film.reading;
   const length = duration(film.durationSeconds);
@@ -65,12 +65,12 @@ export function FilmCard({ film, client }: { film: Film; client: YoutubeApi }) {
         </span>
       </button>
 
-      {open && <Unfolded film={film} client={client} />}
+      {open && <Unfolded film={film} client={client} onChanged={onChanged} />}
     </article>
   );
 }
 
-function Unfolded({ film, client }: { film: Film; client: YoutubeApi }) {
+function Unfolded({ film, client, onChanged }: { film: Film; client: YoutubeApi; onChanged?(): void }) {
   const detail = useRead<FilmDetail | null>({
     key: ["youtube", "film", film.videoId],
     read: (signal) => client.film(film.videoId, signal),
@@ -109,6 +109,7 @@ function Unfolded({ film, client }: { film: Film; client: YoutubeApi }) {
           obejrzyj na YouTube
         </a>
       </div>
+      {film.state === "filtered_out" && <AnalyseAnyway film={film} client={client} onChanged={onChanged} />}
       {hasWords(film) && (
         <ReadAgain film={film} client={client} read={detail.value?.readings.map((r) => r.promptId) ?? []} onRead={detail.reload} />
       )}
@@ -119,7 +120,47 @@ function Unfolded({ film, client }: { film: Film; client: YoutubeApi }) {
 
 /** A film that has been transcribed has words to read again; one still waiting for them has none, and the module says so. */
 function hasWords(film: Film): boolean {
-  return film.state !== "discovered" && film.state !== "skipped" && film.state !== "gave_up" && film.state !== "no_transcript";
+  return (
+    film.state !== "discovered" &&
+    film.state !== "skipped" &&
+    film.state !== "filtered_out" &&
+    film.state !== "gave_up" &&
+    film.state !== "no_transcript"
+  );
+}
+
+/**
+ * What a channel's filter turned away, taken after all: the film goes the way of one named by hand — transcribed and read now,
+ * by its channel's prompt, and nobody told. The module refuses nothing here but a film that has since moved on.
+ */
+function AnalyseAnyway({ film, client, onChanged }: { film: Film; client: YoutubeApi; onChanged?(): void }) {
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
+  const [failure, setFailure] = useState<string | null>(null);
+
+  async function analyse() {
+    setBusy(true);
+    setFailure(null);
+    try {
+      await client.analyse(film.videoId, null, new AbortController().signal);
+      setNote("Przyjęte — film jest transkrybowany i czytany w tle.");
+      onChanged?.();
+    } catch (cause: unknown) {
+      setFailure(messageOf(cause, "nie udało się zlecić analizy"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <Button size="xs" tone="quiet" disabled={busy || note !== null} onClick={() => void analyse()}>
+        {busy ? "Zlecam…" : "Analizuj mimo to"}
+      </Button>
+      {note !== null && <span className="text-ink-faint">{note}</span>}
+      {failure !== null && <span className="text-critical">{failure}</span>}
+    </div>
+  );
 }
 
 /**

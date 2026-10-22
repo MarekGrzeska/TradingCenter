@@ -208,3 +208,69 @@ async def test_a_provider_is_blocked_until_it_next_answers(db) -> None:
 def test_a_provider_that_was_never_blocked_is_not_blocked() -> None:
     assert not ProviderState("direct", last_ok_at=None, last_blocked_at=None, blocked_reason=None).blocked
 
+
+
+async def test_a_channel_filter_is_set_kept_and_taken_off_only_when_asked(db) -> None:
+    info = ChannelInfo(channel_id="UC1", title="A Channel")
+    added = await store.add_channel(
+        db, info, language="", prompt_id=SEEDED_PROMPT_ID, added_by="agent", filter="only macro analyses"
+    )
+    assert added.filter == "only macro analyses"
+
+    paused = await store.update_channel(db, "UC1", active=False)
+    assert paused is not None and paused.filter == "only macro analyses"
+
+    cleared = await store.update_channel(db, "UC1", filter=None)
+    assert cleared is not None and cleared.filter is None
+
+
+async def test_a_filtered_out_film_is_kept_with_its_reason_and_listed_only_when_asked_for(db) -> None:
+    kept = Discovery(film("v1"), "channel:UC1", SEEDED_PROMPT_ID)
+    turned_away = Discovery(film("v2"), "channel:UC1", SEEDED_PROMPT_ID, filtered_reason="a Q&A with viewers")
+    await store.upsert_films(db, [kept, turned_away])
+
+    window = {"start": NOW - timedelta(days=1), "end": NOW, "limit": 10}
+    assert [f.video.video_id for f in await store.list_films(db, **window)] == ["v1"]
+    only = await store.list_films(db, state="filtered_out", **window)
+    assert [(f.video.video_id, f.video.skip_reason) for f in only] == [("v2", "a Q&A with viewers")]
+    assert await store.due_for_transcription(db, NOW, 10) == [(await store.get_video(db, "v1"))]
+
+
+async def test_a_filtered_out_film_seen_again_is_not_stored_again_and_survives_the_drop(db) -> None:
+    turned_away = Discovery(film("v2"), "channel:UC1", SEEDED_PROMPT_ID, filtered_reason="a Q&A")
+    await store.upsert_films(db, [turned_away])
+
+    assert await store.upsert_films(db, [turned_away]) == 0
+    await store.drop_unwanted(db, minimum=180, maximum=4 * 3600)
+
+    assert (await store.get_video(db, "v2")).state == "filtered_out"
+
+
+async def test_releasing_a_filtered_out_film_puts_it_in_the_queue_and_leaves_any_other_film_alone(db) -> None:
+    await store.upsert_films(
+        db,
+        [
+            Discovery(film("v2"), "channel:UC1", SEEDED_PROMPT_ID, filtered_reason="a Q&A"),
+            discovery("v1"),
+        ],
+    )
+
+    assert await store.release_filtered(db, "v2", prompt_id=None) is True
+    assert await store.release_filtered(db, "v1", prompt_id=None) is False
+
+    released = await store.get_video(db, "v2")
+    assert released.state == "discovered" and released.skip_reason is None
+    assert released.origins == ("channel:UC1", "manual")
+
+
+async def test_a_film_released_by_a_named_prompt_is_read_by_it_and_otherwise_by_its_channels(db) -> None:
+    technical = await store.create_prompt(db, name="Technical", body="Levels only.")
+    await store.upsert_films(
+        db,
+        [Discovery(film(id_), "channel:UC1", SEEDED_PROMPT_ID, filtered_reason="a Q&A") for id_ in ("v1", "v2")],
+    )
+
+    await store.release_filtered(db, "v1", prompt_id=technical.id)
+    await store.release_filtered(db, "v2", prompt_id=None)
+
+    assert [(await store.get_video(db, v)).prompt_id for v in ("v1", "v2")] == [technical.id, SEEDED_PROMPT_ID]

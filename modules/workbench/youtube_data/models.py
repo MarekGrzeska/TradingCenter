@@ -14,8 +14,11 @@ NOTIFIED = "notified"
 QUIET = "quiet"
 GAVE_UP = "gave_up"
 SKIPPED = "skipped"
+# Turned away by the channel's filter, with the reason in `skip_reason`. Unlike `skipped` it is kept: the row is what stops
+# the next pass paying to judge the film again, and what "analyse anyway" starts from.
+FILTERED_OUT = "filtered_out"
 
-STATES = (DISCOVERED, NO_TRANSCRIPT, TRANSCRIBED, ANALYSED, NOTIFIED, QUIET, GAVE_UP, SKIPPED)
+STATES = (DISCOVERED, NO_TRANSCRIPT, TRANSCRIBED, ANALYSED, NOTIFIED, QUIET, GAVE_UP, SKIPPED, FILTERED_OUT)
 
 ADDED_BY = ("operator", "agent")
 
@@ -46,6 +49,8 @@ class Channel:
     added_by: str
     added_at: datetime
     last_discovery_at: datetime | None
+    # What the operator wants of this channel's films, in words; `None` processes all of them.
+    filter: str | None
 
 
 @dataclass(frozen=True, slots=True)

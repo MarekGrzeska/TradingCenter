@@ -78,6 +78,52 @@ describe("recentFilms", () => {
   });
 });
 
+describe("a channel's filter", () => {
+  const CHANNEL = {
+    channel_id: "UC1",
+    title: "Sim Złoto PL",
+    handle: null,
+    language: "",
+    prompt_id: 1,
+    active: true,
+    added_by: "operator",
+    added_at: "2026-09-27T09:00:00Z",
+    last_discovery_at: null,
+    filter: "tylko analizy makro",
+  };
+
+  it("is read, sent as null to take it off and left out of a patch that does not mention it", async () => {
+    const bodies: unknown[] = [];
+    server.use(
+      http.patch(`${BASE}/channels/UC1`, async ({ request }) => {
+        bodies.push(await request.json());
+        return HttpResponse.json(CHANNEL);
+      }),
+    );
+    const api = createYoutubeApi(BASE);
+
+    const set = await api.setChannel("UC1", { filter: null }, signal());
+    await api.setChannel("UC1", { active: false }, signal());
+
+    expect(set.filter).toBe("tylko analizy makro");
+    expect(bodies).toEqual([{ filter: null }, { active: false }]);
+  });
+
+  it("asks only for the films a filter turned away when told to", async () => {
+    let url = "";
+    server.use(
+      http.get(`${BASE}/videos`, ({ request }) => {
+        url = request.url;
+        return HttpResponse.json({ videos: [], count: 0, window_from: "2026-09-26T10:00:00Z", window_to: "2026-09-27T10:00:00Z" });
+      }),
+    );
+
+    await createYoutubeApi(BASE).recentFilms(24, signal(), "filtered_out");
+
+    expect(new URL(url).searchParams.get("state")).toBe("filtered_out");
+  });
+});
+
 describe("the watch list", () => {
   it("sends the defaulted fields the contract lists as required, and reads the answer's flag", async () => {
     let seen: unknown;
@@ -101,9 +147,9 @@ describe("the watch list", () => {
       }),
     );
 
-    const result = await createYoutubeApi(BASE).followChannel("@simzloto", null, signal());
+    const result = await createYoutubeApi(BASE).followChannel("@simzloto", null, null, signal());
 
-    expect(seen).toEqual({ reference: "@simzloto", language: "", prompt_id: null });
+    expect(seen).toEqual({ reference: "@simzloto", language: "", prompt_id: null, filter: null });
     expect(result.created).toBe(false);
     expect(result.channel.lastDiscoveryAt).toBeNull();
   });
@@ -121,7 +167,7 @@ describe("the watch list", () => {
       ),
     );
 
-    await expect(createYoutubeApi(BASE).followChannel("@x", null, signal())).rejects.toMatchObject({
+    await expect(createYoutubeApi(BASE).followChannel("@x", null, null, signal())).rejects.toMatchObject({
       kind: "refused",
       message: expect.stringContaining("the watch list holds 100 channels"),
     });

@@ -124,6 +124,50 @@ async def test_a_channel_is_followed_paused_and_taken_off(api) -> None:
     assert (await api.delete(f"/channels/{GOLD}")).status_code == 404
 
 
+async def test_a_channels_filter_is_set_kept_when_something_else_changes_and_taken_off_only_by_a_null(api) -> None:
+    added = await api.post("/channels", json={"reference": GOLD, "filter": " only macro analyses "})
+    assert added.json()["channel"]["filter"] == "only macro analyses"
+
+    paused = await api.patch(f"/channels/{GOLD}", json={"active": False})
+    changed = await api.patch(f"/channels/{GOLD}", json={"filter": "no Q&A"})
+    cleared = await api.patch(f"/channels/{GOLD}", json={"filter": None})
+
+    assert paused.json()["filter"] == "only macro analyses"
+    assert changed.json()["filter"] == "no Q&A"
+    assert cleared.json()["filter"] is None
+
+
+@pytest.mark.parametrize("filter", ["   ", "x" * 1001])
+async def test_a_filter_that_says_nothing_or_too_much_is_refused_and_changes_nothing(api, filter: str) -> None:
+    await api.post("/channels", json={"reference": GOLD, "filter": "only macro analyses"})
+
+    on_patch = await api.patch(f"/channels/{GOLD}", json={"filter": filter})
+    on_follow = await api.post("/channels", json={"reference": "@simmarkets", "filter": filter})
+
+    assert on_patch.status_code == on_follow.status_code == 422
+    assert "1 to 1000 characters" in on_patch.json()["detail"]["detail"]
+    assert (await api.get("/channels")).json()["channels"][0]["filter"] == "only macro analyses"
+
+
+async def test_a_film_the_filter_turned_away_is_left_out_of_the_list_until_asked_for_and_can_be_analysed_anyway(
+    api, rig
+) -> None:
+    await api.post("/channels", json={"reference": GOLD, "filter": "only macro analyses"})
+    await rig.tick()
+
+    plain = (await api.get("/videos", params={"hours": 24})).json()["videos"]
+    turned_away = (await api.get("/videos", params={"hours": 24, "state": "filtered_out"})).json()["videos"]
+    assert "simfilm0008" not in {film["video_id"] for film in plain}
+    assert [(film["video_id"], bool(film["skip_reason"])) for film in turned_away] == [("simfilm0008", True)]
+    assert (await api.get("/state")).json()["channels_filtered"] == 1
+
+    anyway = await api.post("/videos", json={"reference": "simfilm0008"})
+
+    assert anyway.json()["created"] is False
+    back = (await api.get("/videos", params={"hours": 24, "state": "discovered"})).json()["videos"]
+    assert [(film["video_id"], film["skip_reason"]) for film in back] == [("simfilm0008", None)]
+
+
 async def test_a_channel_that_does_not_exist_and_a_list_that_is_full_are_refused_with_the_reason(api, rig) -> None:
     unknown = await api.post("/channels", json={"reference": "@nobody-here"})
     assert unknown.status_code == 422 and "no channel" in unknown.json()["detail"]["detail"]

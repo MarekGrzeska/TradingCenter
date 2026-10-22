@@ -31,6 +31,7 @@ const NO_PAGE: FilmsPage = { films: [], windowFrom: new Date(0), windowTo: new D
 const NO_STATE: ArchiveState = {
   simulating: false,
   modelConfigured: true,
+  channelsFiltered: 0,
   alertsConfigured: true,
   providers: [],
   waiting: {},
@@ -60,6 +61,8 @@ export function YoutubeView({ api }: { api?: YoutubeApi } = {}) {
   );
   const [tab, setTab] = useState<TabId>("films");
   const [analysing, setAnalysing] = useState(false);
+  // The films a channel's filter turned away are a list of their own: the plain one leaves them out, as the module does.
+  const [turnedAway, setTurnedAway] = useState(false);
 
   const state = useRead<StateRead>({
     key: ["youtube", "state"],
@@ -81,8 +84,8 @@ export function YoutubeView({ api }: { api?: YoutubeApi } = {}) {
 
   const present = state.value.present;
   const page = useRead<FilmsPage>({
-    key: ["youtube", "films", WINDOW_HOURS],
-    read: (signal) => client.recentFilms(WINDOW_HOURS, signal),
+    key: ["youtube", "films", WINDOW_HOURS, turnedAway],
+    read: (signal) => client.recentFilms(WINDOW_HOURS, signal, turnedAway ? "filtered_out" : undefined),
     initial: NO_PAGE,
     fallbackMessage: "nie udało się wczytać filmów",
     pollMs: POLL_MS,
@@ -133,6 +136,11 @@ export function YoutubeView({ api }: { api?: YoutubeApi } = {}) {
           Przeanalizuj film…
         </Button>
         {tab === "films" && (
+          <Button size="xs" tone="muted" aria-pressed={turnedAway} onClick={() => setTurnedAway((was) => !was)}>
+            Pominięte przez filtr
+          </Button>
+        )}
+        {tab === "films" && (
           <span className="text-xs text-ink-faint">
             {page.value.films.length} {page.value.films.length === 1 ? "film" : "filmów"} · ostatnie {WINDOW_HOURS} h ·
             odświeżane co {POLL_MS / 1000} s
@@ -169,12 +177,13 @@ export function YoutubeView({ api }: { api?: YoutubeApi } = {}) {
             {page.error !== null && <UnreachableNotice onRetry={page.reload}>{page.error}</UnreachableNotice>}
             {page.status === "ready" && page.value.films.length === 0 && (
               <p className="text-sm text-ink-muted">
-                Brak filmów z ostatnich {WINDOW_HOURS} h. Powyżej widać, czy to cichy dzień, czy archiwum czeka na
-                dostawcę.
+                {turnedAway
+                  ? `Filtry kanałów nie odrzuciły niczego w ostatnich ${WINDOW_HOURS} h.`
+                  : `Brak filmów z ostatnich ${WINDOW_HOURS} h. Powyżej widać, czy to cichy dzień, czy archiwum czeka na dostawcę.`}
               </p>
             )}
             {page.value.films.map((film) => (
-              <FilmCard key={film.videoId} film={film} client={client} />
+              <FilmCard key={film.videoId} film={film} client={client} onChanged={page.reload} />
             ))}
           </>
         )}

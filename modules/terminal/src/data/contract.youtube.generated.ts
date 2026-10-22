@@ -577,6 +577,11 @@ export interface components {
         /** ChannelIn */
         ChannelIn: {
             /**
+             * Filter
+             * @description 1 to 1000 characters saying which new films to process; their metadata is judged against it before any is transcribed. Null processes every one
+             */
+            filter?: string | null;
+            /**
              * Language
              * @default
              */
@@ -608,6 +613,11 @@ export interface components {
             added_by: "operator" | "agent";
             /** Channel Id */
             channel_id: string;
+            /**
+             * Filter
+             * @description which of the channel's new films to process, in words; null processes every one of them
+             */
+            filter: string | null;
             /** Handle */
             handle: string | null;
             /** Language */
@@ -626,6 +636,11 @@ export interface components {
              * @description false pauses discovery without taking anything off
              */
             active?: boolean | null;
+            /**
+             * Filter
+             * @description applies to films found from now on; null takes the filter off, and leaving it out keeps it
+             */
+            filter?: string | null;
             /**
              * Prompt Id
              * @description read the channel's films from now on by this prompt
@@ -967,6 +982,11 @@ export interface components {
             /** Channels Active */
             channels_active: number;
             /**
+             * Channels Filtered
+             * @description active channels that carry a filter — their new films wait to be judged while there is no model or the analyser's day is spent, and are not transcribed meanwhile
+             */
+            channels_filtered: number;
+            /**
              * Day
              * Format: date
              * @description the UTC day the budgets are counted in
@@ -975,7 +995,7 @@ export interface components {
             loop: components["schemas"]["LoopOut"] | null;
             /**
              * Model Configured
-             * @description false means no reading is being made and no search result is screened, by configuration
+             * @description false means no reading is being made, no search result is screened and no film of a filtered channel is judged, by configuration
              */
             model_configured: boolean;
             /** Providers */
@@ -1184,14 +1204,17 @@ export interface components {
             readings: components["schemas"]["ReadingOut"][];
             /** Simulated */
             simulated: boolean;
-            /** Skip Reason */
+            /**
+             * Skip Reason
+             * @description why a film was turned away by its channel's filter
+             */
             skip_reason: string | null;
             /**
              * State
-             * @description where the film is on its road; `gave_up` and `skipped` are never picked up again
+             * @description where the film is on its road; `gave_up` and `skipped` are never picked up again, `filtered_out` is left out of a list unless asked for and waits for someone to analyse it anyway
              * @enum {string}
              */
-            state: "discovered" | "no_transcript" | "transcribed" | "analysed" | "notified" | "quiet" | "gave_up" | "skipped";
+            state: "discovered" | "no_transcript" | "transcribed" | "analysed" | "notified" | "quiet" | "gave_up" | "skipped" | "filtered_out";
             /** Title */
             title: string;
             /**
@@ -1251,14 +1274,17 @@ export interface components {
             reading: components["schemas"]["ReadingSummary"] | null;
             /** Simulated */
             simulated: boolean;
-            /** Skip Reason */
+            /**
+             * Skip Reason
+             * @description why a film was turned away by its channel's filter
+             */
             skip_reason: string | null;
             /**
              * State
-             * @description where the film is on its road; `gave_up` and `skipped` are never picked up again
+             * @description where the film is on its road; `gave_up` and `skipped` are never picked up again, `filtered_out` is left out of a list unless asked for and waits for someone to analyse it anyway
              * @enum {string}
              */
-            state: "discovered" | "no_transcript" | "transcribed" | "analysed" | "notified" | "quiet" | "gave_up" | "skipped";
+            state: "discovered" | "no_transcript" | "transcribed" | "analysed" | "notified" | "quiet" | "gave_up" | "skipped" | "filtered_out";
             /** Title */
             title: string;
             /**

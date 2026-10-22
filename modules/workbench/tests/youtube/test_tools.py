@@ -146,6 +146,16 @@ async def test_the_agent_follows_a_channel_once_and_a_second_time_changes_nothin
     assert again["created"] is False and again["channel"]["channel_id"] == first["channel"]["channel_id"]
 
 
+async def test_the_agent_may_give_a_new_channel_a_filter_and_cannot_change_that_of_one_already_followed(tools) -> None:
+    first = await call(tools, "follow_channel", reference="@simzloto", filter="only macro analyses")
+    again = await call(tools, "follow_channel", reference=GOLD, filter="everything")
+    too_long = await call(tools, "follow_channel", reference="@simmarkets", filter="x" * 1001)
+
+    assert first["channel"]["filter"] == "only macro analyses"
+    assert again["created"] is False and again["channel"]["filter"] == "only macro analyses"
+    assert "1000 characters" in too_long["refused"]
+
+
 async def test_the_agent_meets_the_same_ceiling_the_screen_does_and_is_sent_to_the_operator(tools, rig, app) -> None:
     app.state.settings = rig.settings.model_copy(update={"max_channels": 1, "max_topics": 1})
     await call(tools, "follow_channel", reference="@simzloto")

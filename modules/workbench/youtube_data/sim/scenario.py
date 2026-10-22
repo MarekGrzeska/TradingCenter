@@ -34,7 +34,8 @@ class SimVideo(BaseModel):
     speech: str = ""
     language: str = "en"
     description: str = ""
-    # What the simulated screening makes of the film when a topic's search finds it. Blank is a film worth proposing.
+    # What the simulated screening makes of the film — when a topic's search finds it, or its channel's filter is asked.
+    # Blank is a film worth proposing.
     screening: Literal["proposed", "rejected"] | None = None
     # A prepared reading, the word `unusable` for a model that answers with something the schema refuses, or nothing
     # for the neutral one.

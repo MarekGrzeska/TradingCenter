@@ -179,12 +179,17 @@ class SimScreener:
         self._world = world
 
     async def screen(self, phrase: str, films: Sequence[VideoRef]) -> Screening:
+        return self._verdicts(films, "Symulowany przesiew: film pasuje do tematu.", "Symulowany przesiew: film obok tematu.")
+
+    async def screen_channel(self, criteria: str, films: Sequence[VideoRef]) -> Screening:
+        return self._verdicts(
+            films, "Symulowany filtr: film spełnia kryteria kanału.", "Symulowany filtr: film poza kryteriami kanału."
+        )
+
+    def _verdicts(self, films: Sequence[VideoRef], proposed: str, rejected: str) -> Screening:
         verdicts: dict[str, tuple[str, str]] = {}
         for film in films:
             video = self._world.video(film.video_id)
             verdict = (video.screening if video is not None else None) or "proposed"
-            verdicts[film.video_id] = (
-                verdict,
-                "Symulowany przesiew: film pasuje do tematu." if verdict == "proposed" else "Symulowany przesiew: film obok tematu.",
-            )
+            verdicts[film.video_id] = (verdict, proposed if verdict == "proposed" else rejected)
         return Screening(verdicts, self.model, input_tokens=60 * len(films), output_tokens=30 * len(films))
