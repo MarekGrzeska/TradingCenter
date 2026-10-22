@@ -82,6 +82,7 @@ export function ChannelsPanel({ client, onChanged }: { client: YoutubeApi; onCha
               value={prompts.find((p) => p.seeded)?.id === channel.promptId ? null : channel.promptId}
               onChange={(id) => void change(channel, { promptId: id ?? prompts.find((p) => p.seeded)?.id })}
               className="rounded border border-border bg-sunken px-1 py-0.5 text-xs text-ink"
+              disabled={prompts.length === 0}
             />
             <Button size="xs" tone="muted" onClick={() => void change(channel, { active: !channel.active })}>
               {channel.active ? "Wstrzymaj" : "Wznów"}
@@ -175,6 +176,7 @@ export function TopicsPanel({ client, onChanged }: { client: YoutubeApi; onChang
               value={prompts.find((p) => p.seeded)?.id === topic.promptId ? null : topic.promptId}
               onChange={(id) => void change(topic, { promptId: id ?? prompts.find((p) => p.seeded)?.id })}
               className="rounded border border-border bg-sunken px-1 py-0.5 text-xs text-ink"
+              disabled={prompts.length === 0}
             />
             <Button size="xs" tone="muted" onClick={() => void change(topic, { active: !topic.active })}>
               {topic.active ? "Wstrzymaj" : "Wznów"}

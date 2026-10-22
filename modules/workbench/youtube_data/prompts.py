@@ -1,9 +1,6 @@
-"""What the operator may do with prompts, and what the agent may do with them: choose one. The same functions serve the REST
-routes and the tools, so a refusal is one rule and not two that agree today.
+"""What the operator may do with prompts; the agent only chooses one. One set of functions serves the routes and the tools.
 
-A prompt says what to look for in a film and how to lay the text out. It does not say what a transcript is or what shape the
-answer has — `analysis.system_message` keeps that, so no prompt can change it. Deleting is the operator's alone, and never
-leaves a channel or a topic without a prompt to read by."""
+A prompt never changes what a transcript is or the answer's shape — `analysis.system_message` keeps that."""
 
 from __future__ import annotations
 
@@ -38,7 +35,7 @@ async def create(pool, *, name: str, body: str) -> Prompt:
     clean_name, clean_body = _clean(name, body)
     assert clean_name is not None and clean_body is not None
     async with pool.acquire() as conn:
-        if len(await store.list_prompts(conn)) >= MAX_PROMPTS:
+        if await store.count_prompts(conn) >= MAX_PROMPTS:
             raise PromptRefused(f"there are {MAX_PROMPTS} prompts, which is the ceiling — delete one first")
         try:
             return await store.create_prompt(conn, name=clean_name, body=clean_body)
@@ -53,12 +50,13 @@ async def update(pool, prompt_id: int, *, name: str | None, body: str | None) ->
         try:
             return await store.update_prompt(conn, prompt_id, name=clean_name, body=clean_body)
         except asyncpg.UniqueViolationError as err:
+            if clean_name is None:
+                raise PromptRefused("the prompt was saved at the same moment from elsewhere — reload and try again") from err
             raise PromptRefused(f"a prompt named {clean_name!r} already exists") from err
 
 
 async def delete(pool, prompt_id: int) -> bool:
-    """False where there is no such prompt. Refused for the seeded one — there is always at least one — and for one a
-    channel or a topic still reads by, naming them."""
+    """False where there is no such prompt. Refused for the seeded one and for one a channel or a topic still reads by."""
     async with pool.acquire() as conn:
         found = await store.get_prompt(conn, prompt_id)
         if found is None:
@@ -69,7 +67,9 @@ async def delete(pool, prompt_id: int) -> bool:
         if channels or topics:
             using = [f"channel {title}" for title in channels] + [f"topic {phrase!r}" for phrase in topics]
             raise PromptRefused(f"{found.name!r} is still read by {', '.join(using)} — give them another prompt first")
-        return await store.delete_prompt(conn, prompt_id)
+        if not await store.delete_prompt(conn, prompt_id):
+            raise PromptRefused(f"{found.name!r} was taken by a channel or a topic a moment ago — try again")
+        return True
 
 
 async def resolve(conn, choice: int | str | None) -> int:
@@ -82,10 +82,12 @@ async def resolve(conn, choice: int | str | None) -> int:
     return found.id
 
 
-async def order_reading(pool, settings, clock, video_id: str, choice: int | str | None) -> int:
-    """Checks that a film can be read once more by the chosen prompt, and says which prompt that is. Refuses where the film
-    is not in the archive, has no words yet — the transcript is Gemini's, and this does not ask for one — or the day's
-    tokens are spent."""
+async def order_reading(
+    pool, settings, clock, video_id: str, choice: int | str | None, *, model_configured: bool
+) -> int:
+    """Which prompt a film is to be read by once more, or why not: no model, no film, no words yet, or no tokens left."""
+    if not model_configured:
+        raise PromptRefused("no model is configured, so nothing can be read — youtube_archive_status says so")
     async with pool.acquire() as conn:
         prompt_id = await resolve(conn, choice)
         if await store.get_video(conn, video_id) is None:

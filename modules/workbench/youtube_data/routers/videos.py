@@ -136,7 +136,14 @@ async def read_again(request: Request, video_id: str, body: ReadIn) -> QueuedOut
     day's tokens like any reading, and leaves the film where it is."""
     state = request.app.state
     try:
-        prompt_id = await prompts.order_reading(state.pool, state.settings, state.providers.clock, video_id, body.prompt_id)
+        prompt_id = await prompts.order_reading(
+            state.pool,
+            state.settings,
+            state.providers.clock,
+            video_id,
+            body.prompt_id,
+            model_configured=state.providers.analyser is not None,
+        )
     except prompts.PromptRefused as err:
         raise _refuse(str(err)) from err
     if getattr(state, "ingest", None) is not None:

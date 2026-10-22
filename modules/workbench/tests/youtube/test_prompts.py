@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import timedelta
 
 import pytest
 
 from youtube_data import prompts, store, watchlist
 from youtube_data.analysis import Analysis, Reading
-from youtube_data.providers.base import VideoRef
+from youtube_data.ingest import Ingest
+from youtube_data.providers.base import ReadingUnusable, VideoRef
 
 from .builders import SEEDED_PROMPT_ID
 from .harness import GOLD, MARKETS, Rig
@@ -159,7 +161,7 @@ async def test_another_prompt_reads_a_film_again_without_asking_for_its_words_or
     listened = await rig.used(rig.providers.transcriber.name, "sim_video_seconds")
     technical = await prompts.create(pool, name="Technical", body="Levels only.")
 
-    prompt_id = await prompts.order_reading(pool, rig.settings, rig.clock, "simfilm0001", technical.id)
+    prompt_id = await prompts.order_reading(pool, rig.settings, rig.clock, "simfilm0001", technical.id, model_configured=True)
     await rig.ingest.read_with("simfilm0001", prompt_id)
 
     async with pool.acquire() as conn:
@@ -179,8 +181,59 @@ async def test_a_reading_by_another_prompt_is_refused_for_a_film_without_words_o
     async with pool.acquire() as conn:
         await store.upsert_films(conn, [store.Discovery(_unheard(rig), "manual", SEEDED_PROMPT_ID)])
     with pytest.raises(prompts.PromptRefused, match="no transcript"):
-        await prompts.order_reading(pool, rig.settings, rig.clock, "unheard01", technical.id)
+        await prompts.order_reading(pool, rig.settings, rig.clock, "unheard01", technical.id, model_configured=True)
     with pytest.raises(prompts.PromptRefused, match="no film"):
-        await prompts.order_reading(pool, rig.settings, rig.clock, "nothing", technical.id)
+        await prompts.order_reading(pool, rig.settings, rig.clock, "nothing", technical.id, model_configured=True)
     with pytest.raises(prompts.PromptRefused, match="tokens are spent"):
-        await prompts.order_reading(pool, rig.settings, rig.clock, "simfilm0001", technical.id)
+        await prompts.order_reading(pool, rig.settings, rig.clock, "simfilm0001", technical.id, model_configured=True)
+
+
+async def test_a_reading_is_refused_where_no_model_is_configured(pool) -> None:
+    rig = Rig(pool, analyser=None)
+    technical = await prompts.create(pool, name="Technical", body="Levels only.")
+
+    with pytest.raises(prompts.PromptRefused, match="no model"):
+        await prompts.order_reading(pool, rig.settings, rig.clock, "simfilm0001", technical.id, model_configured=False)
+
+
+async def test_a_reading_ordered_by_hand_that_fails_is_not_one_of_the_films_attempts(pool) -> None:
+    class Unusable:
+        model = "unusable"
+
+        async def read(self, film, transcript, *, prompt):
+            raise ReadingUnusable("breaks the schema", tokens=10)
+
+    rig = Rig(pool)
+    await watchlist.follow_channel(pool, rig.providers.source, rig.settings, GOLD, added_by="operator")
+    await rig.tick()
+    technical = await prompts.create(pool, name="Technical", body="Levels only.")
+    rig.providers = replace(rig.providers, analyser=Unusable())  # type: ignore[arg-type]
+    rig.ingest = Ingest(pool, rig.providers, rig.settings)
+
+    await rig.ingest.read_with("simfilm0001", technical.id)
+
+    assert (await rig.row("simfilm0001"))["reading_failures"] == 0
+
+
+async def test_an_order_accepted_before_the_days_tokens_ran_out_does_not_run_after_it(pool) -> None:
+    recording = Recording()
+    rig = Rig(pool, analyser=recording, daily_token_limit=10**9)  # type: ignore[arg-type]
+    await watchlist.follow_channel(pool, rig.providers.source, rig.settings, GOLD, added_by="operator")
+    await rig.tick()
+    technical = await prompts.create(pool, name="Technical", body="Levels only.")
+    asked = len(recording.asked)
+    async with pool.acquire() as conn:
+        await store.add_usage(conn, {("analyser", "tokens"): 10**9}, day=rig.clock.now().date())
+
+    await rig.ingest.read_with("simfilm0001", technical.id)
+
+    assert len(recording.asked) == asked
+
+
+async def test_a_prompt_a_channel_took_a_moment_ago_is_not_deleted_whatever_was_checked_before(pool) -> None:
+    rig = Rig(pool)
+    created = await prompts.create(pool, name="Technical", body="Levels only.")
+    await watchlist.follow_channel(pool, rig.providers.source, rig.settings, GOLD, added_by="operator", prompt=created.id)
+
+    async with pool.acquire() as conn:
+        assert await store.delete_prompt(conn, created.id) is False

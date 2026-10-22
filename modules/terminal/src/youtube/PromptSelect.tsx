@@ -12,18 +12,21 @@ export function PromptSelect({
   onChange,
   label,
   className = INPUT,
+  disabled = false,
 }: {
   prompts: Prompt[];
   value: number | null;
   onChange(promptId: number | null): void;
   label: string;
   className?: string;
+  disabled?: boolean;
 }) {
   const seeded = prompts.find((prompt) => prompt.seeded);
   return (
     <select
       aria-label={label}
       className={className}
+      disabled={disabled}
       value={value === null ? "" : String(value)}
       onChange={(event) => onChange(event.target.value === "" ? null : Number(event.target.value))}
     >

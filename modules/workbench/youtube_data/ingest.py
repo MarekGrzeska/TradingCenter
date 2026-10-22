@@ -61,6 +61,8 @@ class Ingest:
         # One thing spends the providers' day at a time: the loop's pass, or a film somebody named by hand.
         self._busy = asyncio.Lock()
         self._named: set[asyncio.Task] = set()
+        # Readings ordered by hand and not yet done, so a second click on the same one is not a second bill.
+        self._ordered: set[tuple[str, int]] = set()
 
     async def start(self) -> None:
         self._task = asyncio.create_task(self._run(), name="youtube-ingest")
@@ -355,16 +357,20 @@ class Ingest:
             await self._read_with(item.video, item.transcript, item.language, item.video.prompt_id)
 
     async def read_with(self, video_id: str, prompt_id: int) -> None:
-        """One more reading of a film already transcribed, by a prompt somebody chose: no transcript is asked for, the
-        film does not move on, and the day's tokens are spent as for any reading — under the loop's own lock."""
+        """One more reading of a film already transcribed, by a prompt somebody chose, under the loop's own lock."""
         if self._providers.analyser is None:
             return
+        ceiling = budget.Ceiling(budget.ANALYSER, budget.TOKENS, self._settings.daily_token_limit)
         async with self._busy:
             try:
+                # Checked again here: the order was accepted while another pass held the lock, and so were others.
+                if await self._remaining(ceiling) <= 0:
+                    log.warning("the day's tokens are spent; the reading of %s by another prompt waits", video_id)
+                    return
                 async with self._pool.acquire() as conn:
                     found = await store.reading_input(conn, video_id)
                 if found is not None:
-                    await self._read_with(*found, prompt_id)
+                    await self._read_with(*found, prompt_id, counts=False)
             except asyncio.CancelledError:
                 raise
             except Exception:
@@ -373,11 +379,16 @@ class Ingest:
                 await self._flush()
 
     def start_reading(self, video_id: str, prompt_id: int) -> None:
+        key = (video_id, prompt_id)
+        if key in self._ordered:
+            return
+        self._ordered.add(key)
         task = asyncio.create_task(self.read_with(video_id, prompt_id), name=f"youtube-reading-{video_id}")
         self._named.add(task)
         task.add_done_callback(self._named.discard)
+        task.add_done_callback(lambda _: self._ordered.discard(key))
 
-    async def _read_with(self, video, transcript: str, language: str, prompt_id: int) -> None:
+    async def _read_with(self, video, transcript: str, language: str, prompt_id: int, *, counts: bool = True) -> None:
         analyser = self._providers.analyser
         assert analyser is not None
         film = Film(
@@ -397,8 +408,10 @@ class Ingest:
             # An answer about this film that will not be stored: paid for, and one of the film's attempts.
             self._providers.meter.record(budget.ANALYSER, budget.TOKENS, err.tokens)
             log.warning("reading %s is unusable: %s", video.video_id, err)
-            async with self._pool.acquire() as conn:
-                await store.record_reading_failure(conn, video.video_id)
+            # The film's failures are the loop's: a reading ordered by hand is not one of its attempts.
+            if counts:
+                async with self._pool.acquire() as conn:
+                    await store.record_reading_failure(conn, video.video_id)
             return
         except Exception as err:  # noqa: BLE001 - whatever a model provider raises must not stop the batch
             # A key, a quota, a rate limit or a dropped connection says nothing about the film, so it spends none of

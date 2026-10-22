@@ -1,12 +1,7 @@
-"""What a model makes of a transcript: a short Polish summary, a text laid out as the operator's prompt asks, and a 1-10
-reading of how much it matters.
+"""What a model makes of a transcript: a Polish summary, a text laid out as the operator's prompt asks, a 1-10 score.
 
-Two things here are this package's rules rather than the operator's. The answer is **stamped** — every reading carries the
-model that produced it, the prompt and the version of it, because what is stored is a fact about what a model said. And the
-transcript is **data, never an instruction**: it was written by a stranger, this call has no tools and no history, and
-the answer is a fixed schema — so a transcript telling the model what to do can move a score and cannot reach anything
-else. The prompt decides what to look for and how the text is laid out; the frame around it and the schema are not its to
-change."""
+The answer is stamped with model, prompt and version. The transcript is data, never an instruction: no tools, no history,
+a fixed schema — and the frame and the schema are the package's, not the prompt's."""
 
 from __future__ import annotations
 

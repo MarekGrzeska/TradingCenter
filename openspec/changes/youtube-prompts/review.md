@@ -8,9 +8,9 @@ z pustym filtrem i szablonem `{text}`, więc nic nie wymaga poprawy (sprawdzone 
 
 ## Verified
 
-- `uv run pytest` w `modules/workbench`: 2928 passed, 11 skipped (pełny zestaw, z testami `db` na PostgreSQL 17 w kontenerze).
+- `uv run pytest` w `modules/workbench`: 2928 passed, 11 skipped przed poprawkami z review; po nich `tests/youtube` 242 passed (pełny zestaw, z testami `db` na PostgreSQL 17 w kontenerze).
 - `uv run ruff check .` i `uv run pyright`: bez uwag, 0 błędów.
-- `pnpm typecheck`, `pnpm lint`, `pnpm test` w `modules/terminal`: 948 passed (80 plików); `pnpm contract:check`: aktualny.
+- `pnpm typecheck`, `pnpm lint`, `pnpm test` w `modules/terminal`: 948 passed (+1 po review) (80 plików); `pnpm contract:check`: aktualny.
 - `contract-sync`: zmienił się tylko `contract.youtube.generated.ts`; pocket i snapshot trading-mcp bez zmian.
 - `openspec validate youtube-prompts --strict`: poprawna.
 - Migracja `0003` przeszła na bazie z odczytem w starym kształcie (wszystkie pola) oraz w dół i w górę (`test_migration.py`).
@@ -20,10 +20,19 @@ z pustym filtrem i szablonem `{text}`, więc nic nie wymaga poprawy (sprawdzone 
 
 | Severity | Where | Finding | Status |
 |---|---|---|---|
-| low | `ingest.py` `_read_with` | Odczyt zamówiony ręcznie, który model odrzuci (`ReadingUnusable`), zwiększa `reading_failures` filmu, choć film jest już odczytany własnym promptem. Licznik czyta tylko krok pętli dla stanu `transcribed`, więc skutku nie ma; wprowadzi w błąd, gdy ktoś zacznie go raportować. | open |
-| low | `migrations/youtube/versions/0003` `downgrade` | Zdejmuje schemat, nie treść: odczyt zostaje w nowym kształcie i stary obraz go nie odczyta. Wycofanie obrazu bez `alembic downgrade` nie wystartuje (sprawdzenie schematu). Opisane w `design.md`. | accepted |
-| low | `store.py` `prompt_to_read_with` | Film zakolejkowany z promptem, który operator potem usunął, jest czytany jego ostatnią wersją. Zamierzone (film musi być czymś czytany), ale prompt znikł z listy wyboru. | accepted |
-| info | `analysis.py` | Treść promptu wchodzi do wiadomości systemowej między ramką a opisem pól; model może ją zignorować i odpowiedzieć poza schematem — odpowiedź nie zostanie zapisana (test), ale tokeny pójdą. | accepted |
+| medium | `ingest.py` `_read_with` | Odczyt zamówiony ręcznie i odrzucony przez model zwiększał `reading_failures` filmu, a ten licznik zatrzymuje pętlę po `READING_MAX_FAILURES`: film mógł zostać bez odczytu własnym promptem, choć ten nie zawiódł. | FIXED — zamówiony odczyt nie liczy się do prób (`counts=False`), test `…is_not_one_of_the_films_attempts` |
+| medium | `routers/videos.py`, `prompts.order_reading` | `POST /videos/{id}/readings` odpowiadał 202 bez skonfigurowanego modelu i nic się nie działo. | FIXED — odmowa „no model is configured”, test `…no_model_is_configured` |
+| medium | `ingest.py` `read_with` | Dzienny limit tokenów sprawdzany tylko przy zamówieniu, nie przy wykonaniu; kilka kliknięć tego samego odczytu mnożyło koszt. | FIXED — sprawdzenie przy wykonaniu i brak duplikatów (`_ordered`), test `…does_not_run_after_it` |
+| medium | `terminal/agent/MessageBody.tsx` | Tekst odczytu to Markdown napisany przez model po obcej transkrypcji; obrazek `![](https://…?d=…)` byłby pobrany przez przeglądarkę. | FIXED — `img` nie ładuje nic, pokazuje alt; test w `MessageBody.test.tsx` (dotyczy też czatu agenta) |
+| low | `store.py` `update_prompt`, `prompts.update` | Dwa równoległe zapisy tego samego promptu brały ten sam numer wersji; błąd klucza głównego raportowany jako „nazwa zajęta” z `None`. | FIXED — blokada wiersza promptu na czas zapisu; komunikat rozróżnia przypadki |
+| low | `prompts.delete` | Sprawdzenie przypisań i usunięcie w osobnych zapytaniach: kanał przypisany w międzyczasie zostawał z usuniętym promptem. | FIXED w oknie sprawdzenia — usunięcie jednym zapytaniem z `NOT EXISTS`; test `…took_a_moment_ago…`. Pozostaje mikrookno przy równoległym PATCH kanału (jeden operator) |
+| low | `terminal/WatchPanels.tsx` | Wybór „domyślny” przy niewczytanych promptach wysyłał pusty PATCH bez błędu. | FIXED — lista wyboru wyłączona, dopóki prompty się nie wczytają |
+| low | `store.py` `analysed_for_alert` | Zapytanie czytało pełny tekst odczytu (do 20 kB) dla każdego ogłaszanego filmu. | FIXED — `result - 'text'` |
+| low | `prompts.create` | Limit liczony przez wczytanie wszystkich promptów z treścią. | FIXED — `count(*)`; kontrola i wstawienie nadal nie są atomowe (limit miękki) |
+| low | komentarze | Nowe docstringi dłuższe niż dwie linie, wbrew CLAUDE.md. | FIXED w `prompts.py`, `analysis.py`, `store.py` |
+| low | `migrations/youtube/versions/0003` `downgrade` | Zdejmuje schemat, nie treść; stary obraz na nowym schemacie nie wystartuje. Opisane w `design.md`. | accepted |
+| low | `store.py` `prompt_to_read_with` | Film zakolejkowany z promptem usuniętym potem przez operatora jest czytany jego ostatnią wersją. | accepted |
+| info | `analysis.py` | Model może zignorować ramkę i odpowiedzieć poza schematem — odpowiedź nie zostanie zapisana, tokeny pójdą. | accepted |
 
 ## Spec coverage
 

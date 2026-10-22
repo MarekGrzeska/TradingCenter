@@ -395,10 +395,7 @@ async def save_reading(
     simulated: bool,
     at: datetime | None = None,
 ) -> None:
-    """Overwrites the reading of this film by this prompt: the history is the film, not what a model thought of it. A film
-    is moved on to `analysed` only by the reading its own prompt made — one ordered by hand with another prompt sits beside
-    it and changes nothing about where the film is. `at` is the loop's clock — a simulated one runs faster than the
-    database's, and the alert window is measured on it."""
+    """Overwrites the reading of this film by this prompt. Only the film's own prompt moves it to `analysed`; `at` is the loop's clock."""
     async with conn.transaction():
         await conn.execute(
             """
@@ -549,7 +546,7 @@ class ToAnnounce:
 async def analysed_for_alert(conn: Conn, *, limit: int) -> list[ToAnnounce]:
     rows = await conn.fetch(
         f"""
-        SELECT {", ".join(f"v.{c.strip()}" for c in _VIDEO_COLUMNS.split(","))}, r.result, r.simulated AS r_simulated, p.name AS prompt_name,
+        SELECT {", ".join(f"v.{c.strip()}" for c in _VIDEO_COLUMNS.split(","))}, r.result - 'text' AS result, r.simulated AS r_simulated, p.name AS prompt_name,
                (SELECT t.phrase FROM topics t WHERE 'topic:' || t.id::text = ANY (v.origins) ORDER BY t.id LIMIT 1) AS topic_phrase
         FROM videos v JOIN readings r ON r.video_id = v.video_id AND r.prompt_id = v.prompt_id
         JOIN prompts p ON p.id = r.prompt_id
@@ -825,6 +822,8 @@ async def create_prompt(conn: Conn, *, name: str, body: str) -> Prompt:
 async def update_prompt(conn: Conn, prompt_id: int, *, name: str | None, body: str | None) -> Prompt | None:
     """A new name replaces the old one; new words make a new version, and an edit that changes no word makes none."""
     async with conn.transaction():
+        # One writer at a time per prompt: two saves would otherwise both take the next version number.
+        await conn.execute("SELECT 1 FROM prompts WHERE id = $1 FOR UPDATE", prompt_id)
         if name is not None:
             await conn.execute("UPDATE prompts SET name = $2 WHERE id = $1 AND deleted_at IS NULL", prompt_id, name)
         if body is not None:
@@ -842,9 +841,14 @@ async def update_prompt(conn: Conn, prompt_id: int, *, name: str | None, body: s
 
 
 async def delete_prompt(conn: Conn, prompt_id: int) -> bool:
-    """Taken off offer, not out of the database: the readings it made keep its name and version."""
+    """Taken off offer, not out of the database — and only while no channel or topic reads by it, checked in the same statement."""
     return (
-        await conn.execute("UPDATE prompts SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL", prompt_id)
+        await conn.execute(
+            "UPDATE prompts SET deleted_at = now() WHERE id = $1 AND deleted_at IS NULL AND NOT seeded "
+            "AND NOT EXISTS (SELECT 1 FROM channels WHERE prompt_id = $1) "
+            "AND NOT EXISTS (SELECT 1 FROM topics WHERE prompt_id = $1)",
+            prompt_id,
+        )
     ) == "UPDATE 1"
 
 
@@ -871,3 +875,7 @@ async def reading_input(conn: Conn, video_id: str) -> tuple[Video, str, str] | N
 
 async def has_transcript(conn: Conn, video_id: str) -> bool:
     return bool(await conn.fetchval("SELECT EXISTS (SELECT 1 FROM transcripts WHERE video_id = $1)", video_id))
+
+
+async def count_prompts(conn: Conn) -> int:
+    return int(await conn.fetchval("SELECT count(*) FROM prompts WHERE deleted_at IS NULL") or 0)

