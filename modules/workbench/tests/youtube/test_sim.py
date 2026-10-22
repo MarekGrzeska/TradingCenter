@@ -197,7 +197,7 @@ FILM = Film(video_id="simfilm0001", title="t", channel_title="c", published_on=d
 async def test_a_prepared_reading_is_returned_stamped_and_paid_for_in_tokens() -> None:
     world, _, _ = world_of()
 
-    analysis = await SimAnalyser(world).read(FILM, "x" * 400, profile="market")
+    analysis = await SimAnalyser(world).read(FILM, "x" * 400, prompt="Look for markets.")
 
     assert analysis.simulated and analysis.model == "sim"
     assert analysis.reading.impact_score == 6
@@ -209,8 +209,8 @@ async def test_a_model_that_answers_badly_and_one_with_nothing_prepared() -> Non
     analyser = SimAnalyser(world)
 
     with pytest.raises(ReadingUnusable):
-        await analyser.read(replace(FILM, video_id="simfilm0012"), "words", profile="market")
-    unknown = await analyser.read(replace(FILM, video_id="simfilm0003"), "words", profile="market")
+        await analyser.read(replace(FILM, video_id="simfilm0012"), "words", prompt="Look for markets.")
+    unknown = await analyser.read(replace(FILM, video_id="simfilm0003"), "words", prompt="Look for markets.")
     assert unknown.reading == NEUTRAL
 
 

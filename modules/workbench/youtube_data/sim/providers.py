@@ -30,10 +30,7 @@ VIDEO_SECONDS = "sim_video_seconds"
 # be read as if it had them.
 NEUTRAL = Reading(
     summary_pl="Symulowany odczyt bez przygotowanej treści: film nie zawiera tez rynkowych.",
-    key_points=[],
-    instruments=[],
-    predictions=[],
-    topics=[],
+    text="Symulowany odczyt bez przygotowanej treści.",
     impact_score=1,
 )
 
@@ -153,7 +150,7 @@ class SimAnalyser:
     def __init__(self, world: World) -> None:
         self._world = world
 
-    async def read(self, film: Film, transcript: str, *, profile: str) -> Analysis:
+    async def read(self, film: Film, transcript: str, *, prompt: str) -> Analysis:
         video = self._world.video(film.video_id)
         prepared = None if video is None else video.reading
         if prepared == "unusable":

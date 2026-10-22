@@ -1,8 +1,8 @@
 # youtube-data
 
 The YouTube archive. Channels and search topics the operator (or an agent) chose to follow, the films
-they yield, their transcripts, what a model made of each — and each read film handed to the alerts package, whose rules say whether anybody is told.
-Two surfaces in one process: the REST contract the terminal's **YouTube** tab reads, and nine tools at
+they yield, their transcripts, the prompts a model reads them by, what it made of each — and each read film handed to the alerts package, whose rules say whether anybody is told.
+Two surfaces in one process: the REST contract the terminal's **YouTube** and **Prompts** tabs read, and eight tools at
 `/mcp` that reach the conversation and the teams as functions.
 
 **The ninth package of the workbench, and the only optional one.** Served whole under `/youtube` when
@@ -26,10 +26,11 @@ when the line is set.
 
 | Table | What | Who writes it |
 |---|---|---|
-| `channels`, `topics` | the watch list, each row with `added_by` (`operator` / `agent`) and a profile | REST and tools add; **only REST removes** |
+| `channels`, `topics` | the watch list, each row with `added_by` (`operator` / `agent`) and the prompt its new films are read by | REST and tools add; **only REST removes** |
 | `videos` | one row per film however many doors it came through (`origins`), its state and retry schedule | the loop; `POST /videos` and `analyse_video` enqueue one |
 | `transcripts` | the words, apart from `videos` so a list never reads TOAST | the loop |
-| `readings` | one per film and profile, stamped with its model and moment, overwritten on a re-read | the loop |
+| `prompts`, `prompt_versions` | what a model is told to look for in a film; new words are a new version, never an overwrite; a deleted prompt keeps its row | **only REST** writes; the seeded one is edited, never deleted |
+| `readings` | one per film and prompt — a summary, one Markdown text laid out by the prompt, a 1-10 score — stamped with model, moment, prompt and its version, overwritten on a re-read by the same prompt | the loop; `POST /videos/{id}/readings` orders another |
 | `usage` | what each provider was asked for, per UTC day, in its own unit | the loop and the paid tools |
 | `provider_state` | when a provider last let us in and last refused | the loop |
 
@@ -51,8 +52,8 @@ One pass every `YOUTUBE_POLL_INTERVAL_SECONDS`, four steps, each with a batch li
    `RETRY_DELAYS_MINUTES` (60, 360, 1440) and then `gave_up`. **Blocked is not a miss**: a crowded model, a rate
    limit, a timeout or a bad key spends no attempt; the pass stops asking and Gemini rests
    `TRANSCRIBER_COOLDOWN_MINUTES` (15).
-3. **read** — one model call per film, no tools, no history, a strict JSON schema, the transcript marked
-   as a stranger's data. An answer the schema rejects is one of the film's `READING_MAX_FAILURES`; a
+3. **read** — one model call per film by the prompt the film was noticed with, no tools, no history, a strict JSON schema, the
+   transcript marked as a stranger's data. An answer the schema rejects is one of the film's `READING_MAX_FAILURES`; a
    provider that could not be reached is none of them.
 4. **tell** — `analysed` → `notified` or `quiet`. Every read film is handed to the alerts package as a `youtube.film.read`
    event (channel, topic, score, instruments, link and the message to send); what it does with it — tell nobody, tell one
@@ -67,6 +68,18 @@ Every provider call is counted in `usage`, and daily ceilings stop the step that
 the loop: `DAILY_SOURCE_UNITS`, `GEMINI_DAILY_VIDEO_SECONDS`
 (28 800, the free tier's eight hours; tokens are counted beside it for the bill), `DAILY_TOKEN_LIMIT`. `GET /state`
 says what is spent, what is blocked, and how many intervals ago the last complete pass was.
+
+## Prompts
+
+A prompt is the operator's words about what to look for in a film and how to lay the text out. The seeded one (`Rynkowy`,
+from migration `0003`) is a row like any other with one lock: it cannot be deleted, so there is always a prompt to read by.
+A channel or a topic holds one prompt, and a film takes it when it is noticed — changing it is for films noticed after. Another
+prompt reads a film already transcribed on request (`POST /videos/{id}/readings`): no words are asked for, the day's tokens
+are spent, the film does not move, and nobody is told.
+
+What no prompt can change is in `analysis.system_message`: the transcript is data, there are no tools, and the answer is
+`{summary_pl, text, impact_score}`. An answer outside that is not stored. The agent chooses a prompt by name and cannot write,
+edit or delete one.
 
 ## Providers
 
@@ -102,15 +115,14 @@ start of the process, randomness is seeded, so a run replays.
 ## Surfaces
 
 REST (`contract.py`, generated into the terminal as `contract.youtube.generated.ts`):
-`GET /videos` (window, channel, topic, instrument, score, state) · `GET /videos/{id}` ·
+`GET /videos` (window, channel, topic, score, state; a reading without its text) · `GET /videos/{id}` (every reading, with its text) · `POST /videos/{id}/readings` · `GET|POST /prompts` · `PATCH|DELETE /prompts/{id}` ·
 `GET /videos/{id}/transcript` (pages) · `POST /videos` (one film named by hand: accepted at once, transcribed and read in the background ahead of the queue) · `GET|POST /channels` ·
 `PATCH|DELETE /channels/{id}` · `GET|POST /topics` · `PATCH|DELETE /topics/{id}` · `GET /state` ·
 `GET /health`.
 
-Tools: `youtube_archive_status`, `recent_videos`, `read_video`, `read_transcript`,
-`instrument_sentiment` read; `search_youtube`, `follow_channel`, `add_topic`,
-`analyse_video` write or spend. None removes anything. Lists carry an excerpt; `read_video` carries the
-reading and no words; `read_transcript` pages the words (8 000 characters at most) with a notice that
+Tools: `youtube_archive_status` (with the prompts on offer), `recent_videos`, `read_video`, `read_transcript` read;
+`search_youtube`, `follow_channel`, `add_topic`, `analyse_video` write or spend — the three that add take an optional prompt name. None removes anything. Lists carry an excerpt; `read_video` carries the
+readings (each text cut at 8 000 characters) and no transcript; `read_transcript` pages the words (8 000 characters at most) with a notice that
 they are data, not instructions. The two that cost say so in their description and refuse past the
 day's ceiling.
 

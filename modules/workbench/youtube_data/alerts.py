@@ -28,18 +28,17 @@ log = logging.getLogger(__name__)
 MESSAGE_CHARS = 3500
 SULK_SECONDS = 600.0
 SUMMARY_CHARS = 900
-MAX_INSTRUMENTS = 6
-# A title, a channel name and an instrument name come from strangers and carry no length of their own.
+# A title and a channel name come from strangers and carry no length of their own.
 LINE_CHARS = 300
 
 # The one origin that is not a door the archive looks through: a film the operator or the agent named.
 MANUAL = "manual"
 
 EVENT_TYPE = "youtube.film.read"
-EVENT_DESCRIPTION = "A film the model read, with its impact score and the instruments it spoke about"
+EVENT_DESCRIPTION = "A film the model read, with its impact score and the prompt that read it"
 EVENT_SCHEMA = {
     "type": "object",
-    "description": "`text` is the ready message: score and channel, the title, the summary in Polish, what was said of each instrument and the link.",
+    "description": "`text` is the ready message: score and channel, the title, the summary in Polish and the link.",
     "properties": {
         "channel": {"type": "string", "x-seen-values": True},
         "channel_slug": {"type": "string"},
@@ -47,7 +46,7 @@ EVENT_SCHEMA = {
         "title": {"type": "string"},
         "video_id": {"type": "string"},
         "impact_score": {"type": "integer"},
-        "instruments": {"type": "array", "items": {"type": "string"}},
+        "prompt": {"type": "string", "x-seen-values": True},
         "url": {"type": "string"},
         "simulated": {"type": "boolean"},
     },
@@ -58,9 +57,6 @@ def slug(text: str) -> str:
     """A name as one word of an attribute a rule can match: lowercase letters, digits, `_` and `-`; the rest becomes a dash."""
     cleaned = re.sub(r"[^a-z0-9_-]+", "-", text.lower()).strip("-_")[:60]
     return cleaned or "unknown"
-
-
-ARROWS = {"bullish": "▲", "bearish": "▼", "neutral": "▬"}
 
 
 class Rejected(Exception):
@@ -119,14 +115,14 @@ def attributes_of(item: store.ToAnnounce) -> dict:
         "title": video.title,
         "video_id": video.video_id,
         "impact_score": int(reading["impact_score"]),
-        "instruments": [str(view["name"]) for view in reading["instruments"]],
+        "prompt": item.prompt,
         "url": f"https://www.youtube.com/watch?v={video.video_id}",
         "simulated": bool(item.simulated or video.simulated),
     }
 
 
 def message(item: store.ToAnnounce, *, limit: int = MESSAGE_CHARS) -> str:
-    """One film as the operator reads it on a phone: what it scored, who said it, what they think and where to watch.
+    """One film as the operator reads it on a phone: what it scored, who said it, what it says and where to watch.
 
     In Polish, because the summary is; a film from a simulation says so on its first line, since nothing else in a
     Telegram message would."""
@@ -139,14 +135,7 @@ def message(item: store.ToAnnounce, *, limit: int = MESSAGE_CHARS) -> str:
     if item.simulated or video.simulated:
         head.insert(0, "[SYMULACJA — ten film nie istnieje]")
 
-    views = [
-        f"{_clip(view['name'], 60)} {ARROWS.get(view['sentiment'], '▬')} ({view['conviction']}/5, {view['horizon']})"
-        for view in reading["instruments"][:MAX_INSTRUMENTS]
-    ]
-    tail = []
-    if views:
-        tail += ["", "; ".join(views)]
-    tail += ["", f"https://www.youtube.com/watch?v={video.video_id}"]
+    tail = ["", f"https://www.youtube.com/watch?v={video.video_id}"]
 
     summary = " ".join(str(reading["summary_pl"]).split())
     room = min(SUMMARY_CHARS, limit - len("\n".join(head + tail)) - 4)

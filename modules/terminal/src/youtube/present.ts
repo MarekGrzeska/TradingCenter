@@ -3,7 +3,7 @@
  * not reached through the DOM. Polish, like the social tab.
  */
 
-import type { ArchiveState, Film, ProviderState, Sentiment } from "./youtubeApi";
+import type { ArchiveState, Film, ProviderState } from "./youtubeApi";
 
 /** Where a film is on its road, in words. A film with a reading is said to be read; one without says why not. */
 export function stateLabel(film: Film): string {
@@ -25,18 +25,6 @@ export function stateLabel(film: Film): string {
       return `pominięty: ${film.skipReason ?? "bez podania powodu"}`;
   }
 }
-
-export const SENTIMENT_LABEL: Record<Sentiment, string> = {
-  bullish: "wzrost",
-  bearish: "spadek",
-  neutral: "neutralnie",
-};
-
-export const SENTIMENT_ARROW: Record<Sentiment, string> = {
-  bullish: "▲",
-  bearish: "▼",
-  neutral: "▬",
-};
 
 /** `12:34` for a film under an hour or `1 h 02 min`, or nothing where the source could not say — a feed does not. */
 export function duration(seconds: number | null): string | null {

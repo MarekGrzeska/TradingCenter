@@ -8,8 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from . import budget, store
-from .analysis import PROFILES
+from . import budget, prompts, store
 from .config import Settings
 from .models import ADDED_BY, DISCOVERED, NO_TRANSCRIPT, TRANSCRIBED, Channel, Topic
 from .providers.base import ChannelInfo, SourceError, VideoSource
@@ -27,6 +26,14 @@ MAX_INTERVAL_MINUTES = 7 * 24 * 60
 
 class WatchlistRefused(Exception):
     """The request cannot be done, and this says why in words meant for whoever asked."""
+
+
+async def _prompt_id(pool, choice: int | str | None) -> int:
+    async with pool.acquire() as conn:
+        try:
+            return await prompts.resolve(conn, choice)
+        except prompts.PromptRefused as err:
+            raise WatchlistRefused(str(err)) from err
 
 
 def _check_choice(name: str, value: str, allowed) -> None:
@@ -47,10 +54,10 @@ async def follow_channel(
     reference: str,
     *,
     added_by: str,
-    profile: str = "market",
+    prompt: int | str | None = None,
     language: str = "",
 ) -> Followed:
-    _check_choice("profile", profile, tuple(PROFILES))
+    prompt_id = await _prompt_id(pool, prompt)
     _check_choice("added_by", added_by, ADDED_BY)
     try:
         info: ChannelInfo = await source.resolve_channel(reference)
@@ -67,7 +74,7 @@ async def follow_channel(
                 "to take one off; adding another would need a decision about which"
             )
         channel = await store.add_channel(
-            conn, info, language=language, profile=profile, added_by=added_by
+            conn, info, language=language, prompt_id=prompt_id, added_by=added_by
         )
     return Followed(channel, created=True)
 
@@ -89,13 +96,13 @@ async def add_topic(
     language: str = "",
     interval_minutes: int | None = None,
     max_videos_per_run: int | None = None,
-    profile: str = "market",
+    prompt: int | str | None = None,
 ) -> AddedTopic:
     text = " ".join(phrase.split())
     if not text or len(text) > MAX_PHRASE_CHARS:
         raise WatchlistRefused(f"a topic is a phrase of 1 to {MAX_PHRASE_CHARS} characters")
-    _check_choice("profile", profile, tuple(PROFILES))
     _check_choice("added_by", added_by, ADDED_BY)
+    prompt_id = await _prompt_id(pool, prompt)
 
     defaults: list[str] = []
     if interval_minutes is None:
@@ -133,7 +140,7 @@ async def add_topic(
             language=language,
             interval_minutes=interval_minutes,
             max_videos_per_run=max_videos_per_run,
-            profile=profile,
+            prompt_id=prompt_id,
             added_by=added_by,
         )
     return AddedTopic(topic, created=True, defaults_applied=tuple(defaults))
@@ -155,12 +162,12 @@ async def analyse_film(
     settings: Settings,
     reference: str,
     *,
-    profile: str = "market",
+    prompt: int | str | None = None,
 ) -> Queued:
     """One film named by hand. Costs what asking the source about it costs, counted against the same day as everything
     else; the caller then has it processed at once (`Ingest.start_now`) rather than left to the loop's next pass. Not an
     alert: a film named by hand ends quiet, because whoever asked is already looking."""
-    _check_choice("profile", profile, tuple(PROFILES))
+    prompt_id = await _prompt_id(pool, prompt)
     try:
         wanted = video_id(reference)
     except SourceError as err:
@@ -195,7 +202,7 @@ async def analyse_film(
 
     async with pool.acquire() as conn:
         await store.upsert_films(
-            conn, [store.Discovery(found[0], origin="manual", profile=profile)]
+            conn, [store.Discovery(found[0], origin="manual", prompt_id=prompt_id)]
         )
         await store.add_usage(conn, providers.meter.drain(), day=budget.utc_day(providers.clock.now()))
     return Queued(found[0].video_id, found[0].title, created=True, process=True)

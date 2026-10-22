@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { PromptSelect } from "./PromptSelect";
+import { usePrompts } from "./usePrompts";
 import type { YoutubeApi } from "./youtubeApi";
 
 /**
@@ -19,6 +21,8 @@ export function FollowChannelDialog({
   onDone(): void;
 }) {
   const [reference, setReference] = useState("");
+  const [promptId, setPromptId] = useState<number | null>(null);
+  const prompts = usePrompts(client);
   const [already, setAlready] = useState<string | null>(null);
 
   if (already !== null) {
@@ -47,7 +51,7 @@ export function FollowChannelDialog({
       fallbackError="nie udało się dodać kanału"
       closeOnSuccess={false}
       onConfirm={async () => {
-        const result = await client.followChannel(reference.trim(), new AbortController().signal);
+        const result = await client.followChannel(reference.trim(), promptId, new AbortController().signal);
         onDone();
         if (!result.created) {
           setAlready(result.channel.title);
@@ -68,6 +72,10 @@ export function FollowChannelDialog({
             onChange={(e) => setReference(e.target.value)}
           />
         </label>
+        <label className="flex flex-col gap-1 text-xs">
+          <span className="text-ink-secondary">Prompt, którym czytane są nowe filmy</span>
+          <PromptSelect label="Prompt" prompts={prompts.value.prompts} value={promptId} onChange={setPromptId} />
+        </label>
       </div>
     </ConfirmDialog>
   );
@@ -85,6 +93,8 @@ export function AddTopicDialog({
   const [phrase, setPhrase] = useState("");
   const [interval, setInterval] = useState("");
   const [max, setMax] = useState("");
+  const [promptId, setPromptId] = useState<number | null>(null);
+  const prompts = usePrompts(client);
 
   return (
     <ConfirmDialog
@@ -99,6 +109,7 @@ export function AddTopicDialog({
             phrase: phrase.trim(),
             ...(interval.trim() === "" ? {} : { intervalMinutes: wholeNumber(interval, "co ile minut") }),
             ...(max.trim() === "" ? {} : { maxVideosPerRun: wholeNumber(max, "ile filmów") }),
+            ...(promptId === null ? {} : { promptId }),
           },
           new AbortController().signal,
         );
@@ -127,6 +138,10 @@ export function AddTopicDialog({
             <input className={INPUT} inputMode="numeric" value={max} onChange={(e) => setMax(e.target.value)} />
           </label>
         </div>
+        <label className="flex flex-col gap-1 text-xs">
+          <span className="text-ink-secondary">Prompt, którym czytane są nowe filmy</span>
+          <PromptSelect label="Prompt" prompts={prompts.value.prompts} value={promptId} onChange={setPromptId} />
+        </label>
         <p className="text-xs text-ink-faint">
           Każde wyszukiwanie zużywa dzienny limit źródła (sto jednostek z dziesięciu tysięcy klucza YouTube). Puste pola
           biorą wartości z ustawień.
@@ -146,6 +161,8 @@ export function AnalyseDialog({
   onDone(): void;
 }) {
   const [reference, setReference] = useState("");
+  const [promptId, setPromptId] = useState<number | null>(null);
+  const prompts = usePrompts(client);
   const [queued, setQueued] = useState<string | null>(null);
 
   if (queued !== null) {
@@ -175,7 +192,7 @@ export function AnalyseDialog({
       fallbackError="nie udało się dodać filmu"
       closeOnSuccess={false}
       onConfirm={async () => {
-        const result = await client.analyse(reference.trim(), new AbortController().signal);
+        const result = await client.analyse(reference.trim(), promptId, new AbortController().signal);
         onDone();
         setQueued(result.created ? result.title : `${result.title} (już w archiwum)`);
       }}
@@ -191,6 +208,10 @@ export function AnalyseDialog({
           onChange={(e) => setReference(e.target.value)}
         />
         <span className="text-ink-faint">Kosztuje jednostkę dziennego limitu źródła. Nie wysyła powiadomienia.</span>
+      </label>
+      <label className="mt-3 flex flex-col gap-1 text-xs">
+        <span className="text-ink-secondary">Prompt (dla filmu, którego jeszcze nie ma w archiwum)</span>
+        <PromptSelect label="Prompt" prompts={prompts.value.prompts} value={promptId} onChange={setPromptId} />
       </label>
     </ConfirmDialog>
   );

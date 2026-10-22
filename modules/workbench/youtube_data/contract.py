@@ -11,8 +11,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from .models import Channel, Topic
-from .store import Film
+from .models import Channel, Prompt, Topic
+from .store import Film, ReadingRow
 
 SCORE = "what a model made of this film's market impact, 1..10 — 1 is commentary with nothing new, 10 a global event"
 WATCH = "https://www.youtube.com/watch?v="
@@ -26,34 +26,39 @@ class Problem(BaseModel):
     retryable: bool = False
 
 
-class InstrumentOut(BaseModel):
-    name: str
-    epic: str | None = Field(default=None, description="a ticker or epic, only where the speaker gave or implied one")
-    sentiment: Literal["bullish", "bearish", "neutral"]
-    conviction: int = Field(description="how sure the speaker sounds, 1..5 — not how sure the model is")
-    horizon: Literal["intraday", "swing", "long"]
+class ReadingSummary(BaseModel):
+    """A model's reading of one film, without its text — a fact about what a model said, never published without naming
+    the model and the prompt that made it."""
 
-
-class PredictionOut(BaseModel):
-    instrument: str
-    claim: str
-    level: float | None = None
-    by: date | None = None
-
-
-class ReadingOut(BaseModel):
-    """A model's reading of one film — a fact about what a model said, never published without naming it."""
-
-    profile: str
+    prompt_id: int
+    prompt_name: str
+    prompt_version: int = Field(description="which version of the prompt it was; the prompt's words may have changed since")
     summary_pl: str
-    key_points: list[str]
-    instruments: list[InstrumentOut]
-    predictions: list[PredictionOut]
-    topics: list[str]
     impact_score: int = Field(description=SCORE)
     model: str
     analysed_at: datetime
     simulated: bool = Field(description="produced by the simulation, about a film that does not exist")
+
+    @classmethod
+    def of(cls, row: ReadingRow) -> ReadingSummary:
+        return cls(
+            prompt_id=row.prompt_id,
+            prompt_name=row.prompt_name,
+            prompt_version=row.prompt_version,
+            summary_pl=row.result["summary_pl"],
+            impact_score=row.result["impact_score"],
+            model=row.model,
+            analysed_at=row.analysed_at,
+            simulated=row.simulated,
+        )
+
+
+class ReadingOut(ReadingSummary):
+    text: str = Field(description="the reading, in Markdown, laid out as its prompt asked")
+
+    @classmethod
+    def of(cls, row: ReadingRow) -> ReadingOut:
+        return cls(**ReadingSummary.of(row).model_dump(), text=row.result.get("text", ""))
 
 
 class VideoOut(BaseModel):
@@ -75,38 +80,50 @@ class VideoOut(BaseModel):
     notified_at: datetime | None = None
     discovered_at: datetime
     simulated: bool
-    reading: ReadingOut | None = Field(default=None, description="null until a model has read it")
+    prompt_id: int = Field(description="the prompt this film is read by; a reading by another prompt is ordered by hand")
+    reading: ReadingSummary | None = Field(
+        default=None, description="the reading by the film's own prompt, without its text; null until a model has read it"
+    )
 
     @classmethod
     def of(cls, film: Film) -> VideoOut:
-        video = film.video
-        reading = None
-        if film.reading is not None and film.reading_model and film.analysed_at:
-            reading = ReadingOut(
-                profile=video.profile,
-                model=film.reading_model,
-                analysed_at=film.analysed_at,
-                simulated=bool(film.reading_simulated),
-                **film.reading,
-            )
+        return cls(**_fields(film), reading=None if film.reading is None else ReadingSummary.of(film.reading))
+
+
+def _fields(film: Film) -> dict:
+    video = film.video
+    return {
+        "video_id": video.video_id,
+        "url": WATCH + video.video_id,
+        "title": video.title,
+        "channel_id": video.channel_id,
+        "channel_title": video.channel_title,
+        "published_at": video.published_at,
+        "duration_seconds": video.duration_seconds,
+        "live_status": video.live_status,
+        "state": video.state,
+        "skip_reason": video.skip_reason,
+        "origins": list(video.origins),
+        "attempts": video.attempts,
+        "next_attempt_at": video.next_attempt_at,
+        "notified_at": video.notified_at,
+        "discovered_at": video.discovered_at,
+        "simulated": video.simulated,
+        "prompt_id": video.prompt_id,
+    }
+
+
+class VideoDetailOut(VideoOut):
+    """One film with every reading it has, the film's own prompt's first, each with its whole text."""
+
+    readings: list[ReadingOut] = Field(description="empty until a model has read it")
+
+    @classmethod
+    def of(cls, film: Film) -> VideoDetailOut:
         return cls(
-            video_id=video.video_id,
-            url=WATCH + video.video_id,
-            title=video.title,
-            channel_id=video.channel_id,
-            channel_title=video.channel_title,
-            published_at=video.published_at,
-            duration_seconds=video.duration_seconds,
-            live_status=video.live_status,  # type: ignore[arg-type]
-            state=video.state,  # type: ignore[arg-type]
-            skip_reason=video.skip_reason,
-            origins=list(video.origins),
-            attempts=video.attempts,
-            next_attempt_at=video.next_attempt_at,
-            notified_at=video.notified_at,
-            discovered_at=video.discovered_at,
-            simulated=video.simulated,
-            reading=reading,
+            **_fields(film),
+            reading=None if film.reading is None else ReadingSummary.of(film.reading),
+            readings=[ReadingOut.of(row) for row in film.readings],
         )
 
 
@@ -140,7 +157,7 @@ class ChannelOut(BaseModel):
     title: str
     handle: str | None = None
     language: str
-    profile: str
+    prompt_id: int
     active: bool
     added_by: Literal["operator", "agent"]
     added_at: datetime
@@ -153,7 +170,7 @@ class ChannelOut(BaseModel):
             title=channel.title,
             handle=channel.handle,
             language=channel.language,
-            profile=channel.profile,
+            prompt_id=channel.prompt_id,
             active=channel.active,
             added_by=channel.added_by,  # type: ignore[arg-type]
             added_at=channel.added_at,
@@ -168,12 +185,12 @@ class ChannelsOut(BaseModel):
 
 class ChannelIn(BaseModel):
     reference: str = Field(description="a channel id (UC…), an @handle, or a youtube.com channel address")
-    profile: str = "market"
+    prompt_id: int | None = Field(default=None, description="null takes the seeded prompt")
     language: str = ""
 
 
 class ChannelPatch(BaseModel):
-    profile: str | None = None
+    prompt_id: int | None = Field(default=None, description="read the channel's films from now on by this prompt")
     active: bool | None = Field(default=None, description="false pauses discovery without taking anything off")
 
 
@@ -188,7 +205,7 @@ class TopicOut(BaseModel):
     language: str
     interval_minutes: int
     max_videos_per_run: int
-    profile: str
+    prompt_id: int
     active: bool
     added_by: Literal["operator", "agent"]
     added_at: datetime
@@ -202,7 +219,7 @@ class TopicOut(BaseModel):
             language=topic.language,
             interval_minutes=topic.interval_minutes,
             max_videos_per_run=topic.max_videos_per_run,
-            profile=topic.profile,
+            prompt_id=topic.prompt_id,
             active=topic.active,
             added_by=topic.added_by,  # type: ignore[arg-type]
             added_at=topic.added_at,
@@ -220,11 +237,12 @@ class TopicIn(BaseModel):
     language: str = ""
     interval_minutes: int | None = Field(default=None, description="null takes the setting's default")
     max_videos_per_run: int | None = Field(default=None, description="null takes the setting's default")
-    profile: str = "market"
+    prompt_id: int | None = Field(default=None, description="null takes the seeded prompt")
 
 
 class TopicPatch(BaseModel):
     active: bool | None = None
+    prompt_id: int | None = Field(default=None, description="read the topic's films from now on by this prompt")
 
 
 class TopicAddedOut(BaseModel):
@@ -235,6 +253,53 @@ class TopicAddedOut(BaseModel):
 
 class AnalyseIn(BaseModel):
     reference: str = Field(description="a YouTube film address or id")
+    prompt_id: int | None = Field(default=None, description="the prompt to read it by; null takes the seeded one")
+
+
+class ReadIn(BaseModel):
+    prompt_id: int = Field(description="read the film once more by this prompt, beside the readings it already has")
+
+
+class PromptOut(BaseModel):
+    id: int
+    name: str
+    seeded: bool = Field(description="the one that is always there: it can be edited and never deleted")
+    version: int
+    body: str
+    created_at: datetime
+    updated_at: datetime
+    channels: list[str] = Field(description="the channels whose new films it reads")
+    topics: list[str] = Field(description="the topics whose new films it reads")
+
+    @classmethod
+    def of(cls, prompt: Prompt, channels: list[str], topics: list[str]) -> PromptOut:
+        return cls(
+            id=prompt.id,
+            name=prompt.name,
+            seeded=prompt.seeded,
+            version=prompt.version,
+            body=prompt.body,
+            created_at=prompt.created_at,
+            updated_at=prompt.updated_at,
+            channels=channels,
+            topics=topics,
+        )
+
+
+class PromptsOut(BaseModel):
+    prompts: list[PromptOut]
+    max_chars: int = Field(description="how long a prompt's text may be")
+    ceiling: int = Field(description="how many prompts there may be")
+
+
+class PromptIn(BaseModel):
+    name: str
+    body: str
+
+
+class PromptPatch(BaseModel):
+    name: str | None = None
+    body: str | None = Field(default=None, description="new words make a new version")
 
 
 class QueuedOut(BaseModel):

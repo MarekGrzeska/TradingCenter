@@ -23,6 +23,7 @@ from .config import Settings
 from .ingest import Ingest
 from .providers import build as providers_build
 from .routers import meta, videos, watch
+from .routers import prompts as prompts_routes
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
 log = logging.getLogger(__name__)
@@ -115,6 +116,7 @@ def create_app() -> FastAPI:
     app.include_router(meta.router)
     app.include_router(videos.router)
     app.include_router(watch.router)
+    app.include_router(prompts_routes.router)
 
     server, tool_app = mcp_app.build_mcp_app(app)
     app.state.mcp_server = server

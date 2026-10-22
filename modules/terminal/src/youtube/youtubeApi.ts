@@ -12,35 +12,49 @@ import { jsonClient, statusMapper } from "../data/http";
 type Schemas = components["schemas"];
 
 export type FilmState = Schemas["VideoOut"]["state"];
-export type Sentiment = Schemas["InstrumentOut"]["sentiment"];
 
-export interface Instrument {
-  name: string;
-  epic: string | null;
-  sentiment: Sentiment;
-  /** How sure the *speaker* sounds, 1..5 — not how sure the model is. */
-  conviction: number;
-  horizon: Schemas["InstrumentOut"]["horizon"];
-}
-
-export interface Prediction {
-  instrument: string;
-  claim: string;
-  level: number | null;
-  by: string | null;
-}
-
-/** A model's reading of a film — a fact about what a model said, never shown without naming it. */
+/** A model's reading of a film, without its text — a fact about what a model said, never shown without naming the prompt. */
 export interface Reading {
+  promptId: number;
+  promptName: string;
+  /** Which version of the prompt made it; the prompt's words may have changed since. */
+  promptVersion: number;
   summary: string;
-  keyPoints: string[];
-  instruments: Instrument[];
-  predictions: Prediction[];
-  topics: string[];
   impactScore: number;
   model: string;
   analysedAt: Date;
   simulated: boolean;
+}
+
+/** The same with the text, laid out in Markdown as its prompt asked. Only a single film carries it. */
+export interface FullReading extends Reading {
+  text: string;
+}
+
+export interface FilmDetail {
+  film: Film;
+  /** The film's own prompt's reading first. */
+  readings: FullReading[];
+}
+
+export interface Prompt {
+  id: number;
+  name: string;
+  /** The one that is always there: it can be edited and never deleted. */
+  seeded: boolean;
+  version: number;
+  body: string;
+  createdAt: Date;
+  updatedAt: Date;
+  /** The channels and the topics whose new films it reads. */
+  channels: string[];
+  topics: string[];
+}
+
+export interface PromptsPage {
+  prompts: Prompt[];
+  maxChars: number;
+  ceiling: number;
 }
 
 export interface Film {
@@ -58,7 +72,9 @@ export interface Film {
   nextAttemptAt: Date | null;
   /** Comes from the simulation: the film does not exist. */
   simulated: boolean;
-  /** `null` until a model has read it — never a zero: unread and unimportant are different facts. */
+  /** The prompt this film is read by. */
+  promptId: number;
+  /** By the film's own prompt; `null` until a model has read it — never a zero: unread and unimportant are different facts. */
   reading: Reading | null;
 }
 
@@ -87,6 +103,7 @@ export interface Channel {
   handle: string | null;
   active: boolean;
   addedBy: "operator" | "agent";
+  promptId: number;
   lastDiscoveryAt: Date | null;
 }
 
@@ -98,6 +115,7 @@ export interface Topic {
   maxVideosPerRun: number;
   active: boolean;
   addedBy: "operator" | "agent";
+  promptId: number;
   lastRunAt: Date | null;
 }
 
@@ -139,6 +157,8 @@ export interface TopicRequest {
   language?: string;
   intervalMinutes?: number;
   maxVideosPerRun?: number;
+  /** Absent takes the seeded prompt. */
+  promptId?: number;
 }
 
 export interface TopicResult {
@@ -152,24 +172,12 @@ function optionalDate(raw: string | null | undefined): Date | null {
   return raw ? new Date(raw) : null;
 }
 
-function mapReading(raw: Schemas["ReadingOut"]): Reading {
+function mapReading(raw: Schemas["ReadingSummary"]): Reading {
   return {
+    promptId: raw.prompt_id,
+    promptName: raw.prompt_name,
+    promptVersion: raw.prompt_version,
     summary: raw.summary_pl,
-    keyPoints: raw.key_points,
-    instruments: raw.instruments.map((view) => ({
-      name: view.name,
-      epic: view.epic ?? null,
-      sentiment: view.sentiment,
-      conviction: view.conviction,
-      horizon: view.horizon,
-    })),
-    predictions: raw.predictions.map((p) => ({
-      instrument: p.instrument,
-      claim: p.claim,
-      level: p.level ?? null,
-      by: p.by ?? null,
-    })),
-    topics: raw.topics,
     impactScore: raw.impact_score,
     model: raw.model,
     analysedAt: new Date(raw.analysed_at),
@@ -192,7 +200,22 @@ function mapFilm(raw: Schemas["VideoOut"]): Film {
     attempts: raw.attempts,
     nextAttemptAt: optionalDate(raw.next_attempt_at),
     simulated: raw.simulated,
+    promptId: raw.prompt_id,
     reading: raw.reading ? mapReading(raw.reading) : null,
+  };
+}
+
+function mapPrompt(raw: Schemas["PromptOut"]): Prompt {
+  return {
+    id: raw.id,
+    name: raw.name,
+    seeded: raw.seeded,
+    version: raw.version,
+    body: raw.body,
+    createdAt: new Date(raw.created_at),
+    updatedAt: new Date(raw.updated_at),
+    channels: raw.channels,
+    topics: raw.topics,
   };
 }
 
@@ -203,6 +226,7 @@ function mapChannel(raw: Schemas["ChannelOut"]): Channel {
     handle: raw.handle ?? null,
     active: raw.active,
     addedBy: raw.added_by,
+    promptId: raw.prompt_id,
     lastDiscoveryAt: optionalDate(raw.last_discovery_at),
   };
 }
@@ -216,6 +240,7 @@ function mapTopic(raw: Schemas["TopicOut"]): Topic {
     maxVideosPerRun: raw.max_videos_per_run,
     active: raw.active,
     addedBy: raw.added_by,
+    promptId: raw.prompt_id,
     lastRunAt: optionalDate(raw.last_run_at),
   };
 }
@@ -250,10 +275,10 @@ export interface YoutubeApi {
   state(signal: AbortSignal): Promise<ArchiveState>;
   transcript(videoId: string, offset: number, signal: AbortSignal): Promise<TranscriptPage>;
   channels(signal: AbortSignal): Promise<{ channels: Channel[]; ceiling: number }>;
-  followChannel(reference: string, signal: AbortSignal): Promise<FollowResult>;
+  followChannel(reference: string, promptId: number | null, signal: AbortSignal): Promise<FollowResult>;
   setChannel(
     channelId: string,
-    patch: { active?: boolean },
+    patch: { active?: boolean; promptId?: number },
     signal: AbortSignal,
   ): Promise<Channel>;
   unfollowChannel(channelId: string, signal: AbortSignal): Promise<void>;
@@ -261,11 +286,22 @@ export interface YoutubeApi {
   addTopic(request: TopicRequest, signal: AbortSignal): Promise<TopicResult>;
   setTopic(
     id: number,
-    patch: { active?: boolean },
+    patch: { active?: boolean; promptId?: number },
     signal: AbortSignal,
   ): Promise<Topic>;
   removeTopic(id: number, signal: AbortSignal): Promise<void>;
-  analyse(reference: string, signal: AbortSignal): Promise<{ videoId: string; title: string; created: boolean }>;
+  analyse(
+    reference: string,
+    promptId: number | null,
+    signal: AbortSignal,
+  ): Promise<{ videoId: string; title: string; created: boolean }>;
+  film(videoId: string, signal: AbortSignal): Promise<FilmDetail>;
+  /** Reads a film already transcribed once more, by another prompt, in the background. */
+  readAgain(videoId: string, promptId: number, signal: AbortSignal): Promise<void>;
+  prompts(signal: AbortSignal): Promise<PromptsPage>;
+  createPrompt(request: { name: string; body: string }, signal: AbortSignal): Promise<Prompt>;
+  updatePrompt(id: number, patch: { name?: string; body?: string }, signal: AbortSignal): Promise<Prompt>;
+  deletePrompt(id: number, signal: AbortSignal): Promise<void>;
 }
 
 /** Characters of transcript per page: enough to read, small enough that a page is a request and not a download. */
@@ -311,9 +347,9 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
       return { channels: raw.channels.map(mapChannel), ceiling: raw.ceiling };
     },
 
-    async followChannel(reference, signal) {
+    async followChannel(reference, promptId, signal) {
       // The contract lists the defaulted fields as required in a request body, so they are said.
-      const body: Schemas["ChannelIn"] = { reference, language: "", profile: "market" };
+      const body: Schemas["ChannelIn"] = { reference, language: "", prompt_id: promptId };
       const raw = await http.json<Schemas["ChannelAddedOut"]>(`${httpBase}/channels`, {
         signal,
         method: "POST",
@@ -325,6 +361,7 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
     async setChannel(channelId, patch, signal) {
       const body: Schemas["ChannelPatch"] = {
         ...(patch.active === undefined ? {} : { active: patch.active }),
+        ...(patch.promptId === undefined ? {} : { prompt_id: patch.promptId }),
       };
       return mapChannel(
         await http.json<Schemas["ChannelOut"]>(`${httpBase}/channels/${encodeURIComponent(channelId)}`, {
@@ -350,7 +387,7 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
       const body: Schemas["TopicIn"] = {
         phrase: request.phrase,
         language: request.language ?? "",
-        profile: "market",
+        prompt_id: request.promptId ?? null,
         ...(request.intervalMinutes === undefined ? {} : { interval_minutes: request.intervalMinutes }),
         ...(request.maxVideosPerRun === undefined ? {} : { max_videos_per_run: request.maxVideosPerRun }),
       };
@@ -365,6 +402,7 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
     async setTopic(id, patch, signal) {
       const body: Schemas["TopicPatch"] = {
         ...(patch.active === undefined ? {} : { active: patch.active }),
+        ...(patch.promptId === undefined ? {} : { prompt_id: patch.promptId }),
       };
       return mapTopic(
         await http.json<Schemas["TopicOut"]>(`${httpBase}/topics/${id}`, { signal, method: "PATCH", body }),
@@ -375,10 +413,49 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
       await http.send(`${httpBase}/topics/${id}`, { signal, method: "DELETE" });
     },
 
-    async analyse(reference, signal) {
-      const body: Schemas["AnalyseIn"] = { reference };
+    async analyse(reference, promptId, signal) {
+      const body: Schemas["AnalyseIn"] = { reference, prompt_id: promptId };
       const raw = await http.json<Schemas["QueuedOut"]>(`${httpBase}/videos`, { signal, method: "POST", body });
       return { videoId: raw.video_id, title: raw.title, created: raw.created };
+    },
+
+    async film(videoId, signal) {
+      const raw = await http.json<Schemas["VideoDetailOut"]>(`${httpBase}/videos/${encodeURIComponent(videoId)}`, {
+        signal,
+      });
+      return {
+        film: mapFilm(raw),
+        readings: raw.readings.map((reading) => ({ ...mapReading(reading), text: reading.text })),
+      };
+    },
+
+    async readAgain(videoId, promptId, signal) {
+      const body: Schemas["ReadIn"] = { prompt_id: promptId };
+      await http.send(`${httpBase}/videos/${encodeURIComponent(videoId)}/readings`, { signal, method: "POST", body });
+    },
+
+    async prompts(signal) {
+      const raw = await http.json<Schemas["PromptsOut"]>(`${httpBase}/prompts`, { signal });
+      return { prompts: raw.prompts.map(mapPrompt), maxChars: raw.max_chars, ceiling: raw.ceiling };
+    },
+
+    async createPrompt(request, signal) {
+      const body: Schemas["PromptIn"] = { name: request.name, body: request.body };
+      return mapPrompt(await http.json<Schemas["PromptOut"]>(`${httpBase}/prompts`, { signal, method: "POST", body }));
+    },
+
+    async updatePrompt(id, patch, signal) {
+      const body: Schemas["PromptPatch"] = {
+        ...(patch.name === undefined ? {} : { name: patch.name }),
+        ...(patch.body === undefined ? {} : { body: patch.body }),
+      };
+      return mapPrompt(
+        await http.json<Schemas["PromptOut"]>(`${httpBase}/prompts/${id}`, { signal, method: "PATCH", body }),
+      );
+    },
+
+    async deletePrompt(id, signal) {
+      await http.send(`${httpBase}/prompts/${id}`, { signal, method: "DELETE" });
     },
   };
 }

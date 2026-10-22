@@ -20,12 +20,10 @@ afterAll(() => server.close());
 const signal = () => new AbortController().signal;
 
 const READING = {
-  profile: "market",
+  prompt_id: 1,
+  prompt_name: "Rynkowy",
+  prompt_version: 2,
   summary_pl: "Autor uważa, że złoto wzrośnie.",
-  key_points: ["banki kupują"],
-  instruments: [{ name: "Gold", epic: "GOLD", sentiment: "bullish", conviction: 4, horizon: "swing" }],
-  predictions: [{ instrument: "Gold", claim: "3000 USD", level: 3000, by: "2026-12-31" }],
-  topics: ["złoto"],
   impact_score: 6,
   model: "sim",
   analysed_at: "2026-09-27T10:05:00Z",
@@ -49,6 +47,7 @@ const FILM = {
   notified_at: null,
   discovered_at: "2026-09-27T09:00:00Z",
   simulated: true,
+  prompt_id: 1,
   reading: READING,
 };
 
@@ -71,13 +70,7 @@ describe("recentFilms", () => {
     expect(read.publishedAt).toEqual(new Date("2026-09-27T08:30:00Z"));
     expect(read.simulated).toBe(true);
     expect(read.reading?.summary).toBe("Autor uważa, że złoto wzrośnie.");
-    expect(read.reading?.instruments[0]).toEqual({
-      name: "Gold",
-      epic: "GOLD",
-      sentiment: "bullish",
-      conviction: 4,
-      horizon: "swing",
-    });
+    expect(read.reading).toMatchObject({ promptId: 1, promptName: "Rynkowy", promptVersion: 2, impactScore: 6 });
     expect(read.reading?.analysedAt).toEqual(new Date("2026-09-27T10:05:00Z"));
     // Not a zero and not an empty reading: unread and unimportant are different facts.
     expect(unread.reading).toBeNull();
@@ -97,8 +90,7 @@ describe("the watch list", () => {
             title: "Sim Złoto PL",
             handle: "@simzloto",
             language: "",
-            profile: "market",
-            alert_rule: "always",
+            prompt_id: 1,
             active: true,
             added_by: "operator",
             added_at: "2026-09-27T09:00:00Z",
@@ -109,9 +101,9 @@ describe("the watch list", () => {
       }),
     );
 
-    const result = await createYoutubeApi(BASE).followChannel("@simzloto", signal());
+    const result = await createYoutubeApi(BASE).followChannel("@simzloto", null, signal());
 
-    expect(seen).toEqual({ reference: "@simzloto", language: "", profile: "market" });
+    expect(seen).toEqual({ reference: "@simzloto", language: "", prompt_id: null });
     expect(result.created).toBe(false);
     expect(result.channel.lastDiscoveryAt).toBeNull();
   });
@@ -129,10 +121,56 @@ describe("the watch list", () => {
       ),
     );
 
-    await expect(createYoutubeApi(BASE).followChannel("@x", signal())).rejects.toMatchObject({
+    await expect(createYoutubeApi(BASE).followChannel("@x", null, signal())).rejects.toMatchObject({
       kind: "refused",
       message: expect.stringContaining("the watch list holds 100 channels"),
     });
+  });
+});
+
+describe("prompts", () => {
+  const PROMPT = {
+    id: 3,
+    name: "Technical",
+    seeded: false,
+    version: 2,
+    body: "Levels only.",
+    created_at: "2026-10-22T09:00:00Z",
+    updated_at: "2026-10-22T10:00:00Z",
+    channels: ["Sim Złoto PL"],
+    topics: [],
+  };
+
+  it("maps a prompt with who reads by it, and sends only what changed", async () => {
+    let seen: unknown;
+    server.use(
+      http.get(`${BASE}/prompts`, () => HttpResponse.json({ prompts: [PROMPT], max_chars: 8000, ceiling: 50 })),
+      http.patch(`${BASE}/prompts/3`, async ({ request }) => {
+        seen = await request.json();
+        return HttpResponse.json(PROMPT);
+      }),
+    );
+    const api = createYoutubeApi(BASE);
+
+    const page = await api.prompts(signal());
+    await api.updatePrompt(3, { body: "Levels and volume." }, signal());
+
+    expect(page.prompts[0]).toMatchObject({ id: 3, version: 2, channels: ["Sim Złoto PL"] });
+    expect(page.prompts[0].updatedAt).toEqual(new Date("2026-10-22T10:00:00Z"));
+    expect(seen).toEqual({ body: "Levels and volume." });
+  });
+
+  it("maps a film's readings with their text, the film's own prompt's first", async () => {
+    server.use(
+      http.get(`${BASE}/videos/simfilm0001`, () =>
+        HttpResponse.json({ ...FILM, readings: [{ ...READING, text: "## Tezy\n- złoto rośnie" }] }),
+      ),
+    );
+
+    const detail = await createYoutubeApi(BASE).film("simfilm0001", signal());
+
+    expect(detail.film.promptId).toBe(1);
+    expect(detail.readings[0]).toMatchObject({ promptName: "Rynkowy", text: "## Tezy\n- złoto rośnie" });
   });
 });
 

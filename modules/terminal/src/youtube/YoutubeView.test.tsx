@@ -4,19 +4,18 @@ import { describe, expect, it, vi } from "vitest";
 import { queryClient } from "../data/query";
 import { MarketDataError } from "../data/types";
 import { YoutubeView } from "./YoutubeView";
-import type { ArchiveState, Channel, Film, FilmsPage, Reading, YoutubeApi } from "./youtubeApi";
+import type { ArchiveState, Channel, Film, FilmsPage, Prompt, Reading, YoutubeApi } from "./youtubeApi";
 
 /**
- * The tab from the operator's seat: that a film shows its score and what was said about each instrument, that an unread film
+ * The tab from the operator's seat: that a film shows its score and summary and, opened, each reading under its prompt, that an unread film
  * says where it is instead of a number, that the screen says why a list is thin, and that adding to the list refuses out loud.
  */
 
 const READING: Reading = {
+  promptId: 1,
+  promptName: "Rynkowy",
+  promptVersion: 1,
   summary: "Autor uważa, że złoto wzrośnie.",
-  keyPoints: ["banki kupują złoto"],
-  instruments: [{ name: "Gold", epic: "GOLD", sentiment: "bullish", conviction: 4, horizon: "swing" }],
-  predictions: [{ instrument: "Gold", claim: "dochodzi do 3000", level: 3000, by: "2026-12-31" }],
-  topics: ["złoto"],
   impactScore: 6,
   model: "sim",
   analysedAt: new Date("2026-09-27T10:05:00Z"),
@@ -38,6 +37,7 @@ function film(overrides: Partial<Film> = {}): Film {
     attempts: 0,
     nextAttemptAt: null,
     simulated: false,
+    promptId: 1,
     reading: READING,
     ...overrides,
   };
@@ -62,8 +62,22 @@ const CHANNEL: Channel = {
   handle: "@simzloto",
   active: true,
   addedBy: "operator",
+  promptId: 1,
   lastDiscoveryAt: null,
 };
+
+const SEEDED: Prompt = {
+  id: 1,
+  name: "Rynkowy",
+  seeded: true,
+  version: 1,
+  body: "Streszcz film dla tradera.",
+  createdAt: new Date("2026-10-22T09:00:00Z"),
+  updatedAt: new Date("2026-10-22T09:00:00Z"),
+  channels: ["Sim Złoto PL"],
+  topics: [],
+};
+const TECHNICAL: Prompt = { ...SEEDED, id: 2, name: "Technical", seeded: false, body: "Levels only.", channels: [] };
 
 function api(films: Film[], overrides: Partial<YoutubeApi> = {}): YoutubeApi {
   const page: FilmsPage = {
@@ -84,23 +98,33 @@ function api(films: Film[], overrides: Partial<YoutubeApi> = {}): YoutubeApi {
     setTopic: vi.fn(),
     removeTopic: vi.fn(),
     analyse: vi.fn(),
+    film: vi.fn(async () => ({
+      film: film(),
+      readings: [{ ...READING, text: "## Główne tezy\n- banki kupują złoto\n\n## Prognozy\n- Gold: dochodzi do 3000" }],
+    })),
+    readAgain: vi.fn(async () => undefined),
+    prompts: vi.fn(async () => ({ prompts: [SEEDED, TECHNICAL], maxChars: 8000, ceiling: 50 })),
+    createPrompt: vi.fn(),
+    updatePrompt: vi.fn(),
+    deletePrompt: vi.fn(async () => undefined),
     ...overrides,
   };
 }
 
 describe("YoutubeView", () => {
-  it("shows a read film with its score and a direction per instrument, and its words a fold away", async () => {
+  it("shows a read film with its score and summary, and the reading under its prompt a fold away", async () => {
     render(<YoutubeView api={api([film()])} />);
 
     expect(await screen.findByText("Złoto do 3000?")).toBeInTheDocument();
     expect(screen.getByText("6/10")).toBeInTheDocument();
-    expect(screen.getByText(/Gold ▲ 4\/5/)).toBeInTheDocument();
+    expect(screen.getByText("Autor uważa, że złoto wzrośnie.")).toBeInTheDocument();
     expect(screen.queryByText("banki kupują złoto")).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Złoto do 3000\?/ }));
 
-    expect(screen.getByText("banki kupują złoto")).toBeInTheDocument();
+    expect(await screen.findByText("banki kupują złoto")).toBeInTheDocument();
     expect(screen.getByText(/dochodzi do 3000/)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Rynkowy/ })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /obejrzyj na YouTube/ })).toHaveAttribute(
       "href",
       "https://www.youtube.com/watch?v=v1",
@@ -191,7 +215,7 @@ describe("YoutubeView", () => {
     await userEvent.click(screen.getByRole("button", { name: "Obserwuj" }));
 
     expect(await screen.findByText(/which is its ceiling/)).toBeInTheDocument();
-    expect(followChannel).toHaveBeenCalledWith("@zapelniony", expect.anything());
+    expect(followChannel).toHaveBeenCalledWith("@zapelniony", null, expect.anything());
   });
 
   it("takes a channel off only after asking, and says its films stay", async () => {
@@ -206,5 +230,30 @@ describe("YoutubeView", () => {
     await userEvent.click(screen.getAllByRole("button", { name: "Zdejmij" }).at(-1)!);
 
     expect(client.unfollowChannel).toHaveBeenCalledWith("UC1", expect.anything());
+  });
+
+  it("orders another prompt's reading of a film and says it was accepted", async () => {
+    const client = api([film()]);
+    render(<YoutubeView api={client} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Złoto do 3000\?/ }));
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: /Odczytaj innym promptem/ }), "Technical");
+    await userEvent.click(screen.getByRole("button", { name: "Zamów" }));
+
+    expect(client.readAgain).toHaveBeenCalledWith("v1", 2, expect.anything());
+    expect(await screen.findByText(/Przyjęte — odczyt powstaje w tle/)).toBeInTheDocument();
+  });
+
+  it("follows a channel by the prompt chosen in the dialog", async () => {
+    const followChannel = vi.fn(async () => ({ channel: CHANNEL, created: true }));
+    render(<YoutubeView api={api([], { followChannel })} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Kanały" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Obserwuj kanał" }));
+    await userEvent.type(screen.getByPlaceholderText(/@nazwa/), "@nowy");
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Prompt" }), "Technical");
+    await userEvent.click(screen.getByRole("button", { name: "Obserwuj" }));
+
+    expect(followChannel).toHaveBeenCalledWith("@nowy", 2, expect.anything());
   });
 });

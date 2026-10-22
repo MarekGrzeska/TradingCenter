@@ -56,6 +56,8 @@ const COMPONENTS = {
   ),
   hr: () => <hr className="my-2 border-border" />,
   a: SafeLink,
+  // A model that read a stranger's text could write an image whose address carries something out; no image is fetched.
+  img: ({ alt }: { alt?: string }) => <span className="text-ink-muted">{alt}</span>,
   // A table in a 460px column overflows whatever its content is, so it scrolls in its own box rather than
   // widening the bubble. The system prompt asks the model not to write them; this is what happens anyway.
   table: ({ children }: { children?: ReactNode }) => (

@@ -3,6 +3,8 @@ import { Button } from "../ui/Button";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { messageOf, useRead } from "../data/query";
 import { AddTopicDialog, FollowChannelDialog, RemoveDialog } from "./dialogs";
+import { PromptSelect } from "./PromptSelect";
+import { usePrompts } from "./usePrompts";
 import type { Channel, Topic, YoutubeApi } from "./youtubeApi";
 
 /**
@@ -28,11 +30,12 @@ export function ChannelsPanel({ client, onChanged }: { client: YoutubeApi; onCha
     fallbackMessage: "nie udało się wczytać kanałów",
     pollMs: POLL_MS,
   });
+  const prompts = usePrompts(client).value.prompts;
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<Channel | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
-  async function change(channel: Channel, patch: { active?: boolean }) {
+  async function change(channel: Channel, patch: { active?: boolean; promptId?: number }) {
     setFailure(null);
     try {
       await client.setChannel(channel.channelId, patch, new AbortController().signal);
@@ -73,6 +76,14 @@ export function ChannelsPanel({ client, onChanged }: { client: YoutubeApi; onCha
                 ostatnio sprawdzony: {channel.lastDiscoveryAt?.toLocaleString("pl-PL") ?? "jeszcze nie"}
               </span>
             </span>
+            <PromptSelect
+              label={`Prompt kanału ${channel.title}`}
+              prompts={prompts}
+              value={prompts.find((p) => p.seeded)?.id === channel.promptId ? null : channel.promptId}
+              onChange={(id) => void change(channel, { promptId: id ?? prompts.find((p) => p.seeded)?.id })}
+              className="rounded border border-border bg-sunken px-1 py-0.5 text-xs text-ink"
+              disabled={prompts.length === 0}
+            />
             <Button size="xs" tone="muted" onClick={() => void change(channel, { active: !channel.active })}>
               {channel.active ? "Wstrzymaj" : "Wznów"}
             </Button>
@@ -117,11 +128,12 @@ export function TopicsPanel({ client, onChanged }: { client: YoutubeApi; onChang
     fallbackMessage: "nie udało się wczytać tematów",
     pollMs: POLL_MS,
   });
+  const prompts = usePrompts(client).value.prompts;
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<Topic | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
-  async function change(topic: Topic, patch: { active?: boolean }) {
+  async function change(topic: Topic, patch: { active?: boolean; promptId?: number }) {
     setFailure(null);
     try {
       await client.setTopic(topic.id, patch, new AbortController().signal);
@@ -158,6 +170,14 @@ export function TopicsPanel({ client, onChanged }: { client: YoutubeApi; onChang
                 {topic.lastRunAt?.toLocaleString("pl-PL") ?? "jeszcze nie szukano"}
               </span>
             </span>
+            <PromptSelect
+              label={`Prompt tematu ${topic.phrase}`}
+              prompts={prompts}
+              value={prompts.find((p) => p.seeded)?.id === topic.promptId ? null : topic.promptId}
+              onChange={(id) => void change(topic, { promptId: id ?? prompts.find((p) => p.seeded)?.id })}
+              className="rounded border border-border bg-sunken px-1 py-0.5 text-xs text-ink"
+              disabled={prompts.length === 0}
+            />
             <Button size="xs" tone="muted" onClick={() => void change(topic, { active: !topic.active })}>
               {topic.active ? "Wstrzymaj" : "Wznów"}
             </Button>

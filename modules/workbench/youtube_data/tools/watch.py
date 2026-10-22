@@ -95,15 +95,18 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         ]
 
     @mcp.tool(annotations=ADDS)
-    async def follow_channel(reference: str) -> Followed | dict:
+    async def follow_channel(reference: str, prompt: str | None = None) -> Followed | dict:
         """Follow a channel by its `@handle`, its id (UC…) or its address. New films are found, transcribed and read.
+
+        `prompt` is the name of one of the prompts `youtube_archive_status` lists; without it the seeded one reads. Only the
+        operator writes prompts.
 
         Who is told about its films is the operator's rule, set on their screen. Following a channel already followed
         changes nothing about it. Cannot remove a channel — ask the operator.
         """
         try:
             followed = await watchlist.follow_channel(
-                ctx.pool, ctx.providers.source, ctx.settings, reference, added_by="agent"
+                ctx.pool, ctx.providers.source, ctx.settings, reference, added_by="agent", prompt=prompt
             )
         except WatchlistRefused as err:
             return refused(str(err), ASK_THE_OPERATOR)
@@ -115,11 +118,13 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         language: str = "",
         interval_minutes: int | None = None,
         max_videos_per_run: int | None = None,
+        prompt: str | None = None,
     ) -> TopicAdded | dict:
         """Keep searching YouTube for a phrase, and read the new films it turns up. Each search spends the source's day, so
         leave the limits empty unless there is a reason: the answer says which came from the settings.
 
-        Topics wait where the source cannot search — `youtube_archive_status` says so. Cannot remove a topic.
+        `prompt` names the prompt that reads its films, as in follow_channel. Topics wait where the source cannot search —
+        `youtube_archive_status` says so. Cannot remove a topic.
         """
         try:
             added = await watchlist.add_topic(
@@ -130,6 +135,7 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
                 language=language,
                 interval_minutes=interval_minutes,
                 max_videos_per_run=max_videos_per_run,
+                prompt=prompt,
             )
         except WatchlistRefused as err:
             return refused(str(err), ASK_THE_OPERATOR)
@@ -140,12 +146,14 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         )
 
     @mcp.tool(annotations=ADDS)
-    async def analyse_video(reference: str) -> Queued | dict:
+    async def analyse_video(reference: str, prompt: str | None = None) -> Queued | dict:
         """Have one film, named by its address or id, transcribed and read now, in the background and ahead of the queue.
         Costs what asking the source about it costs — a unit of the day, not a search — and then what the transcript and
-        the reading cost. Whoever asked is not alerted: they are already looking. Ask read_video a little later."""
+        the reading cost. Whoever asked is not alerted: they are already looking. Ask read_video a little later.
+
+        `prompt` names the prompt that reads a film new to the archive, as in follow_channel; a film already here keeps its own."""
         try:
-            queued = await watchlist.analyse_film(ctx.pool, ctx.providers, ctx.settings, reference)
+            queued = await watchlist.analyse_film(ctx.pool, ctx.providers, ctx.settings, reference, prompt=prompt)
         except WatchlistRefused as err:
             return refused(str(err), "search_youtube finds films by phrase, and recent_videos lists what is here")
         ingest = getattr(ctx.app.state, "ingest", None)  # pyright: ignore[reportAttributeAccessIssue]

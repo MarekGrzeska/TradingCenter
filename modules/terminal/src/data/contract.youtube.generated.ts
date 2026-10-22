@@ -114,6 +114,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/prompts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Prompts */
+        get: operations["list_prompts_prompts_get"];
+        put?: never;
+        /** Create Prompt */
+        post: operations["create_prompt_prompts_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/prompts/{prompt_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Prompt
+         * @description Refused for the seeded prompt and for one a channel or a topic still reads by. The readings it made stay.
+         */
+        delete: operations["delete_prompt_prompts__prompt_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Patch Prompt
+         * @description New words make a new version; the readings the old ones made keep saying which version that was.
+         */
+        patch: operations["patch_prompt_prompts__prompt_id__patch"];
+        trace?: never;
+    };
     "/state": {
         parameters: {
             query?: never;
@@ -215,6 +257,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/videos/{video_id}/readings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Read Again
+         * @description Read a film already transcribed once more, by another prompt, in the background. Asks Gemini for nothing; spends the
+         *     day's tokens like any reading, and leaves the film where it is.
+         */
+        post: operations["read_again_videos__video_id__readings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/videos/{video_id}/transcript": {
         parameters: {
             query?: never;
@@ -242,6 +305,11 @@ export interface components {
         /** AnalyseIn */
         AnalyseIn: {
             /**
+             * Prompt Id
+             * @description the prompt to read it by; null takes the seeded one
+             */
+            prompt_id?: number | null;
+            /**
              * Reference
              * @description a YouTube film address or id
              */
@@ -264,10 +332,10 @@ export interface components {
              */
             language: string;
             /**
-             * Profile
-             * @default market
+             * Prompt Id
+             * @description null takes the seeded prompt
              */
-            profile: string;
+            prompt_id?: number | null;
             /**
              * Reference
              * @description a channel id (UC…), an @handle, or a youtube.com channel address
@@ -296,8 +364,8 @@ export interface components {
             language: string;
             /** Last Discovery At */
             last_discovery_at: string | null;
-            /** Profile */
-            profile: string;
+            /** Prompt Id */
+            prompt_id: number;
             /** Title */
             title: string;
         };
@@ -308,8 +376,11 @@ export interface components {
              * @description false pauses discovery without taking anything off
              */
             active?: boolean | null;
-            /** Profile */
-            profile?: string | null;
+            /**
+             * Prompt Id
+             * @description read the channel's films from now on by this prompt
+             */
+            prompt_id?: number | null;
         };
         /** ChannelsOut */
         ChannelsOut: {
@@ -325,31 +396,6 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail: components["schemas"]["ValidationError"][];
-        };
-        /** InstrumentOut */
-        InstrumentOut: {
-            /**
-             * Conviction
-             * @description how sure the speaker sounds, 1..5 — not how sure the model is
-             */
-            conviction: number;
-            /**
-             * Epic
-             * @description a ticker or epic, only where the speaker gave or implied one
-             */
-            epic: string | null;
-            /**
-             * Horizon
-             * @enum {string}
-             */
-            horizon: "intraday" | "swing" | "long";
-            /** Name */
-            name: string;
-            /**
-             * Sentiment
-             * @enum {string}
-             */
-            sentiment: "bullish" | "bearish" | "neutral";
         };
         /** LoopOut */
         LoopOut: {
@@ -367,17 +413,6 @@ export interface components {
             passes_late: number;
             /** Ran */
             ran: boolean;
-        };
-        /** PredictionOut */
-        PredictionOut: {
-            /** By */
-            by: string | null;
-            /** Claim */
-            claim: string;
-            /** Instrument */
-            instrument: string;
-            /** Level */
-            level: number | null;
         };
         /**
          * Problem
@@ -397,6 +432,74 @@ export interface components {
              * @default false
              */
             retryable: boolean;
+        };
+        /** PromptIn */
+        PromptIn: {
+            /** Body */
+            body: string;
+            /** Name */
+            name: string;
+        };
+        /** PromptOut */
+        PromptOut: {
+            /** Body */
+            body: string;
+            /**
+             * Channels
+             * @description the channels whose new films it reads
+             */
+            channels: string[];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /**
+             * Seeded
+             * @description the one that is always there: it can be edited and never deleted
+             */
+            seeded: boolean;
+            /**
+             * Topics
+             * @description the topics whose new films it reads
+             */
+            topics: string[];
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /** Version */
+            version: number;
+        };
+        /** PromptPatch */
+        PromptPatch: {
+            /**
+             * Body
+             * @description new words make a new version
+             */
+            body?: string | null;
+            /** Name */
+            name?: string | null;
+        };
+        /** PromptsOut */
+        PromptsOut: {
+            /**
+             * Ceiling
+             * @description how many prompts there may be
+             */
+            ceiling: number;
+            /**
+             * Max Chars
+             * @description how long a prompt's text may be
+             */
+            max_chars: number;
+            /** Prompts */
+            prompts: components["schemas"]["PromptOut"][];
         };
         /** ProviderOut */
         ProviderOut: {
@@ -446,10 +549,15 @@ export interface components {
             /** Video Id */
             video_id: string;
         };
-        /**
-         * ReadingOut
-         * @description A model's reading of one film — a fact about what a model said, never published without naming it.
-         */
+        /** ReadIn */
+        ReadIn: {
+            /**
+             * Prompt Id
+             * @description read the film once more by this prompt, beside the readings it already has
+             */
+            prompt_id: number;
+        };
+        /** ReadingOut */
         ReadingOut: {
             /**
              * Analysed At
@@ -461,16 +569,17 @@ export interface components {
              * @description what a model made of this film's market impact, 1..10 — 1 is commentary with nothing new, 10 a global event
              */
             impact_score: number;
-            /** Instruments */
-            instruments: components["schemas"]["InstrumentOut"][];
-            /** Key Points */
-            key_points: string[];
             /** Model */
             model: string;
-            /** Predictions */
-            predictions: components["schemas"]["PredictionOut"][];
-            /** Profile */
-            profile: string;
+            /** Prompt Id */
+            prompt_id: number;
+            /** Prompt Name */
+            prompt_name: string;
+            /**
+             * Prompt Version
+             * @description which version of the prompt it was; the prompt's words may have changed since
+             */
+            prompt_version: number;
             /**
              * Simulated
              * @description produced by the simulation, about a film that does not exist
@@ -478,8 +587,46 @@ export interface components {
             simulated: boolean;
             /** Summary Pl */
             summary_pl: string;
-            /** Topics */
-            topics: string[];
+            /**
+             * Text
+             * @description the reading, in Markdown, laid out as its prompt asked
+             */
+            text: string;
+        };
+        /**
+         * ReadingSummary
+         * @description A model's reading of one film, without its text — a fact about what a model said, never published without naming
+         *     the model and the prompt that made it.
+         */
+        ReadingSummary: {
+            /**
+             * Analysed At
+             * Format: date-time
+             */
+            analysed_at: string;
+            /**
+             * Impact Score
+             * @description what a model made of this film's market impact, 1..10 — 1 is commentary with nothing new, 10 a global event
+             */
+            impact_score: number;
+            /** Model */
+            model: string;
+            /** Prompt Id */
+            prompt_id: number;
+            /** Prompt Name */
+            prompt_name: string;
+            /**
+             * Prompt Version
+             * @description which version of the prompt it was; the prompt's words may have changed since
+             */
+            prompt_version: number;
+            /**
+             * Simulated
+             * @description produced by the simulation, about a film that does not exist
+             */
+            simulated: boolean;
+            /** Summary Pl */
+            summary_pl: string;
         };
         /**
          * StateOut
@@ -568,10 +715,10 @@ export interface components {
             /** Phrase */
             phrase: string;
             /**
-             * Profile
-             * @default market
+             * Prompt Id
+             * @description null takes the seeded prompt
              */
-            profile: string;
+            prompt_id?: number | null;
         };
         /** TopicOut */
         TopicOut: {
@@ -599,13 +746,18 @@ export interface components {
             max_videos_per_run: number;
             /** Phrase */
             phrase: string;
-            /** Profile */
-            profile: string;
+            /** Prompt Id */
+            prompt_id: number;
         };
         /** TopicPatch */
         TopicPatch: {
             /** Active */
             active?: boolean | null;
+            /**
+             * Prompt Id
+             * @description read the topic's films from now on by this prompt
+             */
+            prompt_id?: number | null;
         };
         /** TopicsOut */
         TopicsOut: {
@@ -659,6 +811,81 @@ export interface components {
             /** Error Type */
             type: string;
         };
+        /**
+         * VideoDetailOut
+         * @description One film with every reading it has, the film's own prompt's first, each with its whole text.
+         */
+        VideoDetailOut: {
+            /**
+             * Attempts
+             * @description how many times a transcript was asked for and turned out not to exist
+             */
+            attempts: number;
+            /** Channel Id */
+            channel_id: string | null;
+            /** Channel Title */
+            channel_title: string;
+            /**
+             * Discovered At
+             * Format: date-time
+             */
+            discovered_at: string;
+            /**
+             * Duration Seconds
+             * @description null where the source cannot say — a feed does not
+             */
+            duration_seconds: number | null;
+            /**
+             * Live Status
+             * @enum {string}
+             */
+            live_status: "none" | "live" | "upcoming";
+            /** Next Attempt At */
+            next_attempt_at: string | null;
+            /** Notified At */
+            notified_at: string | null;
+            /**
+             * Origins
+             * @description the doors it came in by: channel:UC…, topic:7, manual
+             */
+            origins: string[];
+            /**
+             * Prompt Id
+             * @description the prompt this film is read by; a reading by another prompt is ordered by hand
+             */
+            prompt_id: number;
+            /**
+             * Published At
+             * Format: date-time
+             */
+            published_at: string;
+            /** @description the reading by the film's own prompt, without its text; null until a model has read it */
+            reading: components["schemas"]["ReadingSummary"] | null;
+            /**
+             * Readings
+             * @description empty until a model has read it
+             */
+            readings: components["schemas"]["ReadingOut"][];
+            /** Simulated */
+            simulated: boolean;
+            /** Skip Reason */
+            skip_reason: string | null;
+            /**
+             * State
+             * @description where the film is on its road; `gave_up` and `skipped` are never picked up again
+             * @enum {string}
+             */
+            state: "discovered" | "no_transcript" | "transcribed" | "analysed" | "notified" | "quiet" | "gave_up" | "skipped";
+            /** Title */
+            title: string;
+            /**
+             * Url
+             * @description where to watch it — shown wherever YouTube's data is, as its terms require
+             */
+            url: string;
+            /** Video Id */
+            video_id: string;
+        };
         /** VideoOut */
         VideoOut: {
             /**
@@ -695,12 +922,17 @@ export interface components {
              */
             origins: string[];
             /**
+             * Prompt Id
+             * @description the prompt this film is read by; a reading by another prompt is ordered by hand
+             */
+            prompt_id: number;
+            /**
              * Published At
              * Format: date-time
              */
             published_at: string;
-            /** @description null until a model has read it */
-            reading: components["schemas"]["ReadingOut"] | null;
+            /** @description the reading by the film's own prompt, without its text; null until a model has read it */
+            reading: components["schemas"]["ReadingSummary"] | null;
             /** Simulated */
             simulated: boolean;
             /** Skip Reason */
@@ -951,6 +1183,141 @@ export interface operations {
             };
         };
     };
+    list_prompts_prompts_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptsOut"];
+                };
+            };
+        };
+    };
+    create_prompt_prompts_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromptIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptOut"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    delete_prompt_prompts__prompt_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                prompt_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    patch_prompt_prompts__prompt_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                prompt_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromptPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PromptOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     state_state_get: {
         parameters: {
             query?: never;
@@ -1114,8 +1481,6 @@ export interface operations {
                 until?: string | null;
                 channel_id?: string | null;
                 topic_id?: number | null;
-                /** @description a name or ticker a reading mentions */
-                instrument?: string | null;
                 min_score?: number | null;
                 state?: string | null;
                 limit?: number;
@@ -1196,7 +1561,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["VideoOut"];
+                    "application/json": components["schemas"]["VideoDetailOut"];
                 };
             };
             /** @description Not Found */
@@ -1215,6 +1580,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_again_videos__video_id__readings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                video_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReadIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueuedOut"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
         };

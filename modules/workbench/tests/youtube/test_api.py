@@ -57,14 +57,12 @@ async def test_a_read_film_reaches_the_wire_with_its_reading_and_an_unread_one_w
     assert all("transcript" not in film and "content" not in film for film in body["videos"])
 
 
-async def test_a_list_can_be_narrowed_by_what_a_reading_says(api, rig) -> None:
+async def test_a_list_can_be_narrowed_by_score_and_channel(api, rig) -> None:
     await followed_and_read(api, rig, GOLD, MARKETS)
 
-    by_instrument = (await api.get("/videos", params={"instrument": "GOLD"})).json()["videos"]
     by_score = (await api.get("/videos", params={"min_score": 6})).json()["videos"]
     by_channel = (await api.get("/videos", params={"channel_id": MARKETS})).json()["videos"]
 
-    assert [film["video_id"] for film in by_instrument] == ["simfilm0001"]
     assert {film["video_id"] for film in by_score} == {"simfilm0001"}
     assert {film["channel_id"] for film in by_channel} == {MARKETS}
 
@@ -185,3 +183,70 @@ async def test_a_loop_that_has_stopped_is_called_stale_and_a_failed_pass_is_not_
     app.state.heartbeats = type("H", (), {"__getitem__": lambda self, name: LoopHeartbeat(name, expected_seconds=1800, started=started)})()
     stale = await state()
     assert stale["stale"] is True and stale["loop"]["ran"] is False and stale["loop"]["passes_late"] > 3
+
+
+# --- prompts --------------------------------------------------------------------------------------------------------
+
+
+async def test_the_operator_writes_edits_and_deletes_prompts_and_the_wire_says_why_not(api) -> None:
+    created = await api.post("/prompts", json={"name": "Technical", "body": "Levels only."})
+    prompt = created.json()
+    again = await api.post("/prompts", json={"name": "technical", "body": "x"})
+    patched = await api.patch(f"/prompts/{prompt['id']}", json={"body": "Levels and volume."})
+    seeded = next(p for p in (await api.get("/prompts")).json()["prompts"] if p["seeded"])
+    refused = await api.delete(f"/prompts/{seeded['id']}")
+
+    assert created.status_code == 201 and prompt["version"] == 1 and prompt["channels"] == []
+    assert again.status_code == 422 and "already exists" in again.json()["detail"]["detail"]
+    assert patched.json()["version"] == 2
+    assert refused.status_code == 422 and "cannot be deleted" in refused.json()["detail"]["detail"]
+    assert (await api.delete(f"/prompts/{prompt['id']}")).status_code == 204
+    assert (await api.delete(f"/prompts/{prompt['id']}")).status_code == 404
+
+
+async def test_a_prompt_says_which_channels_read_by_it_and_cannot_be_deleted_while_one_does(api) -> None:
+    prompt = (await api.post("/prompts", json={"name": "Technical", "body": "Levels only."})).json()
+    followed = await api.post("/channels", json={"reference": GOLD, "prompt_id": prompt["id"]})
+
+    listed = {p["id"]: p for p in (await api.get("/prompts")).json()["prompts"]}
+    refused = await api.delete(f"/prompts/{prompt['id']}")
+
+    assert followed.json()["channel"]["prompt_id"] == prompt["id"]
+    assert listed[prompt["id"]]["channels"] == [followed.json()["channel"]["title"]]
+    assert refused.status_code == 422 and followed.json()["channel"]["title"] in refused.json()["detail"]["detail"]
+
+
+async def test_a_channel_and_a_topic_change_their_prompt_and_an_unknown_one_is_refused(api) -> None:
+    prompt = (await api.post("/prompts", json={"name": "Technical", "body": "Levels only."})).json()
+    await api.post("/channels", json={"reference": GOLD})
+    topic = (await api.post("/topics", json={"phrase": "gold"})).json()["topic"]
+
+    channel = await api.patch(f"/channels/{GOLD}", json={"prompt_id": prompt["id"]})
+    moved = await api.patch(f"/topics/{topic['id']}", json={"prompt_id": prompt["id"]})
+    unknown = await api.patch(f"/channels/{GOLD}", json={"prompt_id": 99_999})
+
+    assert channel.json()["prompt_id"] == moved.json()["prompt_id"] == prompt["id"]
+    assert unknown.status_code == 422 and "no prompt" in unknown.json()["detail"]["detail"]
+
+
+async def test_a_list_carries_no_text_and_one_film_carries_every_reading_by_its_prompt(api, rig) -> None:
+    await followed_and_read(api, rig, GOLD)
+    technical = (await api.post("/prompts", json={"name": "Technical", "body": "Levels only."})).json()
+
+    ordered = await api.post("/videos/simfilm0001/readings", json={"prompt_id": technical["id"]})
+    await rig.ingest.read_with("simfilm0001", technical["id"])
+    listed = {f["video_id"]: f for f in (await api.get("/videos", params={"hours": 24})).json()["videos"]}
+    one = (await api.get("/videos/simfilm0001")).json()
+
+    assert ordered.status_code == 202
+    assert "text" not in listed["simfilm0001"]["reading"] and listed["simfilm0001"]["reading"]["prompt_name"] == "Rynkowy"
+    assert [r["prompt_name"] for r in one["readings"]] == ["Rynkowy", "Technical"]
+    assert all(r["text"] for r in one["readings"])
+
+
+async def test_a_reading_by_another_prompt_is_refused_with_the_reason(api) -> None:
+    technical = (await api.post("/prompts", json={"name": "Technical", "body": "Levels only."})).json()
+
+    refused = await api.post("/videos/nothing/readings", json={"prompt_id": technical["id"]})
+
+    assert refused.status_code == 422 and "no film" in refused.json()["detail"]["detail"]
