@@ -7,7 +7,7 @@ do odkrywania nowych autorów. Archiwum ich nie czyta. Co z nimi zrobić, decydu
 
 ### Requirement: Wynik wyszukiwania tematu jest kandydatem, nie filmem archiwum
 
-Każdy wynik wyszukiwania tematu, który przeszedł progi długości i nie jest trwającą transmisją, MUST zostać zapisany
+Każdy wynik wyszukiwania tematu, który przeszedł progi długości, MUST zostać zapisany
 jako kandydat z frazą tematu, momentem znalezienia, tytułem, kanałem, datą publikacji, długością i odnośnikiem do
 filmu na YouTube. Kandydat MUST NOT być transkrybowany, czytany ani przekazany pakietowi alertów. Tożsamością
 kandydata MUST być identyfikator filmu YouTube: ten sam film znaleziony drugi raz, przez ten sam albo inny temat,
@@ -19,6 +19,11 @@ MUST NOT tworzyć drugiego kandydata.
 - **THEN** film MUST pojawić się wśród kandydatów
 - **AND** żaden dostawca transkrypcji MUST NOT zostać o niego zapytany
 
+#### Scenario: Trwająca transmisja
+
+- **WHEN** wyszukiwanie tematu zwraca transmisję, która jeszcze trwa albo jeszcze się nie zaczęła
+- **THEN** MUST ona pojawić się wśród kandydatów, bo późniejsze wyszukiwanie jej już nie zwróci
+
 #### Scenario: Ten sam film z dwóch tematów
 
 - **WHEN** dwa tematy znajdują ten sam film
@@ -29,7 +34,7 @@ MUST NOT tworzyć drugiego kandydata.
 Wynik wyszukiwania MUST NOT zostać kandydatem, gdy zachodzi któryś z warunków:
 
 - film jest już w archiwum filmów;
-- film pochodzi z kanału na liście obserwacji;
+- film pochodzi z kanału na liście obserwacji, także gdy kanał dopisano już po znalezieniu filmu;
 - film pochodzi z kanału ignorowanego;
 - operator odrzucił już ten film.
 

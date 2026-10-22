@@ -59,6 +59,8 @@ export function CandidatesPanel({ client, onChanged }: { client: YoutubeApi; onC
   });
   const [asking, setAsking] = useState<Asking>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  // A second click on the same button would arrive after the first has decided, and be refused for it.
+  const [busy, setBusy] = useState(false);
 
   const done = () => {
     list.reload();
@@ -68,11 +70,14 @@ export function CandidatesPanel({ client, onChanged }: { client: YoutubeApi; onC
 
   async function attempt(work: () => Promise<void>, fallback: string) {
     setFailure(null);
+    setBusy(true);
     try {
       await work();
       done();
     } catch (cause: unknown) {
       setFailure(messageOf(cause, fallback));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -110,6 +115,7 @@ export function CandidatesPanel({ client, onChanged }: { client: YoutubeApi; onC
           <CandidateRow
             key={candidate.videoId}
             candidate={candidate}
+            busy={busy}
             onAsk={(kind) => setAsking({ kind, candidate })}
             onDismiss={() => void attempt(() => client.dismissCandidate(candidate.videoId, new AbortController().signal), "nie udało się odrzucić filmu")}
           />
@@ -196,10 +202,12 @@ export function CandidatesPanel({ client, onChanged }: { client: YoutubeApi; onC
 
 function CandidateRow({
   candidate,
+  busy,
   onAsk,
   onDismiss,
 }: {
   candidate: Candidate;
+  busy: boolean;
   onAsk(kind: "follow" | "analyse" | "ignore"): void;
   onDismiss(): void;
 }) {
@@ -245,7 +253,7 @@ function CandidateRow({
           <Button size="xs" tone="muted" onClick={() => onAsk("analyse")}>
             Analizuj film
           </Button>
-          <Button size="xs" tone="muted" onClick={onDismiss}>
+          <Button size="xs" tone="muted" onClick={onDismiss} disabled={busy}>
             Odrzuć
           </Button>
           <Button size="xs" tone="critical" onClick={() => onAsk("ignore")} disabled={candidate.channelId === null}>

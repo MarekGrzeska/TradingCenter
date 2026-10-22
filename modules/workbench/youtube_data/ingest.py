@@ -253,14 +253,14 @@ class Ingest:
         have not already settled, screened by a model on their metadata in one call, and stored as candidates."""
         async with self._pool.acquire() as conn:
             known = await store.already_known(conn, [film.video_id for film in films])
-            settled = {channel.channel_id for channel in await store.list_channels(conn)}
-            settled |= await store.ignored_channel_ids(conn)
+            settled = await store.settled_channels(conn, [film.channel_id for film in films if film.channel_id])
+        # A stream still live or a premiere not yet run is offered like any film: a search never returns it again once it
+        # is over, and the operator's analysis waits for its end.
         fresh = [
             film
             for film in films
             if film.video_id not in known
             and film.channel_id not in settled
-            and film.live_status == "none"
             and store.unwanted_reason(film, self._bounds) is None
         ]
         verdicts, model = await self._screen(topic.phrase, fresh)

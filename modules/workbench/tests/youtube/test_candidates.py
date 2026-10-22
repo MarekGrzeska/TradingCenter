@@ -80,6 +80,23 @@ async def test_what_the_archive_or_the_operator_already_settled_is_not_offered(p
     assert set(await offered(rig)) == {"new"}
 
 
+async def test_a_stream_still_running_is_offered_because_no_later_search_would_return_it(pool) -> None:
+    rig = Rig(pool, world(film("live1", live_until_minutes=1000, duration_seconds=None), film("done1")))
+
+    await search(rig)
+
+    assert set(await offered(rig)) == {"live1", "done1"}
+
+
+async def test_a_channel_followed_after_its_film_was_found_takes_the_film_off_the_open_list(pool) -> None:
+    rig = Rig(pool, world(film("a1"), film("b1", MARKETS)))
+    await search(rig)
+
+    await watchlist.follow_channel(pool, rig.providers.source, rig.settings, GOLD, added_by="agent")
+
+    assert set(await offered(rig)) == {"b1"}
+
+
 async def test_a_result_found_again_is_not_offered_twice_nor_screened_again(pool) -> None:
     rig = Rig(pool, world(film("simfilm0001")))
     await search(rig)

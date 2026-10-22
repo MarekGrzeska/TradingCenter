@@ -904,40 +904,37 @@ class Screened:
     model: str | None
 
 
-async def add_candidates(conn: Conn, topic_id: int, phrase: str, found: Sequence[Screened], *, at: datetime) -> int:
+async def add_candidates(conn: Conn, topic_id: int, phrase: str, found: Sequence[Screened], *, at: datetime) -> None:
     """The candidates this search had not offered before. A film offered twice stays as it was first offered."""
-    added = 0
-    for item in found:
-        ref = item.ref
-        result = await conn.execute(
-            """
-            INSERT INTO candidates (
-                video_id, topic_id, phrase, channel_id, channel_title, title, published_at, duration_seconds,
-                simulated, found_at, verdict, reason, screened_by
-            )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
-            ON CONFLICT (video_id) DO NOTHING
-            """,
-            ref.video_id,
-            topic_id,
-            phrase,
-            ref.channel_id,
-            ref.channel_title,
-            ref.title,
-            ref.published_at,
-            ref.duration_seconds,
-            ref.simulated,
-            at,
-            item.verdict,
-            item.reason,
-            item.model,
+    await conn.executemany(
+        """
+        INSERT INTO candidates (
+            video_id, topic_id, phrase, channel_id, channel_title, title, published_at, duration_seconds,
+            simulated, found_at, verdict, reason, screened_by
         )
-        added += result == "INSERT 0 1"
-    return added
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        ON CONFLICT (video_id) DO NOTHING
+        """,
+        [
+            (
+                item.ref.video_id,
+                topic_id,
+                phrase,
+                item.ref.channel_id,
+                item.ref.channel_title,
+                item.ref.title,
+                item.ref.published_at,
+                item.ref.duration_seconds,
+                item.ref.simulated,
+                at,
+                item.verdict,
+                item.reason,
+                item.model,
+            )
+            for item in found
+        ],
+    )
 
-
-CANDIDATE_VIEWS = ("open", "rejected", "decided")
-CANDIDATE_SORTS = ("found", "published")
 
 
 async def list_candidates(
@@ -946,7 +943,9 @@ async def list_candidates(
     """`open` is what is on offer: not rejected by the model and not yet decided about. The two orders each have a partial
     index over exactly that set."""
     where = {
-        "open": "decision IS NULL AND verdict <> 'rejected'",
+        # A channel followed some other way since the film was found is no longer a question to ask.
+        "open": "decision IS NULL AND verdict <> 'rejected' "
+        "AND (channel_id IS NULL OR channel_id NOT IN (SELECT channel_id FROM channels))",
         "rejected": "decision IS NULL AND verdict = 'rejected'",
         "decided": "decision IS NOT NULL",
     }[view]
@@ -990,8 +989,14 @@ async def decide_channel_candidates(conn: Conn, channel_id: str, decision: str, 
     return int(result.split()[-1])
 
 
-async def ignored_channel_ids(conn: Conn) -> set[str]:
-    return {row["channel_id"] for row in await conn.fetch("SELECT channel_id FROM ignored_channels")}
+async def settled_channels(conn: Conn, channel_ids: Sequence[str]) -> set[str]:
+    """Which of these channels are followed or ignored: their films are not offered."""
+    rows = await conn.fetch(
+        "SELECT channel_id FROM channels WHERE channel_id = ANY($1::text[]) "
+        "UNION SELECT channel_id FROM ignored_channels WHERE channel_id = ANY($1::text[])",
+        list(channel_ids),
+    )
+    return {row["channel_id"] for row in rows}
 
 
 async def list_ignored_channels(conn: Conn) -> list[IgnoredChannel]:

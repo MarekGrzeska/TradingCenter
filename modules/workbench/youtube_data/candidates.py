@@ -40,6 +40,13 @@ async def _open(conn, video_id: str) -> Candidate:
     return found
 
 
+def _decided(decided: Candidate | None, video_id: str) -> Candidate:
+    """A second click on the same button arrives after the first has decided: that is a refusal, not a failure."""
+    if decided is None:
+        raise WatchlistRefused(f"{video_id!r} has already been decided about")
+    return decided
+
+
 def _channel_of(candidate: Candidate) -> str:
     if candidate.channel_id is None:
         raise WatchlistRefused(f"the source named no channel for {candidate.title!r}")
@@ -75,8 +82,7 @@ async def dismiss(pool, clock, video_id: str) -> Candidate:
     async with pool.acquire() as conn:
         await _open(conn, video_id)
         decided = await store.decide_candidate(conn, video_id, DISMISSED, at=clock.now())
-    assert decided is not None
-    return decided
+    return _decided(decided, video_id)
 
 
 async def ignore_channel_of(pool, clock, video_id: str) -> Candidate:
@@ -89,5 +95,4 @@ async def ignore_channel_of(pool, clock, video_id: str) -> Candidate:
             await store.ignore_channel(conn, channel_id, candidate.channel_title)
             decided = await store.decide_candidate(conn, video_id, CHANNEL_IGNORED, at=now)
             await store.decide_channel_candidates(conn, channel_id, CHANNEL_IGNORED, at=now)
-    assert decided is not None
-    return decided
+    return _decided(decided, video_id)

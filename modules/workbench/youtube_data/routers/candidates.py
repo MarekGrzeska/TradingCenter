@@ -9,6 +9,8 @@ from fastapi import APIRouter, HTTPException, Query, Request, Response, status
 
 from .. import candidates, store
 from ..contract import (
+    CANDIDATE_SORTS,
+    CANDIDATE_VIEWS,
     CandidateChannelOut,
     CandidateChoice,
     CandidateOut,
@@ -41,22 +43,16 @@ def _missing(what: str) -> HTTPException:
 @router.get("/candidates", response_model=CandidatesOut, responses={422: {"model": Problem}})
 async def list_candidates(
     request: Request,
-    view: str = Query(default="open"),
-    sort: str = Query(default="found"),
+    view: CANDIDATE_VIEWS = Query(default="open"),
+    sort: CANDIDATE_SORTS = Query(default="found"),
     topic_id: int | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=MAX_LIMIT),
 ) -> CandidatesOut:
     """Films a topic's search found, newest first in the order asked for. Reading it asks nobody anything."""
-    if view not in store.CANDIDATE_VIEWS:
-        raise _refuse(f"view must be one of {', '.join(store.CANDIDATE_VIEWS)}; got {view!r}")
-    if sort not in store.CANDIDATE_SORTS:
-        raise _refuse(f"sort must be one of {', '.join(store.CANDIDATE_SORTS)}; got {sort!r}")
     async with connection(request.app.state.pool) as conn:
         found = await store.list_candidates(conn, view=view, sort=sort, topic_id=topic_id, limit=limit)
     return CandidatesOut(
-        candidates=[CandidateOut.of(candidate) for candidate in found],
-        view=view,  # type: ignore[arg-type]
-        sort=sort,  # type: ignore[arg-type]
+        candidates=[CandidateOut.of(candidate) for candidate in found], view=view, sort=sort
     )
 
 

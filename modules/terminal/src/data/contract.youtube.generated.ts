@@ -1242,8 +1242,8 @@ export interface operations {
     list_candidates_candidates_get: {
         parameters: {
             query?: {
-                view?: string;
-                sort?: string;
+                view?: "open" | "rejected" | "decided";
+                sort?: "found" | "published";
                 topic_id?: number | null;
                 limit?: number;
             };
