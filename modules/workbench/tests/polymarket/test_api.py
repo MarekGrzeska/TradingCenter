@@ -191,11 +191,13 @@ class TestReads:
         outcome_id = (await outcomes_of(pool, event_id))[0][0]
         async with pool.acquire() as conn:
             await store.record_collected(conn, outcome_id, _now() - timedelta(hours=2), _now())
+            await store.note_thinned(conn, outcome_id, _now() - timedelta(days=30), was=None)
 
         body = (await api.get(f"/outcomes/{outcome_id}/history")).json()
 
         assert body["collected_from"] is not None
         assert body["collected_to"] is not None
+        assert body["hourly_until"] is not None
 
     async def test_history_of_an_outcome_that_does_not_exist_is_a_404(self, api) -> None:
         assert (await api.get("/outcomes/999999/history")).status_code == 404

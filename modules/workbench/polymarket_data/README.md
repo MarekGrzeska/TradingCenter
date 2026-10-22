@@ -38,6 +38,14 @@ sample collected for it, in one indivisible act on the REST contract. Stopping t
 and keeping the samples used to be a separate act; it produced a row that neither collected
 nor left the list, and it is gone with the state it made.
 
+**Older than thirty days, one sample an hour.** Once a day, beside the tick, every outcome's samples
+past that age are thinned to the last one of each UTC hour — a price actually quoted, never an
+average — and `outcomes.thinned_through` records where the hourly part ends; the history read
+returns it as `hourly_until`. Collected ranges are untouched: the period stays collected, only
+coarser. A backfill writing minutes behind the boundary pulls it back, and the next pass thins
+them again. The decision is `polymarket-data-store`'s, not a setting; minute samples were 2.93 GB
+and +63 MB a day on 23 September 2026.
+
 ## Twelve tools, five of which write
 
 Seven read: search the provider's public database live, browse by tag, list what is tracked,
