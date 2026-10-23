@@ -113,8 +113,9 @@ async def topics(request: Request) -> TopicsOut:
     state = request.app.state
     async with connection(state.pool) as conn:
         found = await store.list_topics(conn)
+        last = await store.last_runs(conn)
     return TopicsOut(
-        topics=[TopicOut.of(topic) for topic in found],
+        topics=[TopicOut.of(topic, last.get(topic.id)) for topic in found],
         ceiling=state.settings.max_topics,
     )
 

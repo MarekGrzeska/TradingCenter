@@ -4,6 +4,7 @@ import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { messageOf, useRead } from "../data/query";
 import { AddTopicDialog, ChannelFilterDialog, FollowChannelDialog, RemoveDialog } from "./dialogs";
 import { PromptSelect } from "./PromptSelect";
+import { runOutcomeLabel, runSummary } from "./present";
 import { usePrompts } from "./usePrompts";
 import type { Channel, Topic, YoutubeApi } from "./youtubeApi";
 
@@ -191,6 +192,13 @@ export function TopicsPanel({ client, onChanged }: { client: YoutubeApi; onChang
                 co {topic.intervalMinutes} min · do {topic.maxVideosPerRun} wyników · ostatnio:{" "}
                 {topic.lastRunAt?.toLocaleString("pl-PL") ?? "jeszcze nie szukano"}
               </span>
+              {topic.lastRun !== null && (
+                <span
+                  className={`block text-xs ${topic.lastRun.outcome === "failed" ? "text-critical" : "text-ink-secondary"}`}
+                >
+                  ostatni przebieg: {runOutcomeLabel(topic.lastRun.outcome)} — {runSummary(topic.lastRun)}
+                </span>
+              )}
             </span>
             <Button size="xs" tone="muted" onClick={() => void change(topic, { active: !topic.active })}>
               {topic.active ? "Wstrzymaj" : "Wznów"}

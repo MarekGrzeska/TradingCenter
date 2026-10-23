@@ -3,7 +3,7 @@
  * not reached through the DOM. Polish, like the social tab.
  */
 
-import type { ArchiveState, Film, ProviderState } from "./youtubeApi";
+import type { ArchiveState, Film, ProviderState, RunOutcome, TopicRun, UnscreenedReason } from "./youtubeApi";
 
 /** Where a film is on its road, in words. A film with a reading is said to be read; one without says why not. */
 export function stateLabel(film: Film): string {
@@ -26,6 +26,42 @@ export function stateLabel(film: Film): string {
     case "filtered_out":
       return `pominięty przez filtr kanału: ${film.skipReason ?? "bez podania powodu"}`;
   }
+}
+
+const OUTCOME_LABEL: Record<RunOutcome, string> = {
+  found: "znaleziono",
+  nothing_new: "nic nowego",
+  failed: "nieudany",
+  skipped: "pominięty",
+};
+
+const UNSCREENED_LABEL: Record<UnscreenedReason, string> = {
+  no_model: "brak modelu",
+  day_spent: "wyczerpany dzienny limit tokenów",
+  unusable: "odpowiedź modelu poza schematem",
+  failed: "błąd dostawcy modelu",
+  no_verdict: "model pominął część wyników",
+};
+
+export function runOutcomeLabel(outcome: RunOutcome): string {
+  return OUTCOME_LABEL[outcome];
+}
+
+/** What a search came to, in a line: the reason where it did not go through, the report where it did. */
+export function runSummary(run: TopicRun): string {
+  if (run.outcome === "failed" || run.outcome === "skipped") return run.error ?? "bez podania przyczyny";
+  const parts = [`${run.results} wyników`];
+  if (run.known > 0) parts.push(`${run.known} znanych`);
+  if (run.outOfBounds > 0) parts.push(`${run.outOfBounds} poza długością`);
+  if (run.outcome === "found") {
+    const unscreened =
+      run.unscreened > 0
+        ? `${run.unscreened} bez przesiewu${run.unscreenedReason !== null ? ` (${UNSCREENED_LABEL[run.unscreenedReason]})` : ""}`
+        : null;
+    const candidates = [`${run.proposed} proponowanych`, `${run.rejected} odrzuconych`, unscreened].filter(Boolean);
+    parts.push(`kandydaci: ${candidates.join(", ")}`);
+  }
+  return parts.join(" · ");
 }
 
 /** `12:34` for a film under an hour or `1 h 02 min`, or nothing where the source could not say — a feed does not. */

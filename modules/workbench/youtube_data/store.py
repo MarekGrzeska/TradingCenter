@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
 from tc_runtime.db import Conn
@@ -21,17 +21,20 @@ from .models import (
     CHANNEL_FOLLOWED,
     CHANNEL_IGNORED,
     DISCOVERED,
+    FAILED,
     FILTERED_OUT,
     GAVE_UP,
     NO_TRANSCRIPT,
     NOTIFIED,
     QUIET,
+    SKIPPED,
     Candidate,
     Channel,
     IgnoredChannel,
     LoopSettings,
     Prompt,
     Topic,
+    TopicRun,
     Video,
 )
 from .providers.base import ChannelInfo, Transcript, VideoRef
@@ -48,6 +51,11 @@ _CANDIDATE_COLUMNS = """
     video_id, topic_id, phrase, channel_id, channel_title, title, published_at, duration_seconds, simulated,
     found_at, verdict, reason, screened_by, decision, decided_at
 """
+_RUN_FIELDS = (
+    "id", "topic_id", "phrase", "ran_at", "outcome", "results", "known", "out_of_bounds", "proposed", "rejected",
+    "unscreened", "unscreened_reason", "error",
+)  # fmt: skip
+_RUN_COLUMNS = ", ".join(_RUN_FIELDS)
 _VIDEO_COLUMNS = """
     video_id, channel_id, channel_title, title, published_at, duration_seconds, live_status, origins,
     audio_language, prompt_id, state, skip_reason, attempts, next_attempt_at, reading_failures,
@@ -208,6 +216,102 @@ async def remove_topic(conn: Conn, topic_id: int) -> bool:
 
 async def record_topic_run(conn: Conn, topic_id: int, *, at: datetime) -> None:
     await conn.execute("UPDATE topics SET last_run_at = $2 WHERE id = $1", topic_id, at)
+
+
+# --- topic runs ------------------------------------------------------------------------------------------------------
+
+# Kept this long and no longer: a topic searched every quarter of an hour would otherwise grow the table without end.
+RUN_RETENTION = timedelta(days=30)
+
+
+@dataclass(frozen=True, slots=True)
+class RunReport:
+    """What one search of a topic found, as the loop writes it down."""
+
+    topic_id: int
+    phrase: str
+    ran_at: datetime
+    outcome: str
+    results: int = 0
+    known: int = 0
+    out_of_bounds: int = 0
+    proposed: int = 0
+    rejected: int = 0
+    unscreened: int = 0
+    unscreened_reason: str | None = None
+    error: str | None = None
+
+
+def _run(row) -> TopicRun:
+    return TopicRun(**{name: row[name] for name in TopicRun.__dataclass_fields__})
+
+
+async def add_run(conn: Conn, report: RunReport) -> bool:
+    """The run, written, and those past their retention swept in the same transaction. A failure or a skip that repeats the
+    topic's previous run, error and all, within the UTC day is not written again — it recurs every pass. False then."""
+    day = datetime.combine(report.ran_at.astimezone(UTC).date(), time.min, tzinfo=UTC)
+    async with conn.transaction():
+        if report.outcome in (FAILED, SKIPPED):
+            previous = await conn.fetchrow(
+                "SELECT outcome, error, ran_at FROM topic_runs WHERE topic_id = $1 ORDER BY ran_at DESC, id DESC LIMIT 1",
+                report.topic_id,
+            )
+            if (
+                previous is not None
+                and (previous["outcome"], previous["error"]) == (report.outcome, report.error)
+                and previous["ran_at"] >= day
+            ):
+                return False
+        await conn.execute("DELETE FROM topic_runs WHERE ran_at < $1", report.ran_at - RUN_RETENTION)
+        await conn.execute(
+            """
+            INSERT INTO topic_runs (
+                topic_id, phrase, ran_at, outcome, results, known, out_of_bounds, proposed, rejected, unscreened,
+                unscreened_reason, error
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+            """,
+            report.topic_id,
+            report.phrase,
+            report.ran_at,
+            report.outcome,
+            report.results,
+            report.known,
+            report.out_of_bounds,
+            report.proposed,
+            report.rejected,
+            report.unscreened,
+            report.unscreened_reason,
+            report.error,
+        )
+    return True
+
+
+async def list_runs(conn: Conn, *, topic_id: int | None = None, limit: int = 100) -> list[TopicRun]:
+    """Newest first, across topics or for one — two statements, so that each stays on its own index."""
+    if topic_id is None:
+        rows = await conn.fetch(f"SELECT {_RUN_COLUMNS} FROM topic_runs ORDER BY ran_at DESC, id DESC LIMIT $1", limit)
+    else:
+        rows = await conn.fetch(
+            f"SELECT {_RUN_COLUMNS} FROM topic_runs WHERE topic_id = $1 ORDER BY ran_at DESC, id DESC LIMIT $2",
+            topic_id,
+            limit,
+        )
+    return [_run(row) for row in rows]
+
+
+async def last_runs(conn: Conn) -> dict[int, TopicRun]:
+    """Each listed topic's latest run, by one probe of the index per topic — the list is short, the table is not."""
+    rows = await conn.fetch(
+        f"""
+        SELECT {", ".join(f"r.{field}" for field in _RUN_FIELDS)}
+        FROM topics t
+        JOIN LATERAL (
+            SELECT * FROM topic_runs WHERE topic_id = t.id ORDER BY ran_at DESC, id DESC LIMIT 1
+        ) r ON true
+        """
+    )
+    return {row["topic_id"]: _run(row) for row in rows}
 
 
 # --- loop settings --------------------------------------------------------------------------------------------------

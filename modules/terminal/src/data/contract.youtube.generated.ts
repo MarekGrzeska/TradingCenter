@@ -334,6 +334,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/topic-runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Topic Runs
+         * @description Searches of the topics, newest first — all of them or one topic's. Reading it asks nobody anything.
+         */
+        get: operations["topic_runs_topic_runs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/topics": {
         parameters: {
             query?: never;
@@ -1080,6 +1100,8 @@ export interface components {
             interval_minutes: number;
             /** Language */
             language: string;
+            /** @description how the latest search ended; filled by the list, null before the first one */
+            last_run: components["schemas"]["TopicRunOut"] | null;
             /** Last Run At */
             last_run_at: string | null;
             /**
@@ -1094,6 +1116,77 @@ export interface components {
         TopicPatch: {
             /** Active */
             active?: boolean | null;
+        };
+        /**
+         * TopicRunOut
+         * @description One attempt to search a topic. The counts are of what the source returned: known or settled, outside the length bounds,
+         *     and the rest — which became candidates, proposed, rejected or offered unscreened.
+         */
+        TopicRunOut: {
+            /**
+             * Error
+             * @description why a run failed or was skipped
+             */
+            error: string | null;
+            /** Id */
+            id: number;
+            /**
+             * Known
+             * @description of them, films the archive has, has offered, or whose channel is followed or ignored
+             */
+            known: number;
+            /**
+             * Out Of Bounds
+             * @description of them, too short or too long to be worth a transcript
+             */
+            out_of_bounds: number;
+            /**
+             * Outcome
+             * @description found: new candidates · nothing_new: the source answered, nothing to offer · failed: the source refused · skipped: the source's day could not pay for a search, written once per topic per UTC day
+             * @enum {string}
+             */
+            outcome: "found" | "nothing_new" | "failed" | "skipped";
+            /**
+             * Phrase
+             * @description what was searched, as it stood then — the topic may since have gone
+             */
+            phrase: string;
+            /** Proposed */
+            proposed: number;
+            /**
+             * Ran At
+             * Format: date-time
+             */
+            ran_at: string;
+            /** Rejected */
+            rejected: number;
+            /**
+             * Results
+             * @description what the source returned
+             */
+            results: number;
+            /** Topic Id */
+            topic_id: number;
+            /** Unscreened */
+            unscreened: number;
+            /**
+             * Unscreened Reason
+             * @description why the candidates have no verdict, where `unscreened` is not zero
+             */
+            unscreened_reason: ("no_model" | "day_spent" | "unusable" | "failed" | "no_verdict") | null;
+        };
+        /** TopicRunsOut */
+        TopicRunsOut: {
+            /**
+             * Retention Days
+             * @description how long a run is kept
+             */
+            retention_days: number;
+            /**
+             * Runs
+             * @description newest first
+             */
+            runs: components["schemas"]["TopicRunOut"][];
         };
         /** TopicsOut */
         TopicsOut: {
@@ -1989,6 +2082,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StateOut"];
+                };
+            };
+        };
+    };
+    topic_runs_topic_runs_get: {
+        parameters: {
+            query?: {
+                topic_id?: number | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TopicRunsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

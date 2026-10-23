@@ -5,6 +5,7 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { CandidateChoiceDialog } from "./dialogs";
 import { duration } from "./present";
+import { RunsPanel } from "./RunsPanel";
 import type {
   Candidate,
   CandidateDecision,
@@ -44,12 +45,16 @@ type Asking =
 export function CandidatesPanel({ client, onChanged }: { client: YoutubeApi; onChanged(): void }) {
   const [view, setView] = useState<CandidateView>("open");
   const [sort, setSort] = useState<CandidateSort>("found");
+  // The history is a section of this tab, not a view of candidates: it lists searches, and nothing in it is decided about.
+  const [history, setHistory] = useState(false);
   const list = useRead<Candidate[]>({
     key: ["youtube", "candidates", view, sort],
     read: (signal) => client.candidates({ view, sort }, signal),
     initial: NONE,
     fallbackMessage: "nie udało się wczytać kandydatów",
     pollMs: POLL_MS,
+    // Nothing shows them while the history does.
+    enabled: !history,
   });
   const ignored = useRead<IgnoredChannel[]>({
     key: ["youtube", "ignored-channels"],
@@ -86,23 +91,39 @@ export function CandidatesPanel({ client, onChanged }: { client: YoutubeApi; onC
       <div className="flex flex-wrap items-center gap-2">
         <nav className="flex gap-1" aria-label="widok kandydatów">
           {(Object.keys(VIEW_LABEL) as CandidateView[]).map((id) => (
-            <Button key={id} size="xs" tone={view === id ? "primary" : "muted"} aria-pressed={view === id} onClick={() => setView(id)}>
+            <Button
+              key={id}
+              size="xs"
+              tone={!history && view === id ? "primary" : "muted"}
+              aria-pressed={!history && view === id}
+              onClick={() => {
+                setHistory(false);
+                setView(id);
+              }}
+            >
               {VIEW_LABEL[id]}
             </Button>
           ))}
+          <Button size="xs" tone={history ? "primary" : "muted"} aria-pressed={history} onClick={() => setHistory(true)}>
+            Historia wyszukiwań
+          </Button>
         </nav>
-        <nav className="flex gap-1" aria-label="kolejność">
-          {(Object.keys(SORT_LABEL) as CandidateSort[]).map((id) => (
-            <Button key={id} size="xs" tone={sort === id ? "primary" : "quiet"} aria-pressed={sort === id} onClick={() => setSort(id)}>
-              {SORT_LABEL[id]}
-            </Button>
-          ))}
-        </nav>
+        {!history && (
+          <nav className="flex gap-1" aria-label="kolejność">
+            {(Object.keys(SORT_LABEL) as CandidateSort[]).map((id) => (
+              <Button key={id} size="xs" tone={sort === id ? "primary" : "quiet"} aria-pressed={sort === id} onClick={() => setSort(id)}>
+                {SORT_LABEL[id]}
+              </Button>
+            ))}
+          </nav>
+        )}
       </div>
 
-      {list.error !== null && <UnreachableNotice onRetry={list.reload}>{list.error}</UnreachableNotice>}
-      {failure !== null && <p className="text-sm text-critical">{failure}</p>}
-      {list.status === "ready" && list.value.length === 0 && (
+      {history && <RunsPanel client={client} />}
+
+      {!history && list.error !== null && <UnreachableNotice onRetry={list.reload}>{list.error}</UnreachableNotice>}
+      {!history && failure !== null && <p className="text-sm text-critical">{failure}</p>}
+      {!history && list.status === "ready" && list.value.length === 0 && (
         <p className="text-sm text-ink-muted">
           {view === "open"
             ? "Nie ma kandydatów. Tematy szukają w swoim odstępie — nowe filmy pojawią się tu same."
@@ -110,19 +131,21 @@ export function CandidatesPanel({ client, onChanged }: { client: YoutubeApi; onC
         </p>
       )}
 
-      <ul className="flex flex-col gap-1">
-        {list.value.map((candidate) => (
-          <CandidateRow
-            key={candidate.videoId}
-            candidate={candidate}
-            busy={busy}
-            onAsk={(kind) => setAsking({ kind, candidate })}
-            onDismiss={() => void attempt(() => client.dismissCandidate(candidate.videoId, new AbortController().signal), "nie udało się odrzucić filmu")}
-          />
-        ))}
-      </ul>
+      {!history && (
+        <ul className="flex flex-col gap-1">
+          {list.value.map((candidate) => (
+            <CandidateRow
+              key={candidate.videoId}
+              candidate={candidate}
+              busy={busy}
+              onAsk={(kind) => setAsking({ kind, candidate })}
+              onDismiss={() => void attempt(() => client.dismissCandidate(candidate.videoId, new AbortController().signal), "nie udało się odrzucić filmu")}
+            />
+          ))}
+        </ul>
+      )}
 
-      {ignored.value.length > 0 && (
+      {!history && ignored.value.length > 0 && (
         <details className="rounded border border-border bg-panel px-3 py-2">
           <summary className="cursor-pointer text-xs text-ink-muted">Ignorowane kanały ({ignored.value.length})</summary>
           <ul className="mt-2 flex flex-col gap-1">

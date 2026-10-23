@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { duration, stateLabel, usageLine, warnings } from "./present";
-import type { ArchiveState, Film, ProviderState } from "./youtubeApi";
+import { duration, runSummary, stateLabel, usageLine, warnings } from "./present";
+import type { ArchiveState, Film, ProviderState, TopicRun } from "./youtubeApi";
 
 /** The sentences the screen says, as text: what a film without a reading says about itself, and why a list may be thin. */
 
@@ -130,5 +130,37 @@ describe("warnings", () => {
 describe("usageLine", () => {
   it("is the day's spend in the provider's own unit", () => {
     expect(usageLine(provider())).toBe("direct: 12/500 requests");
+  });
+});
+
+describe("runSummary", () => {
+  const run = (overrides: Partial<TopicRun> = {}): TopicRun => ({
+    id: 1,
+    topicId: 7,
+    phrase: "gold",
+    ranAt: new Date("2026-09-27T10:00:00Z"),
+    outcome: "found",
+    results: 5,
+    known: 2,
+    outOfBounds: 1,
+    proposed: 1,
+    rejected: 1,
+    unscreened: 0,
+    unscreenedReason: null,
+    error: null,
+    ...overrides,
+  });
+
+  it("counts what the source returned and what became of it, leaving out what is zero", () => {
+    expect(runSummary(run())).toBe("5 wyników · 2 znanych · 1 poza długością · kandydaci: 1 proponowanych, 1 odrzuconych");
+    expect(runSummary(run({ outcome: "nothing_new", known: 0, outOfBounds: 0, results: 0 }))).toBe("0 wyników");
+  });
+
+  it("says why results have no verdict, and gives a failed or skipped search its reason, never a count", () => {
+    expect(runSummary(run({ unscreened: 2, unscreenedReason: "day_spent" }))).toContain(
+      "2 bez przesiewu (wyczerpany dzienny limit tokenów)",
+    );
+    expect(runSummary(run({ outcome: "failed", error: "YouTube nie odpowiada" }))).toBe("YouTube nie odpowiada");
+    expect(runSummary(run({ outcome: "skipped", error: null }))).toBe("bez podania przyczyny");
   });
 });

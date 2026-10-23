@@ -13,13 +13,27 @@ import asyncio
 import logging
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
+from typing import NamedTuple
 
 from tc_runtime.liveness import LoopHeartbeat
 
 from . import budget, loop_settings, store
 from .analysis import Film
 from .config import Settings
-from .models import PROPOSED, UNSCREENED
+from .models import (
+    DAY_SPENT,
+    FAILED,
+    FOUND,
+    MODEL_FAILED,
+    NO_MODEL,
+    NO_VERDICT,
+    NOTHING_NEW,
+    PROPOSED,
+    REJECTED,
+    SKIPPED,
+    UNSCREENED,
+    UNUSABLE,
+)
 from .providers.base import (
     Blocked,
     ChannelInfo,
@@ -45,6 +59,15 @@ FIRST_SEARCH_LOOKBACK = timedelta(days=1)
 JUDGE_MAX_FAILURES = 3
 
 Announce = Callable[[datetime], Awaitable[object]]
+
+
+class Judged(NamedTuple):
+    """A screening's verdicts. `answered` is whether a model said anything (a refusal is something, no model is not)."""
+
+    verdicts: dict[str, tuple[str, str]]
+    model: str | None
+    answered: bool
+    why: str | None
 
 
 class Ingest:
@@ -255,9 +278,20 @@ class Ingest:
                 await store.record_discovery(conn, channel.channel_id, at=now)
             left = await self._remaining(ceiling)
 
-        for topic in topics:
-            if left < source.search_cost:
+        spent = False
+        for index, topic in enumerate(topics):
+            if spent or left < source.search_cost:
                 log.warning("topic %r waits: the %s source's day cannot pay for a search", topic.phrase, source.name)
+                for waiting in topics[index:]:
+                    await self._note_run(
+                        store.RunReport(
+                            waiting.id,
+                            waiting.phrase,
+                            now,
+                            SKIPPED,
+                            error=f"the {source.name} source's day cannot pay for a search",
+                        )
+                    )
                 break
             try:
                 films = await source.search(
@@ -268,9 +302,15 @@ class Ingest:
                 )
             except QuotaExceeded:
                 log.warning("the %s source says its quota is spent", source.name)
-                break
+                await self._note_run(
+                    store.RunReport(topic.id, topic.phrase, now, FAILED, error=f"the {source.name} source reports its quota spent")
+                )
+                # The topics after it are then skipped by the check above, and written down as such.
+                spent = True
+                continue
             except SourceError as err:
                 log.warning("topic %r could not be searched: %s", topic.phrase, err)
+                await self._note_run(store.RunReport(topic.id, topic.phrase, now, FAILED, error=str(err)[:300] or type(err).__name__))
                 left = await self._remaining(ceiling)
                 continue
             await self._propose(topic, films, now)
@@ -305,9 +345,10 @@ class Ingest:
         ]
         unseen_ids = {film.video_id for film in unseen}
         fresh_ids = {film.video_id for film in fresh}
-        verdicts, _, answered = await self._screen(
+        judged = await self._screen(
             channel.title, fresh, lambda screener: screener.screen_channel(channel.filter or "", fresh)
         )
+        verdicts, answered = judged.verdicts, judged.answered
         discoveries: list[store.Discovery] = []
         waiting = 0
         for film in films:
@@ -321,7 +362,7 @@ class Ingest:
                 misses = self._unjudged.get(film.video_id, 0) + int(answered)
                 if misses >= JUDGE_MAX_FAILURES:
                     self._unjudged.pop(film.video_id, None)
-                    reason = f"nie udało się ocenić filmu: model {misses} razy nie wydał werdyktu"
+                    reason = f"could not be judged: the model gave no verdict {misses} times"
                     discoveries.append(store.Discovery(film, origin, channel.prompt_id, filtered_reason=reason))
                 else:
                     self._unjudged[film.video_id] = misses
@@ -329,13 +370,23 @@ class Ingest:
             elif verdicts[film.video_id][0] == PROPOSED:
                 discoveries.append(store.Discovery(film, origin, channel.prompt_id))
             else:
-                reason = verdicts[film.video_id][1] or "poza kryteriami kanału"
+                reason = verdicts[film.video_id][1] or "outside the channel's criteria"
                 discoveries.append(store.Discovery(film, origin, channel.prompt_id, filtered_reason=reason))
             if film.video_id in verdicts:
                 self._unjudged.pop(film.video_id, None)
         if waiting:
             log.warning("channel %s: %d film(s) wait to be judged against its filter", channel.channel_id, waiting)
         return discoveries
+
+    async def _note_run(self, report: store.RunReport) -> None:
+        """A run written down. Never the reason a pass fails: the history describes the loop and must not be able to stop it."""
+        try:
+            async with self._pool.acquire() as conn:
+                await store.add_run(conn, report)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("the run of topic %r could not be written down", report.phrase)
 
     async def _propose(self, topic, films: list[VideoRef], now: datetime) -> None:
         """What a search found, offered to the operator instead of sent to be read: the results the archive and the operator
@@ -345,6 +396,7 @@ class Ingest:
             settled = await store.settled_channels(conn, [film.channel_id for film in films if film.channel_id])
         # A stream still live or a premiere not yet run is offered like any film: a search never returns it again once it
         # is over, and the operator's analysis waits for its end.
+        already = [film for film in films if film.video_id in known or film.channel_id in settled]
         fresh = [
             film
             for film in films
@@ -352,9 +404,8 @@ class Ingest:
             and film.channel_id not in settled
             and store.unwanted_reason(film, self._bounds) is None
         ]
-        verdicts, model, _ = await self._screen(
-            topic.phrase, fresh, lambda screener: screener.screen(topic.phrase, fresh)
-        )
+        judged = await self._screen(topic.phrase, fresh, lambda screener: screener.screen(topic.phrase, fresh))
+        verdicts, model = judged.verdicts, judged.model
         async with self._pool.acquire() as conn:
             await store.add_candidates(
                 conn,
@@ -367,21 +418,42 @@ class Ingest:
                 at=now,
             )
             await store.record_topic_run(conn, topic.id, at=now)
+        counts = {PROPOSED: 0, REJECTED: 0, UNSCREENED: 0}
+        for film in fresh:
+            verdict = verdicts.get(film.video_id, (UNSCREENED, ""))[0]
+            counts[verdict if verdict in counts else UNSCREENED] += 1
+        # A model that answered and left some films out is a different silence from one that was not asked.
+        why = judged.why or (NO_VERDICT if counts[UNSCREENED] else None)
+        await self._note_run(
+            store.RunReport(
+                topic.id,
+                topic.phrase,
+                now,
+                FOUND if fresh else NOTHING_NEW,
+                results=len(films),
+                known=len(already),
+                out_of_bounds=len(films) - len(already) - len(fresh),
+                proposed=counts[PROPOSED],
+                rejected=counts[REJECTED],
+                unscreened=counts[UNSCREENED],
+                unscreened_reason=why if counts[UNSCREENED] else None,
+            )
+        )
 
     async def _screen(
         self, label: str, films: list[VideoRef], ask: Callable[[Screener], Awaitable[Screening]]
-    ) -> tuple[dict[str, tuple[str, str]], str | None, bool]:
-        """The verdicts a model gave for these films, the model, and whether it answered at all — a refusal or an answer
-        that breaks the schema is an answer, paid for; no model, a day without tokens or a provider that could not be
-        reached is not. What the caller does with a film nobody judged is the caller's — a topic offers it unscreened, a
-        channel's filter holds it back; nothing here stops the pass."""
+    ) -> Judged:
+        """The verdicts for these films, and why there are none where a model could not give them. What the caller does with
+        a film nobody judged is the caller's — a topic offers it unscreened, a channel's filter holds it back."""
         screener = self._providers.screener
-        if screener is None or not films:
-            return {}, None, False
+        if not films:
+            return Judged({}, None, False, None)
+        if screener is None:
+            return Judged({}, None, False, NO_MODEL)
         ceiling = budget.Ceiling(budget.ANALYSER, budget.TOKENS, self._settings.daily_token_limit)
         if await self._remaining(ceiling) <= 0:
             log.warning("the day's tokens are spent; %r is not screened", label)
-            return {}, None, False
+            return Judged({}, None, False, DAY_SPENT)
         try:
             screening = await ask(screener)
         except asyncio.CancelledError:
@@ -389,12 +461,12 @@ class Ingest:
         except ReadingUnusable as err:
             self._providers.meter.record(budget.ANALYSER, budget.TOKENS, err.tokens)
             log.warning("screening %r is unusable: %s", label, err)
-            return {}, None, True
+            return Judged({}, None, True, UNUSABLE)
         except Exception as err:  # noqa: BLE001 - whatever a model provider raises must not stop the pass
             log.warning("screening %r failed: %s", label, err)
-            return {}, None, False
+            return Judged({}, None, False, MODEL_FAILED)
         self._providers.meter.record(budget.ANALYSER, budget.TOKENS, screening.input_tokens + screening.output_tokens)
-        return screening.verdicts, screening.model, True
+        return Judged(screening.verdicts, screening.model, True, None)
 
     async def _refresh_live(self, video_ids: list[str]) -> None:
         """A stream listed as live is asked about until it is not: it may have dropped out of the channel's latest fifteen

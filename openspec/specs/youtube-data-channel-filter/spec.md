@@ -1,9 +1,11 @@
+# youtube-data-channel-filter Specification
+
 ## Purpose
 
 Pozwala operatorowi (i agentowi) obserwować kanał YouTube, z którego przetwarzane są tylko filmy spełniające opisany słowami
 warunek, oceniany po metadanych filmu, zanim zostanie zapłacona jego transkrypcja.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Kanał ma opcjonalny filtr, a bez niego przetwarza wszystko
 
