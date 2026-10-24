@@ -230,7 +230,7 @@ async def test_a_film_the_model_keeps_answering_nothing_about_is_kept_filtered_o
     await rig.tick()
 
     assert await rig.states() == {"silent1": "filtered_out"}
-    assert "nie udało się ocenić" in (await rig.row("silent1"))["skip_reason"]
+    assert "could not be judged" in (await rig.row("silent1"))["skip_reason"]
 
 
 async def test_a_model_nobody_could_reach_spends_none_of_a_films_answers(pool) -> None:

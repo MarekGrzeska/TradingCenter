@@ -28,6 +28,7 @@ when the line is set.
 |---|---|---|
 | `channels`, `topics` | the watch list, each row with `added_by` (`operator` / `agent`); a channel also holds the prompt its new films are read by and, optionally, a filter; a topic holds neither | REST and tools add; **only REST removes** |
 | `candidates` | what a topic's search found and a model screened by its metadata: a verdict and a sentence on why, and — once the operator has decided — which decision | the loop; **only REST decides** |
+| `topic_runs` | one row per attempt to search a topic: how it ended and the report — what the source returned, what was already known, what became candidates and how they were screened, or why it failed; swept past 30 days | the loop; **nobody edits it** |
 | `ignored_channels` | channels whose films never become candidates | **only REST** |
 | `videos` | one row per film however many doors it came through (`origins`), its state and retry schedule; a film a channel's filter turned away is kept as `filtered_out` with the reason | the loop; `POST /videos` and `analyse_video` enqueue one, and release a `filtered_out` one |
 | `transcripts` | the words, apart from `videos` so a list never reads TOAST | the loop |
@@ -162,12 +163,23 @@ screening can be checked and the same film is never paid for twice.
 
 Screening shares the analyser's key, model and day (`DAILY_TOKEN_LIMIT`); `GET /state` names the missing model or the spent day.
 
+## Topic runs
+
+Every search of a topic is written down, whatever came of it: *found* (new candidates), *nothing new* (the source answered and there
+was nothing to offer), *failed* (the source refused — the message is kept, and the topic is tried again on the next pass, as before) and
+*skipped* (the source's day could not pay for a search — written **once per topic per UTC day**, since it repeats on every pass until
+midnight). The report counts what the source returned, how many of them were already known or belonged to a settled channel, how many
+were outside the length bounds, and how the rest were screened — with, for those offered without a verdict, why (`no_model`,
+`day_spent`, `unusable`, `failed`, `no_verdict` for a model that answered and left some out). A run keeps the phrase it searched and
+outlives the topic; runs older than 30 days are swept when the next is written. `GET /topic-runs` reads them (newest first, optionally
+one topic), and `GET /topics` carries each topic's latest. Cost in units and tokens stays in `usage`, per day.
+
 ## Surfaces
 
 REST (`contract.py`, generated into the terminal as `contract.youtube.generated.ts`):
 `GET /videos` (window, channel, topic, score, state — `filtered_out` only when asked for; a reading without its text) · `GET /videos/{id}` (every reading, with its text) · `POST /videos/{id}/readings` · `GET|POST /prompts` · `PATCH|DELETE /prompts/{id}` ·
 `GET /videos/{id}/transcript` (pages) · `POST /videos` (one film named by hand: accepted at once, transcribed and read in the background ahead of the queue) · `GET|POST /channels` ·
-`PATCH|DELETE /channels/{id}` · `GET|POST /topics` · `PATCH|DELETE /topics/{id}` · `GET /candidates` (`view` open · rejected · decided, `sort` found · published, `topic_id`) ·
+`PATCH|DELETE /channels/{id}` · `GET|POST /topics` · `PATCH|DELETE /topics/{id}` · `GET /topic-runs` (`topic_id`, `limit`) · `GET /candidates` (`view` open · rejected · decided, `sort` found · published, `topic_id`) ·
 `POST /candidates/{id}/follow-channel|analyse|dismiss|ignore-channel` · `GET /ignored-channels` · `DELETE /ignored-channels/{id}` · `GET /state` ·
 `GET /health`.
 

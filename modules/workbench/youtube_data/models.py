@@ -36,6 +36,21 @@ CHANNEL_FOLLOWED = "channel_followed"
 CHANNEL_IGNORED = "channel_ignored"
 DECISIONS = (DISMISSED, ANALYSED_BY_HAND, CHANNEL_FOLLOWED, CHANNEL_IGNORED)
 
+# How a topic's search ended. `skipped` is a search the source's day could not pay for, `failed` one the source refused.
+FOUND = "found"
+NOTHING_NEW = "nothing_new"
+FAILED = "failed"
+SKIPPED = "skipped"
+RUN_OUTCOMES = (FOUND, NOTHING_NEW, FAILED, SKIPPED)
+
+# Why results were offered without a verdict. `no_verdict` is a model that answered and left some of them out.
+NO_MODEL = "no_model"
+DAY_SPENT = "day_spent"
+UNUSABLE = "unusable"
+MODEL_FAILED = "failed"
+NO_VERDICT = "no_verdict"
+UNSCREENED_REASONS = (NO_MODEL, DAY_SPENT, UNUSABLE, MODEL_FAILED, NO_VERDICT)
+
 
 @dataclass(frozen=True, slots=True)
 class Channel:
@@ -120,6 +135,26 @@ class Candidate:
     screened_by: str | None
     decision: str | None
     decided_at: datetime | None
+
+
+@dataclass(frozen=True, slots=True)
+class TopicRun:
+    """One attempt to search a topic, and what came of it. The counts are of the source's results, in the order the loop
+    sorts them: known or settled, outside the length bounds, then the ones that became candidates."""
+
+    id: int
+    topic_id: int
+    phrase: str
+    ran_at: datetime
+    outcome: str
+    results: int
+    known: int
+    out_of_bounds: int
+    proposed: int
+    rejected: int
+    unscreened: int
+    unscreened_reason: str | None
+    error: str | None
 
 
 @dataclass(frozen=True, slots=True)

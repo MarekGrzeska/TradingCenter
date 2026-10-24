@@ -4,7 +4,18 @@ import { describe, expect, it, vi } from "vitest";
 import { queryClient } from "../data/query";
 import { MarketDataError } from "../data/types";
 import { YoutubeView } from "./YoutubeView";
-import type { ArchiveState, Candidate, Channel, Film, FilmsPage, Prompt, Reading, YoutubeApi } from "./youtubeApi";
+import type {
+  ArchiveState,
+  Candidate,
+  Channel,
+  Film,
+  FilmsPage,
+  Prompt,
+  Reading,
+  Topic,
+  TopicRun,
+  YoutubeApi,
+} from "./youtubeApi";
 
 /**
  * The tab from the operator's seat: that a film shows its score and summary and, opened, each reading under its prompt, that an unread film
@@ -68,6 +79,37 @@ const CHANNEL: Channel = {
   filter: null,
 };
 
+function run(overrides: Partial<TopicRun> = {}): TopicRun {
+  return {
+    id: 1,
+    topicId: 7,
+    phrase: "gold outlook",
+    ranAt: new Date("2026-09-27T10:00:00Z"),
+    outcome: "found",
+    results: 5,
+    known: 2,
+    outOfBounds: 0,
+    proposed: 2,
+    rejected: 1,
+    unscreened: 0,
+    unscreenedReason: null,
+    error: null,
+    ...overrides,
+  };
+}
+
+const TOPIC: Topic = {
+  id: 7,
+  phrase: "gold outlook",
+  language: "",
+  intervalMinutes: 60,
+  maxVideosPerRun: 5,
+  active: true,
+  addedBy: "operator",
+  lastRunAt: new Date("2026-09-27T10:00:00Z"),
+  lastRun: null,
+};
+
 const CANDIDATE: Candidate = {
   videoId: "c1",
   url: "https://www.youtube.com/watch?v=c1",
@@ -111,6 +153,7 @@ function api(films: Film[], overrides: Partial<YoutubeApi> = {}): YoutubeApi {
     setChannel: vi.fn(),
     unfollowChannel: vi.fn(async () => undefined),
     topics: vi.fn(async () => ({ topics: [], ceiling: 20 })),
+    topicRuns: vi.fn(async () => ({ runs: [], retentionDays: 30 })),
     addTopic: vi.fn(),
     setTopic: vi.fn(),
     removeTopic: vi.fn(),
@@ -367,6 +410,49 @@ describe("YoutubeView", () => {
 
     expect(await screen.findByText("Technical")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Nowy prompt" })).toBeInTheDocument();
+  });
+
+  it("lists the searches newest first, each with its report, and says why one that failed did", async () => {
+    const topicRuns = vi.fn(async () => ({
+      runs: [
+        run({ id: 3, outcome: "failed", results: 0, known: 0, proposed: 0, rejected: 0, error: "YouTube nie odpowiada" }),
+        run({ id: 2, outcome: "nothing_new", results: 3, known: 3, proposed: 0, rejected: 0 }),
+        run({ id: 1, unscreened: 2, proposed: 0, rejected: 0, unscreenedReason: "no_model" }),
+      ],
+      retentionDays: 30,
+    }));
+    render(<YoutubeView api={api([], { topicRuns, topics: vi.fn(async () => ({ topics: [TOPIC], ceiling: 20 })) })} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Kandydaci" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Historia wyszukiwań" }));
+
+    expect(await screen.findByText("YouTube nie odpowiada")).toBeInTheDocument();
+    expect(screen.getByText("nieudany")).toBeInTheDocument();
+    expect(screen.getByText(/3 wyników · 3 znanych/)).toBeInTheDocument();
+    expect(screen.getByText(/2 bez przesiewu \(brak modelu\)/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Ostatnio znalezione" })).not.toBeInTheDocument();
+  });
+
+  it("narrows the history to one topic, and says when no search has happened yet", async () => {
+    const topicRuns = vi.fn(async () => ({ runs: [], retentionDays: 30 }));
+    render(<YoutubeView api={api([], { topicRuns, topics: vi.fn(async () => ({ topics: [TOPIC], ceiling: 20 })) })} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Kandydaci" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Historia wyszukiwań" }));
+    expect(await screen.findByText(/Nie było jeszcze żadnego przebiegu/)).toBeInTheDocument();
+
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: /Temat/ }), "gold outlook");
+
+    expect(topicRuns).toHaveBeenLastCalledWith({ topicId: 7 }, expect.anything());
+  });
+
+  it("shows how each topic's last search ended, in the topics' own tab", async () => {
+    const lastRun = run({ outcome: "failed", error: "limit źródła wyczerpany" });
+    render(<YoutubeView api={api([], { topics: vi.fn(async () => ({ topics: [{ ...TOPIC, lastRun }], ceiling: 20 })) })} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Tematy" }));
+
+    expect(await screen.findByText(/ostatni przebieg: nieudany — limit źródła wyczerpany/)).toBeInTheDocument();
   });
 
   it("lists candidates with a link to the film and the model's reason, and asks again in the other order", async () => {

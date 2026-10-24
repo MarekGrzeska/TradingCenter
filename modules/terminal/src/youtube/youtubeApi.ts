@@ -122,6 +122,28 @@ export interface Channel {
   filter: string | null;
 }
 
+export type RunOutcome = Schemas["TopicRunOut"]["outcome"];
+export type UnscreenedReason = NonNullable<Schemas["TopicRunOut"]["unscreened_reason"]>;
+
+/** One attempt to search a topic, and its report. The counts are of what the source returned. */
+export interface TopicRun {
+  id: number;
+  topicId: number;
+  /** What was searched, as it stood then — the topic may since have gone. */
+  phrase: string;
+  ranAt: Date;
+  outcome: RunOutcome;
+  results: number;
+  known: number;
+  outOfBounds: number;
+  proposed: number;
+  rejected: number;
+  unscreened: number;
+  unscreenedReason: UnscreenedReason | null;
+  /** Why a run failed or was skipped. */
+  error: string | null;
+}
+
 export interface Topic {
   id: number;
   phrase: string;
@@ -131,6 +153,8 @@ export interface Topic {
   active: boolean;
   addedBy: "operator" | "agent";
   lastRunAt: Date | null;
+  /** How the latest search ended; null before the first one. */
+  lastRun: TopicRun | null;
 }
 
 export type CandidateVerdict = Schemas["CandidateOut"]["verdict"];
@@ -290,6 +314,24 @@ function mapChannel(raw: Schemas["ChannelOut"]): Channel {
   };
 }
 
+function mapRun(raw: Schemas["TopicRunOut"]): TopicRun {
+  return {
+    id: raw.id,
+    topicId: raw.topic_id,
+    phrase: raw.phrase,
+    ranAt: new Date(raw.ran_at),
+    outcome: raw.outcome,
+    results: raw.results,
+    known: raw.known,
+    outOfBounds: raw.out_of_bounds,
+    proposed: raw.proposed,
+    rejected: raw.rejected,
+    unscreened: raw.unscreened,
+    unscreenedReason: raw.unscreened_reason ?? null,
+    error: raw.error ?? null,
+  };
+}
+
 function mapTopic(raw: Schemas["TopicOut"]): Topic {
   return {
     id: raw.id,
@@ -300,6 +342,7 @@ function mapTopic(raw: Schemas["TopicOut"]): Topic {
     active: raw.active,
     addedBy: raw.added_by,
     lastRunAt: optionalDate(raw.last_run_at),
+    lastRun: raw.last_run ? mapRun(raw.last_run) : null,
   };
 }
 
@@ -367,6 +410,8 @@ export interface YoutubeApi {
   ): Promise<Channel>;
   unfollowChannel(channelId: string, signal: AbortSignal): Promise<void>;
   topics(signal: AbortSignal): Promise<{ topics: Topic[]; ceiling: number }>;
+  /** Searches of the topics, newest first — all of them, or one topic's. */
+  topicRuns(query: { topicId?: number }, signal: AbortSignal): Promise<{ runs: TopicRun[]; retentionDays: number }>;
   addTopic(request: TopicRequest, signal: AbortSignal): Promise<TopicResult>;
   setTopic(id: number, patch: { active?: boolean }, signal: AbortSignal): Promise<Topic>;
   removeTopic(id: number, signal: AbortSignal): Promise<void>;
@@ -480,6 +525,12 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
     async topics(signal) {
       const raw = await http.json<Schemas["TopicsOut"]>(`${httpBase}/topics`, { signal });
       return { topics: raw.topics.map(mapTopic), ceiling: raw.ceiling };
+    },
+
+    async topicRuns(query, signal) {
+      const narrowed = query.topicId === undefined ? "" : `&topic_id=${query.topicId}`;
+      const raw = await http.json<Schemas["TopicRunsOut"]>(`${httpBase}/topic-runs?limit=100${narrowed}`, { signal });
+      return { runs: raw.runs.map(mapRun), retentionDays: raw.retention_days };
     },
 
     async addTopic(request, signal) {

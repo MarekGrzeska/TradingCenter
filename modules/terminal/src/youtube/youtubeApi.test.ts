@@ -124,6 +124,63 @@ describe("a channel's filter", () => {
   });
 });
 
+describe("topic runs", () => {
+  const RUN = {
+    id: 3,
+    topic_id: 7,
+    phrase: "gold",
+    ran_at: "2026-09-27T10:00:00Z",
+    outcome: "failed",
+    results: 0,
+    known: 0,
+    out_of_bounds: 0,
+    proposed: 0,
+    rejected: 0,
+    unscreened: 0,
+    unscreened_reason: null,
+    error: "the source is down",
+  };
+
+  it("maps a run, narrows by topic, and carries a topic's latest run", async () => {
+    let url = "";
+    server.use(
+      http.get(`${BASE}/topic-runs`, ({ request }) => {
+        url = request.url;
+        return HttpResponse.json({ runs: [RUN], retention_days: 30 });
+      }),
+      http.get(`${BASE}/topics`, () =>
+        HttpResponse.json({
+          topics: [
+            {
+              id: 7,
+              phrase: "gold",
+              language: "",
+              interval_minutes: 60,
+              max_videos_per_run: 5,
+              active: true,
+              added_by: "operator",
+              added_at: "2026-09-27T09:00:00Z",
+              last_run_at: null,
+              last_run: RUN,
+            },
+          ],
+          ceiling: 20,
+        }),
+      ),
+    );
+    const api = createYoutubeApi(BASE);
+
+    const { runs, retentionDays } = await api.topicRuns({ topicId: 7 }, signal());
+    const { topics } = await api.topics(signal());
+
+    expect(new URL(url).searchParams.get("topic_id")).toBe("7");
+    expect(retentionDays).toBe(30);
+    expect(runs[0]).toMatchObject({ topicId: 7, outcome: "failed", error: "the source is down", unscreenedReason: null });
+    expect(runs[0].ranAt).toEqual(new Date("2026-09-27T10:00:00Z"));
+    expect(topics[0].lastRun?.id).toBe(3);
+  });
+});
+
 describe("the watch list", () => {
   it("sends the defaulted fields the contract lists as required, and reads the answer's flag", async () => {
     let seen: unknown;

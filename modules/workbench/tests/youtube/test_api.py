@@ -192,6 +192,33 @@ async def test_a_topic_says_which_of_its_limits_came_from_the_settings(api) -> N
     assert (await api.post("/topics", json={"phrase": " "})).status_code == 422
 
 
+# --- topic runs -----------------------------------------------------------------------------------------------------
+
+
+async def test_the_history_of_searches_is_read_newest_first_for_everyone_or_for_one_topic_and_the_list_carries_the_last(
+    api, rig
+) -> None:
+    gold = (await api.post("/topics", json={"phrase": "gold"})).json()["topic"]["id"]
+    bitcoin = (await api.post("/topics", json={"phrase": "bitcoin"})).json()["topic"]["id"]
+    await rig.tick()
+    await rig.tick()  # the topics are not due again: one run each
+
+    everyone = (await api.get("/topic-runs")).json()
+    one = (await api.get("/topic-runs", params={"topic_id": gold})).json()
+    listed = {t["id"]: t for t in (await api.get("/topics")).json()["topics"]}
+
+    assert everyone["retention_days"] == 30 and len(everyone["runs"]) == 2
+    assert [run["topic_id"] for run in one["runs"]] == [gold]
+    assert one["runs"][0]["outcome"] in ("found", "nothing_new") and one["runs"][0]["phrase"] == "gold"
+    assert listed[bitcoin]["last_run"]["phrase"] == "bitcoin"
+    assert (await api.post("/topics", json={"phrase": "never searched"})).json()["topic"]["last_run"] is None
+
+
+async def test_a_history_asked_for_too_much_or_nothing_is_refused(api) -> None:
+    assert (await api.get("/topic-runs", params={"limit": 0})).status_code == 422
+    assert (await api.get("/topic-runs", params={"limit": 1000})).status_code == 422
+
+
 # --- state ----------------------------------------------------------------------------------------------------------
 
 

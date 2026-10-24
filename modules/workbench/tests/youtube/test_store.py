@@ -274,3 +274,69 @@ async def test_a_film_released_by_a_named_prompt_is_read_by_it_and_otherwise_by_
     await store.release_filtered(db, "v2", prompt_id=None)
 
     assert [(await store.get_video(db, v)).prompt_id for v in ("v1", "v2")] == [technical.id, SEEDED_PROMPT_ID]
+
+
+def report(topic_id: int = 1, outcome: str = "found", at: datetime = NOW, **overrides) -> store.RunReport:
+    error = overrides.pop("error", "the source said no" if outcome in ("failed", "skipped") else None)
+    return store.RunReport(topic_id, f"topic {topic_id}", at, outcome, error=error, **overrides)
+
+
+async def test_runs_are_listed_newest_first_for_everyone_or_for_one_topic(db) -> None:
+    await store.add_run(db, report(1, at=NOW - timedelta(hours=3), results=4, known=1, proposed=3))
+    await store.add_run(db, report(2, "nothing_new", at=NOW - timedelta(hours=2)))
+    await store.add_run(db, report(1, "failed", at=NOW - timedelta(hours=1)))
+
+    everyone = await store.list_runs(db)
+    one = await store.list_runs(db, topic_id=1, limit=1)
+
+    assert [(r.topic_id, r.outcome) for r in everyone] == [(1, "failed"), (2, "nothing_new"), (1, "found")]
+    assert [(r.outcome, r.error) for r in one] == [("failed", "the source said no")]
+    assert (everyone[2].results, everyone[2].known, everyone[2].proposed) == (4, 1, 3)
+
+
+async def test_a_failure_or_skip_that_repeats_the_previous_run_is_written_once_a_utc_day(db) -> None:
+    first = await store.add_run(db, report(1, "skipped", at=NOW))
+    again = await store.add_run(db, report(1, "skipped", at=NOW + timedelta(hours=5)))
+    other_topic = await store.add_run(db, report(2, "skipped", at=NOW))
+    tomorrow = await store.add_run(db, report(1, "skipped", at=NOW + timedelta(days=1)))
+    failures = [
+        await store.add_run(db, report(1, "failed", at=NOW + timedelta(days=2, minutes=m), error=error))
+        for m, error in ((1, "down"), (2, "down"), (3, "bad key"), (4, "bad key"))
+    ]
+
+    assert (first, again, other_topic, tomorrow) == (True, False, True, True)
+    assert failures == [True, False, True, False]
+    assert len(await store.list_runs(db, topic_id=1)) == 4
+
+
+async def test_a_skip_after_a_run_that_went_through_is_written_though_one_came_earlier_the_same_day(db) -> None:
+    await store.add_run(db, report(1, "skipped", at=NOW))
+    await store.add_run(db, report(1, "found", at=NOW + timedelta(hours=9)))
+
+    again = await store.add_run(db, report(1, "skipped", at=NOW + timedelta(hours=19)))
+
+    assert again is True
+    assert [r.outcome for r in await store.list_runs(db, topic_id=1)] == ["skipped", "found", "skipped"]
+
+
+async def test_a_run_older_than_the_retention_goes_with_the_next_one_written(db) -> None:
+    await store.add_run(db, report(1, at=NOW - store.RUN_RETENTION - timedelta(days=1)))
+    await store.add_run(db, report(1, at=NOW - store.RUN_RETENTION + timedelta(days=1)))
+    assert len(await store.list_runs(db)) == 2
+
+    await store.add_run(db, report(1, at=NOW))
+
+    assert len(await store.list_runs(db)) == 2
+
+
+async def test_a_topics_last_run_is_its_newest_and_a_run_outlives_its_topic(db) -> None:
+    topic = await store.add_topic(db, phrase="gold", language="", interval_minutes=60, max_videos_per_run=3, added_by="operator")
+    await store.add_topic(db, phrase="never searched", language="", interval_minutes=60, max_videos_per_run=3, added_by="operator")
+    await store.add_run(db, report(topic.id, "failed", at=NOW - timedelta(hours=2)))
+    await store.add_run(db, report(topic.id, "found", at=NOW - timedelta(hours=1)))
+
+    last = await store.last_runs(db)
+    await store.remove_topic(db, topic.id)
+
+    assert {topic_id: run.outcome for topic_id, run in last.items()} == {topic.id: "found"}
+    assert len(await store.list_runs(db, topic_id=topic.id)) == 2

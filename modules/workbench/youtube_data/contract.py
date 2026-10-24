@@ -12,7 +12,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from . import loop_settings
-from .models import Candidate, Channel, IgnoredChannel, LoopSettings, Prompt, Topic
+from .models import Candidate, Channel, IgnoredChannel, LoopSettings, Prompt, Topic, TopicRun
 from .store import Film, ReadingRow
 
 SCORE = "what a model made of this film's market impact, 1..10 — 1 is commentary with nothing new, 10 a global event"
@@ -217,6 +217,39 @@ class ChannelAddedOut(BaseModel):
     created: bool = Field(description="false where the channel was already on the list, which is left as it was")
 
 
+class TopicRunOut(BaseModel):
+    """One attempt to search a topic. The counts are of what the source returned: known or settled, outside the length bounds,
+    and the rest — which became candidates, proposed, rejected or offered unscreened."""
+
+    id: int
+    topic_id: int
+    phrase: str = Field(description="what was searched, as it stood then — the topic may since have gone")
+    ran_at: datetime
+    outcome: Literal["found", "nothing_new", "failed", "skipped"] = Field(
+        description="found: new candidates · nothing_new: the source answered, nothing to offer · failed: the source refused "
+        "· skipped: the source's day could not pay for a search, written once per topic per UTC day"
+    )
+    results: int = Field(description="what the source returned")
+    known: int = Field(description="of them, films the archive has, has offered, or whose channel is followed or ignored")
+    out_of_bounds: int = Field(description="of them, too short or too long to be worth a transcript")
+    proposed: int
+    rejected: int
+    unscreened: int
+    unscreened_reason: Literal["no_model", "day_spent", "unusable", "failed", "no_verdict"] | None = Field(
+        default=None, description="why the candidates have no verdict, where `unscreened` is not zero"
+    )
+    error: str | None = Field(default=None, description="why a run failed or was skipped")
+
+    @classmethod
+    def of(cls, run: TopicRun) -> TopicRunOut:
+        return cls(**{name: getattr(run, name) for name in cls.model_fields})
+
+
+class TopicRunsOut(BaseModel):
+    runs: list[TopicRunOut] = Field(description="newest first")
+    retention_days: int = Field(description="how long a run is kept")
+
+
 class TopicOut(BaseModel):
     id: int
     phrase: str
@@ -227,9 +260,12 @@ class TopicOut(BaseModel):
     added_by: Literal["operator", "agent"]
     added_at: datetime
     last_run_at: datetime | None = None
+    last_run: TopicRunOut | None = Field(
+        default=None, description="how the latest search ended; filled by the list, null before the first one"
+    )
 
     @classmethod
-    def of(cls, topic: Topic) -> TopicOut:
+    def of(cls, topic: Topic, last_run: TopicRun | None = None) -> TopicOut:
         return cls(
             id=topic.id,
             phrase=topic.phrase,
@@ -240,6 +276,7 @@ class TopicOut(BaseModel):
             added_by=topic.added_by,  # type: ignore[arg-type]
             added_at=topic.added_at,
             last_run_at=topic.last_run_at,
+            last_run=None if last_run is None else TopicRunOut.of(last_run),
         )
 
 

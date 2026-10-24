@@ -133,3 +133,19 @@ async def test_a_channel_from_before_the_filter_has_none_and_a_filtered_out_film
             await conn.execute("UPDATE videos SET state = 'filtered_out' WHERE video_id = 'v1'")
     finally:
         await conn.close()
+
+
+async def test_a_run_that_failed_or_was_skipped_must_say_why(old_database: str) -> None:
+    config = alembic_config(MIGRATIONS, sqlalchemy_url(old_database))
+    await asyncio.to_thread(command.upgrade, config, "head")
+
+    conn = await asyncpg.connect(asyncpg_dsn(old_database))
+    try:
+        for outcome in ("failed", "skipped"):
+            with pytest.raises(asyncpg.CheckViolationError):
+                await conn.execute(
+                    "INSERT INTO topic_runs (topic_id, phrase, ran_at, outcome) VALUES (1, 'gold', now(), $1)", outcome
+                )
+        await conn.execute("INSERT INTO topic_runs (topic_id, phrase, ran_at, outcome) VALUES (1, 'gold', now(), 'nothing_new')")
+    finally:
+        await conn.close()
