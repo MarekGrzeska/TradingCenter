@@ -8,11 +8,11 @@
 
 ## 2. Język formuł
 
-- [ ] 2.1 Parser: `ast.parse(mode="eval")`, biała lista węzłów, sufit długości i głębokości; test na każdy typ węzła spoza listy i test, że źródło pakietu nie woła `eval`/`exec`/`compile`
-- [ ] 2.2 Rejestr funkcji własnych (sygnatury, typy, gdzie dozwolone) jako jedno źródło dla walidatora i `GET /language`
-- [ ] 2.3 Funkcje katalogu z `GET /market/indicators`: tylko wyjście liniowe, parametry pozycyjnie i po nazwie, zakresy z katalogu, wybór linii polem
-- [ ] 2.4 Sprawdzanie nazw i typów: zmienne `let` (cykle, przesłanianie), `p.*` wobec `params`, stan pozycji tylko w wyjściach, `@` z rozdzielczością albo symbolem, przesunięcia i okna w granicach; błędy ze ścieżką, kolumną i podpowiedzią najbliższej nazwy
-- [ ] 2.5 Testy jednostkowe walidacji: każdy powód odrzucenia raz, każda konstrukcja przyjęta raz
+- [x] 2.1 Parser: `ast.parse(mode="eval")`, biała lista węzłów, sufit długości i głębokości; test na każdy typ węzła spoza listy i test, że źródło pakietu nie woła `eval`/`exec`/`compile`
+- [x] 2.2 Rejestr funkcji własnych (sygnatury, typy, gdzie dozwolone) jako jedno źródło dla walidatora i `GET /language`
+- [x] 2.3 Funkcje katalogu z `GET /market/indicators`: tylko wyjście liniowe, parametry pozycyjnie i po nazwie, zakresy z katalogu, wybór linii polem
+- [x] 2.4 Sprawdzanie nazw i typów: zmienne `let` (cykle, przesłanianie), `p.*` wobec `params`, stan pozycji tylko w wyjściach, `@` z rozdzielczością albo symbolem, przesunięcia i okna w granicach; błędy ze ścieżką, kolumną i podpowiedzią najbliższej nazwy
+- [x] 2.5 Testy jednostkowe walidacji: każdy powód odrzucenia raz, każda konstrukcja przyjęta raz
 
 ## 3. Dokumenty i rewizje
 
