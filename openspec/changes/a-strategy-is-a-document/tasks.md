@@ -57,7 +57,7 @@
 
 ## 9. Dokumentacja i wdrożenie
 
-- [ ] 9.1 `strategies/README.md`; `modules/workbench/README.md`, tabela pakietów i klucze blokad w `CLAUDE.md`, `docs/architecture.md`; przykład w `docs/strategie-i-backtesty-research.html` w formie katalogu (`ema(20)`, nie `ema(close, 20)`)
-- [ ] 9.2 `STRATEGIES_DB_PASSWORD` w środowisku GitHub `vps` przed merge (`fill-github-environment.sh`)
+- [x] 9.1 `strategies/README.md`; `modules/workbench/README.md`, tabela pakietów i klucze blokad w `CLAUDE.md`, `docs/architecture.md`; przykład w `docs/strategie-i-backtesty-research.html` w formie katalogu (`ema(20)`, nie `ema(close, 20)`)
+- [x] 9.2 `STRATEGIES_DB_PASSWORD` w środowisku GitHub `vps` przed merge (`fill-github-environment.sh`)
 - [ ] 9.3 Po merge skill `deploy-watch`; skrypty kopii zainstalowane na serwerze i sprawdzony nocny zrzut z `strategies`
-- [ ] 9.4 `review.md`
+- [x] 9.4 `review.md`

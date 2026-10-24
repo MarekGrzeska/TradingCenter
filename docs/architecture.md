@@ -30,7 +30,8 @@ may not".
   │  social_data      /social      the post archive    │
   │  telegram_gateway /telegram    the door out        │
   │  alerts           /alerts      who is told what    │
-  │  seven databases · one identity · one Easy Auth    │◀── OpenAI ×2
+  │  strategies       /strategies  backtests, no orders│
+  │  ten databases · one identity · one door           │◀── OpenAI ×2
   └───────────┬───────────────────────────┬────────────┘
               │ REST + WS, the operator's │ REST, the operator's token
               ▼          token            ▼

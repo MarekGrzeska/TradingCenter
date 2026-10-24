@@ -448,10 +448,10 @@
   <span class="s">"timeframe"</span>: <span class="s">"HOUR"</span>,
   <span class="s">"params"</span>: {<span class="s">"fast"</span>: {<span class="s">"default"</span>: 20, <span class="s">"min"</span>: 10, <span class="s">"max"</span>: 30, <span class="s">"step"</span>: 5}},
   <span class="s">"let"</span>: {
-    <span class="s">"fast"</span>:     <span class="s">"ema(close, p.fast)"</span>,
-    <span class="s">"slow"</span>:     <span class="s">"ema(close, 50)"</span>,
+    <span class="s">"fast"</span>:     <span class="s">"ema(p.fast)"</span>,
+    <span class="s">"slow"</span>:     <span class="s">"ema(50)"</span>,
     <span class="s">"atr"</span>:      <span class="s">"atr(14)"</span>,
-    <span class="s">"trend_h4"</span>: <span class="s">"ema(close @ HOUR_4, 20) &gt; ema(close @ HOUR_4, 50)"</span>,
+    <span class="s">"trend_h4"</span>: <span class="s">"ema(20) @ HOUR_4 &gt; ema(50) @ HOUR_4"</span>,
     <span class="s">"pullback"</span>: <span class="s">"low &lt;= fast and close &gt; fast"</span>
   },
   <span class="s">"entries"</span>: [{
@@ -460,8 +460,8 @@
     <span class="s">"order"</span>: {<span class="s">"type"</span>: <span class="s">"stop"</span>, <span class="s">"price"</span>: <span class="s">"high + 0.1 * atr"</span>, <span class="s">"expires_bars"</span>: 3}
   }],
   <span class="s">"exits"</span>: {
-    <span class="s">"stop"</span>:     <span class="s">"entry.price - 2 * entry.atr"</span>,
-    <span class="s">"target"</span>:   <span class="s">"entry.price + 3 * entry.atr"</span>,
+    <span class="s">"stop"</span>:     <span class="s">"entry_price - 2 * at_entry(atr)"</span>,
+    <span class="s">"target"</span>:   <span class="s">"entry_price + 3 * at_entry(atr)"</span>,
     <span class="s">"trail"</span>:    {<span class="s">"after_r"</span>: 1.5, <span class="s">"distance"</span>: <span class="s">"1.5 * atr"</span>},
     <span class="s">"when"</span>:     <span class="s">"crosses_below(close, slow)"</span>,
     <span class="s">"max_bars"</span>: 48
@@ -794,13 +794,13 @@
           <tbody>
             <tr><td><b>Serie bazowe</b></td><td><code>open high low close volume</code></td><td>Wszystko, co jest w świecy.</td></tr>
             <tr><td><b>Wstecz</b></td><td><code>close[1]</code>, <code>highest(high, 20)[1]</code></td><td>Formacje, wybicia, porównania z przeszłością. Ujemny indeks jest odrzucany.</td></tr>
-            <tr><td><b>Wskaźniki z katalogu</b></td><td><code>ema(close, 20)</code>, <code>rsi(14)</code>, <code>bbands(20, 2).upper</code></td><td>Cały katalog <code>/market</code>. Nowy wpis w katalogu od razu staje się funkcją, bez zmiany w silniku.</td></tr>
+            <tr><td><b>Wskaźniki z katalogu</b></td><td><code>ema(20)</code>, <code>rsi(14)</code>, <code>bbands(20, 2).upper</code></td><td>Cały katalog <code>/market</code>. Nowy wpis w katalogu od razu staje się funkcją, bez zmiany w silniku.</td></tr>
             <tr><td><b>Inny interwał</b></td><td><code>close @ HOUR_4</code></td><td>Strategie wieloczasowe. Silnik dopasowuje serię do ostatniej zamkniętej świecy H4.</td></tr>
             <tr><td><b>Inny instrument jako filtr</b></td><td><code>close @ US500</code>, <code>close @ US500 @ DAY</code></td><td>Handel nadal na jednym instrumencie, ale warunek może czytać inny, np. „long US100 tylko gdy US500 też jest nad EMA200”. Później także ropa czy rentowności obligacji, gdy trafią do archiwum (<a href="#decyzje">sekcja 12</a>).</td></tr>
             <tr><td><b>Zmienne nazwane</b></td><td>sekcja <code>let</code></td><td>Czytelność i ponowne użycie. Silnik sprawdza, czy zmienne nie odwołują się do siebie w kółko.</td></tr>
             <tr><td><b>Zdarzenia</b></td><td><code>crosses_above(a, b)</code>, <code>bars_since(cond)</code>, <code>value_when(cond, x)</code></td><td>„Setup uzbrojony 5 świec temu”, „cena przy ostatnim wybiciu”. To zastępuje pętle.</td></tr>
             <tr><td><b>Czas</b></td><td><code>hour</code>, <code>weekday</code>, <code>session_high("asia")</code></td><td>Filtry sesji, strategie otwarcia, unikanie weekendu.</td></tr>
-            <tr><td><b>Stan pozycji</b></td><td><code>entry.price</code>, <code>entry.atr</code>, <code>bars_in_trade</code>, <code>open_r</code></td><td>Wyjścia zależne od przebiegu transakcji, przesuwanie stopu na wejście.</td></tr>
+            <tr><td><b>Stan pozycji</b></td><td><code>entry_price</code>, <code>at_entry(atr(14))</code>, <code>bars_in_trade</code>, <code>open_r</code></td><td>Wyjścia zależne od przebiegu transakcji, przesuwanie stopu na wejście.</td></tr>
             <tr><td><b>Historia transakcji</b></td><td><code>losses_in_row</code>, <code>last_trade.r</code></td><td>„Po dwóch stratach z rzędu pauza na dzień”.</td></tr>
             <tr><td><b>Parametry</b></td><td><code>p.fast</code></td><td>Strojenie i walidacja bez zmiany dokumentu.</td></tr>
           </tbody>
@@ -818,7 +818,7 @@
 
       <h3 class="sub">Droga dokumentu do silnika</h3>
       <ul class="plain">
-        <li><strong>Parsowanie bez wykonywania.</strong> Formuły mają składnię wyrażeń Pythona, więc parsuje je standardowy moduł <code>ast</code> (<code>mode="eval"</code>), a nie <code>eval</code>. Dozwolone są tylko konkretne typy węzłów: liczby, nazwy, działania, porównania, <code>and/or/not</code>, wywołania funkcji z białej listy, pole (<code>entry.price</code>), indeks <code>[n]</code> z nieujemną stałą i operator <code>@</code>. Wszystko inne jest odrzucane. <code>close[-1]</code> parsuje się poprawnie, więc musi go odrzucić walidator, nie parser. <code>close @ HOUR_4</code> i <code>close[1]</code> parsują się natywnie, a każdy model językowy zna tę składnię.</li>
+        <li><strong>Parsowanie bez wykonywania.</strong> Formuły mają składnię wyrażeń Pythona, więc parsuje je standardowy moduł <code>ast</code> (<code>mode="eval"</code>), a nie <code>eval</code>. Dozwolone są tylko konkretne typy węzłów: liczby, nazwy, działania, porównania, <code>and/or/not</code>, wywołania funkcji z białej listy, pole (<code>p.fast</code>, linia wskaźnika <code>bbands(20, 2).upper</code>), indeks <code>[n]</code> z nieujemną stałą i operator <code>@</code>. Wszystko inne jest odrzucane. <code>close[-1]</code> parsuje się poprawnie, więc musi go odrzucić walidator, nie parser. <code>close @ HOUR_4</code> i <code>close[1]</code> parsują się natywnie, a każdy model językowy zna tę składnię.</li>
         <li><strong>Walidacja przy zapisie.</strong> Silnik sprawdza nazwy (czy funkcja istnieje w rejestrze, wskaźnik w katalogu, parametr w <code>params</code>), typy (seria, liczba, warunek), cykle w <code>let</code>, dostępność danych w archiwum (symbol, interwał, zakres) i od razu wylicza potrzebną rozgrzewkę. Dokument, który nie przejdzie walidacji, nie zostaje zapisany.</li>
         <li><strong>Błędy dla człowieka i agenta.</strong> Lista z adresem i podpowiedzią, np. <code>entries[0].when, kol. 14: nieznana funkcja "emaa" — czy chodziło o "ema"?</code> Dzięki temu agent poprawia dokument sam, w pętli.</li>
         <li><strong>Niezmienna rewizja.</strong> Zapisany dokument dostaje numer rewizji i hash treści. Edycja tworzy nową rewizję. Raport zawsze wskazuje, której rewizji dotyczy.</li>
@@ -926,8 +926,8 @@
         <table>
           <thead><tr><th>Co</th><th>Przykład</th><th>Ile pozycji i na czym</th><th>Stan</th></tr></thead>
           <tbody>
-            <tr><td><b>Inny interwał tego samego instrumentu</b></td><td>„Long US100 na H1 tylko w trendzie na H4”: <code>ema(close @ HOUR_4, 20) &gt; ema(close @ HOUR_4, 50)</code></td><td>jedna, US100</td><td><span class="tag ok">etap 1</span></td></tr>
-            <tr><td><b>Inny instrument jako filtr</b></td><td>„Long US100 tylko gdy US500 też jest nad EMA200”: <code>close @ US500 &gt; ema(close @ US500, 200)</code>. Oba zapisy da się łączyć: <code>close @ US500 @ DAY</code>.</td><td>jedna, US100; drugi instrument jest tylko czytany</td><td><span class="tag ok">etap 1</span></td></tr>
+            <tr><td><b>Inny interwał tego samego instrumentu</b></td><td>„Long US100 na H1 tylko w trendzie na H4”: <code>ema(20) @ HOUR_4 &gt; ema(50) @ HOUR_4</code></td><td>jedna, US100</td><td><span class="tag ok">etap 1</span></td></tr>
+            <tr><td><b>Inny instrument jako filtr</b></td><td>„Long US100 tylko gdy US500 też jest nad EMA200”: <code>close @ US500 &gt; ema(200) @ US500</code>. Oba zapisy da się łączyć: <code>close @ US500 @ DAY</code>.</td><td>jedna, US100; drugi instrument jest tylko czytany</td><td><span class="tag ok">etap 1</span></td></tr>
             <tr class="void"><td>Rotacja (<code>rank</code>)</td><td>„Trzymaj ten z 5 indeksów, który najmocniej rósł przez 20 dni”</td><td>wybór, <em>czym</em> handlować, czyli portfel</td><td><span class="tag stop">wykluczone decyzją</span></td></tr>
           </tbody>
         </table>
