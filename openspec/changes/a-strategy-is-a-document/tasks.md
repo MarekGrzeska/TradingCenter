@@ -16,10 +16,10 @@
 
 ## 3. Dokumenty i rewizje
 
-- [ ] 3.1 Model dokumentu (sekcje z `strategies-documents`, pola nieznane jako odmowa, stop obowiązkowy, `schema`)
-- [ ] 3.2 Walidacja zależna od archiwum: symbol i rozdzielczość dostępne, `MINUTE` instrumentu handlowanego (odczyt `/market` w procesie)
-- [ ] 3.3 Zapis: rewizja n+1 z hashem, brak rewizji przy treści równej ostatniej, archiwizacja i przywrócenie, brak usuwania
-- [ ] 3.4 Testy: rewizje niezmienne, ponowny zapis tej samej treści, dokument ze schematu przyszłego (`-m db` tylko tam, gdzie zapis)
+- [x] 3.1 Model dokumentu (sekcje z `strategies-documents`, pola nieznane jako odmowa, stop obowiązkowy, `schema`)
+- [x] 3.2 Walidacja zależna od archiwum: symbol i rozdzielczość dostępne, `MINUTE` instrumentu handlowanego (odczyt `/market` w procesie)
+- [x] 3.3 Zapis: rewizja n+1 z hashem, brak rewizji przy treści równej ostatniej, archiwizacja i przywrócenie, brak usuwania
+- [x] 3.4 Testy: rewizje niezmienne, ponowny zapis tej samej treści, dokument ze schematu przyszłego (`-m db` tylko tam, gdzie zapis)
 
 ## 4. Silnik backtestu
 

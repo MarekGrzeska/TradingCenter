@@ -37,6 +37,10 @@ class Arg(str, Enum):
 # The furthest back an offset or a window reaches, and so the most warm-up one formula can ask for.
 MAX_BARS = 5000
 
+# What the archive computes from a collected minute series rather than collecting (`market_data/rollups.py`, DERIVABLE).
+# DAY and WEEK follow the venue's session there, so they have to be collected to be read.
+DERIVED_FROM_MINUTE: tuple[str, ...] = ("MINUTE_5", "MINUTE_15", "MINUTE_30", "HOUR", "HOUR_4")
+
 RESOLUTIONS: tuple[str, ...] = ("MINUTE", "MINUTE_5", "MINUTE_15", "MINUTE_30", "HOUR", "HOUR_4", "DAY", "WEEK")
 
 SERIES: dict[str, str] = {

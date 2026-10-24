@@ -63,3 +63,14 @@ def settings() -> Settings:
 @pytest.fixture
 def app():
     return create_app()
+
+
+@pytest.fixture
+async def pool(migrated_url: str):
+    """A pool over the migrated database, emptied first."""
+    from tc_runtime.db import pool as make_pool
+
+    async with make_pool(migrated_url, max_size=5) as created:
+        async with created.acquire() as conn:
+            await conn.execute(f"TRUNCATE {', '.join(TABLES)} RESTART IDENTITY CASCADE")
+        yield created
