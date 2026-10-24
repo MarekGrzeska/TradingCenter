@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import copy
+
 from strategies.checking import ParamDecl, Scope
 from strategies.vocabulary import Indicator, Place, Type, catalogue_from_wire
 
@@ -42,3 +44,44 @@ def scope(
         lets=lets or {},
         catalogue=catalogue(),
     )
+
+
+TRACKED = {("US100", "MINUTE"), ("US500", "MINUTE"), ("US500", "DAY")}
+
+_DOCUMENT = {
+    "schema": 1,
+    "name": "US100 pullback in an H4 trend",
+    "hypothesis": "An H1 trend agreeing with H4 continues after a pullback to its EMA.",
+    "symbol": "US100",
+    "timeframe": "HOUR",
+    "params": {"fast": {"default": 20, "min": 10, "max": 30, "step": 5}},
+    "let": {
+        "fast": "ema(p.fast)",
+        "slow": "ema(50)",
+        "trend_h4": "ema(20) @ HOUR_4 > ema(50) @ HOUR_4",
+        "pullback": "low <= fast and close > fast",
+    },
+    "entries": [
+        {
+            "side": "long",
+            "when": "trend_h4 and fast > slow and pullback and close @ US500 > ema(200) @ US500 @ DAY",
+            "order": {"type": "stop", "price": "high + 0.1 * atr(14)", "expires_bars": 3},
+        }
+    ],
+    "exits": {
+        "stop": "entry_price - 2 * at_entry(atr(14))",
+        "target": "entry_price + 3 * at_entry(atr(14))",
+        "trail": {"after_r": 1.5, "distance": "1.5 * atr(14)"},
+        "when": "crosses_below(close, slow)",
+        "max_bars": 48,
+    },
+    "sizing": {"mode": "risk_fraction", "value": 0.005},
+    "limits": {"daily_stop_r": -2, "no_entry": "weekday == FRIDAY and hour >= 18"},
+}
+
+
+def document(**changes) -> dict:
+    """A document that passes, with top-level sections replaced by `changes`."""
+    built = copy.deepcopy(_DOCUMENT)
+    built.update(changes)
+    return built

@@ -46,6 +46,8 @@ class Scope:
     params: Mapping[str, ParamDecl]
     lets: Mapping[str, Type]
     catalogue: Mapping[str, Indicator]
+    # Variables declared but refused where they are defined; reading one is not a second defect.
+    untyped_lets: frozenset[str] = frozenset()
 
 
 @dataclass
@@ -79,6 +81,12 @@ def check(node: f.Node, scope: Scope, path: str, expected: Type) -> list[Problem
     return walk.problems
 
 
+def infer(node: f.Node, scope: Scope, path: str) -> tuple[Type | None, list[Problem]]:
+    """The type a `let` formula gives, and its problems — a variable may hold either a number or a condition."""
+    walk = _Walk(scope, path)
+    return _type(node, walk, _Context()), walk.problems
+
+
 def let_order(references: Mapping[str, set[str]]) -> tuple[list[str], list[str]]:
     """The `let` names in an order where each comes after every name it uses, and the names that cannot be ordered —
     those in a cycle and those that use one. Kahn's algorithm, so no recursion however long the chain."""
@@ -109,14 +117,14 @@ def names_used(node: f.Node) -> set[str]:
     def walk(n: f.Node) -> None:
         if isinstance(n, f.Name):
             found.add(n.id)
-        for child in _children(n):
+        for child in children(n):
             walk(child)
 
     walk(node)
     return found
 
 
-def _children(n: f.Node) -> tuple[f.Node, ...]:
+def children(n: f.Node) -> tuple[f.Node, ...]:
     if isinstance(n, f.Neg | f.Not):
         return (n.operand,)
     if isinstance(n, f.Arith):
@@ -144,7 +152,7 @@ def _type(n: f.Node, w: _Walk, ctx: _Context) -> Type | None:
     if isinstance(n, f.Param):
         return Type.NUMBER if _declared(n, w) is not None else None
     if isinstance(n, f.Neg | f.Arith):
-        for child in _children(n):
+        for child in children(n):
             _expect(child, Type.NUMBER, w, ctx, "arithmetic works on numbers")
         return Type.NUMBER
     if isinstance(n, f.Compare):
@@ -152,7 +160,7 @@ def _type(n: f.Node, w: _Walk, ctx: _Context) -> Type | None:
             _expect(child, Type.NUMBER, w, ctx, "a comparison compares numbers; join conditions with and / or")
         return Type.CONDITION
     if isinstance(n, f.Logic | f.Not):
-        for child in _children(n):
+        for child in children(n):
             _expect(child, Type.CONDITION, w, ctx, f"`{getattr(n, 'op', 'not')}` joins conditions")
         return Type.CONDITION
     if isinstance(n, f.IfElse):
@@ -222,6 +230,8 @@ def _name(n: f.Name, w: _Walk, ctx: _Context) -> Type | None:
         return Type.NUMBER
     if name in RESOLUTIONS:
         w.refuse(n, f"`{name}` is a resolution; it stands only on the right of `@`", hint=f"close @ {name}")
+        return None
+    if name in w.scope.untyped_lets:
         return None
     if name in w.scope.lets:
         if ctx.elsewhere:
@@ -375,17 +385,15 @@ def _closest(name: str, candidates) -> str | None:
     return found[0] if found else None
 
 
-def reserved_problem(name: str, path: str, catalogue: Mapping[str, Indicator]) -> Problem | None:
-    """A `let` name that would hide a name of the language or of the catalogue. Compared as Python's parser will read it:
-    NFKC-normalised, so `ｃｌｏｓｅ` is `close`, and never a keyword, which no formula could refer to."""
+def unreadable_name(name: str) -> bool:
+    """A name no formula could refer to as written: Python's parser NFKC-normalises it (`ｃｌｏｓｅ` is `close`) or reads it
+    as a keyword."""
     read_as = unicodedata.normalize("NFKC", name)
-    if (
-        read_as != name
-        or read_as in RESERVED
-        or read_as in catalogue
-        or not read_as.isidentifier()
-        or keyword.iskeyword(read_as)
-        or keyword.issoftkeyword(read_as)
-    ):
+    return read_as != name or not name.isidentifier() or keyword.iskeyword(name) or keyword.issoftkeyword(name)
+
+
+def reserved_problem(name: str, path: str, catalogue: Mapping[str, Indicator]) -> Problem | None:
+    """A `let` name that would hide a name of the language or of the catalogue, or one no formula could read."""
+    if unreadable_name(name) or name in RESERVED or name in catalogue:
         return Problem(path, f"`{name}` cannot name a variable: it is a name of the language or not a name at all")
     return None
