@@ -22,7 +22,7 @@ to need something a package cannot give it, the change is wrong, not the rule.
 | Where | What |
 |---|---|
 | `modules/capital-gateway` | capital.com: trading, deep history, live stream. Demo only, and the only door to the provider. |
-| `modules/workbench` | one process, nine packages that never import each other: the conversation (`agent`), the teams (`teams`, `teams_tools`), three archives under `/market`, `/polymarket`, `/social`, the one door to Telegram under `/telegram`, the YouTube archive under `/youtube` and the rules that decide who is told what under `/alerts` — **those last two mounted only when `YOUTUBE_DATABASE_URL` / `ALERTS_DATABASE_URL` is set**. Six schemas (eight with both), three OpenAI keys. What each package may write: `modules/workbench/README.md`. Every package's tools reach the conversation as functions, not over MCP. |
+| `modules/workbench` | one process, ten packages that never import each other: the conversation (`agent`), the teams (`teams`, `teams_tools`), three archives under `/market`, `/polymarket`, `/social`, the one door to Telegram under `/telegram`, the YouTube archive under `/youtube`, the rules that decide who is told what under `/alerts` and the strategy engine under `/strategies` (strategies as documents, backtests, never an order) — **those last three mounted only when `YOUTUBE_`/`ALERTS_`/`STRATEGIES_DATABASE_URL` is set**. Six schemas (nine with all), three OpenAI keys. What each package may write: `modules/workbench/README.md`. Every package's tools reach the conversation as functions, not over MCP. |
 | `modules/trading-mcp` | MCP tools over the gateway's demo account. Network transport only, one named caller (the workbench). Demo checked against the gateway, not against a setting. |
 | `modules/terminal` | React+TS · the operator's screen. Consumes the others, publishes nothing. Call it the **terminal**, never a "console" or "dashboard". |
 | `modules/pocket` | React+TS · the archive on a phone, and a chat with the workbench beside it. A second consumer, sharing the terminal's generated contract and none of its code. |
@@ -154,7 +154,7 @@ images back otherwise; a check of "the container runs" is not enough (Azure repo
 crash-looping container on 16 August 2026).
 
 Each module does this in its own `lifespan`, under a Postgres advisory lock keyed per module (in the
-workbench 8020, 8030, 8050, 8070, 8090, 8100, YouTube's 8110 and alerts' 8120 — the port each package used to have, then the next free number), with
+workbench 8020, 8030, 8050, 8070, 8090, 8100, YouTube's 8110, alerts' 8120 and strategies' 8130 — the port each package used to have, then the next free number), with
 its own identity. Reasoning: `openspec/changes/archive/…-modules-migrate-their-own-database`.
 
 Each role owns its database from the start: `deploy/postgres/ensure-databases.sh` creates both on every
