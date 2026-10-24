@@ -1,11 +1,9 @@
-"""Golden strategies: reference documents run on seeded synthetic minutes, their results recorded in `golden.json` beside
-`ENGINE_VERSION`. A change to the engine that moves any result has to raise that number (`strategies-backtest`).
-
-The archive's indicators are recorded too — computed once by its own kernel in `regenerate.py` — so the test reads no
-archive and depends on no package but this one."""
+"""Golden strategies: reference documents on seeded synthetic minutes, results and the archive's indicator lines recorded
+in `golden.json` beside `ENGINE_VERSION`, which any change that moves a result has to raise."""
 
 from __future__ import annotations
 
+import functools
 import json
 import pathlib
 from dataclasses import asdict, dataclass
@@ -22,7 +20,7 @@ from strategies.requirements import IndicatorKey, needs
 from strategies.series import Series
 
 from ..builders import catalogue
-from ..market import MONDAY, minutes, walk
+from ..market import MONDAY, bars, minutes, walk
 
 RECORDING = pathlib.Path(__file__).with_name("golden.json")
 DAYS = 21
@@ -31,27 +29,13 @@ PROFILE = [2.5] * 7 + [1.0] * 14 + [2.5] * 3  # wide at night, narrow through th
 COSTS = CostModel(spread=PROFILE, slippage=0.3, overnight_long=0.0002, overnight_short=0.0001, rollover_hour=22)
 
 
-def _bars(minute: Series, resolution: str, seconds: int) -> Series:
-    buckets = minute.starts // seconds * seconds
-    starts, first = np.unique(buckets, return_index=True)
-    last = np.append(first[1:], len(buckets)) - 1
-    columns = {
-        "open": minute.columns["open"][first],
-        "close": minute.columns["close"][last],
-        "high": np.maximum.reduceat(minute.columns["high"], first),
-        "low": np.minimum.reduceat(minute.columns["low"], first),
-        "volume": np.add.reduceat(minute.columns["volume"], first),
-    }
-    return Series(resolution, starts, starts + seconds, columns)
-
-
 def series() -> dict[tuple[str, str], Series]:
     out = {}
     for symbol, seed, price in (("US100", 11, 18_000.0), ("US500", 12, 5_000.0)):
         minute = minutes(walk(DAYS, seed=seed, start_price=price))
         out[(symbol, "MINUTE")] = minute
-        out[(symbol, "HOUR")] = _bars(minute, "HOUR", 3600)
-        out[(symbol, "HOUR_4")] = _bars(minute, "HOUR_4", 14400)
+        out[(symbol, "HOUR")] = bars(minute, "HOUR")
+        out[(symbol, "HOUR_4")] = bars(minute, "HOUR_4")
     return out
 
 
@@ -109,6 +93,7 @@ DOCUMENTS: dict[str, dict[str, Any]] = {
 RANGES = {name: (MONDAY + 2 * 86400, MONDAY + (4 if name == "minute_scalp" else DAYS) * 86400) for name in DOCUMENTS}
 
 
+@functools.cache
 def checked(name: str) -> Checked:
     found, problems = validate(DOCUMENTS[name], catalogue(), servable({("US100", "MINUTE"), ("US500", "MINUTE")}))
     assert found is not None, (name, problems)
@@ -142,7 +127,7 @@ def run(name: str, data: dict[tuple[str, str], Series], indicators: dict[Indicat
 
 
 def rounded(value: Any) -> Any:
-    """Six decimals: well under a cent at these prices, and above the last bits two machines may disagree on."""
+    """Six decimals, to keep the recording readable; comparison is `same`, with a tolerance, not equality."""
     if isinstance(value, float):
         return None if not np.isfinite(value) else round(value, 6)
     if isinstance(value, dict):
@@ -163,3 +148,20 @@ def recorded_indicators(recording: dict[str, Any], data: dict[tuple[str, str], S
         out[key] = np.array([np.nan if v is None else v for v in item["values"]], dtype=np.float64)
         assert len(out[key]) == len(data[key.context])
     return out
+
+
+def same(found: Any, recorded: Any, path: str = "") -> str | None:
+    """Where `found` differs from `recorded`, or `None`. Numbers within 1e-6 are the same: two machines may disagree in
+    the last bits, and a rounding boundary would turn that into a difference."""
+    if isinstance(recorded, dict) and isinstance(found, dict):
+        if found.keys() != recorded.keys():
+            return f"{path}: keys {sorted(found.keys() ^ recorded.keys())}"
+        return next((d for k in recorded if (d := same(found[k], recorded[k], f"{path}.{k}"))), None)
+    if isinstance(recorded, list) and isinstance(found, list):
+        if len(found) != len(recorded):
+            return f"{path}: {len(found)} items, recorded {len(recorded)}"
+        return next((d for i, (a, b) in enumerate(zip(found, recorded, strict=True)) if (d := same(a, b, f"{path}[{i}]"))), None)
+    numbers = (int, float)
+    if isinstance(recorded, numbers) and isinstance(found, numbers) and not isinstance(recorded, bool):
+        return None if abs(found - recorded) <= 1e-6 + 1e-9 * abs(recorded) else f"{path}: {found} vs {recorded}"
+    return None if found == recorded else f"{path}: {found!r} vs {recorded!r}"
