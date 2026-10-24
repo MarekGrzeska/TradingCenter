@@ -56,6 +56,9 @@ class _Context:
 
     symbol: str | None = None
     resolution: str | None = None
+    # Inside an offset or a function over bars: a series of past values, which the trade's state is not — it exists
+    # one bar at a time, while the engine walks.
+    over_bars: bool = False
 
     @property
     def elsewhere(self) -> bool:
@@ -172,7 +175,7 @@ def _type(n: f.Node, w: _Walk, ctx: _Context) -> Type | None:
         return then or otherwise
     if isinstance(n, f.Lag):
         _bars(n, n.bars, w, minimum=0)
-        return _type(n.value, w, ctx)
+        return _type(n.value, w, _Context(ctx.symbol, ctx.resolution, over_bars=True))
     if isinstance(n, f.At):
         return _at(n, w, ctx)
     if isinstance(n, f.Field):
@@ -209,6 +212,9 @@ def _name(n: f.Name, w: _Walk, ctx: _Context) -> Type | None:
         return Type.NUMBER
     if name in CONSTANTS:
         return Type.NUMBER
+    if (name in POSITION or name in HISTORY) and ctx.over_bars and not ctx.elsewhere:
+        w.refuse(n, f"`{name}` exists one bar at a time, so no offset or function over past bars can read it")
+        return None
     if name in POSITION:
         if place is not Place.EXIT:
             w.refuse(n, f"`{name}` describes the open position, and before an entry there is none; it belongs in exits")
@@ -247,7 +253,7 @@ def _name(n: f.Name, w: _Walk, ctx: _Context) -> Type | None:
 
 
 def _at(n: f.At, w: _Walk, ctx: _Context) -> Type | None:
-    inner = _Context(ctx.symbol, ctx.resolution)
+    inner = _Context(ctx.symbol, ctx.resolution, over_bars=True)
     if n.context in RESOLUTIONS:
         if ctx.resolution is not None:
             w.refuse(n, "one formula reads one resolution under `@`; this one names two")
@@ -271,9 +277,11 @@ def _function(n: f.Call, w: _Walk, ctx: _Context) -> Type | None:
     if spec.places is not None and w.scope.place not in spec.places:
         w.refuse(n, f"`{n.function}` reads the open position, and before an entry there is none; it belongs in exits")
         return None
-    if spec.name == "at_entry" and ctx.elsewhere:
-        w.refuse(n, "`at_entry` is the traded position's bar, and cannot be read under `@`")
+    if spec.name == "at_entry" and (ctx.elsewhere or ctx.over_bars):
+        w.refuse(n, "`at_entry` is the traded position's bar; it cannot be read under `@`, an offset or a window")
         return None
+    # Everything but plain arithmetic reads its arguments as series of past bars; `at_entry` reads one past bar.
+    args_ctx = ctx if spec.name in _PER_BAR else _Context(ctx.symbol, ctx.resolution, over_bars=True)
     if n.kwargs:
         w.refuse(n, f"`{n.function}` takes its arguments in order, not by name", hint=spec.signature())
         return None
@@ -286,8 +294,11 @@ def _function(n: f.Call, w: _Walk, ctx: _Context) -> Type | None:
         if kind is Arg.WINDOW:
             _window(arg, w)
         else:
-            _expect(arg, Type(kind.value), w, ctx, f"argument {index + 1} of {spec.signature()}")
+            _expect(arg, Type(kind.value), w, args_ctx, f"argument {index + 1} of {spec.signature()}")
     return spec.returns
+
+
+_PER_BAR = frozenset({"abs", "min", "max"})
 
 
 def _window(arg: f.Node, w: _Walk) -> None:

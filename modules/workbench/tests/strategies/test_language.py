@@ -112,6 +112,11 @@ def test_the_open_position_in_an_entry_condition_is_refused() -> None:
     assert "before an entry there is none" in problems("close > entry_price")[0]
 
 
+@pytest.mark.parametrize("text", ["open_r[1] > 0", "highest(open_r, 3) > 1", "at_entry(open_r) > 0"])
+def test_the_trades_state_does_not_enter_an_offset_or_a_window(text: str) -> None:
+    assert "one bar at a time" in problems(text, place=Place.EXIT)[0] or "at_entry" in problems(text, place=Place.EXIT)[0]
+
+
 def test_trades_cannot_be_read_by_a_let() -> None:
     assert "computed once" in problems("losses_in_row", place=Place.LET, expected=Type.NUMBER)[0]
 

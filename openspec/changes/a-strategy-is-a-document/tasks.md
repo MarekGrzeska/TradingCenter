@@ -23,13 +23,13 @@
 
 ## 4. Silnik backtestu
 
-- [ ] 4.1 Odczyt serii z `/market` w procesie w miesięcznych porcjach: świece (bez formujących), wskaźniki per kontekst, chwila dostępności, rozgrzewka, fragmenty niepotwierdzone, odcisk danych
-- [ ] 4.2 Faza wektorowa: serie, przesunięcia, okna, zdarzenia, czas, dopasowanie `@` po chwili dostępności, `stale`
-- [ ] 4.3 Broker na `MINUTE`: ask z profilu spreadu, zlecenia `market`/`stop`/`limit` z wygaśnięciem, jedna pozycja i jedno oczekujące zlecenie, stop/cel/trailing/`when`/`max_bars`, luki, rozstrzyganie pesymistyczne z oznaczeniem, koniec zakresu
-- [ ] 4.4 Faza stanowa: interpreter formuł ze stanem pozycji i historią, `at_entry`, `daily_stop_r`, `no_entry`
-- [ ] 4.5 Rozmiar (`risk_fraction`, `fixed_units`), wynik w R i w pieniądzu nominalnym (design D6), finansowanie overnight za każde przekroczenie godziny rozliczenia
-- [ ] 4.6 Testy jednostkowe: każdy scenariusz z `strategies-backtest` raz, na najniższej warstwie; test „naraz = świeca po świecy” i „dłuższy zakres nie zmienia wcześniejszych transakcji”
-- [ ] 4.7 Pomiar na danych dev (rok `MINUTE` US100): czas i pamięć jednego uruchomienia, z tego domyślne limity w `config.py` (design, Open Questions)
+- [x] 4.1 Odczyt serii z `/market` w procesie w miesięcznych porcjach: świece (bez formujących), wskaźniki per kontekst, chwila dostępności, rozgrzewka, fragmenty niepotwierdzone, odcisk danych
+- [x] 4.2 Faza wektorowa: serie, przesunięcia, okna, zdarzenia, czas, dopasowanie `@` po chwili dostępności, `stale`
+- [x] 4.3 Broker na `MINUTE`: ask z profilu spreadu, zlecenia `market`/`stop`/`limit` z wygaśnięciem, jedna pozycja i jedno oczekujące zlecenie, stop/cel/trailing/`when`/`max_bars`, luki, rozstrzyganie pesymistyczne z oznaczeniem, koniec zakresu
+- [x] 4.4 Faza stanowa: interpreter formuł ze stanem pozycji i historią, `at_entry`, `daily_stop_r`, `no_entry`
+- [x] 4.5 Rozmiar (`risk_fraction`, `fixed_units`), wynik w R i w pieniądzu nominalnym (design D6), finansowanie overnight za każde przekroczenie godziny rozliczenia
+- [x] 4.6 Testy jednostkowe: każdy scenariusz z `strategies-backtest` raz, na najniższej warstwie; test „naraz = świeca po świecy” i „dłuższy zakres nie zmienia wcześniejszych transakcji”
+- [x] 4.7 Pomiar na danych dev (rok `MINUTE` US100): czas i pamięć jednego uruchomienia, z tego domyślne limity w `config.py` (design, Open Questions)
 
 ## 5. Uruchomienia jako zadania
 
