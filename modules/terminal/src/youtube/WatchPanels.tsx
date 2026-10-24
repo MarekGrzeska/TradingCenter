@@ -199,6 +199,11 @@ export function TopicsPanel({ client, onChanged }: { client: YoutubeApi; onChang
                   ostatni przebieg: {runOutcomeLabel(topic.lastRun.outcome)} — {runSummary(topic.lastRun)}
                 </span>
               )}
+              {topic.retryAt !== null && topic.retryAt.getTime() > Date.now() && (
+                <span className="block text-xs text-warning">
+                  wstrzymany po odmowie źródła — następna próba nie wcześniej niż {topic.retryAt.toLocaleString("pl-PL")}
+                </span>
+              )}
             </span>
             <Button size="xs" tone="muted" onClick={() => void change(topic, { active: !topic.active })}>
               {topic.active ? "Wstrzymaj" : "Wznów"}

@@ -166,9 +166,15 @@ Screening shares the analyser's key, model and day (`DAILY_TOKEN_LIMIT`); `GET /
 ## Topic runs
 
 Every search of a topic is written down, whatever came of it: *found* (new candidates), *nothing new* (the source answered and there
-was nothing to offer), *failed* (the source refused — the message is kept, and the topic is tried again on the next pass, as before) and
-*skipped* (the source's day could not pay for a search — written **once per topic per UTC day**, since it repeats on every pass until
-midnight). The report counts what the source returned, how many of them were already known or belonged to a settled channel, how many
+was nothing to offer), *failed* (the source refused or never answered — its message, and Google's own reason and sentence, are kept) and
+*skipped* (the source's day could not pay for a search). A failure or a skip that repeats the topic's previous run — same outcome, same
+error — within the UTC day is **not written again**: it recurs for as long as its cause lasts, and would bury the runs that mean something.
+
+**A refused search holds its topic back for the topic's own interval** (`topics.retry_at`, shown on `GET /topics`): the source counts a
+refusal against the day like any search — 101 units — so retrying on every pass made a failing topic the most expensive thing in the
+archive (on 22–24 October eight of them spent the whole 8 000-unit day by morning, and starved the channels' discovery). A search the
+source never answered cost nothing and is tried again on the next pass. The hold does not move `last_run_at`, which is where the next
+search's window starts; a search that goes through lifts it. The report counts what the source returned, how many of them were already known or belonged to a settled channel, how many
 were outside the length bounds, and how the rest were screened — with, for those offered without a verdict, why (`no_model`,
 `day_spent`, `unusable`, `failed`, `no_verdict` for a model that answered and left some out). A run keeps the phrase it searched and
 outlives the topic; runs older than 30 days are swept when the next is written. `GET /topic-runs` reads them (newest first, optionally

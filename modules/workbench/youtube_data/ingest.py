@@ -41,6 +41,7 @@ from .providers.base import (
     QuotaExceeded,
     ReadingUnusable,
     SourceError,
+    SourceRefused,
     Transcript,
     TranscriptRequest,
     TranscriptResult,
@@ -247,7 +248,8 @@ class Ingest:
             topics = [
                 topic
                 for topic in await store.list_topics(conn, active_only=True)
-                if topic.last_run_at is None or now - topic.last_run_at >= timedelta(minutes=topic.interval_minutes)
+                if (topic.last_run_at is None or now - topic.last_run_at >= timedelta(minutes=topic.interval_minutes))
+                and (topic.retry_at is None or now >= topic.retry_at)
             ][: self._settings.discover_batch_limit]
 
         left = await self._remaining(ceiling)
@@ -305,11 +307,15 @@ class Ingest:
                 await self._note_run(
                     store.RunReport(topic.id, topic.phrase, now, FAILED, error=f"the {source.name} source reports its quota spent")
                 )
+                await self._hold(topic, now)
                 # The topics after it are then skipped by the check above, and written down as such.
                 spent = True
                 continue
             except SourceError as err:
                 log.warning("topic %r could not be searched: %s", topic.phrase, err)
+                # A refusal was paid for, and asking again on the next pass would pay again; no answer cost nothing.
+                if isinstance(err, SourceRefused):
+                    await self._hold(topic, now)
                 await self._note_run(store.RunReport(topic.id, topic.phrase, now, FAILED, error=str(err)[:300] or type(err).__name__))
                 left = await self._remaining(ceiling)
                 continue
@@ -377,6 +383,11 @@ class Ingest:
         if waiting:
             log.warning("channel %s: %d film(s) wait to be judged against its filter", channel.channel_id, waiting)
         return discoveries
+
+    async def _hold(self, topic, now: datetime) -> None:
+        """A topic whose search was paid for and failed waits its own interval, so it costs no more than one that works."""
+        async with self._pool.acquire() as conn:
+            await store.hold_topic(conn, topic.id, until=now + timedelta(minutes=topic.interval_minutes))
 
     async def _note_run(self, report: store.RunReport) -> None:
         """A run written down. Never the reason a pass fails: the history describes the loop and must not be able to stop it."""

@@ -19,6 +19,7 @@ from .base import (
     ChannelNotFound,
     Meter,
     QuotaExceeded,
+    SourceRefused,
     SourceUnavailable,
     VideoRef,
 )
@@ -75,19 +76,21 @@ class DataApiSource:
             reasons = _error_reasons(response)
             if "quotaExceeded" in reasons or "dailyLimitExceeded" in reasons or response.status_code == 429:
                 raise QuotaExceeded("the YouTube Data API's daily quota is spent")
-            raise SourceUnavailable(
+            raise SourceRefused(
                 f"the YouTube Data API refused {resource} ({','.join(reasons) or response.status_code}) — "
                 "is the key restricted to another API?"
             )
         if response.is_error:
-            raise SourceUnavailable(f"the YouTube Data API answered {response.status_code} for {resource}")
+            raise SourceRefused(
+                f"the YouTube Data API answered {response.status_code} for {resource}{_error_said(response)}"
+            )
         # A proxy's or a captive portal's page arrives as a 200 too.
         try:
             body = response.json()
         except ValueError as err:
-            raise SourceUnavailable(f"the YouTube Data API's answer to {resource} is not JSON") from err
+            raise SourceRefused(f"the YouTube Data API's answer to {resource} is not JSON") from err
         if not isinstance(body, dict):
-            raise SourceUnavailable(f"the YouTube Data API's answer to {resource} is not an object")
+            raise SourceRefused(f"the YouTube Data API's answer to {resource} is not an object")
         return body
 
     async def resolve_channel(self, reference: str) -> ChannelInfo:
@@ -186,9 +189,22 @@ def _live_status(value: str | None) -> str:
     return value if value in {"none", "live", "upcoming"} else "none"
 
 
-def _error_reasons(response: httpx.Response) -> list[str]:
+def _error(response: httpx.Response) -> dict:
     try:
-        errors = response.json().get("error", {}).get("errors", [])
+        body = response.json()
     except ValueError:
-        return []
+        return {}
+    error = body.get("error") if isinstance(body, dict) else None
+    return error if isinstance(error, dict) else {}
+
+
+def _error_reasons(response: httpx.Response) -> list[str]:
+    errors = _error(response).get("errors") or []
     return [str(error.get("reason", "")) for error in errors if isinstance(error, dict)]
+
+
+def _error_said(response: httpx.Response) -> str:
+    """Google's own reason and sentence, which is what an operator reading the run's history needs to act on."""
+    reasons, message = _error_reasons(response), str(_error(response).get("message") or "")[:200]
+    said = ", ".join(part for part in (",".join(reasons), message) if part)
+    return f": {said}" if said else ""

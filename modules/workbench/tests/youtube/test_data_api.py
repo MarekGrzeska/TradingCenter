@@ -8,7 +8,13 @@ import httpx
 import pytest
 import respx
 
-from youtube_data.providers.base import ChannelNotFound, Meter, QuotaExceeded, SourceUnavailable
+from youtube_data.providers.base import (
+    ChannelNotFound,
+    Meter,
+    QuotaExceeded,
+    SourceRefused,
+    SourceUnavailable,
+)
 from youtube_data.providers.data_api import API_URL, DataApiSource, duration_seconds
 
 from .builders import CHANNEL_ID, api_video
@@ -119,8 +125,30 @@ async def test_a_spent_quota_is_told_apart_from_a_refusal_and_still_counted(sour
     respx.get(f"{API_URL}/videos").respond(
         status_code=403, json={"error": {"errors": [{"reason": "forbidden"}]}}
     )
-    with pytest.raises(SourceUnavailable, match="restricted"):
+    with pytest.raises(SourceRefused, match="restricted"):
         await source.video_details(["v1"])
+
+
+@respx.mock
+async def test_an_answered_error_is_a_paid_refusal_that_says_what_google_said_and_no_answer_costs_nothing(source, meter) -> None:
+    respx.get(f"{API_URL}/search").respond(
+        status_code=400,
+        json={"error": {"message": "Request contains an invalid argument.", "errors": [{"reason": "badRequest"}]}},
+    )
+    with pytest.raises(SourceRefused, match="badRequest, Request contains an invalid argument"):
+        await source.search("gold", language="", published_after=None, limit=5)
+    assert meter.drain() == {("data_api", "api_units"): 100}
+
+    respx.get(f"{API_URL}/search").respond(status_code=200, text="<html>captive portal</html>")
+    with pytest.raises(SourceRefused, match="not JSON"):
+        await source.search("gold", language="", published_after=None, limit=5)
+    assert meter.drain() == {("data_api", "api_units"): 100}
+
+    respx.get(f"{API_URL}/search").mock(side_effect=httpx.ConnectError("down"))
+    with pytest.raises(SourceUnavailable) as unanswered:
+        await source.search("gold", language="", published_after=None, limit=5)
+    assert not isinstance(unanswered.value, SourceRefused)
+    assert meter.drain() == {}
 
 
 @respx.mock

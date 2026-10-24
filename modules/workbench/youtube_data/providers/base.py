@@ -53,6 +53,11 @@ class SourceUnavailable(SourceError):
     """The source did not answer usefully — a network error, a 5xx, a document that would not parse."""
 
 
+class SourceRefused(SourceUnavailable):
+    """The source answered, and counted the call against its allowance, but the answer was a refusal or of no use. Unlike a
+    call it never answered, asking again at once costs again."""
+
+
 class QuotaExceeded(SourceError):
     """The source's own daily allowance is spent. Not retried before the day turns."""
 

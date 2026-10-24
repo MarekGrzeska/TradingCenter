@@ -260,6 +260,10 @@ class TopicOut(BaseModel):
     added_by: Literal["operator", "agent"]
     added_at: datetime
     last_run_at: datetime | None = None
+    retry_at: datetime | None = Field(
+        default=None,
+        description="not searched before this, after a search the source refused; null when the topic is not held back",
+    )
     last_run: TopicRunOut | None = Field(
         default=None, description="how the latest search ended; filled by the list, null before the first one"
     )
@@ -276,6 +280,7 @@ class TopicOut(BaseModel):
             added_by=topic.added_by,  # type: ignore[arg-type]
             added_at=topic.added_at,
             last_run_at=topic.last_run_at,
+            retry_at=topic.retry_at,
             last_run=None if last_run is None else TopicRunOut.of(last_run),
         )
 
