@@ -52,8 +52,8 @@
 
 ## 8. Złote strategie
 
-- [ ] 8.1 Generator świec z ziarnem, nagranie odpowiedzi `/market/indicators`, 4–6 dokumentów referencyjnych (konstrukcje języka, typy zleceń, luki, rozstrzygnięcia pesymistyczne, finansowanie, inny interwał i instrument)
-- [ ] 8.2 `ENGINE_VERSION`, test porównujący wyniki i wersję, skrypt regenerujący, który odmawia bez podniesienia wersji
+- [x] 8.1 Generator świec z ziarnem, nagranie odpowiedzi `/market/indicators`, 4–6 dokumentów referencyjnych (konstrukcje języka, typy zleceń, luki, rozstrzygnięcia pesymistyczne, finansowanie, inny interwał i instrument)
+- [x] 8.2 `ENGINE_VERSION`, test porównujący wyniki i wersję, skrypt regenerujący, który odmawia bez podniesienia wersji
 
 ## 9. Dokumentacja i wdrożenie
 
