@@ -1,0 +1,976 @@
+<title>Strategie i backtesty</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 16px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  nav.toc { margin-top: 34px; font-size: 14.5px; }
+  nav.toc ol { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px 24px; }
+  nav.toc a { text-decoration: none; color: var(--ink-2); }
+  nav.toc a:hover { color: var(--navy); text-decoration: underline; }
+  nav.toc span { font-family: var(--mono); font-size: 11px; color: var(--navy); font-weight: 700; margin-right: 8px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 22ch; text-wrap: balance;
+  }
+  h3.sub {
+    font-family: var(--head); font-weight: 700; font-size: 21px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 30px 0 10px;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  ul.plain { margin: 0 0 16px; padding-left: 20px; max-width: 68ch; }
+  ul.plain li { margin-bottom: 6px; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; min-width: 640px; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 20px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin: 6px 0 20px; }
+  .fails.two { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0 0 8px; font-size: 15px; max-width: 72ch; }
+  .fail p:last-child { margin-bottom: 0; }
+
+  .sources { font-size: 14px; }
+  .sources li { margin-bottom: 5px; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Research · strategie i backtesty</span>
+    <h1>Od pomysłu do strategii, której można ufać</h1>
+    <p class="lede">Czym jest strategia, jak się ją zapisuje, jak działa backtest i dlaczego <b>jego wynik najczęściej kłamie</b>. Na końcu projekt modułu dla TradingCenter: <b>silnik napisany raz, strategie jako dane</b>, czyli nowa strategia bez zmiany w kodzie.</p>
+    <div class="strip">
+      <span>TradingCenter / research</span>
+      <span>24 października 2026</span>
+      <span>stan: <b>przed propozycją OpenSpec</b></span>
+      <span>środowisko <b>demo</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">0</div><div class="l">uniwersalnych formatów zapisu strategii, takich jak OpenAPI dla HTTP</div></div>
+      <div class="cell"><div class="v">5</div><div class="l">utartych kształtów, w których branża zapisuje strategie</div></div>
+      <div class="cell"><div class="v">6</div><div class="l">kroków od hipotezy do rachunku demo</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">commitów na nową strategię: założenie tego projektu</div></div>
+    </div>
+
+    <nav class="toc" aria-label="Spis treści">
+      <ol>
+        <li><a href="#slownik"><span>01</span>Słownik w pięciu pojęciach</a></li>
+        <li><a href="#proces"><span>02</span>Cały proces krok po kroku</a></li>
+        <li><a href="#standard"><span>03</span>Czy istnieje standard?</a></li>
+        <li><a href="#anatomia"><span>04</span>Z czego składa się strategia</a></li>
+        <li><a href="#silnik"><span>05</span>Jak działa silnik backtestu</a></li>
+        <li><a href="#pulapki"><span>06</span>Pułapki</a></li>
+        <li><a href="#metryki"><span>07</span>Metryki</a></li>
+        <li><a href="#walidacja"><span>08</span>Walidacja</a></li>
+        <li><a href="#narzedzia"><span>09</span>Gotowe narzędzia</a></li>
+        <li><a href="#podejscia"><span>10</span>Silnik raz, strategie jako dane</a></li>
+        <li><a href="#lekcje"><span>11</span>Lekcje z poprzedniej platformy</a></li>
+        <li><a href="#decyzje"><span>12</span>Pytania do decyzji</a></li>
+      </ol>
+    </nav>
+
+    <!-- 01 -->
+    <section id="slownik">
+      <div class="eyebrow">01 · Słownik</div>
+      <h2>Pięć pojęć, bez których reszta nie ma sensu</h2>
+      <p class="intro">Strategia to przepis. Mówi, kiedy wejść, za ile, gdzie wyjść i czego nie robić. Musi być tak dokładny, żeby komputer wykonał go bez pytań, a dwa uruchomienia na tych samych danych dały identyczny wynik.</p>
+      <p>Formalnie strategia to <span class="hl">funkcja z „wszystkiego, co było wiadomo do chwili t” na „decyzję w chwili t”</span>. Z tej definicji wynika prawie wszystko inne w tym dokumencie: backtest jest uczciwy tylko wtedy, gdy strategia naprawdę nie widzi niczego po chwili t.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Pojęcie</th><th>Po ludzku</th><th>Przykład</th></tr></thead>
+          <tbody>
+            <tr><td><b>Sygnał</b></td><td>Strategia mówi „teraz jest okazja”. To jeszcze nie jest zlecenie.</td><td>EMA 20 przecięła EMA 50 od dołu na zamknięciu świecy H1.</td></tr>
+            <tr><td><b>Zlecenie</b> / <b>pozycja</b></td><td>Zlecenie to prośba do brokera. Pozycja to to, co faktycznie masz po jej wykonaniu.</td><td>„Kup 2 kontrakty US100 po rynku, SL 40 pkt niżej” → otwarta pozycja long 2.</td></tr>
+            <tr><td><b>Parametr</b></td><td>Liczba w przepisie, którą można zmienić bez zmiany jego logiki.</td><td>Okres szybkiej EMA = 20; mnożnik ATR dla stop-lossa = 2.</td></tr>
+            <tr><td><b>Backtest</b></td><td>Przepis puszczony po historii tak, jakby wtedy działał na żywo, z symulowanym brokerem, który pobiera koszty.</td><td>US100, H1, 2024-01 → 2026-06, spread 1,5 pkt: 214 transakcji, wynik +31 R.</td></tr>
+            <tr><td><b>Forward test</b> (paper trading)</td><td>Ten sam przepis na żywych danych, bez prawdziwych pieniędzy. U nas to rachunek demo w capital.com.</td><td>Strategia przez 6 tygodni składa zlecenia na demo; wynik porównujemy z backtestem tego samego okresu.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Jednostka, którą warto przyjąć od pierwszego dnia, to <strong>R</strong>, czyli ryzyko jednej transakcji. Jeśli stop-loss jest 40 pkt od wejścia, to 1 R = 40 pkt. Transakcja zamknięta na +80 pkt daje +2 R. Wyniki w R da się porównywać między instrumentami i wielkościami pozycji. Wyniki w złotówkach już nie. Poprzednia platforma w repo też liczyła w R.</p>
+    </section>
+
+    <!-- 02 -->
+    <section id="proces">
+      <div class="eyebrow">02 · Proces</div>
+      <h2>Sześć kroków, a większość pomysłów odpada w czwartym</h2>
+      <p class="intro">Profesjonalny proces jest lejkiem. Na wejściu jest dużo pomysłów, na wyjściu bardzo mało strategii. Backtest nie jest metą. To jedno z sit po drodze.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 230" role="img" aria-label="Sześć kroków: hipoteza, zapisana definicja, backtest na danych treningowych, walidacja, forward test na demo, monitoring. Z walidacji, forward testu i monitoringu wraca się do nowej hipotezy.">
+            <defs>
+              <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path></marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="10" y="50" width="140" height="70" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="80" y="76" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">1</text>
+              <text x="80" y="96" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Hipoteza</text>
+              <text x="80" y="112" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">dlaczego ma działać</text>
+
+              <rect x="174" y="50" width="140" height="70" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="244" y="76" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">2</text>
+              <text x="244" y="96" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Definicja</text>
+              <text x="244" y="112" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">zapisana, wersjonowana</text>
+
+              <rect x="338" y="50" width="140" height="70" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="408" y="76" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">3</text>
+              <text x="408" y="96" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Backtest</text>
+              <text x="408" y="112" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">na danych treningowych</text>
+
+              <rect x="502" y="50" width="140" height="70" fill="#14306b" stroke="#14306b" stroke-width="1.4"></rect>
+              <text x="572" y="76" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#f2c313">4</text>
+              <text x="572" y="96" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">Walidacja</text>
+              <text x="572" y="112" text-anchor="middle" font-size="10.5" fill="#d6dcec">dane nietknięte, koszty ×2</text>
+
+              <rect x="666" y="50" width="140" height="70" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="736" y="76" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">5</text>
+              <text x="736" y="96" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Forward test</text>
+              <text x="736" y="112" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">tygodnie na demo</text>
+
+              <rect x="830" y="50" width="140" height="70" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="900" y="76" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">6</text>
+              <text x="900" y="96" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Monitoring</text>
+              <text x="900" y="112" text-anchor="middle" font-size="10.5" fill="currentColor" opacity="0.7">żywe vs backtest</text>
+
+              <line x1="152" y1="85" x2="170" y2="85" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <line x1="316" y1="85" x2="334" y2="85" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <line x1="480" y1="85" x2="498" y2="85" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <line x1="644" y1="85" x2="662" y2="85" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <line x1="808" y1="85" x2="826" y2="85" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+
+              <path d="M 572 122 L 572 175 L 80 175 L 80 124" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#a1)"></path>
+              <line x1="736" y1="122" x2="736" y2="175" stroke="currentColor" stroke-width="1.3" stroke-dasharray="5 4"></line>
+              <line x1="900" y1="122" x2="900" y2="175" stroke="currentColor" stroke-width="1.3" stroke-dasharray="5 4"></line>
+              <line x1="572" y1="175" x2="900" y2="175" stroke="currentColor" stroke-width="1.3" stroke-dasharray="5 4"></line>
+              <text x="326" y="196" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">odrzucona → nowa hipoteza (nie: „podkręcę parametry”)</text>
+
+              <rect x="430" y="14" width="284" height="20" fill="#f2c313"></rect>
+              <text x="572" y="28" text-anchor="middle" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#14306b" letter-spacing="0.07em">TU ODPADA WIĘKSZOŚĆ POMYSŁÓW</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — lejek strategii. Przerywana linia to najważniejsza strzałka: odrzucona strategia wraca do kroku 1, nie do kroku 3 z innymi liczbami.</figcaption>
+      </figure>
+
+      <h3 class="sub">Co się dzieje w każdym kroku</h3>
+      <ul class="plain">
+        <li><strong>1 · Hipoteza.</strong> Jedno zdanie o tym, <em>dlaczego</em> rynek miałby się tak zachowywać. Na przykład: „po wybiciu z zakresu sesji azjatyckiej US100 częściej kontynuuje ruch, niż wraca”. Strategia bez hipotezy to dopasowywanie krzywej do szumu.</li>
+        <li><strong>2 · Definicja.</strong> Hipoteza zamieniona w przepis bez niedomówień i zapisana z numerem wersji. Od tej chwili każdy wynik należy do konkretnej wersji.</li>
+        <li><strong>3 · Backtest na danych treningowych</strong> (in-sample). Tylko na części historii. Tu wolno szukać parametrów.</li>
+        <li><strong>4 · Walidacja.</strong> Uruchomienie na danych, których krok 3 nie widział (out-of-sample), plus walk-forward, podwojone koszty i sprawdzenie, czy sąsiednie parametry też działają. Szczegóły w <a href="#walidacja">sekcji 08</a>.</li>
+        <li><strong>5 · Forward test.</strong> Strategia działa na żywych danych i składa zlecenia na demo. Tu wychodzi to, czego backtest nie modeluje: realny spread o 15:30, opóźnienia, poślizg na danych makro.</li>
+        <li><strong>6 · Monitoring.</strong> Wynik na żywo porównywany z tym, co backtest przewidziałby dla tego samego okresu. Rozjazd jest sygnałem, że model kosztów albo sama strategia przestały pasować do rynku.</li>
+      </ul>
+      <p><strong>Zakres modułu w TradingCenter to kroki 1–4.</strong> Moduł jest narzędziem badawczym: niczego nie składa i nie ocenia, czy strategia jest „gotowa”. Forward test na demo i dalsze kroki to Twoja decyzja i Twoje działanie.</p>
+      <div class="quote">Backtest nie udowodni, że strategia działa. Może tylko szybko i tanio pokazać, że nie działa.</div>
+    </section>
+
+    <!-- 03 -->
+    <section id="standard">
+      <div class="eyebrow">03 · Standard</div>
+      <h2>Formatu nie ma. Jest pięć utartych kształtów</h2>
+      <p class="intro">Nie istnieje odpowiednik OpenAPI dla strategii, czyli jeden plik, który rozumie każda platforma. Każde narzędzie ma własny zapis. Jest za to kilka kształtów, do których wszystkie narzędzia się zbiegają, i kilka zasad, które łączą je wszystkie.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Kształt</th><th>Jak wygląda</th><th>Kto tak robi</th><th>Mocne</th><th>Słabe</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><b>Klasa ze zdarzeniami</b><br><span class="tag ok">najczęstszy</span></td>
+              <td>Kod z metodą wołaną przy każdej nowej świecy, np. <code>on_bar(bar)</code>. Strategia trzyma własny stan i składa zlecenia.</td>
+              <td>NautilusTrader (<code>on_bar</code>), QuantConnect LEAN (<code>OnData</code>), backtrader (<code>next</code>), Backtesting.py (<code>next</code>), Pine Script (skrypt wykonywany raz na świecę)</td>
+              <td>Wyrazi wszystko. Ten sam kod działa w backteście i na żywo. Trudno o podgląd przyszłości.</td>
+              <td>Wolniejszy. Trzeba umieć programować. Kod trzeba przejrzeć, zanim się go uruchomi.</td>
+            </tr>
+            <tr>
+              <td><b>Wektorowy</b></td>
+              <td>Cała historia naraz jako tabela. Strategia dopisuje kolumny <code>enter_long</code> / <code>exit_long</code> wyliczone na całej serii.</td>
+              <td>vectorbt; freqtrade (<code>populate_indicators</code>, <code>populate_entry_trend</code>, potem pętla transakcji)</td>
+              <td>Bardzo szybki, więc nadaje się do przeszukiwania tysięcy wariantów parametrów.</td>
+              <td>Łatwo przypadkiem podejrzeć przyszłość (<code>shift(-1)</code>). Kiepsko oddaje logikę zależną od stanu (trailing stop, piramidowanie).</td>
+            </tr>
+            <tr>
+              <td><b>Deklaratywny</b> (strategia jako dane)</td>
+              <td>JSON/YAML albo drzewo warunków: „jeśli RSI &lt; 30 i cena &gt; EMA200, kup”. Zwykle składane w edytorze.</td>
+              <td>Kreatory no-code, warunki alertów TradingView, poprzednia platforma TradingCenter (drzewo węzłów)</td>
+              <td>Bezpieczny, bo nie ma kodu do wykonania. Łatwy do zapisania, porównania i wygenerowania przez model językowy. Da się go wyklikać.</td>
+              <td>Ograniczony do tego, co przewiduje słownik. Każda nowa idea to rozbudowa języka.</td>
+            </tr>
+            <tr>
+              <td><b>Język formuł</b><br><span class="tag ok">wzorzec dla nas</span></td>
+              <td>Tekstowe formuły na całych seriach w stałych slotach: AFL w AmiBrokerze przypisuje warunki do <code>Buy</code>, <code>Sell</code>, <code>Short</code>, <code>Cover</code>, a stopy ustawia przez <code>ApplyStop</code>.</td>
+              <td>AmiBroker AFL, MetaStock, częściowo Pine Script</td>
+              <td>Zwięzły, czytelny dla człowieka, łatwy do napisania dla modelu językowego. Silnik obsługuje cały cykl transakcji, formuły tylko odpowiadają na pytania.</td>
+              <td>Język trzeba dobrze zaprojektować: co jest serią, co liczbą i jak wygląda stan pozycji.</td>
+            </tr>
+            <tr>
+              <td><b>Framework warstwowy</b></td>
+              <td>Strategia złożona z wymiennych modułów: wybór instrumentów → sygnał → konstrukcja portfela → ryzyko → wykonanie.</td>
+              <td>QuantConnect LEAN Algorithm Framework (Universe Selection, Alpha, Portfolio Construction, Risk Management, Execution)</td>
+              <td>Moduły wielokrotnego użytku. Ten sam sygnał można łączyć z różnymi zasadami rozmiaru pozycji i ryzyka.</td>
+              <td>Więcej pojęć na start. Pełna moc przydaje się dopiero przy wielu instrumentach naraz.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">Co jest standardem de facto</h3>
+      <p>Choć formatu nie ma, poważne narzędzia zgadzają się w trzech sprawach. Warto je przyjąć jako zasady modułu:</p>
+      <ul class="plain">
+        <li><strong>Warstwy są rozdzielone.</strong> „Czy wchodzić” (sygnał), „za ile” (rozmiar), „czy wolno” (ryzyko) i „jak” (wykonanie) to osobne decyzje. Strategia, która miesza je w jednej funkcji, nie da się ponownie użyć z innym zarządzaniem ryzykiem.</li>
+        <li><strong>Ta sama logika w backteście i na żywo.</strong> NautilusTrader ma to wprost w opisie projektu. U nas oznacza to jeden silnik, który interpretuje ten sam dokument strategii w obu trybach. Jeśli backtest liczy coś inaczej niż pętla na żywo, porównanie w kroku 6 nic nie mówi.</li>
+        <li><strong>Decyzja na zamkniętej świecy, wykonanie na następnej.</strong> Strategia widzi świecę <em>t</em> dopiero po jej zamknięciu, a zlecenie wykonuje się najwcześniej po cenie otwarcia <em>t+1</em>. To najprostsza ochrona przed podglądaniem przyszłości.</li>
+      </ul>
+
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 170" role="img" aria-label="Warstwy strategii: dane, cechy, sygnał, rozmiar pozycji, ryzyko, wykonanie. Wykonanie idzie do symulowanego brokera w backteście albo do rachunku demo na żywo.">
+            <defs>
+              <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path></marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="10" y="40" width="130" height="58" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="75" y="66" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Dane</text>
+              <text x="75" y="84" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">świece /market</text>
+
+              <rect x="170" y="40" width="130" height="58" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="235" y="66" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Cechy</text>
+              <text x="235" y="84" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">wskaźniki</text>
+
+              <rect x="330" y="40" width="130" height="58" fill="#14306b" stroke="#14306b" stroke-width="1.4"></rect>
+              <text x="395" y="66" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">Sygnał</text>
+              <text x="395" y="84" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#f2c313">long/short/nic</text>
+
+              <rect x="490" y="40" width="130" height="58" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="555" y="66" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Rozmiar</text>
+              <text x="555" y="84" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">np. 1% kapitału</text>
+
+              <rect x="650" y="40" width="130" height="58" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="715" y="66" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Ryzyko</text>
+              <text x="715" y="84" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">limity, veto</text>
+
+              <rect x="810" y="40" width="160" height="58" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="890" y="66" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Wykonanie</text>
+              <text x="890" y="84" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">typ zlecenia, SL/TP</text>
+
+              <line x1="142" y1="69" x2="166" y2="69" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"></line>
+              <line x1="302" y1="69" x2="326" y2="69" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"></line>
+              <line x1="462" y1="69" x2="486" y2="69" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"></line>
+              <line x1="622" y1="69" x2="646" y2="69" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"></line>
+              <line x1="782" y1="69" x2="806" y2="69" stroke="currentColor" stroke-width="1.4" marker-end="url(#a2)"></line>
+              <text x="155" y="32" text-anchor="middle" font-size="9.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">≤ t</text>
+              <text x="475" y="32" text-anchor="middle" font-size="9.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">intencja</text>
+              <text x="635" y="32" text-anchor="middle" font-size="9.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">cel pozycji</text>
+              <text x="795" y="32" text-anchor="middle" font-size="9.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">zlecenie</text>
+
+              <line x1="860" y1="100" x2="800" y2="136" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"></line>
+              <line x1="920" y1="100" x2="940" y2="136" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)"></line>
+              <text x="760" y="152" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.8">backtest: broker symulowany</text>
+              <text x="935" y="152" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.8">żywe: demo</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 2</b> — warstwy strategii, uproszczone z modelu LEAN pod jeden rachunek. Wymienia się tylko ostatnią warstwę. Wszystko po lewej to ten sam silnik czytający ten sam dokument, w backteście i na żywo.</figcaption>
+      </figure>
+    </section>
+
+    <!-- 04 -->
+    <section id="anatomia">
+      <div class="eyebrow">04 · Anatomia</div>
+      <h2>Kompletna definicja ma dziewięć części</h2>
+      <p class="intro">Większość początkujących zapisuje tylko warunek wejścia. Wynik backtestu zależy jednak co najmniej tak samo od wyjścia, rozmiaru pozycji i kosztów. Definicja, w której brakuje którejś części, nie jest odtwarzalna.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Część</th><th>Na jakie pytanie odpowiada</th><th>Przykład</th></tr></thead>
+          <tbody>
+            <tr><td class="n">1</td><td><b>Tożsamość i hipoteza</b></td><td>Co to jest, która wersja, dlaczego ma działać?</td><td><code>us100-ema-trend@3</code>, „trend H1 kontynuuje po korekcie do EMA20”</td></tr>
+            <tr><td class="n">2</td><td><b>Uniwersum</b></td><td>Na jakich instrumentach?</td><td><code>US100</code>, <code>DE40</code></td></tr>
+            <tr><td class="n">3</td><td><b>Dane i interwał</b></td><td>Jakie świece, która strona ceny?</td><td>H1 do decyzji, MINUTE do symulacji wypełnień; bid</td></tr>
+            <tr><td class="n">4</td><td><b>Cechy</b></td><td>Z czego liczy się decyzję?</td><td>EMA 20, EMA 50, ATR 14 z katalogu wskaźników</td></tr>
+            <tr><td class="n">5</td><td><b>Wejście</b></td><td>Kiedy otworzyć pozycję i w którą stronę?</td><td>EMA20 &gt; EMA50 i low świecy dotknął EMA20 → long</td></tr>
+            <tr><td class="n">6</td><td><b>Wyjście</b></td><td>Kiedy zamknąć? Stop, cel, czas, sygnał przeciwny.</td><td>SL = 2×ATR, TP = 3×ATR, maks. 24 świece</td></tr>
+            <tr><td class="n">7</td><td><b>Rozmiar</b></td><td>Za ile?</td><td>Ryzyko 0,5% kapitału na transakcję</td></tr>
+            <tr><td class="n">8</td><td><b>Ograniczenia ryzyka</b></td><td>Czego nie wolno, nawet przy sygnale?</td><td>Maks. 1 pozycja na instrument, stop dnia przy −2 R, bez wejść 5 min przed danymi</td></tr>
+            <tr><td class="n">9</td><td><b>Parametry z zakresami</b></td><td>Co wolno stroić i w jakich granicach?</td><td><code>ema_fast</code>: 10–30, krok 5</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>Koszty i założenia wykonania</strong> (spread, poślizg, finansowanie overnight, wypełnienie na otwarciu kolejnej świecy) nie należą do strategii, tylko do <em>uruchomienia backtestu</em>. Muszą być jednak zapisane w każdym raporcie, bo bez nich wynik nic nie znaczy.</p>
+
+      <h3 class="sub">Jak wygląda taki dokument</h3>
+      <p>Wszystkie dziewięć części w jednym dokumencie. Struktura (sekcje) jest stała i zna ją silnik. Wewnątrz sekcji są <strong>formuły tekstowe</strong>. Ten zapis trafia do bazy, ma numer rewizji i może go napisać człowiek albo agent. Nie wymaga żadnej zmiany w kodzie:</p>
+<pre><code>{
+  <span class="s">"schema"</span>: 1,
+  <span class="s">"id"</span>: <span class="s">"us100-ema-pullback"</span>, <span class="s">"revision"</span>: 4,
+  <span class="s">"hypothesis"</span>: <span class="s">"Trend H1 zgodny z H4 kontynuuje po korekcie do EMA."</span>,
+  <span class="s">"universe"</span>: [<span class="s">"US100"</span>],
+  <span class="s">"timeframe"</span>: <span class="s">"HOUR"</span>,
+  <span class="s">"params"</span>: {<span class="s">"fast"</span>: {<span class="s">"default"</span>: 20, <span class="s">"min"</span>: 10, <span class="s">"max"</span>: 30, <span class="s">"step"</span>: 5}},
+  <span class="s">"let"</span>: {
+    <span class="s">"fast"</span>:     <span class="s">"ema(p.fast)"</span>,
+    <span class="s">"slow"</span>:     <span class="s">"ema(50)"</span>,
+    <span class="s">"atr"</span>:      <span class="s">"atr(14)"</span>,
+    <span class="s">"trend_h4"</span>: <span class="s">"ema(20) @ HOUR_4 &gt; ema(50) @ HOUR_4"</span>,
+    <span class="s">"pullback"</span>: <span class="s">"low &lt;= fast and close &gt; fast"</span>
+  },
+  <span class="s">"entries"</span>: [{
+    <span class="s">"side"</span>: <span class="s">"long"</span>,
+    <span class="s">"when"</span>: <span class="s">"trend_h4 and fast &gt; slow and pullback and 7 &lt;= hour &lt; 20"</span>,
+    <span class="s">"order"</span>: {<span class="s">"type"</span>: <span class="s">"stop"</span>, <span class="s">"price"</span>: <span class="s">"high + 0.1 * atr"</span>, <span class="s">"expires_bars"</span>: 3}
+  }],
+  <span class="s">"exits"</span>: {
+    <span class="s">"stop"</span>:     <span class="s">"entry_price - 2 * at_entry(atr)"</span>,
+    <span class="s">"target"</span>:   <span class="s">"entry_price + 3 * at_entry(atr)"</span>,
+    <span class="s">"trail"</span>:    {<span class="s">"after_r"</span>: 1.5, <span class="s">"distance"</span>: <span class="s">"1.5 * atr"</span>},
+    <span class="s">"when"</span>:     <span class="s">"crosses_below(close, slow)"</span>,
+    <span class="s">"max_bars"</span>: 48
+  },
+  <span class="s">"sizing"</span>: {<span class="s">"mode"</span>: <span class="s">"risk_fraction"</span>, <span class="s">"value"</span>: 0.005},
+  <span class="s">"limits"</span>: {<span class="s">"max_open"</span>: 1, <span class="s">"daily_stop_r"</span>: -2, <span class="s">"no_entry"</span>: <span class="s">"weekday == FRIDAY and hour &gt;= 18"</span>}
+}</code></pre>
+      <p>Formuły wyglądają jak kod, ale <span class="hl">nigdy nie są wykonywane jako kod</span>. Silnik parsuje je do drzewa, sprawdza każdą nazwę z listą dozwolonych funkcji i dopiero to drzewo interpretuje. Szczegóły języka są w <a href="#podejscia">sekcji 10</a>.</p>
+    </section>
+
+    <!-- 05 -->
+    <section id="silnik">
+      <div class="eyebrow">05 · Silnik</div>
+      <h2>Backtest to pętla z udawanym brokerem</h2>
+      <p class="intro">Silnik bierze świece po kolei. Po każdej pyta strategię, co chce zrobić, a symulowany broker wykonuje jej zlecenia tak, jak zrobiłby to prawdziwy: z opóźnieniem, po gorszej cenie i za opłatą.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 250" role="img" aria-label="Pętla backtestu: świeca t się zamyka, strategia widzi dane do t, zwraca zlecenie, symulowany broker wypełnia je na t plus 1 ze spreadem i poślizgiem, portfel się aktualizuje, transakcje trafiają do dziennika, potem następna świeca.">
+            <defs>
+              <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path></marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="10" y="60" width="160" height="66" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="90" y="88" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Świeca t</text>
+              <text x="90" y="106" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">zamknięta</text>
+
+              <rect x="210" y="60" width="170" height="66" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="295" y="88" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Formuły strategii</text>
+              <text x="295" y="106" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">liczone na danych ≤ t</text>
+
+              <rect x="420" y="60" width="200" height="66" fill="#14306b" stroke="#14306b" stroke-width="1.4"></rect>
+              <text x="520" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">Symulowany broker</text>
+              <text x="520" y="104" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#f2c313">wypełnia na t+1</text>
+              <text x="520" y="118" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#d6dcec">+ spread + poślizg</text>
+
+              <rect x="660" y="60" width="150" height="66" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="735" y="88" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Portfel</text>
+              <text x="735" y="106" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">pozycje, kapitał</text>
+
+              <rect x="850" y="60" width="120" height="66" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="910" y="88" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Dziennik</text>
+              <text x="910" y="106" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">→ metryki</text>
+
+              <line x1="172" y1="93" x2="206" y2="93" stroke="currentColor" stroke-width="1.4" marker-end="url(#a3)"></line>
+              <line x1="382" y1="93" x2="416" y2="93" stroke="currentColor" stroke-width="1.4" marker-end="url(#a3)"></line>
+              <text x="399" y="52" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">zlecenie</text>
+              <line x1="622" y1="93" x2="656" y2="93" stroke="currentColor" stroke-width="1.4" marker-end="url(#a3)"></line>
+              <text x="639" y="52" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">wypełnienie</text>
+              <line x1="812" y1="93" x2="846" y2="93" stroke="currentColor" stroke-width="1.4" marker-end="url(#a3)"></line>
+              <text x="829" y="52" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">transakcja</text>
+
+              <path d="M 735 128 L 735 190 L 90 190 L 90 130" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#a3)"></path>
+              <text x="412" y="210" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">następna świeca: stan pozycji wraca do strategii w kontekście</text>
+
+              <rect x="210" y="14" width="170" height="20" fill="#f2c313"></rect>
+              <text x="295" y="28" text-anchor="middle" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#14306b" letter-spacing="0.07em">NIC PO CHWILI t</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 3</b> — jeden obrót pętli. Cała uczciwość backtestu siedzi w dwóch miejscach: co strategia może zobaczyć (żółta etykieta) i po jakiej cenie broker ją wypełnia (granatowe pole).</figcaption>
+      </figure>
+
+      <h3 class="sub">Wektorowo czy zdarzeniowo</h3>
+      <p>Silnik <strong>wektorowy</strong> liczy całą historię naraz na tablicach, więc tysiąc wariantów parametrów sprawdza w sekundy. Silnik <strong>zdarzeniowy</strong> idzie świeca po świecy, jak na rysunku. Jest wolniejszy, ale wiernie oddaje stan: otwartą pozycję, przesuwany stop, limit dzienny. Częsta praktyka to oba naraz: <span class="hl">wektorowy do odsiewu, zdarzeniowy do ostatecznej oceny</span>. Kandydat, który przeszedł odsiew, musi dać zgodny wynik w silniku zdarzeniowym, inaczej któryś z nich się myli.</p>
+
+      <h3 class="sub">Wnętrze świecy: problem, który mamy czym rozwiązać</h3>
+      <p>Świeca H1 ma open, high, low i close, ale nie mówi, w jakiej kolejności cena je odwiedziła. Jeśli w jednej godzinie zakres świecy obejmuje i stop-loss, i take-profit, silnik nie wie, co padło pierwsze. Typowe wyjścia to założenie pesymistyczne (zawsze najpierw stop) albo <strong>zejście do niższego interwału</strong>. Archiwum trzyma serię <code>MINUTE</code> jako źródło wszystkich wyższych interwałów, więc silnik może decydować na H1, a wypełnienia rozstrzygać minutami. To realna przewaga nad większością prostych narzędzi.</p>
+      <p><strong>Wyjątek: strategie na samym M1.</strong> Poniżej minuty archiwum nie ma niczego, ani ticków, ani strony ask. Dla strategii decydujących na M1 silnik rozstrzyga niejasną świecę pesymistycznie (najpierw stop), a raport mówi, ile transakcji tak rozstrzygnięto. <span class="hl">Wynik scalpingu na M1 jest więc z natury mniej pewny niż wynik swingu na H4</span>, a jego jakość prawie w całości zależy od modelu spreadu i poślizgu.</p>
+
+      <h3 class="sub">Koszty, które w naszych danych są niewidoczne</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Koszt</th><th>Skąd się bierze</th><th>Dlaczego u nas trzeba go dodać ręcznie</th></tr></thead>
+          <tbody>
+            <tr><td><b>Spread</b></td><td>Kupujesz po ask, sprzedajesz po bid.</td><td>Archiwum trzyma tylko stronę <strong>bid</strong>. Spreadu nie ma w danych, więc model musi go dodać przy każdym wejściu i wyjściu.</td></tr>
+            <tr><td><b>Poślizg</b></td><td>Zlecenie rynkowe wypełnia się gorzej niż ostatnia cena, zwłaszcza przy danych makro i na otwarciu.</td><td>Brak danych o księdze zleceń. Zostaje stała wartość lub zależna od zmienności (np. ułamek ATR).</td></tr>
+            <tr><td><b>Finansowanie overnight</b></td><td>CFD w capital.com pobierają opłatę za każdą noc trzymania pozycji.</td><td>Przy strategiach swingowych potrafi zjeść przewagę. Trzeba ją naliczać za każdą przekroczoną granicę doby handlowej.</td></tr>
+            <tr><td><b>Luki</b></td><td>Weekend, przerwy handlowe (BTCUSD: 21:00–21:05 UTC codziennie), otwarcie po danych.</td><td>Stop leżący w luce wypełnia się po cenie otwarcia za luką, nie po cenie stopu.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Strategie mają działać na dowolnym interwale, od M1 do tygodnia, więc model kosztów musi od pierwszego dnia mieć <strong>wszystkie cztery składniki naraz</strong>. Scalping zabija spread i poślizg, swing finansowanie i luki. Spread warto przy tym podawać jako <em>profil godzinowy</em> dla instrumentu (szerszy w nocy i przy otwarciu), a nie jedną liczbę, bo przy M1 to właśnie godzina decyduje o wyniku.</p>
+    </section>
+
+    <!-- 06 -->
+    <section id="pulapki">
+      <div class="eyebrow">06 · Pułapki</div>
+      <h2>Dlaczego piękne backtesty przegrywają na żywo</h2>
+      <p class="intro">Prawie każdy rozjazd między backtestem a rzeczywistością ma jedną z tych przyczyn. Pierwsze trzy są najgroźniejsze, bo nie dają żadnego błędu. Wynik po prostu wygląda lepiej, niż powinien.</p>
+      <div class="fails two">
+        <div class="fail stop">
+          <h3>Podgląd przyszłości <span class="tag stop">look-ahead</span></h3>
+          <p>Strategia używa informacji, której w chwili decyzji jeszcze nie było: close bieżącej świecy przy wejściu na jej open, wskaźnik policzony na całej serii, dzienne high znane o 10:00.</p>
+          <p><strong>Obrona:</strong> w języku formuł przyszłości <em>nie da się zapisać</em>. Nie ma składni na świecę z przodu (<code>close[-1]</code> jest odrzucane przy zapisie), a <code>close @ HOUR_4</code> zawsze oznacza ostatnią <em>zamkniętą</em> świecę H4. Do tego test silnika, że wynik liczony naraz i świeca po świecy jest identyczny (poprzednia platforma miała taki test).</p>
+        </div>
+        <div class="fail stop">
+          <h3>Przeuczenie <span class="tag stop">overfitting</span></h3>
+          <p>Po 500 próbach parametrów któraś <em>musi</em> wyglądać świetnie, nawet na losowych danych. Strategia zapamiętała historię, zamiast znaleźć zależność.</p>
+          <p><strong>Obrona:</strong> dane testowe tknięte raz, mało parametrów, zapis <em>każdej</em> próby i statystyki, które za liczbę prób karzą (<a href="#walidacja">sekcja 08</a>).</p>
+        </div>
+        <div class="fail stop">
+          <h3>Pominięte koszty <span class="tag stop">cicha</span></h3>
+          <p>Strategia z wieloma krótkimi transakcjami może mieć dodatni wynik brutto i ujemny po spreadzie. Im mniejszy średni zysk na transakcji, tym bardziej o wszystkim decydują koszty.</p>
+          <p><strong>Obrona:</strong> raport bez modelu kosztów jest odrzucany. Poprzednia platforma miała dokładnie tę zasadę. Dodatkowo test z kosztami ×2.</p>
+        </div>
+        <div class="fail">
+          <h3>Niedomknięta świeca <span class="tag att">specyficzne dla nas</span></h3>
+          <p>Archiwum oznacza świece <code>forming</code>. Strategia na żywo, która decyduje na formującej się świecy, zachowa się inaczej niż backtest, który widzi tylko zamknięte.</p>
+          <p><strong>Obrona:</strong> pętla na żywo czyta wyłącznie zamknięte świece, dokładnie jak backtest.</p>
+        </div>
+        <div class="fail">
+          <h3>Rozgrzewka wskaźników <span class="tag att">warm-up</span></h3>
+          <p>EMA policzona od pierwszej świecy zakresu różni się od EMA z dłuższą historią. Pierwsze sygnały backtestu bywają przez to fałszywe.</p>
+          <p><strong>Obrona:</strong> silnik doczytuje historię przed startem zakresu. Archiwum już wie, ile trzeba (<code>indicators/warmup.py</code>).</p>
+        </div>
+        <div class="fail">
+          <h3>Za mała próbka <span class="tag att">statystyka</span></h3>
+          <p>30 transakcji to za mało, żeby odróżnić przewagę od szczęścia. Wynik wisi na kilku dużych zyskach.</p>
+          <p><strong>Obrona:</strong> raport zawsze pokazuje liczbę transakcji i wynik bez 5 najlepszych. Orientacyjnie to minimum kilkaset transakcji lub kilka lat danych.</p>
+        </div>
+        <div class="fail">
+          <h3>Zmiana reżimu <span class="tag att">rynek</span></h3>
+          <p>Strategia trendowa z 2024 roku może nie przeżyć roku w konsolidacji. Backtest na jednym typie rynku mówi tylko o nim.</p>
+          <p><strong>Obrona:</strong> wyniki w podziale na lata i reżimy zmienności. Katalog ma grupę wskaźników <code>regime</code>.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Survivorship bias <span class="tag ok">u nas mało istotny</span></h3>
+          <p>Testowanie tylko na spółkach, które przetrwały do dziś. Przy indeksach, walutach i BTC w CFD prawie nie występuje. Wróci, gdyby uniwersum obejmowało akcje.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 07 -->
+    <section id="metryki">
+      <div class="eyebrow">07 · Metryki</div>
+      <h2>Jedna liczba zawsze kłamie, a kilka razem nie</h2>
+      <p class="intro">Raport backtestu odpowiada na trzy pytania: czy zarabia, ile przy tym boli i czy to nie przypadek. Żadna pojedyncza metryka nie odpowiada na wszystkie trzy.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Metryka</th><th>Co mówi po ludzku</th><th>Orientacyjnie</th></tr></thead>
+          <tbody>
+            <tr><td><b>Expectancy</b> (wartość oczekiwana w R)</td><td>Ile średnio zarabiasz na transakcji, w jednostkach ryzyka. To najważniejsza pojedyncza liczba.</td><td>&gt; 0,1 R po kosztach to już coś</td></tr>
+            <tr><td><b>Liczba transakcji</b></td><td>Na ile wynik jest statystycznie wiarygodny.</td><td>&lt; 100 → ostrożnie</td></tr>
+            <tr><td><b>Max drawdown</b></td><td>Największy spadek od szczytu kapitału. Tyle musisz psychicznie i finansowo przetrwać.</td><td>Na żywo licz na <em>większy</em> niż w backteście</td></tr>
+            <tr><td><b>Profit factor</b></td><td>Suma zysków ÷ suma strat.</td><td>1,0 = zero; &gt; 1,3 po kosztach przyzwoicie; &gt; 3 podejrzanie</td></tr>
+            <tr><td><b>Win rate</b></td><td>Procent zyskownych transakcji. Bez stosunku zysku do straty nic nie znaczy.</td><td>35% przy średnio 3 R zysku to świetna strategia</td></tr>
+            <tr><td><b>Sharpe</b></td><td>Zwrot podzielony przez zmienność zwrotów. Mówi, ile płaci za każdą jednostkę wahań.</td><td>&gt; 1 rocznie po kosztach dobrze; &gt; 3 w backteście raczej błąd</td></tr>
+            <tr><td><b>Sortino</b></td><td>Jak Sharpe, ale karze tylko za spadki, nie za skoki w górę.</td><td>Porównuj między wariantami, nie z liczbą stałą</td></tr>
+            <tr><td><b>Calmar</b> / MAR</td><td>Roczny zwrot ÷ max drawdown. Ile zarabiasz na każdy procent bólu.</td><td>&gt; 1 dobrze</td></tr>
+            <tr><td><b>Najdłuższa seria strat</b></td><td>Ile kolejnych strat trzeba przetrwać bez wyłączenia strategii.</td><td>Planuj na dwukrotność</td></tr>
+            <tr><td><b>Ekspozycja</b> / średni czas w pozycji</td><td>Jak długo kapitał jest w ryzyku. Wpływa na finansowanie overnight.</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>Silnik nie wystawia ocen.</strong> Liczy i pokazuje wszystkie te metryki, ale nie mówi „strategia przeszła” ani „nie przeszła”. Decyzja należy do Ciebie. Progi w prawej kolumnie to reguły kciuka z literatury i praktyki, które mają pomóc w tej decyzji, a nie kryteria wbudowane w system. Wartość mają w porównaniu dwóch wariantów na <strong>tych samych danych i kosztach</strong>, a nie jako ocena bezwzględna. Do każdego raportu warto dołączyć dwa punkty odniesienia: <em>kup i trzymaj</em> na tym samym instrumencie oraz <em>losowe wejście z tymi samymi wyjściami</em>. Jeśli strategia nie bije losowego wejścia, cała przewaga siedzi w zarządzaniu pozycją, a nie w sygnale.</p>
+    </section>
+
+    <!-- 08 -->
+    <section id="walidacja">
+      <div class="eyebrow">08 · Walidacja</div>
+      <h2>Jak odróżnić przewagę od szczęścia</h2>
+      <p class="intro">Walidacja to zestaw prób, które strategia musi przetrwać, zanim trafi na demo. Kolejność jest od najprostszej do najbardziej wymagającej.</p>
+
+      <h3 class="sub">1 · Podział danych</h3>
+      <p>Historię dzieli się na część treningową (in-sample, np. 70%) i testową (out-of-sample, 30%, zawsze <em>późniejszą</em>). Na treningowej wolno szukać parametrów. Testową uruchamia się <strong>raz</strong>, na końcu. Jeśli po tym coś poprawisz i uruchomisz ponownie, dane testowe stały się treningowymi i trzeba nowych.</p>
+
+      <h3 class="sub">2 · Walk-forward</h3>
+      <p>Uczciwsza wersja podziału, powtarzana wiele razy. Okno treningowe przesuwa się w czasie, a po każdym kawałku treningu następuje kawałek testu. Sklejone testy dają krzywą, której <span class="hl">żaden wybór parametrów nie widział z góry</span>, czyli najbliższą temu, co działoby się na żywo.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 900 230" role="img" aria-label="Walk-forward: pięć przebiegów, w każdym okno treningowe i następujące po nim okno testowe, przesuwane w prawo w czasie. Sklejone okna testowe tworzą jedną krzywą wyników.">
+            <g font-family="Karla, sans-serif">
+              <text x="12" y="20" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.1em" fill="currentColor" opacity="0.55">CZAS →</text>
+              <g font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor">
+                <text x="12" y="52" opacity="0.7">przebieg 1</text>
+                <text x="12" y="84" opacity="0.7">przebieg 2</text>
+                <text x="12" y="116" opacity="0.7">przebieg 3</text>
+                <text x="12" y="148" opacity="0.7">przebieg 4</text>
+                <text x="12" y="180" opacity="0.7">przebieg 5</text>
+              </g>
+              <rect x="110" y="38" width="320" height="20" fill="#e6ebf5" stroke="#14306b" stroke-width="1"></rect>
+              <rect x="430" y="38" width="80" height="20" fill="#f2c313"></rect>
+              <rect x="190" y="70" width="320" height="20" fill="#e6ebf5" stroke="#14306b" stroke-width="1"></rect>
+              <rect x="510" y="70" width="80" height="20" fill="#f2c313"></rect>
+              <rect x="270" y="102" width="320" height="20" fill="#e6ebf5" stroke="#14306b" stroke-width="1"></rect>
+              <rect x="590" y="102" width="80" height="20" fill="#f2c313"></rect>
+              <rect x="350" y="134" width="320" height="20" fill="#e6ebf5" stroke="#14306b" stroke-width="1"></rect>
+              <rect x="670" y="134" width="80" height="20" fill="#f2c313"></rect>
+              <rect x="430" y="166" width="320" height="20" fill="#e6ebf5" stroke="#14306b" stroke-width="1"></rect>
+              <rect x="750" y="166" width="80" height="20" fill="#f2c313"></rect>
+              <text x="270" y="52" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#14306b">trening: dobór parametrów</text>
+              <text x="470" y="52" text-anchor="middle" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#14306b">test</text>
+              <rect x="430" y="204" width="400" height="14" fill="#f2c313" opacity="0.55"></rect>
+              <line x1="430" y1="196" x2="830" y2="196" stroke="currentColor" stroke-width="1"></line>
+              <text x="630" y="215" text-anchor="middle" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#14306b">sklejone testy = wynik walk-forward</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 4</b> — pięć przebiegów walk-forward. Każdy żółty kawałek oceniono parametrami dobranymi wyłącznie na niebieskim pasku po jego lewej.</figcaption>
+      </figure>
+
+      <h3 class="sub">3 · Płaskowyż zamiast szczytu</h3>
+      <p>Warto rozrysować wynik dla siatki parametrów, np. <code>ema_fast</code> × mnożnik stopu, jako mapę cieplną. Dobra strategia ma <strong>płaskowyż</strong>: sąsiednie wartości też działają. Pojedynczy jasny punkt otoczony czerwienią to przeuczenie. Lepiej wziąć środek płaskowyżu niż jego najwyższy punkt.</p>
+
+      <h3 class="sub">4 · Monte Carlo i testy obciążeniowe</h3>
+      <ul class="plain">
+        <li><strong>Tasowanie kolejności transakcji</strong> tysiąc razy. Daje rozkład możliwych drawdownów, nie jeden, który akurat wypadł w historii. Planuje się na 95. percentyl, nie na wartość z backtestu.</li>
+        <li><strong>Koszty ×2 i ×3.</strong> Strategia, która przy podwojonym spreadzie spada pod zero, nie ma zapasu bezpieczeństwa.</li>
+        <li><strong>Usunięcie 5 najlepszych transakcji.</strong> Jeśli po tym wynik znika, to nie była strategia, tylko kilka szczęśliwych dni.</li>
+        <li><strong>Inne instrumenty i lata.</strong> Hipoteza o „indeksach w trendzie” powinna choć trochę działać na DE40, nie tylko na US100.</li>
+      </ul>
+
+      <h3 class="sub">5 · Liczenie prób (poziom zaawansowany)</h3>
+      <p>Bailey i López de Prado pokazali, że przy wielu wypróbowanych wariantach najlepszy Sharpe jest systematycznie zawyżony. Proponują dwa narzędzia. <strong>Deflated Sharpe Ratio</strong> obniża Sharpe zależnie od liczby prób i rozkładu zwrotów. <strong>Probability of Backtest Overfitting</strong> sprawdza, jak często zwycięzca na treningu ląduje w dolnej połowie na teście. Oba wymagają jednego warunku po stronie systemu: <span class="hl">każda uruchomiona próba musi być zapisana</span>, także te nieudane. To wymaganie dla bazy danych modułu, nie dla analityka. Kolejny krok to <em>combinatorial purged cross-validation</em> (López de Prado, „Advances in Financial Machine Learning”, 2018): wiele ścieżek testowych zamiast jednej i rozkład wyników zamiast jednej liczby.</p>
+    </section>
+
+    <!-- 09 -->
+    <section id="narzedzia">
+      <div class="eyebrow">09 · Narzędzia</div>
+      <h2>Co jest gotowe i czy pasuje do nas</h2>
+      <p class="intro">Silnik backtestu da się napisać samemu w kilkuset liniach. Trudniejsze jest wszystko wokół: wiarygodny broker symulowany, walidacja, zapis prób. Oto stan głównych narzędzi Pythona jesienią 2026.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Narzędzie</th><th>Kształt</th><th>Stan</th><th>Dla TradingCenter</th></tr></thead>
+          <tbody>
+            <tr><td><b>NautilusTrader</b></td><td>zdarzeniowy, rdzeń w Rust</td><td><span class="tag ok">aktywny</span> linia 2.0 w RC (rc4, wrzesień 2026)</td><td>Najpoważniejszy kandydat na silnik. Ten sam kod strategii w backteście i na żywo to cel projektu. Ciężki, duża powierzchnia API, adaptera do capital.com nie ma. Właśnie przechodzi przebudowę 1.x → 2.0.</td></tr>
+            <tr><td><b>QuantConnect LEAN</b></td><td>framework warstwowy, C# z Pythonem</td><td><span class="tag ok">aktywny</span></td><td>Najlepszy wzorzec <em>architektury</em> (warstwy). Jako silnik ciężki: .NET, nastawiony na własną chmurę i własne dane.</td></tr>
+            <tr><td><b>vectorbt</b></td><td>wektorowy</td><td><span class="tag ok">utrzymywany</span></td><td>Świetny do szybkiego odsiewu parametrów. Licencja Apache 2.0 z Commons Clause ogranicza sprzedaż produktów na nim opartych, co dla prywatnego narzędzia nie jest przeszkodą.</td></tr>
+            <tr><td><b>Backtesting.py</b></td><td>zdarzeniowy, prosty</td><td><span class="tag att">wolne tempo</span> 0.6.x; istnieje fork LUCIT</td><td>Dobry do nauki i szybkich prób. Za wąski jako fundament: jeden instrument, uproszczony broker.</td></tr>
+            <tr><td><b>backtrader</b></td><td>zdarzeniowy</td><td><span class="tag stop">nieaktywny</span> ostatnie wydanie 2023</td><td>Nadal dużo tutoriali, ale nie warto na nim budować.</td></tr>
+            <tr><td><b>freqtrade</b></td><td>hybryda</td><td><span class="tag ok">aktywny</span></td><td>Wyłącznie krypto przez giełdy. Warto podejrzeć wzorce: <code>hyperopt</code>, analizę look-ahead. Nie pasuje do CFD w capital.com.</td></tr>
+            <tr><td><b>Pine Script v6</b></td><td>skrypt na świecę</td><td><span class="tag ok">aktywny</span></td><td>Zamknięty w TradingView. Dobry do szkicowania pomysłu na wykresie, nie do naszego systemu.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Wniosek: <strong>żadne narzędzie nie pasuje bez dopasowania</strong>. Przy założeniu „strategie jako dane” jest jeszcze jeden powód. NautilusTrader, LEAN, backtrader i Backtesting.py zakładają, że <em>strategia jest klasą w kodzie</em>. Żeby karmić je dokumentami, trzeba napisać jedną ogólną klasę, która interpretuje dokument, a interpreter i tak jest sercem naszego modułu. Do tego dochodzą własne archiwum z serią minutową, własny katalog wskaźników i koszty CFD. Dlatego rekomendacją jest własny silnik. Z NautilusTradera warto czerpać wzorce brokera symulowanego, a vectorbt może być później opcjonalnym narzędziem do szybkiego odsiewu.</p>
+    </section>
+
+    <!-- 10 -->
+    <section id="podejscia">
+      <div class="eyebrow">10 · Projekt</div>
+      <h2>Silnik raz, strategie jako dane</h2>
+      <p class="intro">Założenie: silnik powstaje raz i potem jest tylko poprawiany. Nowa strategia to nowy dokument w bazie, a nie commit. Wtedy pytanie „jak elastyczne mogą być strategie” sprowadza się do jednego: <span class="hl">jak bogaty jest język, w którym zapisany jest dokument</span>.</p>
+
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 300" role="img" aria-label="Po lewej silnik napisany raz: parser i walidator, ewaluator formuł, broker symulowany, koszty, rozmiar i limity, metryki i walidacja, pętla na żywo. Po prawej dane w bazie: dokumenty strategii jako rewizje, zestawy parametrów, uruchomienia i raporty, licznik prób. Silnik interpretuje dane. Pod spodem katalog wskaźników, z którego nowe wskaźniki trafiają do formuł bez zmian w silniku.">
+            <defs>
+              <marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path></marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="10" y="14" width="300" height="20" fill="#f2c313"></rect>
+              <text x="18" y="28" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.08em" fill="#14306b">NAPISANE RAZ · KOD W REPO</text>
+              <rect x="10" y="42" width="400" height="190" fill="#14306b"></rect>
+              <g font-size="13" fill="#ffffff">
+                <text x="30" y="70">parser i walidator języka formuł</text>
+                <text x="30" y="94">ewaluator: serie, interwały, stan pozycji</text>
+                <text x="30" y="118">broker symulowany: typy zleceń, SL/TP,</text>
+                <text x="30" y="136">  trailing, wnętrze świecy z MINUTE</text>
+                <text x="30" y="160">koszty · rozmiar pozycji · limity ryzyka</text>
+                <text x="30" y="184">metryki · walk-forward · Monte Carlo</text>
+                <text x="30" y="208">raport bez werdyktu · zapis każdej próby</text>
+              </g>
+
+              <rect x="570" y="14" width="300" height="20" fill="#e6ebf5"></rect>
+              <text x="578" y="28" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.08em" fill="#14306b">ZAPISYWANE W BAZIE · BEZ DEPLOYU</text>
+              <rect x="570" y="42" width="400" height="190" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <g font-size="13" fill="currentColor">
+                <text x="590" y="70">dokumenty strategii (niezmienne rewizje)</text>
+                <text x="590" y="94">zestawy parametrów</text>
+                <text x="590" y="118">uruchomienia: dokument + koszty + zakres</text>
+                <text x="590" y="136">  + wersja silnika → raport</text>
+                <text x="590" y="160">licznik prób na strategię</text>
+                <text x="590" y="184">kto napisał: operator czy agent</text>
+              </g>
+
+              <line x1="414" y1="137" x2="566" y2="137" stroke="currentColor" stroke-width="1.6" marker-end="url(#a5)"></line>
+              <text x="490" y="127" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor">interpretuje</text>
+
+              <rect x="10" y="252" width="400" height="36" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 4"></rect>
+              <text x="210" y="275" text-anchor="middle" font-size="12" fill="currentColor">katalog wskaźników /market (rośnie wpisami)</text>
+              <line x1="210" y1="250" x2="210" y2="236" stroke="currentColor" stroke-width="1.3" marker-end="url(#a5)"></line>
+              <text x="590" y="275" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">nowy wskaźnik = od razu nowa funkcja w formułach</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 5</b> — podział, na którym stoi cały projekt. Lewa strona zmienia się rzadko i przez PR. Prawa codziennie, przez zapis do bazy.</figcaption>
+      </figure>
+
+      <h3 class="sub">Cztery poziomy języka strategii</h3>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>L1 · Szablony z parametrami <span class="tag stop">odpada</span></h3>
+          <p>Silnik zna kilka typów strategii (przecięcie średnich, wybicie z kanału), a dokument podaje tylko liczby. Najprostsze, ale każdy nowy typ to zmiana kodu, więc łamie Twoje założenie.</p>
+        </div>
+        <div class="fail">
+          <h3>L2 · Bloki do składania <span class="tag att">za ciasne</span></h3>
+          <p>Drzewo gotowych warunków składane w edytorze. Tak działała poprzednia platforma. Nie wymaga zmian w kodzie, ale w tamtej wersji nie miało zmiennych ani stanu pozycji, a sygnał był jedyną warstwą. Składanie dużego drzewa klikaniem jest też uciążliwe dla człowieka.</p>
+        </div>
+        <div class="fail ok">
+          <h3>L3 · Język formuł + stały cykl życia transakcji <span class="tag ok">rekomendowane</span></h3>
+          <p>Dokument ma stałe sekcje (wejścia, wyjścia, rozmiar, limity), a w nich formuły tekstowe, jak w przykładzie z sekcji 04. Silnik obsługuje cały cykl transakcji, a formuły tylko odpowiadają na pytania: „czy wejść?”, „gdzie stop?”, „ile?”. Wzorzec sprawdzony od lat w AmiBroker AFL i Pine Scripcie.</p>
+          <p>Język celowo <strong>nie jest Turing-zupełny</strong>: nie ma pętli, wywołań na zewnątrz ani składni na przyszłość. Dlatego jest bezpieczny bez piaskownicy. Nic nie jest wykonywane, silnik tylko interpretuje sprawdzone drzewo.</p>
+        </div>
+        <div class="fail">
+          <h3>L4 · Skrypt w piaskownicy <span class="tag att">furtka na później</span></h3>
+          <p>Dokument zawiera program, np. w Starlarku, deterministycznym i hermetycznym dialekcie Pythona z wiązaniami do Pythona (<code>starlark-pyo3</code>), albo w Lua lub WASM. Wyrazi dowolną logikę. Wymaga jednak wykonywania niezaufanego kodu, więc osobnego procesu bez sieci, sekretów i baz, a to nowa granica bezpieczeństwa w tym repo. Ma sens dopiero wtedy, gdy zbierze się lista realnych strategii, których L3 nie wyrazi.</p>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Kryterium</th><th>L1 · szablony</th><th>L2 · bloki</th><th>L3 · formuły</th><th>L4 · skrypt</th></tr></thead>
+          <tbody>
+            <tr><td><b>Nowa strategia bez zmiany kodu</b></td><td><span class="tag stop">tylko nowe liczby</span></td><td><span class="tag ok">tak</span></td><td><span class="tag ok">tak</span></td><td><span class="tag ok">tak</span></td></tr>
+            <tr><td><b>Co wyrazi</b></td><td>kilka typów</td><td>proste reguły</td><td>zdecydowaną większość strategii technicznych</td><td>wszystko</td></tr>
+            <tr><td><b>Bezpieczeństwo</b></td><td><span class="tag ok">pełne</span></td><td><span class="tag ok">pełne</span></td><td><span class="tag ok">pełne, z założenia</span></td><td><span class="tag att">tylko w piaskownicy</span></td></tr>
+            <tr><td><b>Agent napisze</b></td><td><span class="tag ok">łatwo</span></td><td><span class="tag att">nieporęcznie</span></td><td><span class="tag ok">łatwo, zna taką składnię</span></td><td><span class="tag ok">łatwo</span></td></tr>
+            <tr><td><b>Podgląd przyszłości</b></td><td><span class="tag ok">niemożliwy</span></td><td><span class="tag ok">niemożliwy</span></td><td><span class="tag ok">niemożliwy składniowo</span></td><td><span class="tag stop">trzeba pilnować w środowisku</span></td></tr>
+            <tr><td><b>Koszt budowy</b></td><td><span class="tag ok">mały</span></td><td><span class="tag att">średni</span></td><td><span class="tag att">średni</span></td><td><span class="tag stop">duży</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">Co wyraża język formuł (L3)</h3>
+      <p>To od tej listy zależy, czy strategie będą „dowolne”. Każdy wiersz to jedna rzecz, którą silnik implementuje raz.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Element</th><th>Zapis</th><th>Co umożliwia</th></tr></thead>
+          <tbody>
+            <tr><td><b>Serie bazowe</b></td><td><code>open high low close volume</code></td><td>Wszystko, co jest w świecy.</td></tr>
+            <tr><td><b>Wstecz</b></td><td><code>close[1]</code>, <code>highest(high, 20)[1]</code></td><td>Formacje, wybicia, porównania z przeszłością. Ujemny indeks jest odrzucany.</td></tr>
+            <tr><td><b>Wskaźniki z katalogu</b></td><td><code>ema(20)</code>, <code>rsi(14)</code>, <code>bbands(20, 2).upper</code></td><td>Cały katalog <code>/market</code>. Nowy wpis w katalogu od razu staje się funkcją, bez zmiany w silniku.</td></tr>
+            <tr><td><b>Inny interwał</b></td><td><code>close @ HOUR_4</code></td><td>Strategie wieloczasowe. Silnik dopasowuje serię do ostatniej zamkniętej świecy H4.</td></tr>
+            <tr><td><b>Inny instrument jako filtr</b></td><td><code>close @ US500</code>, <code>close @ US500 @ DAY</code></td><td>Handel nadal na jednym instrumencie, ale warunek może czytać inny, np. „long US100 tylko gdy US500 też jest nad EMA200”. Później także ropa czy rentowności obligacji, gdy trafią do archiwum (<a href="#decyzje">sekcja 12</a>).</td></tr>
+            <tr><td><b>Zmienne nazwane</b></td><td>sekcja <code>let</code></td><td>Czytelność i ponowne użycie. Silnik sprawdza, czy zmienne nie odwołują się do siebie w kółko.</td></tr>
+            <tr><td><b>Zdarzenia</b></td><td><code>crosses_above(a, b)</code>, <code>bars_since(cond)</code>, <code>value_when(cond, x)</code></td><td>„Setup uzbrojony 5 świec temu”, „cena przy ostatnim wybiciu”. To zastępuje pętle.</td></tr>
+            <tr><td><b>Czas</b></td><td><code>hour</code>, <code>weekday</code>, <code>session_high("asia")</code></td><td>Filtry sesji, strategie otwarcia, unikanie weekendu.</td></tr>
+            <tr><td><b>Stan pozycji</b></td><td><code>entry_price</code>, <code>at_entry(atr(14))</code>, <code>bars_in_trade</code>, <code>open_r</code></td><td>Wyjścia zależne od przebiegu transakcji, przesuwanie stopu na wejście.</td></tr>
+            <tr><td><b>Historia transakcji</b></td><td><code>losses_in_row</code>, <code>last_trade.r</code></td><td>„Po dwóch stratach z rzędu pauza na dzień”.</td></tr>
+            <tr><td><b>Parametry</b></td><td><code>p.fast</code></td><td>Strojenie i walidacja bez zmiany dokumentu.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Do tego dochodzi część <strong>stała, ale konfigurowalna</strong>: typy zleceń (rynkowe, limit, stop, z wygaśnięciem), wyjścia (stop, cel, trailing, czas, formuła, częściowe zamknięcie), tryby rozmiaru (stały, ułamek ryzyka, cel zmienności), limity (pozycje naraz, stop dnia, okna bez wejść). Każda strategia handluje <strong>jednym instrumentem</strong>, więc nie ma warstwy konstrukcji portfela ani rotacji między instrumentami.</p>
+
+      <h3 class="sub">Czego L3 nie wyrazi, i co z tym zrobić</h3>
+      <ul class="plain">
+        <li><strong>Algorytmów z pętlami</strong>: uczenia modeli w trakcie, optymalizacji wewnątrz strategii, dowolnych struktur danych. To przypadki dla L4.</li>
+        <li><strong>Danych, których silnik nie zna</strong>, np. sentymentu z archiwum <code>/social</code> albo kalendarza makro. Dodanie nowego źródła jako serii (<code>sentiment("US100")</code>) to zmiana silnika, ale <em>jednorazowa</em>: potem każda strategia może z niego korzystać.</li>
+        <li><strong>Nowego typu zlecenia albo nowej funkcji zdarzeń.</strong> To także zmiana silnika, ale rzadka. Tym właśnie są „poprawki później”.</li>
+      </ul>
+      <p>Każda taka zmiana poszerza język dla <em>wszystkich</em> strategii naraz. To odwrotność modelu „strategia jako kod”, gdzie każda zmiana dotyczy jednej strategii.</p>
+
+      <h3 class="sub">Droga dokumentu do silnika</h3>
+      <ul class="plain">
+        <li><strong>Parsowanie bez wykonywania.</strong> Formuły mają składnię wyrażeń Pythona, więc parsuje je standardowy moduł <code>ast</code> (<code>mode="eval"</code>), a nie <code>eval</code>. Dozwolone są tylko konkretne typy węzłów: liczby, nazwy, działania, porównania, <code>and/or/not</code>, wywołania funkcji z białej listy, pole (<code>p.fast</code>, linia wskaźnika <code>bbands(20, 2).upper</code>), indeks <code>[n]</code> z nieujemną stałą i operator <code>@</code>. Wszystko inne jest odrzucane. <code>close[-1]</code> parsuje się poprawnie, więc musi go odrzucić walidator, nie parser. <code>close @ HOUR_4</code> i <code>close[1]</code> parsują się natywnie, a każdy model językowy zna tę składnię.</li>
+        <li><strong>Walidacja przy zapisie.</strong> Silnik sprawdza nazwy (czy funkcja istnieje w rejestrze, wskaźnik w katalogu, parametr w <code>params</code>), typy (seria, liczba, warunek), cykle w <code>let</code>, dostępność danych w archiwum (symbol, interwał, zakres) i od razu wylicza potrzebną rozgrzewkę. Dokument, który nie przejdzie walidacji, nie zostaje zapisany.</li>
+        <li><strong>Błędy dla człowieka i agenta.</strong> Lista z adresem i podpowiedzią, np. <code>entries[0].when, kol. 14: nieznana funkcja "emaa" — czy chodziło o "ema"?</code> Dzięki temu agent poprawia dokument sam, w pętli.</li>
+        <li><strong>Niezmienna rewizja.</strong> Zapisany dokument dostaje numer rewizji i hash treści. Edycja tworzy nową rewizję. Raport zawsze wskazuje, której rewizji dotyczy.</li>
+      </ul>
+
+      <h3 class="sub">Jak silnik może się zmieniać, nie psując zapisanych strategii</h3>
+      <ul class="plain">
+        <li><strong>Pole <code>schema</code> w dokumencie.</strong> Język rośnie przez dodawanie (nowe funkcje i pola), więc stare dokumenty dalej działają. Zmiana znaczenia czegoś istniejącego to nowy numer schematu i konwerter starych dokumentów.</li>
+        <li><strong>Wersja silnika w każdym uruchomieniu.</strong> Raport zapisuje hash dokumentu, parametry, koszty, zakres danych i wersję silnika. Ten sam zestaw daje ten sam wynik.</li>
+        <li><strong>Złote strategie w CI.</strong> Kilkanaście dokumentów referencyjnych z zapisanymi wynikami na zamrożonym wycinku danych. Poprawka silnika, która zmienia wynik, jest widoczna w PR i musi być świadoma. Repo robi już tak z wskaźnikami (plik golden).</li>
+      </ul>
+
+      <h3 class="sub">Jak zbudować język: cztery opcje</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Opcja</th><th>Za</th><th>Przeciw</th></tr></thead>
+          <tbody>
+            <tr><td><b>Składnia Pythona przez <code>ast</code> + biała lista</b> <span class="tag ok">rekomendowane</span></td><td>Zero zależności. Składnię znają ludzie i modele. Pełna kontrola nad semantyką serii i komunikatami błędów.</td><td>Parsowalne są konstrukcje, których nie chcemy, więc biała lista musi być szczelna i przetestowana.</td></tr>
+            <tr><td><b>Własna gramatyka</b> (np. Lark)</td><td>Dokładnie taki język, jaki chcemy, np. z <code>between</code>.</td><td>Zależność i więcej kodu, a modele językowe nie znają tej składni.</td></tr>
+            <tr><td><b>CEL</b> (Common Expression Language)</td><td>Dojrzały standard, celowo nie Turing-zupełny, ma implementacje dla Pythona (także rdzeń w Rust).</td><td>Zaprojektowany do warunków na pojedynczych wartościach, nie na seriach. Przesunięcia i interwały trzeba by doklejać.</td></tr>
+            <tr><td><b>Starlark</b></td><td>Pełny, bezpieczny z założenia dialekt Pythona.</td><td>To już L4: programy zamiast formuł, wiązania mniej dojrzałe. Na później.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">Agent i edytor: jak powstaje strategia</h3>
+      <p>Głównym autorem jest <strong>agent, któremu opisujesz strategię po polsku</strong>. Edytor tekstowy obok pokazuje dokument, który agent z tego zrobił, i pozwala go poprawić ręcznie. Skoro strategia jest dokumentem, agent nie potrzebuje dostępu do repo.</p>
+      <ul class="plain">
+        <li><strong>1 · Opis.</strong> „Kupuj US100, gdy cena wybije szczyt sesji azjatyckiej, ale tylko w trendzie wzrostowym na H4. Stop pod dołkiem zakresu, cel 2R.”</li>
+        <li><strong>2 · Pytania zamiast zgadywania.</strong> Opis w języku naturalnym zawsze jest niedomknięty. Które godziny to „sesja azjatycka”? Jak zdefiniować „trend na H4”? Agent dopytuje albo zapisuje każde swoje założenie w polu <code>notes</code> dokumentu.</li>
+        <li><strong>3 · Dokument i walidacja.</strong> Agent pisze dokument i woła walidator. Poprawia błędy w pętli, dopóki dokument nie przejdzie.</li>
+        <li><strong>4 · Odczytanie wstecz.</strong> Edytor pokazuje dokument i obok jego <em>streszczenie wygenerowane z dokumentu</em>, a nie z Twojego opisu. To najważniejsza kontrola: <span class="hl">źle zrozumiany opis wygląda w raporcie jak zła strategia</span>, więc trzeba to wyłapać przed backtestem.</li>
+        <li><strong>5 · Poprawki.</strong> Ręcznie w edytorze albo słownie („zmień stop na 1,5 ATR”). Każda zmiana to nowa rewizja z widoczną różnicą względem poprzedniej.</li>
+        <li><strong>6 · Backtest i raport.</strong> Na Twoje żądanie albo na prośbę do agenta. Raport pokazuje liczby, a agent może je skomentować, ale niczego nie rozstrzyga.</li>
+      </ul>
+      <p>Narzędzia agenta, dostępne w rozmowie jak narzędzia innych pakietów workbencha:</p>
+      <ul class="plain">
+        <li><code>strategy_language</code> — opis języka <em>generowany z tego samego rejestru funkcji, którego używa walidator</em>, więc opis i silnik nie mogą się rozjechać;</li>
+        <li><code>validate_strategy</code> — lista błędów z adresami, nic nie zapisuje;</li>
+        <li><code>save_strategy</code> — nowa rewizja dokumentu;</li>
+        <li><code>run_backtest</code> — zadanie w tle z limitem, liczone do licznika prób;</li>
+        <li><code>compare_runs</code> — porównanie tylko przy tych samych kosztach i zakresie.</li>
+      </ul>
+      <p>Agent, który na prośbę „poszukaj lepszych parametrów” uruchomi setki wariantów, prawie na pewno znajdzie przeuczonego zwycięzcę. Licznik prób i Deflated Sharpe w raporcie (<a href="#walidacja">sekcja 08</a>) pokazują, ile tego „lepszego” to szczęście.</p>
+
+      <h3 class="sub">Etapy</h3>
+      <ul class="plain">
+        <li><strong>Etap 1 · Język, silnik, zapis.</strong> Parser, walidator i ewaluator L3 (serie, wstecz, katalog wskaźników, inne interwały, inne instrumenty jako filtr z dopasowaniem w czasie i czasem dostępności serii, <code>let</code>, zdarzenia, czas, stan pozycji). Zdarzeniowy silnik backtestu na dowolnym interwale, z wypełnieniami rozstrzyganymi na <code>MINUTE</code>. Model kosztów z czterema składnikami i profilem spreadu. Dokumenty jako rewizje w bazie. Raport w R z punktami odniesienia, bez werdyktu. Złote strategie w CI.</li>
+        <li><strong>Etap 2 · Ekran i agent.</strong> Zakładka w terminalu: rozmowa z agentem, edytor tekstowy z podpowiedziami i walidacją na żywo, odczytanie wstecz, historia rewizji, raport z krzywą kapitału i listą transakcji na wykresie. Narzędzia agenta jak wyżej.</li>
+        <li><strong>Etap 3 · Walidacja.</strong> Podział IS/OOS z licznikiem użyć danych testowych widocznym w raporcie, walk-forward, siatka parametrów z mapą cieplną, Monte Carlo, licznik prób i Deflated Sharpe. Wszystko jako liczby w raporcie, nie jako bramki.</li>
+        <li><strong>Poza zakresem.</strong> Składanie zleceń, publikowanie decyzji dla zespołów, pętla na żywo, portfel i rotacja, L4. Moduł jest narzędziem badawczym, a decyzja o handlu jest Twoja.</li>
+      </ul>
+      <p><strong>Jak to siada w architekturze repo.</strong> Moduł czyta świece i liczy, więc jest pakietem workbencha pod wolnym już prefiksem <code>/strategy</code>. Świece czyta w procesie (<code>tc_runtime.caller_access.in_process</code>), wskaźniki bierze z katalogu <code>/market</code> zamiast liczyć je drugi raz, a dokumenty i uruchomienia trzyma we własnym schemacie. <strong>Nie ma żadnej drogi do rachunku</strong>: ani klienta <code>trading-mcp</code>, ani bramki. Backtest na roku danych minutowych to setki tysięcy świec, więc powinien działać poza pętlą zdarzeń serwera i przejść <code>db-cost-check</code>. Całość to zmiana OpenSpec: nowe wymagania i kontrakt.</p>
+    </section>
+
+    <!-- 11 -->
+    <section id="lekcje">
+      <div class="eyebrow">11 · Lekcje</div>
+      <h2>Co warto zabrać z platformy usuniętej 17 października</h2>
+      <p class="intro">Poprzednia platforma (<code>openspec/changes/archive/2026-10-18-remove-strategy-platform</code>) została usunięta, bo nie była kształtem, na którym operator chciał budować dalej. Kilka jej decyzji to jednak dokładnie to, co zaleca literatura. Warto je przenieść świadomie, a nie odkrywać ponownie.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Decyzja</th><th>Werdykt</th><th>Dlaczego</th></tr></thead>
+          <tbody>
+            <tr><td><b>Czysta funkcja decyzji</b> (bez I/O, bez zegara)</td><td><span class="tag ok">zabrać</span></td><td>To warunek odtwarzalności i tego, żeby backtest i pętla na żywo wołały ten sam kod.</td></tr>
+            <tr><td><b>Test „naraz = świeca po świecy”</b> i test „dłuższy zakres nie zmienia wspólnej części”</td><td><span class="tag ok">zabrać</span></td><td>Najtańsze automatyczne wykrywanie podglądu przyszłości.</td></tr>
+            <tr><td><b>Raport bez kosztów nie jest wynikiem</b></td><td><span class="tag ok">zabrać</span></td><td>Archiwum ma tylko bid, więc bez tego każdy wynik jest zawyżony.</td></tr>
+            <tr><td><b>Niezmienne rewizje</b>, parametry przypięte do rewizji</td><td><span class="tag ok">zabrać</span></td><td>Każdy wynik należy do konkretnej wersji. Bez tego porównania są fikcją.</td></tr>
+            <tr><td><b>Wyniki w R</b>, porównanie tylko przy tych samych kosztach i zakresie</td><td><span class="tag ok">zabrać</span></td><td>Standard w praktyce tradingowej.</td></tr>
+            <tr><td><b>Wskaźniki tylko z katalogu archiwum</b></td><td><span class="tag ok">zabrać</span></td><td>Jedna matematyka dla wykresu, agenta i strategii.</td></tr>
+            <tr><td><b>Jedna decyzja (setup) na świecę</b>, bez pozycji, rozmiaru i limitów</td><td><span class="tag att">rozszerzyć</span></td><td>Setup to tylko warstwa sygnału. Brakowało rozmiaru, limitów i wykonania jako osobnych warstw.</td></tr>
+            <tr><td><b>Reguła jako dane, zamknięty słownik</b>, odrzucanie przy zapisie</td><td><span class="tag ok">zabrać</span></td><td>To ten sam kierunek co L3. Walidacja przy zapisie na katalogu archiwum przechodzi bez zmian.</td></tr>
+            <tr><td><b>Drzewo węzłów składane w edytorze</b>, bez składni tekstowej, zmiennych i stanu pozycji</td><td><span class="tag att">zmienić</span></td><td>Drzewo zostaje, ale jako postać wewnętrzna. Autor pisze formuły tekstowe, a parser robi z nich drzewo. Dochodzą <code>let</code>, interwały, stan pozycji i pełny cykl transakcji.</td></tr>
+            <tr><td><b>Dwa źródła strategii</b> (kod w obrazie i reguła z ekranu, rozdzielane przez <code>resolver.py</code>)</td><td><span class="tag stop">porzucić</span></td><td>Jedno źródło: dokument w bazie. Strategia odniesienia (dawniej <code>baseline_ma_cross</code> w kodzie) też jest dokumentem, wśród złotych strategii w CI.</td></tr>
+            <tr><td><b>Brak drogi do rachunku</b> (moduł niczego nie składa)</td><td><span class="tag ok">zabrać</span></td><td>Zgodne z decyzją: moduł tylko do badań, decyzja o handlu po stronie operatora.</td></tr>
+            <tr><td><b>Backtest tylko jako komenda CLI</b></td><td><span class="tag att">przemyśleć</span></td><td>Bezpieczne, ale odcina terminal i agentów od pętli „pomysł → wynik”. Lepiej zadanie w tle, uruchamiane z ekranu, z limitem.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 12 -->
+    <section id="decyzje">
+      <div class="eyebrow">12 · Decyzje</div>
+      <h2>Osiem decyzji przed propozycją</h2>
+      <p class="intro">Decyzje operatora z 24 października 2026 i to, co każda z nich zmienia w projekcie. Otwartych pytań nie ma, więc następnym krokiem jest propozycja OpenSpec na etap 1.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Pytanie</th><th>Decyzja</th><th>Co to zmienia</th></tr></thead>
+          <tbody>
+            <tr><td><b>Kod czy dane?</b></td><td><span class="tag ok">dane</span></td><td>Silnik raz, strategie jako dokumenty w bazie, język formuł L3.</td></tr>
+            <tr><td><b>Edytor</b></td><td><span class="tag ok">tekst + agent</span></td><td>Głównym autorem jest agent piszący z opisu w języku naturalnym. Edytor tekstowy służy do podglądu i ręcznych poprawek. Stąd odczytanie wstecz, pytania doprecyzowujące, pole <code>notes</code> i rewizje z różnicami.</td></tr>
+            <tr><td><b>Jeden instrument czy portfel?</b></td><td><span class="tag ok">jeden</span></td><td>Bez warstwy konstrukcji portfela, wspólnego kapitału i rotacji.</td></tr>
+            <tr><td><b>Na co formuła może patrzeć?</b></td><td><span class="tag ok">inne interwały i inne instrumenty</span></td><td><code>close @ HOUR_4</code> i <code>close @ US500</code> działają od etapu 1. Silnik dopasowuje w czasie serie o różnych godzinach handlu.</td></tr>
+            <tr><td><b>Horyzonty</b></td><td><span class="tag ok">wszystkie interwały</span></td><td>Model kosztów od pierwszego dnia ma spread (z profilem godzinowym), poślizg, finansowanie overnight i luki. Dla M1 raport pokazuje, ile świec rozstrzygnięto pesymistycznie.</td></tr>
+            <tr><td><b>Sygnał czy wykonanie?</b></td><td><span class="tag ok">tylko badania</span></td><td>Moduł nie ma drogi do rachunku i nie publikuje decyzji. Pętla na żywo wypada z zakresu.</td></tr>
+            <tr><td><b>Gdzie jest „dosyć”?</b></td><td><span class="tag ok">silnik nie ocenia</span></td><td>Raport bez werdyktu i bez bramek. Licznik prób, użycia danych testowych i Deflated Sharpe są tylko pokazywane.</td></tr>
+            <tr><td><b>Własny silnik czy NautilusTrader?</b></td><td><span class="tag ok">własny</span></td><td>Bez ciężkiej zależności. Interpreter dokumentu i broker symulowany są nasze.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 class="sub">Inny interwał i inny instrument: co silnik musi umieć</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Co</th><th>Przykład</th><th>Ile pozycji i na czym</th><th>Stan</th></tr></thead>
+          <tbody>
+            <tr><td><b>Inny interwał tego samego instrumentu</b></td><td>„Long US100 na H1 tylko w trendzie na H4”: <code>ema(20) @ HOUR_4 &gt; ema(50) @ HOUR_4</code></td><td>jedna, US100</td><td><span class="tag ok">etap 1</span></td></tr>
+            <tr><td><b>Inny instrument jako filtr</b></td><td>„Long US100 tylko gdy US500 też jest nad EMA200”: <code>close @ US500 &gt; ema(200) @ US500</code>. Oba zapisy da się łączyć: <code>close @ US500 @ DAY</code>.</td><td>jedna, US100; drugi instrument jest tylko czytany</td><td><span class="tag ok">etap 1</span></td></tr>
+            <tr class="void"><td>Rotacja (<code>rank</code>)</td><td>„Trzymaj ten z 5 indeksów, który najmocniej rósł przez 20 dni”</td><td>wybór, <em>czym</em> handlować, czyli portfel</td><td><span class="tag stop">wykluczone decyzją</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul class="plain">
+        <li><strong>Dopasowanie w czasie.</strong> Rynki mają różne godziny: DE40 i US100 handlują w innych porach, a BTCUSD prawie całą dobę. W chwili <em>t</em> liczy się ostatnia <em>zamknięta</em> świeca drugiego instrumentu. Gdy jego rynek jest zamknięty, wartość jest „stara”, a formuła może o to zapytać (<code>stale(close @ DE40)</code>) i na przykład nie wchodzić.</li>
+        <li><strong>Dane obu instrumentów.</strong> Walidator sprawdza, czy archiwum ma każdy symbol z dokumentu w potrzebnym zakresie i interwale. Jeśli nie ma, odmawia zapisu z komunikatem, którego symbolu brakuje, zamiast liczyć na pustej serii.</li>
+        <li><strong>Testy silnika</strong> na przesunięcia sesji, luki weekendowe i zmianę czasu letniego.</li>
+      </ul>
+
+      <h3 class="sub">Ropa i rentowności obligacji: przygotowanie, nie zakres</h3>
+      <p>Dodanie takich serii to <strong>osobne zadanie po stronie danych</strong>, nie część tego projektu. Silnik musi jednak od początku zakładać dwie rzeczy, żeby ich późniejsze dodanie nie zmieniło formatu dokumentu ani silnika:</p>
+      <ul class="plain">
+        <li><strong>Symbol to po prostu seria.</strong> Formuła nie wie i nie musi wiedzieć, czy <code>@ OIL</code> to świece CFD z capital.com, czy dzienna rentowność 10-letnich obligacji z zewnętrznego źródła. Silnik prosi archiwum o serię pod nazwą. Nowe źródło to nowy dostawca serii, nie zmiana języka. Seria bez pełnej świecy (sama wartość, jak rentowność) udostępnia <code>close</code>, a formuła z <code>high</code> na niej jest odrzucana przy zapisie.</li>
+        <li><strong>Moment publikacji, nie tylko moment, którego dotyczy wartość.</strong> Świeca CFD jest znana w chwili zamknięcia. Dana makro albo dzienna rentowność z zewnętrznego źródła bywa publikowana godziny lub dni po okresie, którego dotyczy. Backtest, który użyje jej od początku tego okresu, <span class="hl">podgląda przyszłość, choć formuła wygląda niewinnie</span>. Dlatego każda seria niesie, poza czasem okresu, czas, od którego była dostępna, a silnik pokazuje formule tylko wartości już opublikowane. Repo mierzy już pokrewną różnicę dla newsów: zmiana <code>news-arrives-with-its-delay</code> zapisuje, kiedy news faktycznie dotarł, a nie tylko, jak go datowano.</li>
+      </ul>
+      <p>W etapie 1 wszystkie serie pochodzą z archiwum świec, więc czas dostępności to czas zamknięcia świecy. Pole istnieje jednak od początku, a dostawca nowej serii tylko je wypełnia.</p>
+    </section>
+
+    <section id="zrodla">
+      <div class="eyebrow">13 · Źródła</div>
+      <h2>Skąd te informacje</h2>
+      <ul class="sources">
+        <li>QuantConnect, <a href="https://www.quantconnect.com/docs/v2/writing-algorithms/algorithm-framework/overview">Algorithm Framework — overview</a> (warstwy Universe / Alpha / Portfolio / Risk / Execution)</li>
+        <li>NautilusTrader, <a href="https://docs.nautilustrader.io/concepts/overview.html">Concepts — overview</a>, <a href="https://pypi.org/project/nautilus-trader/">PyPI</a>, <a href="https://newreleases.io/project/github/nautechsystems/nautilus_trader/release/v2.0.0rc4">wydanie 2.0.0rc4</a></li>
+        <li>Bailey, Borwein, López de Prado, Zhu, <a href="https://papers.ssrn.com/abstract=2326253">The Probability of Backtest Overfitting</a> (SSRN)</li>
+        <li><a href="https://en.wikipedia.org/wiki/Purged_cross-validation">Purged cross-validation</a> (Wikipedia); López de Prado, <em>Advances in Financial Machine Learning</em>, Wiley 2018</li>
+        <li>AmiBroker, <a href="https://amibroker.com/guide/afl/applystop.html">AFL — ApplyStop</a> (język formuł z <code>Buy</code> / <code>Sell</code> / <code>Short</code> / <code>Cover</code>)</li>
+        <li><a href="https://python-common-expression-language.readthedocs.io/">python-common-expression-language</a> (CEL, rdzeń w Rust) · <a href="https://pypi.org/project/cel-python">cel-python</a></li>
+        <li><a href="https://github.com/inducer/starlark-pyo3">starlark-pyo3</a> (Starlark dla Pythona, piaskownica)</li>
+        <li>Trading Strategy, <a href="https://tradingstrategy.ai/docs/learn/backtesting.html">Backtesting &amp; research methodology</a></li>
+        <li>TradingView, <a href="https://www.tradingview.com/pine-script-docs/concepts/strategies/">Pine Script — Strategies</a></li>
+        <li>Snyk Advisor, <a href="https://snyk.io/advisor/python/backtrader">backtrader</a> i <a href="https://security.snyk.io/package/pip/vectorbt">vectorbt</a> (stan utrzymania)</li>
+        <li><a href="https://data.safetycli.com/changelogs/backtesting">Backtesting.py changelog</a>; <a href="https://pypi.org/project/lucit-backtesting">fork lucit-backtesting</a></li>
+        <li>W repozytorium: <code>openspec/changes/archive/2026-08-23-a-strategy-is-a-catalogue-entry</code>, <code>…/2026-10-18-remove-strategy-platform</code>, <code>modules/workbench/market_data/README.md</code></li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>TradingCenter · research: moduł strategii i backtestów</span>
+    <span>24 października 2026 · przed propozycją OpenSpec</span>
+  </div>
+</footer>

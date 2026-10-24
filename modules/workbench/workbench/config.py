@@ -14,6 +14,7 @@ from alerts.config import Settings as AlertsSettings
 from market_data.config import Settings as MarketSettings
 from polymarket_data.config import Settings as PolymarketSettings
 from social_data.config import Settings as SocialSettings
+from strategies.config import Settings as StrategiesSettings
 from teams.config import ModelCatalogueEntry as TeamsModelCatalogueEntry
 from teams.config import Settings as TeamsSettings
 from telegram_gateway.config import Settings as TelegramSettings
@@ -112,11 +113,14 @@ class Settings(BaseSettings):
     # The alerts package, optional for the same reason: unset, the process runs without it, and the archives that publish
     # events simply do not. Production sets it in the same deploy that ships the package.
     alerts_database_url: str | None = Field(default=None, repr=False)
+    # The strategy engine, optional for the same reason: unset, the process runs without it. Research only — nothing in it
+    # reaches an account, so nothing else in the process depends on it being here.
+    strategies_database_url: str | None = Field(default=None, repr=False)
     telegram_api_id: int | None = None
     telegram_api_hash: str | None = None
     telegram_session_key: str | None = Field(default=None, repr=False)
 
-    @field_validator("youtube_database_url", "alerts_database_url")
+    @field_validator("youtube_database_url", "alerts_database_url", "strategies_database_url")
     @classmethod
     def _blank_optional_database_means_absent(cls, value: str | None) -> str | None:
         # `YOUTUBE_DATABASE_URL=` left in a .env is the line not being there, not a database named "".
@@ -367,6 +371,29 @@ class Settings(BaseSettings):
         )
 
 
+    def for_strategies(self) -> StrategiesSettings:
+        """The strategy engine's own settings, the same way, and asked for only when `strategies_enabled()` said yes."""
+        if self.strategies_database_url is None:
+            raise ValueError(
+                "STRATEGIES_DATABASE_URL is not set, so the strategy engine is not part of this process — "
+                "there is no settings object to build for it."
+            )
+        return StrategiesSettings(
+            _env_prefix="STRATEGIES_",  # pyright: ignore[reportCallIssue]
+            _env_file=self.model_config.get("env_file"),  # pyright: ignore[reportCallIssue]
+            database_url=self.strategies_database_url,
+            database_user=self.database_user,
+            private_hosts=self.private_hosts,
+            azure_client_id=self.azure_client_id,
+            azure_client_secret=self.azure_client_secret,
+            azure_tenant_id=self.azure_tenant_id,
+            migration_lock_wait_seconds=self.migration_lock_wait_seconds,
+            require_authenticated_principal=self.require_authenticated_principal,
+            # Not the process's REST list: the pocket reads archives, and this package is the operator's research.
+            # Read as STRATEGIES_REST_CALLER_APPLICATION_IDS.
+        )
+
+
 class _YoutubeSwitch(BaseSettings):
     """The one setting the assembly reads at import time, alone: whether to mount the YouTube archive is decided before
     `Settings()` — which refuses to build without the other seven databases — has anywhere to run."""
@@ -393,4 +420,18 @@ class _AlertsSwitch(BaseSettings):
 def alerts_enabled() -> bool:
     """Whether this process serves the alerts package: its database is configured, and nothing else decides it."""
     configured = _AlertsSwitch().alerts_database_url
+    return configured is not None and bool(configured.strip())
+
+
+class _StrategiesSwitch(BaseSettings):
+    """The same one setting for the strategy engine, read alone and at import time."""
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    strategies_database_url: str | None = None
+
+
+def strategies_enabled() -> bool:
+    """Whether this process serves the strategy engine: its database is configured, and nothing else decides it."""
+    configured = _StrategiesSwitch().strategies_database_url
     return configured is not None and bool(configured.strip())

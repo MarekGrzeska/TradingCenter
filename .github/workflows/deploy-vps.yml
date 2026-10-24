@@ -226,6 +226,7 @@ jobs:
           TELEGRAM_DB_PASSWORD: ${{ secrets.TELEGRAM_DB_PASSWORD }}
           YOUTUBE_DB_PASSWORD: ${{ secrets.YOUTUBE_DB_PASSWORD }}
           ALERTS_DB_PASSWORD: ${{ secrets.ALERTS_DB_PASSWORD }}
+          STRATEGIES_DB_PASSWORD: ${{ secrets.STRATEGIES_DB_PASSWORD }}
           GATEWAY_API_KEY: ${{ secrets.GATEWAY_API_KEY }}
           CAPITAL_API_KEY: ${{ secrets.CAPITAL_API_KEY }}
           CAPITAL_IDENTIFIER: ${{ secrets.CAPITAL_IDENTIFIER }}

@@ -1,0 +1,142 @@
+"""The only door to this package's tables for strategies and their revisions. Nothing here updates a revision or deletes
+anything: a revision is the next row, and a strategy is archived."""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Literal
+
+import asyncpg
+from tc_runtime.db import Conn
+
+from .document import SCHEMA_VERSION, Checked
+
+Author = Literal["operator", "agent"]
+
+
+class NotFound(Exception):
+    pass
+
+
+def decoded(value: Any) -> Any:
+    """A `jsonb` column as the value it holds. asyncpg hands it back as text unless a codec says otherwise."""
+    return json.loads(value) if isinstance(value, str) else value
+
+
+@dataclass(frozen=True)
+class Saved:
+    strategy_id: int
+    revision: int
+    created: bool
+
+
+async def create(pool: asyncpg.Pool, checked: Checked, author: Author) -> Saved:
+    async with pool.acquire() as conn, conn.transaction():
+        strategy_id = await conn.fetchval(
+            "INSERT INTO strategies (name) VALUES ($1) RETURNING id", checked.document.name
+        )
+        await _insert_revision(conn, strategy_id, 1, checked, author)
+    return Saved(strategy_id, 1, True)
+
+
+async def save_revision(pool: asyncpg.Pool, strategy_id: int, checked: Checked, author: Author) -> Saved:
+    """The next revision, or the latest one unchanged when the content is the same. The strategy's row is locked for the
+    length of it, so two saves at once take numbers one after the other instead of the same one."""
+    async with pool.acquire() as conn, conn.transaction():
+        found = await conn.fetchval("SELECT id FROM strategies WHERE id = $1 FOR UPDATE", strategy_id)
+        if found is None:
+            raise NotFound(strategy_id)
+        latest = await conn.fetchrow(
+            "SELECT n, content_hash FROM strategy_revisions WHERE strategy_id = $1 ORDER BY n DESC LIMIT 1", strategy_id
+        )
+        if latest is not None and latest["content_hash"] == checked.hash:
+            return Saved(strategy_id, latest["n"], False)
+        n = 1 if latest is None else latest["n"] + 1
+        await _insert_revision(conn, strategy_id, n, checked, author)
+        await conn.execute("UPDATE strategies SET name = $2 WHERE id = $1", strategy_id, checked.document.name)
+    return Saved(strategy_id, n, True)
+
+
+async def _insert_revision(conn: Conn, strategy_id: int, n: int, checked: Checked, author: Author) -> None:
+    await conn.execute(
+        "INSERT INTO strategy_revisions (strategy_id, n, document, content_hash, schema_version, author) "
+        "VALUES ($1, $2, $3::jsonb, $4, $5, $6)",
+        strategy_id, n, json.dumps(checked.canonical), checked.hash, SCHEMA_VERSION, author,
+    )
+
+
+_SUMMARY = """
+    SELECT s.id, s.name, s.created_at, s.archived_at,
+           (SELECT max(n) FROM strategy_revisions r WHERE r.strategy_id = s.id) AS latest_revision,
+           (SELECT count(*) FROM runs u WHERE u.strategy_id = s.id AND u.status = 'done') AS trials
+    FROM strategies s
+"""
+
+
+@dataclass(frozen=True)
+class Summary:
+    id: int
+    name: str
+    created_at: datetime
+    archived_at: datetime | None
+    latest_revision: int
+    trials: int
+
+
+def _summary(row: asyncpg.Record) -> Summary:
+    return Summary(
+        row["id"], row["name"], row["created_at"], row["archived_at"], row["latest_revision"], row["trials"]
+    )
+
+
+async def list_strategies(conn: Conn, *, archived: bool = False) -> list[Summary]:
+    """The default list leaves archived strategies out; `archived=True` lists only them."""
+    condition = "s.archived_at IS NOT NULL" if archived else "s.archived_at IS NULL"
+    rows = await conn.fetch(f"{_SUMMARY} WHERE {condition} ORDER BY s.created_at DESC, s.id DESC")
+    return [_summary(row) for row in rows]
+
+
+async def get_strategy(conn: Conn, strategy_id: int) -> Summary:
+    row = await conn.fetchrow(f"{_SUMMARY} WHERE s.id = $1", strategy_id)
+    if row is None:
+        raise NotFound(strategy_id)
+    return _summary(row)
+
+
+@dataclass(frozen=True)
+class Revision:
+    strategy_id: int
+    n: int
+    document: dict[str, Any]
+    content_hash: str
+    schema_version: int
+    author: str
+    created_at: datetime
+
+
+async def get_revision(conn: Conn, strategy_id: int, n: int | None = None) -> Revision:
+    """Revision `n`, or the latest one."""
+    row = await conn.fetchrow(
+        "SELECT * FROM strategy_revisions WHERE strategy_id = $1 AND ($2::integer IS NULL OR n = $2) "
+        "ORDER BY n DESC LIMIT 1",
+        strategy_id, n,
+    )
+    if row is None:
+        raise NotFound((strategy_id, n))
+    return Revision(
+        row["strategy_id"], row["n"], decoded(row["document"]), row["content_hash"], row["schema_version"],
+        row["author"], row["created_at"],
+    )
+
+
+async def set_archived(conn: Conn, strategy_id: int, archived: bool) -> Summary:
+    found = await conn.fetchval(
+        "UPDATE strategies SET archived_at = CASE WHEN $2 THEN coalesce(archived_at, now()) END "
+        "WHERE id = $1 RETURNING id",
+        strategy_id, archived,
+    )
+    if found is None:
+        raise NotFound(strategy_id)
+    return await get_strategy(conn, strategy_id)
