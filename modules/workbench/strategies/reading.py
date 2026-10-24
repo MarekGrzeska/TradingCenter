@@ -4,9 +4,9 @@ the archive accepts — its indicator ceiling is candles × indicators per reque
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
@@ -14,7 +14,7 @@ import numpy as np
 from .archive import Archive
 from .document import Checked
 from .requirements import IndicatorKey, Needs, needs
-from .series import PERIOD_SECONDS, Context, Series, epoch
+from .series import PERIOD_SECONDS, Context, Series, epoch, moment
 from .vocabulary import Indicator
 
 # Bars per request: under the archive's 200 000 candles × indicators, with one indicator per request.
@@ -57,10 +57,11 @@ async def read(
         gaps: list[tuple[int, int]] = []
         first = start if context in required.warm else range_from
         for lo, hi in _pieces(first, range_to, context[1]):
-            answer = await archive.candles(context[0], context[1], _moment(lo), _moment(hi))
+            answer = await archive.candles(context[0], context[1], moment(lo), moment(hi))
             rows.extend(answer["candles"])
             gaps.extend((epoch(u["from"]), epoch(u["to"])) for u in answer.get("uncovered", []))
-        series[context] = Series.from_candles(context[1], rows)
+        # Off the loop: a year of minutes is half a million rows of parsing, and this process serves the stream.
+        series[context] = await asyncio.to_thread(Series.from_candles, context[1], rows)
         uncovered[context] = [(max(a, range_from), b) for a, b in gaps if b > range_from]
 
     indicators: dict[IndicatorKey, np.ndarray] = {}
@@ -71,7 +72,7 @@ async def read(
         settled = True
         for lo, hi in _pieces(start, range_to, key.context[1]):
             answer = await archive.indicator(
-                key.context[0], key.context[1], _moment(lo), _moment(hi), key.id, dict(key.params)
+                key.context[0], key.context[1], moment(lo), moment(hi), key.id, dict(key.params)
             )
             settled = settled and answer["settled"]
             line = np.array([np.nan if v is None else float(v) for v in answer["lines"].get(key.line) or []])
@@ -90,6 +91,3 @@ def _pieces(start: int, end: int, resolution: str) -> list[tuple[int, int]]:
     width = CHUNK_BARS * PERIOD_SECONDS[resolution]
     return [(lo, min(lo + width, end)) for lo in range(start, end, width)]
 
-
-def _moment(seconds: int) -> datetime:
-    return datetime.fromtimestamp(seconds, tz=UTC)

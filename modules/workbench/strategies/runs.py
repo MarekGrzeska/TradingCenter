@@ -7,7 +7,6 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any
 
 import asyncpg
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
@@ -16,7 +15,8 @@ from tc_runtime.db import Conn, fetch_one
 from .costs import CostModel
 from .problems import Problem
 from .reading import minute_bars
-from .series import epoch
+from .series import epoch, moment
+from .store import decoded
 
 
 class RunIn(BaseModel):
@@ -60,11 +60,6 @@ def resolved_params(request: RunIn, declared: Mapping[str, Mapping[str, float]])
     return {name: request.params.get(name, spec["default"]) for name, spec in declared.items()}
 
 
-def decoded(value: Any) -> Any:
-    """A `jsonb` column as the value it holds; asyncpg hands it back as text unless a codec says otherwise."""
-    return json.loads(value) if isinstance(value, str) else value
-
-
 async def enqueue(conn: Conn, request: RunIn, revision: int, params: Mapping[str, float]) -> int:
     recorded = request.model_dump(mode="json", by_alias=True) | {"revision": revision, "params": dict(params)}
     row = await fetch_one(
@@ -98,6 +93,10 @@ async def finish(
     pool: asyncpg.Pool, run_id: int, engine_version: int, report: dict, provenance: dict, trades: list[dict]
 ) -> None:
     async with pool.acquire() as conn, conn.transaction():
+        # Still running, held for the transaction: a run cancelled while its worker was answering keeps no trades.
+        status = await conn.fetchval("SELECT status FROM runs WHERE id = $1 FOR UPDATE", run_id)
+        if status != "running":
+            return
         await conn.copy_records_to_table(
             "run_trades",
             columns=[
@@ -106,7 +105,7 @@ async def finish(
             ],
             records=[
                 (
-                    run_id, seq, t["side"], _moment(t["entry_time"]), t["entry_price"], _moment(t["exit_time"]),
+                    run_id, seq, t["side"], moment(t["entry_time"]), t["entry_price"], moment(t["exit_time"]),
                     t["exit_price"], t["units"], t["initial_stop"], t["result_r"], t["result_money"],
                     json.dumps(t["costs"]), t["exit_reason"], t["pessimistic"],
                 )
@@ -170,8 +169,3 @@ async def get_run(conn: Conn, run_id: int) -> RunRow | None:
 async def status_of(conn: Conn, run_id: int) -> str | None:
     return await conn.fetchval("SELECT status FROM runs WHERE id = $1", run_id)
 
-
-def _moment(seconds: int) -> datetime:
-    from datetime import UTC
-
-    return datetime.fromtimestamp(seconds, tz=UTC)

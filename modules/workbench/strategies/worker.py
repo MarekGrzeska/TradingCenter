@@ -46,7 +46,7 @@ def main(job: Job, pipe: Connection) -> None:
     """The process's whole life: compute, send, end. An exception is sent as text, so the run fails with its reason."""
     try:
         pipe.send(("done", compute(job)))
-    except Exception as err:  # noqa: BLE001 — anything at all ends the run with its name, not a silent dead worker
+    except Exception as err:  # noqa: BLE001 — anything ends the run with its name, never a silently dead worker
         pipe.send(("failed", f"{type(err).__name__}: {err}"))
     finally:
         pipe.close()

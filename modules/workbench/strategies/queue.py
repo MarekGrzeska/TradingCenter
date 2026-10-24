@@ -70,8 +70,12 @@ class RunQueue:
     async def _serve(self) -> None:
         while True:
             while len(self._running) < self._settings.run_concurrency:
-                async with self._pool.acquire() as conn:
-                    row = await runs.claim(conn)
+                try:
+                    async with self._pool.acquire() as conn:
+                        row = await runs.claim(conn)
+                except Exception:
+                    log.exception("the run queue could not claim a run; it tries again at the next wake")
+                    break
                 if row is None:
                     break
                 task = asyncio.create_task(self._run(row), name=f"strategies-run-{row['id']}")
@@ -89,9 +93,24 @@ class RunQueue:
 
     async def _run(self, row: asyncpg.Record) -> None:
         run_id = row["id"]
+        try:
+            await self._run_unguarded(row)
+        except Exception as err:
+            # A run that fails says why, and the queue keeps serving the next one.
+            log.exception("run %s failed", run_id)
+            try:
+                async with self._pool.acquire() as conn:
+                    await runs.fail(conn, run_id, f"{type(err).__name__}: {err}")
+            except Exception:
+                log.exception("run %s could not even be marked failed; the next start marks it interrupted", run_id)
+
+    async def _run_unguarded(self, row: asyncpg.Record) -> None:
+        run_id = row["id"]
         deadline = time.monotonic() + self._settings.run_timeout_seconds
         try:
             job, provenance = await asyncio.wait_for(self._prepare(row), timeout=self._settings.run_timeout_seconds)
+            # Read, but cancelled meanwhile: no process is started for a run nobody wants any more.
+            await self._still_wanted(run_id)
             outcome = await self._compute(run_id, job, deadline)
         except _Ends as ended:
             async with self._pool.acquire() as conn:
@@ -105,20 +124,18 @@ class RunQueue:
             async with self._pool.acquire() as conn:
                 await runs.fail(conn, run_id, f"the archive could not be read: {err}")
             return
-        except asyncio.CancelledError:
-            raise
-        except Exception as err:
-            log.exception("run %s failed", run_id)
-            async with self._pool.acquire() as conn:
-                await runs.fail(conn, run_id, f"{type(err).__name__}: {err}")
-            return
         provenance["engine_version"] = outcome["engine_version"]
         await runs.finish(
             self._pool, run_id, outcome["engine_version"], outcome["report"], provenance, outcome["trades"]
         )
 
+    async def _still_wanted(self, run_id: int) -> None:
+        async with self._pool.acquire() as conn:
+            if await runs.status_of(conn, run_id) == "cancelled":
+                raise _Ends("cancelled by the operator", status="cancelled")
+
     async def _prepare(self, row: asyncpg.Record) -> tuple[Job, dict[str, Any]]:
-        request = runs.decoded(row["request"])
+        request = store.decoded(row["request"])
         async with self._pool.acquire() as conn:
             revision = await store.get_revision(conn, row["strategy_id"], row["revision"])
         # Checked again against the archive as it is now: a pair untracked since the save would otherwise read as
@@ -157,7 +174,8 @@ class RunQueue:
     async def _compute(self, run_id: int, job: Job, deadline: float) -> dict[str, Any]:
         receiver, sender = _CONTEXT.Pipe(duplex=False)
         process = _CONTEXT.Process(target=self._target, args=(job, sender), daemon=True)
-        process.start()
+        # Off the loop: a spawned start pickles the whole job into the child's pipe and waits for it to be read.
+        await asyncio.to_thread(process.start)
         sender.close()
         try:
             last_look = time.monotonic()
@@ -174,9 +192,7 @@ class RunQueue:
                     raise TimeoutError
                 if now - last_look >= CANCEL_POLL_SECONDS:
                     last_look = now
-                    async with self._pool.acquire() as conn:
-                        if await runs.status_of(conn, run_id) == "cancelled":
-                            raise _Ends("cancelled by the operator", status="cancelled")
+                    await self._still_wanted(run_id)
                 await asyncio.sleep(0.05)
         finally:
             if process.is_alive():

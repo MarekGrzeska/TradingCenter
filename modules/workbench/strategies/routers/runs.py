@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import JSONResponse
 
 from .. import runs, store
 from ..contract import ProblemsOut, RunAcceptedOut, RunCancelledOut
@@ -35,10 +34,10 @@ async def enqueue(body: RunIn, db=Depends(pool), run_queue=Depends(queue), confi
 
 
 @router.post("/runs/{run_id}/cancel", response_model=RunCancelledOut, responses={404: {"description": "no such run"}})
-async def cancel(run_id: int, db=Depends(pool)) -> RunCancelledOut | JSONResponse:
+async def cancel(run_id: int, db=Depends(pool)) -> RunCancelledOut:
     async with db.acquire() as conn:
         was = await runs.cancel(conn, run_id)
         if was is None:
             raise not_found(f"run {run_id}")
         now = await runs.status_of(conn, run_id)
-    return RunCancelledOut(id=run_id, status=now, was=was)  # type: ignore[arg-type]
+    return RunCancelledOut.model_validate({"id": run_id, "status": now, "was": was})

@@ -133,32 +133,37 @@ async def test_a_run_past_its_time_limit_is_stopped_and_says_why(pool) -> None:
 
 
 @pytest.mark.db
-async def test_a_running_run_can_be_cancelled_and_the_process_meanwhile_answers(pool) -> None:
+async def test_a_running_run_is_stopped_by_the_queue_when_cancelled_and_the_process_answers_meanwhile(pool) -> None:
     from strategies.app import create_app
 
     from .slow_worker import main as slow
 
     run_id = await _enqueue(pool, await _strategy(pool))
     queue = RunQueue(pool, archive_of(MINUTES), _settings(), target=slow)
-    await queue.start()
     app = create_app()
     app.state.settings = _settings()
+    await queue.start()
     try:
         await _until(pool, run_id, {"running"})
-        await asyncio.sleep(1.5)  # past the spawn: the worker is computing now
+        # Timed from the moment the run is taken — reading, spawning and computing all happen in this window.
+        slowest = 0.0
         async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as client:
-            started = time.monotonic()
-            pong = await client.get("/ping")
-            answered_in = time.monotonic() - started
+            for _ in range(15):
+                started = time.monotonic()
+                assert (await client.get("/ping")).status_code == 200
+                slowest = max(slowest, time.monotonic() - started)
+                await asyncio.sleep(0.1)
         async with pool.acquire() as conn:
             await runs.cancel(conn, run_id)
-        row = await _until(pool, run_id, {"cancelled"}, seconds=10)
+        deadline = time.monotonic() + 5
+        while queue.busy and time.monotonic() < deadline:
+            await asyncio.sleep(0.1)
+        stopped_by_queue = queue.busy == 0
     finally:
         await queue.stop()
 
-    assert pong.status_code == 200 and answered_in < 0.5
-    assert row.reason == "cancelled by the operator" and queue.busy == 0
-
+    assert slowest < 0.5
+    assert stopped_by_queue, "the queue did not stop the cancelled run's worker"
 
 
 @pytest.mark.db
