@@ -161,13 +161,29 @@ async def test_a_refusal_about_us_is_blocked_and_one_about_the_film_is_no_transc
     retried = isinstance(reply, httpx.TransportError) or (
         isinstance(reply, httpx.Response) and reply.status_code in (429, 500, 502, 503, 504)
     )
-    assert len(google.requests) == (3 if retried else 1), (
-        "a crowded model is asked again; a refused key or film is not"
+    probed = isinstance(reply, httpx.Response) and reply.status_code == 403
+    assert len(google.requests) == (3 if retried else 2 if probed else 1), (
+        "a crowded model is asked again, a 403 is checked once against the key; a refused key or film is not"
     )
     assert KEY not in result.reason
     assert meter.drain() == {}
     if isinstance(result, NoTranscript):
         assert result.charged is False
+
+
+async def test_a_403_that_the_key_survives_is_about_the_film_and_says_what_google_said() -> None:
+    google = Google(
+        refusal(403, f"Cannot watch {KEY}", "PERMISSION_DENIED"),
+        httpx.Response(200, json={"totalTokens": 1}),
+    )
+
+    result = await provider(google).fetch(request())
+
+    assert isinstance(result, NoTranscript)
+    assert "403 PERMISSION_DENIED" in result.reason
+    assert "Cannot watch" in result.reason
+    assert KEY not in result.reason
+    assert len(google.requests) == 2
 
 
 @pytest.mark.parametrize(
