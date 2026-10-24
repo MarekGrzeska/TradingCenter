@@ -9,9 +9,11 @@ from typing import Any
 
 import numpy as np
 
+from . import reports
 from .costs import CostModel
 from .document import Checked
 from .engine import ENGINE_VERSION, simulate
+from .evaluate import Evaluator
 from .requirements import IndicatorKey
 from .series import Context, Series
 from .vocabulary import Indicator
@@ -33,13 +35,24 @@ class Job:
 
 
 def compute(job: Job) -> dict[str, Any]:
-    result = simulate(
-        job.checked, job.params, job.catalogue, job.series, job.indicators, job.costs, job.capital,
-        job.range_from, job.range_to,
+    d = job.checked.document
+    evaluator = Evaluator(job.checked, job.params, job.catalogue, job.series, job.indicators)
+    args = {
+        "checked": job.checked, "params": job.params, "catalogue": job.catalogue, "series": job.series,
+        "indicators": job.indicators, "costs": job.costs, "capital": job.capital,
+        "range_from": job.range_from, "range_to": job.range_to,
+    }
+    result = simulate(**args, evaluator=evaluator)
+    decision, minute = job.series[(d.symbol, d.timeframe)], job.series[(d.symbol, "MINUTE")]
+    benchmark = reports.random_entry(
+        result, simulate_args=args, evaluator=evaluator, decision=decision, range_from=job.range_from,
+        range_to=job.range_to, seed=job.seed, repetitions=job.repetitions,
     )
-    trades = [asdict(t) for t in result.trades]
-    report = {"trades": len(trades), "rejected_entries": result.rejected_entries, "decision_bars": result.decision_bars}
-    return {"engine_version": ENGINE_VERSION, "report": report, "trades": trades}
+    report = reports.build(
+        result, decision=decision, minute=minute, costs=job.costs, capital=job.capital,
+        range_from=job.range_from, range_to=job.range_to, random_entry=benchmark,
+    )
+    return {"engine_version": ENGINE_VERSION, "report": report, "trades": [reports.finite(asdict(t)) for t in result.trades]}
 
 
 def main(job: Job, pipe: Connection) -> None:

@@ -97,9 +97,13 @@ def simulate(
     capital: float,
     range_from: int,
     range_to: int,
+    forced: Mapping[int, int] | None = None,
+    evaluator: Evaluator | None = None,
 ) -> Result:
+    """`forced` replaces the entry conditions with market entries on the given decision bars (bar → +1 long, −1 short),
+    everything else unchanged — the random-entry benchmark. An `evaluator` already built for these inputs is reused."""
     d = checked.document
-    evaluator = Evaluator(checked, params, catalogue, series, indicators)
+    evaluator = evaluator or Evaluator(checked, params, catalogue, series, indicators)
     decision = series[(d.symbol, d.timeframe)]
     minute = series[(d.symbol, "MINUTE")]
     entry_conditions = [checked.formulas[f"entries[{i}].when"] for i in range(len(d.entries))]
@@ -110,6 +114,8 @@ def simulate(
     bars = [i for i in range(len(decision)) if range_from <= decision.starts[i] and decision.available[i] <= range_to]
     previous_moment = range_from
     for bar in bars:
+        if forced is not None and position is None and order is None and bar not in forced:
+            continue  # nothing can happen on this bar: no position, no order, no entry
         moment = int(decision.available[bar])
         # Every minute between the last decision and this one: orders fill, stops and targets are touched.
         lo, hi = np.searchsorted(minute.starts, [previous_moment, moment], side="left")
@@ -131,6 +137,10 @@ def simulate(
                 position.exit_at_next_minute = "max_bars"
             continue
         if order is not None or _blocked(checked, evaluator, bar, state, book):
+            continue
+        if forced is not None:
+            if bar in forced:
+                order = _Order(forced[bar], "market", np.nan, bar, None)
             continue
         for index, condition in enumerate(entry_conditions):
             if evaluator.at(condition, bar, state):
