@@ -18,9 +18,21 @@ def _no_dotenv(tmp_path, monkeypatch):
     monkeypatch.delenv("STRATEGIES_DATABASE_URL", raising=False)
 
 
-def test_this_packages_lock_key_is_its_own() -> None:
+def test_no_two_chains_in_this_process_share_a_lock_key() -> None:
     """A key silently shared would put two chains' migrations behind one lock, in databases neither can see."""
-    assert MIGRATION_LOCK_KEY == 8130
+    import importlib
+
+    # The archive keeps its key beside its database helpers, every other package in `runtime`.
+    keys = {
+        module: importlib.import_module(module).MIGRATION_LOCK_KEY
+        for module in (
+            "agent.runtime", "teams.runtime", "polymarket_data.runtime", "social_data.runtime", "market_data.db",
+            "telegram_gateway.runtime", "youtube_data.runtime", "alerts.runtime", "strategies.runtime",
+        )
+    }
+
+    assert len(set(keys.values())) == len(keys), keys
+    assert keys["strategies.runtime"] == MIGRATION_LOCK_KEY
 
 
 def test_migrations_live_beside_the_package() -> None:
@@ -78,10 +90,11 @@ def test_the_browsers_that_read_the_archives_are_not_this_packages_callers() -> 
     assert process.for_strategies().rest_caller_ids == frozenset()
 
 
-async def test_a_configured_database_that_does_not_answer_stops_the_start_and_names_it(settings, app) -> None:
+async def test_a_configured_database_that_does_not_answer_stops_the_start_and_names_it(app) -> None:
+    """Local mode, no identity: the refusal is the closed port itself, not a credential fetched on the way."""
     from strategies.app import serving
 
-    unreachable = settings.model_copy(update={"database_url": "postgresql://strategies@127.0.0.1:1/strategies"})
+    unreachable = Settings(database_url="postgresql://strategies@127.0.0.1:1/strategies", _env_file=None)  # type: ignore[call-arg]
 
     with pytest.raises(RuntimeError, match="strategies database"):
         async with serving(app, unreachable):

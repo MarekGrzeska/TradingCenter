@@ -126,10 +126,8 @@ set_variable WORKBENCH_ENTRA_AUDIENCES "api://tradingcenter-agent,$workbench_app
 set_variable GATEWAY_ENTRA_AUDIENCES "api://tradingcenter-capital-gateway,$gateway_app"
 
 # The Users tab (access-roles): the service principals that carry the app roles, and the roles' ids. Public.
-sp_of() { az ad sp show --id "$1" --query id -o tsv | tr -d '
-'; }
-role_of() { az ad app show --id "$1" --query "appRoles[?value=='$2'].id | [0]" -o tsv | tr -d '
-'; }
+sp_of() { az ad sp show --id "$1" --query id -o tsv | tr -d ''; }
+role_of() { az ad app show --id "$1" --query "appRoles[?value=='$2'].id | [0]" -o tsv | tr -d ''; }
 set_variable ACCESS_WORKBENCH_PRINCIPAL "$(sp_of "$workbench_app")"
 set_variable ACCESS_GATEWAY_PRINCIPAL "$(sp_of "$gateway_app")"
 set_variable ACCESS_ROLE_WORKBENCH_ADMIN "$(role_of "$workbench_app" admin)"
