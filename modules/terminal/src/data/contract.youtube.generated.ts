@@ -1112,6 +1112,11 @@ export interface components {
             max_videos_per_run: number;
             /** Phrase */
             phrase: string;
+            /**
+             * Retry At
+             * @description not searched before this, after a search the source refused; null when the topic is not held back
+             */
+            retry_at: string | null;
         };
         /** TopicPatch */
         TopicPatch: {

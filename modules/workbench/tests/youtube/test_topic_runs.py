@@ -4,12 +4,18 @@ well — why. The table's own rules (once a day, retention) are `test_store`'s; 
 from __future__ import annotations
 
 from dataclasses import replace
+from datetime import timedelta
 
 import pytest
 
 from youtube_data import budget, store, watchlist
 from youtube_data.ingest import Ingest
-from youtube_data.providers.base import QuotaExceeded, ReadingUnusable, SourceUnavailable
+from youtube_data.providers.base import (
+    QuotaExceeded,
+    ReadingUnusable,
+    SourceRefused,
+    SourceUnavailable,
+)
 from youtube_data.screening import Screening
 from youtube_data.sim.providers import SimScreener, SimSource
 
@@ -25,19 +31,32 @@ async def runs(rig: Rig) -> list[store.TopicRun]:
 
 
 class Refusing(SimSource):
-    """A source whose searches fail with whatever the test says."""
+    """A source whose searches fail with whatever the test says — or, with no error, go through — and which remembers when
+    each search was asked to start looking."""
 
-    def __init__(self, world, error: Exception) -> None:
+    def __init__(self, world, error: Exception | None) -> None:
         super().__init__(world)
         self._error = error
+        self.asked_from: list = []
 
-    async def search(self, *args, **kwargs):
-        raise self._error
+    async def search(self, phrase, *, language, published_after, limit):
+        self.asked_from.append(published_after)
+        if self._error is not None:
+            raise self._error
+        return await super().search(phrase, language=language, published_after=published_after, limit=limit)
 
 
-def failing_with(rig: Rig, error: Exception) -> None:
-    rig.providers = replace(rig.providers, source=Refusing(rig.world, error))
+def failing_with(rig: Rig, error: Exception | None) -> Refusing:
+    source = Refusing(rig.world, error)
+    rig.providers = replace(rig.providers, source=source)
     rig.ingest = Ingest(rig.pool, rig.providers, rig.settings)
+    return source
+
+
+async def topic(rig: Rig):
+    async with rig.pool.acquire() as conn:
+        [found] = await store.list_topics(conn)
+    return found
 
 
 async def test_a_search_that_found_films_says_what_became_of_each(pool) -> None:
@@ -70,18 +89,58 @@ async def test_a_search_with_nothing_new_is_written_down_all_the_same(pool) -> N
 
 @pytest.mark.parametrize(
     ("error", "said"),
-    [(SourceUnavailable("the source is down"), "the source is down"), (QuotaExceeded("spent"), "quota")],
+    [(SourceRefused("refused search: badRequest"), "badRequest"), (QuotaExceeded("spent"), "quota")],
 )
-async def test_a_search_the_source_refused_says_why_and_is_tried_again_next_pass(pool, error: Exception, said: str) -> None:
+async def test_a_search_the_source_refused_says_why_and_waits_the_topics_interval_before_it_is_paid_for_again(
+    pool, error: Exception, said: str
+) -> None:
     rig = Rig(pool, world(film("new1")))
-    failing_with(rig, error)
+    source = failing_with(rig, error)
 
     await search(rig)
+    held = await topic(rig)
+    for hours in (1, 4):  # five hours in: still inside the six-hour interval
+        rig.clock.advance(hours=hours)
+        await rig.tick()
+    asked_while_held = len(source.asked_from)
+    rig.clock.advance(hours=2)
+    await rig.tick()
 
-    [run] = await runs(rig)
+    [run] = (await runs(rig))[:1]
     assert run.outcome == "failed" and said in (run.error or "")
-    async with pool.acquire() as conn:
-        assert [topic.last_run_at for topic in await store.list_topics(conn)] == [None]
+    assert held.last_run_at is None
+    assert held.retry_at == run.ran_at + timedelta(minutes=held.interval_minutes)
+    assert (asked_while_held, len(source.asked_from)) == (1, 2)
+
+
+async def test_a_search_the_source_never_answered_is_tried_again_on_the_next_pass(pool) -> None:
+    rig = Rig(pool, world(film("new1")))
+    source = failing_with(rig, SourceUnavailable("the YouTube Data API did not answer search"))
+
+    await search(rig)
+    rig.clock.advance(minutes=30)
+    await rig.tick()
+
+    assert len(source.asked_from) == 2
+    assert (await topic(rig)).retry_at is None
+
+
+async def test_a_search_that_goes_through_after_a_hold_lifts_it_and_looks_from_the_last_one_that_went_through(pool) -> None:
+    rig = Rig(pool, world(film("new1")))
+    source = failing_with(rig, None)
+    await search(rig)
+    first = await topic(rig)
+
+    failing_with(rig, SourceRefused("refused"))
+    rig.clock.advance(minutes=first.interval_minutes + 1)
+    await rig.tick()
+    source = failing_with(rig, None)
+    rig.clock.advance(minutes=first.interval_minutes + 1)
+    await rig.tick()
+
+    after = await topic(rig)
+    assert source.asked_from == [first.last_run_at]
+    assert after.retry_at is None and after.last_run_at is not None and after.last_run_at > first.last_run_at
 
 
 async def test_a_day_that_cannot_pay_for_a_search_is_one_skipped_run_per_topic_a_day(pool) -> None:

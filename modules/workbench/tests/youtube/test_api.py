@@ -214,6 +214,18 @@ async def test_the_history_of_searches_is_read_newest_first_for_everyone_or_for_
     assert (await api.post("/topics", json={"phrase": "never searched"})).json()["topic"]["last_run"] is None
 
 
+async def test_a_topic_held_back_after_a_refused_search_says_until_when(api, rig) -> None:
+    topic = (await api.post("/topics", json={"phrase": "gold"})).json()["topic"]
+    until = rig.clock.now() + timedelta(hours=6)
+    async with rig.pool.acquire() as conn:
+        await store.hold_topic(conn, topic["id"], until=until)
+
+    listed = (await api.get("/topics")).json()["topics"]
+
+    assert topic["retry_at"] is None
+    assert datetime.fromisoformat(listed[0]["retry_at"]) == until
+
+
 async def test_a_history_asked_for_too_much_or_nothing_is_refused(api) -> None:
     assert (await api.get("/topic-runs", params={"limit": 0})).status_code == 422
     assert (await api.get("/topic-runs", params={"limit": 1000})).status_code == 422

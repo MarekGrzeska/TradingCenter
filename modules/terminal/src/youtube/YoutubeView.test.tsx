@@ -107,6 +107,7 @@ const TOPIC: Topic = {
   active: true,
   addedBy: "operator",
   lastRunAt: new Date("2026-09-27T10:00:00Z"),
+  retryAt: null,
   lastRun: null,
 };
 
@@ -488,6 +489,19 @@ describe("YoutubeView", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Tematy" }));
 
     expect(await screen.findByText(/ostatni przebieg: nieudany — limit źródła wyczerpany/)).toBeInTheDocument();
+  });
+
+  it("says when a topic held back after a refused search is next tried, and nothing once that moment has passed", async () => {
+    const later = new Date(Date.now() + 3 * 3600_000);
+    const held = { ...TOPIC, retryAt: later };
+    const released = { ...TOPIC, id: 8, phrase: "fed", retryAt: new Date(Date.now() - 60_000) };
+    render(<YoutubeView api={api([], { topics: vi.fn(async () => ({ topics: [held, released], ceiling: 20 })) })} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Tematy" }));
+
+    const lines = await screen.findAllByText(/następna próba nie wcześniej niż/);
+    expect(lines).toHaveLength(1);
+    expect(lines[0].textContent).toContain(later.toLocaleString("pl-PL"));
   });
 
   it("lists candidates with a link to the film and the model's reason, and asks again in the other order", async () => {

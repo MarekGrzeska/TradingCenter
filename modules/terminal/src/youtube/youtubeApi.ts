@@ -153,6 +153,8 @@ export interface Topic {
   active: boolean;
   addedBy: "operator" | "agent";
   lastRunAt: Date | null;
+  /** Not searched before this, after a search the source refused; null when it is not held back. */
+  retryAt: Date | null;
   /** How the latest search ended; null before the first one. */
   lastRun: TopicRun | null;
 }
@@ -342,6 +344,7 @@ function mapTopic(raw: Schemas["TopicOut"]): Topic {
     active: raw.active,
     addedBy: raw.added_by,
     lastRunAt: optionalDate(raw.last_run_at),
+    retryAt: optionalDate(raw.retry_at),
     lastRun: raw.last_run ? mapRun(raw.last_run) : null,
   };
 }

@@ -45,7 +45,7 @@ _CHANNEL_COLUMNS = """
 """
 _TOPIC_COLUMNS = """
     id, phrase, language, interval_minutes, max_videos_per_run, active,
-    added_by, added_at, last_run_at
+    added_by, added_at, last_run_at, retry_at
 """
 _CANDIDATE_COLUMNS = """
     video_id, topic_id, phrase, channel_id, channel_title, title, published_at, duration_seconds, simulated,
@@ -215,7 +215,13 @@ async def remove_topic(conn: Conn, topic_id: int) -> bool:
 
 
 async def record_topic_run(conn: Conn, topic_id: int, *, at: datetime) -> None:
-    await conn.execute("UPDATE topics SET last_run_at = $2 WHERE id = $1", topic_id, at)
+    """A search that went through: the next one's window starts here, and any hold from an earlier refusal is lifted."""
+    await conn.execute("UPDATE topics SET last_run_at = $2, retry_at = NULL WHERE id = $1", topic_id, at)
+
+
+async def hold_topic(conn: Conn, topic_id: int, *, until: datetime) -> None:
+    """A search the source refused, and charged for: the topic is not tried again before `until`. `last_run_at` stays."""
+    await conn.execute("UPDATE topics SET retry_at = $2 WHERE id = $1", topic_id, until)
 
 
 # --- topic runs ------------------------------------------------------------------------------------------------------

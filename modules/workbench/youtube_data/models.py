@@ -79,6 +79,8 @@ class Topic:
     added_by: str
     added_at: datetime
     last_run_at: datetime | None
+    # Not searched before this, after a search the source refused; `None` is not held back.
+    retry_at: datetime | None
 
 
 @dataclass(frozen=True, slots=True)
