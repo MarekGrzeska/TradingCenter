@@ -27,7 +27,8 @@ async def language(reading=Depends(archive)) -> LanguageOut:
         indicators = [
             {"id": e.id, "signature": e.signature(), "lines": list(e.lines)}
             for e in sorted(catalogue.values(), key=lambda e: e.id)
-            if e.output == "lines" and e.id not in v.RESERVED
+            # The validator's own rule: a built-in function wins over a catalogue entry of the same name.
+            if e.output == "lines" and e.id not in v.FUNCTIONS
         ]
     except ArchiveUnavailable:
         indicators = None

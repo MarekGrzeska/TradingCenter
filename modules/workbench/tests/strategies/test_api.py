@@ -4,7 +4,6 @@ their own layer."""
 from __future__ import annotations
 
 import ast
-import json
 import pathlib
 
 import httpx
@@ -110,11 +109,13 @@ async def test_runs_are_listed_read_and_paged_and_a_missing_one_is_a_404(pool) -
         page = (await client.get(f"/runs/{run_id}/trades")).json()
         health = (await client.get("/health")).json()
         missing = await client.get("/runs/999999")
+        too_large = await client.get("/runs/99999999999999999999")
 
     assert [r["id"] for r in listed] == [run_id] and listed[0]["status"] == "done"
     assert page["total"] == 1 and page["trades"][0]["costs"] == {"spread": 1.0}
     assert health == {"database": "reachable", "queue": {"queued": 0, "running": 0}}
-    assert missing.status_code == 404
+    assert missing.status_code == 404 and too_large.status_code == 422
+    assert "report" not in listed[0]
 
 
 def test_the_package_has_no_road_to_an_account() -> None:
@@ -132,4 +133,3 @@ def test_the_package_has_no_road_to_an_account() -> None:
     assert not {m for m in imported if "trading" in m or "gateway" in m or "capital" in m}
     assert "trading_mcp" not in text and "gateway_base_url" not in text
     assert not {name for name in Settings.model_fields if "gateway" in name or "trading" in name}
-    assert json.dumps(sorted(Settings.model_fields))  # the settings exist to be read, and none of them leaves

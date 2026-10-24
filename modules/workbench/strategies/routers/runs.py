@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Path, Query
 
 from .. import runs, store
-from ..contract import ProblemsOut, RunAcceptedOut, RunCancelledOut, RunOut, TradesPageOut
+from ..contract import (
+    ProblemsOut,
+    RunAcceptedOut,
+    RunCancelledOut,
+    RunOut,
+    RunSummaryOut,
+    TradesPageOut,
+)
 from ..runs import RunIn
-from .deps import not_found, pool, queue, refused, settings
+from .deps import BIGINT, not_found, pool, queue, refused, settings
 
 router = APIRouter(tags=["runs"])
 
@@ -34,7 +41,7 @@ async def enqueue(body: RunIn, db=Depends(pool), run_queue=Depends(queue), confi
 
 
 @router.post("/runs/{run_id}/cancel", response_model=RunCancelledOut, responses={404: {"description": "no such run"}})
-async def cancel(run_id: int, db=Depends(pool)) -> RunCancelledOut:
+async def cancel(run_id: int = Path(ge=1, le=BIGINT), db=Depends(pool)) -> RunCancelledOut:
     async with db.acquire() as conn:
         was = await runs.cancel(conn, run_id)
         if was is None:
@@ -43,19 +50,22 @@ async def cancel(run_id: int, db=Depends(pool)) -> RunCancelledOut:
     return RunCancelledOut.model_validate({"id": run_id, "status": now, "was": was})
 
 
-@router.get("/runs", response_model=list[RunOut])
+@router.get("/runs", response_model=list[RunSummaryOut])
 async def list_runs(
-    strategy_id: int | None = Query(None, description="only this strategy's runs"),
+    strategy_id: int | None = Query(None, ge=1, le=BIGINT, description="only this strategy's runs"),
+    offset: int = Query(0, ge=0, le=BIGINT),
     limit: int = Query(100, ge=1, le=500),
     db=Depends(pool),
-) -> list[RunOut]:
-    """Newest first. Every run is here, failed and cancelled ones too — they are the count of what was tried."""
+) -> list[RunSummaryOut]:
+    """Newest first, a page at a time, without reports (`GET /runs/{id}` has one). Failed and cancelled runs are listed
+    too; the strategy's `trials` counts the finished ones."""
     async with db.acquire() as conn:
-        return [RunOut.model_validate(row.__dict__) for row in await runs.list_runs(conn, strategy_id, limit)]
+        rows = await runs.list_runs(conn, strategy_id, offset, limit)
+    return [RunSummaryOut.model_validate(dict(row) | {"request": store.decoded(row["request"])}) for row in rows]
 
 
 @router.get("/runs/{run_id}", response_model=RunOut, responses={404: {"description": "no such run"}})
-async def detail(run_id: int, db=Depends(pool)) -> RunOut:
+async def detail(run_id: int = Path(ge=1, le=BIGINT), db=Depends(pool)) -> RunOut:
     async with db.acquire() as conn:
         row = await runs.get_run(conn, run_id)
     if row is None:
@@ -65,8 +75,8 @@ async def detail(run_id: int, db=Depends(pool)) -> RunOut:
 
 @router.get("/runs/{run_id}/trades", response_model=TradesPageOut, responses={404: {"description": "no such run"}})
 async def trades(
-    run_id: int,
-    offset: int = Query(0, ge=0),
+    run_id: int = Path(ge=1, le=BIGINT),
+    offset: int = Query(0, ge=0, le=BIGINT),
     limit: int = Query(200, ge=1, le=1000),
     db=Depends(pool),
 ) -> TradesPageOut:

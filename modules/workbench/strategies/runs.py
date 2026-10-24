@@ -171,12 +171,20 @@ async def status_of(conn: Conn, run_id: int) -> str | None:
 
 
 
-async def list_runs(conn: Conn, strategy_id: int | None, limit: int) -> list[RunRow]:
-    rows = await conn.fetch(
-        "SELECT * FROM runs WHERE ($1::bigint IS NULL OR strategy_id = $1) ORDER BY queued_at DESC, id DESC LIMIT $2",
-        strategy_id, limit,
-    )
-    return [run_row(row) for row in rows]
+# A list carries no report or provenance — those are megabytes across a page, and `GET /runs/{id}` has them.
+_LIST = "SELECT id, strategy_id, revision, status, reason, engine_version, request, queued_at, started_at, finished_at"
+
+
+async def list_runs(conn: Conn, strategy_id: int | None, offset: int, limit: int) -> list[asyncpg.Record]:
+    # Two statements rather than `$1 IS NULL OR …`: a cached generic plan of that form cannot use runs_by_strategy.
+    if strategy_id is None:
+        return list(await conn.fetch(
+            f"{_LIST} FROM runs ORDER BY queued_at DESC, id DESC OFFSET $1 LIMIT $2", offset, limit
+        ))
+    return list(await conn.fetch(
+        f"{_LIST} FROM runs WHERE strategy_id = $1 ORDER BY queued_at DESC, id DESC OFFSET $2 LIMIT $3",
+        strategy_id, offset, limit,
+    ))
 
 
 async def trades_page(conn: Conn, run_id: int, offset: int, limit: int) -> tuple[int, list[asyncpg.Record]]:

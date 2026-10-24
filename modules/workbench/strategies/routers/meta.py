@@ -21,7 +21,7 @@ async def health(request: Request) -> HealthOut:
     """Whether the package can answer at all — its database — and what its queue holds."""
     async with request.app.state.pool.acquire() as conn:
         waiting = await runs.queued(conn)
-    running = getattr(getattr(request.app.state, "queue", None), "busy", 0)
+    running = request.app.state.queue.busy
     return HealthOut.model_validate({"database": "reachable", "queue": {"queued": waiting, "running": running}})
 
 

@@ -35,6 +35,19 @@ class RunCancelledOut(BaseModel):
     was: RunStatus = Field(description="the status the run had when the cancellation arrived")
 
 
+class RunSummaryOut(BaseModel):
+    id: int
+    strategy_id: int
+    revision: int
+    status: RunStatus
+    reason: str | None
+    engine_version: int | None
+    request: dict
+    queued_at: datetime
+    started_at: datetime | None
+    finished_at: datetime | None
+
+
 class RunOut(BaseModel):
     id: int
     strategy_id: int

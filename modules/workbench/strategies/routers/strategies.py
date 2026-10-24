@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
 
 from .. import documents, store
 from ..archive import ArchiveUnavailable
@@ -16,11 +16,12 @@ from ..contract import (
     StrategyOut,
     ValidationOut,
 )
-from .deps import archive, not_found, pool, refused
+from .deps import BIGINT, INTEGER, archive, not_found, pool, refused
 
 router = APIRouter(tags=["strategies"])
 
 _DOCUMENT = Body(..., description="a strategy document — its shape is `GET /language`")
+ID = Path(ge=1, le=BIGINT)
 
 
 async def _checked(raw: dict[str, Any], reading):
@@ -32,10 +33,7 @@ async def _checked(raw: dict[str, Any], reading):
 
 
 def _summary(s: store.Summary) -> StrategyOut:
-    return StrategyOut(
-        id=s.id, name=s.name, created_at=s.created_at, archived_at=s.archived_at,
-        latest_revision=s.latest_revision, trials=s.trials,
-    )
+    return StrategyOut.model_validate(s.__dict__)
 
 
 def _revision(r: store.Revision) -> RevisionOut:
@@ -68,21 +66,22 @@ async def create(raw: dict[str, Any] = _DOCUMENT, db=Depends(pool), reading=Depe
 
 
 @router.get("/strategies/{strategy_id}", response_model=StrategyDetailOut, responses={404: {}})
-async def detail(strategy_id: int, db=Depends(pool)) -> StrategyDetailOut:
-    async with db.acquire() as conn:
+async def detail(strategy_id: int = ID, db=Depends(pool)) -> StrategyDetailOut:
+    # One snapshot for both reads, so a revision saved in between cannot pair one revision's summary with another's body.
+    async with db.acquire() as conn, conn.transaction(isolation="repeatable_read", readonly=True):
         try:
             summary = await store.get_strategy(conn, strategy_id)
             revision = await store.get_revision(conn, strategy_id)
         except store.NotFound:
             raise not_found(f"strategy {strategy_id}") from None
-    return StrategyDetailOut(**_summary(summary).model_dump(), revision=_revision(revision))
+    return StrategyDetailOut.model_validate(summary.__dict__ | {"revision": _revision(revision)})
 
 
 @router.post(
     "/strategies/{strategy_id}/revisions", response_model=SavedOut,
     responses={404: {}, 422: {"model": ProblemsOut}, 503: {"description": "the archive did not answer"}},
 )
-async def save_revision(strategy_id: int, raw: dict[str, Any] = _DOCUMENT, db=Depends(pool), reading=Depends(archive)):
+async def save_revision(strategy_id: int = ID, raw: dict[str, Any] = _DOCUMENT, db=Depends(pool), reading=Depends(archive)):
     checked, problems = await _checked(raw, reading)
     if checked is None:
         return refused("the document is not a valid strategy", problems)
@@ -94,7 +93,7 @@ async def save_revision(strategy_id: int, raw: dict[str, Any] = _DOCUMENT, db=De
 
 
 @router.get("/strategies/{strategy_id}/revisions/{n}", response_model=RevisionOut, responses={404: {}})
-async def revision(strategy_id: int, n: int, db=Depends(pool)) -> RevisionOut:
+async def revision(strategy_id: int = ID, n: int = Path(ge=1, le=INTEGER), db=Depends(pool)) -> RevisionOut:
     async with db.acquire() as conn:
         try:
             return _revision(await store.get_revision(conn, strategy_id, n))
@@ -103,12 +102,12 @@ async def revision(strategy_id: int, n: int, db=Depends(pool)) -> RevisionOut:
 
 
 @router.post("/strategies/{strategy_id}/archive", response_model=StrategyOut, responses={404: {}})
-async def archive_strategy(strategy_id: int, db=Depends(pool)) -> StrategyOut:
+async def archive_strategy(strategy_id: int = ID, db=Depends(pool)) -> StrategyOut:
     return await _set_archived(db, strategy_id, True)
 
 
 @router.post("/strategies/{strategy_id}/restore", response_model=StrategyOut, responses={404: {}})
-async def restore_strategy(strategy_id: int, db=Depends(pool)) -> StrategyOut:
+async def restore_strategy(strategy_id: int = ID, db=Depends(pool)) -> StrategyOut:
     return await _set_archived(db, strategy_id, False)
 
 
