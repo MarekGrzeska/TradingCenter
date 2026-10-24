@@ -32,6 +32,7 @@ MODULES = {
     "workbench:telegram_gateway": "workbench/telegram_gateway",
     "workbench:youtube_data": "workbench/youtube_data",
     "workbench:alerts": "workbench/alerts",
+    "workbench:strategies": "workbench/strategies",
     "workbench": "workbench/workbench",
 }
 

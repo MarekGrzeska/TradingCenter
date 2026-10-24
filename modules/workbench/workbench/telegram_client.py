@@ -28,9 +28,11 @@ def telegram_client(telegram_app: FastAPI, caller: str) -> httpx.AsyncClient:
     return httpx.AsyncClient(transport=transport, base_url=TELEGRAM_AUTHORITY, timeout=TIMEOUT)
 
 
-def package_client(package_app: FastAPI, caller: str, authority: str) -> httpx.AsyncClient:
+def package_client(
+    package_app: FastAPI, caller: str, authority: str, timeout: httpx.Timeout = TIMEOUT
+) -> httpx.AsyncClient:
     """The same for any other package's REST contract, in this process: what one package reads of another's without going
     through the door. `authority` is never dialled; it only has to be a URL."""
     transport = httpx.ASGITransport(app=in_process(package_app, caller), raise_app_exceptions=False)
-    return httpx.AsyncClient(transport=transport, base_url=authority, timeout=TIMEOUT)
+    return httpx.AsyncClient(transport=transport, base_url=authority, timeout=timeout)
 

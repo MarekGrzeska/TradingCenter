@@ -47,6 +47,7 @@ ensure social       "${SOCIAL_DB_PASSWORD:-}"
 ensure telegram     "${TELEGRAM_DB_PASSWORD:-}"
 ensure youtube      "${YOUTUBE_DB_PASSWORD:-}"
 ensure alerts       "${ALERTS_DB_PASSWORD:-}"
+ensure strategies   "${STRATEGIES_DB_PASSWORD:-}"
 
 retire strategy
 

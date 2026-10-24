@@ -1,10 +1,10 @@
 ## 1. Szkielet pakietu i baza
 
-- [ ] 1.1 `strategies/` z `config.py` (prefiks `STRATEGIES_`: baza, pula 2, lista aplikacji REST, `RUN_CONCURRENCY`, `MAX_MINUTE_BARS`, limit czasu uruchomienia, powtórzenia losowego wejścia), `runtime.py` (klucz blokady `8130`), `app.py`, `openapi.py`, `caller_access.py` (ścieżki zapisane wprost)
-- [ ] 1.2 `alembic-strategies.ini` i migracja: `strategies`, `strategy_revisions` (PK `(strategy_id, n)`, dokument, hash treści, schemat, autor), `runs` (wkład, wersja silnika, stan, przyczyna, czasy, raport, pochodzenie), `run_trades` (stronicowane po `(run_id, seq)`)
-- [ ] 1.3 Montaż warunkowy w `workbench/app.py`, wpis w `tests/test_layering.py` i `scripts/tests/test_pool_budget.py`, blok `STRATEGIES_*` w `.env.example`
-- [ ] 1.4 `scripts/dev.py` (`LOGICAL_DATABASES`, łańcuch opcjonalny), `deploy/postgres/ensure-databases.sh` (`ensure strategies`), `deploy/docker-compose.yml`, `deploy/env.required` (`STRATEGIES_DB_PASSWORD`), `deploy/scripts/backup.sh` i `backup-check.sh`; test w `scripts/tests`, że żadna nazwa z `ensure` nie jest w `retire`
-- [ ] 1.5 Testy: start bez bazy, baza nieosiągalna (odmowa z nazwą), migracja pod blokadą (`-m db`)
+- [x] 1.1 `strategies/` z `config.py` (prefiks `STRATEGIES_`: baza, pula 2, lista aplikacji REST, `RUN_CONCURRENCY`, `MAX_MINUTE_BARS`, limit czasu uruchomienia, powtórzenia losowego wejścia), `runtime.py` (klucz blokady `8130`), `app.py`, `openapi.py`, `caller_access.py` (ścieżki zapisane wprost)
+- [x] 1.2 `alembic-strategies.ini` i migracja: `strategies`, `strategy_revisions` (PK `(strategy_id, n)`, dokument, hash treści, schemat, autor), `runs` (wkład, wersja silnika, stan, przyczyna, czasy, raport, pochodzenie), `run_trades` (stronicowane po `(run_id, seq)`)
+- [x] 1.3 Montaż warunkowy w `workbench/app.py`, wpis w `tests/test_layering.py` i `scripts/tests/test_pool_budget.py`, blok `STRATEGIES_*` w `.env.example`
+- [x] 1.4 `scripts/dev.py` (`LOGICAL_DATABASES`, łańcuch opcjonalny), `deploy/postgres/ensure-databases.sh` (`ensure strategies`), `deploy/docker-compose.yml`, `deploy/env.required` (`STRATEGIES_DB_PASSWORD`), `deploy/scripts/backup.sh` i `backup-check.sh`; test w `scripts/tests`, że żadna nazwa z `ensure` nie jest w `retire`
+- [x] 1.5 Testy: start bez bazy, baza nieosiągalna (odmowa z nazwą), migracja pod blokadą (`-m db`)
 
 ## 2. Język formuł
 

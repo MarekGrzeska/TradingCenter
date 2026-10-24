@@ -19,8 +19,9 @@ PACKAGES = [
     "telegram",
     "youtube",
     "alerts",
+    "strategies",
 ]
-DATABASES = ["agent", "teams", "polymarket", "social", "market", "telegram", "youtube", "alerts"]
+DATABASES = ["agent", "teams", "polymarket", "social", "market", "telegram", "youtube", "alerts", "strategies"]
 
 
 def _url(name: str, host: str, credential: str = f"{{name}}:{PASSWORD}") -> str:

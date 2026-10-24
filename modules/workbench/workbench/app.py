@@ -22,6 +22,7 @@ os.environ.setdefault("OTEL_PYTHON_FASTAPI_EXCLUDED_URLS", UNTRACED_URLS)
 # archives register (`liveness.register_metrics`) were never exported and both loop alerts went without data.
 telemetry.configure(quiet=("httpx", "httpcore", "urllib3"))
 
+import httpx
 from fastapi import FastAPI, Request
 from pydantic import BaseModel
 from starlette.routing import Mount
@@ -36,6 +37,7 @@ import alerts.app
 import market_data.app
 import polymarket_data.app
 import social_data.app
+import strategies.app
 import teams.surface
 import telegram_gateway.app
 import youtube_data.app
@@ -58,7 +60,7 @@ from teams.tools import ToolServerRegistry as TeamsToolServerRegistry
 from . import model_successors
 from .alert_tools import AlertTools
 from .assembly import mount_package
-from .config import Settings, alerts_enabled, youtube_enabled
+from .config import Settings, alerts_enabled, strategies_enabled, youtube_enabled
 from .edge import edge_config, edge_provider
 from .local_tools import ConversationLocalTools, TeamsLocalTools
 from .root_access import RootCallers
@@ -66,6 +68,10 @@ from .team_tools import LocalTeamsTools
 from .telegram_client import package_client, telegram_client
 
 log = logging.getLogger(__name__)
+
+# A backtest reads a month of minute candles, or an indicator over years, per request: minutes, not the seconds a message
+# to Telegram is allowed.
+STRATEGIES_MARKET_TIMEOUT = httpx.Timeout(connect=5.0, read=300.0, write=10.0, pool=5.0)
 
 
 def _alerts_client(caller: str):
@@ -86,6 +92,7 @@ async def lifespan(app: FastAPI):
     telegram_settings = settings.for_telegram()
     youtube_settings = settings.for_youtube() if YOUTUBE_MOUNTED else None
     alerts_settings = settings.for_alerts() if ALERTS_MOUNTED else None
+    strategies_settings = settings.for_strategies() if STRATEGIES_MOUNTED else None
     # Each package's tools, called as functions: the server its own `/mcp` mounts, minus the transport. The
     # archive's eleven were the first tools this process ever called, over the network; they are the last to move in.
     polymarket_tools = ConversationLocalTools("polymarket-data", polymarket_app.state.mcp_server)
@@ -181,6 +188,19 @@ async def lifespan(app: FastAPI):
             else nullcontext()
         ),
         _alerts_client("the teams module") as teams_alerts,
+        # After the archive it reads. Entered only when mounted, like the YouTube archive.
+        (
+            package_client(
+                market_app, "the strategy engine", "http://market.in-process", STRATEGIES_MARKET_TIMEOUT
+            )
+            if strategies_app is not None
+            else nullcontext(None)
+        ) as strategies_market,
+        (
+            strategies.app.serving(strategies_app, strategies_settings, market=strategies_market)
+            if strategies_app is not None and strategies_settings is not None
+            else nullcontext()
+        ),
     ):
         # Every package is serving: what the alerts' clock reads can answer now.
         if alerts_app is not None and alerts_settings is not None:
@@ -414,6 +434,14 @@ if alerts_app is not None:
     mount_package(app, "/alerts", alerts_app)
 else:
     log.info("the alerts package is not part of this process: ALERTS_DATABASE_URL is not set")
+
+# The strategy engine, whole, and only when its database is configured — the same half-state refused.
+STRATEGIES_MOUNTED = strategies_enabled()
+strategies_app = strategies.app.create_app() if STRATEGIES_MOUNTED else None
+if strategies_app is not None:
+    mount_package(app, "/strategies", strategies_app)
+else:
+    log.info("the strategy engine is not part of this process: STRATEGIES_DATABASE_URL is not set")
 
 # After every mount, so the prefixes it lets through to each package's own record are all of them.
 app.add_middleware(
