@@ -7,6 +7,7 @@ import hashlib
 import json
 from collections.abc import Iterator, Mapping
 from dataclasses import dataclass
+from functools import cached_property
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -21,9 +22,19 @@ from .checking import (
     let_order,
     names_used,
     reserved_problem,
+    unreadable_name,
 )
 from .problems import Problem
-from .vocabulary import DERIVED_FROM_MINUTE, FUNCTIONS, RESOLUTIONS, SERIES, Indicator, Place, Type
+from .vocabulary import (
+    DERIVED_FROM_MINUTE,
+    FUNCTIONS,
+    RESOLUTIONS,
+    SERIES,
+    TIME,
+    Indicator,
+    Place,
+    Type,
+)
 
 # The language a document is written in. Raised only when the meaning of something already accepted changes; an
 # addition (a new function, a new optional field) keeps it, so every saved document stays runnable.
@@ -34,7 +45,8 @@ _Formula = Annotated[str, Field(min_length=1)]
 
 
 class _Strict(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    # No infinities: they pass a range check and then cannot be stored, since jsonb has no Infinity.
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False)
 
 
 class ParamIn(_Strict):
@@ -93,7 +105,7 @@ class DocumentIn(_Strict):
     sizing: SizingIn
     limits: LimitsIn = Field(default_factory=LimitsIn)
 
-    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+    model_config = ConfigDict(extra="forbid", populate_by_name=True, allow_inf_nan=False)
 
     def canonical(self) -> dict[str, Any]:
         """The document as stored: defaults filled, keys in one order, so the same strategy written twice is one hash."""
@@ -114,11 +126,11 @@ class Checked:
     let_types: Mapping[str, Type]
     let_order: tuple[str, ...]
 
-    @property
+    @cached_property
     def canonical(self) -> dict[str, Any]:
         return self.document.canonical()
 
-    @property
+    @cached_property
     def hash(self) -> str:
         return content_hash(self.canonical)
 
@@ -126,18 +138,18 @@ class Checked:
 def validate(
     raw: Any,
     catalogue: Mapping[str, Indicator],
-    available: set[tuple[str, str]] | None,
+    available: set[tuple[str, str]],
 ) -> tuple[Checked | None, list[Problem]]:
-    """Every problem with `raw`, or the checked document. `available` is the archive's (symbol, resolution) pairs it can
-    serve; `None` when the archive could not be asked, which is itself a problem the caller reports."""
-    if isinstance(raw, Mapping) and isinstance(raw.get("schema"), int) and raw["schema"] > SCHEMA_VERSION:
-        return None, [Problem(
-            "schema", f"this document is written for schema {raw['schema']}; this engine reads up to {SCHEMA_VERSION}",
-        )]
+    """Every problem with `raw`, or the checked document. `available` is the (symbol, resolution) pairs the archive can
+    serve — required, because a document nobody checked against the archive is not a valid one."""
     try:
         document = DocumentIn.model_validate(raw)
     except ValidationError as err:
         return None, [_from_pydantic(e) for e in err.errors()]
+    if document.schema_ > SCHEMA_VERSION:
+        return None, [Problem(
+            "schema", f"this document is written for schema {document.schema_}; this engine reads up to {SCHEMA_VERSION}",
+        )]
 
     problems: list[Problem] = []
     params = _params(document, problems)
@@ -159,23 +171,26 @@ def validate(
     order, unordered = let_order(references)
     for name in unordered:
         problems.append(Problem(f"let.{name}", f"`{name}` is defined through itself, or through a variable that is"))
+    # Declared, but without a type to give: already refused where it is defined, so silent where it is used.
+    untyped = set(document.let)
     for name in order:
         path = f"let.{name}"
         if path not in parsed:
             continue
-        scope = Scope(Place.LET, params, dict(let_types), catalogue)
+        scope = Scope(Place.LET, params, dict(let_types), catalogue, frozenset(untyped - set(let_types)))
         found_type, found = infer(parsed[path], scope, path)
         problems.extend(found)
         if found_type is not None:
             let_types[name] = found_type
+    untyped -= set(let_types)
 
-    for path, place, expected in _typed_fields(document):
+    for path, place, expected, _ in _typed_fields(document):
         if path in parsed:
-            problems.extend(check(parsed[path], Scope(place, params, let_types, catalogue), path, expected))
+            scope = Scope(place, params, let_types, catalogue, frozenset(untyped))
+            problems.extend(check(parsed[path], scope, path, expected))
 
     problems.extend(_orders(document))
-    if available is not None:
-        problems.extend(_archive(document, parsed, available))
+    problems.extend(_archive(document, parsed, available))
     if problems:
         return None, problems
     return Checked(document, parsed, let_types, tuple(order)), []
@@ -194,8 +209,8 @@ def _params(document: DocumentIn, problems: list[Problem]) -> dict[str, ParamDec
     declared: dict[str, ParamDecl] = {}
     for name, p in document.params.items():
         path = f"params.{name}"
-        if not name.isidentifier():
-            problems.append(Problem(path, f"`{name}` cannot name a parameter; it is read as p.{name}"))
+        if unreadable_name(name):
+            problems.append(Problem(path, f"`{name}` cannot name a parameter: no formula could read it as p.{name}"))
             continue
         if not p.min <= p.default <= p.max:
             problems.append(Problem(path, f"the default {p.default:g} is outside {p.min:g} to {p.max:g}"))
@@ -207,38 +222,25 @@ def _params(document: DocumentIn, problems: list[Problem]) -> dict[str, ParamDec
 def _formula_fields(d: DocumentIn) -> Iterator[tuple[str, str]]:
     for name, text in d.let.items():
         yield f"let.{name}", text
-    for path, _, _ in _typed_fields(d):
-        yield path, _text(d, path)
+    for path, _, _, text in _typed_fields(d):
+        yield path, text
 
 
-def _typed_fields(d: DocumentIn) -> Iterator[tuple[str, Place, Type]]:
+def _typed_fields(d: DocumentIn) -> Iterator[tuple[str, Place, Type, str]]:
+    """Every formula outside `let`: where it is, what may stand there, what it must give, and its text."""
     for i, entry in enumerate(d.entries):
-        yield f"entries[{i}].when", Place.ENTRY, Type.CONDITION
+        yield f"entries[{i}].when", Place.ENTRY, Type.CONDITION, entry.when
         if entry.order.price is not None:
-            yield f"entries[{i}].order.price", Place.ENTRY, Type.NUMBER
-    yield "exits.stop", Place.EXIT, Type.NUMBER
+            yield f"entries[{i}].order.price", Place.ENTRY, Type.NUMBER, entry.order.price
+    yield "exits.stop", Place.EXIT, Type.NUMBER, d.exits.stop
     if d.exits.target is not None:
-        yield "exits.target", Place.EXIT, Type.NUMBER
+        yield "exits.target", Place.EXIT, Type.NUMBER, d.exits.target
     if d.exits.trail is not None:
-        yield "exits.trail.distance", Place.EXIT, Type.NUMBER
+        yield "exits.trail.distance", Place.EXIT, Type.NUMBER, d.exits.trail.distance
     if d.exits.when is not None:
-        yield "exits.when", Place.EXIT, Type.CONDITION
+        yield "exits.when", Place.EXIT, Type.CONDITION, d.exits.when
     if d.limits.no_entry is not None:
-        yield "limits.no_entry", Place.LIMIT, Type.CONDITION
-
-
-def _text(d: DocumentIn, path: str) -> str:
-    if path.startswith("entries["):
-        index = int(path[len("entries["):path.index("]")])
-        entry = d.entries[index]
-        return entry.when if path.endswith(".when") else entry.order.price or ""
-    return {
-        "exits.stop": d.exits.stop,
-        "exits.target": d.exits.target,
-        "exits.trail.distance": d.exits.trail.distance if d.exits.trail else None,
-        "exits.when": d.exits.when,
-        "limits.no_entry": d.limits.no_entry,
-    }[path] or ""
+        yield "limits.no_entry", Place.LIMIT, Type.CONDITION, d.limits.no_entry
 
 
 def _orders(d: DocumentIn) -> list[Problem]:
@@ -258,7 +260,8 @@ def contexts(d: DocumentIn, parsed: Mapping[str, f.Node]) -> set[tuple[str, str]
 
     def walk(n: f.Node, symbol: str, resolution: str) -> None:
         # Recorded where a series is read rather than at each `@`: `x @ US500 @ DAY` reads US500 at DAY, never US100 at DAY.
-        if isinstance(n, f.Name) and n.id in SERIES or isinstance(n, f.Call) and n.function not in FUNCTIONS:
+        reads_bars = isinstance(n, f.Name) and (n.id in SERIES or n.id in TIME)
+        if reads_bars or isinstance(n, f.Call) and n.function not in FUNCTIONS:
             found.add((symbol, resolution))
         if isinstance(n, f.At):
             if n.context in RESOLUTIONS:

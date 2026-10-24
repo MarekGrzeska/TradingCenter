@@ -12,6 +12,5 @@ from .problems import Problem
 
 async def check(raw: Any, archive: Archive) -> tuple[Checked | None, list[Problem]]:
     """Raises `ArchiveUnavailable` rather than checking without it: a symbol nobody could verify is not a valid one."""
-    catalogue = await archive.catalogue()
-    available = servable(await archive.tracked())
-    return validate(raw, catalogue, available)
+    catalogue, tracked = await archive.check_inputs()
+    return validate(raw, catalogue, servable(tracked))

@@ -82,3 +82,38 @@ def test_the_same_strategy_written_in_another_key_order_is_one_hash() -> None:
     second, _ = validate(dict(reversed(list(document().items()))), catalogue(), servable(TRACKED))
 
     assert first is not None and second is not None and first.hash == second.hash
+
+
+def test_a_future_schema_written_as_a_float_or_text_is_still_refused() -> None:
+    assert [path for path, _ in problems(document(schema=2.0))] == ["schema"]
+    assert [path for path, _ in problems(document(schema="2"))] == ["schema"]
+
+
+def test_an_infinite_number_is_refused_before_it_could_reach_the_database() -> None:
+    assert [path for path, _ in problems(document(sizing={"mode": "risk_fraction", "value": float("inf")}))] == [
+        "sizing.value"
+    ]
+
+
+def test_a_parameter_no_formula_could_read_is_refused() -> None:
+    found = problems(document(params={"ｆａｓｔ": {"default": 20, "min": 10, "max": 30, "step": 5}}))
+
+    assert ("params.ｆａｓｔ", "`ｆａｓｔ` cannot name a parameter: no formula could read it as p.ｆａｓｔ") in found
+
+
+def test_a_let_refused_where_it_is_defined_is_not_refused_again_where_it_is_used() -> None:
+    entries = document()["entries"]
+    entries[0]["when"] = "broken > 1"
+
+    lets = document()["let"] | {"broken": "1 if close > 1 else close > 2"}
+
+    found = problems(document(let=lets, entries=entries))
+
+    assert [path for path, _ in found] == ["let.broken"]
+
+
+def test_a_time_name_read_under_at_needs_that_instrument_in_the_archive() -> None:
+    entries = document()["entries"]
+    entries[0]["when"] = "hour @ OIL >= 9"
+
+    assert any("OIL at HOUR" in message for _, message in problems(document(entries=entries)))

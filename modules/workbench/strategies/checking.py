@@ -46,6 +46,8 @@ class Scope:
     params: Mapping[str, ParamDecl]
     lets: Mapping[str, Type]
     catalogue: Mapping[str, Indicator]
+    # Variables declared but refused where they are defined; reading one is not a second defect.
+    untyped_lets: frozenset[str] = frozenset()
 
 
 @dataclass
@@ -229,6 +231,8 @@ def _name(n: f.Name, w: _Walk, ctx: _Context) -> Type | None:
     if name in RESOLUTIONS:
         w.refuse(n, f"`{name}` is a resolution; it stands only on the right of `@`", hint=f"close @ {name}")
         return None
+    if name in w.scope.untyped_lets:
+        return None
     if name in w.scope.lets:
         if ctx.elsewhere:
             w.refuse(n, "a `let` variable cannot be read under `@`; write its formula there instead")
@@ -381,17 +385,15 @@ def _closest(name: str, candidates) -> str | None:
     return found[0] if found else None
 
 
-def reserved_problem(name: str, path: str, catalogue: Mapping[str, Indicator]) -> Problem | None:
-    """A `let` name that would hide a name of the language or of the catalogue. Compared as Python's parser will read it:
-    NFKC-normalised, so `ｃｌｏｓｅ` is `close`, and never a keyword, which no formula could refer to."""
+def unreadable_name(name: str) -> bool:
+    """A name no formula could refer to as written: Python's parser NFKC-normalises it (`ｃｌｏｓｅ` is `close`) or reads it
+    as a keyword."""
     read_as = unicodedata.normalize("NFKC", name)
-    if (
-        read_as != name
-        or read_as in RESERVED
-        or read_as in catalogue
-        or not read_as.isidentifier()
-        or keyword.iskeyword(read_as)
-        or keyword.issoftkeyword(read_as)
-    ):
+    return read_as != name or not name.isidentifier() or keyword.iskeyword(name) or keyword.issoftkeyword(name)
+
+
+def reserved_problem(name: str, path: str, catalogue: Mapping[str, Indicator]) -> Problem | None:
+    """A `let` name that would hide a name of the language or of the catalogue, or one no formula could read."""
+    if unreadable_name(name) or name in RESERVED or name in catalogue:
         return Problem(path, f"`{name}` cannot name a variable: it is a name of the language or not a name at all")
     return None
