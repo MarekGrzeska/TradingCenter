@@ -177,6 +177,7 @@ class RunQueue:
         # Off the loop: a spawned start pickles the whole job into the child's pipe and waits for it to be read.
         await asyncio.to_thread(process.start)
         sender.close()
+        outcome: dict[str, Any] | None = None
         try:
             last_look = time.monotonic()
             while True:
@@ -184,11 +185,21 @@ class RunQueue:
                     kind, payload = receiver.recv()
                     if kind == "failed":
                         raise _Ends(payload)
-                    return payload
+                    if kind == "result":
+                        outcome = payload
+                        continue
+                    if outcome is None:
+                        raise _Ends("the worker sent a benchmark before its result")
+                    outcome["report"]["benchmarks"]["random_entry"] = payload
+                    return outcome
                 if not process.is_alive() and not receiver.poll():
                     raise _Ends(f"the worker process ended without an answer (exit code {process.exitcode})")
                 now = time.monotonic()
                 if now >= deadline:
+                    if outcome is not None:
+                        # The run's own result is in; only the benchmark ran out of time, and says so.
+                        outcome["report"]["benchmarks"]["random_entry"] = {"skipped": "the run's time limit came first"}
+                        return outcome
                     raise TimeoutError
                 if now - last_look >= CANCEL_POLL_SECONDS:
                     last_look = now

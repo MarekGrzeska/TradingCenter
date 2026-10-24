@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
 from strategies import reports
@@ -23,8 +24,11 @@ def trade(r: float, *, exit_time: int = MONDAY + 2 * HOUR, side: str = "long") -
     )
 
 
+HOURS = np.arange(MONDAY, MONDAY + 7 * 86400, HOUR)
+
+
 def test_metrics_of_a_handful_of_trades() -> None:
-    found = reports.trade_metrics([trade(2), trade(-1), trade(-1), trade(3)], HOUR, 10 * HOUR)
+    found = reports.trade_metrics([trade(2), trade(-1), trade(-1), trade(3)], HOURS, 10 * HOUR)
 
     assert found["win_rate"] == 0.5 and found["total_r"] == 3 and found["expectancy_r"] == 0.75
     assert found["profit_factor"] == pytest.approx(2.5) and found["max_drawdown_r"] == 2
@@ -32,15 +36,15 @@ def test_metrics_of_a_handful_of_trades() -> None:
 
 
 def test_without_trades_every_trade_metric_is_empty_not_zero() -> None:
-    assert set(reports.trade_metrics([], HOUR, HOUR).values()) == {None}
+    assert set(reports.trade_metrics([], HOURS, HOUR).values()) == {None}
 
 
 def test_without_a_loss_the_profit_factor_is_empty() -> None:
-    assert reports.trade_metrics([trade(1), trade(2)], HOUR, HOUR)["profit_factor"] is None
+    assert reports.trade_metrics([trade(1), trade(2)], HOURS, HOUR)["profit_factor"] is None
 
 
 def test_the_best_five_removed_shows_what_is_left() -> None:
-    found = reports.trade_metrics([trade(r) for r in (5, 4, 3, 2, 1, -1, -2)], HOUR, HOUR)
+    found = reports.trade_metrics([trade(r) for r in (5, 4, 3, 2, 1, -1, -2)], HOURS, HOUR)
 
     assert found["total_r_without_best_5"] == -3
 
@@ -55,10 +59,7 @@ def _report(document, minute, *, seed=1, repetitions=10):
     }
     evaluator = Evaluator(checked, {}, catalogue(), series, {})
     result = simulate(**args, evaluator=evaluator)
-    benchmark = reports.random_entry(
-        result, simulate_args=args, evaluator=evaluator, decision=series[("US100", "HOUR")],
-        range_from=args["range_from"], range_to=args["range_to"], seed=seed, repetitions=repetitions,
-    )
+    benchmark = reports.random_entry(result, simulate_args=args, evaluator=evaluator, seed=seed, repetitions=repetitions)
     return reports.build(
         result, decision=series[("US100", "HOUR")], minute=minute, costs=FREE, capital=10_000.0,
         range_from=args["range_from"], range_to=args["range_to"], random_entry=benchmark,
@@ -94,3 +95,26 @@ def test_a_strategy_that_never_enters_says_so() -> None:
 
 def test_an_unmeasurable_number_is_stored_as_null() -> None:
     assert reports.finite({"a": float("nan"), "b": [float("inf"), 1.0]}) == {"a": None, "b": [None, 1.0]}
+
+
+def test_bars_held_count_decision_bars_not_the_clock_over_a_weekend() -> None:
+    friday_20, monday_10 = MONDAY + 4 * 86400 + 20 * HOUR, MONDAY + 7 * 86400 + 10 * HOUR
+    weekday_hours = np.array([h for h in range(MONDAY, MONDAY + 8 * 86400, HOUR) if (h - MONDAY) // 86400 % 7 < 5])
+    held = Trade("long", 0, friday_20, 100.0, monday_10, 100.0, 1.0, 90.0, 0.0, 0.0,
+                 {"spread": 0, "slippage": 0, "financing": 0}, "when", False)
+
+    assert reports.trade_metrics([held], weekday_hours, 86400)["average_bars_held"] == 14  # 20:00–24:00 Fri, 00–10 Mon
+
+
+def test_equity_ratios_are_empty_once_the_account_is_not_positive() -> None:
+    found = reports.equity_metrics([(0, 500.0), (86400, -200.0), (172800, -100.0)], 1000.0, -100.0)
+
+    assert found["sharpe"] is None and found["max_drawdown_pct"] == 1.0
+
+
+def test_random_entries_falling_inside_a_trade_are_taken_on_the_next_flat_bar() -> None:
+    minute = minutes(walk(10, seed=5))
+    random = _report(WALKING, minute, repetitions=5)
+    strategy_trades = _report(WALKING, minute)["trades"]
+
+    assert random["benchmarks"]["random_entry"]["average_trades"] >= 0.9 * strategy_trades

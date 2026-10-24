@@ -14,7 +14,7 @@ import numpy as np
 from .costs import CostModel
 from .engine import Result, Trade, simulate
 from .evaluate import Evaluator
-from .series import PERIOD_SECONDS, Series
+from .series import Series
 
 # Calendar days, because a CFD account is marked every day and financing is charged on weekends too.
 ANNUALISATION = "daily returns of nominal equity, scaled by sqrt(365)"
@@ -39,8 +39,8 @@ def build(
         "rejected_entries": result.rejected_entries,
         "decision_bars": result.decision_bars,
         "pessimistic_resolutions": sum(t.pessimistic for t in trades),
-        **trade_metrics(trades, PERIOD_SECONDS[decision.resolution], range_to - range_from),
-        **equity_metrics(equity, capital),
+        **trade_metrics(trades, decision.starts, range_to - range_from),
+        **equity_metrics(equity, capital, capital + sum(t.result_money for t in trades)),
         "by_year": by_year(trades),
         "costs": {k: sum(t.costs[k] for t in trades) for k in ("spread", "slippage", "financing")},
         "benchmarks": {
@@ -63,7 +63,7 @@ def finite(value: Any) -> Any:
     return value
 
 
-def trade_metrics(trades: Sequence[Trade], bar_seconds: int, range_seconds: int) -> dict[str, Any]:
+def trade_metrics(trades: Sequence[Trade], decision_starts: np.ndarray, range_seconds: int) -> dict[str, Any]:
     """Every metric a list of trades alone answers. Empty — never zero — where there is nothing to measure."""
     if not trades:
         return {
@@ -79,7 +79,9 @@ def trade_metrics(trades: Sequence[Trade], bar_seconds: int, range_seconds: int)
     for value in r:
         streak = streak + 1 if value < 0 else 0
         longest = max(longest, streak)
-    held = [(t.exit_time - t.entry_time) / bar_seconds for t in trades]
+    # Decision bars that started while the position was open — a weekend is no bars, not sixty.
+    entries = np.searchsorted(decision_starts, [t.entry_time for t in trades])
+    exits = np.searchsorted(decision_starts, [t.exit_time for t in trades])
     return {
         "win_rate": float(np.mean(r > 0)),
         "expectancy_r": float(r.mean()),
@@ -87,7 +89,7 @@ def trade_metrics(trades: Sequence[Trade], bar_seconds: int, range_seconds: int)
         "profit_factor": None if losses == 0 else float(gains / losses),
         "max_drawdown_r": float(np.max(np.maximum.accumulate(curve) - curve)),
         "longest_losing_streak": longest,
-        "average_bars_held": float(np.mean(held)),
+        "average_bars_held": float(np.mean(exits - entries)),
         "exposure": min(1.0, sum(t.exit_time - t.entry_time for t in trades) / max(range_seconds, 1)),
         "total_r_without_best_5": float(np.sort(r)[:-5].sum()) if len(r) > 5 else 0.0,
     }
@@ -96,51 +98,62 @@ def trade_metrics(trades: Sequence[Trade], bar_seconds: int, range_seconds: int)
 def daily_equity(
     trades: Sequence[Trade], minute: Series, costs: CostModel, capital: float, range_from: int, range_to: int
 ) -> list[tuple[int, float]]:
-    """Equity at each UTC midnight of the range and at its end: realised results, plus open positions marked at the last
-    minute close before the mark — at the bid for a long, the ask for a short."""
-    marks = list(range((range_from // 86400 + 1) * 86400, range_to, 86400)) + [range_to]
+    """Equity at each UTC midnight inside the range — whole days only, so every return is a day's. Realised results,
+    plus the open position marked at the last minute close before the mark (bid for a long, ask for a short), less the
+    financing it has accrued, as the realised result of the same trade will be."""
+    marks = np.arange((range_from // 86400 + 1) * 86400, range_to + 1, 86400)
+    by_exit = sorted(trades, key=lambda t: t.exit_time)
+    exit_times = np.array([t.exit_time for t in by_exit], dtype=np.int64)
+    realised = np.concatenate([[0.0], np.cumsum([t.result_money for t in by_exit])])
+    by_entry = sorted(trades, key=lambda t: t.entry_time)
+    entry_times = np.array([t.entry_time for t in by_entry], dtype=np.int64)
     closes = minute.columns["close"]
-    out: list[tuple[int, float]] = [(range_from, capital)]
-    for mark in marks:
-        realised = sum(t.result_money for t in trades if t.exit_time <= mark)
+    out: list[tuple[int, float]] = []
+    for mark in marks.tolist():
+        value = capital + realised[int(np.searchsorted(exit_times, mark, side="right"))]
+        # One position at a time: the last one entered by the mark is the only one that can still be open.
+        last = int(np.searchsorted(entry_times, mark, side="right")) - 1
         index = int(np.searchsorted(minute.available, mark, side="right")) - 1
-        open_value = 0.0
-        if index >= 0:
-            for t in trades:
-                if t.entry_time <= mark < t.exit_time:
-                    side = 1 if t.side == "long" else -1
-                    price = closes[index] + (costs.spread_at(int(minute.starts[index])) if side < 0 else 0.0)
-                    open_value += side * (price - t.entry_price) * t.units
-        out.append((mark, capital + realised + open_value))
+        if last >= 0 and index >= 0 and by_entry[last].exit_time > mark:
+            t = by_entry[last]
+            side = 1 if t.side == "long" else -1
+            price = closes[index] + (costs.spread_at(int(minute.starts[index])) if side < 0 else 0.0)
+            value += side * (price - t.entry_price) * t.units
+            value -= costs.financing(side, t.units, t.entry_price, t.entry_time, mark)
+        out.append((mark, value))
     return out
 
 
-def equity_metrics(equity: Sequence[tuple[int, float]], capital: float) -> dict[str, Any]:
+def equity_metrics(equity: Sequence[tuple[int, float]], capital: float, final: float) -> dict[str, Any]:
+    """`final` is the equity at the range's end, which a midnight mark may not reach."""
     values = np.array([v for _, v in equity])
-    peak = np.maximum.accumulate(values)
-    drawdown = float(np.max((peak - values) / peak)) if len(values) else 0.0
-    returns = values[1:] / values[:-1] - 1 if len(values) > 1 else np.array([])
-    days = (equity[-1][0] - equity[0][0]) / 86400 if len(equity) > 1 else 0
-    sharpe = sortino = calmar = None
-    if len(returns) >= 2 and np.std(returns) > 0:
-        sharpe = float(np.mean(returns) / np.std(returns) * math.sqrt(365))
-    downside = math.sqrt(float(np.mean(np.minimum(returns, 0) ** 2))) if len(returns) else 0.0
-    if len(returns) >= 2 and downside > 0:
-        sortino = float(np.mean(returns) / downside * math.sqrt(365))
-    annual = None
-    if days > 0 and values[-1] > 0:
-        annual = float((values[-1] / capital) ** (365 / days) - 1)
-        if drawdown > 0:
-            calmar = annual / drawdown
-    return {
-        "final_equity": float(values[-1]) if len(values) else capital,
-        "return_pct": float(values[-1] / capital - 1) if len(values) else 0.0,
-        "annual_return_pct": annual,
-        "max_drawdown_pct": drawdown,
-        "sharpe": sharpe,
-        "sortino": sortino,
-        "calmar": calmar,
+    result: dict[str, Any] = {
+        "final_equity": final, "return_pct": final / capital - 1, "annual_return_pct": None,
+        "max_drawdown_pct": None, "sharpe": None, "sortino": None, "calmar": None,
     }
+    if len(values) < 2:
+        return result
+    peak = np.maximum.accumulate(np.concatenate([[capital], values]))
+    curve = np.concatenate([[capital], values])
+    if np.min(curve) <= 0:
+        # A return off an empty or negative account is not a return; the curve is shown, its ratios are not.
+        result["max_drawdown_pct"] = 1.0
+        return result
+    drawdown = float(np.max((peak - curve) / peak))
+    returns = values[1:] / values[:-1] - 1
+    days = (equity[-1][0] - equity[0][0]) / 86400
+    result["max_drawdown_pct"] = drawdown
+    if np.std(returns) > 0:
+        result["sharpe"] = float(np.mean(returns) / np.std(returns) * math.sqrt(365))
+    downside = math.sqrt(float(np.mean(np.minimum(returns, 0) ** 2)))
+    if downside > 0:
+        result["sortino"] = float(np.mean(returns) / downside * math.sqrt(365))
+    if days > 0:
+        annual = float((values[-1] / values[0]) ** (365 / days) - 1)
+        result["annual_return_pct"] = annual
+        if drawdown > 0:
+            result["calmar"] = annual / drawdown
+    return result
 
 
 def by_year(trades: Sequence[Trade]) -> dict[str, dict[str, float]]:
@@ -161,41 +174,36 @@ def buy_and_hold(minute: Series, costs: CostModel, capital: float, range_from: i
     entry = minute.columns["open"][first] + costs.spread_at(int(minute.starts[first])) + costs.slippage
     leave = minute.columns["close"][last] - costs.slippage
     units = capital / entry
-    financing = costs.nights(int(minute.starts[first]), int(minute.available[last])) * costs.overnight_long * capital
+    financing = costs.financing(1, units, entry, int(minute.starts[first]), int(minute.available[last]))
     money = (leave - entry) * units - financing
     return {"return_pct": float(money / capital), "entry_price": float(entry), "exit_price": float(leave)}
 
 
-def random_entry(
-    result: Result,
-    *,
-    simulate_args: Mapping[str, Any],
-    evaluator: Evaluator,
-    decision: Series,
-    range_from: int,
-    range_to: int,
-    seed: int,
-    repetitions: int,
-) -> dict[str, Any] | None:
+def random_entry(result: Result, *, simulate_args: Mapping[str, Any], evaluator: Evaluator, seed: int, repetitions: int):
     """As many entries as the strategy made, on decision bars drawn at random from the range, long or short in the
-    strategy's own proportion, with its exits, sizing and costs — repeated, and reproducible from `seed`."""
+    strategy's own proportion, as market orders with its exits, sizing and costs — repeated, reproducible from `seed`."""
+    checked, series = simulate_args["checked"], simulate_args["series"]
+    range_from, range_to = simulate_args["range_from"], simulate_args["range_to"]
+    decision = series[(checked.document.symbol, checked.document.timeframe)]
     count = len(result.trades)
     candidates = np.flatnonzero((decision.starts >= range_from) & (decision.available <= range_to))
     if count == 0 or candidates.size == 0:
         return None
     long_share = sum(t.side == "long" for t in result.trades) / count
     rng = np.random.default_rng(seed)
-    totals = []
+    totals, made = [], []
     for _ in range(repetitions):
-        bars = rng.choice(candidates, size=min(count, candidates.size), replace=False)
+        bars = np.sort(rng.choice(candidates, size=min(count, candidates.size), replace=False))
         sides = np.where(rng.random(bars.size) < long_share, 1, -1)
-        forced = {int(b): int(s) for b, s in zip(bars, sides, strict=True)}
-        drawn = simulate(**simulate_args, forced=forced, evaluator=evaluator)
+        drawn = simulate(**simulate_args, forced=list(zip(bars.tolist(), sides.tolist(), strict=True)), evaluator=evaluator)
         totals.append(sum(t.result_r for t in drawn.trades))
+        made.append(len(drawn.trades))
     values = np.array(totals)
     return {
         "repetitions": repetitions,
         "seed": seed,
+        "entry": "market",
+        "average_trades": float(np.mean(made)),
         "median_total_r": float(np.median(values)),
         "p5_total_r": float(np.percentile(values, 5)),
         "p95_total_r": float(np.percentile(values, 95)),
