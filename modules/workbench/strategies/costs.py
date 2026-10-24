@@ -35,6 +35,11 @@ class CostModel(BaseModel):
             return self.spread[(moment // 3600) % 24]
         return self.spread
 
+    def financing(self, side: int, units: float, entry_price: float, entered: int, until: int) -> float:
+        """What a position has paid (positive) for its nights so far, on its value at entry."""
+        rate = self.overnight_long if side > 0 else self.overnight_short
+        return self.nights(entered, until) * rate * units * entry_price
+
     def nights(self, entered: int, left: int) -> int:
         """How many times the rollover hour was crossed between two moments — every calendar day counts, weekends too."""
         first = (entered // 86400) * 86400 + self.rollover_hour * 3600

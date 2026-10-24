@@ -4,7 +4,7 @@ nothing but its arguments (design D5), and so the same inputs always give the sa
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -97,9 +97,14 @@ def simulate(
     capital: float,
     range_from: int,
     range_to: int,
+    forced: Sequence[tuple[int, int]] | None = None,
+    evaluator: Evaluator | None = None,
 ) -> Result:
+    """`forced` replaces the entry conditions with market entries — (bar, +1 long / −1 short), ascending — each taken on
+    its bar or, when a position is still open there, on the first flat bar after it: the random-entry benchmark, which
+    owes the strategy as many entries as it made. An `evaluator` already built for these inputs is reused."""
     d = checked.document
-    evaluator = Evaluator(checked, params, catalogue, series, indicators)
+    evaluator = evaluator or Evaluator(checked, params, catalogue, series, indicators)
     decision = series[(d.symbol, d.timeframe)]
     minute = series[(d.symbol, "MINUTE")]
     entry_conditions = [checked.formulas[f"entries[{i}].when"] for i in range(len(d.entries))]
@@ -107,9 +112,20 @@ def simulate(
     position: _Position | None = None
     order: _Order | None = None
 
-    bars = [i for i in range(len(decision)) if range_from <= decision.starts[i] and decision.available[i] <= range_to]
+    bars = np.flatnonzero((decision.starts >= range_from) & (decision.available <= range_to))
     previous_moment = range_from
-    for bar in bars:
+    wanted = 0
+    i = 0
+    while i < len(bars):
+        if forced is not None and position is None and order is None:
+            # Nothing can happen before the next wanted entry: jump to it, or stop when there is none.
+            if wanted >= len(forced):
+                break
+            i = max(i, int(np.searchsorted(bars, forced[wanted][0])))
+            if i >= len(bars):
+                break
+        bar = int(bars[i])
+        i += 1
         moment = int(decision.available[bar])
         # Every minute between the last decision and this one: orders fill, stops and targets are touched.
         lo, hi = np.searchsorted(minute.starts, [previous_moment, moment], side="left")
@@ -132,6 +148,11 @@ def simulate(
             continue
         if order is not None or _blocked(checked, evaluator, bar, state, book):
             continue
+        if forced is not None:
+            if wanted < len(forced) and bar >= forced[wanted][0]:
+                order = _Order(forced[wanted][1], "market", np.nan, bar, None)
+                wanted += 1
+            continue
         for index, condition in enumerate(entry_conditions):
             if evaluator.at(condition, bar, state):
                 entry = d.entries[index]
@@ -152,7 +173,7 @@ def simulate(
     for m in range(int(lo), int(hi)):
         if position is None:
             break
-        position, order = _minute(m, minute, position, None, costs, book, checked, evaluator, bars[-1] if bars else 0)
+        position, order = _minute(m, minute, position, None, costs, book, checked, evaluator, int(bars[-1]) if len(bars) else 0)
     if position is not None:
         last = int(hi) - 1 if hi > 0 else 0
         spread = costs.spread_at(int(minute.starts[last]))
@@ -336,8 +357,7 @@ def _open(
 
 
 def _financing(position: _Position, moment: int, costs: CostModel) -> float:
-    rate = costs.overnight_long if position.side > 0 else costs.overnight_short
-    return costs.nights(position.entry_time, moment) * rate * position.units * position.entry_price
+    return costs.financing(position.side, position.units, position.entry_price, position.entry_time, moment)
 
 
 def _close(

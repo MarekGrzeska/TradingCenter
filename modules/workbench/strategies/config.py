@@ -50,8 +50,9 @@ class Settings(BaseSettings):
     max_minute_bars: int = 1_500_000
     # How long one run may compute before it is stopped and recorded as failed, with that reason.
     run_timeout_seconds: float = 600.0
-    # How many times the random-entry benchmark is drawn. Its median and percentiles are only as steady as this.
-    random_entry_repetitions: int = 200
+    # How many times the random-entry benchmark is drawn: its percentiles are only as steady as this, and each draw is a
+    # run of the exits — the reason it is a hundred, not a thousand.
+    random_entry_repetitions: int = 100
 
     # The operator's screen, and nobody else: what this package holds is research the operator decides on. There is no
     # tool surface, so there is no tool caller list.

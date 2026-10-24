@@ -40,10 +40,10 @@
 
 ## 6. Raport
 
-- [ ] 6.1 Metryki z `strategies-reports` (puste zamiast zera, metoda rocznej skali Sharpe'a nazwana), podział na lata, koszty na składniki, wynik bez pięciu najlepszych
-- [ ] 6.2 Punkty odniesienia: kup i trzymaj, losowe wejście z ziarnem (mediana, 5. i 95. percentyl)
-- [ ] 6.3 Pochodzenie: rewizja i hash, wkład, wersja silnika, ziarno, odciski danych, fragmenty niepotwierdzone; licznik prób na strategię
-- [ ] 6.4 Testy jednostkowe metryk na ręcznie podanych transakcjach; test, że raport nie ma pola oceny
+- [x] 6.1 Metryki z `strategies-reports` (puste zamiast zera, metoda rocznej skali Sharpe'a nazwana), podział na lata, koszty na składniki, wynik bez pięciu najlepszych
+- [x] 6.2 Punkty odniesienia: kup i trzymaj, losowe wejście z ziarnem (mediana, 5. i 95. percentyl)
+- [x] 6.3 Pochodzenie: rewizja i hash, wkład, wersja silnika, ziarno, odciski danych, fragmenty niepotwierdzone; licznik prób na strategię
+- [x] 6.4 Testy jednostkowe metryk na ręcznie podanych transakcjach; test, że raport nie ma pola oceny
 
 ## 7. REST
 
