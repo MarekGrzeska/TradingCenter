@@ -8,7 +8,7 @@ import numpy as np
 from strategies.costs import CostModel
 from strategies.document import servable, validate
 from strategies.engine import Result, simulate
-from strategies.series import Series
+from strategies.series import PERIOD_SECONDS, Series
 
 from .builders import catalogue
 
@@ -49,19 +49,24 @@ def walk(days: int, seed: int = 7, start_price: float = 18_000.0) -> dict[int, t
     return rows
 
 
+def bars(minute: Series, resolution: str) -> Series:
+    """The bars a minute series makes at `resolution` — what the archive derives, done here the same way."""
+    seconds = PERIOD_SECONDS[resolution]
+    buckets = minute.starts // seconds * seconds
+    starts, first = np.unique(buckets, return_index=True)
+    last = np.append(first[1:], len(buckets)) - 1
+    columns = {
+        "open": minute.columns["open"][first],
+        "close": minute.columns["close"][last],
+        "high": np.maximum.reduceat(minute.columns["high"], first),
+        "low": np.minimum.reduceat(minute.columns["low"], first),
+        "volume": np.add.reduceat(minute.columns["volume"], first),
+    }
+    return Series(resolution, starts, starts + seconds, columns)
+
+
 def hours(minute: Series) -> Series:
-    """The hour bars a minute series makes — what the archive derives, done here the same way."""
-    buckets = minute.starts // HOUR * HOUR
-    starts = np.unique(buckets)
-    columns = {}
-    for name, reduce in (("open", "first"), ("high", "max"), ("low", "min"), ("close", "last"), ("volume", "sum")):
-        values = []
-        for s in starts:
-            chunk = minute.columns[name][buckets == s]
-            values.append({"first": chunk[0], "last": chunk[-1], "max": chunk.max(), "min": chunk.min(),
-                           "sum": chunk.sum()}[reduce])
-        columns[name] = np.array(values, dtype=np.float64)
-    return Series("HOUR", starts, starts + HOUR, columns)
+    return bars(minute, "HOUR")
 
 
 def strategy(**sections) -> dict:
