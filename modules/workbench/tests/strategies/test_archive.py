@@ -33,3 +33,29 @@ async def test_the_pairs_are_reused_for_a_while() -> None:
     await reading.tracked()
     assert await reading.tracked() == {("US100", "MINUTE")}
     assert asked == ["/pairs"]
+
+
+async def test_the_traded_minutes_are_read_from_the_range_and_an_unsettled_indicator_is_named() -> None:
+    from strategies.document import servable, validate
+    from strategies.reading import read
+
+    from .builders import catalogue
+    from .market import MONDAY, strategy
+
+    asked: list[tuple[str, str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "GET":
+            asked.append((request.url.path, request.url.params["from"]))
+            return httpx.Response(200, json={"candles": [], "uncovered": []})
+        return httpx.Response(200, json={"times": [], "results": [{"id": "ema", "settled": False, "lines": {"ema": []}}]})
+
+    document = strategy(entries=[{"side": "long", "when": "close > ema(20)"}])
+    checked, _ = validate(document, catalogue(), servable({("US100", "MINUTE")}))
+    assert checked is not None
+
+    inputs = await read(archive(handler), checked, {}, catalogue(), MONDAY, MONDAY + 86400)
+
+    minute_from = {start for path, start in asked if path == "/candles/US100" and start.startswith("2026-03-02")}
+    assert minute_from == {"2026-03-02T00:00:00+00:00"}
+    assert [key.id for key in inputs.unsettled] == ["ema"]

@@ -16,6 +16,7 @@ from .vocabulary import (
     FUNCTIONS,
     HISTORY,
     MAX_BARS,
+    PER_BAR,
     POSITION,
     RESERVED,
     RESOLUTIONS,
@@ -25,6 +26,7 @@ from .vocabulary import (
     Indicator,
     Place,
     Type,
+    inner_context,
 )
 
 
@@ -111,6 +113,16 @@ def let_order(references: Mapping[str, set[str]]) -> tuple[list[str], list[str]]
                 ready.append(user)
         ready.sort()
     return order, sorted(set(references) - set(order))
+
+
+def through_at(node: f.At, context: tuple[str, str]) -> tuple[f.Node, tuple[str, str]]:
+    """A chain of `@` as one: `x @ US500 @ DAY` is `x` read in (US500, DAY), never through (traded, DAY), which nobody
+    reads. Returns the first node that is not an `@`, and the context it is read in."""
+    current: f.Node = node
+    while isinstance(current, f.At):
+        context = inner_context(context, current.context)
+        current = current.value
+    return current, context
 
 
 def names_used(node: f.Node) -> set[str]:
@@ -281,7 +293,7 @@ def _function(n: f.Call, w: _Walk, ctx: _Context) -> Type | None:
         w.refuse(n, "`at_entry` is the traded position's bar; it cannot be read under `@`, an offset or a window")
         return None
     # Everything but plain arithmetic reads its arguments as series of past bars; `at_entry` reads one past bar.
-    args_ctx = ctx if spec.name in _PER_BAR else _Context(ctx.symbol, ctx.resolution, over_bars=True)
+    args_ctx = ctx if spec.name in PER_BAR else _Context(ctx.symbol, ctx.resolution, over_bars=True)
     if n.kwargs:
         w.refuse(n, f"`{n.function}` takes its arguments in order, not by name", hint=spec.signature())
         return None
@@ -296,9 +308,6 @@ def _function(n: f.Call, w: _Walk, ctx: _Context) -> Type | None:
         else:
             _expect(arg, Type(kind.value), w, args_ctx, f"argument {index + 1} of {spec.signature()}")
     return spec.returns
-
-
-_PER_BAR = frozenset({"abs", "min", "max"})
 
 
 def _window(arg: f.Node, w: _Walk) -> None:

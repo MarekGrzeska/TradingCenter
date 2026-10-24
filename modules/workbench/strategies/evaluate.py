@@ -13,11 +13,11 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
 from . import formula as f
-from .checking import children
+from .checking import children, through_at
 from .document import Checked
 from .requirements import IndicatorKey, indicator_key
 from .series import PERIOD_SECONDS, Context, Series, align, pick
-from .vocabulary import CONSTANTS, FUNCTIONS, HISTORY, POSITION, RESOLUTIONS, Indicator
+from .vocabulary import CONSTANTS, FUNCTIONS, HISTORY, PER_BAR, POSITION, Indicator
 
 _COMPARE: dict[str, Callable] = {
     "<": operator.lt, "<=": operator.le, ">": operator.gt, ">=": operator.ge, "==": operator.eq, "!=": operator.ne,
@@ -105,9 +105,9 @@ class Evaluator:
         if isinstance(n, f.Lag):
             return _shift(self.vector(n.value, ctx), self._count(n.bars))
         if isinstance(n, f.At):
-            inner = (ctx[0], n.context) if n.context in RESOLUTIONS else (n.context, ctx[1])
+            value, inner = through_at(n, ctx)
             index = align(self._series[inner].available, self._series[ctx].available)
-            return pick(self.vector(n.value, inner), index)
+            return pick(self.vector(value, inner), index)
         if isinstance(n, f.Field) and isinstance(n.value, f.Call):
             return self._indicator(n.value, n.name, ctx)
         if isinstance(n, f.Call):
@@ -187,12 +187,12 @@ class Evaluator:
         def walk(n: f.Node, at: Context) -> None:
             nonlocal out
             if isinstance(n, f.At):
-                inner = (at[0], n.context) if n.context in RESOLUTIONS else (n.context, at[1])
+                value, inner = through_at(n, at)
                 source = self._series[inner]
                 index = align(source.available, moments)
                 age = moments - pick(source.available.astype(np.float64), index)
                 out |= (index < 0) | (age > PERIOD_SECONDS[inner[1]])
-                walk(n.value, inner)
+                walk(value, inner)
                 return
             for child in children(n):
                 walk(child, at)
@@ -241,7 +241,7 @@ class Evaluator:
             return self.at(branch, bar, state)
         if isinstance(node, f.Call) and node.function == "at_entry":
             return float(self.vector(node.args[0])[state.entry_bar]) if state.entry_bar >= 0 else np.nan
-        if isinstance(node, f.Call) and node.function in ("abs", "min", "max"):
+        if isinstance(node, f.Call) and node.function in PER_BAR:
             values = [float(self.at(a, bar, state)) for a in node.args]
             if node.function == "abs":
                 return abs(values[0])

@@ -180,3 +180,41 @@ def _cut(series: Series, size: int) -> Series:
 
 def test_free_costs_are_a_choice_written_down() -> None:
     assert FREE.spread == 0.0 and FREE.slippage == 0.0
+
+
+def test_a_chain_of_at_reads_the_other_instrument_at_the_other_resolution_and_nothing_between() -> None:
+    from strategies.requirements import needs
+
+    minute = minutes(flat(9 * HOUR, 12 * HOUR, 100.0))
+    day = Series("DAY", np.array([MONDAY - 86400], dtype=np.int64), np.array([MONDAY], dtype=np.int64),
+                 {k: np.array([50.0]) for k in ("open", "high", "low", "close", "volume")})
+    document = strategy(entries=[{"side": "long", "when": "hour == 9 and close @ US500 @ DAY > 10"}])
+    checked, problems = validate(document, catalogue(), servable({("US100", "MINUTE"), ("US500", "DAY")}))
+    assert checked is not None, problems
+
+    assert needs(checked, {}, catalogue()).contexts == {("US100", "HOUR"), ("US100", "MINUTE"), ("US500", "DAY")}
+    series = {("US100", "MINUTE"): minute, ("US100", "HOUR"): hours(minute), ("US500", "DAY"): day}
+    from strategies.engine import simulate
+
+    result = simulate(checked, {}, catalogue(), series, {}, FREE, 10_000.0, MONDAY, int(minute.available[-1]))
+    assert len(result.trades) == 1
+
+
+def test_an_order_whose_price_is_not_known_yet_is_counted_and_does_not_block_the_next_signal() -> None:
+    document = strategy(entries=[
+        {"side": "long", "when": "hour == 9", "order": {"type": "limit", "price": "close[30]"}},
+        {"side": "long", "when": "hour == 11"},
+    ], exits={"stop": "entry_price - 50", "max_bars": 1})
+
+    result = run(document, minutes(flat(9 * HOUR, 14 * HOUR, 100.0)))
+
+    assert result.rejected_entries == 1 and len(result.trades) == 1
+
+
+def test_a_market_entry_stopped_later_in_its_own_minute_is_certain_not_assumed() -> None:
+    rows = flat(9 * HOUR, 12 * HOUR, 100.0)
+    rows[10 * HOUR] = (100.0, 100.0, 40.0, 40.0)
+
+    [trade] = run(strategy(), minutes(rows)).trades
+
+    assert trade.exit_reason == "stop" and not trade.pessimistic

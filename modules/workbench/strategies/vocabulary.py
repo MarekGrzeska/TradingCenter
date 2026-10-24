@@ -118,6 +118,15 @@ FUNCTIONS: dict[str, Function] = {
     )
 }
 
+# Functions that read their arguments on the current bar only, so they may carry the trade's state.
+PER_BAR: frozenset[str] = frozenset({"abs", "min", "max"})
+
+
+def inner_context(context: tuple[str, str], name: str) -> tuple[str, str]:
+    """The (instrument, resolution) the left of `@ name` is read in, from the one it stands in."""
+    return (context[0], name) if name in RESOLUTIONS else (name, context[1])
+
+
 RESERVED: frozenset[str] = frozenset(
     {*SERIES, *TIME, *CONSTANTS, *POSITION, *HISTORY, *FUNCTIONS, *RESOLUTIONS, "p", "True", "False"}
 )

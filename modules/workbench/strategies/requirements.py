@@ -7,10 +7,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 
 from . import formula as f
-from .checking import children
+from .checking import children, through_at
 from .document import Checked, contexts
 from .series import PERIOD_SECONDS, Context
-from .vocabulary import FUNCTIONS, RESOLUTIONS, Indicator
+from .vocabulary import FUNCTIONS, SERIES, TIME, Indicator
 
 # Bars are counted in trading bars and read in calendar time: a weekend, a holiday and the daily break stretch one into
 # the other. Generous on purpose — reading too far back costs a few rows, too short a series is a wrong warm-up.
@@ -42,8 +42,10 @@ def indicator_key(
 @dataclass(frozen=True)
 class Needs:
     contexts: frozenset[Context]
+    # The contexts a formula reads, read from `warmup_seconds` before the range; the traded minutes, when only the fills
+    # use them, are read from the range's start — the run's ceiling is counted in those.
+    warm: frozenset[Context]
     indicators: frozenset[IndicatorKey]
-    # How far before the range every series is read, so the first decision in it already has its full history.
     warmup_seconds: int
 
 
@@ -54,22 +56,30 @@ def needs(checked: Checked, params: Mapping[str, float], catalogue: Mapping[str,
     lets = {name: checked.formulas[f"let.{name}"] for name in checked.let_order}
     let_reach: dict[str, int] = {}
 
+    warm: set[Context] = {decision}
+
     def reach(n: f.Node, ctx: Context) -> int:
-        """Seconds of history `n` needs behind the bar it is evaluated on, collecting indicator keys on the way."""
+        """Seconds of history `n` needs behind the bar it is evaluated on, collecting what it reads on the way."""
         period = PERIOD_SECONDS[ctx[1]]
         if isinstance(n, f.Name) and n.id in lets:
             if n.id not in let_reach:
                 let_reach[n.id] = reach(lets[n.id], decision)
             return let_reach[n.id]
+        if isinstance(n, f.Name) and (n.id in SERIES or n.id in TIME):
+            warm.add(ctx)
+            return 0
         if isinstance(n, f.Field) and isinstance(n.value, f.Call):
             keys.add(indicator_key(n.value, n.name, ctx, catalogue, params))
+            warm.add(ctx)
             return 0
         if isinstance(n, f.Call) and n.function not in FUNCTIONS:
             keys.add(indicator_key(n, None, ctx, catalogue, params))
+            warm.add(ctx)
             return 0
         if isinstance(n, f.At):
-            inner = (ctx[0], n.context) if n.context in RESOLUTIONS else (n.context, ctx[1])
-            return reach(n.value, inner) + PERIOD_SECONDS[inner[1]]
+            value, inner = through_at(n, ctx)
+            warm.add(inner)
+            return reach(value, inner) + PERIOD_SECONDS[inner[1]]
         own = 0
         if isinstance(n, f.Lag):
             own = _bars(n.bars, params) * period
@@ -82,7 +92,7 @@ def needs(checked: Checked, params: Mapping[str, float], catalogue: Mapping[str,
 
     deepest = max((reach(node, decision) for node in checked.formulas.values()), default=0)
     warmup = int(deepest * _CALENDAR_FACTOR) + _CALENDAR_MARGIN_SECONDS
-    return Needs(frozenset(contexts(d, checked.formulas)), frozenset(keys), warmup)
+    return Needs(frozenset(contexts(d, checked.formulas)), frozenset(warm), frozenset(keys), warmup)
 
 
 def _window_of(arg: f.Node) -> int | f.Param:

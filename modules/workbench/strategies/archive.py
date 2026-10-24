@@ -96,4 +96,4 @@ class Archive:
             raise ArchiveUnavailable(f"the archive's indicator answer has a shape this package does not read: {err!r}") from err
         if result.get("error"):
             raise ArchiveUnavailable(f"the archive could not compute {id} for {symbol}: {result['error']}")
-        return {"times": times, "lines": result.get("lines") or {}}
+        return {"times": times, "lines": result.get("lines") or {}, "settled": bool(result.get("settled", True))}

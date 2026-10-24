@@ -124,7 +124,7 @@ def simulate(
 
         state = _state(position, book, bar, decision, costs, moment)
         if position is not None:
-            _trail(position, checked, evaluator, bar, state, decision)
+            _trail(position, checked, evaluator, bar, state, decision, costs, moment)
             if d.exits.when is not None and evaluator.at(checked.formulas["exits.when"], bar, state):
                 position.exit_at_next_minute = "when"
             elif d.exits.max_bars is not None and bar - position.entry_bar >= d.exits.max_bars:
@@ -139,6 +139,10 @@ def simulate(
                     float(evaluator.at(checked.formulas[f"entries[{index}].order.price"], bar, state))
                     if entry.order.price is not None else np.nan
                 )
+                if entry.order.type != "market" and np.isnan(price):
+                    # No price yet (a warm-up, an empty series): no order, counted — never one that waits forever.
+                    book.rejected += 1
+                    break
                 expires = None if entry.order.expires_bars is None else bar + entry.order.expires_bars
                 order = _Order(1 if entry.side == "long" else -1, entry.order.type, price, bar, expires)
                 break
@@ -151,8 +155,9 @@ def simulate(
         position, order = _minute(m, minute, position, None, costs, book, checked, evaluator, bars[-1] if bars else 0)
     if position is not None:
         last = int(hi) - 1 if hi > 0 else 0
-        price = minute.columns["close"][last] + (costs.spread_at(int(minute.starts[last])) if position.side < 0 else 0.0)
-        _close(position, int(minute.available[last]), price, "end_of_range", book, costs)
+        spread = costs.spread_at(int(minute.starts[last]))
+        price = minute.columns["close"][last] + (spread if position.side < 0 else 0.0)
+        _close(position, int(minute.available[last]), price, "end_of_range", book, costs, spread)
     return Result(book.trades, book.rejected, len(bars))
 
 
@@ -160,7 +165,8 @@ def _state(position: _Position | None, book: _Book, bar: int, decision: Series, 
     state = State(losses_in_row=book.losses_in_row, last_trade_r=book.last_trade_r, trades_today=book.trades_today)
     if position is not None:
         close = decision.columns["close"][bar]
-        exit_price = close if position.side > 0 else close + costs.spread_at(moment)
+        # The spread of the bar's last minute, not of the hour its close opens.
+        exit_price = close if position.side > 0 else close + costs.spread_at(moment - 60)
         state.position = position.side
         state.entry_price = position.entry_price
         state.entry_bar = position.signal_bar
@@ -172,7 +178,10 @@ def _state(position: _Position | None, book: _Book, bar: int, decision: Series, 
     return state
 
 
-def _trail(position: _Position, checked: Checked, evaluator: Evaluator, bar: int, state: State, decision: Series) -> None:
+def _trail(
+    position: _Position, checked: Checked, evaluator: Evaluator, bar: int, state: State, decision: Series,
+    costs: CostModel, moment: int,
+) -> None:
     trail = checked.document.exits.trail
     if trail is None or not state.open_r >= trail.after_r:
         return
@@ -180,7 +189,8 @@ def _trail(position: _Position, checked: Checked, evaluator: Evaluator, bar: int
     if np.isnan(distance) or distance <= 0:
         return
     close = decision.columns["close"][bar]
-    candidate = close - distance if position.side > 0 else close + distance
+    # Measured from the side the stop is tested on: the bid for a long, the ask for a short.
+    candidate = close - distance if position.side > 0 else close + costs.spread_at(moment - 60) + distance
     if position.side * (candidate - position.stop) > 0:
         position.stop = candidate
         position.trailed = True
@@ -223,17 +233,19 @@ def _minute(
         _close(position, start, price, position.exit_at_next_minute, book, costs)
         return None, order
 
-    entered_now = False
+    # A fill inside the minute (stop, limit) leaves the order of entry and stop unknown; a fill at its open does not.
+    entered_inside = False
     if position is None and order is not None:
         fill = _fill(order, bid, ask, costs)
         if fill is None:
             return None, order
         price, slipped = fill
+        order_kind = order.kind
         position = _open(order, price, slipped, start, costs, checked, evaluator, book, bar)
         order = None
         if position is None:
             return None, None
-        entered_now = True
+        entered_inside = order_kind != "market"
 
     if position is None:
         return None, order
@@ -244,7 +256,7 @@ def _minute(
     )
     if stop_hit:
         # Within one minute the data cannot say what came first; the worse order is assumed and marked as assumed.
-        if target_hit or entered_now:
+        if target_hit or entered_inside:
             position.pessimistic = True
         gapped = exit_side["open"] <= position.stop if position.side > 0 else exit_side["open"] >= position.stop
         level = exit_side["open"] if gapped else position.stop
@@ -253,7 +265,7 @@ def _minute(
         reason = "trail" if position.trailed else "stop"
         _close(position, start, price, reason, book, costs)
         return None, order
-    if target_hit and not entered_now:
+    if target_hit and not entered_inside:
         gapped = exit_side["open"] >= position.target if position.side > 0 else exit_side["open"] <= position.target
         _close(position, start, exit_side["open"] if gapped else position.target, "target", book, costs)
         return None, order
@@ -328,9 +340,14 @@ def _financing(position: _Position, moment: int, costs: CostModel) -> float:
     return costs.nights(position.entry_time, moment) * rate * position.units * position.entry_price
 
 
-def _close(position: _Position, moment: int, price: float, reason: str, book: _Book, costs: CostModel) -> None:
+def _close(
+    position: _Position, moment: int, price: float, reason: str, book: _Book, costs: CostModel,
+    spread_now: float | None = None,
+) -> None:
+    """`spread_now` is the spread the exit price was built with, when it is not the one at `moment`."""
     financing = _financing(position, moment, costs)
-    spread = position.spread_paid if position.side > 0 else costs.spread_at(moment)
+    paid_now = costs.spread_at(moment) if spread_now is None else spread_now
+    spread = position.spread_paid if position.side > 0 else paid_now
     money = position.side * (price - position.entry_price) * position.units - financing
     r = money / (position.units * position.risk)
     _new_day(book, moment)

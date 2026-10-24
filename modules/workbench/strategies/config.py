@@ -45,13 +45,10 @@ class Settings(BaseSettings):
     # How many runs compute at once, each in a worker process of its own. One by default: a run is CPU for minutes, and
     # this process also serves the candle stream and the conversation.
     run_concurrency: int = 1
-    # The most `MINUTE` candles of the traded instrument one run may read — the bound on its memory and its time. A range
-    # needing more is refused before it is queued, with both numbers. Measured 24.10.2026 on a synthetic year (375 840
-    # minutes): an HOUR strategy computes in 0.1 s, a MINUTE one with trade state in its entry in 8 s, ~190 MB at peak —
-    # so this is about four years of a 24-hour market.
+    # The most `MINUTE` candles of the traded instrument one run may read, refused before queueing: about four years of
+    # a 24-hour market, sized from the measurement in PR #352.
     max_minute_bars: int = 1_500_000
-    # How long one run may compute before it is stopped and recorded as failed, with that reason: ten times the measured
-    # worst case of a run at the ceiling above.
+    # How long one run may compute before it is stopped and recorded as failed, with that reason.
     run_timeout_seconds: float = 600.0
     # How many times the random-entry benchmark is drawn. Its median and percentiles are only as steady as this.
     random_entry_repetitions: int = 200
