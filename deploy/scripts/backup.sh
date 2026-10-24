@@ -14,7 +14,7 @@ APP_DIR="${APP_DIR:-/opt/tradingcenter}"
 # Outside /opt/tradingcenter, whose mode keeps every other account out: the backup account reads this directory and no other.
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/tradingcenter}"
 KEEP_DAYS="${KEEP_DAYS:-14}"
-DATABASES="${DATABASES:-agent teams market_data polymarket social telegram youtube alerts}"
+DATABASES="${DATABASES:-agent teams market_data polymarket social telegram youtube alerts strategies}"
 PROJECT="${COMPOSE_PROJECT:-tradingcenter-vps}"
 PG_EXEC="${PG_EXEC:-docker compose --project-name $PROJECT --env-file $APP_DIR/.env --env-file $APP_DIR/tags.env -f $APP_DIR/docker-compose.yml exec -T postgres}"
 ALERT="${ALERT:-$(dirname "$0")/alert}"

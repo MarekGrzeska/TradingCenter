@@ -158,3 +158,11 @@ def alerts_settings() -> object:
     from workbench.config import Settings
 
     return Settings().for_alerts()  # type: ignore[call-arg]
+
+
+def strategies_settings() -> object:
+    """The strategy engine's chain — the tenth, and optional like the alerts': absent from a process whose
+    `STRATEGIES_DATABASE_URL` is not set."""
+    from workbench.config import Settings
+
+    return Settings().for_strategies()  # type: ignore[call-arg]

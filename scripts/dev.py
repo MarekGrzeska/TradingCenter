@@ -200,10 +200,12 @@ MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
 YOUTUBE_CHAIN: tuple[str, str] = ("workbench", "alembic-youtube.ini")
 # The alerts package's chain is optional for the same reason, and reads `ALERTS_DATABASE_URL`.
 ALERTS_CHAIN: tuple[str, str] = ("workbench", "alembic-alerts.ini")
+# And the strategy engine's, reading `STRATEGIES_DATABASE_URL`.
+STRATEGIES_CHAIN: tuple[str, str] = ("workbench", "alembic-strategies.ini")
 
 # Created here if missing rather than through docker-entrypoint-initdb.d, which only runs against
 # an empty volume and would never fire for a container from before these modules existed.
-LOGICAL_DATABASES = ("agent", "teams", "polymarket", "social", "telegram", "youtube", "alerts")
+LOGICAL_DATABASES = ("agent", "teams", "polymarket", "social", "telegram", "youtube", "alerts", "strategies")
 
 
 
@@ -768,12 +770,16 @@ def ensure_databases(names: Iterable[str] = LOGICAL_DATABASES) -> bool:
 
 
 def migration_chains(env: Environment) -> tuple[tuple[str, str | None], ...]:
-    """Every chain this checkout runs: the seven every workbench has, and the YouTube archive's and the alerts
-    package's only when the workbench's `.env` names their database."""
+    """Every chain this checkout runs: the seven every workbench has, and the YouTube archive's, the alerts package's
+    and the strategy engine's only when the workbench's `.env` names their database."""
     workbench_env = env.read_env("workbench") or ""
     optional = [
         chain
-        for variable, chain in (("YOUTUBE_DATABASE_URL", YOUTUBE_CHAIN), ("ALERTS_DATABASE_URL", ALERTS_CHAIN))
+        for variable, chain in (
+            ("YOUTUBE_DATABASE_URL", YOUTUBE_CHAIN),
+            ("ALERTS_DATABASE_URL", ALERTS_CHAIN),
+            ("STRATEGIES_DATABASE_URL", STRATEGIES_CHAIN),
+        )
         if env_value(workbench_env, variable)
     ]
     return (*MIGRATION_CHAINS, *optional)

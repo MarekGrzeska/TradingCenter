@@ -114,6 +114,7 @@ services:
       TELEGRAM_DATABASE_URL: postgresql://telegram:${TELEGRAM_DB_PASSWORD:?}@postgres:5432/telegram
       YOUTUBE_DATABASE_URL: postgresql://youtube:${YOUTUBE_DB_PASSWORD:?}@postgres:5432/youtube
       ALERTS_DATABASE_URL: postgresql://alerts:${ALERTS_DB_PASSWORD:?}@postgres:5432/alerts
+      STRATEGIES_DATABASE_URL: postgresql://strategies:${STRATEGIES_DB_PASSWORD:?}@postgres:5432/strategies
       DATABASE_POOL_SIZE: "4"
       MARKET_DATABASE_POOL_SIZE: "8"
       POLYMARKET_DATABASE_POOL_SIZE: "3"
@@ -121,6 +122,7 @@ services:
       TELEGRAM_DATABASE_POOL_SIZE: "4"
       YOUTUBE_DATABASE_POOL_SIZE: "2"
       ALERTS_DATABASE_POOL_SIZE: "2"
+      STRATEGIES_DATABASE_POOL_SIZE: "2"
 
       GATEWAY_BASE_URL: http://gateway:80
       GATEWAY_STREAM_URL: ws://gateway:80/ws/stream
@@ -145,6 +147,7 @@ services:
       YOUTUBE_REST_CALLER_APPLICATION_IDS: ${TERMINAL_APPLICATION_ID:?}
       # The rules decide who is told what: the terminal alone writes them.
       ALERTS_REST_CALLER_APPLICATION_IDS: ${TERMINAL_APPLICATION_ID:?}
+      STRATEGIES_REST_CALLER_APPLICATION_IDS: ${TERMINAL_APPLICATION_ID:?}
 
       SCHEDULER_ENABLED: "true"
 
@@ -232,6 +235,7 @@ services:
       TELEGRAM_DB_PASSWORD: ${TELEGRAM_DB_PASSWORD:?}
       YOUTUBE_DB_PASSWORD: ${YOUTUBE_DB_PASSWORD:?}
       ALERTS_DB_PASSWORD: ${ALERTS_DB_PASSWORD:?}
+      STRATEGIES_DB_PASSWORD: ${STRATEGIES_DB_PASSWORD:?}
     volumes:
       - ./postgres/ensure-databases.sh:/ensure-databases.sh:ro
     depends_on:
