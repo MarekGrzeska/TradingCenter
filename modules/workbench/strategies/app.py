@@ -19,7 +19,7 @@ from .archive import Archive
 from .caller_access import RECORD, CallerAccess
 from .config import Settings
 from .queue import RunQueue
-from .routers import meta, runs
+from .routers import language, meta, runs, strategies
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
 log = logging.getLogger(__name__)
@@ -84,6 +84,8 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.include_router(meta.router)
+    app.include_router(language.router)
+    app.include_router(strategies.router)
     app.include_router(runs.router)
 
     # In front of the whole application: nothing decides who may call after routing has begun.

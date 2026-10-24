@@ -169,3 +169,23 @@ async def get_run(conn: Conn, run_id: int) -> RunRow | None:
 async def status_of(conn: Conn, run_id: int) -> str | None:
     return await conn.fetchval("SELECT status FROM runs WHERE id = $1", run_id)
 
+
+
+async def list_runs(conn: Conn, strategy_id: int | None, limit: int) -> list[RunRow]:
+    rows = await conn.fetch(
+        "SELECT * FROM runs WHERE ($1::bigint IS NULL OR strategy_id = $1) ORDER BY queued_at DESC, id DESC LIMIT $2",
+        strategy_id, limit,
+    )
+    return [run_row(row) for row in rows]
+
+
+async def trades_page(conn: Conn, run_id: int, offset: int, limit: int) -> tuple[int, list[asyncpg.Record]]:
+    total = await conn.fetchval("SELECT count(*) FROM run_trades WHERE run_id = $1", run_id)
+    rows = await conn.fetch(
+        "SELECT * FROM run_trades WHERE run_id = $1 ORDER BY seq OFFSET $2 LIMIT $3", run_id, offset, limit
+    )
+    return int(total or 0), list(rows)
+
+
+async def queued(conn: Conn) -> int:
+    return int(await conn.fetchval("SELECT count(*) FROM runs WHERE status = 'queued'") or 0)

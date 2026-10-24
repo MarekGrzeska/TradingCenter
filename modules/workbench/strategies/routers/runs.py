@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 
 from .. import runs, store
-from ..contract import ProblemsOut, RunAcceptedOut, RunCancelledOut
+from ..contract import ProblemsOut, RunAcceptedOut, RunCancelledOut, RunOut, TradesPageOut
 from ..runs import RunIn
 from .deps import not_found, pool, queue, refused, settings
 
@@ -41,3 +41,40 @@ async def cancel(run_id: int, db=Depends(pool)) -> RunCancelledOut:
             raise not_found(f"run {run_id}")
         now = await runs.status_of(conn, run_id)
     return RunCancelledOut.model_validate({"id": run_id, "status": now, "was": was})
+
+
+@router.get("/runs", response_model=list[RunOut])
+async def list_runs(
+    strategy_id: int | None = Query(None, description="only this strategy's runs"),
+    limit: int = Query(100, ge=1, le=500),
+    db=Depends(pool),
+) -> list[RunOut]:
+    """Newest first. Every run is here, failed and cancelled ones too — they are the count of what was tried."""
+    async with db.acquire() as conn:
+        return [RunOut.model_validate(row.__dict__) for row in await runs.list_runs(conn, strategy_id, limit)]
+
+
+@router.get("/runs/{run_id}", response_model=RunOut, responses={404: {"description": "no such run"}})
+async def detail(run_id: int, db=Depends(pool)) -> RunOut:
+    async with db.acquire() as conn:
+        row = await runs.get_run(conn, run_id)
+    if row is None:
+        raise not_found(f"run {run_id}")
+    return RunOut.model_validate(row.__dict__)
+
+
+@router.get("/runs/{run_id}/trades", response_model=TradesPageOut, responses={404: {"description": "no such run"}})
+async def trades(
+    run_id: int,
+    offset: int = Query(0, ge=0),
+    limit: int = Query(200, ge=1, le=1000),
+    db=Depends(pool),
+) -> TradesPageOut:
+    async with db.acquire() as conn:
+        if await runs.status_of(conn, run_id) is None:
+            raise not_found(f"run {run_id}")
+        total, rows = await runs.trades_page(conn, run_id, offset, limit)
+    return TradesPageOut.model_validate({
+        "run_id": run_id, "total": total,
+        "trades": [dict(row) | {"costs": store.decoded(row["costs"])} for row in rows],
+    })

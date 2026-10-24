@@ -47,8 +47,8 @@
 
 ## 7. REST
 
-- [ ] 7.1 Trasy z `strategies-api`, `GET /language` z rejestru i katalogu, `POST /validate` bez zapisu, `GET /health`
-- [ ] 7.2 Testy wg reguły CRUD (szczęśliwa ścieżka, błąd, odmowa) dla strategii i uruchomień; odmowa dla `viewer`; test zależności pakietu bez klienta bramy i `trading-mcp`
+- [x] 7.1 Trasy z `strategies-api`, `GET /language` z rejestru i katalogu, `POST /validate` bez zapisu, `GET /health`
+- [x] 7.2 Testy wg reguły CRUD (szczęśliwa ścieżka, błąd, odmowa) dla strategii i uruchomień; odmowa dla `viewer`; test zależności pakietu bez klienta bramy i `trading-mcp`
 
 ## 8. Złote strategie
 

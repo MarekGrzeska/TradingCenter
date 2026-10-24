@@ -22,8 +22,18 @@ OPEN_PATHS = frozenset({"/", "/ping"})
 # application can never disagree with it, and disagreeing is the whole job.
 REST_PATHS: tuple[str, ...] = (
     "/health",
+    "/language",
+    "/validate",
+    "/strategies",
+    "/strategies/{strategy_id}",
+    "/strategies/{strategy_id}/revisions",
+    "/strategies/{strategy_id}/revisions/{n}",
+    "/strategies/{strategy_id}/archive",
+    "/strategies/{strategy_id}/restore",
     "/runs",
+    "/runs/{run_id}",
     "/runs/{run_id}/cancel",
+    "/runs/{run_id}/trades",
     # FastAPI's own, published by the framework rather than by a router.
     "/docs",
     "/docs/oauth2-redirect",
