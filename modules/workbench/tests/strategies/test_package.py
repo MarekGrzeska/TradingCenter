@@ -131,5 +131,5 @@ async def test_the_package_migrates_an_empty_database_itself_and_then_answers(po
         async with app.state.pool.acquire() as conn:
             tables = {row["tablename"] for row in await conn.fetch("SELECT tablename FROM pg_tables")}
 
-    assert response.json() == {"database": "reachable"}
+    assert response.json()["database"] == "reachable"
     assert {"strategies", "strategy_revisions", "runs", "run_trades"} <= tables

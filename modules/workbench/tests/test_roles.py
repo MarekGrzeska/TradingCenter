@@ -79,6 +79,8 @@ def _door() -> httpx.AsyncClient:
         ("GET", "/telegram/bots", 403),
         ("GET", "/alerts/rules", 403),
         ("GET", "/youtube/videos", 403),
+        ("GET", "/strategies/strategies", 403),
+        ("POST", "/strategies/runs", 403),
         ("GET", "/social/mcp", 403),
         ("POST", "/polymarket/mcp", 403),
     ],

@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Request
 
+from .. import runs
+from ..contract import HealthOut
+
 router = APIRouter()
 
 
@@ -13,12 +16,13 @@ async def root() -> dict:
     return {"service": "strategies", "docs": "/docs"}
 
 
-@router.get("/health", tags=["meta"])
-async def health(request: Request) -> dict:
-    """Whether the package can answer at all, which means whether its database can."""
+@router.get("/health", tags=["meta"], response_model=HealthOut)
+async def health(request: Request) -> HealthOut:
+    """Whether the package can answer at all — its database — and what its queue holds."""
     async with request.app.state.pool.acquire() as conn:
-        await conn.fetchval("SELECT 1")
-    return {"database": "reachable"}
+        waiting = await runs.queued(conn)
+    running = request.app.state.queue.busy
+    return HealthOut.model_validate({"database": "reachable", "queue": {"queued": waiting, "running": running}})
 
 
 @router.get("/ping", tags=["meta"])

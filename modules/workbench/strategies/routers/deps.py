@@ -7,6 +7,10 @@ from fastapi.responses import JSONResponse
 
 from ..problems import Problem
 
+# The columns' own ranges: a number past them is a refusal FastAPI names, not a database error asyncpg raises.
+BIGINT = 2**63 - 1
+INTEGER = 2**31 - 1
+
 
 def pool(request: Request):
     return request.app.state.pool
