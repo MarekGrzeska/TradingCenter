@@ -64,6 +64,22 @@ export function runSummary(run: TopicRun): string {
   return parts.join(" · ");
 }
 
+/**
+ * The instants a pair of days stands for, in the operator's own time zone and both days included: from the first one's
+ * midnight to the midnight after the last one's. A day left empty leaves that end open. `YYYY-MM-DD`, as `<input type=date>`
+ * gives it.
+ */
+export function dayRange(from: string, to: string): { since?: Date; until?: Date } {
+  const range: { since?: Date; until?: Date } = {};
+  if (from !== "") range.since = new Date(`${from}T00:00:00`);
+  if (to !== "") {
+    const end = new Date(`${to}T00:00:00`);
+    end.setDate(end.getDate() + 1);
+    range.until = end;
+  }
+  return range;
+}
+
 /** `12:34` for a film under an hour or `1 h 02 min`, or nothing where the source could not say — a feed does not. */
 export function duration(seconds: number | null): string | null {
   if (seconds === null) return null;

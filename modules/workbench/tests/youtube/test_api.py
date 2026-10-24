@@ -219,6 +219,21 @@ async def test_a_history_asked_for_too_much_or_nothing_is_refused(api) -> None:
     assert (await api.get("/topic-runs", params={"limit": 1000})).status_code == 422
 
 
+async def test_a_history_is_read_for_a_range_with_a_zoneless_bound_taken_as_utc_and_a_reversed_range_is_refused(api, rig) -> None:
+    topic = (await api.post("/topics", json={"phrase": "gold"})).json()["topic"]["id"]
+    await rig.tick()
+    now = rig.clock.now()
+    day = lambda offset: (now + timedelta(days=offset)).replace(tzinfo=None).isoformat()
+
+    within = await api.get("/topic-runs", params={"since": day(-1), "until": day(1), "topic_id": topic})
+    before = await api.get("/topic-runs", params={"until": day(-1)})
+    reversed_ = await api.get("/topic-runs", params={"since": day(1), "until": day(-1)})
+
+    assert [run["topic_id"] for run in within.json()["runs"]] == [topic]
+    assert before.json()["runs"] == []
+    assert reversed_.status_code == 422 and "ends before it starts" in reversed_.json()["detail"]["detail"]
+
+
 # --- state ----------------------------------------------------------------------------------------------------------
 
 

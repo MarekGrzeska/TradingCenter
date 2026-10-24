@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { duration, runSummary, stateLabel, usageLine, warnings } from "./present";
+import { dayRange, duration, runSummary, stateLabel, usageLine, warnings } from "./present";
 import type { ArchiveState, Film, ProviderState, TopicRun } from "./youtubeApi";
 
 /** The sentences the screen says, as text: what a film without a reading says about itself, and why a list may be thin. */
@@ -130,6 +130,20 @@ describe("warnings", () => {
 describe("usageLine", () => {
   it("is the day's spend in the provider's own unit", () => {
     expect(usageLine(provider())).toBe("direct: 12/500 requests");
+  });
+});
+
+describe("dayRange", () => {
+  it("is from the first day's midnight to the midnight after the last, in the operator's own zone, and open where a day is empty", () => {
+    expect(dayRange("2026-10-22", "2026-10-24")).toEqual({ since: new Date(2026, 9, 22), until: new Date(2026, 9, 25) });
+    expect(dayRange("2026-10-22", "")).toEqual({ since: new Date(2026, 9, 22) });
+    expect(dayRange("", "2026-10-22")).toEqual({ until: new Date(2026, 9, 23) });
+    expect(dayRange("", "")).toEqual({});
+  });
+
+  it("ends a day at the next local midnight, not 24 hours on, where the clocks change", () => {
+    // 25 October 2026 is the 25-hour day in Europe; elsewhere it is an ordinary one, and the local midnight is right in both.
+    expect(dayRange("2026-10-25", "2026-10-25").until).toEqual(new Date(2026, 9, 26));
   });
 });
 
