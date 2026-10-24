@@ -15,9 +15,11 @@ from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
+from .archive import Archive
 from .caller_access import RECORD, CallerAccess
 from .config import Settings
-from .routers import meta
+from .queue import RunQueue
+from .routers import meta, runs
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
 log = logging.getLogger(__name__)
@@ -29,7 +31,7 @@ async def serving(app: FastAPI, settings: Settings, *, market: httpx.AsyncClient
     client over the candle archive's REST contract; without it documents can be written but not checked against what
     the archive holds, nor run."""
     app.state.settings = settings
-    app.state.market = market
+    app.state.archive = Archive(market)
 
     async with AsyncExitStack() as stack:
         try:
@@ -56,8 +58,14 @@ async def serving(app: FastAPI, settings: Settings, *, market: httpx.AsyncClient
             ) from err
 
         app.state.pool = pool
+        # After the migration: the queue's first act is marking what a previous process left running.
+        app.state.queue = RunQueue(pool, app.state.archive, settings)
+        await app.state.queue.start()
         log.info("strategies is serving")
-        yield
+        try:
+            yield
+        finally:
+            await app.state.queue.stop()
 
 
 @asynccontextmanager
@@ -76,6 +84,7 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.include_router(meta.router)
+    app.include_router(runs.router)
 
     # In front of the whole application: nothing decides who may call after routing has begun.
     app.add_middleware(CallerAccess, state=app.state, record=RECORD)

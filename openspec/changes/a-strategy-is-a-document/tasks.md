@@ -33,10 +33,10 @@
 
 ## 5. Uruchomienia jako zadania
 
-- [ ] 5.1 `POST /runs`: walidacja wkładu (parametry w zakresach, model kosztów obowiązkowy, limit świec przed zakolejkowaniem), zapis w stanie zakolejkowanym
-- [ ] 5.2 Kolejka w lifespanie: robotnicy `ProcessPoolExecutor` (design D5), limit czasu, anulowanie, przy starcie `running` → niepowodzenie „przerwane restartem”
-- [ ] 5.3 Test, że uruchomienie w toku nie opóźnia odpowiedzi `/market/ping` i trasy pakietu obok (`workbench-process`)
-- [ ] 5.4 `db-cost-check` dla odczytu roku `MINUTE` z porcjami i dla zapisu `run_trades`
+- [x] 5.1 `POST /runs`: walidacja wkładu (parametry w zakresach, model kosztów obowiązkowy, limit świec przed zakolejkowaniem), zapis w stanie zakolejkowanym
+- [x] 5.2 Kolejka w lifespanie: robotnicy `ProcessPoolExecutor` (design D5), limit czasu, anulowanie, przy starcie `running` → niepowodzenie „przerwane restartem”
+- [x] 5.3 Test, że uruchomienie w toku nie opóźnia odpowiedzi `/market/ping` i trasy pakietu obok (`workbench-process`)
+- [x] 5.4 `db-cost-check` dla odczytu roku `MINUTE` z porcjami i dla zapisu `run_trades`
 
 ## 6. Raport
 
