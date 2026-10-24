@@ -22,13 +22,13 @@ from .checking import (
     let_order,
     names_used,
     reserved_problem,
+    through_at,
     unreadable_name,
 )
 from .problems import Problem
 from .vocabulary import (
     DERIVED_FROM_MINUTE,
     FUNCTIONS,
-    RESOLUTIONS,
     SERIES,
     TIME,
     Indicator,
@@ -258,21 +258,22 @@ def contexts(d: DocumentIn, parsed: Mapping[str, f.Node]) -> set[tuple[str, str]
     """Every (instrument, resolution) a document reads, the traded one at its timeframe and at `MINUTE` included."""
     found = {(d.symbol, d.timeframe), (d.symbol, "MINUTE")}
 
-    def walk(n: f.Node, symbol: str, resolution: str) -> None:
-        # Recorded where a series is read rather than at each `@`: `x @ US500 @ DAY` reads US500 at DAY, never US100 at DAY.
+    def walk(n: f.Node, ctx: tuple[str, str]) -> None:
+        # Recorded where bars are read: each series name, each indicator, and the axis every chain of `@` is read on —
+        # so `x @ US500 @ DAY` reads US500 at DAY, and never US100 at DAY.
         reads_bars = isinstance(n, f.Name) and (n.id in SERIES or n.id in TIME)
         if reads_bars or isinstance(n, f.Call) and n.function not in FUNCTIONS:
-            found.add((symbol, resolution))
+            found.add(ctx)
         if isinstance(n, f.At):
-            if n.context in RESOLUTIONS:
-                resolution = n.context
-            else:
-                symbol = n.context
+            value, inner = through_at(n, ctx)
+            found.add(inner)
+            walk(value, inner)
+            return
         for child in children(n):
-            walk(child, symbol, resolution)
+            walk(child, ctx)
 
     for node in parsed.values():
-        walk(node, d.symbol, d.timeframe)
+        walk(node, (d.symbol, d.timeframe))
     return found
 
 

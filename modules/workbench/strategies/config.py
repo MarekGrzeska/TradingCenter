@@ -45,8 +45,8 @@ class Settings(BaseSettings):
     # How many runs compute at once, each in a worker process of its own. One by default: a run is CPU for minutes, and
     # this process also serves the candle stream and the conversation.
     run_concurrency: int = 1
-    # The most `MINUTE` candles of the traded instrument one run may read — the bound on its memory and its time. A range
-    # needing more is refused before it is queued, with both numbers.
+    # The most `MINUTE` candles of the traded instrument one run may read, refused before queueing: about four years of
+    # a 24-hour market, sized from the measurement in PR #352.
     max_minute_bars: int = 1_500_000
     # How long one run may compute before it is stopped and recorded as failed, with that reason.
     run_timeout_seconds: float = 600.0
