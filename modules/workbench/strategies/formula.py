@@ -1,15 +1,10 @@
-"""A formula is read, never run. Python's own parser turns the text into a syntax tree, and only the node types listed
-here are carried over into this package's tree — everything else is a refusal naming where it stands. Nothing in this
-package hands a formula's text to anything that executes code; the interpreter only ever walks the tree built here.
-
-Python's grammar is borrowed rather than a grammar of our own because every model that will write documents in stage 2
-already knows it, and because it already parses what the language needs: `close[1]` is a subscript, `close @ HOUR_4` is
-the matrix-multiplication operator, and `7 <= hour < 20` is a chained comparison.
-"""
+"""A formula is read, never run: Python's parser builds a syntax tree, only the node types listed here are carried into
+this package's tree, and the interpreter only ever walks that. Why Python's grammar: `strategies/README.md`."""
 
 from __future__ import annotations
 
 import ast
+from contextvars import ContextVar
 from dataclasses import dataclass
 
 from .problems import Problem
@@ -134,20 +129,39 @@ def parse(text: str, path: str) -> tuple[Node | None, list[Problem]]:
         return None, [Problem(path, "a formula is expected here, and this one is empty")]
     if len(text) > MAX_LENGTH:
         return None, [Problem(path, f"a formula is at most {MAX_LENGTH} characters; this one is {len(text)}")]
+    # In parentheses, so leading spaces and line breaks are layout rather than Python's indentation; every column on the
+    # first line is then one to the right, and taken back.
+    wrapped = f"({text})"
     try:
-        tree = ast.parse(text.strip(), mode="eval")
+        tree = ast.parse(wrapped, mode="eval")
     except SyntaxError as err:
-        return None, [Problem(path, f"this is not a formula: {err.msg}", column=err.offset)]
+        column = None if err.offset is None else max(1, err.offset - (1 if err.lineno == 1 else 0))
+        return None, [Problem(path, f"this is not a formula: {err.msg}", column=column)]
     except (ValueError, RecursionError, MemoryError):
         return None, [Problem(path, "this formula cannot be read: it is nested too deeply or holds a null byte")]
+    token = _LINES.set(wrapped.splitlines())
     try:
         return _convert(tree.body, 0), []
     except _Refused as refused:
         return None, [Problem(path, refused.message, column=refused.column, hint=refused.hint)]
+    except OverflowError:
+        return None, [Problem(path, "a number in this formula is too large to be a price or a count")]
+    finally:
+        _LINES.reset(token)
+
+
+# The formula being converted, so a node's place can be told in characters from its start.
+_LINES: ContextVar[list[str]] = ContextVar("formula_lines")
 
 
 def _column(node: ast.AST) -> int:
-    return getattr(node, "col_offset", 0) + 1
+    """`ast` counts UTF-8 bytes from the start of a line; a person counts characters from the start of the formula."""
+    lines = _LINES.get([])
+    line, offset = getattr(node, "lineno", 1), getattr(node, "col_offset", 0)
+    before = sum(len(text) + 1 for text in lines[: line - 1])
+    current = lines[line - 1] if 0 < line <= len(lines) else ""
+    characters = before + len(current.encode("utf-8")[:offset].decode("utf-8", errors="ignore"))
+    return max(1, characters)  # the opening parenthesis `parse` added is character 0
 
 
 def _convert(node: ast.AST, depth: int) -> Node:
@@ -226,6 +240,8 @@ def _convert(node: ast.AST, depth: int) -> Node:
 
 def _bars(node: ast.AST) -> int | Param:
     col = _column(node)
+    if isinstance(node, ast.Constant) and isinstance(node.value, float):
+        raise _Refused(col, "an offset is a whole number of bars", hint="close[1]")
     if isinstance(node, ast.Constant) and isinstance(node.value, int) and not isinstance(node.value, bool):
         if node.value < 0:
             raise _Refused(col, "the language does not reach into the future: an offset is 0 or more bars back")

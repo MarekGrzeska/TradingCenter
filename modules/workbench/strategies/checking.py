@@ -4,6 +4,8 @@ collected rather than the first one raised, because a model fixing a document in
 from __future__ import annotations
 
 import difflib
+import keyword
+import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass, field
 
@@ -78,27 +80,26 @@ def check(node: f.Node, scope: Scope, path: str, expected: Type) -> list[Problem
 
 
 def let_order(references: Mapping[str, set[str]]) -> tuple[list[str], list[str]]:
-    """The `let` names in an order where each comes after every name it uses, and the names caught in a cycle."""
+    """The `let` names in an order where each comes after every name it uses, and the names that cannot be ordered —
+    those in a cycle and those that use one. Kahn's algorithm, so no recursion however long the chain."""
+    uses = {name: {u for u in used if u in references and u != name} for name, used in references.items()}
+    selfish = {name for name, used in references.items() if name in used}
+    users: dict[str, set[str]] = {name: set() for name in references}
+    for name, used in uses.items():
+        for u in used:
+            users[u].add(name)
+    waiting = {name: len(used) for name, used in uses.items()}
+    ready = sorted(name for name, count in waiting.items() if count == 0 and name not in selfish)
     order: list[str] = []
-    state: dict[str, int] = {}  # 1 visiting, 2 done
-    cyclic: set[str] = set()
-
-    def visit(name: str, trail: list[str]) -> None:
-        if state.get(name) == 2:
-            return
-        if state.get(name) == 1:
-            cyclic.update(trail[trail.index(name):])
-            return
-        state[name] = 1
-        for used in sorted(references.get(name, ())):
-            if used in references:
-                visit(used, [*trail, used])
-        state[name] = 2
+    while ready:
+        name = ready.pop(0)
         order.append(name)
-
-    for name in sorted(references):
-        visit(name, [name])
-    return [n for n in order if n not in cyclic], sorted(cyclic)
+        for user in sorted(users[name]):
+            waiting[user] -= 1
+            if waiting[user] == 0 and user not in selfish:
+                ready.append(user)
+        ready.sort()
+    return order, sorted(set(references) - set(order))
 
 
 def names_used(node: f.Node) -> set[str]:
@@ -141,10 +142,7 @@ def _type(n: f.Node, w: _Walk, ctx: _Context) -> Type | None:
     if isinstance(n, f.Name):
         return _name(n, w, ctx)
     if isinstance(n, f.Param):
-        if n.name not in w.scope.params:
-            w.refuse(n, f"p.{n.name} is not declared in params", hint=_closest(n.name, w.scope.params))
-            return None
-        return Type.NUMBER
+        return Type.NUMBER if _declared(n, w) is not None else None
     if isinstance(n, f.Neg | f.Arith):
         for child in _children(n):
             _expect(child, Type.NUMBER, w, ctx, "arithmetic works on numbers")
@@ -246,6 +244,11 @@ def _at(n: f.At, w: _Walk, ctx: _Context) -> Type | None:
             return None
         inner.resolution = n.context
     else:
+        # An instrument is any other name — but one a hair from a resolution, or a name of the language, is a slip.
+        near = _closest(n.context.upper(), RESOLUTIONS)
+        if n.context in RESERVED or (near is not None and _squeezed(n.context) == _squeezed(near)):
+            w.refuse(n, f"`{n.context}` is neither a resolution nor an instrument", hint=near)
+            return None
         if ctx.symbol is not None:
             w.refuse(n, "one formula reads one other instrument under `@`; this one names two")
             return None
@@ -295,9 +298,8 @@ def _bars(node: f.Node, bars: int | f.Param, w: _Walk, *, minimum: int) -> None:
         if not minimum <= bars <= MAX_BARS:
             w.refuse(node, f"{what} is {minimum} to {MAX_BARS} bars; this one is {bars}")
         return
-    decl = w.scope.params.get(bars.name)
+    decl = _declared(bars, w)
     if decl is None:
-        w.refuse(bars, f"p.{bars.name} is not declared in params", hint=_closest(bars.name, w.scope.params))
         return
     if not decl.integer or decl.min < minimum or decl.max > MAX_BARS:
         w.refuse(
@@ -348,13 +350,24 @@ def _indicator_param(function: str, param, arg: f.Node, w: _Walk) -> None:
             w.refuse(arg, f"`{param.name}` of `{function}` is {bounds} in the catalogue; this one is {arg.value:g}")
         return
     if isinstance(arg, f.Param):
-        decl = w.scope.params.get(arg.name)
+        decl = _declared(arg, w)
         if decl is None:
-            w.refuse(arg, f"p.{arg.name} is not declared in params", hint=_closest(arg.name, w.scope.params))
-        elif decl.min < param.min or decl.max > param.max or (param.integer and not decl.integer):
+            return
+        if decl.min < param.min or decl.max > param.max or (param.integer and not decl.integer):
             w.refuse(arg, f"p.{arg.name} may leave the range of `{param.name}` of `{function}` ({bounds})")
         return
     w.refuse(arg, f"`{param.name}` of `{function}` is a number or a parameter, never a formula")
+
+
+def _squeezed(name: str) -> str:
+    return name.upper().replace("_", "")
+
+
+def _declared(param: f.Param, w: _Walk) -> ParamDecl | None:
+    decl = w.scope.params.get(param.name)
+    if decl is None:
+        w.refuse(param, f"p.{param.name} is not declared in params", hint=_closest(param.name, w.scope.params))
+    return decl
 
 
 def _closest(name: str, candidates) -> str | None:
@@ -363,7 +376,16 @@ def _closest(name: str, candidates) -> str | None:
 
 
 def reserved_problem(name: str, path: str, catalogue: Mapping[str, Indicator]) -> Problem | None:
-    """A `let` name that would hide a name of the language or of the catalogue."""
-    if name in RESERVED or name in catalogue or not name.isidentifier():
+    """A `let` name that would hide a name of the language or of the catalogue. Compared as Python's parser will read it:
+    NFKC-normalised, so `ｃｌｏｓｅ` is `close`, and never a keyword, which no formula could refer to."""
+    read_as = unicodedata.normalize("NFKC", name)
+    if (
+        read_as != name
+        or read_as in RESERVED
+        or read_as in catalogue
+        or not read_as.isidentifier()
+        or keyword.iskeyword(read_as)
+        or keyword.issoftkeyword(read_as)
+    ):
         return Problem(path, f"`{name}` cannot name a variable: it is a name of the language or not a name at all")
     return None

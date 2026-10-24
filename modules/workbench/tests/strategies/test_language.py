@@ -44,7 +44,11 @@ def test_an_exit_may_read_the_open_position() -> None:
 
 @pytest.mark.parametrize(
     "text",
-    ['__import__("os")', "lambda: 1", "[x for x in close]", "(x := 1)", "close[1:5]", "close ** 2", "{1: 2}"],
+    [
+        '__import__("os")', "lambda: 1", "[x for x in close]", "(x := 1)", "close[1:5]", "close ** 2", "{1: 2}",
+        "(close, open)", "{close}", 'f"{close}"', "close % 2", "close is open", "close in open", "~close",
+        "ema(**p)", "max(*close)", "close | open", "close.real",
+    ],
 )
 def test_a_construction_outside_the_list_is_refused_with_its_place(text: str) -> None:
     node, found = formula.parse(text, "entries[0].when")
@@ -57,10 +61,6 @@ def test_a_construction_outside_the_list_is_refused_with_its_place(text: str) ->
 def test_an_offset_into_the_future_or_from_a_formula_is_refused(text: str) -> None:
     message = problems(text)[0]
     assert "future" in message or "never a formula" in message
-
-
-def test_a_negative_offset_names_the_future() -> None:
-    assert "future" in problems("close[-1] > open")[0]
 
 
 def test_a_window_beyond_the_ceiling_is_refused() -> None:
@@ -116,6 +116,21 @@ def test_trades_cannot_be_read_by_a_let() -> None:
     assert "computed once" in problems("losses_in_row", place=Place.LET, expected=Type.NUMBER)[0]
 
 
+@pytest.mark.parametrize("text", ["close @ HOUR4 > 1", "close @ hour4 > 1", "close @ hour > 1", "close @ p > 1"])
+def test_a_slip_on_the_right_of_at_is_not_read_as_an_instrument(text: str) -> None:
+    assert "neither a resolution nor an instrument" in problems(text)[0]
+
+
+def test_columns_count_characters_of_the_formula_as_written() -> None:
+    _, [found] = formula.parse('  close @ "Ż225" > open[-1]', "x")
+
+    assert found.column == 25
+
+
+def test_a_number_too_large_is_a_problem_not_a_crash() -> None:
+    assert "too large" in problems("close > 1" + "0" * 400)[0]
+
+
 def test_two_instruments_in_one_context_are_refused() -> None:
     assert "names two" in problems("close @ US500 @ DE40 > 1")[0]
 
@@ -124,10 +139,18 @@ def test_a_let_is_not_read_under_at() -> None:
     assert "under `@`" in problems("trend @ HOUR_4", lets={"trend": Type.CONDITION})[0]
 
 
-def test_let_order_follows_use_and_names_a_cycle() -> None:
-    order, cyclic = let_order({"a": {"b"}, "b": {"close"}, "c": {"d"}, "d": {"c"}})
+def test_let_order_follows_use_and_names_a_cycle_and_what_depends_on_it() -> None:
+    order, unordered = let_order({"a": {"b"}, "b": {"close"}, "c": {"d"}, "d": {"c"}, "e": {"c"}, "s": {"s"}})
 
-    assert order == ["b", "a"] and cyclic == ["c", "d"]
+    assert order == ["b", "a"] and unordered == ["c", "d", "e", "s"]
+
+
+def test_a_long_chain_of_lets_orders_without_recursion() -> None:
+    chain = {f"v{i}": {f"v{i - 1}"} for i in range(1, 3000)} | {"v0": set()}
+
+    order, unordered = let_order(chain)
+
+    assert order[0] == "v0" and order[-1] == "v2999" and unordered == []
 
 
 def test_names_used_reads_through_every_construction() -> None:
@@ -136,19 +159,29 @@ def test_names_used_reads_through_every_construction() -> None:
     assert names_used(node) == {"fast", "slow", "trend"}  # type: ignore[arg-type]
 
 
-@pytest.mark.parametrize("name", ["close", "ema", "HOUR", "p", "2fast"])
+@pytest.mark.parametrize("name", ["close", "ema", "HOUR", "p", "2fast", "None", "if", "match", "ｃｌｏｓｅ"])
 def test_a_let_name_cannot_hide_a_name_of_the_language(name: str) -> None:
     assert reserved_problem(name, f"let.{name}", catalogue()) is not None
 
 
 def test_nothing_in_the_package_executes_code() -> None:
-    """The guarantee the whole language rests on, read off the source: no eval, exec or compile anywhere."""
+    """The guarantee the whole language rests on, read off the source: no eval, exec or compile however reached, and no
+    import of the modules that reach them by another door."""
     package = pathlib.Path(__file__).resolve().parents[2] / "strategies"
-    calls = {
-        node.func.id
-        for path in package.rglob("*.py")
-        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
-        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+    trees = [ast.parse(path.read_text(encoding="utf-8")) for path in package.rglob("*.py")]
+    called = {
+        node.func.id if isinstance(node.func, ast.Name) else node.func.attr
+        for tree in trees
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name | ast.Attribute)
+    }
+    imported = {
+        alias.name.split(".")[0]
+        for tree in trees
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Import | ast.ImportFrom)
+        for alias in (node.names if isinstance(node, ast.Import) else [ast.alias(node.module or "")])
     }
 
-    assert not calls & {"eval", "exec", "compile", "__import__"}
+    assert not called & {"eval", "exec", "compile", "__import__", "literal_eval"}
+    assert not imported & {"builtins", "importlib", "code", "codeop", "runpy", "types"}
