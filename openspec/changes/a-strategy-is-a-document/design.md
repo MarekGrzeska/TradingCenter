@@ -77,9 +77,12 @@ wyrazi stanu pozycji, trailingu ani stopu dnia).
 
 ### D5. Dane czytane w procesie, liczenie w osobnym procesie roboczym
 
-Część asynchroniczna czyta serie z `/market` w miesięcznych porcjach, składa tablice i oddaje je razem ze
-sprawdzonym drzewem dokumentu do `ProcessPoolExecutor` (liczba robotników = `STRATEGIES_RUN_CONCURRENCY`,
-domyślnie 1). Robotnik nie ma połączenia z bazą ani klienta HTTP: dostaje tablice, oddaje transakcje i metryki.
+Część asynchroniczna czyta serie z `/market` porcjami (parsowanie poza pętlą zdarzeń), składa tablice i oddaje je
+razem ze sprawdzonym drzewem dokumentu **osobnemu procesowi uruchamianemu metodą `spawn` dla każdego uruchomienia**
+(najwyżej `STRATEGIES_RUN_CONCURRENCY` naraz, domyślnie 1). Nie `ProcessPoolExecutor`, choć tak brzmiała pierwsza
+wersja tej decyzji: robotnika puli nie da się zatrzymać, a limit czasu i anulowanie muszą zatrzymywać liczenie, a nie
+tylko przestać na nie czekać. Start procesu też idzie poza pętlą, bo `spawn` przepycha przez potok całe zadanie.
+Robotnik nie ma połączenia z bazą ani klienta HTTP: dostaje tablice, oddaje transakcje i metryki.
 Zapis raportu i transakcji robi znów część asynchroniczna. Robotnik to ten sam obraz, ta sama tożsamość i ta sama
 granica bezpieczeństwa, a nie nowy proces w rozumieniu „jeden proces na granicę”.
 

@@ -20,7 +20,7 @@ class NotFound(Exception):
     pass
 
 
-def _json(value: Any) -> Any:
+def decoded(value: Any) -> Any:
     """A `jsonb` column as the value it holds. asyncpg hands it back as text unless a codec says otherwise."""
     return json.loads(value) if isinstance(value, str) else value
 
@@ -126,7 +126,7 @@ async def get_revision(conn: Conn, strategy_id: int, n: int | None = None) -> Re
     if row is None:
         raise NotFound((strategy_id, n))
     return Revision(
-        row["strategy_id"], row["n"], _json(row["document"]), row["content_hash"], row["schema_version"],
+        row["strategy_id"], row["n"], decoded(row["document"]), row["content_hash"], row["schema_version"],
         row["author"], row["created_at"],
     )
 

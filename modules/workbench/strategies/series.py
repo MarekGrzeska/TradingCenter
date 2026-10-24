@@ -36,6 +36,10 @@ def epoch(moment: datetime | str) -> int:
     return int(moment.timestamp())
 
 
+def moment(seconds: int) -> datetime:
+    return datetime.fromtimestamp(seconds, tz=UTC)
+
+
 @dataclass(frozen=True)
 class Series:
     resolution: str
