@@ -116,5 +116,16 @@ Wszystkie testy są w `modules/workbench/tests/strategies/`, poza `tests/test_ro
   mechanizm jest ten sam. Pełnego procesu z archiwum i rozmową test jednak nie stawia.
 - **Minuty w archiwum**: patrz Verdict. Bez `MINUTE` dla instrumentu walidator odmawia z podpowiedzią, więc to stan
   działający, ale do sprawdzenia przed pierwszym użyciem.
-- Po wdrożeniu (zadanie 9.3): `deploy-watch`, instalacja `backup.sh`/`backup-check.sh` z `strategies` na serwerze i
-  pierwszy nocny zrzut — wynik dopisuje się tu albo w PR do `main`.
+- Pierwszy nocny zrzut z `strategies` (25.10.2026, 02:30 czasu serwera) nie był jeszcze sprawdzony, gdy pisano ten
+  plik — do potwierdzenia przy archiwizacji.
+
+## Deployed
+
+- #358 → `main` `54a43c48`: checks zielone (workbench 8 min 17 s, terminal, scripts, openspec); `deploy-vps` run
+  40134905640 zielony; sonda: „54a43c48 is serving, and every address answers”.
+- Na serwerze 24.10.2026 ~21:45 UTC: baza `strategies` istnieje, pakiet sam ją zmigrował (`alembic_version`, `strategies`,
+  `strategy_revisions`, `runs`, `run_trades`, właściciel `strategies`); w logu workbencha z 40 minut zero `error` i
+  `traceback`; `GET /strategies/ping` z zewnątrz → 401 od drzwi Entra, czyli tak, jak ma być.
+- `backup.sh` i `backup-check.sh` zainstalowane ręcznie (`install -o deploy -g deploy -m 0750`). Różnica z repo była tylko
+  na liście baz i obejmowała też **`alerts`**: zrzuty pomijały tę bazę od wprowadzenia pakietu alertów, bo skrypty
+  jeździ tylko Ansible (to samo znalezisko co w review `remove-strategy-platform`). Teraz lista ma obie bazy.
