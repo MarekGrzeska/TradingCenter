@@ -134,6 +134,7 @@ class GeminiTranscripts:
             api_key=api_key,
             http_options=types.HttpOptions(timeout=int(timeout_seconds * 1000), httpx_async_client=self._http),
         )
+        self._key = api_key
         self._model = model
         self._piece = piece_seconds
         self._meter = meter
@@ -168,7 +169,7 @@ class GeminiTranscripts:
             try:
                 response = await self._ask(url, start, end)
             except errors.APIError as err:
-                return self._refusal(err)
+                return await self._refusal(err)
             except Exception as err:  # noqa: BLE001 - a timeout or a network error says nothing about the film
                 return Blocked(self.name, f"Gemini did not answer: {type(err).__name__}")
 
@@ -217,13 +218,25 @@ class GeminiTranscripts:
             await asyncio.sleep(pause)
         raise AssertionError("unreachable: the last pause is None and raises above")
 
-    def _refusal(self, err: errors.APIError) -> TranscriptResult:
-        # The code and status only: the details are Google's text, and nothing from a response belongs in a log whole.
+    async def _refusal(self, err: errors.APIError) -> TranscriptResult:
+        # Google's text is kept short and without our key: it is what tells the operator why a film fails.
         said = f"{err.code} {err.status or ''}".strip()
+        detail = (err.message or "").replace(self._key, "<key>")[:200]
         message = f"{err.message or ''} {err.status or ''}".lower()
         if err.code in (400, 404) and not any(word in message for word in _ABOUT_US):
-            return NoTranscript(self.name, f"Gemini cannot watch this film ({said})")
-        return Blocked(self.name, f"Gemini refused ({said})")
+            return NoTranscript(self.name, f"Gemini cannot watch this film ({said}): {detail}")
+        # A 403 is a key that may not ask or a film that may not be watched, and the answer looks the same. Asking
+        # for the price of one word settles it for nothing: a key that passes is not what was refused.
+        if err.code == 403 and await self._key_works():
+            return NoTranscript(self.name, f"Gemini would not watch this film ({said}): {detail}")
+        return Blocked(self.name, f"Gemini refused ({said}): {detail}")
+
+    async def _key_works(self) -> bool:
+        try:
+            await self._client.aio.models.count_tokens(model=self._model, contents="hi")
+        except Exception:  # noqa: BLE001 - any failure leaves the refusal read as ours
+            return False
+        return True
 
     async def aclose(self) -> None:
         await self._client.aio.aclose()
