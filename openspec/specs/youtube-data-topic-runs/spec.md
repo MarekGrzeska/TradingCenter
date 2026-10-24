@@ -1,9 +1,11 @@
+# youtube-data-topic-runs Specification
+
 ## Purpose
 
 Daje operatorowi historię przebiegów wyszukiwania tematów wraz z raportem — co zwróciło źródło, co z tego zostało
 kandydatem, a gdy przebieg się nie udał, dlaczego — żeby cisza tematu miała wyjaśnienie.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Każda próba wyszukiwania tematu zostawia wpis z wynikiem i raportem
 

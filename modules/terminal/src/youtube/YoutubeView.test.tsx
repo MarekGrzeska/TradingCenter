@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { queryClient } from "../data/query";
@@ -444,6 +444,41 @@ describe("YoutubeView", () => {
     await userEvent.selectOptions(await screen.findByRole("combobox", { name: /Temat/ }), "gold outlook");
 
     expect(topicRuns).toHaveBeenLastCalledWith({ topicId: 7 }, expect.anything());
+  });
+
+  it("narrows the history to days, both included, says when none had a search, and clears them", async () => {
+    const topicRuns = vi.fn(async () => ({ runs: [], retentionDays: 30 }));
+    render(<YoutubeView api={api([], { topicRuns })} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Kandydaci" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Historia wyszukiwań" }));
+    fireEvent.change(await screen.findByLabelText("Od"), { target: { value: "2026-10-22" } });
+    fireEvent.change(screen.getByLabelText("Do"), { target: { value: "2026-10-24" } });
+
+    expect(await screen.findByText(/W wybranych dniach nie było przebiegów/)).toBeInTheDocument();
+    expect(topicRuns).toHaveBeenLastCalledWith(
+      { topicId: undefined, since: new Date(2026, 9, 22), until: new Date(2026, 9, 25) },
+      expect.anything(),
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "Wyczyść dni" }));
+
+    expect(await screen.findByText(/Nie było jeszcze żadnego przebiegu/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Wyczyść dni" })).not.toBeInTheDocument();
+  });
+
+  it("says a range that ends before it starts is empty, and does not send it", async () => {
+    const topicRuns = vi.fn(async () => ({ runs: [], retentionDays: 30 }));
+    render(<YoutubeView api={api([], { topicRuns })} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Kandydaci" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Historia wyszukiwań" }));
+    fireEvent.change(await screen.findByLabelText("Do"), { target: { value: "2026-10-20" } });
+    const calls = topicRuns.mock.calls.length;
+    fireEvent.change(screen.getByLabelText("Od"), { target: { value: "2026-10-24" } });
+
+    expect(await screen.findByText(/Dzień początkowy jest po końcowym/)).toBeInTheDocument();
+    expect(topicRuns.mock.calls.length).toBe(calls);
   });
 
   it("shows how each topic's last search ended, in the topics' own tab", async () => {

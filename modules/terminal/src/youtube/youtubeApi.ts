@@ -411,7 +411,10 @@ export interface YoutubeApi {
   unfollowChannel(channelId: string, signal: AbortSignal): Promise<void>;
   topics(signal: AbortSignal): Promise<{ topics: Topic[]; ceiling: number }>;
   /** Searches of the topics, newest first — all of them, or one topic's. */
-  topicRuns(query: { topicId?: number }, signal: AbortSignal): Promise<{ runs: TopicRun[]; retentionDays: number }>;
+  topicRuns(
+    query: { topicId?: number; since?: Date; until?: Date },
+    signal: AbortSignal,
+  ): Promise<{ runs: TopicRun[]; retentionDays: number }>;
   addTopic(request: TopicRequest, signal: AbortSignal): Promise<TopicResult>;
   setTopic(id: number, patch: { active?: boolean }, signal: AbortSignal): Promise<Topic>;
   removeTopic(id: number, signal: AbortSignal): Promise<void>;
@@ -528,7 +531,11 @@ export function createYoutubeApi(httpBase: string, identity: Identity = noIdenti
     },
 
     async topicRuns(query, signal) {
-      const narrowed = query.topicId === undefined ? "" : `&topic_id=${query.topicId}`;
+      const narrowed = [
+        query.topicId === undefined ? "" : `&topic_id=${query.topicId}`,
+        query.since === undefined ? "" : `&since=${encodeURIComponent(query.since.toISOString())}`,
+        query.until === undefined ? "" : `&until=${encodeURIComponent(query.until.toISOString())}`,
+      ].join("");
       const raw = await http.json<Schemas["TopicRunsOut"]>(`${httpBase}/topic-runs?limit=100${narrowed}`, { signal });
       return { runs: raw.runs.map(mapRun), retentionDays: raw.retention_days };
     },

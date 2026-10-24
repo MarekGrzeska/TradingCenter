@@ -172,8 +172,17 @@ describe("topic runs", () => {
 
     const { runs, retentionDays } = await api.topicRuns({ topicId: 7 }, signal());
     const { topics } = await api.topics(signal());
+    await api.topicRuns(
+      { since: new Date("2026-10-22T00:00:00Z"), until: new Date("2026-10-25T00:00:00Z") },
+      signal(),
+    );
+    const ranged = new URL(url).searchParams;
 
-    expect(new URL(url).searchParams.get("topic_id")).toBe("7");
+    expect([ranged.get("since"), ranged.get("until"), ranged.get("topic_id")]).toEqual([
+      "2026-10-22T00:00:00.000Z",
+      "2026-10-25T00:00:00.000Z",
+      null,
+    ]);
     expect(retentionDays).toBe(30);
     expect(runs[0]).toMatchObject({ topicId: 7, outcome: "failed", error: "the source is down", unscreenedReason: null });
     expect(runs[0].ranAt).toEqual(new Date("2026-09-27T10:00:00Z"));

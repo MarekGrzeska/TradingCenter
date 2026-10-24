@@ -28,14 +28,14 @@ def window(
     """The window a caller asked for, as two instants. `hours` and an explicit range are two ways of saying the same thing,
     and the explicit one wins where both arrive."""
     # A bound without a zone is read as UTC: compared with an aware one it would be a `TypeError`, not a refusal.
-    since, until = (_aware(bound) for bound in (since, until))
+    since, until = (aware(bound) for bound in (since, until))
     end = until or (now or datetime.now(UTC))
     if since is not None:
         return since, end
     return end - timedelta(hours=hours or default_hours), end
 
 
-def _aware(bound: datetime | None) -> datetime | None:
+def aware(bound: datetime | None) -> datetime | None:
     return bound.replace(tzinfo=UTC) if bound is not None and bound.tzinfo is None else bound
 
 

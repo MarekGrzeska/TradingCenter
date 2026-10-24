@@ -340,3 +340,18 @@ async def test_a_topics_last_run_is_its_newest_and_a_run_outlives_its_topic(db) 
 
     assert {topic_id: run.outcome for topic_id, run in last.items()} == {topic.id: "found"}
     assert len(await store.list_runs(db, topic_id=topic.id)) == 2
+
+
+async def test_runs_can_be_narrowed_to_a_range_whose_start_is_included_and_end_is_not_and_to_a_topic_within_it(db) -> None:
+    for hours, topic in ((5, 1), (4, 2), (3, 1), (2, 1), (1, 2)):
+        await store.add_run(db, report(topic, "found", at=NOW - timedelta(hours=hours)))
+    start, end = NOW - timedelta(hours=4), NOW - timedelta(hours=2)
+
+    inside = await store.list_runs(db, since=start, until=end)
+    one_topic = await store.list_runs(db, topic_id=1, since=start, until=end)
+    from_only = await store.list_runs(db, since=NOW - timedelta(hours=2))
+    until_only = await store.list_runs(db, until=NOW - timedelta(hours=4))
+
+    assert [(r.ran_at, r.topic_id) for r in inside] == [(NOW - timedelta(hours=3), 1), (NOW - timedelta(hours=4), 2)]
+    assert [r.ran_at for r in one_topic] == [NOW - timedelta(hours=3)]
+    assert len(from_only) == 2 and [r.ran_at for r in until_only] == [NOW - timedelta(hours=5)]

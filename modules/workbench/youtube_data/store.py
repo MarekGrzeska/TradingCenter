@@ -287,16 +287,27 @@ async def add_run(conn: Conn, report: RunReport) -> bool:
     return True
 
 
-async def list_runs(conn: Conn, *, topic_id: int | None = None, limit: int = 100) -> list[TopicRun]:
-    """Newest first, across topics or for one — two statements, so that each stays on its own index."""
-    if topic_id is None:
-        rows = await conn.fetch(f"SELECT {_RUN_COLUMNS} FROM topic_runs ORDER BY ran_at DESC, id DESC LIMIT $1", limit)
-    else:
-        rows = await conn.fetch(
-            f"SELECT {_RUN_COLUMNS} FROM topic_runs WHERE topic_id = $1 ORDER BY ran_at DESC, id DESC LIMIT $2",
-            topic_id,
-            limit,
-        )
+async def list_runs(
+    conn: Conn,
+    *,
+    topic_id: int | None = None,
+    since: datetime | None = None,
+    until: datetime | None = None,
+    limit: int = 100,
+) -> list[TopicRun]:
+    """Newest first, across topics or for one, from `since` (included) to `until` (excluded). The statement is built from
+    the conditions asked for, so each plan stays on its own index instead of an `OR` on a parameter."""
+    conditions: list[str] = []
+    args: list[object] = []
+    for sql, value in (("topic_id = ${}", topic_id), ("ran_at >= ${}", since), ("ran_at < ${}", until)):
+        if value is not None:
+            args.append(value)
+            conditions.append(sql.format(len(args)))
+    args.append(limit)
+    where = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+    rows = await conn.fetch(
+        f"SELECT {_RUN_COLUMNS} FROM topic_runs {where} ORDER BY ran_at DESC, id DESC LIMIT ${len(args)}", *args
+    )
     return [_run(row) for row in rows]
 
 

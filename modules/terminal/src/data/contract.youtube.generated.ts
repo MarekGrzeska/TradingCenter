@@ -343,7 +343,8 @@ export interface paths {
         };
         /**
          * Topic Runs
-         * @description Searches of the topics, newest first — all of them or one topic's. Reading it asks nobody anything.
+         * @description Searches of the topics, newest first — all of them or one topic's, within a range of time if asked. Reading it asks
+         *     nobody anything.
          */
         get: operations["topic_runs_topic_runs_get"];
         put?: never;
@@ -2090,6 +2091,10 @@ export interface operations {
         parameters: {
             query?: {
                 topic_id?: number | null;
+                /** @description from this moment, included; without a zone it is UTC */
+                since?: string | null;
+                /** @description to this moment, excluded; without a zone it is UTC */
+                until?: string | null;
                 limit?: number;
             };
             header?: never;
@@ -2107,13 +2112,13 @@ export interface operations {
                     "application/json": components["schemas"]["TopicRunsOut"];
                 };
             };
-            /** @description Validation Error */
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
         };
