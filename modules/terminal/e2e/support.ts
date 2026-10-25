@@ -59,8 +59,8 @@ export interface RunOptions {
   withoutCosts?: boolean;
 }
 
-/** Queues a run and waits for it to end; the instrument's cost profile is the one `seed.py` set. */
-export async function finishedRun(request: APIRequestContext, strategyId: number, options: RunOptions = {}): Promise<number> {
+/** Queues a run and returns at once; the instrument's cost profile is the one `seed.py` set. */
+export async function queuedRun(request: APIRequestContext, strategyId: number, options: RunOptions = {}): Promise<number> {
   const body = {
     strategy_id: strategyId,
     from: `${daysAgo(options.from ?? 20)}T00:00:00Z`,
@@ -70,7 +70,12 @@ export async function finishedRun(request: APIRequestContext, strategyId: number
   };
   const queued = await request.post("/strategies-api/runs", { data: body });
   expect(queued.status(), await queued.text()).toBe(202);
-  const id: number = (await queued.json()).id;
+  return (await queued.json()).id;
+}
+
+/** Queues a run and waits for it to end. */
+export async function finishedRun(request: APIRequestContext, strategyId: number, options: RunOptions = {}): Promise<number> {
+  const id = await queuedRun(request, strategyId, options);
   await expect
     .poll(async () => (await (await request.get(`/strategies-api/runs/${id}`)).json()).status, { timeout: 30_000 })
     .toBe("done");

@@ -79,6 +79,17 @@
         { "say": "Zapisałem nową rewizję." }
       ]
     },
+    {
+      "when": "^E2E backtest (?<id>\\d+) (?<from>\\S+) (?<to>\\S+)$",
+      "rounds": [
+        {
+          "tools": [
+            { "name": "run_backtest", "arguments": { "strategy_id": "{id}", "start": "{from}", "end": "{to}" } }
+          ]
+        },
+        { "say": "Backtest policzony." }
+      ]
+    },
     { "when": "^E2E ping$", "rounds": [{ "say": "pong" }] }
   ]
 }

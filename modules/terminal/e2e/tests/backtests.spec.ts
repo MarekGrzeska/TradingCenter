@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { createStrategy, daysAgo, finishedRun, openStrategy, strategyDocument, uniqueName } from "../support";
+import { createStrategy, daysAgo, finishedRun, openStrategy, queuedRun, strategyDocument, uniqueName } from "../support";
 
 /** Runs, reports and comparisons against a live workbench (`docs/strategie-scenariusze-testowe.html`, sections 05–07). */
 
@@ -104,4 +104,81 @@ test("BT-08 refuses runs of different ranges and says why", async ({ page, reque
 
   await expect(page.getByRole("alert")).toContainText(`run ${b} covers`);
   await expect(page.getByRole("table", { name: "Porównanie" })).toHaveCount(0);
+});
+
+test("BT-09 sends nothing to the queue for a parameter outside its declared range", async ({ page, request }) => {
+  const id = await createStrategy(request, strategyDocument(uniqueName("BT-09")));
+  await page.goto(`/backtests?strategy=${id}`);
+  const form = page.getByRole("form", { name: "Uruchomienie" });
+  await expect(form).toContainText("z profilu wpisanego przez operatora");
+
+  await form.getByLabel(/p\.stop/).fill("500");
+  await form.getByRole("button", { name: "Uruchom backtest" }).click();
+
+  await expect(page.getByText("Ta strategia nie miała jeszcze uruchomień.")).toBeVisible();
+});
+
+test("BT-10 cancels a run that waits in the queue", async ({ page, request }) => {
+  const id = await createStrategy(request, strategyDocument(uniqueName("BT-10")));
+  await queuedRun(request, id, { from: 28 });
+  const waiting = await queuedRun(request, id, { from: 28 });
+  await page.goto(`/backtests?strategy=${id}`);
+
+  await runRow(page, waiting).getByRole("button", { name: "Anuluj" }).click();
+
+  await expect(runRow(page, waiting)).toContainText("anulowane");
+  await expect(runRow(page, waiting).getByRole("button", { name: "Anuluj" })).toHaveCount(0);
+});
+
+test("BT-11 names a close on a moved stop a trailing stop, not a stop", async ({ page, request }) => {
+  const trailing = strategyDocument(uniqueName("BT-11"), {
+    exits: { stop: "entry_price - p.stop", trail: { after_r: 0.3, distance: "0.3 * p.stop" }, max_bars: 48 },
+  });
+  const id = await createStrategy(request, trailing);
+  const run = await finishedRun(request, id);
+  await page.goto(`/backtests?strategy=${id}`);
+
+  await runRow(page, run).click();
+
+  const trades = page.getByRole("table", { name: "Transakcje" });
+  await expect(trades.getByRole("cell", { name: "stop kroczący" }).first()).toBeVisible();
+});
+
+test("BT-12 lists runs of every strategy with their names and compares across strategies", async ({ page, request }) => {
+  const nameA = uniqueName("BT-12a");
+  const nameB = uniqueName("BT-12b");
+  const a = await finishedRun(request, await createStrategy(request, strategyDocument(nameA)));
+  const b = await finishedRun(request, await createStrategy(request, strategyDocument(nameB)));
+  await page.goto("/backtests");
+
+  // Across strategies another run's trade count can equal an id, so the row is found by its id column alone.
+  const rowOf = (run: number) => runs(page).getByRole("row").filter({ has: page.locator("td:nth-child(2)", { hasText: new RegExp(`^${run}$`) }) });
+  await expect(rowOf(a)).toContainText(nameA);
+  await expect(rowOf(b)).toContainText(nameB);
+  const ids = await runs(page).getByRole("row").locator("td:nth-child(2)").allTextContents();
+  expect(ids.indexOf(String(b))).toBeLessThan(ids.indexOf(String(a)));
+
+  await page.getByRole("checkbox", { name: `Porównaj uruchomienie ${a}` }).check();
+  await page.getByRole("checkbox", { name: `Porównaj uruchomienie ${b}` }).check();
+  await page.getByRole("button", { name: "Porównaj (2)" }).click();
+
+  const table = page.getByRole("table", { name: "Porównanie" });
+  await expect(table.getByRole("columnheader", { name: new RegExp(`#${a} `) })).toBeVisible();
+  await expect(table.getByRole("columnheader", { name: new RegExp(`#${b} `) })).toBeVisible();
+});
+
+test("BT-13 ticks only finished runs and compares between two and five", async ({ page, request }) => {
+  const id = await createStrategy(request, strategyDocument(uniqueName("BT-13")));
+  const done: number[] = [];
+  for (let i = 0; i < 6; i++) done.push(await finishedRun(request, id, { from: 6, to: 2, params: { stop: 20 + 10 * i } }));
+  await queuedRun(request, id, { from: 28 });
+  await queuedRun(request, id, { from: 28 });
+  const waiting = await queuedRun(request, id, { from: 28 });
+  await page.goto(`/backtests?strategy=${id}`);
+
+  await expect(page.getByRole("checkbox", { name: `Porównaj uruchomienie ${waiting}` })).toBeDisabled();
+  for (const run of done.slice(0, 5)) await page.getByRole("checkbox", { name: `Porównaj uruchomienie ${run}` }).check();
+  await expect(page.getByRole("button", { name: "Porównaj (5)" })).toBeEnabled();
+  await page.getByRole("checkbox", { name: `Porównaj uruchomienie ${done[5]}` }).check();
+  await expect(page.getByRole("button", { name: "Porównaj (6)" })).toBeDisabled();
 });

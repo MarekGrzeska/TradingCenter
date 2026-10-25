@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { createStrategy, documentText, openStrategy, replaceEditorText, strategyDocument, uniqueName } from "../support";
+import { createStrategy, daysAgo, documentText, openStrategy, replaceEditorText, strategyDocument, uniqueName } from "../support";
 
 /**
  * The strategy's chat with the agent, answered by `e2e/agent-scenario.json` instead of a model (`agent-simulated-model`):
@@ -76,4 +76,17 @@ test("AG-04 a revision the agent saves leaves the operator's unsaved edit in pla
 
   await expect(page.getByRole("status")).toContainText("Istnieje nowsza rewizja 2");
   await expect(page.locator(".cm-content")).toContainText("hour == 10");
+});
+
+test("AG-05 a backtest the agent runs is a finished run, marked as the agent's", async ({ page, request }) => {
+  const name = uniqueName("AG-05");
+  const id = await createStrategy(request, strategyDocument(name));
+  await openStrategy(page, name);
+
+  await say(page, `E2E backtest ${id} ${daysAgo(10)}T00:00:00Z ${daysAgo(2)}T00:00:00Z`, "Backtest policzony.");
+
+  await page.getByRole("link", { name: "Backtesty tej strategii →" }).click();
+  const row = page.getByRole("table", { name: "Uruchomienia" }).getByRole("row").nth(1);
+  await expect(row).toContainText("gotowe");
+  await expect(row).toContainText("agent");
 });
