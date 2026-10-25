@@ -11,3 +11,5 @@ CREATE ROLE telegram LOGIN PASSWORD 'change-me';
 CREATE DATABASE telegram OWNER telegram;
 CREATE ROLE strategies LOGIN PASSWORD 'change-me';
 CREATE DATABASE strategies OWNER strategies;
+CREATE ROLE alerts LOGIN PASSWORD 'change-me';
+CREATE DATABASE alerts OWNER alerts;
