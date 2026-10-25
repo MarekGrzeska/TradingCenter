@@ -46,6 +46,8 @@ async def create(pool: asyncpg.Pool, checked: Checked, author: Author) -> Saved:
             "INSERT INTO strategies (name) VALUES ($1) RETURNING id", checked.document.name
         )
         await _insert_revision(conn, strategy_id, 1, checked, author)
+        # The new strategy's draft became this strategy; left, it would come back the next time "new" is opened.
+        await conn.execute("DELETE FROM strategy_drafts WHERE strategy_id IS NULL")
     return Saved(strategy_id, 1, True)
 
 
@@ -59,6 +61,8 @@ async def save_revision(
         found = await conn.fetchval("SELECT id FROM strategies WHERE id = $1 FOR UPDATE", strategy_id)
         if found is None:
             raise NotFound(strategy_id)
+        # A save ends the draft, whether or not the content was new: the editor now shows what is saved.
+        await conn.execute("DELETE FROM strategy_drafts WHERE strategy_id = $1", strategy_id)
         latest = await conn.fetchrow(
             "SELECT n, content_hash FROM strategy_revisions WHERE strategy_id = $1 ORDER BY n DESC LIMIT 1", strategy_id
         )

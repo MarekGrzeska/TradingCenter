@@ -107,10 +107,12 @@ parameters, costs, range, engine version, seed, and a fingerprint of every serie
 
 ## The conversation's tools
 
-Eight, in `tools/`, built into a FastMCP server the assembly hands **to the conversation alone** as functions — never to
+Nine, in `tools/`, built into a FastMCP server the assembly hands **to the conversation alone** as functions — never to
 the teams (a schedule would spend the queue and the trial count on runs nobody asked for), never to the alerts'
 catalogue, and never mounted at `/mcp` (design D7). `strategy_language`, `list_strategies`, `read_strategy` and
-`validate_strategy` read; `save_strategy` writes a revision authored `agent`, and needs `based_on` — the revision the
+`validate_strategy` read; `draft_strategy` puts a document into the operator's editor as unsaved text — no revision,
+no trial, one draft per strategy and one for the new strategy (`drafts.py`), ended by any saved revision; `save_strategy`
+writes a revision authored `agent`, and needs `based_on` — the revision the
 change was made to — or a newer one is a refusal; `run_backtest` queues a run marked `requested_by = agent`, with the
 **instrument's cost profile** and no costs of its own, refuses while another of the agent's runs waits, and waits up to
 `WAIT_SECONDS` for the result — read off the broker when there is none — or `without_costs` when the operator asks for

@@ -241,6 +241,13 @@ class CostProfileOut(BaseModel):
     )
 
 
+class DraftOut(BaseModel):
+    strategy_id: int | None = Field(description="null for the new strategy not saved yet")
+    document: dict[str, Any] = Field(description="as the agent put it — not necessarily valid")
+    seq: int = Field(description="new with every draft, also one carrying the same document")
+    updated_at: datetime
+
+
 class ConversationIn(BaseModel):
     conversation_id: int | None = Field(ge=1, le=2**63 - 1, description="null forgets the conversation")
 

@@ -47,3 +47,12 @@ def test_arithmetic_keeps_only_the_parentheses_it_needs() -> None:
     said = _said(document(exits={"stop": "entry_price - (2 * atr(14) - 1)", "target": "(high - low) * 2"}))
 
     assert "Stop: cena wejścia − (2 × ATR(14) − 1)." in said and "Cel: (maksimum − minimum) × 2." in said
+
+
+def test_a_variable_is_said_as_what_it_is_not_by_its_name() -> None:
+    said = _said(document(let={"fast": "ema(10)", "risk": "1.5 * atr(14)"}, exits={"stop": "entry_price - risk"},
+                          entries=[{"side": "long", "when": "crosses_above(fast, ema(30))", "order": {"type": "market"}}]))
+
+    # Still listed under its name, so the summary can be held against the document.
+    assert "«fast» = EMA(10)." in said and "Long, gdy EMA(10) przecina od dołu EMA(30)." in said
+    assert "Stop: cena wejścia − (1,5 × ATR(14))." in said

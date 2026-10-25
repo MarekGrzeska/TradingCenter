@@ -32,6 +32,8 @@ REST_PATHS: tuple[str, ...] = (
     "/strategies/{strategy_id}/archive",
     "/strategies/{strategy_id}/restore",
     "/strategies/{strategy_id}/conversation",
+    "/strategies/{strategy_id}/draft",
+    "/drafts/new",
     "/runs",
     "/runs/{run_id}",
     "/runs/{run_id}/cancel",

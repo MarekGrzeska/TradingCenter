@@ -189,6 +189,22 @@ async def test_a_report_says_where_its_costs_came_from_and_marks_a_run_without_t
     assert listed[0]["headline"]["without_costs"] is True
 
 
+@pytest.mark.db
+async def test_a_draft_is_read_and_discarded_and_none_is_a_404(pool) -> None:
+    from strategies import drafts
+
+    async with pool.acquire() as conn:
+        await drafts.put(conn, None, strategy(name="draft"))
+    async with _client(pool) as client:
+        found = (await client.get("/drafts/new")).json()
+        discarded = await client.delete("/drafts/new")
+        gone = await client.get("/drafts/new")
+        none = await client.get("/strategies/1/draft")
+
+    assert found["document"]["name"] == "draft" and found["strategy_id"] is None and found["seq"] >= 1
+    assert discarded.status_code == 204 and gone.status_code == 404 and none.status_code == 404
+
+
 def test_the_package_has_no_road_to_an_account() -> None:
     """No client, address or setting for trading-mcp or the gateway — read off the source, not trusted to a comment."""
     package = pathlib.Path(__file__).resolve().parents[2] / "strategies"

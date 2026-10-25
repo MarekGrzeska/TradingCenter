@@ -5,6 +5,7 @@ the same document is the same summary — and literal wherever a construction ha
 from __future__ import annotations
 
 from collections.abc import Mapping
+from contextvars import ContextVar
 from typing import Any
 
 from pydantic import ValidationError
@@ -22,6 +23,10 @@ TERMINAL_NAMES: dict[str, str] = {
 _COMPARE = {">": "powyżej", "<": "poniżej", ">=": "co najmniej", "<=": "co najwyżej", "==": "równe", "!=": "różne od"}
 _ARITH = {"+": "+", "-": "−", "*": "×", "/": "/"}
 _SIDES = {"long": "Long", "short": "Short"}
+# The document's `let` formulas while it is read back: a name defined there is said as what it is (`EMA(10)`), not as a
+# label the reader has to look up. A context variable rather than an argument threaded through every phrase function.
+_LETS: ContextVar[Mapping[str, f.Node] | None] = ContextVar("lets", default=None)
+
 _ON_DAY = {
     "MONDAY": "w poniedziałek", "TUESDAY": "we wtorek", "WEDNESDAY": "w środę", "THURSDAY": "w czwartek",
     "FRIDAY": "w piątek", "SATURDAY": "w sobotę", "SUNDAY": "w niedzielę",
@@ -36,6 +41,19 @@ def summarize(raw: Mapping[str, Any]) -> dict[str, Any] | None:
     except ValidationError:
         return None
 
+    lets: dict[str, f.Node] = {}
+    for name, text in d.let.items():
+        node, _ = f.parse(text, f"let.{name}")
+        if node is not None:
+            lets[name] = node
+    token = _LETS.set(lets)
+    try:
+        return _sections(d)
+    finally:
+        _LETS.reset(token)
+
+
+def _sections(d: DocumentIn) -> dict[str, Any]:
     def say(text: str | None, path: str) -> str:
         if text is None:
             return ""
@@ -168,7 +186,8 @@ def _formula(n: f.Node) -> str:
             return NAME_PHRASES[n.id]
         if n.id in RESOLUTIONS:
             return TERMINAL_NAMES[n.id]
-        return f"«{n.id}»"
+        defined = (_LETS.get() or {}).get(n.id)
+        return f"«{n.id}»" if defined is None else _grouped(defined)
     if isinstance(n, f.Param):
         return f"p.{n.name}"
     if isinstance(n, f.Neg):
