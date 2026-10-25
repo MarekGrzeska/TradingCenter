@@ -96,16 +96,16 @@ describe("agentApi.setSessionModel", () => {
         return HttpResponse.json({
           id: 7,
           title: "why is BTC flat",
-          current_model_id: "gpt-6-sol",
+          current_model_id: "gpt-6.1-sol",
           created_at: "2026-08-11T10:00:00Z",
           last_active_at: "2026-08-11T10:05:00Z",
         });
       }),
     );
 
-    const session = await api().setSessionModel(7, "gpt-6-sol", new AbortController().signal);
-    expect(body).toEqual({ model_id: "gpt-6-sol" });
-    expect(session.currentModelId).toBe("gpt-6-sol");
+    const session = await api().setSessionModel(7, "gpt-6.1-sol", new AbortController().signal);
+    expect(body).toEqual({ model_id: "gpt-6.1-sol" });
+    expect(session.currentModelId).toBe("gpt-6.1-sol");
   });
 });
 

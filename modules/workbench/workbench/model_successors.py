@@ -7,9 +7,10 @@ from collections.abc import Collection
 
 SUCCESSORS: dict[str, str] = {
     "gpt-5.6-luna": "gpt-6-luna",
-    "gpt-5.6-sol": "gpt-6-sol",
+    "gpt-5.6-sol": "gpt-6.1-sol",
+    "gpt-6-sol": "gpt-6.1-sol",
     # Terra has no GPT-6 successor; Sol is the entry at its price.
-    "gpt-5.6-terra": "gpt-6-sol",
+    "gpt-5.6-terra": "gpt-6.1-sol",
 }
 
 

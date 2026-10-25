@@ -71,7 +71,7 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_base_url: str | None = None
     translation_model: str = "gpt-6-luna"
-    analysis_model: str = "gpt-6-sol"
+    analysis_model: str = "gpt-6.1-sol"
 
     # How many posts one pass may enrich. The ceiling exists for the same reason the window does:
     # a busy day must cost a bounded amount, and the rest waits for the next pass.

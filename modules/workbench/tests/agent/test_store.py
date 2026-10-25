@@ -83,18 +83,18 @@ async def test_changing_model_does_not_rewrite_earlier_messages(db) -> None:
         incomplete=False,
     )
     await store.set_session_model(
-        db, session_id=session.id, owner_principal="op-1", model_id="gpt-6-sol"
+        db, session_id=session.id, owner_principal="op-1", model_id="gpt-6.1-sol"
     )
     later_reply = await store.append_agent_message(
         db,
         session_id=session.id,
         content="answer on sol",
-        model_id="gpt-6-sol",
+        model_id="gpt-6.1-sol",
         prompt_version="v1",
         incomplete=False,
     )
     assert early_reply.model_id == "gpt-6-luna"
-    assert later_reply.model_id == "gpt-6-sol"
+    assert later_reply.model_id == "gpt-6.1-sol"
 
 
 async def test_an_incomplete_reply_is_marked(db) -> None:

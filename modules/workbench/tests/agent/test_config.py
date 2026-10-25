@@ -72,7 +72,7 @@ def test_duplicate_model_ids_refuse_to_start() -> None:
 
 def test_default_model_outside_the_catalogue_refuses_to_start() -> None:
     with pytest.raises(ValidationError) as err:
-        settings(default_model_id="gpt-6-sol")
+        settings(default_model_id="gpt-6.1-sol")
     assert "DEFAULT_MODEL_ID" in str(err.value)
 
 
