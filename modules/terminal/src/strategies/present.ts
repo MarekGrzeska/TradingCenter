@@ -2,7 +2,8 @@
 
 import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import type { Resolution } from "../data/types";
-import type { RunItem } from "./strategiesApi";
+import { formatInstant } from "../ui/formatTime";
+import type { CostProfile, CostsSource, RunItem } from "./strategiesApi";
 
 const NUMBER = new Intl.NumberFormat("pl-PL", { maximumFractionDigits: 2 });
 const PERCENT = new Intl.NumberFormat("pl-PL", { style: "percent", maximumFractionDigits: 2 });
@@ -50,4 +51,21 @@ export function minutesIn(from: Date, to: Date): number {
 /** Whether the list has to keep asking: only while something waits or computes, so an idle tab costs nothing. */
 export function anyPending(runs: readonly RunItem[]): boolean {
   return runs.some((run) => run.status === "queued" || run.status === "running");
+}
+
+/** Where a run's costs came from; a run without them is said to be one, not shown as zeros. */
+export const COSTS_SOURCE_LABEL: Record<CostsSource, string> = {
+  request: "wpisane do uruchomienia",
+  broker: "z capital.com",
+  operator: "z profilu operatora",
+  none: "bez kosztów",
+};
+
+export const WITHOUT_COSTS_NOTE = "bez kosztów — wynik pomija spread, poślizg i finansowanie";
+
+/** Where the costs a form shows came from, in the operator's words. */
+export function sourceLabel(profile: CostProfile): string {
+  if (profile.source === "operator") return "z profilu wpisanego przez operatora";
+  const at = profile.fetchedAt === null ? "" : `, pobrane ${formatInstant(profile.fetchedAt.getTime() / 1000)}`;
+  return `z capital.com${at}`;
 }

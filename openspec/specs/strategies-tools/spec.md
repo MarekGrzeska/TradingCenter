@@ -1,10 +1,9 @@
-## Purpose
+# strategies-tools Specification
 
+## Purpose
 Narzędzia, którymi agent w rozmowie pisze, sprawdza i uruchamia strategie: co każde robi, czego odmawia i gdzie kończy
 się swoboda agenta. Koszty, kolejka i licznik prób są granicą, której agent nie przesuwa.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Powierzchnia narzędzi pakietu strategii
 
 Pakiet MUST publikować narzędzia: `strategy_language` (opis języka), `list_strategies`, `read_strategy`,
@@ -122,3 +121,4 @@ Opisy narzędzi MUST mówić modelowi, że:
 
 - **WHEN** model czyta opisy narzędzi strategii
 - **THEN** opis `save_strategy` MUST mówić, że każde założenie, którego operator nie podał, trafia do `notes`
+

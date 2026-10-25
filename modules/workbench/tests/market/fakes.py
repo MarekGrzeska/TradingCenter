@@ -82,6 +82,11 @@ class FakeInstruments:
             return self.search_results
         return [{"symbol": q.upper(), "name": q, "asset_class": "CRYPTO", "tradeable": True}]
 
+    async def terms(self, symbol: str) -> dict:
+        if self.error is not None:
+            raise self.error
+        return {"symbol": symbol, "overnight_long_rate": -0.0151992, "overnight_rate_unit": "PERCENTAGE"}
+
     async def asset_classes(self) -> list:
         if self.error is not None:
             raise self.error

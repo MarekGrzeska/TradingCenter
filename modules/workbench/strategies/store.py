@@ -83,7 +83,7 @@ async def _insert_revision(conn: Conn, strategy_id: int, n: int, checked: Checke
 _SUMMARY = """
     SELECT s.id, s.name, s.created_at, s.archived_at, r.n AS latest_revision, r.author AS latest_author,
            r.created_at AS changed_at, r.document->>'symbol' AS symbol, r.document->>'timeframe' AS timeframe,
-           (SELECT count(*) FROM runs u WHERE u.strategy_id = s.id AND u.status = 'done') AS trials
+           (SELECT count(*) FROM runs u WHERE u.strategy_id = s.id AND u.status = 'done') AS trials, s.conversation_id
     FROM strategies s
     CROSS JOIN LATERAL (
         SELECT n, author, created_at, document FROM strategy_revisions
@@ -104,12 +104,13 @@ class Summary:
     symbol: str
     timeframe: str
     trials: int
+    conversation_id: int | None
 
 
 def _summary(row: asyncpg.Record) -> Summary:
     return Summary(
         row["id"], row["name"], row["created_at"], row["archived_at"], row["latest_revision"], row["latest_author"],
-        row["changed_at"], row["symbol"], row["timeframe"], row["trials"],
+        row["changed_at"], row["symbol"], row["timeframe"], row["trials"], row["conversation_id"],
     )
 
 
@@ -171,6 +172,16 @@ async def list_revisions(conn: Conn, strategy_id: int) -> list[RevisionEntry]:
     if not rows:
         raise NotFound(strategy_id)
     return [RevisionEntry(row["n"], row["author"], row["created_at"], row["content_hash"]) for row in rows]
+
+
+async def set_conversation(conn: Conn, strategy_id: int, conversation_id: int | None) -> Summary:
+    """Which conversation the strategy is written in — not a revision, and not a trial."""
+    found = await conn.fetchval(
+        "UPDATE strategies SET conversation_id = $2 WHERE id = $1 RETURNING id", strategy_id, conversation_id
+    )
+    if found is None:
+        raise NotFound(strategy_id)
+    return await get_strategy(conn, strategy_id)
 
 
 async def set_archived(conn: Conn, strategy_id: int, archived: bool) -> Summary:

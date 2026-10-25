@@ -103,15 +103,38 @@ async def test_a_document_with_problems_is_refused_with_every_one_and_saves_noth
     assert len(said["problems"]) >= 2 and count == 0
 
 
+class _NoWait:
+    """A queue that is woken and never computes: what the tool queued is the question, not what the run found."""
+
+    def listen(self, run_id: int) -> None: ...
+    def wake(self) -> None: ...
+    async def wait_for(self, run_id: int, timeout: float) -> None: ...
+
+
 @pytest.mark.db
-async def test_without_a_cost_profile_the_agent_cannot_run_and_nothing_is_queued(pool) -> None:
-    app = _app(pool)
+async def test_without_a_cost_profile_the_agent_runs_with_the_brokers_and_says_so(pool) -> None:
+    app = _app(pool, _NoWait())
     saved = await _call(app, "save_strategy", document=strategy())
 
-    with pytest.raises(ToolError, match="no cost profile"):
-        await _call(app, "run_backtest", strategy_id=saved["strategy_id"], **RANGE)
+    answered = await _call(app, "run_backtest", strategy_id=saved["strategy_id"], **RANGE)
+
+    assert answered["costs_source"] == "broker" and answered["costs"]["rollover_hour"] == 21
+
+
+@pytest.mark.db
+async def test_a_run_without_costs_is_the_agents_only_on_request_and_is_recorded_as_such(pool) -> None:
+    app = _app(pool, _NoWait())
+    saved = await _call(app, "save_strategy", document=strategy())
+    described = {t.name: t.description or "" for t in await app.state.mcp_server.list_tools()}
+
+    answered = await _call(app, "run_backtest", strategy_id=saved["strategy_id"], without_costs=True, **RANGE)
     async with pool.acquire() as conn:
-        assert await conn.fetchval("SELECT count(*) FROM runs") == 0
+        row = await runs.get_run(conn, answered["run_id"])
+        profiles = await conn.fetchval("SELECT count(*) FROM cost_profiles")
+
+    assert "operator asks for a run without costs" in described["run_backtest"]
+    assert answered["costs_source"] == "none" and row is not None and row.request["without_costs"] is True
+    assert profiles == 0
 
 
 @pytest.mark.db
@@ -127,7 +150,8 @@ async def test_a_short_run_answers_within_the_wait_counts_as_a_trial_and_a_secon
         # A run the agent asked for that has not ended: the next request waits for it.
         waiting = await runs.enqueue(
             conn, runs.RunIn.model_validate({"strategy_id": saved["strategy_id"], "from": RANGE["start"],
-                                             "to": RANGE["end"], "costs": COSTS}), 1, {}, "agent",
+                                             "to": RANGE["end"], "costs": COSTS}), 1, {},
+            runs.RunCosts(COSTS, "request"), "agent",
         )
     with pytest.raises(ToolError, match=f"run {waiting}"):
         await _call(app, "run_backtest", strategy_id=saved["strategy_id"], **RANGE)

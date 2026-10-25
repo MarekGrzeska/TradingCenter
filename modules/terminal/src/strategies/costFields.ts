@@ -33,3 +33,7 @@ export function costsOf(fields: CostFields): Costs {
     rollover_hour: Number(fields.rolloverHour),
   };
 }
+
+export function sameFields(a: CostFields, b: CostFields): boolean {
+  return (Object.keys(a) as (keyof CostFields)[]).every((key) => a[key].trim() === b[key].trim());
+}

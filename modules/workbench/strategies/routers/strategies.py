@@ -12,6 +12,7 @@ from ..archive import ArchiveUnavailable
 from ..contract import (
     ChangesOut,
     ConflictOut,
+    ConversationIn,
     ProblemsOut,
     RevisionEntryOut,
     RevisionOut,
@@ -167,6 +168,16 @@ async def archive_strategy(strategy_id: int = ID, db=Depends(pool)) -> StrategyO
 @router.post("/strategies/{strategy_id}/restore", response_model=StrategyOut, responses={404: {}})
 async def restore_strategy(strategy_id: int = ID, db=Depends(pool)) -> StrategyOut:
     return await _set_archived(db, strategy_id, False)
+
+
+@router.put("/strategies/{strategy_id}/conversation", response_model=StrategyOut, responses={404: {}})
+async def set_conversation(body: ConversationIn, strategy_id: int = ID, db=Depends(pool)) -> StrategyOut:
+    """The conversation the strategy's window reopens. Neither a revision nor a trial; the id is not checked."""
+    async with db.acquire() as conn:
+        try:
+            return _summary(await store.set_conversation(conn, strategy_id, body.conversation_id))
+        except store.NotFound:
+            raise not_found(f"strategy {strategy_id}") from None
 
 
 async def _set_archived(db, strategy_id: int, archived: bool) -> StrategyOut:

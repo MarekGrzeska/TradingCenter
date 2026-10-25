@@ -52,6 +52,14 @@ async def test_a_search_comes_back_unreshaped(gw: GatewayInstruments) -> None:
 
 
 @respx.mock
+async def test_terms_come_back_unreshaped(gw: GatewayInstruments) -> None:
+    terms = {"symbol": "GOLD", "overnight_long_rate": -0.0151992, "overnight_rate_unit": "PERCENTAGE"}
+    respx.get(f"{BASE_URL}/instruments/GOLD/terms").mock(return_value=httpx.Response(200, json=terms))
+
+    assert await gw.terms("GOLD") == terms
+
+
+@respx.mock
 async def test_asset_classes_come_back_unreshaped(gw: GatewayInstruments) -> None:
     respx.get(f"{BASE_URL}/asset-classes").mock(
         return_value=httpx.Response(200, json=["CRYPTO", "SHARES"])
@@ -67,6 +75,7 @@ async def test_asset_classes_come_back_unreshaped(gw: GatewayInstruments) -> Non
         ("catalogue", lambda gw: gw.catalogue(None, None)),
         ("search", lambda gw: gw.search("gold")),
         ("asset_classes", lambda gw: gw.asset_classes()),
+        ("terms", lambda gw: gw.terms("GOLD")),
     ],
 )
 async def test_a_401_is_a_refusal_not_an_empty_answer(gw: GatewayInstruments, method, call) -> None:
@@ -77,6 +86,9 @@ async def test_a_401_is_a_refusal_not_an_empty_answer(gw: GatewayInstruments, me
         return_value=httpx.Response(401, json={"detail": "missing or invalid caller key"})
     )
     respx.get(f"{BASE_URL}/asset-classes").mock(
+        return_value=httpx.Response(401, json={"detail": "missing or invalid caller key"})
+    )
+    respx.get(f"{BASE_URL}/instruments/GOLD/terms").mock(
         return_value=httpx.Response(401, json={"detail": "missing or invalid caller key"})
     )
 

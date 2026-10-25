@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { agentActivity, type AgentActivityStore } from "../agent/agentActivity";
+import type { AgentChatStore } from "../agent/agentChatStore";
 import { setStrategyInView } from "../agent/strategyInView";
 import { resolveEndpoints } from "../data/config";
 import { archive, workbenchIdentity } from "../data/marketData";
@@ -25,14 +26,17 @@ import {
   type StrategiesApi,
   type StrategyItem,
 } from "./strategiesApi";
+import { StrategyChat } from "./StrategyChat";
+import { createStrategyChatStore } from "./strategyChatStore";
 import { StrategyEditor } from "./StrategyEditor";
 import { SummaryPanel } from "./SummaryPanel";
 import { useLiveValidation } from "./useLiveValidation";
 
 /**
  * Strategies as documents (`terminal-strategies`): the operator reads what the agent wrote and the summary read back from
- * it, corrects it by hand, runs it and reads the report. The agent is the terminal's own panel; this tab tells it which
- * strategy is open and reads everything again once a turn ends — it never interprets the agent's tool calls.
+ * it, corrects it by hand, runs it and reads the report. Beside the editor is the strategy's own conversation with the
+ * agent; the terminal's panel is told which strategy is open too. Everything is read again once a turn ends — the tab
+ * never interprets the agent's tool calls.
  */
 
 const signal = () => new AbortController().signal;
@@ -55,12 +59,18 @@ const BLANK = {
 
 type Pane = "history" | "runs";
 
+/** Which strategy the chat's conversation belongs to: its id, or "new" for one begun before the strategy existed. */
+type ChatOwner = { strategy: number | "new"; name: string; conversation: number | null } | null;
+
 export function StrategiesView({
   api,
   activity = agentActivity,
   pairs = archive,
-}: { api?: StrategiesApi; activity?: AgentActivityStore; pairs?: ArchiveAdmin } = {}) {
+  chat: chatStore,
+}: { api?: StrategiesApi; activity?: AgentActivityStore; pairs?: ArchiveAdmin; chat?: AgentChatStore } = {}) {
   const client = useMemo(() => api ?? createStrategiesApi(resolveEndpoints().strategiesHttp, workbenchIdentity), [api]);
+  const chat = useMemo(() => chatStore ?? createStrategyChatStore(activity), [chatStore, activity]);
+  const chatOwner = useRef<ChatOwner>(null);
   const [archived, setArchived] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
@@ -141,14 +151,56 @@ export function StrategiesView({
     setNewer(null);
   }
 
+  async function assignConversation(strategyId: number, conversation: number, name: string) {
+    try {
+      await client.setConversation(strategyId, conversation, signal());
+      chat.renameSession(conversation, name);
+      list.reload();
+    } catch {
+      // The conversation stays on screen; only reopening the strategy elsewhere would start a new one.
+    }
+  }
+
+  /** The strategy's own conversation, or the one begun for it while it did not exist yet, or a new one. */
+  function attachChat(item: StrategyItem) {
+    const owner = chatOwner.current;
+    const session = chat.getSnapshot().activeSessionId;
+    chatOwner.current = { strategy: item.id, name: item.name, conversation: item.conversationId };
+    if (item.conversationId !== null) {
+      chat.openSession(item.conversationId);
+    } else if (owner?.strategy === "new" && session !== null) {
+      chatOwner.current.conversation = session;
+      void assignConversation(item.id, session, item.name);
+    } else {
+      chat.newSession();
+    }
+  }
+
+  // A conversation the chat creates on its first message belongs to the strategy it was begun for.
+  useEffect(() => {
+    let before = chat.getSnapshot().activeSessionId;
+    return chat.subscribe(() => {
+      const now = chat.getSnapshot().activeSessionId;
+      const created = before === null && now !== null;
+      before = now;
+      const owner = chatOwner.current;
+      if (!created || now === null || owner === null || owner.strategy === "new" || owner.conversation !== null) return;
+      owner.conversation = now;
+      void assignConversation(owner.strategy, now, owner.name);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chat]);
+
   async function open(id: number) {
     setFailure(null);
     setNotice(null);
     setCreating(false);
     setPickedRun(null);
     try {
-      load(await client.revision(id, null, signal()));
+      const { item, revision } = await client.detail(id, signal());
+      load(revision);
       setOpenId(id);
+      attachChat(item);
     } catch (cause: unknown) {
       setFailure(messageOf(cause, "nie udało się otworzyć strategii"));
     }
@@ -265,7 +317,9 @@ export function StrategiesView({
               setBase(null);
               setCreating(true);
               setText(documentText(BLANK));
-              setNotice("Nowa strategia: popraw szkielet albo opisz strategię w panelu agenta.");
+              chatOwner.current = { strategy: "new", name: "", conversation: null };
+              chat.newSession();
+              setNotice("Nowa strategia: opisz ją w czacie obok albo popraw szkielet.");
             }}
           >
             Nowa…
@@ -299,7 +353,7 @@ export function StrategiesView({
       <div className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto">
         {!editing ? (
           <p className="text-sm text-ink-muted">
-            Wybierz strategię z listy albo opisz nową w panelu agenta — po jego odpowiedzi otworzy się tutaj.
+            Wybierz strategię z listy albo kliknij „Nowa…” i opisz ją w czacie obok edytora.
           </p>
         ) : (
           <>
@@ -345,7 +399,7 @@ export function StrategiesView({
               </p>
             )}
             {validation.failure !== null && <p className="text-xs text-critical">{validation.failure}</p>}
-            <div className="grid h-[30rem] min-h-0 grid-cols-[minmax(0,3fr)_minmax(0,2fr)] gap-3">
+            <div className="grid h-[30rem] min-h-0 grid-cols-[minmax(0,3fr)_minmax(0,2fr)_minmax(18rem,2fr)] gap-3">
               <StrategyEditor
                 text={text}
                 onChange={setText}
@@ -354,6 +408,7 @@ export function StrategiesView({
                 symbols={symbols.value}
               />
               <SummaryPanel summary={validation.summary ?? base?.summary ?? null} valid={validation.valid} stale={validation.stale && dirty} />
+              <StrategyChat store={chat} />
             </div>
 
             {base !== null && (

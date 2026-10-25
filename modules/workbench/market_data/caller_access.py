@@ -35,6 +35,7 @@ REST_PATHS: tuple[str, ...] = (
     "/indicators/{symbol}",
     "/instruments",
     "/instruments/search",
+    "/instruments/{symbol}/terms",
     "/jobs",
     "/jobs/estimate",
     "/jobs/{job_id}",

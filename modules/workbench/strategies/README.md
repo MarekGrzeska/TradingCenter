@@ -5,7 +5,9 @@ is saved, and replayed over the candle archive by an engine written once. A new 
 archive's catalogue — needs no change here and no deploy. Research only: nothing in this package can reach an account.
 
 Why it exists and what was weighed: `openspec/changes/archive/2026-10-25-a-strategy-is-a-document` (the engine) and
-`openspec/changes/a-strategy-from-a-description` (the screen and the agent), and the research behind both in
+`openspec/changes/archive/2026-10-25-a-strategy-from-a-description` (the screen and the agent),
+`openspec/changes/costs-come-from-the-broker` (costs read off capital.com, runs without costs, the strategy's own
+conversation), and the research behind them in
 `docs/strategie-i-backtesty-research.html`. Walk-forward and the other validation are stage 3.
 
 **Optional**, like the alerts: mounted only when `STRATEGIES_DATABASE_URL` is set; unset is a working process.
@@ -65,18 +67,35 @@ Formulas without trade state are computed on numpy for the whole axis at once; f
 bar, reading the first phase's columns (design D4). A test demands both agree with a series cut at each bar.
 
 A minute whose range covers two events in an unknown order (stop and target, or a stop entry and its stop) is settled
-against the strategy and marked. Costs are required on every run: hourly spread profile, slippage on orders that take
+against the strategy and marked. Every run has a cost model: hourly spread profile, slippage on orders that take
 the price, financing for every rollover crossed (weekends too). `ENGINE_VERSION` in `engine.py` is raised by any change
 that moves a result; the golden strategies (`tests/strategies/golden/`) refuse a moved result under the same number —
 re-record with `uv run python -m tests.strategies.golden.regenerate`.
 
 ## Runs
 
-`POST /runs` checks the request (parameters in range, costs present, range under `STRATEGIES_MAX_MINUTE_BARS`) and queues
-it. The queue (`queue.py`) re-checks the revision against the archive as it is now, reads the data in this process —
+`POST /runs` checks the request (parameters in range, range under `STRATEGIES_MAX_MINUTE_BARS`) and queues it. The queue (`queue.py`) re-checks the revision against the archive as it is now, reads the data in this process —
 parsing off the event loop — and computes in **a spawned process per run**, which a time limit or a cancellation stops.
 A run left `running` by a stopped process is marked "interrupted by a restart" at the next start. The worker sends the
 strategy's result before the random-entry benchmark, so a benchmark that runs out of time costs only itself.
+
+## Costs
+
+A run's costs come from one of three places, and the run records which in its `request` (`costs_source`): the
+request's own `costs`; the instrument's **cost profile** when the request names none; or `without_costs`, a choice that
+gives a model of zeros and is marked in the report and the list — typed zeros are an ordinary model. Asking for both is
+a refusal.
+
+The profile is **read off the broker** the first time a run needs one (`broker_costs.py`), through `/market` in this
+process — the package still has no road to the gateway: the spread is ask − bid of the archive's search for the exact
+symbol, the financing and the settlement hour come from the instrument's terms (`GET /instruments/{symbol}/terms`).
+capital.com states `longRate`/`shortRate` as a percentage of the position's value per day, negative when the holder
+pays; the profile stores `−rate / 100`, positive being a charge — checked against a charge on the demo account (design
+D3). The broker's own numbers are kept in `broker` beside the converted ones. A value the broker leaves out, or a
+charge other than daily, is a refusal naming it, and nothing is written.
+
+The profile is kept until the operator changes it (`PUT /costs/{symbol}`, `source = operator`) or asks the broker again
+(`POST /costs/{symbol}/from-broker`) — never refreshed by a run, so two runs a day apart cost the same and compare.
 
 ## The report
 
@@ -94,8 +113,9 @@ catalogue, and never mounted at `/mcp` (design D7). `strategy_language`, `list_s
 `validate_strategy` read; `save_strategy` writes a revision authored `agent`, and needs `based_on` — the revision the
 change was made to — or a newer one is a refusal; `run_backtest` queues a run marked `requested_by = agent`, with the
 **instrument's cost profile** and no costs of its own, refuses while another of the agent's runs waits, and waits up to
-`WAIT_SECONDS` for the result; `read_run` and `compare_runs`, which refuses runs of different range, costs or engine.
-No tool sets a cost profile: costs are the operator's, `PUT /costs/{symbol}`. The surface has a character ceiling in
+`WAIT_SECONDS` for the result — read off the broker when there is none — or `without_costs` when the operator asks for
+that in so many words; `read_run` and `compare_runs`, which refuses runs of different range, costs or engine.
+No tool sets a cost profile. The surface has a character ceiling in
 `tests/strategies/test_tools.py`.
 
 ## What the screen reads
@@ -106,8 +126,11 @@ No tool sets a cost profile: costs are the operator's, `PUT /costs/{symbol}`. Th
 - **Changes** (`changes.py`) between two revisions, by the paths problems use; the history and `save_strategy` share it.
 - **A save based on a stale revision** (`?based_on=`) is a 409 naming the latest, so the editor and the agent never
   silently undo each other.
+- **A strategy's conversation** (`PUT /strategies/{id}/conversation`, `conversation_id` in every read) is the id of the
+  agent session the terminal's chat beside the editor reopens. Not a revision and not a trial; the id is never read here.
 - **The report** is `ReportOut` in the contract, with the daily `equity` curve the ratios were computed from (engine 2;
-  a v1 report has none). A list of runs reads the `headline` column, never the report.
+  a v1 report has none) and where its costs came from (`costs_source`, `costs_fetched_at`, `without_costs`, read off
+  the run's `request`). A list of runs reads the `headline` column, never the report, and marks a run without costs.
 
 ## Settings
 

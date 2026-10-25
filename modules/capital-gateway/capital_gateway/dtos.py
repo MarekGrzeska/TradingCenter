@@ -77,6 +77,13 @@ class InstrumentTerms(BaseModel):
     min_deal_size: float | None = None
     max_deal_size: float | None = None
     size_increment: float | None = None
+    # Overnight funding as the provider states it: signed (negative = the holder pays), in its
+    # unit, never converted to a fraction here — that reading is the consumer's to make once.
+    overnight_long_rate: float | None = None
+    overnight_short_rate: float | None = None
+    overnight_rate_unit: str | None = None
+    overnight_charge_at: str | None = None
+    overnight_charge_interval_minutes: int | None = None
     provider: str = "capital.com"
 
 

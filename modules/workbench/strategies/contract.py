@@ -11,6 +11,12 @@ from .costs import CostModel
 
 RunStatus = Literal["queued", "running", "done", "failed", "cancelled"]
 Requester = Literal["operator", "agent"]
+CostsSource = Literal["request", "broker", "operator", "none"]
+_COSTS_SOURCE = (
+    "where the run's costs came from: the request, the instrument's profile read off the broker or typed by the "
+    "operator, or `none` — a run without costs"
+)
+_WITHOUT_COSTS = "the result leaves out spread, slippage and financing — a choice, not a model of zeros"
 
 
 class ProblemOut(BaseModel):
@@ -46,6 +52,8 @@ class HeadlineOut(BaseModel):
     expectancy_r: float | None
     max_drawdown_r: float | None
     sharpe: float | None
+    costs_source: CostsSource = Field(description=_COSTS_SOURCE)
+    without_costs: bool = Field(description=_WITHOUT_COSTS)
 
 
 class RunSummaryOut(BaseModel):
@@ -128,6 +136,9 @@ class ReportOut(BaseModel):
     costs: CostsByComponentOut
     benchmarks: BenchmarksOut
     annualisation: str
+    costs_source: CostsSource = Field(description=_COSTS_SOURCE)
+    costs_fetched_at: datetime | None = Field(description="when the broker's profile was read; null for any other source")
+    without_costs: bool = Field(description=_WITHOUT_COSTS)
     equity: list[tuple[int, float | None]] | None = Field(
         default=None,
         description="nominal equity at each UTC midnight of the range, epoch seconds — the series the ratios come from; "
@@ -162,6 +173,9 @@ class StrategyOut(BaseModel):
     symbol: str
     timeframe: str
     trials: int = Field(description="finished runs of every revision — what was tried, the count overfitting is judged by")
+    conversation_id: int | None = Field(
+        description="the conversation this strategy is written in — an id in the agent's sessions, never read here"
+    )
 
 
 class SummarySectionOut(BaseModel):
@@ -219,6 +233,16 @@ class CostProfileOut(BaseModel):
     symbol: str
     costs: CostModel
     updated_at: datetime
+    source: Literal["operator", "broker"] = Field(description="who set the values: typed by the operator, or read off the broker")
+    fetched_at: datetime | None = Field(description="when the broker was asked; null for the operator's values")
+    broker: dict[str, Any] | None = Field(
+        description="the broker's own numbers the costs were converted from — bid, ask, overnight rates in its unit and "
+        "the moment of its charge; null for the operator's values"
+    )
+
+
+class ConversationIn(BaseModel):
+    conversation_id: int | None = Field(ge=1, le=2**63 - 1, description="null forgets the conversation")
 
 
 class StrategyDetailOut(StrategyOut):

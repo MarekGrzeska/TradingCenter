@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 
 from .. import runs, store
+from ..archive import ArchiveUnavailable
+from ..broker_costs import BrokerCostsMissing
 from ..contract import (
     ProblemsOut,
     RunAcceptedOut,
@@ -13,18 +15,25 @@ from ..contract import (
     RunSummaryOut,
     TradesPageOut,
 )
+from ..problems import Problem
 from ..runs import RunIn
-from .deps import BIGINT, not_found, pool, queue, refused, settings
+from .deps import BIGINT, archive, not_found, pool, queue, refused, settings
 
 router = APIRouter(tags=["runs"])
 
 
 @router.post(
     "/runs", response_model=RunAcceptedOut, status_code=202,
-    responses={404: {"description": "no such strategy or revision"}, 422: {"model": ProblemsOut}},
+    responses={
+        404: {"description": "no such strategy or revision"}, 422: {"model": ProblemsOut},
+        503: {"description": "the run needs the broker's costs and the archive could not ask for them"},
+    },
 )
-async def enqueue(body: RunIn, db=Depends(pool), run_queue=Depends(queue), config=Depends(settings)):
-    """Checked against the revision's parameters and the run's ceiling, then queued — never computed in the request."""
+async def enqueue(
+    body: RunIn, db=Depends(pool), run_queue=Depends(queue), config=Depends(settings), reading=Depends(archive)
+):
+    """Checked against the revision's parameters and the run's ceiling, then queued — never computed in the request.
+    Without `costs` the instrument's profile is used, read off the broker the first time."""
     async with db.acquire() as conn:
         try:
             revision = await store.get_revision(conn, body.strategy_id, body.revision)
@@ -34,8 +43,14 @@ async def enqueue(body: RunIn, db=Depends(pool), run_queue=Depends(queue), confi
         problems = runs.check_request(body, declared, config.max_minute_bars)
         if problems:
             return refused("the run cannot be queued", problems)
+        try:
+            costs = await runs.resolved_costs(conn, reading, body, revision.document["symbol"])
+        except BrokerCostsMissing as err:
+            return refused("the broker's costs are incomplete; nothing was queued", [Problem("costs", str(err))])
+        except ArchiveUnavailable as err:
+            raise HTTPException(status_code=503, detail=f"the broker's costs cannot be read now: {err}") from err
         params = runs.resolved_params(body, declared)
-        run_id = await runs.enqueue(conn, body, revision.n, params)
+        run_id = await runs.enqueue(conn, body, revision.n, params, costs)
     run_queue.wake()
     return RunAcceptedOut(id=run_id, strategy_id=body.strategy_id, revision=revision.n, status="queued")
 
@@ -61,12 +76,15 @@ async def list_runs(
     too; the strategy's `trials` counts the finished ones."""
     async with db.acquire() as conn:
         rows = await runs.list_runs(conn, strategy_id, offset, limit)
-    return [
-        RunSummaryOut.model_validate(
-            dict(row) | {"request": store.decoded(row["request"]), "headline": store.decoded(row["headline"])}
-        )
-        for row in rows
-    ]
+    return [_summary(row) for row in rows]
+
+
+def _summary(row) -> RunSummaryOut:
+    request, headline = store.decoded(row["request"]), store.decoded(row["headline"])
+    if headline is not None:
+        marks = runs.costs_marks(request, row["requested_by"])
+        headline = headline | {"costs_source": marks["costs_source"], "without_costs": marks["without_costs"]}
+    return RunSummaryOut.model_validate(dict(row) | {"request": request, "headline": headline})
 
 
 @router.get("/runs/{run_id}", response_model=RunOut, responses={404: {"description": "no such run"}})
@@ -75,7 +93,8 @@ async def detail(run_id: int = Path(ge=1, le=BIGINT), db=Depends(pool)) -> RunOu
         row = await runs.get_run(conn, run_id)
     if row is None:
         raise not_found(f"run {run_id}")
-    return RunOut.model_validate(row.__dict__)
+    report = None if row.report is None else row.report | runs.costs_marks(row.request, row.requested_by)
+    return RunOut.model_validate(row.__dict__ | {"report": report})
 
 
 @router.get("/runs/{run_id}/trades", response_model=TradesPageOut, responses={404: {"description": "no such run"}})

@@ -17,6 +17,7 @@ export type Language = Schemas["LanguageOut"];
 export type Summary = Schemas["SummaryOut"];
 export type Costs = Schemas["CostModel"];
 export type RunStatus = Schemas["RunOut"]["status"];
+export type CostsSource = Schemas["HeadlineOut"]["costs_source"];
 export type Author = "operator" | "agent";
 
 export interface Problem {
@@ -37,6 +38,15 @@ export interface StrategyItem {
   createdAt: Date;
   archivedAt: Date | null;
   trials: number;
+  /** The conversation the strategy is written in, in the agent's sessions. */
+  conversationId: number | null;
+}
+
+export interface CostProfile {
+  costs: Costs;
+  source: "operator" | "broker";
+  /** When the broker was asked; null for the operator's values. */
+  fetchedAt: Date | null;
 }
 
 export interface Revision {
@@ -73,6 +83,8 @@ export interface Headline {
   expectancyR: number | null;
   maxDrawdownR: number | null;
   sharpe: number | null;
+  costsSource: CostsSource;
+  withoutCosts: boolean;
 }
 
 export interface RunItem {
@@ -116,7 +128,9 @@ export interface RunRequest {
   from: Date;
   to: Date;
   params: Record<string, number>;
-  costs: Costs;
+  /** Null: the instrument's profile, read off the broker when it has none. */
+  costs: Costs | null;
+  withoutCosts: boolean;
   capital: number;
   seed: number;
 }
@@ -155,6 +169,8 @@ export interface StrategiesApi {
   language(signal: AbortSignal): Promise<Language>;
   strategies(archived: boolean, signal: AbortSignal): Promise<StrategyItem[]>;
   revision(strategyId: number, n: number | null, signal: AbortSignal): Promise<Revision>;
+  /** The strategy as the list shows it, with its latest revision — read together, from one snapshot. */
+  detail(strategyId: number, signal: AbortSignal): Promise<{ item: StrategyItem; revision: Revision }>;
   revisions(strategyId: number, signal: AbortSignal): Promise<RevisionEntry[]>;
   changes(strategyId: number, n: number, signal: AbortSignal): Promise<Change[]>;
   validate(document: unknown, signal: AbortSignal): Promise<Validation>;
@@ -166,8 +182,11 @@ export interface StrategiesApi {
     signal: AbortSignal,
   ): Promise<{ revision: number; created: boolean }>;
   setArchived(strategyId: number, archived: boolean, signal: AbortSignal): Promise<void>;
-  costs(symbol: string, signal: AbortSignal): Promise<Costs | null>;
-  putCosts(symbol: string, costs: Costs, signal: AbortSignal): Promise<Costs>;
+  setConversation(strategyId: number, conversationId: number | null, signal: AbortSignal): Promise<void>;
+  costs(symbol: string, signal: AbortSignal): Promise<CostProfile | null>;
+  putCosts(symbol: string, costs: Costs, signal: AbortSignal): Promise<CostProfile>;
+  /** Reads the profile off the broker now and keeps it in place of the one there was. */
+  costsFromBroker(symbol: string, signal: AbortSignal): Promise<CostProfile>;
   runs(strategyId: number, signal: AbortSignal): Promise<RunItem[]>;
   run(id: number, signal: AbortSignal): Promise<Run>;
   trades(id: number, offset: number, limit: number, signal: AbortSignal): Promise<{ total: number; trades: Trade[] }>;
@@ -194,7 +213,12 @@ function mapStrategy(raw: Schemas["StrategyOut"]): StrategyItem {
     createdAt: new Date(raw.created_at),
     archivedAt: raw.archived_at ? new Date(raw.archived_at) : null,
     trials: raw.trials,
+    conversationId: raw.conversation_id,
   };
+}
+
+function mapProfile(raw: Schemas["CostProfileOut"]): CostProfile {
+  return { costs: raw.costs, source: raw.source, fetchedAt: raw.fetched_at ? new Date(raw.fetched_at) : null };
 }
 
 function mapRevision(raw: Schemas["RevisionOut"]): Revision {
@@ -216,6 +240,8 @@ function mapHeadline(raw: Schemas["HeadlineOut"] | null | undefined): Headline |
     expectancyR: raw.expectancy_r,
     maxDrawdownR: raw.max_drawdown_r,
     sharpe: raw.sharpe,
+    costsSource: raw.costs_source,
+    withoutCosts: raw.without_costs,
   };
 }
 
@@ -253,6 +279,8 @@ function mapRun(raw: Schemas["RunOut"]): Run {
           expectancy_r: report.expectancy_r,
           max_drawdown_r: report.max_drawdown_r,
           sharpe: report.sharpe,
+          costs_source: report.costs_source,
+          without_costs: report.without_costs,
         })
       : null,
     engineVersion: raw.engine_version,
@@ -321,6 +349,11 @@ export function createStrategiesApi(httpBase: string, identity: Identity = noIde
       );
     },
 
+    async detail(strategyId, signal) {
+      const raw = await http.json<Schemas["StrategyDetailOut"]>(`${httpBase}/strategies/${strategyId}`, { signal });
+      return { item: mapStrategy(raw), revision: mapRevision(raw.revision) };
+    },
+
     async revisions(strategyId, signal) {
       const raw = await http.json<Schemas["RevisionEntryOut"][]>(`${httpBase}/strategies/${strategyId}/revisions`, {
         signal,
@@ -361,10 +394,19 @@ export function createStrategiesApi(httpBase: string, identity: Identity = noIde
       await http.send(`${httpBase}/strategies/${strategyId}/${archived ? "archive" : "restore"}`, { signal, method: "POST" });
     },
 
+    async setConversation(strategyId, conversationId, signal) {
+      await http.send(`${httpBase}/strategies/${strategyId}/conversation`, {
+        signal,
+        method: "PUT",
+        body: { conversation_id: conversationId },
+      });
+    },
+
     async costs(symbol, signal) {
       try {
-        const raw = await http.json<Schemas["CostProfileOut"]>(`${httpBase}/costs/${encodeURIComponent(symbol)}`, { signal });
-        return raw.costs;
+        return mapProfile(
+          await http.json<Schemas["CostProfileOut"]>(`${httpBase}/costs/${encodeURIComponent(symbol)}`, { signal }),
+        );
       } catch (cause: unknown) {
         if (cause instanceof MarketDataError && cause.kind === "not-found") return null;
         throw cause;
@@ -378,8 +420,17 @@ export function createStrategiesApi(httpBase: string, identity: Identity = noIde
           method: "PUT",
           body: costs,
         });
-        return raw.costs;
+        return mapProfile(raw);
       });
+    },
+
+    async costsFromBroker(symbol, signal) {
+      return mapProfile(
+        await http.json<Schemas["CostProfileOut"]>(`${httpBase}/costs/${encodeURIComponent(symbol)}/from-broker`, {
+          signal,
+          method: "POST",
+        }),
+      );
     },
 
     async runs(strategyId, signal) {
@@ -406,7 +457,7 @@ export function createStrategiesApi(httpBase: string, identity: Identity = noIde
           from: request.from.toISOString(),
           to: request.to.toISOString(),
           params: request.params,
-          costs: request.costs,
+          ...(request.withoutCosts ? { without_costs: true } : request.costs === null ? {} : { costs: request.costs }),
           capital: request.capital,
           seed: request.seed,
         };

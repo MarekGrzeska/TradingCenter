@@ -58,10 +58,31 @@ export interface paths {
         get: operations["get_profile_costs__symbol__get"];
         /**
          * Put Profile
-         * @description Replaces the profile. Runs already recorded keep the costs they were made with.
+         * @description Replaces the profile with the operator's values. Runs already recorded keep the costs they were made with.
          */
         put: operations["put_profile_costs__symbol__put"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/costs/{symbol}/from-broker": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Profile From Broker
+         * @description Reads the profile off the broker now and replaces the one kept. Refused, with the profile unchanged, when the
+         *     broker does not answer or leaves a value out.
+         */
+        post: operations["profile_from_broker_costs__symbol__from_broker_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -142,6 +163,7 @@ export interface paths {
         /**
          * Enqueue
          * @description Checked against the revision's parameters and the run's ceiling, then queued — never computed in the request.
+         *     Without `costs` the instrument's profile is used, read off the broker the first time.
          */
         post: operations["enqueue_runs_post"];
         delete?: never;
@@ -247,6 +269,26 @@ export interface paths {
         put?: never;
         /** Archive Strategy */
         post: operations["archive_strategy_strategies__strategy_id__archive_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/strategies/{strategy_id}/conversation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set Conversation
+         * @description The conversation the strategy's window reopens. Neither a revision nor a trial; the id is not checked.
+         */
+        put: operations["set_conversation_strategies__strategy_id__conversation_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -408,6 +450,14 @@ export interface components {
             /** Latest Revision */
             latest_revision: number;
         };
+        /** ConversationIn */
+        ConversationIn: {
+            /**
+             * Conversation Id
+             * @description null forgets the conversation
+             */
+            conversation_id: number | null;
+        };
         /** CostModel */
         CostModel: {
             /** Overnight Long */
@@ -423,7 +473,25 @@ export interface components {
         };
         /** CostProfileOut */
         CostProfileOut: {
+            /**
+             * Broker
+             * @description the broker's own numbers the costs were converted from — bid, ask, overnight rates in its unit and the moment of its charge; null for the operator's values
+             */
+            broker: {
+                [key: string]: unknown;
+            } | null;
             costs: components["schemas"]["CostModel"];
+            /**
+             * Fetched At
+             * @description when the broker was asked; null for the operator's values
+             */
+            fetched_at: string | null;
+            /**
+             * Source
+             * @description who set the values: typed by the operator, or read off the broker
+             * @enum {string}
+             */
+            source: "operator" | "broker";
             /** Symbol */
             symbol: string;
             /**
@@ -465,6 +533,12 @@ export interface components {
          * @description The few numbers a list of runs shows; the rest is `GET /runs/{id}`. Null where the report has none.
          */
         HeadlineOut: {
+            /**
+             * Costs Source
+             * @description where the run's costs came from: the request, the instrument's profile read off the broker or typed by the operator, or `none` — a run without costs
+             * @enum {string}
+             */
+            costs_source: "request" | "broker" | "operator" | "none";
             /** Expectancy R */
             expectancy_r: number | null;
             /** Max Drawdown R */
@@ -475,6 +549,11 @@ export interface components {
             total_r: number | null;
             /** Trades */
             trades: number | null;
+            /**
+             * Without Costs
+             * @description the result leaves out spread, slippage and financing — a choice, not a model of zeros
+             */
+            without_costs: boolean;
         };
         /** HealthOut */
         HealthOut: {
@@ -622,6 +701,17 @@ export interface components {
             /** Calmar */
             calmar: number | null;
             costs: components["schemas"]["CostsByComponentOut"];
+            /**
+             * Costs Fetched At
+             * @description when the broker's profile was read; null for any other source
+             */
+            costs_fetched_at: string | null;
+            /**
+             * Costs Source
+             * @description where the run's costs came from: the request, the instrument's profile read off the broker or typed by the operator, or `none` — a run without costs
+             * @enum {string}
+             */
+            costs_source: "request" | "broker" | "operator" | "none";
             /** Decision Bars */
             decision_bars: number;
             /**
@@ -666,6 +756,11 @@ export interface components {
             trades: number;
             /** Win Rate */
             win_rate: number | null;
+            /**
+             * Without Costs
+             * @description the result leaves out spread, slippage and financing — a choice, not a model of zeros
+             */
+            without_costs: boolean;
         };
         /** RevisionEntryOut */
         RevisionEntryOut: {
@@ -752,7 +847,7 @@ export interface components {
              * @default 10000
              */
             capital: number;
-            costs: components["schemas"]["CostModel"];
+            costs?: components["schemas"]["CostModel"] | null;
             /**
              * From
              * Format: date-time
@@ -776,6 +871,11 @@ export interface components {
              * Format: date-time
              */
             to: string;
+            /**
+             * Without Costs
+             * @default false
+             */
+            without_costs: boolean;
         };
         /** RunOut */
         RunOut: {
@@ -884,6 +984,11 @@ export interface components {
              */
             changed_at: string;
             /**
+             * Conversation Id
+             * @description the conversation this strategy is written in — an id in the agent's sessions, never read here
+             */
+            conversation_id: number | null;
+            /**
              * Created At
              * Format: date-time
              */
@@ -921,6 +1026,11 @@ export interface components {
              * @description when the latest revision was saved
              */
             changed_at: string;
+            /**
+             * Conversation Id
+             * @description the conversation this strategy is written in — an id in the agent's sessions, never read here
+             */
+            conversation_id: number | null;
             /**
              * Created At
              * Format: date-time
@@ -1181,6 +1291,43 @@ export interface operations {
             };
         };
     };
+    profile_from_broker_costs__symbol__from_broker_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description the instrument, as the archive names it */
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CostProfileOut"];
+                };
+            };
+            /** @description the broker's answer lacks a value the profile needs */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description the archive could not ask the broker */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     health_health_get: {
         parameters: {
             query?: never;
@@ -1314,6 +1461,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ProblemsOut"];
                 };
+            };
+            /** @description the run needs the broker's costs and the archive could not ask for them */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -1556,6 +1710,48 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrategyOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_conversation_strategies__strategy_id__conversation_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConversationIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

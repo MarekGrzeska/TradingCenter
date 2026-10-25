@@ -7,11 +7,14 @@ import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, Literal
 
 import asyncpg
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 from tc_runtime.db import Conn, fetch_one
 
+from . import costs_store
+from .archive import Archive
 from .costs import CostModel
 from .problems import Problem
 from .reading import minute_bars
@@ -28,7 +31,10 @@ class RunIn(BaseModel):
     from_: AwareDatetime = Field(alias="from")
     to: AwareDatetime
     params: dict[str, float] = Field(default_factory=dict)
-    costs: CostModel
+    # Left out, the instrument's profile — read off the broker when there is none yet.
+    costs: CostModel | None = None
+    # A choice, not a model of zeros: the report says the result leaves out spread, slippage and financing (design D4).
+    without_costs: bool = False
     capital: float = Field(default=10_000.0, gt=0)
     seed: int = Field(default=1, ge=0)
 
@@ -36,6 +42,11 @@ class RunIn(BaseModel):
 def check_request(request: RunIn, declared: Mapping[str, Mapping[str, float]], max_minute_bars: int) -> list[Problem]:
     """Everything wrong with a run before it is queued. `declared` is the revision's `params` section."""
     problems: list[Problem] = []
+    if request.costs is not None and request.without_costs:
+        problems.append(Problem(
+            "without_costs", "a run is made either with these costs or without costs, not both",
+            hint="leave out `costs`, or `without_costs`",
+        ))
     start, end = epoch(request.from_), epoch(request.to)
     if end <= start:
         problems.append(Problem("to", "a run's range ends after it starts"))
@@ -56,14 +67,64 @@ def check_request(request: RunIn, declared: Mapping[str, Mapping[str, float]], m
     return problems
 
 
+CostsSource = Literal["request", "broker", "operator", "none"]
+NO_COSTS = CostModel(spread=0.0, slippage=0.0, overnight_long=0.0, overnight_short=0.0, rollover_hour=0)
+
+
+@dataclass(frozen=True)
+class RunCosts:
+    costs: CostModel
+    source: CostsSource
+    # When the broker's profile was read; null for any other source.
+    fetched_at: datetime | None = None
+
+    def recorded(self) -> dict[str, Any]:
+        return {
+            "costs": self.costs.model_dump(mode="json"), "costs_source": self.source,
+            "costs_fetched_at": None if self.fetched_at is None else self.fetched_at.isoformat(),
+        }
+
+
+async def resolved_costs(conn: Conn, archive: Archive, request: RunIn, symbol: str) -> RunCosts:
+    """The request's costs, else the instrument's profile, else none when that was asked for. Raises what
+    `costs_store.get_or_fetch` raises when the broker cannot give a profile."""
+    if request.without_costs:
+        return RunCosts(NO_COSTS, "none")
+    if request.costs is not None:
+        return RunCosts(request.costs, "request")
+    profile = await costs_store.get_or_fetch(conn, archive, symbol)
+    return RunCosts(profile.costs, profile.source, profile.fetched_at)
+
+
+def costs_source_of(request: Mapping[str, Any], requested_by: str) -> CostsSource:
+    """A run recorded before the source was: the operator's came with costs, the agent's from the operator's profile."""
+    recorded = request.get("costs_source")
+    if recorded is not None:
+        return recorded
+    return "operator" if requested_by == "agent" else "request"
+
+
+def costs_marks(request: Mapping[str, Any], requested_by: str) -> dict[str, Any]:
+    """What a report and a list say about a run's costs — read off its `request`, where they were recorded."""
+    return {
+        "costs_source": costs_source_of(request, requested_by),
+        "costs_fetched_at": request.get("costs_fetched_at"),
+        "without_costs": bool(request.get("without_costs", False)),
+    }
+
+
 def resolved_params(request: RunIn, declared: Mapping[str, Mapping[str, float]]) -> dict[str, float]:
     return {name: request.params.get(name, spec["default"]) for name, spec in declared.items()}
 
 
 async def enqueue(
-    conn: Conn, request: RunIn, revision: int, params: Mapping[str, float], requested_by: str = "operator"
+    conn: Conn, request: RunIn, revision: int, params: Mapping[str, float], costs: RunCosts,
+    requested_by: str = "operator",
 ) -> int:
-    recorded = request.model_dump(mode="json", by_alias=True) | {"revision": revision, "params": dict(params)}
+    """The values the run is made with, never a reference to the profile they came from."""
+    recorded = request.model_dump(mode="json", by_alias=True) | {
+        "revision": revision, "params": dict(params), **costs.recorded(),
+    }
     row = await fetch_one(
         conn,
         "INSERT INTO runs (strategy_id, revision, request, requested_by) VALUES ($1, $2, $3::jsonb, $4) RETURNING id",

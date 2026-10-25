@@ -356,6 +356,26 @@ async def test_a_gateway_refusal_on_the_catalogue_is_not_an_empty_result(app, ap
     assert response.status_code != 200
 
 
+async def test_terms_reach_the_gateway_and_come_back_unmodified(api) -> None:
+    response = await api.get("/instruments/GOLD/terms")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "symbol": "GOLD",
+        "overnight_long_rate": -0.0151992,
+        "overnight_rate_unit": "PERCENTAGE",
+    }
+
+
+async def test_a_gateway_refusal_on_terms_is_not_an_empty_result(app, api) -> None:
+    app.state.instruments = FakeInstruments(error=GatewayRefused(404, "no instrument NOPE"))
+
+    response = await api.get("/instruments/NOPE/terms")
+
+    assert response.status_code == 502
+    assert "NOPE" in response.json()["detail"]
+
+
 async def test_a_gateway_refusal_on_asset_classes_is_reported_not_hidden(app, api) -> None:
     app.state.instruments = FakeInstruments(error=GatewayRefused(401, "missing or invalid caller key"))
 

@@ -28,6 +28,11 @@ async def search(q: str = Query(...), gw: GatewayInstruments = Depends(instrumen
     return await gw.search(q)
 
 
+@router.get("/instruments/{symbol}/terms", tags=["market-data"])
+async def terms(symbol: str, gw: GatewayInstruments = Depends(instruments)):
+    return await gw.terms(symbol)
+
+
 @router.get("/asset-classes", tags=["market-data"])
 async def asset_classes(gw: GatewayInstruments = Depends(instruments)):
     return await gw.asset_classes()
