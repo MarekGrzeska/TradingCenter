@@ -1,0 +1,294 @@
+<title>Strategie — stan wdrożenia</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Strategie · stan wdrożenia</span>
+    <h1>Strategie: co działa, co zostało</h1>
+    <p class="lede">Strategie, rozmowa z agentem, koszty od brokera i backtesty są na produkcji. <b>Do zamknięcia zostały
+    sprawdzenie na produkcji, dwa przeglądy i archiwizacja trzech zmian.</b></p>
+    <div class="strip">
+      <span>TradingCenter / strategie</span>
+      <span>25 października 2026</span>
+      <span>stan na <b>main a6239b4d</b></span>
+      <span>środowisko <b>demo</b> · badania, nigdy zlecenie</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">6</div><div class="l">PR-ów scalonych 25.10 (#361, #363–#366 i archiwum etapu 2)</div></div>
+      <div class="cell"><div class="v">3</div><div class="l">zmiany OpenSpec otwarte do zamknięcia</div></div>
+      <div class="cell"><div class="v">9</div><div class="l">narzędzi strategii w rozmowie</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">dróg pakietu do rachunku</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Na produkcji</div>
+      <h2>Co zostało wdrożone</h2>
+      <p class="intro">Trzy etapy modułu strategii: dokument i silnik (etap 1), ekran i agent (etap 2), a 25 października
+      koszty od brokera, czat w oknie strategii, szkic agenta i osobna zakładka backtestów.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>PR</th><th>Co</th><th>Zmiana OpenSpec</th><th>Stan</th></tr></thead>
+          <tbody>
+            <tr><td><b>#361</b></td><td>Koszty z capital.com (spread z bid/ask, finansowanie i godzina rozliczenia z warunków
+              instrumentu), backtest „bez kosztów”, źródło kosztów w raporcie, czat strategii obok edytora</td>
+              <td><code>costs-come-from-the-broker</code></td><td><span class="tag ok">wdrożone</span></td></tr>
+            <tr><td><b>#363 · #364</b></td><td>Układ okna: edytor i czat po połowie na górze, streszczenie na dole; agent nie
+              odpowiada JSON-em do wklejenia</td><td>—</td><td><span class="tag ok">wdrożone</span></td></tr>
+            <tr><td><b>#365</b></td><td>Szkic agenta w edytorze (<code>draft_strategy</code>, bez rewizji), polskie nazwa,
+              hipoteza i założenia, zmienne podstawione w streszczeniu</td>
+              <td><code>agent-drafts-in-the-editor</code></td><td><span class="tag ok">wdrożone</span></td></tr>
+            <tr><td><b>#366</b></td><td>Zakładka Backtests: uruchomienia wszystkich strategii z nazwami, formularz wybranej,
+              raport; Strategies tylko do pisania</td><td><code>backtests-tab</code></td><td><span class="tag ok">wdrożone</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Na demo potwierdzono znaczenie stawek capital.com: <code>longRate</code>/<code>shortRate</code> to
+      procent wartości pozycji za dobę, ujemny oznacza opłatę. Opłata BTCUSD z 25.08 (29,02 USD od 47 081,5 USD) zgadza się z
+      dzisiejszym <code>longRate</code> −0,0616438 (design D3 zmiany <code>costs-come-from-the-broker</code>).</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Do sprawdzenia</div>
+      <h2>Co sprawdzić na produkcji</h2>
+      <p>Żadnej z tych rzeczy nie obejrzano jeszcze w przeglądarce na produkcji. Testy automatyczne przechodzą.</p>
+      <div class="fails">
+        <div class="fail">
+          <h3>Pierwszy backtest z kosztami od brokera <span class="tag att">zadanie 4.2</span></h3>
+          <p>Backtests → strategia → formularz bez wpisywania czegokolwiek. Koszty mają się pokazać „z capital.com, pobrane …”,
+          a raport ma podać źródło „z capital.com” i chwilę pobrania. Spread pobrany poza sesją bywa szerszy, więc warto
+          sprawdzić jego wartość i w razie potrzeby kliknąć „Odśwież z capital.com” w godzinach handlu.</p>
+        </div>
+        <div class="fail">
+          <h3>Szkic agenta w edytorze <span class="tag att">nowe</span></h3>
+          <p>W czacie strategii poprosić o zmianę (np. stopu). Po turze edytor ma pokazać tekst jako niezapisany, z napisem
+          „Agent wpisał zmianę do edytora”, a streszczenie ma dotyczyć szkicu. „Porzuć zmiany” usuwa szkic, a „zapisz” w
+          czacie albo przycisk Zapisz tworzy rewizję. Sprawdzić też, czy agent rzeczywiście woła <code>draft_strategy</code>,
+          a nie wkleja JSON-a.</p>
+        </div>
+        <div class="fail">
+          <h3>Nowa strategia z czatu <span class="tag att">nowe</span></h3>
+          <p>„Nowa…” → opis po polsku → szkic w edytorze → Zapisz. Strategia ma się otworzyć, a rozmowa ma do niej należeć.
+          Po ponownym otwarciu strategii, także na innym urządzeniu, wraca ta sama rozmowa. Na liście rozmów w panelu agenta
+          rozmowa nosi nazwę strategii.</p>
+        </div>
+        <div class="fail">
+          <h3>Polskie opisy i zmienne <span class="tag att">nowe</span></h3>
+          <p>Nazwa, hipoteza i założenia nowych strategii po polsku. W streszczeniu wejście czyta się jako
+          „EMA(10) przecina od dołu EMA(30)”, nie «fast».</p>
+        </div>
+        <div class="fail">
+          <h3>Zakładka Backtests <span class="tag att">nowe</span></h3>
+          <p>„wszystkie” pokazuje uruchomienia różnych strategii z nazwami. Odnośnik „Backtesty tej strategii →” w Strategies
+          otwiera Backtests z tą strategią. Uruchomienie „bez kosztów” jest oznaczone w liście i w raporcie.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Do zamknięcia</div>
+      <h2>Formalności OpenSpec</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Zmiana</th><th>Zadania</th><th>Zostało</th></tr></thead>
+          <tbody>
+            <tr><td><code>costs-come-from-the-broker</code></td><td class="n">19/21</td>
+              <td>4.2 pierwszy backtest z kosztami od brokera na produkcji; 4.3 <code>review.md</code>; archiwizacja</td></tr>
+            <tr><td><code>agent-drafts-in-the-editor</code></td><td class="n">10/11</td>
+              <td>4.1 <code>review.md</code> (README zrobione); archiwizacja po sprawdzeniu szkicu na produkcji</td></tr>
+            <tr><td><code>backtests-tab</code></td><td class="n">3/3</td><td>archiwizacja (<code>review.md</code> pominięty w propozycji)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Dalej</div>
+      <h2>Czego jeszcze nie ma</h2>
+      <p>Rzeczy świadomie odłożone albo wypisane poza zakres. Żadna nie blokuje używania modułu.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Temat</th><th>Stan dziś</th><th>Co by trzeba</th></tr></thead>
+          <tbody>
+            <tr><td><b>Walidacja wyników</b> (walk-forward, próby poza próbą)</td><td>etap 3 w README pakietu, niezaczęty</td>
+              <td>osobna zmiana OpenSpec: podział zakresu, raport porównujący część uczącą i testową</td></tr>
+            <tr><td><b>Godzinowy profil spreadu</b></td><td>broker podaje jeden bieżący spread; profil 24 godzin można wpisać ręcznie</td>
+              <td>źródło spreadu z historii (archiwum ma tylko bid, więc trzeba by zbierać ask)</td></tr>
+            <tr><td><b>Porównanie w zakładce Backtests</b></td><td>lista obok siebie; <code>compare_runs</code> tylko dla agenta</td>
+              <td>zaznaczenie kilku uruchomień i tabela porównania na ekranie</td></tr>
+            <tr><td><b>Szkic w trakcie tury</b></td><td>edytor odświeża się po zakończeniu tury</td>
+              <td>strumieniowanie zdarzenia szkicu, jeśli czekanie na koniec tury będzie przeszkadzać</td></tr>
+            <tr><td><b>Zmiana kosztów w czasie</b></td><td>jeden model kosztów na uruchomienie, profil odświeżany ręcznie</td>
+              <td>tylko gdyby wyniki wieloletnie wymagały kosztów z epoki</td></tr>
+            <tr><td><b>Jeden szkic nowej strategii</b></td><td>„Nowa…” ma jedno miejsce na szkic, czyszczone przy kolejnym „Nowa…”</td>
+              <td>nic, dopóki strategie pisze jeden operator</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Strategie · stan na 25 października 2026</span>
+    <span>Źródła: openspec/changes/*, modules/workbench/strategies/README.md</span>
+  </div>
+</footer>
