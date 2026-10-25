@@ -25,6 +25,7 @@ def test_every_model_key_is_a_dummy_and_every_paid_address_leads_nowhere() -> No
     assert keys and all(value == "" or value.startswith("sk-e2e-") for value in keys.values())
     assert NOWHERE in SETTINGS["OPENAI_BASE_URL"] and NOWHERE in SETTINGS["GATEWAY_BASE_URL"]
     assert SETTINGS["TRADING_MCP_URL"] == ""
+    assert SETTINGS["AGENT_PROVIDER"] == "sim"
 
 
 def test_every_database_is_the_e2e_container() -> None:

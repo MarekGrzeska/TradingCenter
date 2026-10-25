@@ -5,6 +5,8 @@ joined this process read what is theirs alone under a prefix of their own: `POLY
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -47,6 +49,8 @@ class Settings(BaseSettings):
 
     agent_models: list[AgentModelCatalogueEntry] = Field(default_factory=list)
     agent_default_model_id: str
+    agent_provider: Literal["openai", "sim"] = "openai"
+    agent_sim_scenario: str | None = None
     teams_models: list[TeamsModelCatalogueEntry] = Field(default_factory=list)
 
     # No `MARKET_MCP_*` since `one-process-per-security-boundary`: the candle archive is a package of this process,
@@ -211,6 +215,8 @@ class Settings(BaseSettings):
             openai_api_key=self.agent_openai_api_key,
             models=self.agent_models,
             default_model_id=self.agent_default_model_id,
+            provider=self.agent_provider,
+            sim_scenario=self.agent_sim_scenario,
             # No market server and no teams server: both are reached in this process, and the fields they
             # used to fill are gone from `agent.config.Settings` with them.
             trading_mcp_url=self.trading_mcp_url,

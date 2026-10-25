@@ -39,6 +39,9 @@ dependency gets written in a hurry, and a rule with no failing case is a prefere
   was always about the invoice and never about the process boundary.
 - **Two model catalogues**, `AGENT_MODELS` and `TEAMS_MODELS`. Only the conversation has a
   default: every agent in a saved team revision names its own model.
+- **One simulated model**, `AGENT_PROVIDER=sim`: the conversation answers from the scenario file in
+  `AGENT_SIM_SCENARIO` instead of OpenAI, with real tools and no network (`agent/simulation.py`). The end-to-end
+  stack runs on it; it is refused wherever `DATABASE_USER` is set. Teams always call OpenAI.
 
 Everything else is one setting for the whole process — `workbench/config.py` is the only
 code that reads the environment, and both surfaces' own `Settings` are built from it by

@@ -12,7 +12,7 @@ from fastapi import FastAPI
 
 from .config import Settings
 from .models_catalogue import ModelCatalogue
-from .provider import OpenAIProvider
+from .provider import ModelProvider
 from .routers import chart, drawings, models, prompt, sessions, usage
 
 
@@ -24,7 +24,7 @@ class State:
     settings: Settings
     pool: asyncpg.Pool
     catalogue: ModelCatalogue
-    provider: OpenAIProvider
+    provider: ModelProvider
     tool_server: Any
     # Holds a turn's background task for as long as it runs, so nothing collects it mid-generation just
     # because the request that started it ended.
