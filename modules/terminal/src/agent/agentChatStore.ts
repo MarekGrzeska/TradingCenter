@@ -339,7 +339,14 @@ export function createAgentChatStore(
     sessionsInFlight = true;
     try {
       const sessions = await api.listSessions(new AbortController().signal);
-      commit({ ...state, sessions, sessionsStatus: "ready" });
+      // A conversation opened before the list arrived — after a reload, or by a strategy — learns its model only now.
+      const active = sessions.find((s) => s.id === state.activeSessionId);
+      commit({
+        ...state,
+        sessions,
+        sessionsStatus: "ready",
+        ...(active ? { selectedModelId: active.currentModelId } : {}),
+      });
     } catch {
       commit({ ...state, sessionsStatus: "unreachable" });
     } finally {

@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agent.provider import TextDelta, ToolCallRequest, UsageReport
+from agent.simulation import Scenario, SimulatedProvider
 from agent.tools import ToolDescriptor, ToolOutcome, ToolOutcomeKind
 from workbench.app import app
 
@@ -633,3 +634,21 @@ def test_stopping_a_foreign_or_missing_session_reads_the_same_404() -> None:
     with TestClient(app) as client:
         response = client.post("/sessions/999999/stop")
     assert response.status_code == 404
+
+
+def test_a_simulated_turn_runs_the_real_tool_and_records_usage_as_zero() -> None:
+    # specs/agent-simulated-model, "Narzędzie w symulowanej turze" and "Zużycie symulowanej tury"
+    scenario = Scenario.model_validate({"turns": [{"when": r"price of (?P<symbol>\w+)", "rounds": [
+        {"tools": [{"name": "get_last_price", "arguments": {"symbol": "{symbol}"}}]}, {"say": "done"}]}]})
+    with TestClient(app) as client:
+        app.state.agent.provider = SimulatedProvider(scenario)
+        app.state.agent.tool_server = _FakeToolServer()
+        session_id = client.post("/sessions", json={}).json()["id"]
+        response = client.post(f"/sessions/{session_id}/messages", json={"content": "price of US100"})
+        events = _sse_events(response.text)
+        usage = client.get("/usage").json()
+
+    assert [kind for kind, _ in events] == ["tool_call", "fragment", "complete"]
+    assert json.loads(events[0][1])["arguments"] == {"symbol": "US100"}
+    [session] = [row for row in usage["by_session"] if row["key"] == str(session_id)]
+    assert (session["input_tokens"], session["output_tokens"], session["unknown_count"]) == (0, 0, 0)

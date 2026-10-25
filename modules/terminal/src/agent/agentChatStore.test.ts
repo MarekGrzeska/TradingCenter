@@ -581,6 +581,18 @@ describe("createAgentChatStore", () => {
     expect(store.getSnapshot().activeSessionId).toBe(api.sessions[0].id);
   });
 
+  it("shows the model of the conversation it reopens, not the catalogue's first", async () => {
+    const api = createFakeApi();
+    const older = api.seed("older chat", MODELS[1].id);
+    const store = createAgentChatStore(memoryStorage({ "terminal.agentChat.session.v1": String(older.id) }), api);
+
+    store.setExpanded(true);
+
+    await waitFor(() => expect(store.getSnapshot().sessionsStatus).toBe("ready"));
+    await waitFor(() => expect(store.getSnapshot().modelsStatus).toBe("ready"));
+    expect(store.getSnapshot().selectedModelId).toBe(MODELS[1].id);
+  });
+
   it("renames a conversation only once the module has agreed", async () => {
     const api = createFakeApi();
     const older = api.seed("older chat", "luna");

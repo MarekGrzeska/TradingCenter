@@ -170,7 +170,7 @@
       <span>TradingCenter / testy</span>
       <span>25 października 2026</span>
       <span>stan na <b>main 0249bfbd</b> + gałąź fazy 0</span>
-      <span>fazy 0–1 <b>zrobione</b> · faza 2 do zrobienia</span>
+      <span>fazy 0–2 <b>zrobione</b> · CI do rozważenia</span>
     </div>
   </div>
 </header>
@@ -525,6 +525,24 @@
           <p>Środowisko procesu to lista dozwolonych nazw systemowych plus <code>workbench.env</code>. Testy pilnują, że klucz
           z powłoki dewelopera nie dociera do workbencha, każdy klucz modelu w pliku jest atrapą, a każda baza to kontener
           E2E.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">08c · Faza 2</div>
+      <h2>Agent na scenariuszu: 18 testów i drugi błąd</h2>
+      <p class="intro">Zmiana OpenSpec <code>agent-sim-provider</code> dodała <code>AGENT_PROVIDER=sim</code>: rozmowa odpowiada
+      z <code>e2e/agent-scenario.json</code>, a narzędzia działają naprawdę. Doszły testy AG-01…04; cały zestaw to 18 testów
+      w ok. 75 s.</p>
+      <div class="fails">
+        <div class="fail stop"><h3>Wybór modelu wracał do Luny po ponownym otwarciu <span class="tag stop">naprawione</span></h3>
+          <p>AG-03 nie przeszedł: rozmowa działała na wybranym modelu, ale po przeładowaniu albo ponownym otwarciu strategii
+          wybierak pokazywał pierwszy model z katalogu. Rozmowa otwierała się, zanim przyszła lista rozmów, z której store
+          brał model, i nikt potem tego nie poprawiał. Teraz model otwartej rozmowy jest brany, gdy lista przyjdzie. To ten
+          sam objaw, który operator zgłosił 25.10 w czacie strategii.</p></div>
+        <div class="fail ok"><h3>Zero tokenów, nie „nieznane” <span class="tag ok">agent-usage</span></h3>
+          <p>Każde symulowane wywołanie zostawia wiersz zużycia z zerem; zakładka kosztów nie pokazuje wydatku ani wierszy
+          nieznanych.</p></div>
       </div>
     </section>
 

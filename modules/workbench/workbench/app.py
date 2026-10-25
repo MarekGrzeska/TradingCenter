@@ -46,6 +46,7 @@ from agent.models_catalogue import ModelCatalogue as AgentCatalogue
 from agent.provider import OpenAIProvider as AgentProvider
 from agent.runtime import MIGRATION_LOCK_KEY as AGENT_LOCK_KEY
 from agent.runtime import MIGRATIONS as AGENT_MIGRATIONS
+from agent.simulation import SimulatedProvider, load_scenario
 from agent.tools import ToolServerRegistry
 from teams import alerts as teams_alerts_module
 from teams import store as teams_store
@@ -85,6 +86,12 @@ def _alerts_client(caller: str):
 async def lifespan(app: FastAPI):
     settings = Settings()  # type: ignore[call-arg]
     conversation_settings = settings.for_conversation()
+    # Read before anything connects: a scenario that cannot be used is a refusal to start, not a failed third turn.
+    conversation_provider = (
+        SimulatedProvider(load_scenario(conversation_settings.sim_scenario or ""))
+        if conversation_settings.provider == "sim"
+        else AgentProvider(conversation_settings)
+    )
     teams_settings = settings.for_teams()
     polymarket_settings = settings.for_polymarket()
     social_settings = settings.for_social()
@@ -298,7 +305,7 @@ async def lifespan(app: FastAPI):
                 settings=conversation_settings,
                 pool=conversation_pool,
                 catalogue=agent_catalogue,
-                provider=AgentProvider(conversation_settings),
+                provider=conversation_provider,
                 tool_server=conversation_tools,
             )
             app.state.teams = teams.surface.State(

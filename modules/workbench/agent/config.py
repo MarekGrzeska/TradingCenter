@@ -4,6 +4,7 @@ loopback, never neither. A tool server's whole setting is optional — unset is 
 from __future__ import annotations
 
 from decimal import Decimal
+from typing import Literal
 from urllib.parse import parse_qs, urlparse
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
@@ -66,6 +67,11 @@ class Settings(BaseSettings):
     models: list[ModelCatalogueEntry] = Field(default_factory=list)
     default_model_id: str
 
+    # `sim` answers from the scenario file instead of OpenAI (`agent-simulated-model`): the end-to-end stack's model,
+    # refused wherever DATABASE_USER is set. The key above stays required either way.
+    provider: Literal["openai", "sim"] = "openai"
+    sim_scenario: str | None = None
+
     # No `MARKET_MCP_*` since `one-process-per-security-boundary`: the candle archive is a package of this
     # process, and its eleven tools arrive as a local source the assembly hands in — no address, no token, no
     # timeout. The same is true of the teams tools, and neither can be unconfigured.
@@ -111,6 +117,19 @@ class Settings(BaseSettings):
         if value is None or not value.strip():
             return None
         return value.strip()
+
+    @model_validator(mode="after")
+    def _simulation_stays_local(self) -> Settings:
+        if self.provider != "sim":
+            return self
+        if self.database_user is not None:
+            raise ValueError(
+                "AGENT_PROVIDER=sim is refused where DATABASE_USER is set — that is a deployment, and its conversation "
+                "must not answer from a scenario file"
+            )
+        if self.sim_scenario is None or not self.sim_scenario.strip():
+            raise ValueError("AGENT_PROVIDER=sim needs AGENT_SIM_SCENARIO, the scenario file it answers from")
+        return self
 
     @model_validator(mode="after")
     def _database_mode_is_coherent(self) -> Settings:

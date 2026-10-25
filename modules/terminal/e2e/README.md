@@ -18,4 +18,6 @@ The workbench's output is in `e2e/workbench.log`, a failed test's trace in `test
   stack and reaches the screen.
 - **Set up through REST, check on screen** (`support.ts`). Each test makes its own strategy with a unique name.
 - **Ids match the manual scenarios**: ST-01 here covers S-01/S-03 in `docs/strategie-scenariusze-testowe.html`.
+- **The agent is a scenario** (`agent-scenario.json`, `AGENT_PROVIDER=sim`): a message matching a rule gets that
+  rule's tool calls and text, with named groups filled in — `E2E szkic 7` drafts strategy 7. The tools are real.
 - The seed (`seed.py`) is thirty weekdays of US100 minutes to today's UTC midnight and an operator's cost profile.
