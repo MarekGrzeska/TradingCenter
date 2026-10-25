@@ -1,0 +1,29 @@
+# The end-to-end stack's database: its own container, port and memory-only storage, so a run never touches the dev
+# archive on 55432 and always starts from an empty database. The workbench migrates every chain itself on start.
+#
+#     docker compose -f e2e/compose.e2e.yaml up -d --wait
+#     docker compose -f e2e/compose.e2e.yaml down
+
+name: tradingcenter-e2e
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: tradingcenter-e2e-db
+    environment:
+      POSTGRES_USER: market_data
+      POSTGRES_PASSWORD: change-me
+      POSTGRES_DB: market_data
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "127.0.0.1:55442:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ./init-databases.sql:/docker-entrypoint-initdb.d/init-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U market_data -d market_data -q"]
+      interval: 1s
+      timeout: 3s
+      retries: 60

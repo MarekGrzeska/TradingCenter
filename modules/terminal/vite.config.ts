@@ -143,6 +143,8 @@ export default defineConfig(({ mode }) => {
     test: {
       environment: "jsdom",
       globals: true,
+      // `e2e/` is Playwright's, run against a live stack by `pnpm e2e`, never by vitest.
+      include: ["src/**/*.test.{ts,tsx}"],
       setupFiles: ["./src/test/setup.ts"],
       css: true,
     },

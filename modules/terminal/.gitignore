@@ -7,3 +7,7 @@ coverage/
 .env
 .env.*
 !.env.example
+
+# Playwright: traces and reports of the last end-to-end run
+test-results/
+playwright-report/
