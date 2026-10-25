@@ -96,6 +96,7 @@ export interface Headline {
 
 export interface RunItem {
   id: number;
+  strategyId: number;
   revision: number;
   status: RunStatus;
   reason: string | null;
@@ -197,7 +198,8 @@ export interface StrategiesApi {
   putCosts(symbol: string, costs: Costs, signal: AbortSignal): Promise<CostProfile>;
   /** Reads the profile off the broker now and keeps it in place of the one there was. */
   costsFromBroker(symbol: string, signal: AbortSignal): Promise<CostProfile>;
-  runs(strategyId: number, signal: AbortSignal): Promise<RunItem[]>;
+  /** One strategy's runs, or every strategy's with `null` — newest first. */
+  runs(strategyId: number | null, signal: AbortSignal): Promise<RunItem[]>;
   run(id: number, signal: AbortSignal): Promise<Run>;
   trades(id: number, offset: number, limit: number, signal: AbortSignal): Promise<{ total: number; trades: Trade[] }>;
   enqueue(request: RunRequest, signal: AbortSignal): Promise<number>;
@@ -262,6 +264,7 @@ function rangeOf(request: Record<string, unknown>): { from: Date; to: Date } {
 function mapRunItem(raw: Schemas["RunSummaryOut"]): RunItem {
   return {
     id: raw.id,
+    strategyId: raw.strategy_id,
     revision: raw.revision,
     status: raw.status,
     reason: raw.reason,
@@ -276,6 +279,7 @@ function mapRun(raw: Schemas["RunOut"]): Run {
   const report = raw.report ?? null;
   return {
     id: raw.id,
+    strategyId: raw.strategy_id,
     revision: raw.revision,
     status: raw.status,
     reason: raw.reason,
@@ -460,7 +464,8 @@ export function createStrategiesApi(httpBase: string, identity: Identity = noIde
     },
 
     async runs(strategyId, signal) {
-      const raw = await http.json<Schemas["RunSummaryOut"][]>(`${httpBase}/runs?strategy_id=${strategyId}`, { signal });
+      const query = strategyId === null ? "" : `?strategy_id=${strategyId}`;
+      const raw = await http.json<Schemas["RunSummaryOut"][]>(`${httpBase}/runs${query}`, { signal });
       return raw.map(mapRunItem);
     },
 
