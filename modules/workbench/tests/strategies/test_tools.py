@@ -21,7 +21,7 @@ from .market import flat, minutes, strategy
 
 EXPECTED = {
     "strategy_language", "list_strategies", "read_strategy", "validate_strategy", "draft_strategy", "save_strategy",
-    "run_backtest", "read_run", "compare_runs",
+    "run_backtest", "read_backtest", "compare_runs",
 }
 # Characters of the serialized `list_tools()` the conversation reads before every turn. Measured 8 827 on 25 October 2026
 # when the surface was written; 10 367 with draft_strategy, the ninth tool, the same day. The headroom is for a description

@@ -7,11 +7,11 @@ się swoboda agenta. Koszty, kolejka i licznik prób są granicą, której agent
 ### Requirement: Powierzchnia narzędzi pakietu strategii
 
 Pakiet MUST publikować narzędzia: `strategy_language` (opis języka), `list_strategies`, `read_strategy`,
-`validate_strategy`, `save_strategy`, `run_backtest`, `read_run` i `compare_runs`. Każde narzędzie MUST używać tej samej
+`validate_strategy`, `save_strategy`, `run_backtest`, `read_backtest` i `compare_runs`. Każde narzędzie MUST używać tej samej
 logiki co odpowiadająca mu trasa REST, czyli tej samej walidacji i tych samych odmów, a odmowa MUST wracać do modelu jako
 wynik z problemami, ich ścieżkami, kolumnami i podpowiedziami. `strategy_language` MUST powstawać z tego samego rejestru
 i katalogu co `GET /language`. `read_strategy` MUST podawać dokument wskazanej albo ostatniej rewizji, jego streszczenie,
-licznik prób i to, czy instrument ma profil kosztów. `read_run` MUST podawać stan, metryki, punkty odniesienia i
+licznik prób i to, czy instrument ma profil kosztów. `read_backtest` MUST podawać stan, metryki, punkty odniesienia i
 pochodzenie wyniku, ale MUST NOT oddawać modelowi krzywej kapitału ani pełnej listy transakcji.
 
 Serializowana powierzchnia narzędzi pakietu MUST mieścić się w nazwanym suficie znaków.
@@ -74,7 +74,7 @@ narzędzia, które ustawia albo zmienia profil kosztów.
 Narzędzie MUST odmówić, gdy w kolejce czeka albo liczy się już jakieś uruchomienie zlecone przez agenta, i MUST nazwać
 jego identyfikator. Narzędzie MUST czekać na wynik nie dłużej niż czas podany w swoim opisie. Gdy uruchomienie się
 skończy, narzędzie MUST oddać jego główne metryki. W przeciwnym razie MUST oddać identyfikator i stan, żeby wynik dało
-się odczytać przez `read_run`. Opis narzędzia MUST mówić, że każde uruchomienie jest próbą liczoną przeciw strategii i że
+się odczytać przez `read_backtest`. Opis narzędzia MUST mówić, że każde uruchomienie jest próbą liczoną przeciw strategii i że
 narzędzie służy do uruchomień, o które poprosił operator.
 
 #### Scenario: Krótkie uruchomienie
