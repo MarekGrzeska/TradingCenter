@@ -13,6 +13,7 @@ from youtube_data.ingest import Ingest
 from youtube_data.providers.base import (
     QuotaExceeded,
     ReadingUnusable,
+    RequestInvalid,
     SourceRefused,
     SourceUnavailable,
 )
@@ -113,7 +114,34 @@ async def test_a_search_the_source_refused_says_why_and_waits_the_topics_interva
     assert (asked_while_held, len(source.asked_from)) == (1, 2)
 
 
-async def test_a_search_the_source_never_answered_is_tried_again_on_the_next_pass(pool) -> None:
+async def test_a_search_the_source_calls_invalid_switches_the_topic_off_instead_of_paying_for_it_every_interval(pool) -> None:
+    rig = Rig(pool, world(film("new1")))
+    source = failing_with(rig, RequestInvalid("the YouTube Data API answered 400 for search: badRequest"))
+
+    await search(rig)
+    rig.clock.advance(days=1)
+    await rig.tick()
+
+    [run] = await runs(rig)
+    off = await topic(rig)
+    assert (off.active, off.retry_at, len(source.asked_from)) == (False, None, 1)
+    assert run.outcome == "failed" and "badRequest" in (run.error or "") and "switched off" in (run.error or "")
+
+
+async def test_a_topic_searches_only_beyond_what_the_followed_channels_need_until_midnight(pool) -> None:
+    rig = Rig(pool, world(film("new1")), daily_source_units=1000)
+    await watchlist.follow_channel(pool, rig.providers.source, rig.settings, MARKETS, added_by="operator")
+    source = failing_with(rig, None)
+    # About 150 left: enough for a search's 101, not for it and the channel's 2 units for each half hour until midnight.
+    async with pool.acquire() as conn:
+        await store.add_usage(conn, {("sim", "sim_units"): 850}, day=budget.utc_day(rig.clock.now()))
+
+    await search(rig)
+
+    [run] = await runs(rig)
+    assert run.outcome == "skipped" and "followed channels" in (run.error or "")
+    assert source.asked_from == []
+
     rig = Rig(pool, world(film("new1")))
     source = failing_with(rig, SourceUnavailable("the YouTube Data API did not answer search"))
 

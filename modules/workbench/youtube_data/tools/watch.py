@@ -123,7 +123,8 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
     ) -> TopicAdded | dict:
         """Keep searching YouTube for a phrase, and offer the operator what it turns up as candidates. Nothing it finds is
         transcribed or read: the operator decides what to follow or analyse. Each search spends the source's day, so leave
-        the limits empty unless there is a reason: the answer says which came from the settings.
+        the limits empty unless there is a reason: the answer says which came from the settings. `language` is a two-letter
+        ISO 639-1 code such as `pl` or `en` (never a name like "Polish"), or empty for any.
 
         Topics wait where the source cannot search — `youtube_archive_status` says so. Cannot remove a topic.
         """

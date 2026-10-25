@@ -174,7 +174,10 @@ error — within the UTC day is **not written again**: it recurs for as long as 
 refusal against the day like any search — 101 units — so retrying on every pass made a failing topic the most expensive thing in the
 archive (on 22–24 October eight of them spent the whole 8 000-unit day by morning, and starved the channels' discovery). A search the
 source never answered cost nothing and is tried again on the next pass. The hold does not move `last_run_at`, which is where the next
-search's window starts; a search that goes through lifts it. The report counts what the source returned, how many of them were already known or belonged to a settled channel, how many
+search's window starts; a search that goes through lifts it. **A 400 switches the topic off instead**: the request itself is wrong
+(on those days the agent had written the language as `Polish`, not `pl`) and no interval cures it. A language is now an ISO 639-1
+code or nothing, checked when a topic or channel is added. **Topics search only beyond the followed channels' share** — one listing
+each for every pass left before midnight UTC — so the day they spend is never the channels'. The report counts what the source returned, how many of them were already known or belonged to a settled channel, how many
 were outside the length bounds, and how the rest were screened — with, for those offered without a verdict, why (`no_model`,
 `day_spent`, `unusable`, `failed`, `no_verdict` for a model that answered and left some out). A run keeps the phrase it searched and
 outlives the topic; runs older than 30 days are swept when the next is written. `GET /topic-runs` reads them (newest first, optionally

@@ -19,6 +19,7 @@ from .base import (
     ChannelNotFound,
     Meter,
     QuotaExceeded,
+    RequestInvalid,
     SourceRefused,
     SourceUnavailable,
     VideoRef,
@@ -57,6 +58,7 @@ class DataApiSource:
     unit = "api_units"
     # The search itself and the details call that follows it, which is always made.
     search_cost = COST_SEARCH + COST_LIST
+    listing_cost = COST_LIST + COST_LIST
 
     def __init__(self, http: httpx.AsyncClient, *, api_key: str, meter: Meter) -> None:
         self._http = http
@@ -79,6 +81,10 @@ class DataApiSource:
             raise SourceRefused(
                 f"the YouTube Data API refused {resource} ({','.join(reasons) or response.status_code}) — "
                 "is the key restricted to another API?"
+            )
+        if response.status_code == 400:
+            raise RequestInvalid(
+                f"the YouTube Data API answered 400 for {resource}{_error_said(response)}"
             )
         if response.is_error:
             raise SourceRefused(
@@ -135,7 +141,8 @@ class DataApiSource:
             "part": "snippet",
             "type": "video",
             "q": phrase,
-            "order": "date",
+            # Not `order=date`: that order answers from an index weeks behind, and within a recent `publishedAfter` it
+            # returns nothing at all (measured 25.10.2026). The window does the filtering; the loop does the ordering.
             "maxResults": min(max(limit, 1), PAGE),
         }
         if language:

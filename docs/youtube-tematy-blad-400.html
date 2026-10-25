@@ -1,0 +1,293 @@
+<title>YouTube — tematy i błąd 400</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Diagnoza · YouTube · tematy</span>
+    <h1>Osiem tematów, jeden błąd 400</h1>
+    <p class="lede">Agent zapisał język tematu jako <b>„Polish”</b> i <b>„English”</b>. YouTube Data API przyjmuje tylko kod ISO 639-1 — <b>„pl”</b>, <b>„en”</b> — i na każde wyszukiwanie odpowiada 400. Pod spodem czeka drugi błąd, który wyjdzie dopiero po naprawie pierwszego.</p>
+    <div class="strip">
+      <span>TradingCenter / workbench / youtube_data</span>
+      <span>25 października 2026</span>
+      <span>źródło: logi kontenera, baza <b>youtube</b>, zapytania do API z serwera</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">8/8</div><div class="l">tematów z błędnym językiem — wszystkie dodane przez agenta 22.10</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">udanych wyszukiwań od dodania tematów</div></div>
+      <div class="cell"><div class="v">8000</div><div class="l">jednostek wliczonych do dziennego limitu 23 i 24.10 — limit wyczerpany</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">wyników z <code>order=date</code> za ostatnie dwa dni, nawet z poprawnym językiem</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Co widać</div>
+      <h2>Co pokazuje ekran i co mówi log</h2>
+      <p class="intro">Wszystkie osiem tematów ma ten sam stan: „ostatnio: jeszcze nie szukano”, ostatni przebieg nieudany, wstrzymany do 25.10, 13:29:40.</p>
+      <pre><code><span class="c"># docker logs tradingcenter-vps-workbench-1 — 25.10, 06:29 UTC, jedna seria na osiem tematów</span>
+WARNING youtube_data.ingest: topic <span class="s">'rynki finansowe i gospodarka'</span> could not be searched:
+  the YouTube Data API answered <span class="k">400</span> for search: badRequest, Request contains an invalid argument.
+<span class="c"># … identycznie dla siedmiu pozostałych</span></code></pre>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tabela <code>topics</code></th><th>language</th><th class="n">interwał</th><th>dodał</th><th>last_run_at</th><th>retry_at</th></tr></thead>
+          <tbody>
+            <tr><td><b>rynki finansowe i gospodarka</b></td><td><code>Polish</code></td><td class="n">360</td><td>agent</td><td>—</td><td>25.10 12:29 UTC</td></tr>
+            <tr><td><b>global financial markets and economy</b></td><td><code>English</code></td><td class="n">360</td><td>agent</td><td>—</td><td>25.10 12:29 UTC</td></tr>
+            <tr class="void"><td colspan="6">… i sześć kolejnych par PL/EN: wszystkie dodane 22.10 o 20:32 UTC, wszystkie z pełną nazwą języka</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">„Jeszcze nie szukano” to nie błąd ekranu: <code>last_run_at</code> ustawia tylko udane wyszukiwanie, a takiego nie było. Godzina na ekranie (13:29:40) to czas lokalny, czyli 12:29:40 UTC w bazie.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Przyczyna</div>
+      <h2>„Polish” trafia do relevanceLanguage</h2>
+      <p>Narzędzie agenta <code>add_topic(phrase, language="")</code> (<code>youtube_data/tools/watch.py</code>) nie mówi, w jakim formacie podać język, a <code>watchlist.add_topic</code> zapisuje go bez sprawdzenia. Pętla przekazuje go potem do API bez zmian (<code>providers/data_api.py</code>, <code>search</code>):</p>
+      <pre><code><span class="k">if</span> language:
+    params[<span class="s">"relevanceLanguage"</span>] = language   <span class="c"># "Polish" — API chce "pl"</span></code></pre>
+      <p>Sprawdzone na produkcji tym samym kluczem i tymi samymi parametrami, w których zmieniał się tylko język:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>relevanceLanguage</th><th class="n">HTTP</th><th>Odpowiedź</th></tr></thead>
+          <tbody>
+            <tr><td><code>Polish</code></td><td class="n">400</td><td><span class="tag stop">badRequest</span> Request contains an invalid argument.</td></tr>
+            <tr><td><code>pl</code></td><td class="n">200</td><td><span class="tag ok">ok</span> zwykła lista wyników</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="quote">Źródło niczego nam nie odmówiło. Odrzuciło zapytanie, które sami źle zbudowaliśmy.</div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Skutki uboczne</div>
+      <h2>Co ten błąd zrobił po drodze</h2>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Limit dnia wyczerpany przez odrzucone zapytania <span class="tag stop">kanały głodzone</span></h3>
+          <p>Licznik zapisuje koszt <em>przed</em> oceną odpowiedzi, więc każde 400 to 100 jednostek w naszej księdze. Do 24.10, 19:39 (<code>4d970a9d</code>) odrzucony temat nie był wstrzymywany, więc co 30 minut 8 × 100 = 800 jednostek. Księga: 22.10 — 5712, 23.10 — <b>8000</b>, 24.10 — <b>8000</b> (sufit <code>daily_source_units</code>). Po dojściu do sufitu pętla przestaje też listować obserwowany kanał (<code>if left &lt;= 0: break</code>), a dopiero potem pomija tematy — stąd wpisy „skipped: the data_api source's day cannot pay for a search” z 24.10, 13:46. Nowych filmów: 3 dziennie 21–23.10, 1 w dniu 24.10.</p>
+        </div>
+        <div class="fail">
+          <h3>Nasza księga liczy więcej niż Google <span class="tag att">do potwierdzenia</span></h3>
+          <p>Według dokumentacji Google błędne zapytanie kosztuje co najmniej 1 jednostkę, nie 100 jak udane wyszukiwanie. Jeśli tak jest, rzeczywisty limit klucza (10 000) był daleko, a zatrzymał nas własny, zawyżony sufit 8000.</p>
+        </div>
+        <div class="fail">
+          <h3>Ekran mówi „po odmowie źródła” <span class="tag att">mylące</span></h3>
+          <p>400 trafia do tej samej klasy co 403 (<code>SourceRefused</code>): temat jest wstrzymywany na swój interwał i co 6 godzin próbuje ponownie, w nieskończoność. Dziś: 00:08 i 06:29 UTC, następna próba 12:29. Błąd zapytania sam nie przejdzie, a ekran sugeruje, że to wina YouTube.</p>
+        </div>
+        <div class="fail">
+          <h3>Historia pokazuje mniej przebiegów niż było <span class="tag att">z założenia</span></h3>
+          <p><code>store.add_run</code> nie zapisuje drugi raz takiej samej porażki w tej samej dobie UTC. Przebieg z 06:29 jest więc tylko w logu, a w <code>topic_runs</code> jest jeden wiersz na temat z 00:08. Wcześniejszych dni nie ma w historii wcale (tabela działa od 24.10), widać je tylko w księdze zużycia.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Drugi błąd</div>
+      <h2>Po naprawie języka wyniki nadal będą puste</h2>
+      <p class="intro">Wyszukiwanie wysyła <code>order=date</code> razem z <code>publishedAfter</code>. Wyszukiwarka YouTube przy <code>order=date</code> zwraca stare filmy: najnowszy wynik dla frazy „rynki finansowe i gospodarka” był z 4.10.2026. W oknie ostatnich dwóch dni nie ma więc nic.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Parametry (relevanceLanguage=pl)</th><th class="n">totalResults</th><th class="n">zwrócone</th><th>Najnowszy wynik</th></tr></thead>
+          <tbody>
+            <tr class="void"><td><code>order=date</code> + <code>publishedAfter=23.10</code></td><td class="n">45 965</td><td class="n">0</td><td>—</td></tr>
+            <tr class="void"><td><code>order=date</code> + <code>publishedAfter</code> + <code>regionCode=PL</code></td><td class="n">45 965</td><td class="n">0</td><td>—</td></tr>
+            <tr><td><code>order=date</code>, bez okna</td><td class="n">1 000 000</td><td class="n">5</td><td>04.10.2026</td></tr>
+            <tr><td><b>bez <code>order</code></b> (relevance) + <code>publishedAfter=23.10</code></td><td class="n">45 601</td><td class="n">5</td><td><span class="tag ok">filmy z ostatnich dni</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Po samej naprawie języka tematy przeszłyby w stan <code>nothing_new</code>, czyli w ciche niedziałanie: każde wyszukiwanie zapłacone, a zero kandydatów. Przy okazji: <code>relevanceLanguage</code> to tylko wskazówka, bo wśród wyników bez <code>order</code> trafił się film tajski i francuski. Rzeczy spoza języka odsieje screening.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Propozycje</div>
+      <h2>Co poprawić, w kolejności</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th class="n">#</th><th>Zmiana</th><th>Gdzie</th><th>Waga</th></tr></thead>
+          <tbody>
+            <tr><td class="n">1</td><td><b>Naprawić dane.</b> <code>TopicPatch</code> nie zmienia języka, a unikat to <code>(lower(phrase), language)</code>. Migracja <code>0009_language_codes</code> zamienia nazwy języków na kody w <code>topics</code> i <code>channels</code> i zdejmuje wstrzymanie wynikające z błędów 400. Wdrożenie stosuje ją samo. Temat, który zderzyłby się z istniejącym już pod kodem, zostaje bez zmian do usunięcia przez operatora.</td><td><code>migrations/youtube</code></td><td><span class="tag ok">zrobione</span></td></tr>
+            <tr><td class="n">2</td><td><b>Sprawdzać język przy dodaniu.</b> W <code>watchlist.add_topic</code> (i dla kanałów w <code>follow_channel</code>) przyjmować pusty albo dwuliterowy kod; <code>pl-PL</code> sprowadzać do <code>pl</code>, a „Polish” odrzucać z komunikatem, który podaje poprawną formę. Docstring <code>add_topic</code> w narzędziu agenta ma mówić wprost: „ISO 639-1 code such as <code>pl</code> or <code>en</code>, empty for any”. Jeden test jednostkowy reguły, na poziomie <code>watchlist</code>.</td><td><code>watchlist.py</code>, <code>tools/watch.py</code></td><td><span class="tag ok">zrobione</span></td></tr>
+            <tr><td class="n">3</td><td><b>Usunąć <code>order=date</code>.</b> Okno wyznacza <code>publishedAfter</code>, a kolejność i tak ustala pętla. Domyślne <code>relevance</code> zwraca świeże filmy, a <code>date</code> nie zwraca nic. Narzędzie <code>search_youtube</code> idzie tą samą ścieżką, więc ta zmiana naprawia też jego.</td><td><code>providers/data_api.py</code></td><td><span class="tag ok">zrobione</span></td></tr>
+            <tr><td class="n">4</td><td><b>Oddzielić 400 od odmowy.</b> Nowy wyjątek, np. <code>RequestInvalid</code>, dla 400 i <code>badRequest</code>/<code>invalidParameter</code>. Temat <em>wyłączyć</em> (<code>active = false</code>) z błędem w historii zamiast co interwał płacić za to samo złe zapytanie. Ekran ma pisać „zapytanie odrzucone jako błędne — popraw temat”, nie „po odmowie źródła”.</td><td><code>providers/base.py</code>, <code>ingest.py</code></td><td><span class="tag ok">zrobione</span></td></tr>
+            <tr><td class="n">5</td><td><b>Księgować 400 jako 1 jednostkę</b>, zgodnie z tym, co liczy Google; 403 i 429 bez zmian. Najpierw potwierdzić w konsoli Google Cloud (Quotas, dzień 23.10), czy rzeczywiste zużycie było blisko 8000, czy wyraźnie niżej.</td><td><code>providers/data_api.py</code> (<code>_get</code>)</td><td><span class="tag att">po potwierdzeniu</span></td></tr>
+            <tr><td class="n">6</td><td><b>Tematy nie mogą głodzić kanałów.</b> Wyszukiwania tematów korzystają tylko z puli ponad rezerwę dla kanałów, np. sufit minus koszt dnia listowania obserwowanych kanałów. Kanał to 2 jednostki na przebieg, temat to 101.</td><td><code>budget.py</code>, <code>ingest.py</code></td><td><span class="tag ok">zrobione</span></td></tr>
+            <tr><td class="n">7</td><td><b>Alert, gdy temat przez dobę nie ma ani jednego udanego wyszukiwania</b>, przez istniejący pakiet <code>alerts</code>. Ten błąd trwał trzy dni i zauważył go dopiero operator na ekranie.</td><td><code>youtube_data/alerts.py</code></td><td><span class="tag ok">później</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Punkty 1–4 i 6 są w gałęzi <code>fix/youtube-topic-language</code>; temat po 400 jest wyłączany bez nowego <code>outcome</code>, z wyjaśnieniem w błędzie przebiegu. Punkty 2–4 to poprawka błędu bez nowego wymagania i bez zmiany kontraktu (<code>language</code> zostaje stringiem), więc idą zwykłą ścieżką: gałąź, testy, PR. Punkt 4 zmienia tekst na ekranie, ale nie kształt odpowiedzi. Jeśli dojdzie nowy <code>outcome</code> w <code>topic_runs</code>, to już zmiana kontraktu: <code>contract-sync</code> i migracja warunku CHECK.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Metoda</div>
+      <h2>Na czym to stoi</h2>
+      <p>Logi <code>tradingcenter-vps-workbench-1</code> sięgają tylko do restartu 25.10, 04:59 UTC. Wcześniejsze dni odtworzone z tabel <code>topics</code>, <code>topic_runs</code> i <code>usage</code>. Sześć wywołań <code>search</code> wykonanych z kontenera produkcyjnego jego własnym kluczem, poza księgą pętli: około 600 jednostek z dnia klucza 25.10.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Diagnoza tematów YouTube · 25.10.2026</span>
+    <span>Tryb jasny — jedyny</span>
+  </div>
+</footer>

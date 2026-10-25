@@ -58,6 +58,11 @@ class SourceRefused(SourceUnavailable):
     call it never answered, asking again at once costs again."""
 
 
+class RequestInvalid(SourceRefused):
+    """The source says the request itself is wrong — a 400, a mistake of ours that no retry will cure. A topic asking it
+    would pay for the same refusal every interval, so it is switched off instead of held."""
+
+
 class QuotaExceeded(SourceError):
     """The source's own daily allowance is spent. Not retried before the day turns."""
 
@@ -77,6 +82,11 @@ class VideoSource(Protocol):
 
     @property
     def search_cost(self) -> int: ...
+
+    @property
+    def listing_cost(self) -> int:
+        """One channel's latest films: the listing and the details call that follows it."""
+        ...
 
     async def resolve_channel(self, reference: str) -> ChannelInfo: ...
 

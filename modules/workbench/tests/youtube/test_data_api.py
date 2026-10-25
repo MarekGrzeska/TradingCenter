@@ -12,6 +12,7 @@ from youtube_data.providers.base import (
     ChannelNotFound,
     Meter,
     QuotaExceeded,
+    RequestInvalid,
     SourceRefused,
     SourceUnavailable,
 )
@@ -69,7 +70,7 @@ async def test_listing_uploads_is_two_calls_that_cost_two_units(source, meter) -
 
 
 @respx.mock
-async def test_a_search_costs_a_hundred_units_and_asks_for_the_newest(source, meter) -> None:
+async def test_a_search_costs_a_hundred_units_and_leaves_the_order_to_relevance(source, meter) -> None:
     search = respx.get(f"{API_URL}/search").respond(json={"items": [{"id": {"videoId": "v1"}}]})
     respx.get(f"{API_URL}/videos").respond(json={"items": [api_video("v1")]})
 
@@ -78,11 +79,12 @@ async def test_a_search_costs_a_hundred_units_and_asks_for_the_newest(source, me
     )
 
     params = dict(search.calls.last.request.url.params)
-    assert (params["q"], params["order"], params["publishedAfter"]) == (
+    assert (params["q"], params["relevanceLanguage"], params["publishedAfter"]) == (
         "gold outlook",
-        "date",
+        "en",
         "2026-09-26T12:00:00Z",
     )
+    assert "order" not in params
     assert [f.video_id for f in films] == ["v1"]
     assert meter.drain() == {("data_api", "api_units"): 101}
 
@@ -135,7 +137,7 @@ async def test_an_answered_error_is_a_paid_refusal_that_says_what_google_said_an
         status_code=400,
         json={"error": {"message": "Request contains an invalid argument.", "errors": [{"reason": "badRequest"}]}},
     )
-    with pytest.raises(SourceRefused, match="badRequest, Request contains an invalid argument"):
+    with pytest.raises(RequestInvalid, match="badRequest, Request contains an invalid argument"):
         await source.search("gold", language="", published_after=None, limit=5)
     assert meter.drain() == {("data_api", "api_units"): 100}
 

@@ -4,8 +4,9 @@ YouTube Data API says it as a 403 that costs a unit to receive."""
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, time, timedelta
 
 from tc_runtime.db import Conn
 
@@ -41,6 +42,14 @@ def ceilings(settings: Settings, providers: Providers) -> list[Ceiling]:
 
 def utc_day(moment: datetime) -> date:
     return moment.astimezone(UTC).date()
+
+
+def channels_reserve(channels: int, listing_cost: int, *, now: datetime, interval_seconds: float) -> int:
+    """What the followed channels will still spend before midnight UTC, one listing each per pass. Topics search only beyond
+    it: on 23 and 24 October 2026 eight topics spent the whole day on refusals, and the one followed channel went unlisted."""
+    midnight = datetime.combine(utc_day(now) + timedelta(days=1), time.min, tzinfo=UTC)
+    passes = math.ceil((midnight - now).total_seconds() / max(interval_seconds, 1))
+    return channels * listing_cost * passes
 
 
 async def remaining(conn: Conn, ceiling: Ceiling, *, day: date) -> int:
