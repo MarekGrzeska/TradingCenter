@@ -117,6 +117,8 @@ change was made to — or a newer one is a refusal; `run_backtest` queues a run 
 **instrument's cost profile** and no costs of its own, refuses while another of the agent's runs waits, and waits up to
 `WAIT_SECONDS` for the result — read off the broker when there is none — or `without_costs` when the operator asks for
 that in so many words; `read_run` and `compare_runs`, which refuses runs of different range, costs or engine.
+The screen asks the same of `GET /runs/compare?run_id=…&run_id=…`, under the same rule (`compare.py`): 422 names every
+difference, 404 a run that does not exist.
 No tool sets a cost profile. The surface has a character ceiling in
 `tests/strategies/test_tools.py`.
 

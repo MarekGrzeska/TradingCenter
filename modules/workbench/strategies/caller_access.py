@@ -35,6 +35,7 @@ REST_PATHS: tuple[str, ...] = (
     "/strategies/{strategy_id}/draft",
     "/drafts/new",
     "/runs",
+    "/runs/compare",
     "/runs/{run_id}",
     "/runs/{run_id}/cancel",
     "/runs/{run_id}/trades",

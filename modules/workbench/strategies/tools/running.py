@@ -17,7 +17,6 @@ from ._shared import READ_ONLY, WRITES, ToolContext, refusal
 # How long run_backtest waits for its run before answering with the id. An H1 strategy over a year with its random-entry
 # benchmark takes about 2 s (measured for stage 1); a minute strategy can take minutes, and a turn should not.
 WAIT_SECONDS = 20.0
-MAX_COMPARED = 5
 
 
 class RunResult(BaseModel):
@@ -142,8 +141,8 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
     async def compare_runs(run_ids: list[int]) -> Comparison:
         """Two to five finished runs side by side — refused, with every difference named, unless they share the range,
         the costs and the engine version, because then the numbers would not measure the same thing."""
-        if not 2 <= len(run_ids) <= MAX_COMPARED or len(set(run_ids)) != len(run_ids):
-            raise refusal(f"compare 2 to {MAX_COMPARED} different runs")
+        if (problem := compare.count_problem(run_ids)) is not None:
+            raise refusal(problem)
         async with ctx.state.pool.acquire() as conn:
             rows = [await runs.get_run(conn, run_id) for run_id in run_ids]
         missing = [run_id for run_id, row in zip(run_ids, rows, strict=True) if row is None]

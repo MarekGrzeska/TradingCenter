@@ -13,6 +13,8 @@ import { MarketDataError } from "../data/types";
 type Schemas = components["schemas"];
 
 export type Report = Schemas["ReportOut"];
+/** In its wire shape for the reason a report is: numbers under their own names. */
+export type ComparedRun = Schemas["ComparedRunOut"];
 export type Language = Schemas["LanguageOut"];
 export type Summary = Schemas["SummaryOut"];
 export type Costs = Schemas["CostModel"];
@@ -204,6 +206,8 @@ export interface StrategiesApi {
   trades(id: number, offset: number, limit: number, signal: AbortSignal): Promise<{ total: number; trades: Trade[] }>;
   enqueue(request: RunRequest, signal: AbortSignal): Promise<number>;
   cancel(id: number, signal: AbortSignal): Promise<void>;
+  /** Two to five finished runs side by side, in the order given; `Refused` names every difference that forbids it. */
+  compare(runIds: number[], signal: AbortSignal): Promise<ComparedRun[]>;
 }
 
 const mapStatus = statusMapper({ 404: "not-found", 409: "refused", 422: "refused", 503: "upstream" });
@@ -499,6 +503,13 @@ export function createStrategiesApi(httpBase: string, identity: Identity = noIde
 
     async cancel(id, signal) {
       await http.send(`${httpBase}/runs/${id}/cancel`, { signal, method: "POST" });
+    },
+
+    compare(runIds, signal) {
+      return writing(async () => {
+        const query = runIds.map((id) => `run_id=${id}`).join("&");
+        return (await http.json<Schemas["ComparisonOut"]>(`${httpBase}/runs/compare?${query}`, { signal })).runs;
+      });
     },
   };
 }

@@ -5,13 +5,17 @@ import { resolveEndpoints } from "../data/config";
 import { workbenchIdentity } from "../data/marketData";
 import { messageOf, useRead } from "../data/query";
 import { MarketDataError } from "../data/types";
+import { Button } from "../ui/Button";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
+import { ComparePanel } from "./ComparePanel";
 import { anyPending, interval } from "./present";
 import { ReportPanel } from "./ReportPanel";
 import { RunForm } from "./RunForm";
 import { RunsPanel } from "./RunsPanel";
 import {
   createStrategiesApi,
+  Refused,
+  type ComparedRun,
   type Health,
   type Revision,
   type RunItem,
@@ -27,6 +31,7 @@ import {
 
 const signal = () => new AbortController().signal;
 const RUNS_POLL_MS = 3_000;
+const MAX_COMPARED = 5;
 
 export function BacktestsView({
   api,
@@ -37,6 +42,9 @@ export function BacktestsView({
   const picked = Number(params.get("strategy")) || null;
   const [pickedRun, setPickedRun] = useState<number | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
+  // Ids, not rows: a comparison may hold runs of several strategies and survives switching the list's filter.
+  const [checked, setChecked] = useState<ReadonlySet<number>>(new Set());
+  const [compared, setCompared] = useState<{ runs: ComparedRun[] | null; refusal: string[] | null } | null>(null);
 
   const health = useRead<{ present: boolean; health: Health | null }>({
     key: ["strategies", "health"],
@@ -112,6 +120,22 @@ export function BacktestsView({
   }
 
   const names = new Map(list.value.map((s) => [s.id, s.name]));
+
+  function toggleChecked(id: number) {
+    const next = new Set(checked);
+    if (!next.delete(id)) next.add(id);
+    setChecked(next);
+  }
+
+  async function compare() {
+    setFailure(null);
+    try {
+      setCompared({ runs: await client.compare([...checked], signal()), refusal: null });
+    } catch (cause: unknown) {
+      if (cause instanceof Refused) setCompared({ runs: null, refusal: cause.problems.map((p) => p.message) });
+      else setFailure(messageOf(cause, "nie udało się porównać uruchomień"));
+    }
+  }
   const document = detail.value?.document as { symbol?: string; params?: Record<string, never> } | undefined;
   const runDocument = ofRun.value?.document as { symbol?: string; timeframe?: string } | undefined;
 
@@ -165,8 +189,30 @@ export function BacktestsView({
         )
       )}
 
+      <div className="flex items-center gap-2 text-xs text-ink-secondary">
+        <Button size="2xs" disabled={checked.size < 2 || checked.size > MAX_COMPARED} onClick={() => void compare()}>
+          Porównaj ({checked.size})
+        </Button>
+        {checked.size > 0 && (
+          <Button
+            size="2xs"
+            tone="muted"
+            onClick={() => {
+              setChecked(new Set());
+              setCompared(null);
+            }}
+          >
+            Wyczyść
+          </Button>
+        )}
+        <span>zaznacz od 2 do {MAX_COMPARED} zakończonych uruchomień</span>
+      </div>
+      {compared !== null && <ComparePanel runs={compared.runs} refusal={compared.refusal} strategyNames={names} />}
+
       <RunsPanel
         runs={runs.value}
+        checked={checked}
+        onCheck={toggleChecked}
         error={runs.error}
         picked={pickedRun}
         onPick={setPickedRun}

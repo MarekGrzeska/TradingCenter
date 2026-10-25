@@ -15,6 +15,16 @@ METRICS = (
 )
 
 
+MAX_COMPARED = 5
+
+
+def count_problem(run_ids: Sequence[int]) -> str | None:
+    """Why this list of ids cannot be compared at all, before any run is read; `None` when it can."""
+    if not 2 <= len(run_ids) <= MAX_COMPARED or len(set(run_ids)) != len(run_ids):
+        return f"compare 2 to {MAX_COMPARED} different runs"
+    return None
+
+
 class NotComparable(Exception):
     def __init__(self, reasons: list[str]) -> None:
         super().__init__("; ".join(reasons))

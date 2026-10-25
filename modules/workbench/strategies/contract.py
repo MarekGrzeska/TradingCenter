@@ -146,6 +146,32 @@ class ReportOut(BaseModel):
     )
 
 
+class ComparedRunOut(BaseModel):
+    """One run of a comparison: what it was made of and the numbers a reader weighs. Nothing ranks it."""
+
+    run_id: int
+    strategy_id: int
+    revision: int
+    params: dict[str, float]
+    trades: int | None
+    win_rate: float | None
+    expectancy_r: float | None
+    total_r: float | None
+    profit_factor: float | None
+    max_drawdown_r: float | None
+    max_drawdown_pct: float | None
+    sharpe: float | None
+    sortino: float | None
+    calmar: float | None
+    longest_losing_streak: int | None
+    total_r_without_best_5: float | None
+    pessimistic_resolutions: int | None
+
+
+class ComparisonOut(BaseModel):
+    runs: list[ComparedRunOut] = Field(description="in the order asked; same range, costs and engine version")
+
+
 class RunOut(BaseModel):
     id: int
     strategy_id: int
