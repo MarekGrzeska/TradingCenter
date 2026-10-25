@@ -149,21 +149,19 @@ class StrategyInView(BaseModel):
     draft: str | None = None
 
     def as_context(self) -> str:
-        # The tab reloads only what was saved: a document pasted into the reply never reaches the editor.
-        saving = (
-            " Never answer with the document's JSON for the operator to paste — the editor and its summary show "
-            "only what save_strategy saved."
+        # The tab shows what reached the package, never a document pasted into the reply.
+        drafting = (
+            " Put every change into the editor with draft_strategy — the operator sees it there at once, unsaved — and "
+            "save a revision with save_strategy only when the operator asks to save. Never answer with the document's "
+            "JSON to paste."
         )
         if self.strategy_id is None:
-            opened = (
-                "The operator has a new, unsaved strategy open in the Strategies tab's editor. Once the description "
-                "is enough to write it, save it with save_strategy (no strategy_id) and the tab opens it." + saving
-            )
+            opened = "The operator has a new, unsaved strategy open in the Strategies tab's editor." + drafting
         else:
             opened = (
                 f"The operator has strategy {self.strategy_id} open in the Strategies tab, its editor based on "
-                f"revision {self.revision}; read it with read_strategy and save changes with based_on={self.revision}."
-                + saving
+                f"revision {self.revision}; read it with read_strategy, draft with strategy_id={self.strategy_id}, and "
+                f"save with based_on={self.revision}." + drafting
             )
         if self.draft is None:
             return opened

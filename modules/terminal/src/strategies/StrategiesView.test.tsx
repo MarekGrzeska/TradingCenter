@@ -69,6 +69,8 @@ function fakeApi(overrides: Partial<StrategiesApi> = {}): StrategiesApi {
     save: vi.fn(),
     setArchived: vi.fn(),
     setConversation: vi.fn(async () => {}),
+    draft: vi.fn(async () => null),
+    discardDraft: vi.fn(async () => {}),
     costs: vi.fn(async () => null),
     putCosts: vi.fn(),
     costsFromBroker: vi.fn(async () => BROKER),
@@ -194,5 +196,25 @@ describe("StrategiesView", () => {
     expect(await screen.findByText("Agent utworzył tę strategię.")).toBeInTheDocument();
     await waitFor(() => expect(api.setConversation).toHaveBeenCalledWith(8, 42, expect.anything()));
     expect(api.setConversation).toHaveBeenCalledTimes(1);
+  });
+
+  it("puts the agent's draft into the editor as unsaved text, and discarding it removes it", async () => {
+    const activity = createAgentActivityStore();
+    const api = fakeApi();
+    render(<StrategiesView api={api} pairs={pairs} activity={activity} />);
+    await userEvent.click(await screen.findByRole("button", { name: /US100 pullback/ }));
+    await screen.findByText(/rewizja 4/);
+
+    const drafted = { ...DOCUMENT, name: "with a tighter stop" };
+    vi.mocked(api.draft).mockImplementation(async () => ({ document: drafted, seq: 3, updatedAt: new Date() }));
+    activity.turnFinished();
+
+    expect(await screen.findByText(/Agent wpisał zmianę do edytora/)).toBeInTheDocument();
+    expect(screen.getByText("niezapisane zmiany")).toBeInTheDocument();
+    expect(strategyInView()?.draft).toContain("with a tighter stop");
+
+    await userEvent.click(screen.getByRole("button", { name: "Porzuć zmiany" }));
+    expect(api.discardDraft).toHaveBeenCalledWith(7, expect.anything());
+    await waitFor(() => expect(strategyInView()?.draft).toBeNull());
   });
 });

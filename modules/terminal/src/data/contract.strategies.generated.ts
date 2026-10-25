@@ -89,6 +89,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/drafts/new": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * New Draft
+         * @description The agent's draft of a strategy not saved yet; 404 when there is none.
+         */
+        get: operations["new_draft_drafts_new_get"];
+        put?: never;
+        post?: never;
+        /** Discard New Draft */
+        delete: operations["discard_new_draft_drafts_new_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -290,6 +311,27 @@ export interface paths {
         put: operations["set_conversation_strategies__strategy_id__conversation_put"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/strategies/{strategy_id}/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Draft
+         * @description The agent's draft of this strategy, not saved as a revision; 404 when there is none.
+         */
+        get: operations["draft_strategies__strategy_id__draft_get"];
+        put?: never;
+        post?: never;
+        /** Discard Draft */
+        delete: operations["discard_draft_strategies__strategy_id__draft_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -508,6 +550,31 @@ export interface components {
             slippage: number;
             /** Spread */
             spread: number;
+        };
+        /** DraftOut */
+        DraftOut: {
+            /**
+             * Document
+             * @description as the agent put it — not necessarily valid
+             */
+            document: {
+                [key: string]: unknown;
+            };
+            /**
+             * Seq
+             * @description new with every draft, also one carrying the same document
+             */
+            seq: number;
+            /**
+             * Strategy Id
+             * @description null for the new strategy not saved yet
+             */
+            strategy_id: number | null;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** FunctionOut */
         FunctionOut: {
@@ -1328,6 +1395,51 @@ export interface operations {
             };
         };
     };
+    new_draft_drafts_new_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    discard_new_draft_drafts_new_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     health_health_get: {
         parameters: {
             query?: never;
@@ -1764,6 +1876,73 @@ export interface operations {
             };
             /** @description Not Found */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    draft_strategies__strategy_id__draft_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DraftOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    discard_draft_strategies__strategy_id__draft_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
                 headers: {
                     [name: string]: unknown;
                 };

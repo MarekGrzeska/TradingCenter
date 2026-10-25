@@ -21,6 +21,7 @@ import {
   SaveConflict,
   type Health,
   type Language,
+  type Draft,
   type Revision,
   type RunItem,
   type StrategiesApi,
@@ -201,18 +202,43 @@ export function StrategiesView({
       load(revision);
       setOpenId(id);
       attachChat(item);
+      const draft = await client.draft(id, signal());
+      if (draft !== null && draft.updatedAt > revision.createdAt) showDraft(draft);
     } catch (cause: unknown) {
       setFailure(messageOf(cause, "nie udało się otworzyć strategii"));
     }
   }
 
+  // The agent's draft last put into the editor: a later read showing the same `seq` is not news, and a revision the agent
+  // saves while the editor still holds exactly this text replaces it rather than being reported as newer.
+  const shownDraft = useRef<{ seq: number; text: string } | null>(null);
+
+  function showDraft(draft: Draft) {
+    const shown = documentText(draft.document);
+    shownDraft.current = { seq: draft.seq, text: shown };
+    setText(shown);
+    setNewer(null);
+    setNotice("Agent wpisał zmianę do edytora — jest niezapisana: zapisz ją albo porzuć.");
+  }
+
+  async function discardDraft() {
+    shownDraft.current = null;
+    try {
+      await client.discardDraft(base?.strategyId ?? null, signal());
+    } catch {
+      // A draft left behind is shown again only if it is newer than the revision, so nothing is lost by failing here.
+    }
+  }
+
   // Read after every turn: the agent may have saved a revision, created a strategy or queued a run.
-  const latestState = useRef({ openId, base, dirty, list: list.value });
-  latestState.current = { openId, base, dirty, list: list.value };
+  const latestState = useRef({ openId, base, dirty, text, creating, list: list.value });
+  latestState.current = { openId, base, dirty, text, creating, list: list.value };
   useEffect(
     () =>
       activity.subscribe(() => {
-        const { openId: id, base: at, dirty: unsaved, list: known } = latestState.current;
+        const { openId: id, base: at, dirty, text: onScreen, creating: isNew, list: known } = latestState.current;
+        // Text that is the agent's own draft is not the operator's unsaved work.
+        const unsaved = dirty && onScreen !== shownDraft.current?.text;
         list.reload();
         runs.reload();
         void (async () => {
@@ -222,11 +248,18 @@ export function StrategiesView({
               const next = afterTurn({ strategyId: id, base: at.n, dirty: unsaved }, latest.n);
               if (next.kind === "load") {
                 load(latest);
+                shownDraft.current = null;
                 setNotice(latest.author === "agent" ? `Agent zapisał rewizję ${latest.n}.` : `Wczytano rewizję ${latest.n}.`);
               } else if (next.kind === "newer") {
                 setNewer(next.revision);
               }
+              const draft = await client.draft(id, signal());
+              if (draft !== null && draft.seq !== shownDraft.current?.seq) showDraft(draft);
               return;
+            }
+            if (isNew) {
+              const draft = await client.draft(null, signal());
+              if (draft !== null && draft.seq !== shownDraft.current?.seq) showDraft(draft);
             }
             const now = await client.strategies(false, signal());
             const created = createdDuringTurn(new Set(known.map((s) => s.id)), now, id !== null);
@@ -319,6 +352,8 @@ export function StrategiesView({
               setText(documentText(BLANK));
               chatOwner.current = { strategy: "new", name: "", conversation: null };
               chat.newSession();
+              shownDraft.current = null;
+              void client.discardDraft(null, signal()).catch(() => {});
               setNotice("Nowa strategia: opisz ją w czacie obok albo popraw szkielet.");
             }}
           >
@@ -367,7 +402,14 @@ export function StrategiesView({
                 Zapisz
               </Button>
               {dirty && (
-                <Button size="xs" tone="muted" onClick={() => setText(baseText)}>
+                <Button
+                  size="xs"
+                  tone="muted"
+                  onClick={() => {
+                    setText(baseText);
+                    void discardDraft();
+                  }}
+                >
                   Porzuć zmiany
                 </Button>
               )}

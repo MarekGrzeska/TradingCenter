@@ -71,6 +71,13 @@ export interface Change {
   after: unknown;
 }
 
+export interface Draft {
+  document: Record<string, unknown>;
+  /** New with every draft the agent puts, also one carrying the same document. */
+  seq: number;
+  updatedAt: Date;
+}
+
 export interface Validation {
   valid: boolean;
   problems: Problem[];
@@ -183,6 +190,9 @@ export interface StrategiesApi {
   ): Promise<{ revision: number; created: boolean }>;
   setArchived(strategyId: number, archived: boolean, signal: AbortSignal): Promise<void>;
   setConversation(strategyId: number, conversationId: number | null, signal: AbortSignal): Promise<void>;
+  /** The agent's draft of a strategy — `null` for the new one not saved yet — or null when there is none. */
+  draft(strategyId: number | null, signal: AbortSignal): Promise<Draft | null>;
+  discardDraft(strategyId: number | null, signal: AbortSignal): Promise<void>;
   costs(symbol: string, signal: AbortSignal): Promise<CostProfile | null>;
   putCosts(symbol: string, costs: Costs, signal: AbortSignal): Promise<CostProfile>;
   /** Reads the profile off the broker now and keeps it in place of the one there was. */
@@ -392,6 +402,22 @@ export function createStrategiesApi(httpBase: string, identity: Identity = noIde
 
     async setArchived(strategyId, archived, signal) {
       await http.send(`${httpBase}/strategies/${strategyId}/${archived ? "archive" : "restore"}`, { signal, method: "POST" });
+    },
+
+    async draft(strategyId, signal) {
+      const url = strategyId === null ? `${httpBase}/drafts/new` : `${httpBase}/strategies/${strategyId}/draft`;
+      try {
+        const raw = await http.json<Schemas["DraftOut"]>(url, { signal });
+        return { document: raw.document as Record<string, unknown>, seq: raw.seq, updatedAt: new Date(raw.updated_at) };
+      } catch (cause: unknown) {
+        if (cause instanceof MarketDataError && cause.kind === "not-found") return null;
+        throw cause;
+      }
+    },
+
+    async discardDraft(strategyId, signal) {
+      const url = strategyId === null ? `${httpBase}/drafts/new` : `${httpBase}/strategies/${strategyId}/draft`;
+      await http.send(url, { signal, method: "DELETE" });
     },
 
     async setConversation(strategyId, conversationId, signal) {

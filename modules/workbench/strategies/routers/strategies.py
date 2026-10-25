@@ -7,12 +7,13 @@ from typing import Any
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
 from fastapi.responses import JSONResponse
 
-from .. import changes, documents, store
+from .. import changes, documents, drafts, store
 from ..archive import ArchiveUnavailable
 from ..contract import (
     ChangesOut,
     ConflictOut,
     ConversationIn,
+    DraftOut,
     ProblemsOut,
     RevisionEntryOut,
     RevisionOut,
@@ -178,6 +179,38 @@ async def set_conversation(body: ConversationIn, strategy_id: int = ID, db=Depen
             return _summary(await store.set_conversation(conn, strategy_id, body.conversation_id))
         except store.NotFound:
             raise not_found(f"strategy {strategy_id}") from None
+
+
+@router.get("/strategies/{strategy_id}/draft", response_model=DraftOut, responses={404: {}})
+async def draft(strategy_id: int = ID, db=Depends(pool)) -> DraftOut:
+    """The agent's draft of this strategy, not saved as a revision; 404 when there is none."""
+    return await _draft(db, strategy_id)
+
+
+@router.delete("/strategies/{strategy_id}/draft", status_code=204)
+async def discard_draft(strategy_id: int = ID, db=Depends(pool)) -> None:
+    async with db.acquire() as conn:
+        await drafts.discard(conn, strategy_id)
+
+
+@router.get("/drafts/new", response_model=DraftOut, responses={404: {}})
+async def new_draft(db=Depends(pool)) -> DraftOut:
+    """The agent's draft of a strategy not saved yet; 404 when there is none."""
+    return await _draft(db, None)
+
+
+@router.delete("/drafts/new", status_code=204)
+async def discard_new_draft(db=Depends(pool)) -> None:
+    async with db.acquire() as conn:
+        await drafts.discard(conn, None)
+
+
+async def _draft(db, strategy_id: int | None) -> DraftOut:
+    async with db.acquire() as conn:
+        found = await drafts.get(conn, strategy_id)
+    if found is None:
+        raise not_found("a draft" if strategy_id is None else f"a draft of strategy {strategy_id}")
+    return DraftOut.model_validate(found.__dict__)
 
 
 async def _set_archived(db, strategy_id: int, archived: bool) -> StrategyOut:

@@ -20,12 +20,13 @@ from .fake_archive import archive_of
 from .market import flat, minutes, strategy
 
 EXPECTED = {
-    "strategy_language", "list_strategies", "read_strategy", "validate_strategy", "save_strategy", "run_backtest",
-    "read_run", "compare_runs",
+    "strategy_language", "list_strategies", "read_strategy", "validate_strategy", "draft_strategy", "save_strategy",
+    "run_backtest", "read_run", "compare_runs",
 }
 # Characters of the serialized `list_tools()` the conversation reads before every turn. Measured 8 827 on 25 October 2026
-# when the surface was written; the headroom is for a description that has to say one more thing.
-SURFACE_CEILING_CHARS = 10_000
+# when the surface was written; 10 367 with draft_strategy, the ninth tool, the same day. The headroom is for a description
+# that has to say one more thing.
+SURFACE_CEILING_CHARS = 11_500
 
 COSTS = CostModel(spread=1.0, slippage=0.0, overnight_long=0.0, overnight_short=0.0, rollover_hour=22)
 MINUTES = minutes(flat(0, 5 * 86400, 100.0))
@@ -46,7 +47,7 @@ async def _call(app, name: str, **arguments):
     return structured
 
 
-async def test_the_surface_is_the_eight_tools_and_none_sets_costs() -> None:
+async def test_the_surface_is_the_nine_tools_and_none_sets_costs() -> None:
     tools = await _app().state.mcp_server.list_tools()
 
     assert {t.name for t in tools} == EXPECTED
@@ -195,3 +196,26 @@ def test_comparable_runs_stand_side_by_side_without_a_verdict() -> None:
 
     assert [c["total_r"] for c in compared] == [1.5, -2.0]
     assert not {"best", "better", "winner", "rank"} & {k for c in compared for k in c}
+
+
+@pytest.mark.db
+async def test_a_draft_reaches_the_editor_without_a_revision_and_a_save_ends_it(pool) -> None:
+    from strategies import drafts
+
+    app = _app(pool)
+    saved = await _call(app, "save_strategy", document=strategy())
+    sid = saved["strategy_id"]
+    drafted = await _call(app, "draft_strategy", document=strategy(exits={"stop": "entry_price - 1"}), strategy_id=sid)
+    broken = await _call(app, "draft_strategy", document=strategy(exits={}))
+    async with pool.acquire() as conn:
+        kept = await drafts.get(conn, sid)
+        new = await drafts.get(conn, None)
+        summary = await store.get_strategy(conn, sid)
+
+    assert drafted["valid"] is True and broken["valid"] is False and broken["problems"]
+    assert kept is not None and kept.document["exits"]["stop"] == "entry_price - 1" and new is not None
+    assert summary.latest_revision == 1 and summary.trials == 0
+
+    await _call(app, "save_strategy", document=kept.document, strategy_id=sid, based_on=1)
+    async with pool.acquire() as conn:
+        assert await drafts.get(conn, sid) is None

@@ -1,5 +1,5 @@
-"""Writing a strategy: the language, what exists, a document checked, a revision saved. Saving is the same check and the
-same store as `POST /strategies` — only the author differs."""
+"""Writing a strategy: the language, what exists, a document checked, a draft put into the operator's editor, a revision
+saved. Saving is the same check and the same store as `POST /strategies` — only the author differs."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
-from .. import changes, costs_store, documents, runs, store
+from .. import changes, costs_store, documents, drafts, runs, store
 from ..archive import ArchiveUnavailable
 from ..language import describe
 from ..summary import summarize
@@ -26,7 +26,12 @@ HOW_TO_WRITE = [
         "When the operator's description leaves a value open (which hours a session is, what a trend is), ask, or "
         "choose and write the assumption into `notes` — never leave it unsaid."
     ),
-    "Save once; the answer lists every problem at once with its path, column and hint. Fix them all, then save again.",
+    "Write `name`, `hypothesis` and `notes` in Polish — the operator reads them; formulas keep the language's names.",
+    (
+        "Put every change into the operator's editor with draft_strategy, which saves no revision; save_strategy only "
+        "when the operator asks to save."
+    ),
+    "A draft or a save lists every problem at once with its path, column and hint. Fix them all, then draft again.",
     "Compare the summary in the answer with what the operator described before you reply.",
 ]
 
@@ -63,7 +68,7 @@ class StrategyRead(BaseModel):
     document: dict[str, Any]
     summary: dict[str, Any] | None
     trials: int
-    has_cost_profile: bool = Field(description="false: run_backtest refuses until the operator sets the instrument's costs")
+    has_cost_profile: bool = Field(description="false: run_backtest reads the instrument's costs off the broker first")
     recent_runs: list[RunLine]
 
 
@@ -71,6 +76,13 @@ class ValidationResult(BaseModel):
     valid: bool
     problems: list[dict[str, Any]]
     summary: dict[str, Any] | None
+
+
+class DraftResult(BaseModel):
+    valid: bool
+    problems: list[dict[str, Any]]
+    summary: dict[str, Any] | None
+    next_step: str = "The operator sees this draft in the editor, unsaved. Fix any problem with another draft."
 
 
 class SaveResult(BaseModel):
@@ -137,10 +149,29 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         )
 
     @mcp.tool(annotations=WRITES)
+    async def draft_strategy(document: dict[str, Any], strategy_id: int | None = None) -> DraftResult:
+        """Puts a document into the operator's editor on the Strategies tab as unsaved text — of strategy `strategy_id`,
+        or without it of the new strategy not saved yet. No revision and no trial; it replaces the previous draft and is
+        kept even with problems, which come back all at once. Use it for every change; the operator saves."""
+        checked, problems = await _check(ctx, document)
+        async with ctx.state.pool.acquire() as conn:
+            if strategy_id is not None:
+                try:
+                    await store.get_strategy(conn, strategy_id)
+                except store.NotFound:
+                    raise refusal(f"strategy {strategy_id} does not exist") from None
+            await drafts.put(conn, strategy_id, document)
+        return DraftResult(
+            valid=checked is not None, problems=[p.as_dict() for p in problems],
+            summary=None if checked is None else summarize(checked.canonical),
+        )
+
+    @mcp.tool(annotations=WRITES)
     async def save_strategy(
         document: dict[str, Any], strategy_id: int | None = None, based_on: int | None = None
     ) -> SaveResult:
-        """Saves a strategy document as a new strategy, or — with `strategy_id` — as its next revision, authored by you.
+        """Saves a strategy document as a new strategy, or — with `strategy_id` — as its next revision, authored by you,
+        when the operator asks to save; until then changes go in with draft_strategy.
         A revision is never changed afterwards; the operator undoes one by restoring an earlier revision.
 
         With `strategy_id`, `based_on` is required: the revision you read and changed. If someone saved after it, the save
