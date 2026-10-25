@@ -1,0 +1,586 @@
+<title>Playwright — testy E2E</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+<style>
+  td.id { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--navy); white-space: nowrap; }
+  ol.steps { margin: 0 0 16px; padding-left: 22px; max-width: 70ch; }
+  ol.steps li { margin-bottom: 6px; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Testy · analiza i propozycja</span>
+    <h1>Playwright: testy z miejsca operatora</h1>
+    <p class="lede">Warstwa testów, która klika prawdziwy terminal podłączony do prawdziwego workbencha i bazy, na
+    komputerze dewelopera. <b>Model językowy zastępuje scenariusz, więc żaden test nie płaci za tokeny.</b> Pierwszy
+    obszar: strategie i backtesty.</p>
+    <div class="strip">
+      <span>TradingCenter / testy</span>
+      <span>25 października 2026</span>
+      <span>stan na <b>main 0249bfbd</b> + gałąź fazy 0</span>
+      <span>faza 0 <b>zrobiona</b> · fazy 1–2 do zrobienia</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">0 zł</div><div class="l">za modele: odpowiada scenariusz, nie OpenAI</div></div>
+      <div class="cell"><div class="v">4</div><div class="l">niezależne bariery przed płatnym wywołaniem</div></div>
+      <div class="cell"><div class="v">17</div><div class="l">testów strategii w pierwszych dwóch fazach</div></div>
+      <div class="cell"><div class="v">~4 dni</div><div class="l">pracy w trzech fazach (szacunek)</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Stan dziś</div>
+      <h2>Czego nie sprawdza żadna obecna warstwa</h2>
+      <p class="intro">Repozytorium ma dużo testów, ale każdy zatrzymuje się na jednej stronie styku. Nikt nie uruchamia
+      terminalu przeciw działającemu workbenchowi.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Warstwa</th><th>Co sprawdza</th><th>Gdzie się zatrzymuje</th></tr></thead>
+          <tbody>
+            <tr><td><b>pytest</b> (unit i <code>-m db</code>)</td><td>reguły domeny, trasy przez <code>httpx.ASGITransport</code>, migracje na Postgresie z testcontainers</td>
+              <td>na HTTP workbencha; bez przeglądarki i bez proxy Vite</td></tr>
+            <tr><td><b>vitest</b> + Testing Library</td><td>widoki i store'y terminalu w jsdom; sieć zastępuje <code>httpDouble</code></td>
+              <td>na odpowiedziach napisanych ręcznie w teście, nie na prawdziwym serwerze</td></tr>
+            <tr><td><b>contract:check</b></td><td>czy wygenerowany TypeScript zgadza się z modelami Pydantic</td>
+              <td>na kształcie; nie sprawdza ścieżek, kolejności tras ani zachowania</td></tr>
+            <tr><td><b>live</b> (<code>--run-live</code>)</td><td>prawdziwa sesja Capital</td>
+              <td>tylko bramka, nigdy w CI</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Luka to szwy, nie reguły. Komentarze w kodzie same opisują błędy tej klasy:</p>
+      <div class="fails">
+        <div class="fail"><h3>Prefiks proxy zasłaniał zakładkę <span class="tag att">vite.config.ts</span></h3>
+          <p>Proxy archiwum nazywało się <code>/archive</code>, a tę samą ścieżkę miała zakładka. Test jednostkowy tego nie
+          widzi, bo nie przechodzi przez serwer deweloperski.</p></div>
+        <div class="fail"><h3>Lista modeli „niedostępna” do końca sesji <span class="tag att">agentChatStore.ts</span></h3>
+          <p>Ładowanie ruszało przy imporcie, przed rozstrzygnięciem logowania. Widać to dopiero w prawdziwej kolejności
+          uruchamiania strony.</p></div>
+        <div class="fail"><h3>Kolejność tras <span class="tag att">routers/runs.py</span></h3>
+          <p><code>/runs/compare</code> musi stać przed <code>/runs/{run_id}</code>. Dziś pilnuje tego test API. Test E2E
+          złapałby też każdy podobny przypadek w trasach, których nikt nie przewidział.</p></div>
+        <div class="fail"><h3>Pętla agent → narzędzie → edytor <span class="tag att">strategie</span></h3>
+          <p><code>draft_strategy</code> zapisuje szkic w bazie strategii, a terminal czyta go po turze. Każda połowa ma swój
+          test, ale całego obiegu nie sprawdza nic.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Zakres</div>
+      <h2>Co E2E ma sprawdzać, a czego nie</h2>
+      <p>Zasady z CLAUDE.md („How much test is enough”) obowiązują i tutaj: reguła domeny jest testowana raz, w najniższej
+      warstwie. Warstwa E2E nie powtarza macierzy z pytest ani z vitest.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tak</th><th>Nie</th></tr></thead>
+          <tbody>
+            <tr><td>Jedna ścieżka operatora na funkcję, od kliknięcia do stanu w bazie i z powrotem na ekran</td>
+              <td>Warianty walidacji, odmów i liczb: to już robią pytest i vitest</td></tr>
+            <tr><td>Szwy: proxy, wygenerowany kontrakt z prawdziwym serwerem, migracje od zera, odpytywanie stanu uruchomień</td>
+              <td>Piksele wykresów: <code>lightweight-charts</code> rysuje na canvas. Zostają listy, metryki i tekst</td></tr>
+            <tr><td>Obieg agenta z narzędziem, na scenariuszu zamiast modelu</td>
+              <td>Jakość odpowiedzi modelu i parsowanie odpowiedzi OpenAI: to cudza biblioteka</td></tr>
+            <tr><td>Dwie karty naraz (konflikt zapisu), przeładowanie strony, polskie etykiety dostępności</td>
+              <td>Testy wydajności i limitów czasu</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Architektura</div>
+      <h2>Osobny stos obok stosu deweloperskiego</h2>
+      <p class="intro">Stos E2E ma własne porty, własną bazę w pamięci i własny katalog roboczy. Może działać obok
+      uruchomionego <code>scripts/dev.py</code> i nie dotyka ani bazy z archiwum, ani pliku <code>.env</code> z kluczami.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 300" role="img" aria-label="Playwright steruje Chromium, które otwiera terminal na porcie 15173. Proxy Vite przekazuje żądania do workbencha na porcie 18030, a ten pisze do Postgresa na porcie 55442 trzymanego w pamięci. W workbenchu model zastępuje scenariusz. OpenAI, bramka Capital i zewnętrzne kanały są wskazane na adres, pod którym nic nie słucha.">
+            <defs>
+              <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="12" y="40" width="170" height="64" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="97" y="66" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Playwright</text>
+              <text x="97" y="86" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">Chromium · pl-PL</text>
+
+              <rect x="252" y="40" width="170" height="64" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="337" y="66" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">terminal (Vite)</text>
+              <text x="337" y="86" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">15173 · proxy</text>
+
+              <rect x="492" y="40" width="200" height="64" fill="#14306b" stroke="#14306b" stroke-width="1.4"></rect>
+              <text x="592" y="66" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">workbench</text>
+              <text x="592" y="86" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#f2c313">18030 · cwd e2e/stack</text>
+
+              <rect x="762" y="40" width="206" height="64" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="865" y="66" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">PostgreSQL</text>
+              <text x="865" y="86" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">55442 · tmpfs</text>
+
+              <line x1="184" y1="72" x2="248" y2="72" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <line x1="424" y1="72" x2="488" y2="72" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <line x1="694" y1="72" x2="758" y2="72" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+
+              <rect x="512" y="132" width="160" height="40" fill="#f2c313"></rect>
+              <text x="592" y="150" text-anchor="middle" font-size="12" font-weight="700" fill="#14306b">model: scenariusz</text>
+              <text x="592" y="165" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#14306b">AGENT_PROVIDER=sim</text>
+              <line x1="592" y1="106" x2="592" y2="128" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+
+              <text x="12" y="214" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.1em" fill="currentColor" opacity="0.55">WSKAZANE NA 127.0.0.1:9 — TAM NIC NIE SŁUCHA</text>
+              <g opacity="0.55">
+                <rect x="12" y="226" width="200" height="44" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="5 4"></rect>
+                <text x="112" y="253" text-anchor="middle" font-size="13" fill="currentColor">OpenAI</text>
+                <rect x="252" y="226" width="200" height="44" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="5 4"></rect>
+                <text x="352" y="253" text-anchor="middle" font-size="13" fill="currentColor">capital-gateway · trading-mcp</text>
+                <rect x="492" y="226" width="200" height="44" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="5 4"></rect>
+                <text x="592" y="253" text-anchor="middle" font-size="13" fill="currentColor">Truth Social · Polymarket</text>
+              </g>
+              <rect x="762" y="226" width="206" height="44" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+              <text x="865" y="246" text-anchor="middle" font-size="12" font-weight="700" fill="currentColor">seed: świece US100</text>
+              <text x="865" y="261" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">zamiast kolekcji z bramki</text>
+              <line x1="865" y1="224" x2="865" y2="108" stroke="currentColor" stroke-width="1.2" stroke-dasharray="3 3" marker-end="url(#a1)"></line>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — górny rząd to jedyna droga, którą idzie test. Przerywane ramki to wszystko, co w
+        produkcji kosztuje pieniądze albo dotyka rachunku: w stosie E2E prowadzą donikąd.</figcaption>
+      </figure>
+      <div class="table-wrap" style="margin-top:22px">
+        <table>
+          <thead><tr><th>Część</th><th class="n">Dev</th><th class="n">E2E</th><th>Uwagi</th></tr></thead>
+          <tbody>
+            <tr><td><b>terminal (Vite)</b></td><td class="n">5173</td><td class="n">15173</td><td>proxy wskazane zmiennymi <code>WORKBENCH_PROXY_TARGET</code> i <code>ARCHIVE_PROXY_TARGET</code>, które <code>vite.config.ts</code> już czyta</td></tr>
+            <tr><td><b>workbench</b></td><td class="n">8030</td><td class="n">18030</td><td>uruchamiany z katalogu <code>e2e/stack</code>, więc czyta tamtejszy <code>.env</code>, nigdy plik z kluczami</td></tr>
+            <tr><td><b>PostgreSQL</b></td><td class="n">55432</td><td class="n">55442</td><td>osobny kontener na <code>tmpfs</code>: każde uruchomienie zaczyna od pustej bazy</td></tr>
+            <tr class="void"><td>gateway, trading-mcp, OpenAI</td><td class="n">8010 · 8060</td><td class="n">—</td><td>nieuruchamiane; adresy wskazują <code>127.0.0.1:9</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Porty 15173, 18030 i 55442 trzeba dopisać do listy portów w CLAUDE.md jako „tylko E2E”, bo
+      dziś plik wymienia każdy port, który jest czyjś. Logowanie nie jest potrzebne: terminal bez
+      <code>VITE_ENTRA_*</code> ma tożsamość <code>unconfigured</code> i nie prosi o nic, a workbench bez
+      <code>SERVER_MODE</code> nie wymaga tokenu.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Zero płatności</div>
+      <h2>Cztery bariery przed tokenem, za który się płaci</h2>
+      <p>Każda z nich wystarczy sama. Są cztery, bo pomyłka w jednym pliku nie powinna kosztować.</p>
+      <div class="fails">
+        <div class="fail ok"><h3>1. Model to scenariusz <span class="tag ok">bez sieci</span></h3>
+          <p><code>AGENT_PROVIDER=sim</code> podstawia dostawcę, który odpowiada z pliku i nie otwiera żadnego połączenia.
+          Odmawia startu tam, gdzie ustawiono <code>DATABASE_USER</code>, jak już dziś symulacja pakietu YouTube.</p></div>
+        <div class="fail ok"><h3>2. Fikcyjne klucze <span class="tag ok">401</span></h3>
+          <p><code>.env</code> stosu E2E ma wszystkie <code>*_OPENAI_API_KEY</code> ustawione na <code>sk-e2e-nie-placi</code>.
+          Gdyby scenariusz się nie włączył, OpenAI odrzuci zapytanie bez naliczenia opłaty.</p></div>
+        <div class="fail ok"><h3>3. Adres OpenAI donikąd <span class="tag ok">ECONNREFUSED</span></h3>
+          <p><code>OPENAI_BASE_URL=http://127.0.0.1:9/v1</code>. Biblioteka <code>openai</code> 3.3 czyta tę zmienną, a
+          <code>langchain-openai</code> 1.5 ją respektuje (sprawdzone w zainstalowanych wersjach). Zapytanie kończy się na
+          własnym komputerze.</p></div>
+        <div class="fail ok"><h3>4. Prawdziwy <code>.env</code> nie jest czytany <span class="tag ok">katalog</span></h3>
+          <p>Każda konfiguracja workbencha czyta <code>.env</code> z bieżącego katalogu (<code>env_file=".env"</code>). Stos
+          E2E uruchamia proces z <code>e2e/stack</code>, więc plik z prawdziwymi kluczami w <code>modules/workbench</code>
+          nigdy nie trafia do procesu.</p></div>
+      </div>
+      <p style="margin-top:16px">Z tego samego powodu stos nie składa zleceń i nie zużywa budżetu zapytań Capital (10/s na
+      rachunek, wspólny z działającym stosem dev): bez <code>TRADING_MCP_URL</code> rozmowa nie ma narzędzi rachunku, a
+      bramka nie jest uruchomiona.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Model zastępczy</div>
+      <h2>Dlaczego scenariusz w procesie, a nie atrapa OpenAI</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Wariant</th><th>Za</th><th>Przeciw</th><th>Decyzja</th></tr></thead>
+          <tbody>
+            <tr><td><b>A.</b> <code>page.route</code> w przeglądarce</td><td>zero zmian w backendzie</td>
+              <td>powtarza to, co robi <code>httpDouble</code> w vitest; serwer w ogóle nie bierze udziału</td><td><span class="tag stop">odrzucony</span></td></tr>
+            <tr><td><b>B.</b> Atrapa API OpenAI pod <code>OPENAI_BASE_URL</code></td><td>zero zmian w kodzie produkcyjnym; przechodzi przez prawdziwego <code>OpenAIProvider</code></td>
+              <td>trzeba odtworzyć strumień zdarzeń Responses API (<code>use_responses_api=True</code>); pęka przy aktualizacji SDK; testuje cudzą bibliotekę</td><td><span class="tag att">zapasowy</span></td></tr>
+            <tr><td><b>C.</b> <code>AGENT_PROVIDER=sim</code> ze scenariuszem</td><td>deterministyczny; ten sam kształt co <code>tests/teams/scripted_provider.py</code>; precedens symulacji YouTube</td>
+              <td>nowe ustawienie w kodzie produkcyjnym, więc potrzebna zmiana OpenSpec z regułą „odmowa poza trybem lokalnym”</td><td><span class="tag ok">polecany</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Scenariusz dopasowuje wiadomość operatora wyrażeniem regularnym i odtwarza kroki:
+      wywołania narzędzi i tekst. Nazwane grupy trafiają do argumentów, więc jeden statyczny plik obsłuży strategię o
+      dowolnym numerze, bez zapisywania scenariusza w trakcie testu:</p>
+      <pre><code><span class="c">// e2e/stack/agent-scenario.json — czytany przez AGENT_SIM_SCENARIO</span>
+{ <span class="s">"turns"</span>: [
+  { <span class="s">"when"</span>: <span class="s">"^E2E szkic (?&lt;id&gt;\\d+): stop 1,5 ATR$"</span>,
+    <span class="s">"steps"</span>: [
+      { <span class="s">"tool"</span>: <span class="s">"draft_strategy"</span>,
+        <span class="s">"arguments"</span>: { <span class="s">"strategy_id"</span>: <span class="s">"{id}"</span>, <span class="s">"document"</span>: { <span class="c">/* dokument ze stopem 1.5 ATR */</span> } } },
+      { <span class="s">"say"</span>: <span class="s">"Wpisałem stop 1,5 ATR do edytora."</span> } ] },
+  { <span class="s">"when"</span>: <span class="s">".*"</span>, <span class="s">"steps"</span>: [ { <span class="s">"say"</span>: <span class="s">"(scenariusz E2E: brak dopasowania)"</span> } ] } ] }</code></pre>
+      <p>Narzędzie wykonuje się naprawdę: <code>draft_strategy</code> waliduje dokument i zapisuje szkic w bazie strategii, a
+      terminal czyta go po turze tak samo jak w produkcji. Zastąpiony jest tylko wybór, co powiedzieć. Scenariusz zgłasza
+      zerowe zużycie tokenów, więc zakładka kosztów nie pokaże żadnego wydatku.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Dane</div>
+      <h2>Pusta baza, migracje aplikacji i wygenerowane świece</h2>
+      <ol class="steps">
+        <li><strong>Baza od zera przy każdym uruchomieniu.</strong> Kontener na <code>tmpfs</code>, role i bazy z
+        <code>docker-entrypoint-initdb.d</code>, które przy pustym wolumenie wykona się za każdym razem.</li>
+        <li><strong>Migracje robi workbench</strong> w swoim <code>lifespan</code>, jak na produkcji. E2E sprawdza więc przy
+        okazji stałą regułę „merge zostawia produkcję działającą”: każdy łańcuch migracji od pustej bazy.</li>
+        <li><strong>Seed archiwum</strong> skryptem w projekcie workbencha: para US100 (minuty i godziny), ok. 30 dni
+        świec z losowego spaceru z ziarnem (builder z <code>tests/strategies/market.py</code>) i zakres pokrycia. Backtest
+        na takich danych kończy się w sekundach.</li>
+        <li><strong>Koszty przez profil operatora</strong> (<code>PUT /costs/US100</code>) zamiast brokera, bo bramki nie
+        ma. Pobranie kosztów z capital.com zostaje w scenariuszach ręcznych (B-02, B-03).</li>
+        <li><strong>Każdy test tworzy własną strategię</strong> z unikalną nazwą. Przygotowanie idzie przez REST
+        (<code>request</code> Playwrighta przez proxy Vite), a klikanie dotyczy tylko tego, co test sprawdza.</li>
+      </ol>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Pierwszy obszar</div>
+      <h2>Strategie i backtesty: 17 testów</h2>
+      <p>Numery w nawiasach odsyłają do <a href="strategie-scenariusze-testowe.html">scenariuszy ręcznych</a>. To, co
+      zautomatyzowane, znika z ręcznej listy przed wydaniem. Zostaje to, czego stos E2E nie ma: broker, produkcja, rola
+      <code>viewer</code>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Ścieżka</th><th>Scenariusze</th><th>Model</th></tr></thead>
+          <tbody>
+            <tr><td class="id">ST-01</td><td>Lista strategii i otwarcie: edytor, czat, streszczenie, historia</td><td>S-01 · S-03</td><td>—</td></tr>
+            <tr><td class="id">ST-02</td><td>Literówka w formule zaznaczona z podpowiedzią, zapis zablokowany</td><td>E-01</td><td>—</td></tr>
+            <tr><td class="id">ST-03</td><td>Zapis tworzy rewizję, streszczenie mówi o 1,5 ATR; drugi zapis bez zmian nie tworzy nowej</td><td>E-05 · E-06</td><td>—</td></tr>
+            <tr><td class="id">ST-04</td><td>Dwie karty: konflikt zapisu, zmiana operatora zostaje w edytorze</td><td>E-07</td><td>—</td></tr>
+            <tr><td class="id">ST-05</td><td>Historia: różnica pod <code>exits.stop</code>, przywrócenie tworzy nową rewizję</td><td>H-01 · H-03</td><td>—</td></tr>
+            <tr><td class="id">ST-06</td><td>Archiwizacja i przywrócenie</td><td>H-04</td><td>—</td></tr>
+            <tr><td class="id">BT-01</td><td>„Backtesty tej strategii →” otwiera Backtests z formularzem</td><td>B-01</td><td>—</td></tr>
+            <tr><td class="id">BT-02</td><td>Uruchomienie z profilu kosztów: kolejka → zakończone bez przeładowania strony</td><td>B-02 (bez brokera)</td><td>—</td></tr>
+            <tr><td class="id">BT-03</td><td>Zakres ponad sufit minut zgłoszony przed wysłaniem</td><td>B-04</td><td>—</td></tr>
+            <tr><td class="id">BT-04</td><td>„Bez kosztów” oznaczone na liście i w raporcie</td><td>B-06</td><td>—</td></tr>
+            <tr><td class="id">BT-05</td><td>Raport: metryki, lista transakcji, wybór transakcji</td><td>R-01 · R-02 (bez canvas)</td><td>—</td></tr>
+            <tr><td class="id">BT-06</td><td>Raport bez transakcji pokazuje „—”, nie zero</td><td>R-04</td><td>—</td></tr>
+            <tr><td class="id">BT-07</td><td>Porównanie dwóch uruchomień: tabela kolumna na uruchomienie</td><td>P-02 · P-03</td><td>—</td></tr>
+            <tr><td class="id">BT-08</td><td>Porównanie różnych zakresów: lista różnic; niezakończonego nie da się zaznaczyć</td><td>P-04 · P-05</td><td>—</td></tr>
+            <tr><td class="id">AG-01</td><td>„Nowa…” → szkic agenta w edytorze → Zapisz → strategia otwarta, rozmowa do niej należy</td><td>A-01 · A-02 · A-03</td><td><span class="tag att">sim</span></td></tr>
+            <tr><td class="id">AG-02</td><td>Szkic do istniejącej strategii; niezapisane zmiany operatora zostają</td><td>A-04 · A-05 · A-06</td><td><span class="tag att">sim</span></td></tr>
+            <tr><td class="id">AG-03</td><td>Zmiana modelu w czacie strategii się trzyma, bez „no such session”</td><td>A-07</td><td><span class="tag att">sim</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Przykład testu. Przygotowanie idzie przez REST, a sprawdzenie przez ekran, po rolach i
+      polskich etykietach, które widoki już mają:</p>
+      <pre><code><span class="c">// modules/terminal/e2e/tests/backtests.spec.ts</span>
+<span class="k">test</span>(<span class="s">"porównuje dwa uruchomienia obok siebie"</span>, <span class="k">async</span> ({ page, request }) =&gt; {
+  <span class="k">const</span> id = <span class="k">await</span> createStrategy(request, <span class="s">"porównanie"</span>);
+  <span class="k">const</span> [a, b] = <span class="k">await</span> Promise.all([finishedRun(request, id, { stop: <span class="s">2</span> }), finishedRun(request, id, { stop: <span class="s">3</span> })]);
+
+  <span class="k">await</span> page.goto(<span class="s">`/backtests?strategy=${id}`</span>);
+  <span class="k">await</span> page.getByRole(<span class="s">"checkbox"</span>, { name: <span class="s">`Porównaj uruchomienie ${a}`</span> }).check();
+  <span class="k">await</span> page.getByRole(<span class="s">"checkbox"</span>, { name: <span class="s">`Porównaj uruchomienie ${b}`</span> }).check();
+  <span class="k">await</span> page.getByRole(<span class="s">"button"</span>, { name: <span class="s">"Porównaj (2)"</span> }).click();
+
+  <span class="k">const</span> table = page.getByRole(<span class="s">"table"</span>, { name: <span class="s">"Porównanie"</span> });
+  <span class="k">await</span> expect(table.getByRole(<span class="s">"columnheader"</span>, { name: <span class="k">new</span> RegExp(<span class="s">`#${b}`</span>) })).toBeVisible();
+});</code></pre>
+      <p>Edytor to CodeMirror, czyli <code>contenteditable</code>: <code>fill()</code> go nie obsłuży. Pomocnik
+      <code>typeInEditor()</code> klika <code>.cm-content</code>, zaznacza całość skrótem i wpisuje tekst przez
+      <code>keyboard.insertText</code>. Jedno miejsce, jeden haczyk.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Uruchamianie</div>
+      <h2>Jedno polecenie, które sprząta po sobie</h2>
+      <p>Z <code>modules/terminal</code>: <code>pnpm e2e</code>. Skrypt <code>scripts/e2e.py</code> korzysta z gotowych
+      części <code>scripts/dev.py</code>: nadzoru procesów, czekania na HTTP i zamykania drzewa procesów na Windows,
+      które jest już tam rozwiązane.</p>
+      <ol class="steps">
+        <li>Podnosi kontener <code>tradingcenter-e2e-db</code> (55442, tmpfs) i czeka na <code>pg_isready</code>.</li>
+        <li>Uruchamia workbench na 18030 z katalogu <code>e2e/stack</code> i czeka na <code>/health</code>: migracje
+        wszystkich łańcuchów od zera.</li>
+        <li>Wgrywa seed: świece, parę i profil kosztów.</li>
+        <li>Woła <code>pnpm exec playwright test</code>. Playwright sam stawia Vite na 15173 (<code>webServer</code>,
+        <code>reuseExistingServer: false</code>), żeby nigdy nie trafić w stos dev.</li>
+        <li>Zawsze zamyka workbench i usuwa kontener. Flaga <code>--keep</code> zostawia stos do debugowania w
+        <code>playwright test --ui</code>.</li>
+      </ol>
+      <pre><code><span class="c">// modules/terminal/playwright.config.ts — szkic</span>
+<span class="k">export default</span> defineConfig({
+  testDir: <span class="s">"e2e/tests"</span>,
+  workers: <span class="s">1</span>,                         <span class="c">// jeden stos, jedna baza</span>
+  use: { baseURL: <span class="s">"http://127.0.0.1:15173"</span>, locale: <span class="s">"pl-PL"</span>, timezoneId: <span class="s">"Europe/Warsaw"</span>, trace: <span class="s">"retain-on-failure"</span> },
+  projects: [{ name: <span class="s">"chromium"</span>, use: devices[<span class="s">"Desktop Chrome"</span>] }],
+  webServer: {
+    command: <span class="s">"pnpm exec vite --port 15173 --strictPort"</span>,
+    url: <span class="s">"http://127.0.0.1:15173"</span>,
+    reuseExistingServer: <span class="k">false</span>,
+    env: {
+      WORKBENCH_PROXY_TARGET: <span class="s">"http://127.0.0.1:18030"</span>,
+      ARCHIVE_PROXY_TARGET: <span class="s">"http://127.0.0.1:18030/market"</span>,
+      GATEWAY_PROXY_TARGET: <span class="s">"http://127.0.0.1:9"</span>,
+      VITE_ENTRA_CLIENT_ID: <span class="s">""</span>,            <span class="c">// lokalny .env terminalu nie włączy logowania</span>
+    },
+  },
+});</code></pre>
+      <p>Zmierzone w fazie 0: baza 2 s, workbench z migracjami siedmiu łańcuchów od zera 10 s, seed 3,5 s, Vite i pierwszy
+      test 13 s. Cały zestaw 17 testów powinien zmieścić się w 2–3 minutach.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">08a · Faza 0</div>
+      <h2>Wynik próby: da się, i szybko</h2>
+      <div class="fails">
+        <div class="fail ok"><h3>Stos E2E wstaje obok stosu dev <span class="tag ok">potwierdzone</span></h3>
+          <p>Kontener <code>tradingcenter-e2e-db</code> na 55442 (55433 zajmuje kontener innego projektu,
+          <code>market-data-db-1</code>), workbench na 18030 z katalogu <code>e2e/</code>, Vite na 15173. Stos dev na 55432 i
+          8030 nietknięty.</p></div>
+        <div class="fail ok"><h3>Archiwum bez bramki podaje świece z seeda <span class="tag ok">ryzyko zamknięte</span></h3>
+          <p>Para US100 widoczna w <code>/market/pairs</code> (30 240 świec, stan kolekcji <code>unknown</code>). Backtest
+          strategii godzinowej przez REST: zakończony po ok. 3 s, 14 transakcji, koszty z profilu operatora. Atrapa bramki
+          nie jest potrzebna.</p></div>
+        <div class="fail ok"><h3>Bariera 3 działa <span class="tag ok">sprawdzone</span></h3>
+          <p>Tura rozmowy bez scenariusza kończy się zdarzeniem <code>the model call failed</code>, a w logu jest
+          <code>openai.APIConnectionError</code>. Zapytanie nie wyszło poza komputer.</p></div>
+        <div class="fail ok"><h3>ST-01 przechodzi <span class="tag ok">1 test</span></h3>
+          <p>Strategia założona przez REST, otwarta z listy; widać edytor z dokumentem, czat strategii i numer rewizji.
+          Bez żadnej zmiany w kodzie terminalu ani workbencha.</p></div>
+        <div class="fail"><h3>Dwie poprawki konfiguracji <span class="tag att">do szkieletu</span></h3>
+          <p>Stawki w katalogu modeli muszą być dodatnie (walidacja odrzuca zero), więc E2E ma 0,001. Projekt workbencha nie
+          jest instalowanym pakietem, więc seed i workbench potrzebują <code>PYTHONPATH</code> albo <code>--app-dir</code>.
+          Vitest dostał jawne <code>include: src/**/*.test.*</code>, żeby nie zbierał testów Playwrighta.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Plan</div>
+      <h2>Trzy fazy, każda z działającym wynikiem</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Faza</th><th>Co</th><th>Wynik</th><th class="n">Szacunek</th></tr></thead>
+          <tbody>
+            <tr><td><b>0 · próba</b></td><td>Stos E2E ręcznie: kontener, workbench z <code>e2e/stack</code>, Vite na 15173; czy archiwum z martwą bramką podaje świece z seeda; jeden test ST-01</td>
+              <td>odpowiedź „da się”, zmierzony czas startu</td><td class="n">0,5 dnia</td></tr>
+            <tr><td><b>1 · szkielet + strategie</b></td><td><code>scripts/e2e.py</code>, <code>compose.e2e.yaml</code>, seed, <code>playwright.config.ts</code>, pomocnicy (strategia, uruchomienie, edytor), testy ST-01…06 i BT-01…08; porty w CLAUDE.md</td>
+              <td><code>pnpm e2e</code> z 14 testami</td><td class="n">2 dni</td></tr>
+            <tr><td><b>2 · agent na scenariuszu</b></td><td>Zmiana OpenSpec: <code>AGENT_PROVIDER=sim</code> z odmową poza trybem lokalnym; dostawca scenariusza; testy AG-01…03</td>
+              <td>obieg agent → narzędzie → edytor pod testem</td><td class="n">1,5 dnia</td></tr>
+            <tr><td><b>3 · opcjonalnie</b></td><td>Job CI na <code>workflow_dispatch</code> albo nocny (koszt modeli nadal zero); kolejne obszary</td>
+              <td>E2E bez udziału operatora</td><td class="n">wg potrzeb</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px"><strong>Gdzie mieszka zestaw:</strong> <code>modules/terminal/e2e/</code>. Terminal jest
+      konsumentem, który niczego nie publikuje, a testy patrzą z miejsca operatora. Pocket dostanie kiedyś własny, tak jak
+      ma własny kontrakt. <strong>OpenSpec:</strong> szkielet i testy to narzędzia i testy, więc wystarczy gałąź i PR.
+      Dostawca scenariusza dodaje ustawienie z regułą bezpieczeństwa, więc według zasad z CLAUDE.md to osobna zmiana
+      OpenSpec.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">10 · Ryzyka</div>
+      <h2>Co może pójść źle</h2>
+      <div class="fails">
+        <div class="fail"><h3>Archiwum bez bramki <span class="tag att">faza 0</span></h3>
+          <p>Śledzona para będzie próbować dociągnąć dane z <code>127.0.0.1:9</code>. Jeśli to ukryje parę albo jej świece,
+          zapasem jest mała atrapa bramki z historią i warunkami instrumentu. Dałaby przy okazji test pobrania kosztów od
+          brokera.</p></div>
+        <div class="fail"><h3>Niestabilne testy asynchroniczne <span class="tag att">utrzymanie</span></h3>
+          <p>Uruchomienia liczą się w tle. Zamiast <code>sleep</code> testy używają <code>expect.poll</code> i
+          automatycznego czekania lokatorów, a małe dane trzymają backtest w sekundach. <code>trace: retain-on-failure</code>
+          pokazuje, co było na ekranie.</p></div>
+        <div class="fail"><h3>Rozrost zestawu <span class="tag att">koszt utrzymania</span></h3>
+          <p>E2E jest najdroższą warstwą w utrzymaniu. Limit: jedna ścieżka na funkcję, 15–25 testów na obszar. Nowy wariant
+          reguły to test w pytest albo vitest, nie tutaj.</p></div>
+        <div class="fail"><h3>Dwa uruchomienia naraz <span class="tag att">worktree</span></h3>
+          <p>Porty E2E są stałe, tak jak porty dev, więc jeden stos E2E naraz na maszynie. Stos dev może działać obok.</p></div>
+        <div class="fail ok"><h3>Przeglądarki Playwrighta <span class="tag ok">jednorazowo</span></h3>
+          <p><code>pnpm exec playwright install chromium</code> pobiera 118 MB, raz na maszynę. Wersja
+          <code>@playwright/test</code> 1.64 (aktualna 25.10.2026), tylko Chromium na start.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">11 · Dalej</div>
+      <h2>Kolejne obszary, w kolejności wartości</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Obszar</th><th>Dlaczego</th><th>Czego potrzebuje</th></tr></thead>
+          <tbody>
+            <tr><td><b>Panel agenta</b></td><td>rozmowy, zmiana nazwy i kasowanie, przerwanie tury, wykres sterowany przez agenta</td><td>dostawca scenariusza z fazy 2</td></tr>
+            <tr><td><b>Alerty</b></td><td>reguły „kto dostaje co” to CRUD z regułami bezpieczeństwa</td><td><code>ALERTS_DATABASE_URL</code>; Telegram poza stosem</td></tr>
+            <tr><td><b>Zespoły</b></td><td>edytor zespołu, uruchomienie i harmonogram</td><td>ten sam dostawca scenariusza dla <code>teams</code></td></tr>
+            <tr><td><b>Polymarket · Social · News</b></td><td>widoki odczytu i filtry</td><td>seed zamiast kolekcji z sieci</td></tr>
+            <tr><td><b>Pocket</b></td><td>drugi konsument tego samego kontraktu</td><td>osobny <code>playwright.config.ts</code> w <code>modules/pocket</code>, ten sam stos</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="quote">Testy jednostkowe mówią, że każda część działa. E2E mówi, że działają razem.</div>
+      <p><strong>Ustalone 25.10:</strong> zestaw mieszka w <code>modules/terminal/e2e</code>; CI na razie nie, do
+      rozważenia później. <strong>OpenSpec:</strong> wchodzi na początku fazy 2, jako pierwsza rzecz przed kodem dostawcy
+      scenariusza. Fazy 0 i 1 nie zmieniają kodu produkcyjnego (gałąź i PR wystarczą), a faza 1 pokaże, czy zestaw jest
+      wart utrzymania, zanim do produkcji trafi nowe ustawienie.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Playwright E2E · analiza i propozycja · 25 października 2026</span>
+    <span>Źródła: modules/terminal/vite.config.ts, packages/tc-openai, youtube_data/config.py, scripts/dev.py</span>
+  </div>
+</footer>
