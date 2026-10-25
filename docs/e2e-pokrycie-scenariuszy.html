@@ -1,0 +1,290 @@
+<title>Pokrycie scenariuszy testami e2e</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Testy · e2e</span>
+    <h1>Co pokrywają testy e2e</h1>
+    <p class="lede"><b>42 testy</b> Playwrighta: 25 przechodzi przez <b>33 z 43</b> scenariuszy ręcznych strategii i backtestów, a 17 pokrywa pozostałe zakładki: alerty, panel agenta, zespoły, social, news, Polymarket i pocket.</p>
+    <div class="strip">
+      <span>TradingCenter / terminal</span>
+      <span>25 października 2026 · main <b>84a79dc3</b></span>
+      <span>42 testy · <b>1,6 min</b> · bez płatnego modelu</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">42</div><div class="l">testów: 25 strategie i backtesty, 13 pozostałe zakładki, 4 pocket</div></div>
+      <div class="cell"><div class="v">33</div><div class="l">scenariuszy ręcznych pokrytych w całości</div></div>
+      <div class="cell"><div class="v">5</div><div class="l">pokrytych częściowo (E-01…E-04, A-08)</div></div>
+      <div class="cell"><div class="v">5</div><div class="l">bez testu e2e</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Jak to działa</div>
+      <h2>Prawdziwy stos, udawany model</h2>
+      <p class="intro">Test rusza własny stos: PostgreSQL na 55442, workbench na 18030 i terminal na 15173. Żaden z nich nie jest stosem deweloperskim, więc oba mogą działać naraz.</p>
+      <p>Agent jest <span class="hl">scenariuszem, nie modelem</span> (<code>agent-scenario.json</code>): wiadomość pasująca do reguły dostaje z góry zapisane wywołania narzędzi i tekst. Narzędzia są prawdziwe i piszą do bazy, więc test sprawdza, czy stan przechodzi przez cały stos na ekran. Każdy adres zewnętrzny prowadzi na 127.0.0.1:9. Dane to trzydzieści dni minutowych świec US100 i profil kosztów operatora.</p>
+      <p>Uruchomienie: <code>pnpm e2e</code> z <code>modules/terminal</code>. Opis: <code>modules/terminal/e2e/README.md</code>. Identyfikatory testów odpowiadają scenariuszom z <code>strategie-scenariusze-testowe.html</code>.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Strategie</div>
+      <h2>Strategie i backtesty: 25 testów</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Test</th><th>Co dowodzi</th><th>Scenariusze ręczne</th></tr></thead>
+          <tbody>
+            <tr><td><b>ST-01</b></td><td>Strategia z listy otwiera się z edytorem, czatem, streszczeniem i rewizją 1.</td><td>S-01, S-03</td></tr>
+            <tr><td><b>ST-02</b></td><td>Nieznana funkcja w formule jest zaznaczona w edytorze, streszczenie mówi o problemach, a Zapisz jest wyłączony.</td><td>E-01…E-04 (częściowo)</td></tr>
+            <tr><td><b>ST-03</b></td><td>Edycja zapisuje się jako następna rewizja, streszczenie za nią nadąża, a po zapisie nie ma czego zapisywać.</td><td>E-05, E-06</td></tr>
+            <tr><td><b>ST-04</b></td><td>Gdy ktoś zapisał wcześniej, edycja operatora zostaje w edytorze i pojawia się komunikat o nowszej rewizji.</td><td>E-07</td></tr>
+            <tr><td><b>ST-05</b></td><td>Rewizja pokazuje, co zmieniła, a starsza wraca jako nowa rewizja.</td><td>H-01, H-02, H-03</td></tr>
+            <tr><td><b>ST-06</b></td><td>Archiwizacja usuwa strategię z listy, przełącznik „zarchiwizowane” ją pokazuje, przywrócenie ją oddaje.</td><td>H-04, S-02</td></tr>
+            <tr><td><b>AG-01</b></td><td>Strategia opisana w czacie przychodzi jako szkic, zapisuje się i dostaje rozmowę.</td><td>A-01, A-02, A-03</td></tr>
+            <tr><td><b>AG-02</b></td><td>Szkic agenta ląduje w edytorze niezapisany i można go porzucić na dobre.</td><td>A-04, A-06</td></tr>
+            <tr><td><b>AG-03</b></td><td>Model wybrany w czacie strategii zostaje po odpowiedzi i po ponownym otwarciu.</td><td>A-07</td></tr>
+            <tr><td><b>AG-04</b></td><td>Rewizja zapisana przez agenta nie zjada niezapisanej edycji operatora.</td><td>A-05</td></tr>
+            <tr><td><b>BT-01</b></td><td>Przejście ze strategii do jej backtestów z formularzem uruchomienia.</td><td>B-01</td></tr>
+            <tr><td><b>BT-02</b></td><td>Backtest z formularza kończy się bez przeładowania strony, koszty z profilu operatora.</td><td>B-02</td></tr>
+            <tr><td><b>BT-03</b></td><td>Zakres ponad limitem jest zgłoszony przed wysłaniem, a przycisk wyłączony.</td><td>B-04</td></tr>
+            <tr><td><b>BT-04</b></td><td>Uruchomienie bez kosztów jest oznaczone na liście i w raporcie.</td><td>B-06</td></tr>
+            <tr><td><b>BT-05</b></td><td>Raport pokazuje metryki, źródło kosztów i transakcje.</td><td>R-01, R-02</td></tr>
+            <tr><td><b>BT-06</b></td><td>Uruchomienie bez transakcji mówi, że ich nie było, i pokazuje kreski zamiast zer.</td><td>R-04</td></tr>
+            <tr><td><b>BT-07</b></td><td>Dwa uruchomienia z różnym parametrem porównują się obok siebie, kolumna na uruchomienie.</td><td>P-02</td></tr>
+            <tr><td><b>BT-08</b></td><td>Uruchomienia o różnych zakresach są odrzucone z podaniem powodu.</td><td>P-04</td></tr>
+            <tr><td><b>BT-09</b></td><td>Parametr poza zadeklarowanym zakresem nie wysyła niczego do kolejki. Zatrzymuje go walidacja przeglądarki, więc odmowa serwera i jej komunikat nie są sprawdzane.</td><td>B-05</td></tr>
+            <tr><td><b>BT-10</b></td><td>Uruchomienie czekające w kolejce da się anulować, a przycisk znika.</td><td>B-07 (czekające, nie liczące się)</td></tr>
+            <tr><td><b>BT-11</b></td><td>Zamknięcie na przesuniętym stopie ma przyczynę „stop kroczący”.</td><td>R-03</td></tr>
+            <tr><td><b>BT-12</b></td><td>Widok „wszystkie” podaje nazwy strategii, od najnowszego, i porównuje uruchomienia różnych strategii.</td><td>P-01, P-03</td></tr>
+            <tr><td><b>BT-13</b></td><td>Czekającego uruchomienia nie da się zaznaczyć; „Porównaj” działa od 2 do 5.</td><td>P-05</td></tr>
+            <tr><td><b>ST-07</b></td><td>Streszczenie opisuje po polsku warunek na h4 i limit „bez wejść”.</td><td>E-08</td></tr>
+            <tr><td><b>AG-05</b></td><td>Backtest zlecony przez agenta kończy się i na liście jest oznaczony jako „agent”. Odmowa drugiego, gdy pierwszy czeka, zostaje w pytest.</td><td>A-08 (częściowo)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Pozostałe zakładki</div>
+      <h2>Siedemnaście testów poza strategiami</h2>
+      <p>Stos ma teraz jeszcze bazę <code>alerts</code>, jednego odbiorcę Telegrama z botem, dwa posty, dwa newsy i dwa wydarzenia Polymarketu. Bot API leży pod 127.0.0.1:9, więc nic nie jest wysyłane.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Test</th><th>Co dowodzi</th></tr></thead>
+          <tbody>
+            <tr><td><b>AL-01</b></td><td>Reguła zdarzeniowa zrobiona w formularzu jest na liście z odbiorcą i botem i zostaje po przeładowaniu.</td></tr>
+            <tr><td><b>AL-02</b></td><td>Reguła wyłącza się, włącza i znika po potwierdzeniu.</td></tr>
+            <tr><td><b>AL-03</b></td><td>Pakiet odmawia treści z nieznanym slotem i pokazuje to przy polu; nic się nie zapisuje.</td></tr>
+            <tr><td><b>AP-01</b></td><td>Rozmowa w panelu agenta dostaje tytuł, zmienia nazwę i otwiera się z wiadomościami.</td></tr>
+            <tr><td><b>AP-02</b></td><td>Rozmowa kasuje się dopiero po potwierdzeniu, a „Keep” ją zostawia.</td></tr>
+            <tr><td><b>TM-01</b></td><td>Zespół zrobiony w edytorze zapisuje się jako rewizja 1 i jest w katalogu.</td></tr>
+            <tr><td><b>TM-02</b></td><td>Agent bez promptu jest odrzucony i nic się nie zapisuje.</td></tr>
+            <tr><td><b>TM-03</b></td><td>Zmieniony zespół zapisuje się jako rewizja 2, potem wychodzi z katalogu (Retire).</td></tr>
+            <tr><td><b>SO-01</b></td><td>Post z oceną jest otwarty, nieprzeczytany schowany pod „Pozostałe posty”.</td></tr>
+            <tr><td><b>NW-01</b></td><td>Szukanie słowa w tytule lub leadzie zawęża newsy.</td></tr>
+            <tr><td><b>NW-02</b></td><td>News da się zachować i znaleźć wśród zachowanych.</td></tr>
+            <tr><td><b>PM-01</b></td><td>Wydarzenie pokazuje stan „stalled” (nic nie zbiera cen), cenę, i wpada do grupy zrobionej na ekranie.</td></tr>
+            <tr><td><b>PM-02</b></td><td>Usunięcie obserwacji wymaga potwierdzenia ostrzeżenia, a „Cancel” ją zostawia.</td></tr>
+            <tr><td><b>PK-01…PK-04</b></td><td>Pocket na ekranie telefonu (Pixel 7): rynki ze stanem zbierania, posty, filtr newsów i pytanie do agenta z odpowiedzią. Tylko odczyt.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Luki</div>
+      <h2>Pięć scenariuszy strategii bez testu, pięć tylko częściowo</h2>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>G-01…G-04 · dostęp i brak pakietu <span class="tag stop">nie pokryte</span></h3>
+          <p>Role <code>admin</code> i <code>viewer</code> wymagają tokenu, który proces weryfikuje kluczami Entra. Stos lokalny takiego tokenu nie wystawi, a adres kluczy jest w kodzie na stałe, więc test wymagałby zmiany kodu produkcyjnego. Role trzymają testy pytest w <code>tc-entra-auth</code> i workbenchu. Przydział narzędzi w Teams i rachunek demo także wymagają prawdziwych usług.</p>
+        </div>
+        <div class="fail">
+          <h3>B-03 · spread z brokera <span class="tag att">nie pokryte</span></h3>
+          <p>Odświeżenie spreadu z capital.com wymaga prawdziwej bramki w godzinach handlu.</p>
+        </div>
+        <div class="fail">
+          <h3>E-01…E-04 · błędy w formułach <span class="tag att">częściowo</span></h3>
+          <p>ST-02 sprawdza jedną nieznaną funkcję. Pozostałe rodzaje błędów zostają ręczne.</p>
+        </div>
+        <div class="fail">
+          <h3>A-08 · agent odmawia drugiego backtestu <span class="tag att">częściowo</span></h3>
+          <p>AG-05 sprawdza pierwszy przebieg. Odmowa drugiego, gdy pierwszy czeka, wymaga uruchomienia, które trwa dłużej niż 20 s czekania narzędzia, więc zostaje w pytest (<code>tests/strategies/test_tools.py</code>).</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Granice</div>
+      <h2>Czego ten zestaw nie sprawdza</h2>
+      <p><strong>Odpowiedzi modelu.</strong> Agent mówi to, co zapisano w scenariuszu, więc test nie wie, czy prawdziwy model dobrze rozumie polecenie.</p>
+      <p><strong>Liczb silnika.</strong> Test sprawdza, że metryki, kolumny i transakcje docierają na ekran. Poprawność wyników pilnują testy silnika i złota strategia w CI.</p>
+      <p><strong>Przerwania tury agenta i uruchomienia zespołu.</strong> Model scenariusza nie ma opóźnień, a zespoły nie mają dostawcy scenariusza, więc nic tu nie biegnie długo ani nie uruchamia zespołu.</p>
+      <p><strong>Produkcji.</strong> To osobny stos z danymi z ziarna, bez logowania Entra i bez dostawcy. Scenariusze na produkcji zostają ręczne.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Pokrycie scenariuszy testami e2e · modules/terminal/e2e</span>
+    <span>Źródło: e2e/tests/*.spec.ts</span>
+  </div>
+</footer>
