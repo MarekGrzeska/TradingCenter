@@ -1,10 +1,9 @@
-## Purpose
+# terminal-strategies Specification
 
+## Purpose
 Zakładka Strategies w terminalu. Operator czyta tu to, co napisał agent, poprawia to ręcznie, uruchamia backtest i czyta
 raport, bez wysyłania JSON-a pod REST.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Zakładka pokazuje strategie albo mówi, dlaczego nie może
 
 Zakładka MUST wymieniać strategie z nazwą, instrumentem, interwałem decyzji (w nazwach terminala), ostatnią rewizją z jej
@@ -159,3 +158,4 @@ oceny strategii.
 
 - **WHEN** raport pochodzi z wersji silnika, która nie zapisywała krzywej
 - **THEN** zakładka MUST mówić, że to uruchomienie nie ma krzywej, zamiast rysować pusty wykres
+

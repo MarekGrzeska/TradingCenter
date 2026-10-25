@@ -3,9 +3,7 @@
 Powłoka terminala: co operator widzi po otwarciu aplikacji, jak przechodzi między zakładkami, jak
 dokłada się kolejną zakładkę bez ruszania istniejących i skąd wiadomo, że źródło danych przestało
 odpowiadać.
-
 ## Requirements
-
 ### Requirement: Zakładki są adresowalne
 
 Każda zakładka MUST mieć własny adres, a otwarcie adresu wprost MUST pokazać tę zakładkę. Terminal
@@ -60,6 +58,11 @@ dociągania i w każdym komunikacie, który interwał wymienia. Nazwy, jakimi in
 drucie (`MINUTE_5`, `HOUR_4`), MUST NOT docierać na ekran: ten sam interwał pod dwiema nazwami
 w dwóch zakładkach każe operatorowi tłumaczyć jedną na drugą w głowie.
 
+Jedynym wyjątkiem jest tekst dokumentu strategii w edytorze zakładki Strategies. To tekst języka formuł, w którym
+interwał ma nazwę języka (`close @ HOUR_4`), więc edytor MUST pokazywać go dokładnie tak, jak jest zapisany. Gdyby
+terminal przepisał w nim nazwy, zmieniłby dokument, który operator zapisuje. Podpowiedź nazwy interwału w edytorze MUST
+pokazywać obok nazwę terminala. Wszystko poza tym tekstem, w tym streszczenie, MUST używać nazw terminala.
+
 #### Scenario: Wybór interwału na wykresie
 
 - **WHEN** operator otwiera pole wyboru interwału
@@ -70,6 +73,12 @@ w dwóch zakładkach każe operatorowi tłumaczyć jedną na drugą w głowie.
 
 - **WHEN** ten sam interwał jest pokazany na wykresie i na liście archiwizowanych instrumentów
 - **THEN** w obu miejscach nazywa się tak samo
+
+#### Scenario: Interwał w dokumencie strategii
+
+- **WHEN** edytor pokazuje formułę `ema(20) @ HOUR_4`, a obok stoi jej streszczenie
+- **THEN** tekst w edytorze MUST zostać `HOUR_4`, podpowiedź MUST pokazywać `HOUR_4` z `h4` obok
+- **AND** streszczenie i lista strategii MUST mówić `h4`
 
 ### Requirement: Czas jest pokazywany w polskiej strefie czasowej
 
@@ -137,3 +146,4 @@ odpowiada. Cisza na strumieniu MUST być odróżnialna od rynku, który stoi.
 - **WHEN** jeden widok wywraca się na błędzie
 - **THEN** terminal pokazuje w jego miejscu komunikat błędu z możliwością ponowienia
 - **AND** pozostałe zakładki i widoki działają dalej
+
