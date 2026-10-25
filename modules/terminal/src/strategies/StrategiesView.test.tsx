@@ -232,7 +232,8 @@ describe("StrategiesView", () => {
 
     expect(await screen.findByText(/Agent wpisał zmianę do edytora/)).toBeInTheDocument();
     expect(screen.getByText("niezapisane zmiany")).toBeInTheDocument();
-    expect(strategyInView()?.draft).toContain("with a tighter stop");
+    // Published by an effect after the render that shows the banner, so it is waited for, not read at once.
+    await waitFor(() => expect(strategyInView()?.draft).toContain("with a tighter stop"));
 
     await userEvent.click(screen.getByRole("button", { name: "Porzuć zmiany" }));
     expect(api.discardDraft).toHaveBeenCalledWith(7, expect.anything());
