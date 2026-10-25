@@ -1,0 +1,449 @@
+<title>Strategie — scenariusze testowe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+<style>
+  td.id { font-family: var(--mono); font-size: 12px; font-weight: 700; color: var(--navy); white-space: nowrap; }
+  td.box { width: 70px; }
+  td.box span { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--line); }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Strategie · scenariusze testowe</span>
+    <h1>Moduł strategii: co przejść ręcznie</h1>
+    <p class="lede">Najważniejsze przypadki do przejścia w terminalu, od pustej zakładki po porównanie backtestów.
+    <b>Reguły silnika liczą testy automatyczne. Tu jest to, co widać tylko w przeglądarce.</b></p>
+    <div class="strip">
+      <span>TradingCenter / strategie</span>
+      <span>25 października 2026</span>
+      <span>stan na <b>main 7e5698c8</b></span>
+      <span>środowisko <b>demo</b> · badania, nigdy zlecenie</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">43</div><div class="l">scenariusze w ośmiu obszarach</div></div>
+      <div class="cell"><div class="v">15</div><div class="l">krytycznych: przejść przed każdym większym wydaniem</div></div>
+      <div class="cell"><div class="v">2</div><div class="l">zakładki: Strategies i Backtests</div></div>
+      <div class="cell"><div class="v">~45 min</div><div class="l">pełne przejście, z czekaniem na backtesty</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">00 · Jak używać</div>
+      <h2>Przygotowanie i waga</h2>
+      <p class="intro">Terminal na produkcji, zalogowany kontem z rolą <code>admin</code>. Archiwum zbiera US100 i EURUSD
+      co najmniej od miesiąca. Przypadki idą po kolei: późniejsze korzystają ze strategii i uruchomień, które powstały wcześniej.</p>
+      <p><span class="tag stop">krytyczny</span> błąd znaczy złe liczby, utraconą pracę albo zablokowany ekran: wstrzymać
+      wydanie. <span class="tag att">ważny</span> funkcja działa źle, ale da się ją obejść. <span class="tag ok">zwykły</span>
+      wygoda i słowa na ekranie.</p>
+      <p>Kolumnę „Wynik” zaznacza się w kopii pliku albo na wydruku. Przy błędzie zapisz numer strategii, rewizji
+      lub uruchomienia: każdy z nich da się później odczytać w bazie.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">01 · Zakładka</div>
+      <h2>Wejście i lista strategii</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Kroki</th><th>Oczekiwane</th><th>Waga</th><th>Wynik</th></tr></thead>
+          <tbody>
+            <tr><td class="id">S-01</td><td>Otwórz Trading → Strategies.</td>
+              <td>Lista strategii z nazwą, instrumentem, interwałem po terminalowemu (<code>h4</code>, nie <code>HOUR_4</code>) i liczbą prób.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">S-02</td><td>Przełącz „zarchiwizowane” i z powrotem.</td>
+              <td>Widać tylko zarchiwizowane; powrót przywraca domyślną listę.</td>
+              <td><span class="tag ok">zwykły</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">S-03</td><td>Otwórz strategię z listy.</td>
+              <td>Edytor z dokumentem, czat obok, streszczenie na dole, historia rewizji. Numer rewizji zgadza się z listą.</td>
+              <td><span class="tag stop">krytyczny</span></td><td class="box"><span></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Edytor</div>
+      <h2>Pisanie, walidacja i zapis</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Kroki</th><th>Oczekiwane</th><th>Waga</th><th>Wynik</th></tr></thead>
+          <tbody>
+            <tr><td class="id">E-01</td><td>W warunku wejścia wpisz <code>emaa(20) &gt; close</code> i odczekaj chwilę.</td>
+              <td><code>emaa</code> zaznaczone w tej formule, podpowiedź <code>ema</code>. Streszczenie czeka na poprawny dokument. Zapis zablokowany.</td>
+              <td><span class="tag stop">krytyczny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">E-02</td><td>Wpisz <code>bbands(20, 2) &gt; close</code>.</td>
+              <td>Błąd z podpowiedzią, które linie można wybrać.</td>
+              <td><span class="tag ok">zwykły</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">E-03</td><td>Wpisz <code>close[-1] &gt; close</code>.</td>
+              <td>Odrzucone: język nie sięga w przyszłość.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">E-04</td><td>Usuń <code>exits.stop</code>.</td>
+              <td>Błąd przy <code>exits.stop</code>: stop wyznacza 1 R.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">E-05</td><td>Przywróć poprawny dokument, zmień stop z <code>2 * at_entry(atr(14))</code> na <code>1.5 * at_entry(atr(14))</code>, zapisz.</td>
+              <td>Streszczenie mówi o stopie 1,5 ATR. Powstaje rewizja N+1 z autorem operator.</td>
+              <td><span class="tag stop">krytyczny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">E-06</td><td>Kliknij Zapisz jeszcze raz bez zmian.</td>
+              <td>Nie powstaje nowa rewizja; zostaje N+1.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">E-07</td><td>Otwórz tę samą strategię w drugiej karcie i zapisz tam zmianę. Wróć do pierwszej, zmień coś innego i zapisz.</td>
+              <td>Pierwsza karta mówi, że istnieje nowsza rewizja, i nie zapisuje bez decyzji. Twoja zmiana zostaje w edytorze.</td>
+              <td><span class="tag stop">krytyczny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">E-08</td><td>W filtrze wpisz <code>ema(20) @ HOUR_4 &gt; ema(50) @ HOUR_4</code>, w limicie <code>weekday == FRIDAY and hour &gt;= 18</code>.</td>
+              <td>Streszczenie po polsku: EMA(20) powyżej EMA(50) na <code>h4</code>; piątek od 18:00 UTC (19:00 zimą, 20:00 latem w Polsce).</td>
+              <td><span class="tag ok">zwykły</span></td><td class="box"><span></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Historia</div>
+      <h2>Rewizje, różnice, archiwum</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Kroki</th><th>Oczekiwane</th><th>Waga</th><th>Wynik</th></tr></thead>
+          <tbody>
+            <tr><td class="id">H-01</td><td>W historii wybierz rewizję z E-05.</td>
+              <td>Autor operator, jedna zmiana pod <code>exits.stop</code> z wartością przed i po.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">H-02</td><td>Wybierz rewizję 1.</td>
+              <td>Komunikat, że to pierwsza rewizja, nie błąd.</td>
+              <td><span class="tag ok">zwykły</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">H-03</td><td>Przywróć starszą rewizję.</td>
+              <td>Powstaje nowa rewizja o treści przywróconej; starsze zostają nietknięte.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">H-04</td><td>Zarchiwizuj strategię testową, potem ją przywróć.</td>
+              <td>Znika z domyślnej listy i wraca; jej uruchomienia są nadal w Backtests.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Agent</div>
+      <h2>Czat strategii i panel agenta</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Kroki</th><th>Oczekiwane</th><th>Waga</th><th>Wynik</th></tr></thead>
+          <tbody>
+            <tr><td class="id">A-01</td><td>„Nowa…”, potem w czacie strategii opisz po polsku: „wybicie z zakresu azjatyckiego na EURUSD, h1, stop pod dołkiem zakresu”.</td>
+              <td>Agent dopytuje albo wpisuje szkic do edytora jako niezapisany tekst, z napisem „Agent wpisał zmianę do edytora”. Nie wkleja JSON-a do czatu.</td>
+              <td><span class="tag stop">krytyczny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">A-02</td><td>Kliknij Zapisz.</td>
+              <td>Strategia powstaje i się otwiera. Nazwa, hipoteza i założenia są po polsku; to, czego nie podałeś, jest w notatkach.</td>
+              <td><span class="tag stop">krytyczny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">A-03</td><td>Zamknij strategię i otwórz ją ponownie, także na drugim urządzeniu.</td>
+              <td>Wraca ta sama rozmowa. W panelu agenta rozmowa nosi nazwę strategii.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">A-04</td><td>W czacie strategii poproś „zmień stop na 1,5 ATR”, bez niezapisanych zmian.</td>
+              <td>Po turze edytor pokazuje szkic albo nową rewizję autora agent; zakładka mówi, kto zmienił.</td>
+              <td><span class="tag stop">krytyczny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">A-05</td><td>Wpisz coś w edytorze bez zapisu, potem poproś agenta o inną zmianę i każ mu zapisać.</td>
+              <td>Twoje zmiany zostają w edytorze; zakładka mówi, że jest nowsza rewizja.</td>
+              <td><span class="tag stop">krytyczny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">A-06</td><td>Po szkicu agenta kliknij „Porzuć zmiany”.</td>
+              <td>Edytor wraca do zapisanej rewizji; szkic nie wraca po przeładowaniu.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">A-07</td><td>W czacie strategii przełącz model na inny i wyślij pytanie.</td>
+              <td>Model zostaje wybrany i odpowiada; nie wraca sam do Luny. Brak komunikatu „no such session”.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">A-08</td><td>Poproś agenta: „puść backtest tej strategii za ostatni miesiąc”, i od razu drugi raz.</td>
+              <td>Pierwsza prośba: numer uruchomienia i metryki albo stan „liczy się”. Druga, gdy pierwsza czeka: odmowa nazywająca czekające uruchomienie. Na liście zlecający to agent.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Uruchomienie</div>
+      <h2>Formularz backtestu i koszty</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Kroki</th><th>Oczekiwane</th><th>Waga</th><th>Wynik</th></tr></thead>
+          <tbody>
+            <tr><td class="id">B-01</td><td>W Strategies kliknij „Backtesty tej strategii →”.</td>
+              <td>Otwiera się Backtests z tą strategią wybraną i jej formularzem.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">B-02</td><td>Nie wpisuj kosztów, wybierz ostatni miesiąc, uruchom.</td>
+              <td>Koszty „z capital.com, pobrane …”. Uruchomienie przechodzi przez „w kolejce”, „liczy się”, „zakończone” bez przeładowania strony.</td>
+              <td><span class="tag stop">krytyczny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">B-03</td><td>Sprawdź spread pobrany od brokera; w godzinach handlu kliknij „Odśwież z capital.com”.</td>
+              <td>Wartość rozsądna dla instrumentu (poza sesją bywa szersza); po odświeżeniu nowa chwila pobrania.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">B-04</td><td>Wybierz zakres kilku lat.</td>
+              <td>Formularz mówi przed wysłaniem, że zakres przekracza sufit minut, i podaje sufit.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">B-05</td><td>Ustaw parametr strategii poza zadeklarowanym zakresem, uruchom.</td>
+              <td>Odmowa przy tym parametrze, z zakresem; nic nie trafia do kolejki.</td>
+              <td><span class="tag ok">zwykły</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">B-06</td><td>Uruchom „bez kosztów”.</td>
+              <td>Na liście i w raporcie znacznik „bez kosztów”.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">B-07</td><td>Uruchom długi zakres i kliknij Anuluj, póki się liczy.</td>
+              <td>Stan zmienia się na anulowany; lista przestaje się odświeżać, gdy nic nie czeka.</td>
+              <td><span class="tag ok">zwykły</span></td><td class="box"><span></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Raport</div>
+      <h2>Raport, krzywa i transakcje</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Kroki</th><th>Oczekiwane</th><th>Waga</th><th>Wynik</th></tr></thead>
+          <tbody>
+            <tr><td class="id">R-01</td><td>Kliknij zakończone uruchomienie z B-02.</td>
+              <td>Metryki, krzywa kapitału, źródło kosztów „z capital.com” z chwilą pobrania. Żadnej oceny w rodzaju „dobra” albo „zła”.</td>
+              <td><span class="tag stop">krytyczny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">R-02</td><td>Wybierz transakcję z listy.</td>
+              <td>Wykres pokazuje jej fragment osi z wejściem, wyjściem i początkowym stopem, na instrumencie i interwale rewizji tego uruchomienia.</td>
+              <td><span class="tag stop">krytyczny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">R-03</td><td>Przejrzyj przyczyny wyjścia w strategii z trailingiem.</td>
+              <td>Zamknięcie na przesuniętym stopie ma przyczynę <code>trail</code>, nie <code>stop</code>.</td>
+              <td><span class="tag ok">zwykły</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">R-04</td><td>Uruchom strategię z warunkiem, który nigdy nie jest prawdziwy (np. <code>close &lt; 0</code>).</td>
+              <td>Raport mówi, że transakcji nie było; metryki zależne od transakcji to „—”, nie zero.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Backtests</div>
+      <h2>Lista wszystkich i porównanie</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Kroki</th><th>Oczekiwane</th><th>Waga</th><th>Wynik</th></tr></thead>
+          <tbody>
+            <tr><td class="id">P-01</td><td>W Backtests wybierz „wszystkie”.</td>
+              <td>Uruchomienia różnych strategii, każde z nazwą swojej strategii, od najnowszego.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">P-02</td><td>Puść tę samą strategię dwa razy z innym parametrem, przy tym samym zakresie i kosztach. Zaznacz oba, „Porównaj”.</td>
+              <td>Tabela: kolumna na uruchomienie (numer, strategia, rewizja, parametry), wiersz na metrykę. Nic nie jest wyróżnione jako lepsze.</td>
+              <td><span class="tag stop">krytyczny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">P-03</td><td>Zaznacz dwa uruchomienia różnych strategii o tym samym zakresie i kosztach.</td>
+              <td>Porównanie działa także między strategiami.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">P-04</td><td>Zaznacz dwa uruchomienia o różnym zakresie albo jedno „bez kosztów”.</td>
+              <td>Zamiast tabeli lista różnic: który zakres albo które koszty, w którym uruchomieniu.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">P-05</td><td>Spróbuj zaznaczyć uruchomienie w kolejce albo nieudane; zaznacz jedno, a potem sześć zakończonych.</td>
+              <td>Niezakończonego nie da się zaznaczyć. „Porównaj” jest nieaktywne poniżej 2 i powyżej 5.</td>
+              <td><span class="tag ok">zwykły</span></td><td class="box"><span></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Granice</div>
+      <h2>Dostęp i brak pakietu</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Kroki</th><th>Oczekiwane</th><th>Waga</th><th>Wynik</th></tr></thead>
+          <tbody>
+            <tr><td class="id">G-01</td><td>Zaloguj się kontem z rolą <code>viewer</code> i otwórz Strategies.</td>
+              <td>Odmowa dostępu: strategie są tylko dla <code>admin</code>.</td>
+              <td><span class="tag stop">krytyczny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">G-02</td><td>Lokalnie uruchom workbench bez <code>STRATEGIES_DATABASE_URL</code>.</td>
+              <td>Obie zakładki mówią, że pakiet nie jest włączony, i nazywają to ustawienie. Rozmowa działa, tylko bez narzędzi strategii.</td>
+              <td><span class="tag att">ważny</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">G-03</td><td>W Teams otwórz przydział narzędzi agentowi zespołu.</td>
+              <td>Żadnego narzędzia strategii na liście: ma je tylko rozmowa.</td>
+              <td><span class="tag ok">zwykły</span></td><td class="box"><span></span></td></tr>
+            <tr><td class="id">G-04</td><td>Przed B-02 i po nim sprawdź pozycje i zlecenia na rachunku demo.</td>
+              <td>Bez zmian: backtest niczego nie składa na rachunku. Pakiet strategii nie ma drogi do rachunku.</td>
+              <td><span class="tag stop">krytyczny</span></td><td class="box"><span></span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Poza tą listą</div>
+      <h2>Co sprawdzają testy automatyczne</h2>
+      <p>Tych reguł nie da się rzetelnie sprawdzić z ekranu. Pilnują ich testy w <code>modules/workbench/tests/strategies</code>,
+      uruchamiane w CI przy każdej zmianie pakietu.</p>
+      <div class="fails">
+        <div class="fail ok"><h3>Brak zaglądania w przyszłość <span class="tag ok">CI</span></h3>
+          <p>Decyzja na zamkniętej świecy, wypełnienie od następnej minuty; wyższy interwał tylko z zamkniętej świecy;
+          transakcje stycznia takie same przy dłuższym zakresie.</p></div>
+        <div class="fail ok"><h3>Koszty i rozmiar pozycji <span class="tag ok">CI</span></h3>
+          <p>Strona ceny i spread przy stopach, luki przy zleceniach stop, finansowanie za trzy noce przez weekend, rozmiar
+          pozycji z ułamka ryzyka, niejasna minuta rozstrzygana na niekorzyść strategii.</p></div>
+        <div class="fail ok"><h3>Złota strategia <span class="tag ok">CI</span></h3>
+          <p>Dokument referencyjny na zamrożonych danych: zmiana wyniku bez podbicia wersji silnika zatrzymuje CI.</p></div>
+        <div class="fail ok"><h3>Język <span class="tag ok">CI</span></h3>
+          <p>Formuła jest parsowana, nigdy wykonywana: <code>__import__</code>, <code>lambda</code>, wycinki i przypisania są odrzucane.</p></div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Strategie · scenariusze testowe · 25 października 2026</span>
+    <span>Źródła: openspec/specs/strategies-*, openspec/specs/terminal-strategies</span>
+  </div>
+</footer>
