@@ -56,7 +56,7 @@ async def test_validate_answers_what_saving_would_and_writes_nothing() -> None:
         bad = (await client.post("/validate", json=strategy(exits={}))).json()
         good = (await client.post("/validate", json=strategy())).json()
 
-    assert bad["valid"] is False and bad["problems"][0]["path"] == "exits.stop" and bad["summary"] is None
+    assert bad["valid"] is False and bad["problems"][0]["path"] == "exits" and bad["summary"] is None
     assert good["valid"] is True and good["problems"] == [] and good["summary"]["name"] == "test"
 
 
@@ -103,7 +103,7 @@ async def test_runs_are_listed_read_and_paged_and_a_missing_one_is_a_404(pool) -
         async with pool.acquire() as conn:
             await conn.execute("UPDATE runs SET status = 'running' WHERE id = $1", run_id)
         trade = {"side": "long", "entry_time": 1772442000, "entry_price": 100.0, "exit_time": 1772445600,
-                 "exit_price": 101.0, "units": 1.0, "initial_stop": 90.0, "result_r": 0.1, "result_money": 1.0,
+                 "exit_price": 101.0, "units": 1.0, "initial_stop": 90.0, "result_r": 0.1, "result_money": 1.0, "result_pct": 0.0001, "mae_pct": 0.0,
                  "costs": {"spread": 1.0}, "exit_reason": "target", "pessimistic": False}
         await runs.finish(pool, run_id, 1, {"trades": 1}, {"seed": 1}, [trade])
         listed = (await client.get(f"/runs?strategy_id={sid}")).json()
@@ -115,7 +115,7 @@ async def test_runs_are_listed_read_and_paged_and_a_missing_one_is_a_404(pool) -
     assert [r["id"] for r in listed] == [run_id] and listed[0]["status"] == "done"
     assert listed[0]["requested_by"] == "operator"
     assert listed[0]["headline"] == {
-        "trades": 1, "total_r": None, "expectancy_r": None, "max_drawdown_r": None, "sharpe": None,
+        "trades": 1, "total_r": None, "expectancy_r": None, "max_drawdown_r": None, "sharpe": None, "return_pct": None,
         "costs_source": "request", "without_costs": False,
     }
     assert page["total"] == 1 and page["trades"][0]["costs"] == {"spread": 1.0}

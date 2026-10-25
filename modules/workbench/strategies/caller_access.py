@@ -42,6 +42,7 @@ REST_PATHS: tuple[str, ...] = (
     "/costs",
     "/costs/{symbol}",
     "/costs/{symbol}/from-broker",
+    "/margins/{symbol}",
     # FastAPI's own, published by the framework rather than by a router.
     "/docs",
     "/docs/oauth2-redirect",

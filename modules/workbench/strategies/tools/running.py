@@ -52,7 +52,8 @@ class Comparison(BaseModel):
 def _headline(report: dict[str, Any] | None) -> dict[str, Any] | None:
     if report is None:
         return None
-    keys = ("trades", "total_r", "expectancy_r", "win_rate", "profit_factor", "max_drawdown_r", "sharpe")
+    keys = ("trades", "total_r", "expectancy_r", "expectancy_pct", "return_pct", "win_rate", "profit_factor", "max_drawdown_r",
+            "max_drawdown_pct", "worst_mae_pct", "sharpe")
     return {key: report.get(key) for key in keys}
 
 
@@ -102,8 +103,13 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
             except (BrokerCostsMissing, ArchiveUnavailable) as err:
                 raise refusal(f"the broker's costs cannot be read, and a run is never made without them: {err}; "
                               "nothing was queued") from None
+            try:
+                margin = await runs.resolved_margin(conn, ctx.state.archive, found.document)
+            except (BrokerCostsMissing, ArchiveUnavailable) as err:
+                raise refusal(f"the strategy is sized by the deposit and the broker's cannot be read: {err}; "
+                              "nothing was queued") from None
             run_id = await runs.enqueue(
-                conn, request, found.n, runs.resolved_params(request, declared), costs, "agent"
+                conn, request, found.n, runs.resolved_params(request, declared), costs, "agent", margin
             )
         queue = ctx.state.queue
         queue.listen(run_id)

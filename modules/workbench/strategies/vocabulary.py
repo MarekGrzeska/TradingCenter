@@ -32,6 +32,8 @@ class Arg(str, Enum):
     # A whole number of bars, 1 to MAX_BARS, written as a constant or as a parameter — never a formula, so a window's
     # length is known before a single bar is read.
     WINDOW = "window"
+    # The name of one of SESSIONS, and nothing else.
+    SESSION = "session"
 
 
 # The furthest back an offset or a window reaches, and so the most warm-up one formula can ask for.
@@ -59,6 +61,24 @@ CONSTANTS: dict[str, float] = {
     "MONDAY": 0, "TUESDAY": 1, "WEDNESDAY": 2, "THURSDAY": 3, "FRIDAY": 4, "SATURDAY": 5, "SUNDAY": 6,
     "LONG": 1, "SHORT": -1, "FLAT": 0,
 }
+
+
+@dataclass(frozen=True)
+class Session:
+    zone: str
+    # Minutes after local midnight, Monday to Friday local time. The clock only: no exchange holidays or early closes.
+    opens: int
+    closes: int
+
+
+# The zones and hours the chart draws as session ranges (`market_data/indicators/catalogue/zones.py`); a test outside
+# both packages holds them equal, since neither may import the other.
+SESSIONS: dict[str, Session] = {
+    "NEW_YORK": Session("America/New_York", 9 * 60 + 30, 16 * 60),
+    "LONDON": Session("Europe/London", 8 * 60, 16 * 60 + 30),
+    "TOKYO": Session("Asia/Tokyo", 9 * 60, 15 * 60),
+}
+
 # The open position. Only where there is one: the exits.
 POSITION: dict[str, str] = {
     "position": "LONG, SHORT or FLAT",
@@ -85,6 +105,9 @@ NAME_PHRASES: dict[str, str] = {
     "open_r": "bieżący wynik pozycji w R",
     "losses_in_row": "liczba strat z rzędu", "last_trade_r": "wynik ostatniej transakcji w R",
     "trades_today": "liczba transakcji otwartych dziś (UTC)",
+    "NEW_YORK": "nowojorskiej (9:30–16:00 w Nowym Jorku, zwykle 15:30–22:00 w Polsce)",
+    "LONDON": "londyńskiej (8:00–16:30 w Londynie, 9:00–17:30 w Polsce)",
+    "TOKYO": "tokijskiej (9:00–15:00 w Tokio, 1:00–7:00 zimą i 2:00–8:00 latem w Polsce)",
 }
 
 
@@ -107,7 +130,7 @@ class Function:
         return f"{self.name}({', '.join(names)}{', …' if self.variadic else ''}) -> {self.returns.value}"
 
 
-_N, _C, _W = Arg.NUMBER, Arg.CONDITION, Arg.WINDOW
+_N, _C, _W, _S = Arg.NUMBER, Arg.CONDITION, Arg.WINDOW, Arg.SESSION
 
 FUNCTIONS: dict[str, Function] = {
     f.name: f
@@ -140,6 +163,19 @@ FUNCTIONS: dict[str, Function] = {
             phrase="najmniejsze z: {all}"),
         Function("max", (_N, _N), Type.NUMBER, "the largest of its arguments", variadic=True,
             phrase="największe z: {all}"),
+        Function(
+            "session_bar", (_S,), Type.NUMBER,
+            "the bar's number in today's session S (NEW_YORK, LONDON, TOKYO) by the clock in its zone: 1 for the first "
+            "bar starting at or after the open, one more each bar after; 0 for a bar starting outside the session. "
+            "A missing bar does not renumber the next. Monday to Friday, no exchange holidays",
+            phrase="numer świecy sesji {0}",
+        ),
+        Function(
+            "minutes_to_session_close", (_S,), Type.NUMBER,
+            "minutes from the decision (the bar's close) to the close of session S on that local day; negative after "
+            "the close, empty on a day without the session",
+            phrase="minuty do zamknięcia sesji {0}",
+        ),
         Function("stale", (_N,), Type.CONDITION, "the last available value of x is older than one period of its resolution",
             phrase="{0} jest nieaktualne"),
         Function(
@@ -151,6 +187,8 @@ FUNCTIONS: dict[str, Function] = {
 
 # Functions that read their arguments on the current bar only, so they may carry the trade's state.
 PER_BAR: frozenset[str] = frozenset({"abs", "min", "max"})
+# Functions of the axis's clock, like `hour`: they read the bars' times, not their prices.
+SESSION_FUNCTIONS: frozenset[str] = frozenset({"session_bar", "minutes_to_session_close"})
 
 
 def inner_context(context: tuple[str, str], name: str) -> tuple[str, str]:
@@ -159,7 +197,7 @@ def inner_context(context: tuple[str, str], name: str) -> tuple[str, str]:
 
 
 RESERVED: frozenset[str] = frozenset(
-    {*SERIES, *TIME, *CONSTANTS, *POSITION, *HISTORY, *FUNCTIONS, *RESOLUTIONS, "p", "True", "False"}
+    {*SERIES, *TIME, *CONSTANTS, *SESSIONS, *POSITION, *HISTORY, *FUNCTIONS, *RESOLUTIONS, "p", "True", "False"}
 )
 
 

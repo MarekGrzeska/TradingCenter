@@ -13,7 +13,7 @@ import asyncpg
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field
 from tc_runtime.db import Conn, fetch_one
 
-from . import costs_store
+from . import costs_store, margins
 from .archive import Archive
 from .costs import CostModel
 from .problems import Problem
@@ -105,12 +105,21 @@ def costs_source_of(request: Mapping[str, Any], requested_by: str) -> CostsSourc
 
 
 def costs_marks(request: Mapping[str, Any], requested_by: str) -> dict[str, Any]:
-    """What a report and a list say about a run's costs — read off its `request`, where they were recorded."""
+    """What a report and a list say about a run's costs and deposit — read off its `request`, where they were recorded."""
     return {
         "costs_source": costs_source_of(request, requested_by),
         "costs_fetched_at": request.get("costs_fetched_at"),
         "without_costs": bool(request.get("without_costs", False)),
+        "margin_factor": request.get("margin_factor"),
     }
+
+
+async def resolved_margin(conn: Conn, archive: Archive, document: Mapping[str, Any]) -> float | None:
+    """The instrument's deposit when the document is sized by it, else none — no other run reads it. Raises what
+    `margins.get_or_fetch` raises."""
+    if document.get("sizing", {}).get("mode") != "margin_fraction":
+        return None
+    return (await margins.get_or_fetch(conn, archive, document["symbol"])).margin_factor
 
 
 def resolved_params(request: RunIn, declared: Mapping[str, Mapping[str, float]]) -> dict[str, float]:
@@ -119,11 +128,11 @@ def resolved_params(request: RunIn, declared: Mapping[str, Mapping[str, float]])
 
 async def enqueue(
     conn: Conn, request: RunIn, revision: int, params: Mapping[str, float], costs: RunCosts,
-    requested_by: str = "operator",
+    requested_by: str = "operator", margin_factor: float | None = None,
 ) -> int:
     """The values the run is made with, never a reference to the profile they came from."""
     recorded = request.model_dump(mode="json", by_alias=True) | {
-        "revision": revision, "params": dict(params), **costs.recorded(),
+        "revision": revision, "params": dict(params), **costs.recorded(), "margin_factor": margin_factor,
     }
     row = await fetch_one(
         conn,
@@ -172,13 +181,14 @@ async def finish(
             "run_trades",
             columns=[
                 "run_id", "seq", "side", "entry_time", "entry_price", "exit_time", "exit_price", "units",
-                "initial_stop", "result_r", "result_money", "costs", "exit_reason", "pessimistic",
+                "initial_stop", "result_r", "result_money", "result_pct", "mae_pct", "costs", "exit_reason",
+                "pessimistic",
             ],
             records=[
                 (
                     run_id, seq, t["side"], moment(t["entry_time"]), t["entry_price"], moment(t["exit_time"]),
                     t["exit_price"], t["units"], t["initial_stop"], t["result_r"], t["result_money"],
-                    json.dumps(t["costs"]), t["exit_reason"], t["pessimistic"],
+                    t["result_pct"], t["mae_pct"], json.dumps(t["costs"]), t["exit_reason"], t["pessimistic"],
                 )
                 for seq, t in enumerate(trades)
             ],
@@ -251,7 +261,7 @@ _LIST = """
            finished_at, headline
 """
 
-HEADLINE = ("trades", "total_r", "expectancy_r", "max_drawdown_r", "sharpe")
+HEADLINE = ("trades", "total_r", "expectancy_r", "max_drawdown_r", "sharpe", "return_pct")
 
 
 async def list_runs(conn: Conn, strategy_id: int | None, offset: int, limit: int) -> list[asyncpg.Record]:

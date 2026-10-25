@@ -22,6 +22,8 @@ TERMS = {
     "symbol": "US100", "overnight_long_rate": -0.0151992, "overnight_short_rate": 0.0069792,
     "overnight_rate_unit": "PERCENTAGE", "overnight_charge_at": "2026-07-23T21:00:00Z",
     "overnight_charge_interval_minutes": 1440,
+    # US100's deposit on the demo account, read on 25 October 2026 (design D5 of `a-trade-held-through-the-session`).
+    "margin_factor": 5.0, "margin_factor_unit": "PERCENTAGE",
 }
 QUOTE = {"symbol": "US100", "name": "US Tech 100", "tradeable": True, "bid": 4049.28, "ask": 4049.58}
 

@@ -48,10 +48,11 @@ class HeadlineOut(BaseModel):
     """The few numbers a list of runs shows; the rest is `GET /runs/{id}`. Null where the report has none."""
 
     trades: int | None
-    total_r: float | None
+    total_r: float | None = Field(description="null without a stop, which has no 1 R")
     expectancy_r: float | None
     max_drawdown_r: float | None
     sharpe: float | None
+    return_pct: float | None = Field(default=None, description="null for a run recorded before engine version 3")
     costs_source: CostsSource = Field(description=_COSTS_SOURCE)
     without_costs: bool = Field(description=_WITHOUT_COSTS)
 
@@ -73,7 +74,8 @@ class RunSummaryOut(BaseModel):
 
 class YearOut(BaseModel):
     trades: int
-    total_r: float
+    total_r: float | None = Field(description="null without a stop")
+    total_pct: float | None = Field(default=None, description="the trades' results in % of equity at entry, summed")
 
 
 class CostsByComponentOut(BaseModel):
@@ -96,6 +98,9 @@ class RandomEntryOut(BaseModel):
     median_total_r: float | None
     p5_total_r: float | None
     p95_total_r: float | None
+    median_return_pct: float | None = None
+    p5_return_pct: float | None = None
+    p95_return_pct: float | None = None
 
 
 class SkippedOut(BaseModel):
@@ -117,7 +122,8 @@ class ReportOut(BaseModel):
     decision_bars: int
     pessimistic_resolutions: int
     win_rate: float | None
-    expectancy_r: float | None
+    expectancy_r: float | None = Field(description="null without a stop, as every metric in R")
+    expectancy_pct: float | None = Field(default=None, description="mean result in % of the equity at entry")
     total_r: float | None
     profit_factor: float | None
     max_drawdown_r: float | None
@@ -125,6 +131,8 @@ class ReportOut(BaseModel):
     average_bars_held: float | None
     exposure: float | None
     total_r_without_best_5: float | None
+    total_pct_without_best_5: float | None = None
+    worst_mae_pct: float | None = Field(default=None, description="the deepest open loss of any trade, in % of its equity at entry")
     final_equity: float | None
     return_pct: float | None
     annual_return_pct: float | None
@@ -138,6 +146,9 @@ class ReportOut(BaseModel):
     annualisation: str
     costs_source: CostsSource = Field(description=_COSTS_SOURCE)
     costs_fetched_at: datetime | None = Field(description="when the broker's profile was read; null for any other source")
+    margin_factor: float | None = Field(
+        default=None, description="the instrument's deposit as a fraction of a position's value, when the size was computed from it"
+    )
     without_costs: bool = Field(description=_WITHOUT_COSTS)
     equity: list[tuple[int, float | None]] | None = Field(
         default=None,
@@ -156,10 +167,13 @@ class ComparedRunOut(BaseModel):
     trades: int | None
     win_rate: float | None
     expectancy_r: float | None
+    expectancy_pct: float | None
     total_r: float | None
+    return_pct: float | None
     profit_factor: float | None
     max_drawdown_r: float | None
     max_drawdown_pct: float | None
+    worst_mae_pct: float | None
     sharpe: float | None
     sortino: float | None
     calmar: float | None
@@ -267,6 +281,18 @@ class CostProfileOut(BaseModel):
     )
 
 
+class MarginIn(BaseModel):
+    margin_factor: float = Field(gt=0, le=1, description="the deposit as a fraction of the position's value: 0.05 is 5%")
+
+
+class MarginOut(BaseModel):
+    symbol: str
+    margin_factor: float = Field(description="the deposit as a fraction of the position's value")
+    source: Literal["operator", "broker"]
+    broker: dict[str, Any] | None = Field(description="the broker's own number and unit; null for the operator's value")
+    updated_at: datetime
+
+
 class DraftOut(BaseModel):
     strategy_id: int | None = Field(description="null for the new strategy not saved yet")
     document: dict[str, Any] = Field(description="as the agent put it — not necessarily valid")
@@ -317,6 +343,7 @@ class LanguageOut(BaseModel):
     position: dict[str, str] = Field(description="the open position — in exits only")
     history: dict[str, str] = Field(description="closed trades — anywhere but a `let`")
     resolutions: list[str]
+    sessions: dict[str, str] = Field(description="the names a session function takes, with their zone and hours")
     functions: list[FunctionOut]
     indicators: list[IndicatorOut] | None = Field(
         description="the archive's line indicators as functions; null when the archive did not answer"
@@ -332,11 +359,13 @@ class TradeOut(BaseModel):
     exit_time: datetime
     exit_price: float
     units: float
-    initial_stop: float
-    result_r: float
+    initial_stop: float | None = Field(description="null without a stop")
+    result_r: float | None = Field(description="null without a stop")
     result_money: float
+    result_pct: float | None = Field(description="of the equity at entry; null for a run before engine version 3")
+    mae_pct: float | None = Field(description="the deepest open loss, of the equity at entry; null before engine version 3")
     costs: dict
-    exit_reason: Literal["stop", "target", "trail", "when", "max_bars", "end_of_range"]
+    exit_reason: Literal["stop", "target", "trail", "when", "max_bars", "out_of_capital", "end_of_range"]
     pessimistic: bool
 
 

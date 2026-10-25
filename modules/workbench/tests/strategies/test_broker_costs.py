@@ -6,8 +6,8 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from strategies import costs_store, runs
-from strategies.broker_costs import BrokerCostsMissing, from_broker
+from strategies import costs_store, margins, runs
+from strategies.broker_costs import BrokerCostsMissing, from_broker, margin_from_terms
 from strategies.config import Settings
 
 from .fake_archive import QUOTE, TERMS, archive_of
@@ -46,6 +46,13 @@ def test_a_value_the_broker_leaves_out_is_named_never_defaulted(terms: dict, nam
 def test_a_search_without_the_instrument_itself_has_no_price() -> None:
     with pytest.raises(BrokerCostsMissing, match="does not list US100"):
         from_broker("US100", HITS[:1], TERMS)
+
+
+def test_the_brokers_deposit_in_percent_becomes_a_fraction_and_another_unit_is_named() -> None:
+    assert margin_from_terms("US100", TERMS).margin_factor == 0.05
+
+    with pytest.raises(BrokerCostsMissing, match="'POINTS'"):
+        margin_from_terms("US100", TERMS | {"margin_factor_unit": "POINTS"})
 
 
 def _client(pool, archive) -> httpx.AsyncClient:
@@ -115,3 +122,46 @@ async def test_the_operators_values_replace_the_brokers_and_the_broker_can_be_as
 
     assert typed["source"] == "operator" and typed["broker"] is None and typed["fetched_at"] is None
     assert again["source"] == "broker" and again["costs"]["rollover_hour"] == 21
+
+
+BY_DEPOSIT = strategy(sizing={"mode": "margin_fraction", "value": 0.05})
+
+
+@pytest.mark.db
+async def test_the_first_run_sized_by_the_deposit_reads_it_and_leaves_the_cost_profile_alone(pool) -> None:
+    async with pool.acquire() as conn:
+        kept = await costs_store.put_from_broker(conn, "US100", from_broker("US100", HITS, TERMS))
+    async with _client(pool, archive_of(MINUTES)) as client:
+        sid = (await client.post("/strategies", json=BY_DEPOSIT)).json()["strategy_id"]
+        queued = (await client.post("/runs", json={"strategy_id": sid, **RANGE})).json()
+        margin = (await client.get("/margins/US100")).json()
+        profile = (await client.get("/costs/US100")).json()
+    async with pool.acquire() as conn:
+        made = await runs.get_run(conn, queued["id"])
+
+    assert margin["margin_factor"] == 0.05 and margin["source"] == "broker" and margin["broker"]["margin_factor"] == 5.0
+    assert profile["costs"] == kept.costs.model_dump(mode="json")
+    assert made is not None and made.request["margin_factor"] == 0.05
+
+
+@pytest.mark.db
+async def test_a_deposit_in_an_unknown_unit_refuses_the_run_and_keeps_nothing(pool) -> None:
+    async with _client(pool, archive_of(MINUTES, terms=TERMS | {"margin_factor_unit": "POINTS"})) as client:
+        sid = (await client.post("/strategies", json=BY_DEPOSIT)).json()["strategy_id"]
+        refused = await client.post("/runs", json={"strategy_id": sid, "without_costs": True, **RANGE})
+    async with pool.acquire() as conn:
+        stored = await margins.get(conn, "US100")
+
+    assert refused.status_code == 422 and "'POINTS'" in refused.json()["problems"][0]["message"] and stored is None
+
+
+@pytest.mark.db
+async def test_a_run_not_sized_by_the_deposit_never_reads_it(pool) -> None:
+    terms = {k: v for k, v in TERMS.items() if not k.startswith("margin")}
+    async with _client(pool, archive_of(MINUTES, terms=terms)) as client:
+        sid = (await client.post("/strategies", json=strategy())).json()["strategy_id"]
+        queued = await client.post("/runs", json={"strategy_id": sid, **RANGE})
+    async with pool.acquire() as conn:
+        stored = await margins.get(conn, "US100")
+
+    assert queued.status_code == 202 and stored is None

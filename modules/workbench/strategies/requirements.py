@@ -10,7 +10,7 @@ from . import formula as f
 from .checking import children, through_at
 from .document import Checked, contexts
 from .series import PERIOD_SECONDS, Context
-from .vocabulary import FUNCTIONS, SERIES, TIME, Indicator
+from .vocabulary import FUNCTIONS, SERIES, SESSION_FUNCTIONS, TIME, Indicator
 
 # Bars are counted in trading bars and read in calendar time: a weekend, a holiday and the daily break stretch one into
 # the other. Generous on purpose — reading too far back costs a few rows, too short a series is a wrong warm-up.
@@ -65,7 +65,8 @@ def needs(checked: Checked, params: Mapping[str, float], catalogue: Mapping[str,
             if n.id not in let_reach:
                 let_reach[n.id] = reach(lets[n.id], decision)
             return let_reach[n.id]
-        if isinstance(n, f.Name) and (n.id in SERIES or n.id in TIME):
+        clock = isinstance(n, f.Call) and n.function in SESSION_FUNCTIONS
+        if clock or isinstance(n, f.Name) and (n.id in SERIES or n.id in TIME):
             warm.add(ctx)
             return 0
         if isinstance(n, f.Field) and isinstance(n.value, f.Call):

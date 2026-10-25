@@ -12,14 +12,14 @@ from strategies.engine import Trade, simulate
 from strategies.evaluate import Evaluator
 
 from .builders import catalogue
-from .market import FREE, HOUR, MONDAY, flat, hours, minutes, strategy, walk
+from .market import FREE, HOUR, MONDAY, flat, hours, minutes, run, strategy, walk
 
 
 def trade(r: float, *, exit_time: int = MONDAY + 2 * HOUR, side: str = "long") -> Trade:
     return Trade(
         side=side, signal_bar=0, entry_time=MONDAY + HOUR, entry_price=100.0, exit_time=exit_time,
         exit_price=100.0 + 10 * r, units=1.0, initial_stop=90.0, result_r=r, result_money=10 * r,
-        costs={"spread": 1.0, "slippage": 0.5, "financing": 0.0}, exit_reason="stop" if r < 0 else "target",
+        result_pct=r / 1000, mae_pct=min(r, 0) / 1000, costs={"spread": 1.0, "slippage": 0.5, "financing": 0.0}, exit_reason="stop" if r < 0 else "target",
         pessimistic=False,
     )
 
@@ -100,7 +100,7 @@ def test_an_unmeasurable_number_is_stored_as_null() -> None:
 def test_bars_held_count_decision_bars_not_the_clock_over_a_weekend() -> None:
     friday_20, monday_10 = MONDAY + 4 * 86400 + 20 * HOUR, MONDAY + 7 * 86400 + 10 * HOUR
     weekday_hours = np.array([h for h in range(MONDAY, MONDAY + 8 * 86400, HOUR) if (h - MONDAY) // 86400 % 7 < 5])
-    held = Trade("long", 0, friday_20, 100.0, monday_10, 100.0, 1.0, 90.0, 0.0, 0.0,
+    held = Trade("long", 0, friday_20, 100.0, monday_10, 100.0, 1.0, 90.0, 0.0, 0.0, 0.0, 0.0,
                  {"spread": 0, "slippage": 0, "financing": 0}, "when", False)
 
     assert reports.trade_metrics([held], weekday_hours, 86400)["average_bars_held"] == 14  # 20:00–24:00 Fri, 00–10 Mon
@@ -138,3 +138,35 @@ def test_every_field_a_report_carries_has_its_place_in_the_contract() -> None:
 
     assert ReportOut.model_validate(report).model_dump(mode="json").keys() == report.keys()
     assert ReportOut.model_validate(before_the_curve).equity is None
+
+
+WITHOUT_A_STOP = strategy(entries=WALKING["entries"], exits={"max_bars": 12})
+
+
+def test_a_strategy_without_a_stop_reports_nothing_in_r_and_everything_else() -> None:
+    report = _report(WITHOUT_A_STOP, minutes(walk(10, seed=5)))
+    random = report["benchmarks"]["random_entry"]
+
+    assert report["trades"] > 0
+    assert report["expectancy_r"] is None and report["total_r"] is None and report["max_drawdown_r"] is None
+    assert None not in (report["win_rate"], report["expectancy_pct"], report["max_drawdown_pct"], report["worst_mae_pct"])
+    assert random["median_total_r"] is None and random["p5_return_pct"] <= random["median_return_pct"]
+
+
+def test_a_trade_carries_its_deepest_open_loss_and_its_result_in_percent() -> None:
+    rows = flat(9 * HOUR, 10 * HOUR + 1800, 20_000.0) | flat(10 * HOUR + 1860, 12 * HOUR, 20_000.0)
+    rows[10 * HOUR + 1800] = (20_000.0, 20_000.0, 19_800.0, 20_000.0)
+    rows |= flat(12 * HOUR, 13 * HOUR, 20_100.0)
+    document = strategy(exits={"when": "hour == 11"}, sizing={"mode": "fixed_units", "value": 0.5})
+
+    [trade] = run(document, minutes(rows)).trades
+
+    assert trade.mae_pct == pytest.approx(-0.01) and trade.result_pct == pytest.approx(0.005)
+
+
+def test_a_report_sized_by_the_deposit_says_which_deposit() -> None:
+    from strategies.contract import ReportOut
+
+    report = _report(WALKING, minutes(walk(10, seed=5))) | runs.costs_marks({"margin_factor": 0.05}, "operator")
+
+    assert ReportOut.model_validate(report).margin_factor == 0.05

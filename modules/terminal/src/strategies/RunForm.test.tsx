@@ -3,7 +3,16 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { ReportPanel } from "./ReportPanel";
 import { RunForm } from "./RunForm";
-import type { CostProfile, Report, Run, StrategiesApi } from "./strategiesApi";
+import type { CostProfile, Report, Run, StrategiesApi, Trade } from "./strategiesApi";
+
+// The price chart is the library's canvas; what matters here is which levels the report asks it to draw.
+const drawn = vi.hoisted(() => ({ levels: [] as { title?: string }[] }));
+vi.mock("../chart/Chart", () => ({
+  Chart: (props: { levels: { title?: string }[] }) => {
+    drawn.levels = props.levels;
+    return null;
+  },
+}));
 
 /** The run form's costs from the operator's seat: read off capital.com with nothing typed, or left out on purpose. */
 
@@ -72,5 +81,34 @@ describe("ReportPanel", () => {
 
     expect(await screen.findByRole("note")).toHaveTextContent("wynik pomija spread, poślizg i finansowanie");
     expect(screen.getByText(/koszty bez kosztów/)).toBeInTheDocument();
+  });
+});
+
+
+describe("A trade without a stop", () => {
+  it("is drawn without a stop line and reads its result in percent, not in R", async () => {
+    const report = {
+      trades: 1, no_trades: false, costs: { spread: 0, slippage: 0, financing: 0 },
+      benchmarks: { buy_and_hold: null, random_entry: null }, annualisation: "365 dni", equity: null,
+      costs_source: "broker", costs_fetched_at: null, without_costs: false, margin_factor: 0.05,
+    } as unknown as Report;
+    const run = {
+      id: 12, revision: 1, status: "done", from: new Date(), to: new Date(), engineVersion: 3,
+      request: { costs: {} }, report, provenance: {},
+    } as unknown as Run;
+    const trade: Trade = {
+      seq: 0, side: "long", entryTime: new Date("2026-07-02T13:35:00Z"), entryPrice: 20_000,
+      exitTime: new Date("2026-07-02T19:55:00Z"), exitPrice: 20_300, units: 0.5, initialStop: null, resultR: null,
+      resultMoney: 150, resultPct: 0.015, maePct: -0.002, costs: {}, exitReason: "when", pessimistic: false,
+    };
+    const client = api({ run: vi.fn(async () => run), trades: vi.fn(async () => ({ total: 1, trades: [trade] })) });
+    render(<ReportPanel api={client} runId={12} symbol="US100" timeframe="MINUTE_5" />);
+
+    const row = (await screen.findByRole("table", { name: "Transakcje" })).querySelector("tbody tr") as HTMLElement;
+    await userEvent.click(row);
+
+    expect(drawn.levels.map((l) => l.title)).toEqual(["wejście #0", "wyjście"]);
+    expect(row).toHaveTextContent("1,5%");
+    expect(row).toHaveTextContent("—");
   });
 });

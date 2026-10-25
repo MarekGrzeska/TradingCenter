@@ -11,8 +11,9 @@ from typing import Any
 from pydantic import ValidationError
 
 from . import formula as f
+from .checking import children
 from .document import DocumentIn
-from .vocabulary import FUNCTIONS, NAME_PHRASES, RESOLUTIONS
+from .vocabulary import FUNCTIONS, NAME_PHRASES, RESOLUTIONS, SESSION_FUNCTIONS
 
 # The terminal's names for the archive's resolutions (`terminal-shell`): the summary is read on the screen.
 TERMINAL_NAMES: dict[str, str] = {
@@ -60,9 +61,10 @@ def _sections(d: DocumentIn) -> dict[str, Any]:
         node, _ = f.parse(text, path)
         return text if node is None else _formula(node)
 
-    sections: list[dict[str, Any]] = [
-        {"title": "Instrument", "lines": [f"{d.symbol}, decyzje na zamknięciu świecy {TERMINAL_NAMES[d.timeframe]}."]},
-    ]
+    instrument = [f"{d.symbol}, decyzje na zamknięciu świecy {TERMINAL_NAMES[d.timeframe]}."]
+    if _reads_a_session(d):
+        instrument.append("Sesje liczone zegarem od poniedziałku do piątku, bez świąt giełdowych i skróconych sesji.")
+    sections: list[dict[str, Any]] = [{"title": "Instrument", "lines": instrument}]
     if d.params:
         sections.append({"title": "Parametry", "lines": [
             f"p.{name}: domyślnie {_number(p.default)}, od {_number(p.min)} do {_number(p.max)} co {_number(p.step)}."
@@ -85,7 +87,10 @@ def _sections(d: DocumentIn) -> dict[str, Any]:
         entries.append(line)
     sections.append({"title": "Wejścia", "lines": entries})
 
-    exits = [f"Stop: {say(d.exits.stop, 'exits.stop')}."]
+    exits = [
+        f"Stop: {say(d.exits.stop, 'exits.stop')}." if d.exits.stop is not None
+        else "Bez stopu: wynik w R nie jest liczony, tylko w procentach kapitału."
+    ]
     if d.exits.target is not None:
         exits.append(f"Cel: {say(d.exits.target, 'exits.target')}.")
     if d.exits.trail is not None:
@@ -99,10 +104,13 @@ def _sections(d: DocumentIn) -> dict[str, Any]:
         exits.append(f"Najwyżej {_bars(d.exits.max_bars)} w pozycji.")
     sections.append({"title": "Wyjścia", "lines": exits})
 
-    if d.sizing.mode == "risk_fraction":
-        sizing = f"Ryzyko {_number(d.sizing.value * 100)}% kapitału na transakcję (odległość do stopu = 1 R)."
-    else:
-        sizing = f"Stała wielkość: {_number(d.sizing.value)} jednostek."
+    percent = _number(d.sizing.value * 100)
+    sizing = {
+        "risk_fraction": f"Ryzyko {percent}% kapitału na transakcję (odległość do stopu = 1 R).",
+        "fixed_units": f"Stała wielkość: {_number(d.sizing.value)} jednostek.",
+        "margin_fraction": f"Depozyt {percent}% kapitału na pozycję, według depozytu instrumentu wymaganego przez brokera.",
+        "notional_fraction": f"Wartość pozycji {percent}% kapitału.",
+    }[d.sizing.mode]
     sections.append({"title": "Rozmiar", "lines": [sizing]})
 
     limits = []
@@ -114,6 +122,20 @@ def _sections(d: DocumentIn) -> dict[str, Any]:
         sections.append({"title": "Limity", "lines": limits})
 
     return {"name": d.name, "sections": sections, "hypothesis": d.hypothesis, "notes": d.notes}
+
+
+def _reads_a_session(d: DocumentIn) -> bool:
+    texts = [*d.let.values(), *(e.when for e in d.entries), *(e.order.price for e in d.entries), d.exits.stop,
+             d.exits.target, d.exits.when, d.limits.no_entry]
+
+    def uses(n: f.Node) -> bool:
+        return isinstance(n, f.Call) and n.function in SESSION_FUNCTIONS or any(uses(c) for c in children(n))
+
+    for text in texts:
+        node = None if text is None else f.parse(text, "")[0]
+        if node is not None and uses(node):
+            return True
+    return False
 
 
 def _number(value: float) -> str:
@@ -149,6 +171,12 @@ def _flip(op: str) -> str:
 
 
 def _comparison(op: str, left: f.Node, right: f.Node) -> str:
+    if isinstance(left, f.Call) and left.function in SESSION_FUNCTIONS and isinstance(right, f.Num):
+        session = _formula(left.args[0])
+        if left.function == "session_bar" and op == "==" and right.value == 1:
+            return f"pierwsza świeca sesji {session}"
+        if left.function == "minutes_to_session_close" and op == "<=":
+            return f"od {_number(right.value)} min przed zamknięciem sesji {session} (także po nim)"
     if isinstance(left, f.Name) and left.id == "hour" and isinstance(right, f.Num):
         return _hour(right.value, op)
     if isinstance(right, f.Name) and right.id == "hour" and isinstance(left, f.Num):

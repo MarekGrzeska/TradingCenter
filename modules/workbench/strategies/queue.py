@@ -172,7 +172,7 @@ class RunQueue:
         costs = CostModel.model_validate(request["costs"])
         job = Job(
             checked, params, catalogue, inputs.series, inputs.indicators, costs, float(request["capital"]),
-            start, end, int(request["seed"]), self._settings.random_entry_repetitions,
+            start, end, int(request["seed"]), self._settings.random_entry_repetitions, request.get("margin_factor"),
         )
         provenance = {
             "strategy_id": row["strategy_id"],
@@ -180,6 +180,7 @@ class RunQueue:
             "content_hash": revision.content_hash,
             "params": params,
             "costs": request["costs"],
+            "margin_factor": request.get("margin_factor"),
             "range": {"from": request["from"], "to": request["to"]},
             "capital": request["capital"],
             "seed": request["seed"],

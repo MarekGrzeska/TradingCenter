@@ -69,31 +69,39 @@ def trade_metrics(trades: Sequence[Trade], decision_starts: np.ndarray, range_se
     """Every metric a list of trades alone answers. Empty — never zero — where there is nothing to measure."""
     if not trades:
         return {
-            "win_rate": None, "expectancy_r": None, "total_r": None, "profit_factor": None,
+            "win_rate": None, "expectancy_r": None, "expectancy_pct": None, "total_r": None, "profit_factor": None,
             "max_drawdown_r": None, "longest_losing_streak": None, "average_bars_held": None,
-            "exposure": None, "total_r_without_best_5": None,
+            "exposure": None, "total_r_without_best_5": None, "total_pct_without_best_5": None, "worst_mae_pct": None,
         }
     r = np.array([t.result_r for t in trades])
-    gains = sum(t.result_money for t in trades if t.result_money > 0)
-    losses = -sum(t.result_money for t in trades if t.result_money < 0)
+    money = np.array([t.result_money for t in trades])
+    pct = np.array([t.result_pct for t in trades])
+    # Without a stop every R is NaN, and every metric in R is empty rather than a sum of nothing.
+    in_r = bool(np.all(np.isfinite(r)))
+    gains = float(money[money > 0].sum())
+    losses = -float(money[money < 0].sum())
     curve = np.concatenate([[0.0], np.cumsum(r)])
     streak = longest = 0
-    for value in r:
+    for value in money:
         streak = streak + 1 if value < 0 else 0
         longest = max(longest, streak)
+    best_first = np.argsort(-money, kind="stable")
     # Decision bars that started while the position was open — a weekend is no bars, not sixty.
     entries = np.searchsorted(decision_starts, [t.entry_time for t in trades])
     exits = np.searchsorted(decision_starts, [t.exit_time for t in trades])
     return {
-        "win_rate": float(np.mean(r > 0)),
-        "expectancy_r": float(r.mean()),
-        "total_r": float(r.sum()),
+        "win_rate": float(np.mean(money > 0)),
+        "expectancy_r": float(r.mean()) if in_r else None,
+        "expectancy_pct": float(pct.mean()),
+        "total_r": float(r.sum()) if in_r else None,
         "profit_factor": None if losses == 0 else float(gains / losses),
-        "max_drawdown_r": float(np.max(np.maximum.accumulate(curve) - curve)),
+        "max_drawdown_r": float(np.max(np.maximum.accumulate(curve) - curve)) if in_r else None,
         "longest_losing_streak": longest,
         "average_bars_held": float(np.mean(exits - entries)),
         "exposure": min(1.0, sum(t.exit_time - t.entry_time for t in trades) / max(range_seconds, 1)),
-        "total_r_without_best_5": float(np.sort(r)[:-5].sum()) if len(r) > 5 else 0.0,
+        "total_r_without_best_5": (float(np.sort(r)[:-5].sum()) if len(r) > 5 else 0.0) if in_r else None,
+        "total_pct_without_best_5": float(pct[best_first[5:]].sum()),
+        "worst_mae_pct": float(min(t.mae_pct for t in trades)),
     }
 
 
@@ -159,11 +167,12 @@ def equity_metrics(equity: Sequence[tuple[int, float]], capital: float, final: f
 
 
 def by_year(trades: Sequence[Trade]) -> dict[str, dict[str, float]]:
-    years: dict[str, dict[str, float]] = defaultdict(lambda: {"trades": 0, "total_r": 0.0})
+    years: dict[str, dict[str, float]] = defaultdict(lambda: {"trades": 0, "total_r": 0.0, "total_pct": 0.0})
     for t in trades:
         year = str(datetime.fromtimestamp(t.exit_time, tz=UTC).year)
         years[year]["trades"] += 1
         years[year]["total_r"] += t.result_r
+        years[year]["total_pct"] += t.result_pct
     return dict(sorted(years.items()))
 
 
@@ -193,14 +202,16 @@ def random_entry(result: Result, *, simulate_args: Mapping[str, Any], evaluator:
         return None
     long_share = sum(t.side == "long" for t in result.trades) / count
     rng = np.random.default_rng(seed)
-    totals, made = [], []
+    totals, returns, made = [], [], []
     for _ in range(repetitions):
         bars = np.sort(rng.choice(candidates, size=min(count, candidates.size), replace=False))
         sides = np.where(rng.random(bars.size) < long_share, 1, -1)
         drawn = simulate(**simulate_args, forced=list(zip(bars.tolist(), sides.tolist(), strict=True)), evaluator=evaluator)
         totals.append(sum(t.result_r for t in drawn.trades))
+        returns.append(sum(t.result_money for t in drawn.trades) / simulate_args["capital"])
         made.append(len(drawn.trades))
-    values = np.array(totals)
+    # NaN for a strategy without a stop, which `finite` turns into empty.
+    values, gained = np.array(totals), np.array(returns)
     return {
         "repetitions": repetitions,
         "seed": seed,
@@ -209,4 +220,7 @@ def random_entry(result: Result, *, simulate_args: Mapping[str, Any], evaluator:
         "median_total_r": float(np.median(values)),
         "p5_total_r": float(np.percentile(values, 5)),
         "p95_total_r": float(np.percentile(values, 95)),
+        "median_return_pct": float(np.median(gained)),
+        "p5_return_pct": float(np.percentile(gained, 5)),
+        "p95_return_pct": float(np.percentile(gained, 95)),
     }

@@ -95,7 +95,7 @@ async def test_the_agent_saves_a_revision_as_itself_with_its_changes_and_is_refu
 @pytest.mark.db
 async def test_a_document_with_problems_is_refused_with_every_one_and_saves_nothing(pool) -> None:
     with pytest.raises(ToolError) as refused:
-        await _call(_app(pool), "save_strategy", document=strategy(exits={}, universe=["US500"]))
+        await _call(_app(pool), "save_strategy", document=strategy(exits={"max_bars": 0}, universe=["US500"]))
     async with pool.acquire() as conn:
         count = await conn.fetchval("SELECT count(*) FROM strategies")
 
