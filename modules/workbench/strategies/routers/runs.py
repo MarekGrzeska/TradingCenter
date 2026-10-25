@@ -1,4 +1,4 @@
-"""Runs: queued at once, computed in the background, cancelled on request."""
+"""Runs: queued at once, computed in the background, cancelled on request, deleted when no longer wanted."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from ..contract import (
     RunAcceptedOut,
     RunCancelledOut,
     RunOut,
+    RunsDeletedOut,
     RunSummaryOut,
     TradesPageOut,
 )
@@ -64,6 +65,31 @@ async def enqueue(
         run_id = await runs.enqueue(conn, body, revision.n, params, costs, margin_factor=margin)
     run_queue.wake()
     return RunAcceptedOut(id=run_id, strategy_id=body.strategy_id, revision=revision.n, status="queued")
+
+
+@router.delete(
+    "/runs", response_model=RunsDeletedOut,
+    responses={404: {"model": ProblemsOut}, 409: {"model": ProblemsOut}, 422: {"model": ProblemsOut}},
+)
+async def delete_runs(
+    run_ids: list[Annotated[int, Field(ge=1, le=BIGINT)]] = Query(
+        alias="run_id", description="1 to 20 different runs that are done, failed or cancelled"
+    ),
+    db=Depends(pool),
+):
+    """All of them or none. A run still queued or computing is cancelled first; the strategy's trial count keeps every
+    finished run it loses here."""
+    if (problem := runs.delete_count_problem(run_ids)) is not None:
+        return refused("these runs cannot be deleted", [Problem("run_id", problem)])
+    async with db.acquire() as conn:
+        try:
+            deleted = await runs.delete_runs(conn, run_ids)
+        except runs.NotDeletable as err:
+            return refused(
+                "these runs cannot be deleted; none was", [Problem("run_id", reason) for reason in err.reasons()],
+                status=404 if err.missing else 409,
+            )
+    return RunsDeletedOut(deleted=deleted)
 
 
 @router.post("/runs/{run_id}/cancel", response_model=RunCancelledOut, responses={404: {"description": "no such run"}})

@@ -85,3 +85,25 @@ def document(**changes) -> dict:
     built = copy.deepcopy(_DOCUMENT)
     built.update(changes)
     return built
+
+
+async def run_in_state(conn, strategy_id: int, status: str, *, trades: int = 0) -> int:
+    """A run of revision 1 in `status` as the queue would have left it, with `trades` rows in `run_trades`."""
+    from strategies import runs
+    from strategies.costs import CostModel
+
+    free = CostModel(spread=0.0, slippage=0.0, overnight_long=0.0, overnight_short=0.0, rollover_hour=22)
+    request = runs.RunIn.model_validate({
+        "strategy_id": strategy_id, "from": "2026-03-02T00:00:00Z", "to": "2026-03-06T00:00:00Z", "costs": free.model_dump(),
+    })
+    run_id = await runs.enqueue(conn, request, 1, {}, runs.RunCosts(free, "request"))
+    await conn.execute("UPDATE runs SET status = $2 WHERE id = $1", run_id, status)
+    for seq in range(trades):
+        await conn.execute(
+            "INSERT INTO run_trades (run_id, seq, side, entry_time, entry_price, exit_time, exit_price, units, "
+            "result_money, costs, exit_reason, pessimistic) "
+            "VALUES ($1, $2, 'long', now(), 100, now(), 101, 1, 1, '{}'::jsonb, 'when', false)",
+            run_id, seq,
+        )
+    return run_id
+

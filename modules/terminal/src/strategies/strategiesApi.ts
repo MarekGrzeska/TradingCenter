@@ -214,6 +214,8 @@ export interface StrategiesApi {
   trades(id: number, offset: number, limit: number, signal: AbortSignal): Promise<{ total: number; trades: Trade[] }>;
   enqueue(request: RunRequest, signal: AbortSignal): Promise<number>;
   cancel(id: number, signal: AbortSignal): Promise<void>;
+  /** Finished, failed or cancelled runs, all or none; `Refused` names each that is missing or still in progress. */
+  deleteRuns(runIds: number[], signal: AbortSignal): Promise<void>;
   /** Two to five finished runs side by side, in the order given; `Refused` names every difference that forbids it. */
   compare(runIds: number[], signal: AbortSignal): Promise<ComparedRun[]>;
 }
@@ -516,6 +518,20 @@ export function createStrategiesApi(httpBase: string, identity: Identity = noIde
 
     async cancel(id, signal) {
       await http.send(`${httpBase}/runs/${id}/cancel`, { signal, method: "POST" });
+    },
+
+    async deleteRuns(runIds, signal) {
+      const query = runIds.map((id) => `run_id=${id}`).join("&");
+      try {
+        await http.send(`${httpBase}/runs?${query}`, { signal, method: "DELETE" });
+      } catch (cause: unknown) {
+        // A missing run answers 404 and a run in progress 409, both with the problems that name them.
+        if (cause instanceof MarketDataError && (cause.kind === "refused" || cause.kind === "not-found")) {
+          const problems = problemsOf(cause.problem);
+          if (problems.length > 0) throw new Refused(cause.message, problems);
+        }
+        throw cause;
+      }
     },
 
     compare(runIds, signal) {

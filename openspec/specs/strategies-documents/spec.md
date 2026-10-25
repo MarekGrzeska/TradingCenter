@@ -98,9 +98,11 @@ dokumentu, bez modelu językowego i bez opisu, z którego dokument powstał. Str
 - parametry z zakresami i zmienne nazwane.
 
 Formuły MUST być oddane słowami tam, gdzie konstrukcja albo funkcja ma swoje sformułowanie, a dosłownie tam, gdzie go
-nie ma. Każda funkcja rejestru języka MUST mieć swoje sformułowanie. Interwały MUST być nazwane tak jak w terminalu
-(`h4`). Godzina z formuły MUST być nazwana jako UTC, razem z godziną polską zimą i latem. `hypothesis` i `notes` MUST być
-oddane dosłownie, jako założenia autora. Ten sam dokument MUST dawać zawsze to samo streszczenie.
+nie ma. Zmienna z `let` użyta w formule MUST być oddana tym, czym jest (swoją formułą słowami), a nie samą nazwą. Lista
+zmiennych MUST zostać, z nazwami, żeby streszczenie dało się zestawić z dokumentem. Każda funkcja rejestru języka MUST
+mieć swoje sformułowanie. Interwały MUST być nazwane tak jak w terminalu (`h4`). Godzina z formuły MUST być nazwana jako
+UTC, razem z godziną polską zimą i latem. `hypothesis` i `notes` MUST być oddane dosłownie, jako założenia autora. Ten
+sam dokument MUST dawać zawsze to samo streszczenie.
 
 #### Scenario: Filtr na innym interwale
 
@@ -116,6 +118,11 @@ oddane dosłownie, jako założenia autora. Ten sam dokument MUST dawać zawsze 
 
 - **WHEN** ten sam dokument jest streszczany dwa razy
 - **THEN** oba streszczenia MUST być identyczne
+
+#### Scenario: Zmienna w warunku wejścia
+
+- **WHEN** `let` definiuje `fast` jako `ema(10)`, a wejście brzmi `crosses_above(fast, ema(30))`
+- **THEN** streszczenie wejścia MUST mówić o EMA(10) przecinającej od dołu EMA(30), bez nazwy «fast»
 
 ### Requirement: Różnice między rewizjami po ścieżkach dokumentu
 

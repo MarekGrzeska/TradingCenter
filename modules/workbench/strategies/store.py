@@ -87,7 +87,8 @@ async def _insert_revision(conn: Conn, strategy_id: int, n: int, checked: Checke
 _SUMMARY = """
     SELECT s.id, s.name, s.created_at, s.archived_at, r.n AS latest_revision, r.author AS latest_author,
            r.created_at AS changed_at, r.document->>'symbol' AS symbol, r.document->>'timeframe' AS timeframe,
-           (SELECT count(*) FROM runs u WHERE u.strategy_id = s.id AND u.status = 'done') AS trials, s.conversation_id
+           (SELECT count(*) FROM runs u WHERE u.strategy_id = s.id AND u.status = 'done') + s.deleted_trials AS trials,
+           s.conversation_id
     FROM strategies s
     CROSS JOIN LATERAL (
         SELECT n, author, created_at, document FROM strategy_revisions

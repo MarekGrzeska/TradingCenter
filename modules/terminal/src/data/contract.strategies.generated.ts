@@ -211,7 +211,12 @@ export interface paths {
          *     Without `costs` the instrument's profile is used, read off the broker the first time.
          */
         post: operations["enqueue_runs_post"];
-        delete?: never;
+        /**
+         * Delete Runs
+         * @description All of them or none. A run still queued or computing is cancelled first; the strategy's trial count keeps every
+         *     finished run it loses here.
+         */
+        delete: operations["delete_runs_runs_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1205,6 +1210,14 @@ export interface components {
             /** Strategy Id */
             strategy_id: number;
         };
+        /** RunsDeletedOut */
+        RunsDeletedOut: {
+            /**
+             * Deleted
+             * @description the runs that are gone, in the order asked — their trials still count
+             */
+            deleted: number[];
+        };
         /** SavedOut */
         SavedOut: {
             /**
@@ -1866,6 +1879,56 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    delete_runs_runs_delete: {
+        parameters: {
+            query: {
+                /** @description 1 to 20 different runs that are done, failed or cancelled */
+                run_id: number[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunsDeletedOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemsOut"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemsOut"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemsOut"];
+                };
             };
         };
     };

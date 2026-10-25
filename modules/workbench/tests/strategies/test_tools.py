@@ -16,12 +16,13 @@ from strategies.config import Settings
 from strategies.costs import CostModel
 from strategies.queue import RunQueue
 
+from .builders import run_in_state
 from .fake_archive import archive_of
 from .market import flat, minutes, strategy
 
 EXPECTED = {
     "strategy_language", "list_strategies", "read_strategy", "validate_strategy", "draft_strategy", "save_strategy",
-    "run_backtest", "read_backtest", "compare_runs",
+    "run_backtest", "read_backtest", "compare_runs", "delete_backtests",
 }
 # Characters of the serialized `list_tools()` the conversation reads before every turn. Measured 8 827 on 25 October 2026
 # when the surface was written; 10 367 with draft_strategy, the ninth tool, the same day. The headroom is for a description
@@ -47,7 +48,7 @@ async def _call(app, name: str, **arguments):
     return structured
 
 
-async def test_the_surface_is_the_nine_tools_and_none_sets_costs() -> None:
+async def test_the_surface_is_the_ten_tools_and_none_sets_costs() -> None:
     tools = await _app().state.mcp_server.list_tools()
 
     assert {t.name for t in tools} == EXPECTED
@@ -230,3 +231,26 @@ async def test_a_draft_reaches_the_editor_without_a_revision_and_a_save_ends_it(
 def test_one_run_a_repeated_run_or_more_than_five_cannot_be_compared(run_ids: list[int]) -> None:
     assert count_problem(run_ids) == "compare 2 to 5 different runs"
     assert count_problem([1, 2]) is None
+
+
+@pytest.mark.db
+async def test_the_agent_deletes_runs_on_request_and_the_trials_stay_and_a_run_in_progress_stops_it(pool) -> None:
+    app = _app(pool)
+    saved = await _call(app, "save_strategy", document=strategy())
+    async with pool.acquire() as conn:
+        finished = await run_in_state(conn, saved["strategy_id"], "done")
+        running = await run_in_state(conn, saved["strategy_id"], "running")
+    described = {t.name: t.description or "" for t in await app.state.mcp_server.list_tools()}
+
+    with pytest.raises(ToolError, match=f"run {running} is running"):
+        await _call(app, "delete_backtests", run_ids=[finished, running])
+    with pytest.raises(ToolError, match="1 to 20"):
+        await _call(app, "delete_backtests", run_ids=list(range(1, 22)))
+    answered = await _call(app, "delete_backtests", run_ids=[finished])
+    with pytest.raises(ToolError, match="may have been deleted"):
+        await _call(app, "read_backtest", run_id=finished)
+    async with pool.acquire() as conn:
+        summary = await store.get_strategy(conn, saved["strategy_id"])
+
+    assert answered["deleted"] == [finished] and summary.trials == 1
+    assert "operator asked" in described["delete_backtests"] and "no undo" in described["delete_backtests"]

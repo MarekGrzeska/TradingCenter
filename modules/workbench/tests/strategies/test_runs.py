@@ -19,7 +19,7 @@ from strategies.queue import RunQueue
 from strategies.reading import bars_without_minutes
 from strategies.runs import RunIn
 
-from .builders import catalogue
+from .builders import catalogue, run_in_state
 from .fake_archive import archive_of
 from .market import HOUR, MONDAY, flat, hours, minutes, strategy, walk
 
@@ -221,6 +221,28 @@ async def test_a_running_run_is_stopped_by_the_queue_when_cancelled_and_the_proc
 
 
 @pytest.mark.db
+async def test_a_run_cancelled_and_deleted_while_its_worker_computes_is_still_stopped(pool) -> None:
+    from .slow_worker import main as slow
+
+    run_id = await _enqueue(pool, await _strategy(pool))
+    queue = RunQueue(pool, archive_of(MINUTES), _settings(), target=slow)
+    await queue.start()
+    try:
+        await _until(pool, run_id, {"running"})
+        async with pool.acquire() as conn:
+            await runs.cancel(conn, run_id)
+            await runs.delete_runs(conn, [run_id])
+        deadline = time.monotonic() + 5
+        while queue.busy and time.monotonic() < deadline:
+            await asyncio.sleep(0.1)
+        stopped_by_queue = queue.busy == 0
+    finally:
+        await queue.stop()
+
+    assert stopped_by_queue, "the queue left the worker of a deleted run computing"
+
+
+@pytest.mark.db
 async def test_post_runs_queues_at_once_and_a_missing_strategy_is_a_404(pool) -> None:
     from strategies.app import create_app
 
@@ -237,3 +259,57 @@ async def test_post_runs_queues_at_once_and_a_missing_strategy_is_a_404(pool) ->
     assert accepted.status_code == 202 and accepted.json()["status"] == "queued" and accepted.json()["revision"] == 1
     assert missing.status_code == 404 and woken == [1]
 
+
+
+# --- deleting runs (`strategies-backtest`, "Usunięcie uruchomienia nie obniża licznika prób") -----------------------
+
+async def _trials(pool, strategy_id: int) -> int:
+    async with pool.acquire() as conn:
+        return (await store.get_strategy(conn, strategy_id)).trials
+
+
+@pytest.mark.db
+async def test_deleting_finished_runs_removes_them_and_their_trades_but_not_the_trials(pool) -> None:
+    sid = await _strategy(pool)
+    async with pool.acquire() as conn:
+        done = [await run_in_state(conn, sid, "done", trades=2) for _ in range(3)]
+        failed = await run_in_state(conn, sid, "failed")
+        before = await _trials(pool, sid)
+
+        deleted = await runs.delete_runs(conn, [done[0], done[1], failed])
+        left = await conn.fetchval("SELECT count(*) FROM runs WHERE id = ANY($1::bigint[])", [done[0], done[1], failed])
+        trades = await conn.fetchval("SELECT count(*) FROM run_trades WHERE run_id = ANY($1::bigint[])", done[:2])
+
+    assert before == 3 and deleted == [done[0], done[1], failed]
+    assert left == 0 and trades == 0
+    assert await _trials(pool, sid) == 3  # the failed run was never one; the two finished ones still are
+
+
+@pytest.mark.db
+async def test_a_run_still_queued_or_running_or_missing_stops_the_whole_deletion(pool) -> None:
+    sid = await _strategy(pool)
+    async with pool.acquire() as conn:
+        done = await run_in_state(conn, sid, "done")
+        running = await run_in_state(conn, sid, "running")
+        with pytest.raises(runs.NotDeletable) as refused:
+            await runs.delete_runs(conn, [done, running, 99_999])
+        survivors = await conn.fetchval("SELECT count(*) FROM runs WHERE id = ANY($1::bigint[])", [done, running])
+
+    assert refused.value.missing == [99_999] and refused.value.busy == [(running, "running")]
+    assert survivors == 2 and await _trials(pool, sid) == 1
+
+
+@pytest.mark.db
+async def test_a_run_that_finishes_while_it_is_being_deleted_is_counted(pool) -> None:
+    sid = await _strategy(pool)
+    async with pool.acquire() as conn:
+        racing = await run_in_state(conn, sid, "running")
+    async with pool.acquire() as finishing, pool.acquire() as deleting:
+        async with finishing.transaction():
+            await finishing.fetchval("SELECT status FROM runs WHERE id = $1 FOR UPDATE", racing)
+            waiting = asyncio.ensure_future(runs.delete_runs(deleting, [racing]))
+            await asyncio.sleep(0.3)  # the deletion is now parked on the row the worker holds
+            await finishing.execute("UPDATE runs SET status = 'done' WHERE id = $1", racing)
+        await waiting
+
+    assert await _trials(pool, sid) == 1

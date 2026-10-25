@@ -109,6 +109,12 @@ parsing off the event loop — and computes in **a spawned process per run**, wh
 A run left `running` by a stopped process is marked "interrupted by a restart" at the next start. The worker sends the
 strategy's result before the random-entry benchmark, so a benchmark that runs out of time costs only itself.
 
+A run is deleted with `DELETE /runs?run_id=…` (up to 20) or the conversation's `delete_backtests`: all or none, never one
+that is queued or computing, and the report and trades go with it. **The strategy's `trials` do not shrink** — each
+finished run deleted is added to `strategies.deleted_trials` in the same transaction, so `trials` can exceed the runs the
+list shows by exactly the ones thrown away. A worker still computing a run that was cancelled and then deleted is
+stopped by the queue like a cancelled one.
+
 ## Costs
 
 A run's costs come from one of three places, and the run records which in its `request` (`costs_source`): the

@@ -15,6 +15,10 @@ READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotent
 WRITES = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False)
 
 
+# Gone for good: the one tool here whose effect a client may want to confirm before it runs.
+DELETES = ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False)
+
+
 @dataclass(frozen=True)
 class ToolContext:
     """What a tool needs from the running application, read when the tool is called: everything it reads is put on

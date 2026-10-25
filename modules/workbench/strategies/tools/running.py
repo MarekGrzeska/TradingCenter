@@ -12,8 +12,9 @@ from .. import compare, runs, store
 from ..archive import ArchiveUnavailable
 from ..broker_costs import BrokerCostsMissing
 from ..document import execution_of
+from ..problems import Problem
 from ..runs import RunIn
-from ._shared import READ_ONLY, WRITES, ToolContext, refusal
+from ._shared import DELETES, READ_ONLY, WRITES, ToolContext, refusal
 
 # How long run_backtest waits for its run before answering with the id. An H1 strategy over a year with its random-entry
 # benchmark takes about 2 s (measured for stage 1); a minute strategy can take minutes, and a turn should not.
@@ -45,6 +46,11 @@ class RunRead(BaseModel):
     provenance: dict[str, Any] | None = Field(
         description="the revision's hash, the series fills were settled on (`execution`), and what the archive never verified"
     )
+
+
+class RunsDeleted(BaseModel):
+    deleted: list[int]
+    note: str = "Their reports and trades are gone; the strategy's trial count still includes every finished one."
 
 
 class Comparison(BaseModel):
@@ -137,7 +143,7 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         async with ctx.state.pool.acquire() as conn:
             row = await runs.get_run(conn, run_id)
         if row is None:
-            raise refusal(f"run {run_id} does not exist")
+            raise refusal(f"run {run_id} does not exist; it may have been deleted")
         report = None if row.report is None else {k: v for k, v in row.report.items() if k != "equity"}
         provenance = None if row.provenance is None else {
             k: row.provenance.get(k) for k in ("content_hash", "engine_version", "execution", "uncovered", "unsettled")
@@ -158,9 +164,23 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
             rows = [await runs.get_run(conn, run_id) for run_id in run_ids]
         missing = [run_id for run_id, row in zip(run_ids, rows, strict=True) if row is None]
         if missing:
-            raise refusal(f"no such run: {', '.join(map(str, missing))}")
+            raise refusal(f"no such run (it may have been deleted): {', '.join(map(str, missing))}")
         try:
             return Comparison(runs=compare.compare([row for row in rows if row is not None]))
         except compare.NotComparable as err:
             raise refusal("these runs cannot be compared: " + "; ".join(err.reasons)) from None
 
+    @mcp.tool(annotations=DELETES)
+    async def delete_backtests(run_ids: list[int]) -> RunsDeleted:
+        """Deletes 1 to 20 finished, failed or cancelled runs for good — report and trades, no undo. Use it only for runs
+        the operator asked you to delete, by the numbers they gave or you listed with them. Every finished run still
+        counts as a trial of its strategy afterwards. A run still queued or computing is never deleted: all or none go."""
+        if (problem := runs.delete_count_problem(run_ids)) is not None:
+            raise refusal(problem)
+        async with ctx.state.pool.acquire() as conn:
+            try:
+                return RunsDeleted(deleted=await runs.delete_runs(conn, run_ids))
+            except runs.NotDeletable as err:
+                raise refusal("these runs cannot be deleted; none was", [
+                    Problem("run_ids", reason) for reason in err.reasons()
+                ]) from None

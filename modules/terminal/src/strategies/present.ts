@@ -52,6 +52,13 @@ export function barsIn(from: Date, to: Date, resolution: string): number {
   return Math.max(0, Math.floor((to.getTime() - from.getTime()) / 1000 / seconds));
 }
 
+/** "Zniknie 1 uruchomienie", "Znikną 3 uruchomienia", "Zniknie 5 uruchomień" — Polish counts the way it does. */
+export function runsGoing(count: number): string {
+  const few = count % 10 >= 2 && count % 10 <= 4 && (count % 100 < 12 || count % 100 > 14);
+  if (count === 1) return "Zniknie 1 uruchomienie";
+  return few ? `Znikną ${count} uruchomienia` : `Zniknie ${count} uruchomień`;
+}
+
 /** Whether the list has to keep asking: only while something waits or computes, so an idle tab costs nothing. */
 export function anyPending(runs: readonly RunItem[]): boolean {
   return runs.some((run) => run.status === "queued" || run.status === "running");
