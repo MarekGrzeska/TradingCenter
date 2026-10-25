@@ -29,6 +29,15 @@ def test_market_details_carry_the_deposit_and_the_size_rules() -> None:
     assert (terms.min_deal_size, terms.max_deal_size, terms.size_increment) == (0.01, 50000, 0.01)
 
 
+def test_market_details_carry_overnight_funding_as_the_provider_states_it() -> None:
+    terms = mapping.instrument_terms_from_details("GOLD", load_fixture("market_gold.json"))
+    # Signed and unconverted: the long pays on gold, the short is paid.
+    assert (terms.overnight_long_rate, terms.overnight_short_rate) == (-0.0151992, 0.0069792)
+    assert terms.overnight_rate_unit == "PERCENTAGE"
+    assert terms.overnight_charge_at == "2026-07-23T21:00:00Z"
+    assert terms.overnight_charge_interval_minutes == 1440
+
+
 def test_market_details_carry_no_price() -> None:
     terms = mapping.instrument_terms_from_details("GOLD", load_fixture("market_gold.json"))
     assert not any(field.endswith(("bid", "ask", "price")) for field in terms.model_dump())
@@ -42,6 +51,9 @@ def test_a_rule_the_provider_omits_stays_missing_rather_than_becoming_zero() -> 
     assert terms.margin_factor is None
     assert terms.margin_factor_unit is None
     assert terms.lot_size is None
+    assert terms.overnight_long_rate is None
+    assert terms.overnight_rate_unit is None
+    assert terms.overnight_charge_at is None
 
 
 def test_market_details_without_dealing_rules_at_all() -> None:

@@ -317,6 +317,7 @@ and only then does the full route apply.
 | POST | `/jobs/{id}/retry` | retry a job's failed or interrupted chunks |
 | GET | `/instruments?max_nodes=&asset_class=` | the catalogue, proxied from the gateway unread |
 | GET | `/instruments/search?q=` | a search, proxied from the gateway unread |
+| GET | `/instruments/{symbol}/terms` | the instrument's trading terms, overnight financing among them, proxied unread |
 | GET | `/asset-classes` | the classes the gateway describes instruments with |
 | GET | `/indicators` | every indicator this module can compute, and how to draw it |
 | POST | `/indicators/{symbol}` | one or more of them, computed over a range, on one shared time axis |

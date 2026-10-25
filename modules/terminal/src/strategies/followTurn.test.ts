@@ -13,6 +13,7 @@ const item = (id: number, author: "agent" | "operator", changedAt: number): Stra
   createdAt: new Date(changedAt),
   archivedAt: null,
   trials: 0,
+  conversationId: null,
 });
 
 describe("afterTurn", () => {

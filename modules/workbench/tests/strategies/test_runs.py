@@ -12,6 +12,7 @@ import pytest
 
 from strategies import runs, store
 from strategies.config import Settings
+from strategies.costs import CostModel
 from strategies.document import servable, validate
 from strategies.engine import ENGINE_VERSION
 from strategies.queue import RunQueue
@@ -44,9 +45,10 @@ def test_a_range_past_the_ceiling_is_refused_with_both_numbers() -> None:
     assert "1500000" in problem.message and str((4 * 365 + 1) * 1440) in problem.message
 
 
-def test_a_run_without_costs_is_not_a_request() -> None:
-    with pytest.raises(ValueError):
-        RunIn.model_validate({"strategy_id": 1, "from": "2026-03-02T00:00:00Z", "to": "2026-03-03T00:00:00Z"})
+def test_costs_and_without_costs_at_once_are_refused() -> None:
+    [problem] = runs.check_request(request(without_costs=True), DECLARED, 1_500_000)
+
+    assert problem.path == "without_costs"
 
 
 def test_unnamed_parameters_take_their_defaults() -> None:
@@ -63,7 +65,7 @@ async def _strategy(pool) -> int:
 
 async def _enqueue(pool, strategy_id: int) -> int:
     async with pool.acquire() as conn:
-        return await runs.enqueue(conn, request(strategy_id=strategy_id), 1, {})
+        return await runs.enqueue(conn, request(strategy_id=strategy_id), 1, {}, runs.RunCosts(CostModel(**COSTS), "request"))
 
 
 async def _until(pool, run_id: int, statuses: set[str], seconds: float = 60.0) -> runs.RunRow:
@@ -173,7 +175,7 @@ async def test_post_runs_queues_at_once_and_a_missing_strategy_is_a_404(pool) ->
 
     strategy_id = await _strategy(pool)
     app = create_app()
-    app.state.settings, app.state.pool = _settings(), pool
+    app.state.settings, app.state.pool, app.state.archive = _settings(), pool, archive_of(MINUTES)
     woken = []
     app.state.queue = type("Q", (), {"wake": lambda self: woken.append(1)})()
     body = {"strategy_id": strategy_id, "from": "2026-03-02T00:00:00Z", "to": "2026-03-03T00:00:00Z", "costs": COSTS}

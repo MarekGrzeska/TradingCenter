@@ -1,6 +1,6 @@
 import { Button } from "../ui/Button";
 import { formatInstant } from "../ui/formatTime";
-import { num, r, STATUS_LABEL } from "./present";
+import { num, r, STATUS_LABEL, WITHOUT_COSTS_NOTE } from "./present";
 import type { RunItem } from "./strategiesApi";
 
 const day = (d: Date) => formatInstant(d.getTime() / 1000).slice(0, 10);
@@ -51,6 +51,11 @@ export function RunsPanel({
             <td className={run.status === "failed" ? "text-critical" : "text-ink-secondary"} title={run.reason ?? undefined}>
               {STATUS_LABEL[run.status] ?? run.status}
               {run.status === "failed" && run.reason ? ` — ${run.reason}` : ""}
+              {run.headline?.withoutCosts && (
+                <span title={WITHOUT_COSTS_NOTE} className="ml-1 rounded bg-warning-soft px-1 text-warning">
+                  bez kosztów
+                </span>
+              )}
             </td>
             <td>{run.revision}</td>
             <td>

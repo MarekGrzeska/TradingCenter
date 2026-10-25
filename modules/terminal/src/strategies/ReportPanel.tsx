@@ -10,7 +10,7 @@ import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { formatInstant } from "../ui/formatTime";
 import { barStart } from "./curve";
 import { EquityChart } from "./EquityChart";
-import { EXIT_LABEL, num, pct, r } from "./present";
+import { COSTS_SOURCE_LABEL, EXIT_LABEL, num, pct, r, WITHOUT_COSTS_NOTE } from "./present";
 import type { Report, Run, StrategiesApi, Trade } from "./strategiesApi";
 
 const PAGE = 200;
@@ -144,8 +144,15 @@ export function ReportPanel({ api, runId, symbol, timeframe }: { api: Strategies
       <p className="text-xs text-ink-faint">
         Uruchomienie {found.id} · rewizja {found.revision} ({String(provenance.content_hash ?? "").slice(0, 12)}) · silnik{" "}
         {found.engineVersion ?? "—"} · ziarno {String((found.request as { seed?: number }).seed ?? "—")} · {at(found.from)} –{" "}
-        {at(found.to)} · koszty {JSON.stringify((found.request as { costs?: unknown }).costs)} · {report.annualisation}
+        {at(found.to)} · koszty {COSTS_SOURCE_LABEL[report.costs_source]}
+        {report.costs_fetched_at ? `, pobrane ${at(new Date(report.costs_fetched_at))}` : ""}{" "}
+        {JSON.stringify((found.request as { costs?: unknown }).costs)} · {report.annualisation}
       </p>
+      {report.without_costs && (
+        <p role="note" className="rounded bg-warning-soft px-3 py-1 text-sm text-warning">
+          Uruchomienie {WITHOUT_COSTS_NOTE}.
+        </p>
+      )}
       {report.no_trades && <p className="text-sm text-ink-secondary">W tym zakresie strategia nie otworzyła żadnej pozycji.</p>}
       <Metrics report={report} />
 

@@ -2,9 +2,9 @@ import { useEffect, useState } from "react";
 import { messageOf } from "../data/query";
 import { Button } from "../ui/Button";
 import { todayInWarsaw, warsawMidnightEpochSeconds } from "../ui/formatTime";
-import { minutesIn, num } from "./present";
-import { costsOf, EMPTY_COSTS, fieldsOf, type CostFields } from "./costFields";
-import { Refused, type Problem, type StrategiesApi } from "./strategiesApi";
+import { minutesIn, num, sourceLabel } from "./present";
+import { costsOf, EMPTY_COSTS, fieldsOf, sameFields, type CostFields } from "./costFields";
+import { Refused, type CostProfile, type Problem, type StrategiesApi } from "./strategiesApi";
 
 const signal = () => new AbortController().signal;
 
@@ -21,9 +21,12 @@ function monthsBefore(day: string, months: number): string {
   return date.toISOString().slice(0, 10);
 }
 
+type ProfileState = { status: "loading" } | { status: "ready"; profile: CostProfile } | { status: "failed" };
+
 /**
  * A run of one revision: its range in Polish days, its parameters inside their declared ranges, and costs filled from the
- * instrument's profile — changed here for this run alone; the profile is changed with its own button (`terminal-strategies`).
+ * instrument's profile — read off capital.com when there is none, changed here for this run alone, or left out on purpose
+ * with "bez kosztów". The profile is changed with its own buttons (`terminal-strategies`).
  */
 export function RunForm({
   api,
@@ -49,7 +52,8 @@ export function RunForm({
     Object.fromEntries(Object.entries(params).map(([name, p]) => [name, String(p.default)])),
   );
   const [costs, setCosts] = useState<CostFields>(EMPTY_COSTS);
-  const [profile, setProfile] = useState<"loading" | "present" | "absent">("loading");
+  const [profile, setProfile] = useState<ProfileState>({ status: "loading" });
+  const [withoutCosts, setWithoutCosts] = useState(false);
   const [capital, setCapital] = useState("10000");
   const [seed, setSeed] = useState("1");
   const [problems, setProblems] = useState<Problem[]>([]);
@@ -57,26 +61,32 @@ export function RunForm({
   const [saved, setSaved] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  function show(found: CostProfile): void {
+    setProfile({ status: "ready", profile: found });
+    setCosts(fieldsOf(found.costs));
+  }
+
+  // An instrument without a profile gets the broker's, with no step of the operator's.
   useEffect(() => {
     let live = true;
-    setProfile("loading");
-    api
-      .costs(symbol, signal())
-      .then((found) => {
+    setProfile({ status: "loading" });
+    void (async () => {
+      try {
+        const found = (await api.costs(symbol, signal())) ?? (await api.costsFromBroker(symbol, signal()));
+        if (live) show(found);
+      } catch (cause: unknown) {
         if (!live) return;
-        if (found === null) {
-          setProfile("absent");
-          setCosts(EMPTY_COSTS);
-        } else {
-          setProfile("present");
-          setCosts(fieldsOf(found));
-        }
-      })
-      .catch((cause: unknown) => live && setFailure(messageOf(cause, "nie udało się wczytać kosztów instrumentu")));
+        setProfile({ status: "failed" });
+        setCosts(EMPTY_COSTS);
+        setFailure(messageOf(cause, "nie udało się pobrać kosztów z capital.com — wpisz je albo spróbuj odświeżyć"));
+      }
+    })();
     return () => {
       live = false;
     };
   }, [api, symbol]);
+
+  const edited = profile.status !== "ready" || !sameFields(costs, fieldsOf(profile.profile.costs));
 
   const start = new Date(warsawMidnightEpochSeconds(from) * 1000);
   const end = new Date(warsawMidnightEpochSeconds(to) * 1000);
@@ -96,7 +106,9 @@ export function RunForm({
           from: start,
           to: end,
           params: Object.fromEntries(Object.entries(values).map(([k, v]) => [k, Number(v)])),
-          costs: costsOf(costs),
+          // Unchanged, the package takes them from the profile itself and records where they came from.
+          costs: withoutCosts || !edited ? null : costsOf(costs),
+          withoutCosts,
           capital: Number(capital),
           seed: Number(seed),
         },
@@ -115,11 +127,21 @@ export function RunForm({
     setFailure(null);
     setSaved(null);
     try {
-      await api.putCosts(symbol, costsOf(costs), signal());
-      setProfile("present");
+      show(await api.putCosts(symbol, costsOf(costs), signal()));
       setSaved(`Zapisano jako profil kosztów ${symbol}.`);
     } catch (cause: unknown) {
       setFailure(messageOf(cause, "nie udało się zapisać profilu kosztów"));
+    }
+  }
+
+  async function refreshFromBroker(): Promise<void> {
+    setFailure(null);
+    setSaved(null);
+    try {
+      show(await api.costsFromBroker(symbol, signal()));
+      setSaved(`Profil kosztów ${symbol} pobrany z capital.com.`);
+    } catch (cause: unknown) {
+      setFailure(messageOf(cause, "nie udało się pobrać kosztów z capital.com; profil został bez zmian"));
     }
   }
 
@@ -127,7 +149,12 @@ export function RunForm({
   const costField = (key: keyof CostFields, label: string, hint?: string) => (
     <label className="flex flex-col gap-1 text-xs text-ink-secondary">
       {label}
-      <input className={input} value={costs[key]} onChange={(e) => setCosts({ ...costs, [key]: e.target.value })} />
+      <input
+        className={input}
+        value={costs[key]}
+        disabled={withoutCosts}
+        onChange={(e) => setCosts({ ...costs, [key]: e.target.value })}
+      />
       {hint && <span className="text-ink-faint">{hint}</span>}
     </label>
   );
@@ -195,18 +222,32 @@ export function RunForm({
       <fieldset className="flex flex-wrap items-end gap-3">
         <legend className="text-xs font-semibold text-ink-muted">
           Koszty {symbol}
-          {profile === "present" && " — z profilu instrumentu; zmiana tutaj dotyczy tylko tego uruchomienia"}
-          {profile === "absent" && " — instrument nie ma profilu kosztów; wpisz je i zapisz jako profil"}
+          {profile.status === "loading" && " — pobieram z capital.com…"}
+          {profile.status === "ready" && ` — ${sourceLabel(profile.profile)}`}
+          {profile.status === "ready" && edited && "; zmiana tutaj dotyczy tylko tego uruchomienia"}
+          {profile.status === "failed" && " — capital.com nie podał kosztów; wpisz je albo odśwież"}
         </legend>
         {costField("spread", "Spread", "jedna wartość albo 24, po jednej na godzinę UTC")}
         {costField("slippage", "Poślizg na stronę")}
         {costField("overnightLong", "Finansowanie long / noc")}
         {costField("overnightShort", "Finansowanie short / noc")}
         {costField("rolloverHour", "Godzina rozliczenia (UTC)")}
-        <Button type="button" size="xs" onClick={() => void saveProfile()}>
+        <Button type="button" size="xs" disabled={withoutCosts} onClick={() => void saveProfile()}>
           Zapisz jako profil {symbol}
         </Button>
+        <Button type="button" size="xs" tone="muted" disabled={withoutCosts} onClick={() => void refreshFromBroker()}>
+          Odśwież z capital.com
+        </Button>
       </fieldset>
+      <label className="flex items-center gap-2 text-xs text-ink-secondary">
+        <input type="checkbox" checked={withoutCosts} onChange={(e) => setWithoutCosts(e.target.checked)} />
+        Bez kosztów
+      </label>
+      {withoutCosts && (
+        <p className="text-xs text-warning">
+          Wynik pominie spread, poślizg i finansowanie, więc będzie nierealistyczny. Raport i lista uruchomień to oznaczą.
+        </p>
+      )}
       {problemAt("costs").map((p) => (
         <p key={p.path + p.message} className="text-xs text-critical">{p.path}: {p.message}</p>
       ))}
@@ -217,7 +258,7 @@ export function RunForm({
         </p>
       )}
       <div>
-        <Button type="submit" tone="primary" disabled={busy || overCeiling || profile === "loading"}>
+        <Button type="submit" tone="primary" disabled={busy || overCeiling || (!withoutCosts && profile.status === "loading")}>
           Uruchom backtest
         </Button>
       </div>

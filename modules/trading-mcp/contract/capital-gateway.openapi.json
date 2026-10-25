@@ -425,6 +425,61 @@
             ],
             "title": "Min Deal Size"
           },
+          "overnight_charge_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overnight Charge At"
+          },
+          "overnight_charge_interval_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overnight Charge Interval Minutes"
+          },
+          "overnight_long_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overnight Long Rate"
+          },
+          "overnight_rate_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overnight Rate Unit"
+          },
+          "overnight_short_rate": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overnight Short Rate"
+          },
           "provider": {
             "default": "capital.com",
             "title": "Provider",

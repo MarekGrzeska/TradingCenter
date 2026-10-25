@@ -3,6 +3,8 @@ provider's semantics are easiest to misread is testable against recorded payload
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 from .dtos import (
     Account,
     AssetClass,
@@ -58,7 +60,28 @@ def instrument_terms_from_details(symbol: str, m: dict) -> InstrumentTerms:
         min_deal_size=_rule_value(rules, "minDealSize"),
         max_deal_size=_rule_value(rules, "maxDealSize"),
         size_increment=_rule_value(rules, "minSizeIncrement"),
+        **_overnight_fee(instrument.get("overnightFee")),
     )
+
+
+def _overnight_fee(fee: dict | None) -> dict:
+    """capital.com names no unit for `longRate`/`shortRate`; its documentation states them as a
+    percentage of the position's value per charge, so the unit is written here, once, beside them."""
+    if not isinstance(fee, dict):
+        return {}
+    long_rate, short_rate = fee.get("longRate"), fee.get("shortRate")
+    charge_ms = fee.get("swapChargeTimestamp")
+    return {
+        "overnight_long_rate": long_rate,
+        "overnight_short_rate": short_rate,
+        "overnight_rate_unit": None if long_rate is None and short_rate is None else "PERCENTAGE",
+        "overnight_charge_at": (
+            datetime.fromtimestamp(charge_ms / 1000, UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+            if isinstance(charge_ms, int | float)
+            else None
+        ),
+        "overnight_charge_interval_minutes": fee.get("swapChargeInterval"),
+    }
 
 
 def _rule_value(rules: dict, name: str) -> float | None:

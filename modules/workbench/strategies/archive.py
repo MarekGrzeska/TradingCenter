@@ -69,6 +69,20 @@ class Archive:
         catalogue, tracked = await asyncio.gather(self.catalogue(), self.tracked())
         return catalogue, tracked
 
+    async def search(self, symbol: str) -> list:
+        """`GET /instruments/search`: the broker's matches, each with its current bid and ask, unread by the archive."""
+        answer = await self._get("/instruments/search", params={"q": symbol})
+        if not isinstance(answer, list):
+            raise ArchiveUnavailable(f"the archive's search for {symbol} has a shape this package does not read")
+        return answer
+
+    async def terms(self, symbol: str) -> dict:
+        """`GET /instruments/{symbol}/terms`: the broker's trading terms, overnight financing among them."""
+        answer = await self._get(f"/instruments/{symbol}/terms")
+        if not isinstance(answer, dict):
+            raise ArchiveUnavailable(f"the archive's terms of {symbol} have a shape this package does not read")
+        return answer
+
     async def candles(self, symbol: str, resolution: str, start: datetime, end: datetime) -> dict:
         """`GET /candles/{symbol}`: closed candles in `[start, end)` and the stretches the archive never verified."""
         answer = await self._get(

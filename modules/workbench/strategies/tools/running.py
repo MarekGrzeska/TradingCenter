@@ -1,5 +1,5 @@
-"""Running a strategy from the conversation: queued like the operator's, counted like the operator's, made with the costs
-the operator set for the instrument — and one at a time (design D8)."""
+"""Running a strategy from the conversation: queued like the operator's, counted like the operator's, made with the
+instrument's cost profile — read off the broker the first time, never a number of the model's — and one at a time."""
 
 from __future__ import annotations
 
@@ -8,7 +8,9 @@ from typing import Any
 from mcp.server.fastmcp import FastMCP
 from pydantic import AwareDatetime, BaseModel, Field, ValidationError
 
-from .. import compare, costs_store, runs, store
+from .. import compare, runs, store
+from ..archive import ArchiveUnavailable
+from ..broker_costs import BrokerCostsMissing
 from ..runs import RunIn
 from ._shared import READ_ONLY, WRITES, ToolContext, refusal
 
@@ -24,6 +26,8 @@ class RunResult(BaseModel):
     revision: int
     status: str
     reason: str | None = None
+    costs: dict[str, Any] = Field(description="the values the run is made with")
+    costs_source: str = Field(description="`broker` or `operator` (the instrument's profile), or `none`")
     headline: dict[str, Any] | None = Field(default=None, description="present once the run is done")
     next_step: str
 
@@ -63,10 +67,14 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         params: dict[str, float] | None = None,
         capital: float = 10_000.0,
         seed: int = 1,
+        without_costs: bool = False,
     ) -> RunResult:
-        """Backtests a strategy over [start, end) (UTC), with the costs the operator set for its instrument. Use it when
-        the operator asks for a run. Every run is a trial counted against the strategy, so do not run variants of the
-        parameters to look for a better result.
+        """Backtests a strategy over [start, end) (UTC), with its instrument's cost profile — read off the broker if it
+        has none; say which costs were used. Use it when the operator asks for a run. Every run is a trial counted
+        against the strategy, so do not run variants of the parameters to look for a better result.
+
+        `without_costs` only when the operator asks for a run without costs in so many words: its result leaves out
+        spread, slippage and financing.
 
         Waits up to 20 s for the result and answers with its main numbers; a longer run answers with its id, for
         read_run later. Only one run you asked for may wait at a time."""
@@ -79,17 +87,10 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
                 found = await store.get_revision(conn, strategy_id, revision)
             except store.NotFound:
                 raise refusal(f"strategy {strategy_id} has no revision {revision or ''}".strip()) from None
-            symbol = found.document["symbol"]
-            profile = await costs_store.get(conn, symbol)
-            if profile is None:
-                raise refusal(
-                    f"{symbol} has no cost profile, and a run is never made without costs. The operator sets them on "
-                    "the Strategies tab; nothing was queued"
-                )
             try:
                 request = RunIn.model_validate({
                     "strategy_id": strategy_id, "revision": found.n, "from": start, "to": end,
-                    "params": params or {}, "costs": profile.costs, "capital": capital, "seed": seed,
+                    "params": params or {}, "without_costs": without_costs, "capital": capital, "seed": seed,
                 })
             except ValidationError as err:
                 raise refusal(f"the run cannot be queued: {err.errors()[0]['msg']}") from None
@@ -97,7 +98,14 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
             problems = runs.check_request(request, declared, ctx.state.settings.max_minute_bars)
             if problems:
                 raise refusal("the run cannot be queued", problems)
-            run_id = await runs.enqueue(conn, request, found.n, runs.resolved_params(request, declared), "agent")
+            try:
+                costs = await runs.resolved_costs(conn, ctx.state.archive, request, found.document["symbol"])
+            except (BrokerCostsMissing, ArchiveUnavailable) as err:
+                raise refusal(f"the broker's costs cannot be read, and a run is never made without them: {err}; "
+                              "nothing was queued") from None
+            run_id = await runs.enqueue(
+                conn, request, found.n, runs.resolved_params(request, declared), costs, "agent"
+            )
         queue = ctx.state.queue
         queue.listen(run_id)
         queue.wake()
@@ -108,7 +116,7 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         done = row.status == "done"
         return RunResult(
             run_id=run_id, strategy_id=strategy_id, revision=found.n, status=row.status, reason=row.reason,
-            headline=_headline(row.report),
+            costs=costs.costs.model_dump(mode="json"), costs_source=costs.source, headline=_headline(row.report),
             next_step="read_run gives every number" if done else "still computing; read_run tells when it is done",
         )
 

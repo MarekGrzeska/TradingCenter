@@ -6,7 +6,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from strategies import reports
+from strategies import reports, runs
 from strategies.document import servable, validate
 from strategies.engine import Trade, simulate
 from strategies.evaluate import Evaluator
@@ -133,7 +133,7 @@ def test_the_curve_in_the_report_is_the_one_its_drawdown_was_measured_on() -> No
 def test_every_field_a_report_carries_has_its_place_in_the_contract() -> None:
     from strategies.contract import ReportOut
 
-    report = _report(WALKING, minutes(walk(10, seed=5)))
+    report = _report(WALKING, minutes(walk(10, seed=5))) | runs.costs_marks({}, "operator")
     before_the_curve = {k: v for k, v in report.items() if k != "equity"}
 
     assert ReportOut.model_validate(report).model_dump(mode="json").keys() == report.keys()

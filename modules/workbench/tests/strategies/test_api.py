@@ -15,7 +15,8 @@ from strategies.caller_access import OPEN_PATHS, REST_PATHS
 from strategies.config import Settings
 
 from .fake_archive import archive_of
-from .market import flat, minutes, strategy
+from .market import flat, minutes, strategy, walk
+from .test_reports import WALKING, _report
 
 MINUTES = minutes(flat(0, 2 * 86400, 100.0))
 
@@ -115,6 +116,7 @@ async def test_runs_are_listed_read_and_paged_and_a_missing_one_is_a_404(pool) -
     assert listed[0]["requested_by"] == "operator"
     assert listed[0]["headline"] == {
         "trades": 1, "total_r": None, "expectancy_r": None, "max_drawdown_r": None, "sharpe": None,
+        "costs_source": "request", "without_costs": False,
     }
     assert page["total"] == 1 and page["trades"][0]["costs"] == {"spread": 1.0}
     assert health == {"database": "reachable", "queue": {"queued": 0, "running": 0}, "max_minute_bars": 1_500_000}
@@ -157,6 +159,34 @@ async def test_a_cost_profile_is_set_replaced_read_and_refused_when_malformed(po
     assert missing.status_code == 404
     assert replaced["costs"]["spread"] == 2.0 and [p["symbol"] for p in listed] == ["US100"]
     assert malformed.status_code == 422 and listed[0]["costs"]["spread"] == 2.0
+
+
+@pytest.mark.db
+async def test_a_conversation_is_assigned_without_a_revision_or_a_trial(pool) -> None:
+    async with _client(pool) as client:
+        sid = (await client.post("/strategies", json=strategy())).json()["strategy_id"]
+        assigned = (await client.put(f"/strategies/{sid}/conversation", json={"conversation_id": 42})).json()
+        detail = (await client.get(f"/strategies/{sid}")).json()
+        missing = await client.put("/strategies/999/conversation", json={"conversation_id": 42})
+
+    assert assigned["conversation_id"] == 42 and detail["conversation_id"] == 42
+    assert detail["latest_revision"] == 1 and detail["trials"] == 0 and missing.status_code == 404
+
+
+@pytest.mark.db
+async def test_a_report_says_where_its_costs_came_from_and_marks_a_run_without_them(pool) -> None:
+    async with _client(pool) as client:
+        sid = (await client.post("/strategies", json=strategy())).json()["strategy_id"]
+        body = {"strategy_id": sid, "from": "2026-03-02T00:00:00Z", "to": "2026-03-03T00:00:00Z", "without_costs": True}
+        run_id = (await client.post("/runs", json=body)).json()["id"]
+        async with pool.acquire() as conn:
+            await conn.execute("UPDATE runs SET status = 'running' WHERE id = $1", run_id)
+        await runs.finish(pool, run_id, 1, _report(WALKING, minutes(walk(10, seed=5))), {"seed": 1}, [])
+        report = (await client.get(f"/runs/{run_id}")).json()["report"]
+        listed = (await client.get(f"/runs?strategy_id={sid}")).json()
+
+    assert report["without_costs"] is True and report["costs_source"] == "none" and report["costs_fetched_at"] is None
+    assert listed[0]["headline"]["without_costs"] is True
 
 
 def test_the_package_has_no_road_to_an_account() -> None:

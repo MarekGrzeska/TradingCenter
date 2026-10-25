@@ -44,7 +44,7 @@ class GatewayInstruments:
                 return tradeable if isinstance(tradeable, bool) else None
         return None
 
-    # capital-gateway is not public, so the terminal reaches the catalogue through here. These three
+    # capital-gateway is not public, so the terminal reaches the catalogue through here. These four
     # forward the gateway's own JSON unread: a field it adds is visible the same day.
 
     async def catalogue(self, max_nodes: int | None, asset_class: str | None) -> dict:
@@ -66,6 +66,17 @@ class GatewayInstruments:
         )
         if not isinstance(body, list):
             raise UnreadablePayload("the gateway's search response was not a list")
+        return body
+
+    async def terms(self, symbol: str) -> dict:
+        body = await get_json(
+            self._client,
+            f"{self._base_url}/instruments/{symbol}/terms",
+            params={},
+            what=f"the terms of {symbol}",
+        )
+        if not isinstance(body, dict):
+            raise UnreadablePayload(f"the gateway's terms of {symbol} were not an object")
         return body
 
     async def asset_classes(self) -> list:
