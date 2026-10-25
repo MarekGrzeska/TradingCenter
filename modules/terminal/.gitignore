@@ -11,3 +11,4 @@ coverage/
 # Playwright: traces and reports of the last end-to-end run
 test-results/
 playwright-report/
+e2e/workbench.log

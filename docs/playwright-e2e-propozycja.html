@@ -170,7 +170,7 @@
       <span>TradingCenter / testy</span>
       <span>25 października 2026</span>
       <span>stan na <b>main 0249bfbd</b> + gałąź fazy 0</span>
-      <span>faza 0 <b>zrobiona</b> · fazy 1–2 do zrobienia</span>
+      <span>fazy 0–1 <b>zrobione</b> · faza 2 do zrobienia</span>
     </div>
   </div>
 </header>
@@ -503,6 +503,28 @@
           <p>Stawki w katalogu modeli muszą być dodatnie (walidacja odrzuca zero), więc E2E ma 0,001. Projekt workbencha nie
           jest instalowanym pakietem, więc seed i workbench potrzebują <code>PYTHONPATH</code> albo <code>--app-dir</code>.
           Vitest dostał jawne <code>include: src/**/*.test.*</code>, żeby nie zbierał testów Playwrighta.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">08b · Faza 1</div>
+      <h2>Szkielet i 14 testów: pierwszy znaleziony błąd</h2>
+      <p class="intro"><code>pnpm e2e</code> stawia stos, wgrywa seed, uruchamia 14 testów (ST-01…06, BT-01…08) i sprząta.
+      Całość trwa około minuty: same testy 41 s.</p>
+      <div class="fails">
+        <div class="fail stop"><h3>Znaczniki walidacji nie pojawiały się po przerwie w pisaniu <span class="tag stop">naprawione</span></h3>
+          <p>ST-02 nie przeszedł za pierwszym razem: streszczenie mówiło „Dokument ma problemy”, ale edytor nie zaznaczał
+          <code>emaa</code>. <code>forceLinting</code> z <code>@codemirror/lint</code> uruchamia tylko lint, który jeszcze
+          czeka, a ten po ostatnim naciśnięciu klawisza dawno się wykonał, zanim walidacja odpowiedziała. Edytor podaje teraz
+          znaczniki sam (<code>setDiagnostics</code>). Test jednostkowy w jsdom tego nie widział. Scenariusz ręczny E-01
+          wymagał tego zachowania.</p></div>
+        <div class="fail ok"><h3>Przygotowanie przez REST, sprawdzenie na ekranie <span class="tag ok">support.ts</span></h3>
+          <p>Strategie, rewizje i zakończone uruchomienia powstają przez proxy Vite, tak jak woła je terminal. Każdy test ma
+          własną strategię, więc kolejność testów nie ma znaczenia.</p></div>
+        <div class="fail ok"><h3>Nic z powłoki nie przechodzi do workbencha <span class="tag ok">scripts/tests/test_e2e.py</span></h3>
+          <p>Środowisko procesu to lista dozwolonych nazw systemowych plus <code>workbench.env</code>. Testy pilnują, że klucz
+          z powłoki dewelopera nie dociera do workbencha, każdy klucz modelu w pliku jest atrapą, a każda baza to kontener
+          E2E.</p></div>
       </div>
     </section>
 
