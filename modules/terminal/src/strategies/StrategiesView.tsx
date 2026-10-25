@@ -164,8 +164,10 @@ export function StrategiesView({
     return chat.subscribe(() => {
       const now = chat.getSnapshot().activeSessionId;
       const created = before === null && now !== null;
-      before = now;
       const owner = chatOwner.current;
+      // The strategy's conversation was dropped (removed, or another account's): the next one the chat creates is its own.
+      if (owner !== null && now === null && before !== null && owner.conversation === before) owner.conversation = null;
+      before = now;
       if (!created || now === null || owner === null || owner.strategy === "new" || owner.conversation !== null) return;
       owner.conversation = now;
       void assignConversation(owner.strategy, now, owner.name);
