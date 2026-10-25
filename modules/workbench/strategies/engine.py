@@ -1,6 +1,6 @@
 """The run itself: decisions on the close of each bar of the strategy's timeframe, fills settled on the traded
-instrument's minutes, one position at a time. Pure — arrays in, trades out — so it can run in a worker process with
-nothing but its arguments (design D5), and so the same inputs always give the same trades."""
+instrument's execution series (`document.execution`), one position at a time. Pure — arrays in, trades out — so it can
+run in a worker process with nothing but its arguments (design D5), and so the same inputs always give the same trades."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from .costs import CostModel
-from .document import Checked
+from .document import Checked, execution
 from .evaluate import Evaluator, State
 from .requirements import IndicatorKey
 from .series import Context, Series
@@ -19,7 +19,7 @@ from .vocabulary import Indicator
 # Raised by every change that moves a result — a fill rule, a cost, a rounding. Recorded in each report, and the golden
 # strategies refuse a changed result under an unchanged number (`strategies-backtest`). What each number changed: the
 # commits that raised it.
-ENGINE_VERSION = 3
+ENGINE_VERSION = 4
 
 
 @dataclass(frozen=True)
@@ -120,7 +120,8 @@ def simulate(
         raise ValueError("a strategy sized by its deposit needs the instrument's margin factor")
     evaluator = evaluator or Evaluator(checked, params, catalogue, series, indicators)
     decision = series[(d.symbol, d.timeframe)]
-    minute = series[(d.symbol, "MINUTE")]
+    # Called `minute` below: on the decision series, each of its bars plays the minute its open is the open of.
+    minute = series[(d.symbol, execution(d))]
     entry_conditions = [checked.formulas[f"entries[{i}].when"] for i in range(len(d.entries))]
     book = _Book(capital)
     position: _Position | None = None

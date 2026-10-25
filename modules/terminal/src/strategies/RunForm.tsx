@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { messageOf } from "../data/query";
 import { Button } from "../ui/Button";
 import { todayInWarsaw, warsawMidnightEpochSeconds } from "../ui/formatTime";
-import { minutesIn, num, sourceLabel } from "./present";
+import { barsIn, interval, num, sourceLabel } from "./present";
 import { costsOf, EMPTY_COSTS, fieldsOf, sameFields, type CostFields } from "./costFields";
 import { Refused, type CostProfile, type Problem, type StrategiesApi } from "./strategiesApi";
 
@@ -34,7 +34,8 @@ export function RunForm({
   revision,
   symbol,
   params,
-  maxMinuteBars,
+  execution,
+  maxExecutionBars,
   onQueued,
 }: {
   api: StrategiesApi;
@@ -42,7 +43,8 @@ export function RunForm({
   revision: number;
   symbol: string;
   params: Record<string, ParamDecl>;
-  maxMinuteBars: number | null;
+  execution: string;
+  maxExecutionBars: number | null;
   onQueued(runId: number): void;
 }) {
   const today = todayInWarsaw();
@@ -90,8 +92,8 @@ export function RunForm({
 
   const start = new Date(warsawMidnightEpochSeconds(from) * 1000);
   const end = new Date(warsawMidnightEpochSeconds(to) * 1000);
-  const minutes = minutesIn(start, end);
-  const overCeiling = maxMinuteBars !== null && minutes > maxMinuteBars;
+  const bars = barsIn(start, end, execution);
+  const overCeiling = maxExecutionBars !== null && bars > maxExecutionBars;
   const problemAt = (path: string) => problems.filter((p) => p.path === path || p.path.startsWith(`${path}.`));
 
   async function queue(): Promise<void> {
@@ -188,8 +190,8 @@ export function RunForm({
         </label>
       </div>
       <p className={`text-xs ${overCeiling ? "text-critical" : "text-ink-faint"}`}>
-        Zakres obejmuje {num(minutes)} minut
-        {maxMinuteBars !== null && <> z {num(maxMinuteBars)}, które przyjmuje jedno uruchomienie</>}
+        Zakres obejmuje {num(bars)} świec {interval(execution)}, na których wykonuje się ta strategia
+        {maxExecutionBars !== null && <>, z {num(maxExecutionBars)}, które przyjmuje jedno uruchomienie</>}
         {overCeiling && " — skróć zakres albo podziel go na kilka uruchomień"}.
       </p>
       {problemAt("to").map((p) => (

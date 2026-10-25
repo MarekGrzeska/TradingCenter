@@ -19,6 +19,7 @@ from ..contract import (
     RunSummaryOut,
     TradesPageOut,
 )
+from ..document import execution_of
 from ..problems import Problem
 from ..runs import RunIn
 from .deps import BIGINT, archive, not_found, pool, queue, refused, settings
@@ -44,7 +45,7 @@ async def enqueue(
         except store.NotFound:
             raise not_found("that strategy or revision") from None
         declared = revision.document.get("params", {})
-        problems = runs.check_request(body, declared, config.max_minute_bars)
+        problems = runs.check_request(body, declared, execution_of(revision.document), config.max_execution_bars)
         if problems:
             return refused("the run cannot be queued", problems)
         try:

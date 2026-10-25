@@ -42,7 +42,7 @@ def indicator_key(
 @dataclass(frozen=True)
 class Needs:
     contexts: frozenset[Context]
-    # The contexts a formula reads, read from `warmup_seconds` before the range; the traded minutes, when only the fills
+    # The contexts a formula reads, read from `warmup_seconds` before the range; the execution series, when only the fills
     # use them, are read from the range's start — the run's ceiling is counted in those.
     warm: frozenset[Context]
     indicators: frozenset[IndicatorKey]

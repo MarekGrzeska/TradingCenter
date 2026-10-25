@@ -22,6 +22,7 @@ from ..contract import (
     StrategyOut,
     ValidationOut,
 )
+from ..document import execution, execution_of
 from ..summary import summarize
 from .deps import BIGINT, INTEGER, archive, not_found, pool, refused
 
@@ -44,7 +45,7 @@ def _summary(s: store.Summary) -> StrategyOut:
 
 
 def _revision(r: store.Revision) -> RevisionOut:
-    return RevisionOut.model_validate(r.__dict__ | {"summary": summarize(r.document)})
+    return RevisionOut.model_validate(r.__dict__ | {"summary": summarize(r.document), "execution": execution_of(r.document)})
 
 
 def conflict(latest: int) -> JSONResponse:
@@ -63,6 +64,7 @@ async def validate(raw: dict[str, Any] = _DOCUMENT, reading=Depends(archive)) ->
         "valid": checked is not None,
         "problems": [p.as_dict() for p in problems],
         "summary": None if checked is None else summarize(checked.canonical),
+        "execution": None if checked is None else execution(checked.document),
     })
 
 

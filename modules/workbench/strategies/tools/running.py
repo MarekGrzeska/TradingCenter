@@ -11,6 +11,7 @@ from pydantic import AwareDatetime, BaseModel, Field, ValidationError
 from .. import compare, runs, store
 from ..archive import ArchiveUnavailable
 from ..broker_costs import BrokerCostsMissing
+from ..document import execution_of
 from ..runs import RunIn
 from ._shared import READ_ONLY, WRITES, ToolContext, refusal
 
@@ -41,7 +42,9 @@ class RunRead(BaseModel):
     request: dict[str, Any] = Field(description="range, parameters, costs, capital and seed the run was made with")
     engine_version: int | None
     report: dict[str, Any] | None = Field(description="every metric and benchmark; the daily curve is left out")
-    provenance: dict[str, Any] | None = Field(description="the revision's hash, and the stretches the archive never verified")
+    provenance: dict[str, Any] | None = Field(
+        description="the revision's hash, the series fills were settled on (`execution`), and what the archive never verified"
+    )
 
 
 class Comparison(BaseModel):
@@ -95,7 +98,9 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
             except ValidationError as err:
                 raise refusal(f"the run cannot be queued: {err.errors()[0]['msg']}") from None
             declared = found.document.get("params", {})
-            problems = runs.check_request(request, declared, ctx.state.settings.max_minute_bars)
+            problems = runs.check_request(
+                request, declared, execution_of(found.document), ctx.state.settings.max_execution_bars
+            )
             if problems:
                 raise refusal("the run cannot be queued", problems)
             try:
@@ -135,7 +140,7 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
             raise refusal(f"run {run_id} does not exist")
         report = None if row.report is None else {k: v for k, v in row.report.items() if k != "equity"}
         provenance = None if row.provenance is None else {
-            k: row.provenance.get(k) for k in ("content_hash", "engine_version", "uncovered", "unsettled")
+            k: row.provenance.get(k) for k in ("content_hash", "engine_version", "execution", "uncovered", "unsettled")
         }
         return RunRead(
             run_id=row.id, strategy_id=row.strategy_id, revision=row.revision, status=row.status, reason=row.reason,

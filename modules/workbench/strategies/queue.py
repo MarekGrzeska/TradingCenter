@@ -18,8 +18,9 @@ from . import documents, runs, store
 from .archive import Archive, ArchiveUnavailable
 from .config import Settings
 from .costs import CostModel
+from .document import execution
 from .engine import ENGINE_VERSION
-from .reading import read
+from .reading import bars_without_minutes, read
 from .series import epoch
 from .worker import Job
 from .worker import main as compute_in_process
@@ -169,6 +170,13 @@ class RunQueue:
         params = request["params"]
         start, end = epoch(request["from"]), epoch(request["to"])
         inputs = await read(self._archive, checked, params, catalogue, start, end)
+        d = checked.document
+        settled_on = execution(d)
+        if settled_on == "MINUTE":
+            decision, minute = inputs.series[(d.symbol, d.timeframe)], inputs.series[(d.symbol, "MINUTE")]
+            hole = bars_without_minutes(decision, minute, start, end)
+            if hole is not None:
+                raise _Ends(hole)
         costs = CostModel.model_validate(request["costs"])
         job = Job(
             checked, params, catalogue, inputs.series, inputs.indicators, costs, float(request["capital"]),
@@ -185,6 +193,7 @@ class RunQueue:
             "capital": request["capital"],
             "seed": request["seed"],
             "engine_version": ENGINE_VERSION,
+            "execution": settled_on,
             "warmup_seconds": inputs.needs.warmup_seconds,
             "read_from": inputs.read_from,
             "series": inputs.fingerprints(),

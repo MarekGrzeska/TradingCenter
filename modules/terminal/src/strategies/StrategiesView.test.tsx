@@ -41,11 +41,12 @@ const revision = (n: number, name = "US100 pullback"): Revision => ({
   author: "agent",
   createdAt: new Date("2026-10-25T10:00:00Z"),
   summary: { name, sections: [{ title: "Instrument", lines: ["US100, decyzje na zamknięciu świecy h1."] }], hypothesis: "", notes: "" },
+  execution: "MINUTE",
 });
 
 function fakeApi(overrides: Partial<StrategiesApi> = {}): StrategiesApi {
   return {
-    health: vi.fn(async () => ({ queued: 0, running: 0, maxMinuteBars: 1_500_000 })),
+    health: vi.fn(async () => ({ queued: 0, running: 0, maxExecutionBars: 1_500_000 })),
     language: vi.fn(async () => ({
       schema_version: 1,
       sections: [],

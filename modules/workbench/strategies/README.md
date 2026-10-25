@@ -79,15 +79,22 @@ comparison. A test refuses any `eval`/`exec`/`compile` in the package.
 
 ## The engine
 
-Decisions on the close of each bar of the strategy's timeframe; fills settled on the traded instrument's `MINUTE` series
-from the next minute. **The traded instrument must have its `MINUTE` series collected** — the check refuses a document
-whose instrument has none. The archive holds the bid, so the ask is bid + the run's spread for that UTC hour.
+Decisions on the close of each bar of the strategy's timeframe; fills settled from the next minute on the **execution
+series** (`document.execution`). A document with nothing to find inside a bar — no stop, target or trail, only market
+entries — is settled on its own timeframe: the next bar's open *is* the next minute's open, so the trades are the same,
+and no minute is read at all (the archive's minutes reach back months, its M5 years). Any other document is settled on
+`MINUTE`: the check refuses one whose instrument has no `MINUTE` collected, and a run fails before computing anything
+when a decision bar in its range has no minute under it — naming the gaps and the first minute there is, instead of an
+order waiting months for the next minute. The archive holds the bid, so the ask is bid + the run's spread for that UTC
+hour.
 
 Formulas without trade state are computed on numpy for the whole axis at once; formulas with it are interpreted bar by
 bar, reading the first phase's columns (design D4). A test demands both agree with a series cut at each bar.
 
 When the equity marked with the open position reaches zero, the position is closed there as a stop would be
-(`out_of_capital`) and nothing opens again — a floor no account goes below, not the broker's earlier close-out.
+(`out_of_capital`) and nothing opens again — a floor no account goes below, not the broker's earlier close-out. On a
+five-minute execution series the floor sees no gap inside a bar: crossed mid-bar, it closes at the floor, where minutes
+might have closed at a worse open beyond it.
 
 A minute whose range covers two events in an unknown order (stop and target, or a stop entry and its stop) is settled
 against the strategy and marked. Every run has a cost model: hourly spread profile, slippage on orders that take
@@ -97,7 +104,7 @@ re-record with `uv run python -m tests.strategies.golden.regenerate`.
 
 ## Runs
 
-`POST /runs` checks the request (parameters in range, range under `STRATEGIES_MAX_MINUTE_BARS`) and queues it. The queue (`queue.py`) re-checks the revision against the archive as it is now, reads the data in this process —
+`POST /runs` checks the request (parameters in range, range under `STRATEGIES_MAX_EXECUTION_BARS` candles of the execution series) and queues it. The queue (`queue.py`) re-checks the revision against the archive as it is now, reads the data in this process —
 parsing off the event loop — and computes in **a spawned process per run**, which a time limit or a cancellation stops.
 A run left `running` by a stopped process is marked "interrupted by a restart" at the next start. The worker sends the
 strategy's result before the random-entry benchmark, so a benchmark that runs out of time costs only itself.

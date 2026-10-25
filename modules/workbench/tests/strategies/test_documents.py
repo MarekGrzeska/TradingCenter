@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from strategies.document import SCHEMA_VERSION, servable, validate
+import pytest
+
+from strategies.document import SCHEMA_VERSION, execution, servable, validate
 
 from .builders import TRACKED, catalogue, document
 
@@ -81,9 +83,7 @@ def test_a_symbol_the_archive_does_not_collect_is_named() -> None:
 
 
 def test_the_traded_instrument_needs_its_minute_series() -> None:
-    assert ("symbol", "the archive does not collect DE40 at MINUTE, and fills are settled on minutes") in problems(
-        document(symbol="DE40")
-    )
+    assert any(path == "symbol" and "DE40 at MINUTE" in message for path, message in problems(document(symbol="DE40")))
 
 
 def test_a_resolution_the_archive_derives_from_minutes_needs_no_collection_but_a_day_does() -> None:
@@ -157,3 +157,31 @@ def test_a_session_function_on_a_daily_axis_is_refused() -> None:
     found = problems(document(entries=entries))
 
     assert any(path == "entries[0].when" and "holds a whole session" in message for path, message in found)
+
+
+@pytest.mark.parametrize(
+    ("changes", "expected"),
+    [
+        ({}, "MINUTE_5"),
+        ({"exits": {"stop": "entry_price - 50", "when": "hour == 20"}}, "MINUTE"),
+        ({"exits": {"target": "entry_price + 50", "when": "hour == 20"}}, "MINUTE"),
+        ({"exits": {"stop": "entry_price - 50", "trail": {"after_r": 1, "distance": "20"}}}, "MINUTE"),
+        ({"entries": [{"side": "long", "when": "hour == 9", "order": {"type": "limit", "price": "close - 5"}}]}, "MINUTE"),
+        ({"entries": [{"side": "long", "when": "hour == 9", "order": {"type": "stop", "price": "close + 5"}}]}, "MINUTE"),
+    ],
+)
+def test_only_a_level_inside_a_bar_settles_fills_on_minutes(changes: dict, expected: str) -> None:
+    checked, found = validate(SESSION_STRATEGY | changes, catalogue(), servable(TRACKED))
+    assert checked is not None, found
+
+    assert execution(checked.document) == expected
+
+
+def test_a_strategy_without_levels_needs_no_minutes_of_its_instrument() -> None:
+    """An archive that collects DE40 at M5 only: enough for the session strategy, not for the same one with a stop."""
+    collected = servable({("DE40", "MINUTE_5")})
+    plain = SESSION_STRATEGY | {"symbol": "DE40"}
+    stopped = plain | {"exits": {"stop": "entry_price - 50", "when": "hour == 20"}}
+
+    assert validate(plain, catalogue(), collected)[1] == []
+    assert [p.path for p in validate(stopped, catalogue(), collected)[1]] == ["symbol"]

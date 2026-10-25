@@ -31,9 +31,18 @@ function api(overrides: Partial<StrategiesApi> = {}): StrategiesApi {
   } as unknown as StrategiesApi;
 }
 
-function form(client: StrategiesApi) {
+function form(client: StrategiesApi, execution = "MINUTE", maxExecutionBars = 1_500_000) {
   render(
-    <RunForm api={client} strategyId={7} revision={4} symbol="US100" params={{}} maxMinuteBars={1_500_000} onQueued={() => {}} />,
+    <RunForm
+      api={client}
+      strategyId={7}
+      revision={4}
+      symbol="US100"
+      params={{}}
+      execution={execution}
+      maxExecutionBars={maxExecutionBars}
+      onQueued={() => {}}
+    />,
   );
 }
 
@@ -62,6 +71,19 @@ describe("RunForm", () => {
 
     await waitFor(() => expect(client.enqueue).toHaveBeenCalled());
     expect(vi.mocked(client.enqueue).mock.calls[0][0]).toMatchObject({ costs: null, withoutCosts: true });
+  });
+});
+
+describe("RunForm's ceiling", () => {
+  // The default range is twelve months: 525,600 minutes, 105,120 five-minute candles.
+  it.each([
+    ["MINUTE", true],
+    ["MINUTE_5", false],
+  ])("counts candles of the %s series the strategy is settled on", async (execution, over) => {
+    form(api(), execution, 200_000);
+    await screen.findByText(/z capital\.com, pobrane/);
+
+    expect(screen.queryByText(/skróć zakres/) !== null).toBe(over);
   });
 });
 

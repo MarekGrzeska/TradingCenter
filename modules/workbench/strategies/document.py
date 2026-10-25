@@ -320,9 +320,26 @@ def _session_axes(d: DocumentIn, parsed: Mapping[str, f.Node]) -> list[Problem]:
     return problems
 
 
+def execution(d: DocumentIn) -> str:
+    """The series fills are settled on: the decision series when nothing has to be found inside a bar — no stop, target
+    or trail, only market entries — because the next bar's open is the open of the first minute after the decision."""
+    intrabar = d.exits.stop is not None or d.exits.target is not None or d.exits.trail is not None or any(
+        entry.order.type != "market" for entry in d.entries
+    )
+    return "MINUTE" if intrabar else d.timeframe
+
+
+def execution_of(raw: Mapping[str, Any]) -> str | None:
+    """The execution series of a stored document, or `None` for one this engine can no longer read."""
+    try:
+        return execution(DocumentIn.model_validate(raw))
+    except ValidationError:
+        return None
+
+
 def contexts(d: DocumentIn, parsed: Mapping[str, f.Node]) -> set[tuple[str, str]]:
-    """Every (instrument, resolution) a document reads, the traded one at its timeframe and at `MINUTE` included."""
-    found = {(d.symbol, d.timeframe), (d.symbol, "MINUTE")}
+    """Every (instrument, resolution) a document reads, the traded one at its timeframe and its execution included."""
+    found = {(d.symbol, d.timeframe), (d.symbol, execution(d))}
 
     def walk(n: f.Node, ctx: tuple[str, str]) -> None:
         # Recorded where bars are read: each series name, each indicator, and the axis every chain of `@` is read on —
@@ -347,13 +364,15 @@ def contexts(d: DocumentIn, parsed: Mapping[str, f.Node]) -> set[tuple[str, str]
 
 def _archive(d: DocumentIn, parsed: Mapping[str, f.Node], available: set[tuple[str, str]]) -> list[Problem]:
     problems = []
-    if (d.symbol, "MINUTE") not in available:
+    minutes = execution(d) == "MINUTE"
+    if minutes and (d.symbol, "MINUTE") not in available:
         problems.append(Problem(
-            "symbol", f"the archive does not collect {d.symbol} at MINUTE, and fills are settled on minutes",
+            "symbol", f"the archive does not collect {d.symbol} at MINUTE, and this document's stops, targets or "
+            "orders are settled on minutes",
             hint="start collecting it in the terminal's data manager",
         ))
     for symbol, resolution in sorted(contexts(d, parsed)):
-        if (symbol, resolution) in available or (symbol, resolution) == (d.symbol, "MINUTE"):
+        if (symbol, resolution) in available or minutes and (symbol, resolution) == (d.symbol, "MINUTE"):
             continue
         problems.append(Problem(
             "document", f"the archive cannot serve {symbol} at {resolution}, which this document reads",

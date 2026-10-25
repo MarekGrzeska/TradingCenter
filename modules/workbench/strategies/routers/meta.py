@@ -25,7 +25,7 @@ async def health(request: Request) -> HealthOut:
     return HealthOut.model_validate({
         "database": "reachable",
         "queue": {"queued": waiting, "running": running},
-        "max_minute_bars": request.app.state.settings.max_minute_bars,
+        "max_execution_bars": request.app.state.settings.max_execution_bars,
     })
 
 
