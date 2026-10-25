@@ -399,7 +399,7 @@ export function StrategiesView({
               </p>
             )}
             {validation.failure !== null && <p className="text-xs text-critical">{validation.failure}</p>}
-            <div className="grid h-[30rem] min-h-0 grid-cols-[minmax(0,3fr)_minmax(0,2fr)_minmax(18rem,2fr)] gap-3">
+            <div className="grid h-[30rem] min-h-0 shrink-0 grid-cols-[minmax(0,3fr)_minmax(20rem,2fr)] gap-3">
               <StrategyEditor
                 text={text}
                 onChange={setText}
@@ -407,9 +407,9 @@ export function StrategiesView({
                 language={language.value}
                 symbols={symbols.value}
               />
-              <SummaryPanel summary={validation.summary ?? base?.summary ?? null} valid={validation.valid} stale={validation.stale && dirty} />
               <StrategyChat store={chat} />
             </div>
+            <SummaryPanel summary={validation.summary ?? base?.summary ?? null} valid={validation.valid} stale={validation.stale && dirty} />
 
             {base !== null && (
               <>
