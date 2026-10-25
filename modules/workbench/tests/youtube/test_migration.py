@@ -149,3 +149,22 @@ async def test_a_run_that_failed_or_was_skipped_must_say_why(old_database: str) 
         await conn.execute("INSERT INTO topic_runs (topic_id, phrase, ran_at, outcome) VALUES (1, 'gold', now(), 'nothing_new')")
     finally:
         await conn.close()
+
+
+async def test_a_language_written_as_a_name_becomes_its_code_and_the_hold_from_its_400s_is_lifted(old_database: str) -> None:
+    config = alembic_config(MIGRATIONS, sqlalchemy_url(old_database))
+    await asyncio.to_thread(command.upgrade, config, "0008")
+    conn = await asyncpg.connect(asyncpg_dsn(old_database))
+    try:
+        await conn.execute(
+            "INSERT INTO topics (phrase, language, interval_minutes, max_videos_per_run, added_by, retry_at) VALUES "
+            "('rynki', 'Polish', 360, 5, 'agent', now()), ('markets', 'English', 360, 5, 'agent', now()), "
+            "('markets', 'en', 360, 5, 'operator', NULL)"
+        )
+        await asyncio.to_thread(command.upgrade, config, "head")
+
+        rows = await conn.fetch("SELECT phrase, language, retry_at IS NULL AS free FROM topics WHERE phrase <> 'gold' ORDER BY phrase, language")
+        # The second 'markets' would collide with the one already under `en`, so it is left for the operator to remove.
+        assert [tuple(r) for r in rows] == [("markets", "English", False), ("markets", "en", True), ("rynki", "pl", True)]
+    finally:
+        await conn.close()

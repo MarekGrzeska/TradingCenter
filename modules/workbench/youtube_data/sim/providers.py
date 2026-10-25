@@ -48,6 +48,11 @@ class SimSource:
         source = self._world.scenario.source
         return source.search_units + source.details_units
 
+    @property
+    def listing_cost(self) -> int:
+        source = self._world.scenario.source
+        return source.list_units + source.details_units
+
     async def _pay(self, units: int) -> None:
         behaviour = self._world.scenario.source
         await self._world.lag(behaviour.latency_ms)

@@ -40,6 +40,7 @@ from .providers.base import (
     NoTranscript,
     QuotaExceeded,
     ReadingUnusable,
+    RequestInvalid,
     SourceError,
     SourceRefused,
     Transcript,
@@ -280,9 +281,12 @@ class Ingest:
                 await store.record_discovery(conn, channel.channel_id, at=now)
             left = await self._remaining(ceiling)
 
+        reserve = budget.channels_reserve(
+            len(channels), source.listing_cost, now=now, interval_seconds=await self._interval()
+        )
         spent = False
         for index, topic in enumerate(topics):
-            if spent or left < source.search_cost:
+            if spent or left - reserve < source.search_cost:
                 log.warning("topic %r waits: the %s source's day cannot pay for a search", topic.phrase, source.name)
                 for waiting in topics[index:]:
                     await self._note_run(
@@ -291,7 +295,8 @@ class Ingest:
                             waiting.phrase,
                             now,
                             SKIPPED,
-                            error=f"the {source.name} source's day cannot pay for a search",
+                            error=f"the {source.name} source's day cannot pay for a search and the followed channels' "
+                            "listings until midnight UTC",
                         )
                     )
                 break
@@ -313,10 +318,15 @@ class Ingest:
                 continue
             except SourceError as err:
                 log.warning("topic %r could not be searched: %s", topic.phrase, err)
+                error = str(err)[:300] or type(err).__name__
                 # A refusal was paid for, and asking again on the next pass would pay again; no answer cost nothing.
-                if isinstance(err, SourceRefused):
+                if isinstance(err, RequestInvalid):
+                    async with self._pool.acquire() as conn:
+                        await store.update_topic(conn, topic.id, active=False)
+                    error = f"{error[:200]} — the request itself is wrong, so the topic is switched off until it is corrected"
+                elif isinstance(err, SourceRefused):
                     await self._hold(topic, now)
-                await self._note_run(store.RunReport(topic.id, topic.phrase, now, FAILED, error=str(err)[:300] or type(err).__name__))
+                await self._note_run(store.RunReport(topic.id, topic.phrase, now, FAILED, error=error))
                 left = await self._remaining(ceiling)
                 continue
             await self._propose(topic, films, now)

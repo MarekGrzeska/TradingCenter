@@ -6,6 +6,7 @@ the ceiling checked second, and only then is anything stored."""
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from . import budget, loop_settings, prompts, store
@@ -18,6 +19,7 @@ from .providers.refs import video_id
 _STILL_ON_ITS_ROAD = (DISCOVERED, NO_TRANSCRIPT, TRANSCRIBED)
 
 MAX_PHRASE_CHARS = 200
+_LANGUAGE = re.compile(r"^[a-z]{2}(?:[-_][a-z0-9]+)?$")
 MAX_FILTER_CHARS = 1000
 MIN_INTERVAL_MINUTES = loop_settings.MIN_INTERVAL_MINUTES
 MAX_INTERVAL_MINUTES = loop_settings.MAX_INTERVAL_MINUTES
@@ -47,6 +49,17 @@ def clean_filter(filter: str | None) -> str | None:
     return text
 
 
+def language_code(language: str) -> str:
+    """A language as the YouTube Data API takes it: `pl`, not `Polish` — which it answers with a 400 on every search. A
+    regional spelling (`pl-PL`) is narrowed to its language, and empty means any."""
+    text = language.strip().lower()
+    if not text:
+        return ""
+    if _LANGUAGE.match(text) is None:
+        raise WatchlistRefused(f"a language is a two-letter ISO 639-1 code such as 'pl' or 'en', or empty; got {language!r}")
+    return text[:2]
+
+
 def _check_choice(name: str, value: str, allowed) -> None:
     if value not in allowed:
         raise WatchlistRefused(f"{name} must be one of {', '.join(allowed)}; got {value!r}")
@@ -71,6 +84,7 @@ async def follow_channel(
 ) -> Followed:
     prompt_id = await _prompt_id(pool, prompt)
     _check_choice("added_by", added_by, ADDED_BY)
+    language = language_code(language)
     criteria = clean_filter(filter)
     try:
         info: ChannelInfo = await source.resolve_channel(reference)
@@ -114,6 +128,7 @@ async def add_topic(
     if not text or len(text) > MAX_PHRASE_CHARS:
         raise WatchlistRefused(f"a topic is a phrase of 1 to {MAX_PHRASE_CHARS} characters")
     _check_choice("added_by", added_by, ADDED_BY)
+    language = language_code(language)
 
     defaults: list[str] = []
     if interval_minutes is None or max_videos_per_run is None:
