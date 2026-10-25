@@ -4,7 +4,8 @@ tables. A run is never deleted: every one, failed and cancelled included, is the
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections import Counter
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Literal
@@ -251,6 +252,50 @@ def run_row(row: asyncpg.Record) -> RunRow:
 async def get_run(conn: Conn, run_id: int) -> RunRow | None:
     row = await conn.fetchrow("SELECT * FROM runs WHERE id = $1", run_id)
     return None if row is None else run_row(row)
+
+
+MAX_DELETED = 20
+
+
+def delete_count_problem(run_ids: Sequence[int]) -> str | None:
+    """Why this list of ids cannot be deleted at all, before any run is read; `None` when it can."""
+    if not 1 <= len(run_ids) <= MAX_DELETED or len(set(run_ids)) != len(run_ids):
+        return f"delete 1 to {MAX_DELETED} different runs"
+    return None
+
+
+class NotDeletable(Exception):
+    """Nothing was deleted: `missing` do not exist (or were deleted), `busy` are queued or computing, with their status."""
+
+    def __init__(self, missing: list[int], busy: list[tuple[int, str]]) -> None:
+        super().__init__("not deletable")
+        self.missing, self.busy = missing, busy
+
+    def reasons(self) -> list[str]:
+        return [f"run {i} does not exist (it may have been deleted)" for i in self.missing] + [
+            f"run {i} is {status}; cancel it first" for i, status in self.busy
+        ]
+
+
+async def delete_runs(conn: Conn, run_ids: Sequence[int]) -> list[int]:
+    """All of them or none. The rows are held for the transaction, so a run that finishes meanwhile is either still
+    computing here (refused) or already done and counted — a finished run never leaves without being added to its
+    strategy's `deleted_trials`, which is what keeps the number of trials from shrinking."""
+    async with conn.transaction():
+        rows = await conn.fetch(
+            "SELECT id, strategy_id, status FROM runs WHERE id = ANY($1::bigint[]) ORDER BY id FOR UPDATE", list(run_ids)
+        )
+        found = {row["id"]: row for row in rows}
+        missing = [i for i in run_ids if i not in found]
+        busy = [(i, found[i]["status"]) for i in run_ids if i in found and found[i]["status"] in ("queued", "running")]
+        if missing or busy:
+            raise NotDeletable(missing, busy)
+        finished: Counter[int] = Counter(row["strategy_id"] for row in rows if row["status"] == "done")
+        await conn.execute("DELETE FROM run_trades WHERE run_id = ANY($1::bigint[])", list(run_ids))
+        await conn.execute("DELETE FROM runs WHERE id = ANY($1::bigint[])", list(run_ids))
+        for strategy_id, count in finished.items():
+            await conn.execute("UPDATE strategies SET deleted_trials = deleted_trials + $2 WHERE id = $1", strategy_id, count)
+    return list(run_ids)
 
 
 async def status_of(conn: Conn, run_id: int) -> str | None:

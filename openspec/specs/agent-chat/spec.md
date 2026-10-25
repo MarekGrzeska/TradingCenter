@@ -309,8 +309,9 @@ od żądania dla rozmowy nieistniejącej.
 
 Żądanie tury MAY nieść strategię, którą konsument ma otwartą: jej identyfikator (pusty dla nowej, jeszcze niezapisanej),
 rewizję, na której opiera się edytor, oraz tekst edytora, gdy różni się od tej rewizji. Moduł MUST podać to modelowi jako
-kontekst tury i MUST NOT zapisywać tego w transkrypcie. Tekst edytora ma nazwany sufit długości. Dłuższy MUST dać
-odmowę żądania z tym sufitem i MUST NOT trafić do modelu obcięty. Żądanie bez strategii MUST działać jak dotąd.
+kontekst tury, razem ze zdaniem, że zmiany idą do edytora szkicem, a rewizję zapisuje się na prośbę operatora, i MUST NOT
+zapisywać tego w transkrypcie. Tekst edytora ma nazwany sufit długości. Dłuższy MUST dać odmowę żądania z tym sufitem i
+MUST NOT trafić do modelu obcięty. Żądanie bez strategii MUST działać jak dotąd.
 
 #### Scenario: Prośba o zmianę otwartej strategii
 

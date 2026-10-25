@@ -15,6 +15,8 @@ export function RunsPanel({
   strategyNames,
   checked,
   onCheck,
+  marked,
+  onMark,
 }: {
   runs: readonly RunItem[];
   error: string | null;
@@ -27,6 +29,9 @@ export function RunsPanel({
   /** Given, finished runs can be ticked for a comparison. */
   checked?: ReadonlySet<number>;
   onCheck?(id: number): void;
+  /** Given, runs that are not in progress can be ticked for deletion — a set of its own: a comparison takes only finished ones. */
+  marked?: ReadonlySet<number>;
+  onMark?(id: number): void;
 }) {
   if (runs.length === 0) {
     return (
@@ -40,6 +45,7 @@ export function RunsPanel({
       <thead className="text-left text-ink-muted">
         <tr>
           {onCheck && <th />}
+          {onMark && <th />}
           <th className="py-1">#</th>
           {strategyNames && <th>Strategia</th>}
           <th>Stan</th>
@@ -70,6 +76,17 @@ export function RunsPanel({
                   disabled={run.status !== "done"}
                   checked={checked?.has(run.id) ?? false}
                   onChange={() => onCheck(run.id)}
+                />
+              </td>
+            )}
+            {onMark && (
+              <td onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  aria-label={`Usuń uruchomienie ${run.id}`}
+                  disabled={run.status === "queued" || run.status === "running"}
+                  checked={marked?.has(run.id) ?? false}
+                  onChange={() => onMark(run.id)}
                 />
               </td>
             )}

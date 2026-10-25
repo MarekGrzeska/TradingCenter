@@ -153,7 +153,8 @@ class RunQueue:
 
     async def _still_wanted(self, run_id: int) -> None:
         async with self._pool.acquire() as conn:
-            if await runs.status_of(conn, run_id) == "cancelled":
+            # A deleted run is as unwanted as a cancelled one: its row is gone, and so is anything its result would say.
+            if await runs.status_of(conn, run_id) in ("cancelled", None):
                 raise _Ends("cancelled by the operator", status="cancelled")
 
     async def _prepare(self, row: asyncpg.Record) -> tuple[Job, dict[str, Any]]:

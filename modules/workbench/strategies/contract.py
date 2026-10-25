@@ -38,6 +38,10 @@ class RunAcceptedOut(BaseModel):
     status: RunStatus
 
 
+class RunsDeletedOut(BaseModel):
+    deleted: list[int] = Field(description="the runs that are gone, in the order asked — their trials still count")
+
+
 class RunCancelledOut(BaseModel):
     id: int
     status: RunStatus = Field(description="the status after the request")

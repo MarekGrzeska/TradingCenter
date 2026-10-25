@@ -14,6 +14,7 @@ from strategies.archive import Archive
 from strategies.caller_access import OPEN_PATHS, REST_PATHS
 from strategies.config import Settings
 
+from .builders import run_in_state
 from .fake_archive import archive_of
 from .market import flat, minutes, strategy, walk
 from .test_reports import WALKING, _report
@@ -249,3 +250,25 @@ def test_the_package_has_no_road_to_an_account() -> None:
     assert not {m for m in imported if "trading" in m or "gateway" in m or "capital" in m}
     assert "trading_mcp" not in text and "gateway_base_url" not in text
     assert not {name for name in Settings.model_fields if "gateway" in name or "trading" in name}
+
+
+@pytest.mark.db
+async def test_delete_runs_removes_what_is_asked_and_refuses_the_rest_whole(pool) -> None:
+    async with _client(pool) as client:
+        sid = (await client.post("/strategies", json=strategy())).json()["strategy_id"]
+        async with pool.acquire() as conn:
+            finished = await run_in_state(conn, sid, "done")
+            other = await run_in_state(conn, sid, "failed")
+            waiting = await run_in_state(conn, sid, "queued")
+        busy = await client.delete(f"/runs?run_id={finished}&run_id={waiting}")
+        missing = await client.delete(f"/runs?run_id={finished}&run_id=99999")
+        twice = await client.delete(f"/runs?run_id={finished}&run_id={finished}")
+        deleted = await client.delete(f"/runs?run_id={finished}&run_id={other}")
+        gone = await client.get(f"/runs/{finished}")
+        trials = [s["trials"] for s in (await client.get("/strategies")).json()]
+
+    assert busy.status_code == 409 and f"run {waiting} is queued" in busy.text
+    assert missing.status_code == 404 and "99999" in missing.text
+    assert twice.status_code == 422
+    assert deleted.status_code == 200 and deleted.json() == {"deleted": [finished, other]}
+    assert gone.status_code == 404 and trials == [1]

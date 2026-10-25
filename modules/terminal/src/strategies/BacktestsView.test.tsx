@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
@@ -70,7 +70,7 @@ function fakeApi(overrides: Partial<StrategiesApi> = {}): StrategiesApi {
     strategies: vi.fn(async () => [strategy(7, "US100 pullback"), strategy(8, "EURUSD breakout")]),
     detail: vi.fn(async () => ({
       item: strategy(7, "US100 pullback"),
-      revision: { strategyId: 7, n: 1, document: { symbol: "US100", params: {} }, author: "agent", createdAt: new Date(), summary: null },
+      revision: { strategyId: 7, n: 1, document: { symbol: "US100", params: {} }, author: "agent", createdAt: new Date(), summary: null, execution: "MINUTE" },
     })),
     runs: vi.fn(async () => [run(11, 7), run(12, 8)]),
     costs: vi.fn(async () => null),
@@ -129,6 +129,46 @@ describe("BacktestsView", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(reason);
     expect(screen.queryByRole("table", { name: "Porównanie" })).toBeNull();
+  });
+
+  it("deletes the runs ticked after asking, and lists what is left", async () => {
+    const left = [run(12, 8)];
+    const api = fakeApi({
+      runs: vi.fn().mockResolvedValueOnce([run(11, 7), run(12, 8)]).mockResolvedValue(left),
+      deleteRuns: vi.fn(async () => undefined),
+    });
+    view(api);
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Usuń uruchomienie 11" }));
+    await userEvent.click(screen.getByRole("button", { name: "Usuń (1)" }));
+
+    expect(screen.getByText(/Zniknie 1 uruchomienie, razem z raportem i transakcjami/)).toBeInTheDocument();
+    expect(screen.getByText(/Licznik prób strategii zostaje/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Usuń" }));
+
+    expect(api.deleteRuns).toHaveBeenCalledWith([11], expect.anything());
+    await waitFor(() => expect(screen.queryByRole("checkbox", { name: "Usuń uruchomienie 11" })).toBeNull());
+    expect(screen.getByRole("checkbox", { name: "Usuń uruchomienie 12" })).toBeInTheDocument();
+  });
+
+  it("lets a run in progress be cancelled but not ticked for deletion", async () => {
+    view(fakeApi({ runs: vi.fn(async () => [run(11, 7), { ...run(13, 7), status: "running" as const }]) }));
+
+    expect(await screen.findByRole("checkbox", { name: "Usuń uruchomienie 13" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Usuń uruchomienie 11" })).toBeEnabled();
+  });
+
+  it("keeps the question open and names the run the package would not delete", async () => {
+    const reason = "run 11 is running; cancel it first";
+    const api = fakeApi({
+      deleteRuns: vi.fn(async () => Promise.reject(new Refused("no", [{ path: "run_id", message: reason, column: null, hint: null }]))),
+    });
+    view(api);
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Usuń uruchomienie 11" }));
+    await userEvent.click(screen.getByRole("button", { name: "Usuń (1)" }));
+    await userEvent.click(screen.getByRole("button", { name: "Usuń" }));
+
+    expect(await screen.findByText(reason)).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Usuń uruchomienie 11" })).toBeChecked();
   });
 
   it("lets no run that has not finished be ticked", async () => {

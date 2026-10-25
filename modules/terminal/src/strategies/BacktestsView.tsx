@@ -6,9 +6,10 @@ import { workbenchIdentity } from "../data/marketData";
 import { messageOf, useRead } from "../data/query";
 import { MarketDataError } from "../data/types";
 import { Button } from "../ui/Button";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { ComparePanel } from "./ComparePanel";
-import { anyPending, interval } from "./present";
+import { anyPending, interval, runsGoing } from "./present";
 import { ReportPanel } from "./ReportPanel";
 import { RunForm } from "./RunForm";
 import { RunsPanel } from "./RunsPanel";
@@ -44,6 +45,8 @@ export function BacktestsView({
   const [failure, setFailure] = useState<string | null>(null);
   // Ids, not rows: a comparison may hold runs of several strategies and survives switching the list's filter.
   const [checked, setChecked] = useState<ReadonlySet<number>>(new Set());
+  const [marked, setMarked] = useState<ReadonlySet<number>>(new Set());
+  const [deleting, setDeleting] = useState(false);
   const [compared, setCompared] = useState<{ runs: ComparedRun[] | null; refusal: string[] | null } | null>(null);
 
   const health = useRead<{ present: boolean; health: Health | null }>({
@@ -127,6 +130,28 @@ export function BacktestsView({
     setChecked(next);
   }
 
+  function toggleMarked(id: number) {
+    const next = new Set(marked);
+    if (!next.delete(id)) next.add(id);
+    setMarked(next);
+  }
+
+  async function deleteMarked() {
+    const ids = [...marked];
+    try {
+      await client.deleteRuns(ids, signal());
+    } catch (cause: unknown) {
+      // Said in the dialog that asked, which stays open: nothing was deleted.
+      throw cause instanceof Refused ? new Error(cause.problems.map((p) => p.message).join("; ")) : cause;
+    }
+    setMarked(new Set());
+    setChecked(new Set([...checked].filter((id) => !ids.includes(id))));
+    setCompared(null);
+    if (pickedRun !== null && ids.includes(pickedRun)) setPickedRun(null);
+    runs.reload();
+    list.reload();
+  }
+
   async function compare() {
     setFailure(null);
     try {
@@ -207,13 +232,34 @@ export function BacktestsView({
           </Button>
         )}
         <span>zaznacz od 2 do {MAX_COMPARED} zakończonych uruchomień</span>
+        <Button size="2xs" tone="muted" disabled={marked.size === 0} onClick={() => setDeleting(true)}>
+          Usuń ({marked.size})
+        </Button>
       </div>
+      {deleting && (
+        <ConfirmDialog
+          title="Usuń uruchomienia"
+          confirmLabel="Usuń"
+          cancelLabel="Anuluj"
+          busyLabel="Usuwam…"
+          tone="danger"
+          fallbackError="nie udało się usunąć uruchomień"
+          onConfirm={deleteMarked}
+          onClose={() => setDeleting(false)}
+        >
+          <p className="text-xs text-ink-secondary">
+            {runsGoing(marked.size)}, razem z raportem i transakcjami. Nie da się tego cofnąć. Licznik prób strategii zostaje taki, jaki był.
+          </p>
+        </ConfirmDialog>
+      )}
       {compared !== null && <ComparePanel runs={compared.runs} refusal={compared.refusal} strategyNames={names} />}
 
       <RunsPanel
         runs={runs.value}
         checked={checked}
         onCheck={toggleChecked}
+        marked={marked}
+        onMark={toggleMarked}
         error={runs.error}
         picked={pickedRun}
         onPick={setPickedRun}
