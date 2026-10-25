@@ -17,9 +17,8 @@ from .series import Context, Series
 from .vocabulary import Indicator
 
 # Raised by every change that moves a result — a fill rule, a cost, a rounding. Recorded in each report, and the golden
-# strategies refuse a changed result under an unchanged number (`strategies-backtest`). 2 added the daily equity curve to
-# the report, which moved no number but changed every recording; 3 a result in % and the worst open loss on every trade,
-# trades without a stop, and the close when the capital runs out.
+# strategies refuse a changed result under an unchanged number (`strategies-backtest`). What each number changed: the
+# commits that raised it.
 ENGINE_VERSION = 3
 
 
@@ -295,7 +294,7 @@ def _minute(
     target_hit = not np.isnan(position.target) and (
         exit_side["high"] >= position.target if long else exit_side["low"] <= position.target
     )
-    floor = _capital_floor(position, book, costs, start)
+    floor = _capital_floor(position, costs, start)
     floor_hit = exit_side["low"] <= floor if long else exit_side["high"] >= floor
     # The price falls through the nearer of the two first: a stop beyond the floor is never reached.
     stop_first = stop_hit and (position.stop >= floor if long else position.stop <= floor)
@@ -307,6 +306,7 @@ def _minute(
         price = level - costs.slippage if long else level + costs.slippage
         position.slippage_paid += costs.slippage
         _close(position, start, price, "out_of_capital", book, costs)
+        # Set here, not left to `_close`'s test of the equity: at the floor it is zero only up to floating point.
         book.broke = True
         return None, order
     if stop_hit:
@@ -320,16 +320,17 @@ def _minute(
         reason = "trail" if position.trailed else "stop"
         _close(position, start, price, reason, book, costs)
         return None, order
+    # A minute the position leaves at its target counts too: whether its adverse extreme came first is unknown.
+    worst = exit_side["low"] if long else exit_side["high"]
+    position.worst_money = min(position.worst_money, position.side * (worst - position.entry_price) * position.units)
     if target_hit and not entered_inside:
         gapped = exit_side["open"] >= position.target if long else exit_side["open"] <= position.target
         _close(position, start, exit_side["open"] if gapped else position.target, "target", book, costs)
         return None, order
-    worst = exit_side["low"] if long else exit_side["high"]
-    position.worst_money = min(position.worst_money, position.side * (worst - position.entry_price) * position.units)
     return position, order
 
 
-def _capital_floor(position: _Position, book: _Book, costs: CostModel, moment: int) -> float:
+def _capital_floor(position: _Position, costs: CostModel, moment: int) -> float:
     """The price, on the side the position closes on, at which the equity marked with it reaches zero."""
     left = position.equity_at_entry - _financing(position, moment, costs)
     return position.entry_price - position.side * left / position.units

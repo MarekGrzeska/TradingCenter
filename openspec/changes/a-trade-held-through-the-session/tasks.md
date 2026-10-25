@@ -46,4 +46,4 @@
 - [x] 7.1 `strategies/README.md`: przykład z sesją, „A stop is required” zastąpione zasadą bez stopu, tryby wielkości, `out_of_capital`
 - [x] 7.2 `openspec validate a-trade-held-through-the-session --strict`
 - [ ] 7.3 Po merge skill `deploy-watch`; na produkcji agent zapisuje strategię operatora z 25.10 i uruchamia ją na US100
-- [ ] 7.4 `review.md`
+- [x] 7.4 `review.md`

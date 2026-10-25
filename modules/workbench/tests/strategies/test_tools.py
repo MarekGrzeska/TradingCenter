@@ -191,6 +191,11 @@ def test_runs_with_different_costs_are_not_compared_and_the_difference_is_named(
         compare([_row(1), other])
 
 
+def test_runs_sized_by_different_deposits_are_not_compared() -> None:
+    with pytest.raises(NotComparable, match="sized by a deposit of 0.1, run 1 by 0.05"):
+        compare([_row(1, request={"margin_factor": 0.05}), _row(2, request={"margin_factor": 0.1})])
+
+
 def test_comparable_runs_stand_side_by_side_without_a_verdict() -> None:
     compared = compare([_row(1), _row(2, report={"trades": 5, "total_r": -2.0})])
 

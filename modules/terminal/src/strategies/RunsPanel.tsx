@@ -1,6 +1,6 @@
 import { Button } from "../ui/Button";
 import { formatInstant } from "../ui/formatTime";
-import { num, r, STATUS_LABEL, WITHOUT_COSTS_NOTE } from "./present";
+import { num, pct, r, STATUS_LABEL, WITHOUT_COSTS_NOTE } from "./present";
 import type { RunItem } from "./strategiesApi";
 
 const day = (d: Date) => formatInstant(d.getTime() / 1000).slice(0, 10);
@@ -47,6 +47,7 @@ export function RunsPanel({
           <th>Zakres</th>
           <th>Zlecił</th>
           <th className="text-right">Transakcje</th>
+          <th className="text-right">Zwrot</th>
           <th className="text-right">Suma</th>
           <th className="text-right">Oczekiwana</th>
           <th className="text-right">Obsunięcie</th>
@@ -89,6 +90,7 @@ export function RunsPanel({
             </td>
             <td>{run.requestedBy === "agent" ? "agent" : "operator"}</td>
             <td className="text-right">{num(run.headline?.trades)}</td>
+            <td className="text-right">{pct(run.headline?.returnPct)}</td>
             <td className="text-right">{r(run.headline?.totalR)}</td>
             <td className="text-right">{r(run.headline?.expectancyR)}</td>
             <td className="text-right">{r(run.headline?.maxDrawdownR)}</td>

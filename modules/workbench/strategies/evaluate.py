@@ -69,6 +69,7 @@ class Evaluator:
         self._series = series
         self._indicators = indicators
         self._vectors: dict[tuple[f.Node, Context], np.ndarray] = {}
+        self._session_days: dict[tuple[str, Context], sessions.Days] = {}
         self._stateful: dict[f.Node, bool] = {}
 
     # --- phase one: whole axes -----------------------------------------------------------------------------------
@@ -195,7 +196,10 @@ class Evaluator:
         series = self._series[ctx]
         if not len(series):
             return np.full(0, np.nan)
-        days = sessions.days(SESSIONS[session], int(series.starts[0]), int(series.available[-1]))
+        key = (session, ctx)
+        if key not in self._session_days:
+            self._session_days[key] = sessions.days(SESSIONS[session], int(series.starts[0]), int(series.available[-1]))
+        days = self._session_days[key]
         if name == "session_bar":
             return days.bar_number(series.starts, PERIOD_SECONDS[ctx[1]])
         # From the decision, which is the bar's close.

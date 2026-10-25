@@ -126,7 +126,7 @@ def _sections(d: DocumentIn) -> dict[str, Any]:
 
 def _reads_a_session(d: DocumentIn) -> bool:
     texts = [*d.let.values(), *(e.when for e in d.entries), *(e.order.price for e in d.entries), d.exits.stop,
-             d.exits.target, d.exits.when, d.limits.no_entry]
+             d.exits.target, d.exits.trail.distance if d.exits.trail else None, d.exits.when, d.limits.no_entry]
 
     def uses(n: f.Node) -> bool:
         return isinstance(n, f.Call) and n.function in SESSION_FUNCTIONS or any(uses(c) for c in children(n))

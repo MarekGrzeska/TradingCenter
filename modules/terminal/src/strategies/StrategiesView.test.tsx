@@ -56,6 +56,7 @@ function fakeApi(overrides: Partial<StrategiesApi> = {}): StrategiesApi {
       position: {},
       history: {},
       resolutions: [],
+      sessions: {},
       functions: [],
       indicators: [],
       max_bars: 5000,

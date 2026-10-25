@@ -170,3 +170,13 @@ def test_a_report_sized_by_the_deposit_says_which_deposit() -> None:
     report = _report(WALKING, minutes(walk(10, seed=5))) | runs.costs_marks({"margin_factor": 0.05}, "operator")
 
     assert ReportOut.model_validate(report).margin_factor == 0.05
+
+
+def test_the_minute_a_trade_reaches_its_target_counts_toward_its_deepest_loss() -> None:
+    rows = flat(9 * HOUR, 11 * HOUR, 20_000.0)
+    rows[11 * HOUR] = (20_000.0, 20_100.0, 19_800.0, 20_050.0)  # dips to 19 800 and touches the target, order unknown
+    document = strategy(exits={"target": "entry_price + 100", "max_bars": 10}, sizing={"mode": "fixed_units", "value": 0.5})
+
+    [trade] = run(document, minutes(rows)).trades
+
+    assert trade.exit_reason == "target" and trade.mae_pct == pytest.approx(-0.01)

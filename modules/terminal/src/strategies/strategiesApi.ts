@@ -92,6 +92,8 @@ export interface Headline {
   expectancyR: number | null;
   maxDrawdownR: number | null;
   sharpe: number | null;
+  /** The one result a run without a stop has; null before engine version 3. */
+  returnPct: number | null;
   costsSource: CostsSource;
   withoutCosts: boolean;
 }
@@ -260,6 +262,7 @@ function mapHeadline(raw: Schemas["HeadlineOut"] | null | undefined): Headline |
     expectancyR: raw.expectancy_r,
     maxDrawdownR: raw.max_drawdown_r,
     sharpe: raw.sharpe,
+    returnPct: raw.return_pct ?? null,
     costsSource: raw.costs_source,
     withoutCosts: raw.without_costs,
   };

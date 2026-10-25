@@ -47,6 +47,7 @@ Brak.
   kapitału, wymagany depozyt od brokera.
 - `strategies-reports`: wynik w % i MAE każdej transakcji, metryki w %, losowe wejście w %, depozyt w pochodzeniu
   raportu.
+- `strategies-tools` i `strategies-api`: porównanie odmawia uruchomień liczonych z różnym depozytem.
 - `terminal-strategies`: transakcja bez stopu na wykresie i depozyt w pochodzeniu wyniku.
 
 ## Impact

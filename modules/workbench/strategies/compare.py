@@ -47,6 +47,11 @@ def compare(rows: Sequence[RunRow]) -> list[dict[str, Any]]:
                 if other.request["costs"].get(key) != first.request["costs"].get(key)
             )
             reasons.append(f"run {other.id} differs from run {first.id} in costs: {', '.join(differing)}")
+        if other.request.get("margin_factor") != first.request.get("margin_factor"):
+            reasons.append(
+                f"run {other.id} was sized by a deposit of {other.request.get('margin_factor')}, "
+                f"run {first.id} by {first.request.get('margin_factor')}"
+            )
         if other.engine_version != first.engine_version:
             reasons.append(
                 f"run {other.id} was computed by engine {other.engine_version}, run {first.id} by {first.engine_version}"
