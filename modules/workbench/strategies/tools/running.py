@@ -77,12 +77,12 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         spread, slippage and financing.
 
         Waits up to 20 s for the result and answers with its main numbers; a longer run answers with its id, for
-        read_run later. Only one run you asked for may wait at a time."""
+        read_backtest later. Only one run you asked for may wait at a time."""
         pool = ctx.state.pool
         async with pool.acquire() as conn:
             waiting = await runs.waiting_for_agent(conn)
             if waiting is not None:
-                raise refusal(f"run {waiting}, which you asked for, has not finished; read it with read_run first")
+                raise refusal(f"run {waiting}, which you asked for, has not finished; read it with read_backtest first")
             try:
                 found = await store.get_revision(conn, strategy_id, revision)
             except store.NotFound:
@@ -122,11 +122,11 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         return RunResult(
             run_id=run_id, strategy_id=strategy_id, revision=found.n, status=row.status, reason=row.reason,
             costs=costs.costs.model_dump(mode="json"), costs_source=costs.source, headline=_headline(row.report),
-            next_step="read_run gives every number" if done else "still computing; read_run tells when it is done",
+            next_step="read_backtest gives every number" if done else "still computing; read_backtest tells when it is done",
         )
 
     @mcp.tool(annotations=READ_ONLY)
-    async def read_run(run_id: int) -> RunRead:
+    async def read_backtest(run_id: int) -> RunRead:
         """One run: its status, what it was made with, every metric and benchmark of its report, and where the data was
         not verified. The trades and the daily curve are on the Strategies tab."""
         async with ctx.state.pool.acquire() as conn:

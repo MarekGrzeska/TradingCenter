@@ -3,11 +3,11 @@
 ### Requirement: Powierzchnia narzędzi pakietu strategii
 
 Pakiet MUST publikować narzędzia: `strategy_language` (opis języka), `list_strategies`, `read_strategy`,
-`validate_strategy`, `draft_strategy`, `save_strategy`, `run_backtest`, `read_run` i `compare_runs`. Każde narzędzie MUST
+`validate_strategy`, `draft_strategy`, `save_strategy`, `run_backtest`, `read_backtest` i `compare_runs`. Każde narzędzie MUST
 używać tej samej logiki co odpowiadająca mu trasa REST, czyli tej samej walidacji i tych samych odmów, a odmowa MUST
 wracać do modelu jako wynik z problemami, ich ścieżkami, kolumnami i podpowiedziami. `strategy_language` MUST powstawać
 z tego samego rejestru i katalogu co `GET /language`. `read_strategy` MUST podawać dokument wskazanej albo ostatniej
-rewizji, jego streszczenie, licznik prób i to, czy instrument ma profil kosztów. `read_run` MUST podawać stan, metryki,
+rewizji, jego streszczenie, licznik prób i to, czy instrument ma profil kosztów. `read_backtest` MUST podawać stan, metryki,
 punkty odniesienia i pochodzenie wyniku, ale MUST NOT oddawać modelowi krzywej kapitału ani pełnej listy transakcji.
 
 Serializowana powierzchnia narzędzi pakietu MUST mieścić się w nazwanym suficie znaków.

@@ -139,7 +139,7 @@ writes a revision authored `agent`, and needs `based_on` — the revision the
 change was made to — or a newer one is a refusal; `run_backtest` queues a run marked `requested_by = agent`, with the
 **instrument's cost profile** and no costs of its own, refuses while another of the agent's runs waits, and waits up to
 `WAIT_SECONDS` for the result — read off the broker when there is none — or `without_costs` when the operator asks for
-that in so many words; `read_run` and `compare_runs`, which refuses runs of different range, costs or engine.
+that in so many words; `read_backtest` and `compare_runs`, which refuses runs of different range, costs or engine.
 The screen asks the same of `GET /runs/compare?run_id=…&run_id=…`, under the same rule (`compare.py`): 422 names every
 difference, 404 a run that does not exist.
 No tool sets a cost profile. The surface has a character ceiling in
