@@ -1,10 +1,8 @@
+# agent-simulated-model Specification
+
 ## Purpose
-
-Opisuje model zastępczy rozmowy: dostawcę, który zamiast wołać OpenAI odtwarza scenariusz z pliku, żeby testy na
-lokalnym stosie przechodziły przez prawdziwą turę, narzędzia i terminal bez kosztu i bez sieci.
-
-## ADDED Requirements
-
+TBD - created by archiving change agent-sim-provider. Update Purpose after archive.
+## Requirements
 ### Requirement: Symulacja jest wyborem, odmawianym poza trybem lokalnym
 
 Workbench MUST wybierać dostawcę modelu rozmowy ustawieniem `AGENT_PROVIDER`: `openai` (domyślnie) albo `sim`. Inna
@@ -57,3 +55,4 @@ wejścia i wyjścia, odróżnialny od zużycia nieznanego.
 
 - **WHEN** symulowana tura woła model dwa razy
 - **THEN** MUST powstać dwa wiersze zużycia z zerem tokenów wejścia i wyjścia
+
