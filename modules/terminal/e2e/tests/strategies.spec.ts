@@ -103,3 +103,23 @@ test("ST-06 archives a strategy out of the list and restores it", async ({ page,
 
   await expect(list.getByRole("button", { name: new RegExp(name) })).toBeVisible();
 });
+
+test("ST-07 summarises a multi-timeframe condition and a no-entry limit in words", async ({ page, request }) => {
+  const name = uniqueName("ST-07");
+  await createStrategy(request, strategyDocument(name));
+  await openStrategy(page, name);
+
+  await replaceEditorText(
+    page,
+    documentText(
+      strategyDocument(name, {
+        entries: [{ side: "long", when: "ema(20) @ HOUR_4 > ema(50) @ HOUR_4" }],
+        limits: { no_entry: "weekday == FRIDAY and hour >= 18" },
+      }),
+    ),
+  );
+
+  const summary = page.getByRole("complementary", { name: "Streszczenie" });
+  await expect(summary).toContainText("EMA(20) na h4 powyżej EMA(50) na h4");
+  await expect(summary).toContainText("od 18:00 UTC, czyli 19:00 zimą i 20:00 latem w Polsce");
+});

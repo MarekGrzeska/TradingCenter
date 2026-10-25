@@ -1,6 +1,6 @@
 """The terminal's end-to-end tests against a stack of their own: PostgreSQL on 55442 in memory, a workbench on 18030 and
-Vite on 15173 (started by Playwright), none of them the dev stack's, so both can run at once. Every paid or external
-address of that workbench leads to 127.0.0.1:9 (`modules/terminal/e2e/workbench.env`); nothing here pays for a model.
+Vite on 15173 and 15174, the terminal's and the pocket's (started by Playwright), none of them the dev stack's, so both
+can run at once. Every paid or external address of that workbench leads to 127.0.0.1:9 (`modules/terminal/e2e/workbench.env`); nothing here pays for a model.
 
     pnpm e2e                    # from modules/terminal: start, seed, test, tear down
     pnpm e2e -- --keep          # leave the stack up afterwards, for `pnpm exec playwright test --ui`
@@ -35,7 +35,7 @@ WORKBENCH = MODULES / "workbench"
 E2E = TERMINAL / "e2e"
 COMPOSE = ["docker", "compose", "-f", str(E2E / "compose.e2e.yaml")]
 WORKBENCH_PORT = 18030
-PORTS = {WORKBENCH_PORT: "the e2e workbench", 15173: "the e2e terminal", 55442: "the e2e database"}
+PORTS = {WORKBENCH_PORT: "the e2e workbench", 15173: "the e2e terminal", 15174: "the e2e pocket", 55442: "the e2e database"}
 
 # What a child process needs from the parent's environment to find its tools and nothing more. An allowlist, not a
 # denylist: an OPENAI_API_KEY exported in the developer's shell must not reach a workbench that would spend it.
