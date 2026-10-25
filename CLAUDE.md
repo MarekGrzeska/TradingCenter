@@ -58,7 +58,7 @@ module runs `uv run pytest` · `ruff check .` · `pyright`, the terminal and `po
 | `capital-gateway` | `uv run uvicorn capital_gateway.app:app --reload --port 8010` |
 | `workbench` | `uv run alembic -c alembic-<chain>.ini upgrade head` for `market`, `agent`, `teams`, `polymarket`, `social`, `telegram` (the process runs all six itself, plus `youtube` and `alerts` when configured), then `uv run uvicorn workbench.app:app --reload --port 8030` |
 | `trading-mcp` | `uv run python -m trading_mcp` (8060) · plus `uv run python scripts/contract.py check`, its snapshot of the gateway's OpenAPI |
-| `terminal` | `pnpm dev` (5173) |
+| `terminal` | `pnpm dev` (5173) · `pnpm e2e`: Playwright on a stack of its own, no model paid (`modules/terminal/e2e/README.md`) |
 | `pocket` | `pnpm dev` (5174) · `--host` is what a phone on the same Wi-Fi needs |
 
 - `uv run pytest` alone runs unit tests; anything needing a database **skips** without Docker.
@@ -71,7 +71,8 @@ The whole stack: `./scripts/dev.sh` or `./scripts/dev.ps1`, thin wrappers over `
 
 **Ports are fixed: 8010 gateway, 8030 workbench (REST, and each package's REST *and* `/mcp` under
 its prefix), 8060 trading-mcp, 5173 terminal, 5174 pocket. 8020, 8040, 8050, 8070, 8080, 8090 and
-8100 are nobody's** — a `.env` still pointing at one is a tool server that reads as down.
+8100 are nobody's** — a `.env` still pointing at one is a tool server that reads as down. 15173, 18030
+and 55442 are the e2e stack's, so it runs beside the dev stack.
 
 ## Things that will bite you
 

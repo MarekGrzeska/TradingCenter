@@ -13,6 +13,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "e2e": "uv run --project ../../scripts python ../../scripts/e2e.py",
     "contract:generate": "node scripts/contract.mjs generate",
     "contract:check": "node scripts/contract.mjs check",
     "typecheck": "tsc -b --noEmit",

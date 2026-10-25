@@ -1,18 +1,21 @@
 # End-to-end tests
 
-Playwright against a live, isolated stack: the terminal on 15173, a workbench on 18030 and PostgreSQL on 55442, none of
-which is the dev stack's. No model is paid for: every OpenAI address and key in `workbench.env` leads nowhere. Plan and
+Playwright against a live, isolated stack: the terminal on 15173, a workbench on 18030 and PostgreSQL on 55442 in memory,
+none of which is the dev stack's, so both run at once. No model is paid for: every OpenAI address and key in
+`workbench.env` leads nowhere, and `scripts/e2e.py` passes nothing from your shell but what finds the tools. Plan and
 reasoning: `docs/playwright-e2e-propozycja.html`.
 
-Phase 0 runs by hand; phase 1 folds these steps into one `pnpm e2e`.
-
 ```bash
-# from modules/terminal
-docker compose -f e2e/compose.e2e.yaml up -d --wait
-# the workbench, from e2e/ so modules/workbench/.env is never read; workbench.env becomes its environment
-#   (cwd e2e/, PYTHONPATH=../workbench, uvicorn --app-dir ../../workbench workbench.app:app --port 18030)
-PYTHONPATH=../workbench uv run --project ../workbench python e2e/seed.py
 pnpm exec playwright install chromium   # once per machine
-pnpm exec playwright test
-docker compose -f e2e/compose.e2e.yaml down
+pnpm e2e                                # start, seed, test, tear down (about a minute)
+pnpm e2e -- -g BT-07                    # anything after `--` goes to `playwright test`
+pnpm e2e -- --keep                      # leave the stack up, then `pnpm exec playwright test --ui`
 ```
+
+The workbench's output is in `e2e/workbench.log`, a failed test's trace in `test-results/`.
+
+- **One path per feature.** A rule's variants belong in pytest or vitest; a test here proves the state crosses the real
+  stack and reaches the screen.
+- **Set up through REST, check on screen** (`support.ts`). Each test makes its own strategy with a unique name.
+- **Ids match the manual scenarios**: ST-01 here covers S-01/S-03 in `docs/strategie-scenariusze-testowe.html`.
+- The seed (`seed.py`) is thirty weekdays of US100 minutes to today's UTC midnight and an operator's cost profile.
