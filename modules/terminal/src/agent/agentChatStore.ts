@@ -30,6 +30,7 @@ import {
 } from "./drawingsStore";
 import type { AgentStreamEvent } from "./stream";
 import { showToast } from "../ui/toastStore";
+import { MarketDataError } from "../data/types";
 
 export type { ChatRole };
 
@@ -372,11 +373,29 @@ export function createAgentChatStore(
         unclaimedToolCalls: unclaimed,
         transcriptStatus: "ready",
       });
-    } catch {
+    } catch (cause) {
       transcriptFor = null; // so a retry is possible — this one showed nothing
       if (seq !== transcriptSeq || id !== state.activeSessionId) return;
+      if (cause instanceof MarketDataError && cause.kind === "not-found") {
+        // Gone, or another account's: every later turn and model change would answer 404 too, so the panel starts over.
+        forgetActiveSession();
+        return;
+      }
       commit({ ...state, transcriptStatus: "unreachable" });
     }
+  }
+
+  function forgetActiveSession(): void {
+    commit({
+      ...state,
+      activeSessionId: null,
+      messages: [],
+      unclaimedToolCalls: [],
+      transcriptStatus: "ready",
+      turn: null,
+      selectedModelId: state.models[0]?.id ?? state.selectedModelId,
+    });
+    persistActiveSessionId(null);
   }
 
   /** Called once a turn has ended, to bring the transcript back to what the module holds. Only when the

@@ -179,6 +179,25 @@ describe("StrategiesView", () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 
+  it("gives the strategy a new conversation when its own answers 404", async () => {
+    const activity = createAgentActivityStore();
+    const agent = fakeAgent();
+    vi.mocked(agent.getMessages).mockImplementation(async (id: number) => {
+      if (id === 27) throw new MarketDataError("not-found", "no such session");
+      return [];
+    });
+    const api = fakeApi({ detail: vi.fn(async () => ({ item: { ...item, conversationId: 27 }, revision: revision(4) })) });
+    render(<MemoryRouter><StrategiesView api={api} pairs={pairs} activity={activity} chat={strategyChat(agent, activity)} /></MemoryRouter>);
+    await userEvent.click(await screen.findByRole("button", { name: /US100 pullback/ }));
+    await screen.findByText(/rewizja 4/);
+
+    const chat = screen.getByRole("complementary", { name: "Czat strategii" });
+    await userEvent.type(within(chat).getByRole("textbox"), "Wytłumacz{Enter}");
+
+    await waitFor(() => expect(api.setConversation).toHaveBeenCalledWith(7, 42, expect.anything()));
+    expect(screen.queryByText(/no such session/)).not.toBeInTheDocument();
+  });
+
   it("gives a strategy the agent created from the chat the conversation it was created in", async () => {
     const activity = createAgentActivityStore();
     const agent = fakeAgent();

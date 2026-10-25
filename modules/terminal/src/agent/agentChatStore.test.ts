@@ -16,6 +16,7 @@ import type {
 } from "./agentApi";
 import type { AgentStreamEvent } from "./stream";
 import { toastStore } from "../ui/toastStore";
+import { MarketDataError } from "../data/types";
 
 const MODELS: AgentModel[] = [
   { id: "luna", displayName: "Luna", costRank: 1, inputRatePer1M: "0.2", outputRatePer1M: "1.2" },
@@ -563,6 +564,21 @@ describe("createAgentChatStore", () => {
     expect(second.getSnapshot().messages).toEqual([
       { id: 1, role: "operator", text: "hello", incomplete: false, stopped: false, toolCalls: [] },
     ]);
+  });
+
+  it("starts over when the remembered conversation answers 404, instead of every turn failing on it", async () => {
+    const api = createFakeApi();
+    api.getMessages = async () => {
+      throw new MarketDataError("not-found", "no such session");
+    };
+    const store = createAgentChatStore(memoryStorage({ "terminal.agentChat.session.v1": "27" }), api);
+    store.setExpanded(true);
+    await waitFor(() => expect(store.getSnapshot().activeSessionId).toBeNull());
+    expect(store.getSnapshot().transcriptStatus).toBe("ready");
+
+    store.send("hello");
+    await waitFor(() => expect(api.sessions).toHaveLength(1));
+    expect(store.getSnapshot().activeSessionId).toBe(api.sessions[0].id);
   });
 
   it("renames a conversation only once the module has agreed", async () => {
