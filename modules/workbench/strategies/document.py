@@ -30,6 +30,7 @@ from .vocabulary import (
     DERIVED_FROM_MINUTE,
     FUNCTIONS,
     SERIES,
+    SESSION_FUNCTIONS,
     TIME,
     Indicator,
     Place,
@@ -74,7 +75,8 @@ class TrailIn(_Strict):
 
 
 class ExitsIn(_Strict):
-    stop: _Formula
+    # Optional: without one there is no 1 R, and the document closes by `when` or `max_bars` (`_without_a_stop`).
+    stop: _Formula | None = None
     target: _Formula | None = None
     trail: TrailIn | None = None
     when: _Formula | None = None
@@ -82,7 +84,8 @@ class ExitsIn(_Strict):
 
 
 class SizingIn(_Strict):
-    mode: Literal["risk_fraction", "fixed_units"]
+    # `margin_fraction`: the deposit the position needs, as a fraction of equity; `notional_fraction`: its value.
+    mode: Literal["risk_fraction", "fixed_units", "margin_fraction", "notional_fraction"]
     value: float = Field(gt=0)
 
 
@@ -190,6 +193,9 @@ def validate(
             problems.extend(check(parsed[path], scope, path, expected))
 
     problems.extend(_orders(document))
+    problems.extend(_sizing(document))
+    problems.extend(_without_a_stop(document, parsed))
+    problems.extend(_session_axes(document, parsed))
     problems.extend(_archive(document, parsed, available))
     if problems:
         return None, problems
@@ -200,8 +206,6 @@ def _from_pydantic(error: Mapping[str, Any]) -> Problem:
     path = ".".join(str(part) if not isinstance(part, int) else f"[{part}]" for part in error["loc"]).replace(".[", "[")
     if error["type"] == "extra_forbidden":
         return Problem(path, f"`{error['loc'][-1]}` is not a field of a strategy document here")
-    if error["type"] == "missing" and path == "exits.stop":
-        return Problem(path, "a strategy needs a stop: it is what 1 R measures")
     return Problem(path or "document", error["msg"])
 
 
@@ -232,7 +236,8 @@ def _typed_fields(d: DocumentIn) -> Iterator[tuple[str, Place, Type, str]]:
         yield f"entries[{i}].when", Place.ENTRY, Type.CONDITION, entry.when
         if entry.order.price is not None:
             yield f"entries[{i}].order.price", Place.ENTRY, Type.NUMBER, entry.order.price
-    yield "exits.stop", Place.EXIT, Type.NUMBER, d.exits.stop
+    if d.exits.stop is not None:
+        yield "exits.stop", Place.EXIT, Type.NUMBER, d.exits.stop
     if d.exits.target is not None:
         yield "exits.target", Place.EXIT, Type.NUMBER, d.exits.target
     if d.exits.trail is not None:
@@ -254,6 +259,67 @@ def _orders(d: DocumentIn) -> list[Problem]:
     return problems
 
 
+def _sizing(d: DocumentIn) -> list[Problem]:
+    if d.sizing.mode == "margin_fraction" and d.sizing.value > 1:
+        return [Problem("sizing.value", f"a deposit is at most the whole equity; {d.sizing.value:g} is more")]
+    return []
+
+
+# Names measured in R, which a document without a stop has no unit for.
+_IN_R = ("open_r", "last_trade_r")
+
+
+def _without_a_stop(d: DocumentIn, parsed: Mapping[str, f.Node]) -> list[Problem]:
+    """What a document without a stop must have, and everything it cannot use: each measures in R, which the stop is."""
+    if d.exits.stop is not None:
+        return []
+    no_r = "and without a stop there is no 1 R"
+    problems = []
+    if d.exits.when is None and d.exits.max_bars is None:
+        problems.append(Problem("exits", "a position without a stop needs an exit: `when` or `max_bars`"))
+    if d.sizing.mode == "risk_fraction":
+        problems.append(Problem(
+            "sizing.mode", f"`risk_fraction` sizes by the distance to the stop, {no_r}",
+            hint="margin_fraction, notional_fraction or fixed_units",
+        ))
+    if d.exits.trail is not None:
+        problems.append(Problem("exits.trail", f"a trailing stop starts at a result in R and moves the stop, {no_r}"))
+    if d.limits.daily_stop_r is not None:
+        problems.append(Problem("limits.daily_stop_r", f"the daily stop is a result in R, {no_r}"))
+
+    def walk(n: f.Node, path: str) -> None:
+        if isinstance(n, f.Name) and n.id in _IN_R:
+            problems.append(Problem(path, f"`{n.id}` is a result in R, {no_r}", column=n.column))
+        for child in children(n):
+            walk(child, path)
+
+    for path, node in parsed.items():
+        walk(node, path)
+    return problems
+
+
+def _session_axes(d: DocumentIn, parsed: Mapping[str, f.Node]) -> list[Problem]:
+    """A session function read where one bar holds a whole session, so no bar is inside it or numbered in it."""
+    problems = []
+
+    def walk(n: f.Node, ctx: tuple[str, str], path: str) -> None:
+        if isinstance(n, f.Call) and n.function in SESSION_FUNCTIONS and ctx[1] in ("DAY", "WEEK"):
+            problems.append(Problem(
+                path, f"`{n.function}` reads the clock inside a session, and one {ctx[1]} bar holds a whole session",
+                column=n.column, hint="read it on an intraday axis, such as the strategy's own timeframe or @ HOUR",
+            ))
+        if isinstance(n, f.At):
+            value, inner = through_at(n, ctx)
+            walk(value, inner, path)
+            return
+        for child in children(n):
+            walk(child, ctx, path)
+
+    for path, node in parsed.items():
+        walk(node, (d.symbol, d.timeframe), path)
+    return problems
+
+
 def contexts(d: DocumentIn, parsed: Mapping[str, f.Node]) -> set[tuple[str, str]]:
     """Every (instrument, resolution) a document reads, the traded one at its timeframe and at `MINUTE` included."""
     found = {(d.symbol, d.timeframe), (d.symbol, "MINUTE")}
@@ -261,7 +327,9 @@ def contexts(d: DocumentIn, parsed: Mapping[str, f.Node]) -> set[tuple[str, str]
     def walk(n: f.Node, ctx: tuple[str, str]) -> None:
         # Recorded where bars are read: each series name, each indicator, and the axis every chain of `@` is read on —
         # so `x @ US500 @ DAY` reads US500 at DAY, and never US100 at DAY.
-        reads_bars = isinstance(n, f.Name) and (n.id in SERIES or n.id in TIME)
+        reads_bars = isinstance(n, f.Name) and (n.id in SERIES or n.id in TIME) or (
+            isinstance(n, f.Call) and n.function in SESSION_FUNCTIONS
+        )
         if reads_bars or isinstance(n, f.Call) and n.function not in FUNCTIONS:
             found.add(ctx)
         if isinstance(n, f.At):

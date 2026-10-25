@@ -33,6 +33,7 @@ class Job:
     range_to: int
     seed: int
     repetitions: int
+    margin_factor: float | None = None
 
 
 def compute(job: Job) -> tuple[dict[str, Any], Callable[[], dict[str, Any] | None]]:
@@ -43,7 +44,7 @@ def compute(job: Job) -> tuple[dict[str, Any], Callable[[], dict[str, Any] | Non
     args = {
         "checked": job.checked, "params": job.params, "catalogue": job.catalogue, "series": job.series,
         "indicators": job.indicators, "costs": job.costs, "capital": job.capital,
-        "range_from": job.range_from, "range_to": job.range_to,
+        "range_from": job.range_from, "range_to": job.range_to, "margin_factor": job.margin_factor,
     }
     result = simulate(**args, evaluator=evaluator)
     report = reports.build(

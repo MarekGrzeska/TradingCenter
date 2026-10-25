@@ -95,7 +95,7 @@ async def test_the_agent_saves_a_revision_as_itself_with_its_changes_and_is_refu
 @pytest.mark.db
 async def test_a_document_with_problems_is_refused_with_every_one_and_saves_nothing(pool) -> None:
     with pytest.raises(ToolError) as refused:
-        await _call(_app(pool), "save_strategy", document=strategy(exits={}, universe=["US500"]))
+        await _call(_app(pool), "save_strategy", document=strategy(exits={"max_bars": 0}, universe=["US500"]))
     async with pool.acquire() as conn:
         count = await conn.fetchval("SELECT count(*) FROM strategies")
 
@@ -189,6 +189,11 @@ def test_runs_with_different_costs_are_not_compared_and_the_difference_is_named(
 
     with pytest.raises(NotComparable, match="run 2 differs from run 1 in costs: spread"):
         compare([_row(1), other])
+
+
+def test_runs_sized_by_different_deposits_are_not_compared() -> None:
+    with pytest.raises(NotComparable, match="sized by a deposit of 0.1, run 1 by 0.05"):
+        compare([_row(1, request={"margin_factor": 0.05}), _row(2, request={"margin_factor": 0.1})])
 
 
 def test_comparable_runs_stand_side_by_side_without_a_verdict() -> None:

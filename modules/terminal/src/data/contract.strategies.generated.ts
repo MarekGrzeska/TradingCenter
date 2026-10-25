@@ -147,6 +147,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/margins/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Margin
+         * @description The deposit a strategy sized by `margin_fraction` is computed with — read off the broker by its first run.
+         */
+        get: operations["get_margin_margins__symbol__get"];
+        /**
+         * Put Margin
+         * @description Replaces the deposit with the operator's. Runs already recorded keep the one they were made with.
+         */
+        put: operations["put_margin_margins__symbol__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/ping": {
         parameters: {
             query?: never;
@@ -513,6 +537,8 @@ export interface components {
         ComparedRunOut: {
             /** Calmar */
             calmar: number | null;
+            /** Expectancy Pct */
+            expectancy_pct: number | null;
             /** Expectancy R */
             expectancy_r: number | null;
             /** Longest Losing Streak */
@@ -529,6 +555,8 @@ export interface components {
             pessimistic_resolutions: number | null;
             /** Profit Factor */
             profit_factor: number | null;
+            /** Return Pct */
+            return_pct: number | null;
             /** Revision */
             revision: number;
             /** Run Id */
@@ -547,6 +575,8 @@ export interface components {
             trades: number | null;
             /** Win Rate */
             win_rate: number | null;
+            /** Worst Mae Pct */
+            worst_mae_pct: number | null;
         };
         /** ComparisonOut */
         ComparisonOut: {
@@ -681,9 +711,17 @@ export interface components {
             expectancy_r: number | null;
             /** Max Drawdown R */
             max_drawdown_r: number | null;
+            /**
+             * Return Pct
+             * @description null for a run recorded before engine version 3
+             */
+            return_pct: number | null;
             /** Sharpe */
             sharpe: number | null;
-            /** Total R */
+            /**
+             * Total R
+             * @description null without a stop, which has no 1 R
+             */
             total_r: number | null;
             /** Trades */
             trades: number | null;
@@ -757,10 +795,52 @@ export interface components {
             series: {
                 [key: string]: string;
             };
+            /**
+             * Sessions
+             * @description the names a session function takes, with their zone and hours
+             */
+            sessions: {
+                [key: string]: string;
+            };
             /** Time */
             time: {
                 [key: string]: string;
             };
+        };
+        /** MarginIn */
+        MarginIn: {
+            /**
+             * Margin Factor
+             * @description the deposit as a fraction of the position's value: 0.05 is 5%
+             */
+            margin_factor: number;
+        };
+        /** MarginOut */
+        MarginOut: {
+            /**
+             * Broker
+             * @description the broker's own number and unit; null for the operator's value
+             */
+            broker: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Margin Factor
+             * @description the deposit as a fraction of the position's value
+             */
+            margin_factor: number;
+            /**
+             * Source
+             * @enum {string}
+             */
+            source: "operator" | "broker";
+            /** Symbol */
+            symbol: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** ProblemOut */
         ProblemOut: {
@@ -805,10 +885,16 @@ export interface components {
              * @constant
              */
             entry: "market";
+            /** Median Return Pct */
+            median_return_pct: number | null;
             /** Median Total R */
             median_total_r: number | null;
+            /** P5 Return Pct */
+            p5_return_pct: number | null;
             /** P5 Total R */
             p5_total_r: number | null;
+            /** P95 Return Pct */
+            p95_return_pct: number | null;
             /** P95 Total R */
             p95_total_r: number | null;
             /** Repetitions */
@@ -860,7 +946,15 @@ export interface components {
                 number,
                 number | null
             ][] | null;
-            /** Expectancy R */
+            /**
+             * Expectancy Pct
+             * @description mean result in % of the equity at entry
+             */
+            expectancy_pct: number | null;
+            /**
+             * Expectancy R
+             * @description null without a stop, as every metric in R
+             */
             expectancy_r: number | null;
             /** Exposure */
             exposure: number | null;
@@ -868,6 +962,11 @@ export interface components {
             final_equity: number | null;
             /** Longest Losing Streak */
             longest_losing_streak: number | null;
+            /**
+             * Margin Factor
+             * @description the instrument's deposit as a fraction of a position's value, when the size was computed from it
+             */
+            margin_factor: number | null;
             /** Max Drawdown Pct */
             max_drawdown_pct: number | null;
             /** Max Drawdown R */
@@ -886,6 +985,8 @@ export interface components {
             sharpe: number | null;
             /** Sortino */
             sortino: number | null;
+            /** Total Pct Without Best 5 */
+            total_pct_without_best_5: number | null;
             /** Total R */
             total_r: number | null;
             /** Total R Without Best 5 */
@@ -899,6 +1000,11 @@ export interface components {
              * @description the result leaves out spread, slippage and financing — a choice, not a model of zeros
              */
             without_costs: boolean;
+            /**
+             * Worst Mae Pct
+             * @description the deepest open loss of any trade, in % of its equity at entry
+             */
+            worst_mae_pct: number | null;
         };
         /** RevisionEntryOut */
         RevisionEntryOut: {
@@ -1241,20 +1347,36 @@ export interface components {
              * Exit Reason
              * @enum {string}
              */
-            exit_reason: "stop" | "target" | "trail" | "when" | "max_bars" | "end_of_range";
+            exit_reason: "stop" | "target" | "trail" | "when" | "max_bars" | "out_of_capital" | "end_of_range";
             /**
              * Exit Time
              * Format: date-time
              */
             exit_time: string;
-            /** Initial Stop */
-            initial_stop: number;
+            /**
+             * Initial Stop
+             * @description null without a stop
+             */
+            initial_stop: number | null;
+            /**
+             * Mae Pct
+             * @description the deepest open loss, of the equity at entry; null before engine version 3
+             */
+            mae_pct: number | null;
             /** Pessimistic */
             pessimistic: boolean;
             /** Result Money */
             result_money: number;
-            /** Result R */
-            result_r: number;
+            /**
+             * Result Pct
+             * @description of the equity at entry; null for a run before engine version 3
+             */
+            result_pct: number | null;
+            /**
+             * Result R
+             * @description null without a stop
+             */
+            result_r: number | null;
             /** Seq */
             seq: number;
             /**
@@ -1298,8 +1420,16 @@ export interface components {
         };
         /** YearOut */
         YearOut: {
-            /** Total R */
-            total_r: number;
+            /**
+             * Total Pct
+             * @description the trades' results in % of equity at entry, summed
+             */
+            total_pct: number | null;
+            /**
+             * Total R
+             * @description null without a stop
+             */
+            total_r: number | null;
             /** Trades */
             trades: number;
         };
@@ -1551,6 +1681,81 @@ export interface operations {
             };
         };
     };
+    get_margin_margins__symbol__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description the instrument, as the archive names it */
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarginOut"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_margin_margins__symbol__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description the instrument, as the archive names it */
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MarginIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MarginOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     ping_ping_get: {
         parameters: {
             query?: never;
@@ -1645,7 +1850,7 @@ export interface operations {
                     "application/json": components["schemas"]["ProblemsOut"];
                 };
             };
-            /** @description the run needs the broker's costs and the archive could not ask for them */
+            /** @description the run needs the broker's costs or deposit and the archive could not ask for them */
             503: {
                 headers: {
                     [name: string]: unknown;

@@ -33,6 +33,7 @@ export function offersInFormula(language: Language, document: unknown): Offer[] 
       ([name, description]) => ({ label: name, detail: description, kind: "variable" as const }),
     ),
     ...Object.keys(language.constants).map((name) => ({ label: name, detail: "constant", kind: "constant" as const })),
+    ...Object.entries(language.sessions).map(([name, hours]) => ({ label: name, detail: hours, kind: "constant" as const })),
   ];
   const doc = (document ?? {}) as { let?: Record<string, unknown>; params?: Record<string, unknown> };
   for (const name of Object.keys(doc.let ?? {})) offers.push({ label: name, detail: "let", kind: "variable" });

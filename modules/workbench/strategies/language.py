@@ -37,6 +37,11 @@ async def describe(archive: Archive) -> LanguageOut:
         "position": v.POSITION,
         "history": v.HISTORY,
         "resolutions": list(v.RESOLUTIONS),
+        "sessions": {
+            name: f"{s.zone} {s.opens // 60:02d}:{s.opens % 60:02d}–{s.closes // 60:02d}:{s.closes % 60:02d} local time, "
+            "Monday to Friday; no exchange holidays"
+            for name, s in v.SESSIONS.items()
+        },
         "functions": [
             {
                 "name": fn.name, "signature": fn.signature(), "description": fn.description,

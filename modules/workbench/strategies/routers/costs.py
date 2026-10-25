@@ -5,9 +5,9 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Path
 
-from .. import broker_costs, costs_store
+from .. import broker_costs, costs_store, margins
 from ..archive import ArchiveUnavailable
-from ..contract import CostProfileOut
+from ..contract import CostProfileOut, MarginIn, MarginOut
 from ..costs import CostModel
 from .deps import archive, not_found, pool
 
@@ -60,3 +60,20 @@ async def profile_from_broker(symbol: str = SYMBOL, db=Depends(pool), reading=De
         raise HTTPException(status_code=503, detail=f"the broker's costs cannot be read now: {err}") from err
     async with db.acquire() as conn:
         return _out(await costs_store.put_from_broker(conn, symbol, read))
+
+
+@router.get("/margins/{symbol}", response_model=MarginOut, responses={404: {}})
+async def get_margin(symbol: str = SYMBOL, db=Depends(pool)) -> MarginOut:
+    """The deposit a strategy sized by `margin_fraction` is computed with — read off the broker by its first run."""
+    async with db.acquire() as conn:
+        found = await margins.get(conn, symbol)
+    if found is None:
+        raise not_found(f"a deposit for {symbol}")
+    return MarginOut.model_validate(found.__dict__)
+
+
+@router.put("/margins/{symbol}", response_model=MarginOut)
+async def put_margin(body: MarginIn, symbol: str = SYMBOL, db=Depends(pool)) -> MarginOut:
+    """Replaces the deposit with the operator's. Runs already recorded keep the one they were made with."""
+    async with db.acquire() as conn:
+        return MarginOut.model_validate((await margins.put(conn, symbol, body.margin_factor)).__dict__)

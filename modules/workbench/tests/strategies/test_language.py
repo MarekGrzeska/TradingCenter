@@ -32,6 +32,7 @@ def problems(text: str, place: Place = Place.ENTRY, expected: Type = Type.CONDIT
         "bbands(20, 2).upper < high and (close - open if close > open else 0) > 0.5 * atr(14)",
         "bars_since(crosses_below(close, ema(20))) > 5 and highest(high, p.fast)[1] < close",
         "losses_in_row < 2 and trades_today == 0",
+        "session_bar(NEW_YORK) == 1 and minutes_to_session_close(LONDON) > 30",
     ],
 )
 def test_a_formula_built_from_the_language_is_accepted(text: str) -> None:
@@ -106,6 +107,19 @@ def test_a_new_catalogue_entry_is_a_function_without_a_change_here() -> None:
     widened = scope().__class__(Place.ENTRY, {}, {}, grown)
 
     assert check(node, widened, "entries[0].when", Type.CONDITION) == []  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize(
+    ("text", "refusal"),
+    [
+        ("close > NEW_YORK", "a session; it stands only as the argument"),
+        ("highest(close, NEW_YORK) > 1", "a window is a whole number"),
+        ("session_bar(close) == 1", "is a session: NEW_YORK, LONDON, TOKYO"),
+        ("session_bar(PARIS) == 1", "is a session: NEW_YORK, LONDON, TOKYO"),
+    ],
+)
+def test_a_session_stands_only_as_the_argument_of_a_session_function(text: str, refusal: str) -> None:
+    assert refusal in problems(text)[0]
 
 
 def test_the_open_position_in_an_entry_condition_is_refused() -> None:

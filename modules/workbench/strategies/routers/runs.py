@@ -30,7 +30,7 @@ router = APIRouter(tags=["runs"])
     "/runs", response_model=RunAcceptedOut, status_code=202,
     responses={
         404: {"description": "no such strategy or revision"}, 422: {"model": ProblemsOut},
-        503: {"description": "the run needs the broker's costs and the archive could not ask for them"},
+        503: {"description": "the run needs the broker's costs or deposit and the archive could not ask for them"},
     },
 )
 async def enqueue(
@@ -53,8 +53,14 @@ async def enqueue(
             return refused("the broker's costs are incomplete; nothing was queued", [Problem("costs", str(err))])
         except ArchiveUnavailable as err:
             raise HTTPException(status_code=503, detail=f"the broker's costs cannot be read now: {err}") from err
+        try:
+            margin = await runs.resolved_margin(conn, reading, revision.document)
+        except BrokerCostsMissing as err:
+            return refused("the broker's deposit is not readable; nothing was queued", [Problem("sizing", str(err))])
+        except ArchiveUnavailable as err:
+            raise HTTPException(status_code=503, detail=f"the broker's deposit cannot be read now: {err}") from err
         params = runs.resolved_params(body, declared)
-        run_id = await runs.enqueue(conn, body, revision.n, params, costs)
+        run_id = await runs.enqueue(conn, body, revision.n, params, costs, margin_factor=margin)
     run_queue.wake()
     return RunAcceptedOut(id=run_id, strategy_id=body.strategy_id, revision=revision.n, status="queued")
 

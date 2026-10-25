@@ -21,6 +21,7 @@ from .vocabulary import (
     RESERVED,
     RESOLUTIONS,
     SERIES,
+    SESSIONS,
     TIME,
     Arg,
     Indicator,
@@ -249,6 +250,12 @@ def _name(n: f.Name, w: _Walk, ctx: _Context) -> Type | None:
     if name in RESOLUTIONS:
         w.refuse(n, f"`{name}` is a resolution; it stands only on the right of `@`", hint=f"close @ {name}")
         return None
+    if name in SESSIONS:
+        w.refuse(
+            n, f"`{name}` is a session; it stands only as the argument of a session function",
+            hint=f"session_bar({name})",
+        )
+        return None
     if name in w.scope.untyped_lets:
         return None
     if name in w.scope.lets:
@@ -259,7 +266,7 @@ def _name(n: f.Name, w: _Walk, ctx: _Context) -> Type | None:
     if name in FUNCTIONS or name in w.scope.catalogue:
         w.refuse(n, f"`{name}` is a function and needs its arguments", hint=f"{name}(…)")
         return None
-    known = [*SERIES, *TIME, *CONSTANTS, *POSITION, *HISTORY, *w.scope.lets]
+    known = [*SERIES, *TIME, *CONSTANTS, *SESSIONS, *POSITION, *HISTORY, *w.scope.lets]
     w.refuse(n, f"`{name}` is not a name the language knows", hint=_closest(name, known))
     return None
 
@@ -305,6 +312,12 @@ def _function(n: f.Call, w: _Walk, ctx: _Context) -> Type | None:
         kind = spec.args[min(index, len(spec.args) - 1)]
         if kind is Arg.WINDOW:
             _window(arg, w)
+        elif kind is Arg.SESSION:
+            if not (isinstance(arg, f.Name) and arg.id in SESSIONS):
+                w.refuse(
+                    arg, f"argument {index + 1} of {spec.signature()} is a session: {', '.join(SESSIONS)}",
+                    hint=f"{n.function}(NEW_YORK)",
+                )
         else:
             _expect(arg, Type(kind.value), w, args_ctx, f"argument {index + 1} of {spec.signature()}")
     return spec.returns

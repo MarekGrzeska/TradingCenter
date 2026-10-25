@@ -92,6 +92,8 @@ export interface Headline {
   expectancyR: number | null;
   maxDrawdownR: number | null;
   sharpe: number | null;
+  /** The one result a run without a stop has; null before engine version 3. */
+  returnPct: number | null;
   costsSource: CostsSource;
   withoutCosts: boolean;
 }
@@ -124,9 +126,13 @@ export interface Trade {
   exitTime: Date;
   exitPrice: number;
   units: number;
-  initialStop: number;
-  resultR: number;
+  /** Null without a stop, and so is the result in R. */
+  initialStop: number | null;
+  resultR: number | null;
   resultMoney: number;
+  /** Of the equity at entry; null for a run before engine version 3. */
+  resultPct: number | null;
+  maePct: number | null;
   costs: Record<string, number>;
   exitReason: Schemas["TradeOut"]["exit_reason"];
   pessimistic: boolean;
@@ -256,6 +262,7 @@ function mapHeadline(raw: Schemas["HeadlineOut"] | null | undefined): Headline |
     expectancyR: raw.expectancy_r,
     maxDrawdownR: raw.max_drawdown_r,
     sharpe: raw.sharpe,
+    returnPct: raw.return_pct ?? null,
     costsSource: raw.costs_source,
     withoutCosts: raw.without_costs,
   };
@@ -296,6 +303,7 @@ function mapRun(raw: Schemas["RunOut"]): Run {
           total_r: report.total_r,
           expectancy_r: report.expectancy_r,
           max_drawdown_r: report.max_drawdown_r,
+          return_pct: report.return_pct,
           sharpe: report.sharpe,
           costs_source: report.costs_source,
           without_costs: report.without_costs,
@@ -320,6 +328,8 @@ function mapTrade(raw: Schemas["TradeOut"]): Trade {
     initialStop: raw.initial_stop,
     resultR: raw.result_r,
     resultMoney: raw.result_money,
+    resultPct: raw.result_pct,
+    maePct: raw.mae_pct,
     costs: raw.costs as Record<string, number>,
     exitReason: raw.exit_reason,
     pessimistic: raw.pessimistic,

@@ -17,11 +17,42 @@ def test_a_complete_document_passes() -> None:
     assert problems(document()) == []
 
 
-def test_a_document_without_a_stop_is_refused_because_of_r() -> None:
-    exits = document()["exits"]
-    del exits["stop"]
+def test_a_document_without_a_stop_and_without_an_exit_is_refused() -> None:
+    found = problems(document(exits={"target": "entry_price + 50"}, sizing={"mode": "fixed_units", "value": 1}, limits={}))
 
-    assert problems(document(exits=exits)) == [("exits.stop", "a strategy needs a stop: it is what 1 R measures")]
+    assert found == [("exits", "a position without a stop needs an exit: `when` or `max_bars`")]
+
+
+# The operator's strategy of 25 October 2026: the first M5 bar of New York against EMA12, held to five minutes before
+# the close, no stop and no target, 5% of the account as the deposit.
+SESSION_STRATEGY = {
+    "schema": 1, "name": "US100 — pierwsza M5 sesji NY wobec EMA12", "symbol": "US100", "timeframe": "MINUTE_5",
+    "entries": [
+        {"side": "long", "when": "session_bar(NEW_YORK) == 1 and close > ema(12)"},
+        {"side": "short", "when": "session_bar(NEW_YORK) == 1 and close < ema(12)"},
+    ],
+    "exits": {"when": "minutes_to_session_close(NEW_YORK) <= 5"},
+    "sizing": {"mode": "margin_fraction", "value": 0.05},
+}
+
+
+def test_a_session_strategy_without_a_stop_is_accepted() -> None:
+    assert problems(SESSION_STRATEGY) == []
+
+
+def test_without_a_stop_nothing_measured_in_r_is_accepted() -> None:
+    found = problems(SESSION_STRATEGY | {
+        "sizing": {"mode": "risk_fraction", "value": 0.01}, "exits": {"when": "open_r > 2"},
+    })
+
+    assert [path for path, _ in found] == ["sizing.mode", "exits.when"]
+    assert all("no 1 R" in message for _, message in found)
+
+
+def test_a_deposit_larger_than_the_equity_is_refused() -> None:
+    assert [path for path, _ in problems(SESSION_STRATEGY | {"sizing": {"mode": "margin_fraction", "value": 1.5}})] == [
+        "sizing.value"
+    ]
 
 
 def test_an_unknown_field_is_refused_not_dropped() -> None:
@@ -117,3 +148,12 @@ def test_a_time_name_read_under_at_needs_that_instrument_in_the_archive() -> Non
     entries[0]["when"] = "hour @ OIL >= 9"
 
     assert any("OIL at HOUR" in message for _, message in problems(document(entries=entries)))
+
+
+def test_a_session_function_on_a_daily_axis_is_refused() -> None:
+    entries = document()["entries"]
+    entries[0]["when"] = "session_bar(NEW_YORK) @ DAY == 1"
+
+    found = problems(document(entries=entries))
+
+    assert any(path == "entries[0].when" and "holds a whole session" in message for path, message in found)

@@ -38,8 +38,25 @@ conversation), and the research behind them in
 }
 ```
 
-One instrument per strategy. A stop is required: it is what 1 R measures. An unknown field is refused, not dropped. Every
-save of changed content is the next immutable revision; the same content again is not.
+One instrument per strategy. A stop is what 1 R measures, and it is optional: a document without one closes by `when` or
+`max_bars`, may not use anything measured in R (`risk_fraction`, `trail`, `daily_stop_r`, `open_r`, `last_trade_r`),
+and reports in % of equity instead. An unknown field is refused, not dropped. Every save of changed content is the next
+immutable revision; the same content again is not.
+
+A trade held through New York's session, without a stop — the operator's strategy of 25 October 2026:
+
+```json
+{
+  "schema": 1, "name": "US100 — pierwsza M5 sesji NY wobec EMA12", "symbol": "US100", "timeframe": "MINUTE_5",
+  "entries": [{"side": "long", "when": "session_bar(NEW_YORK) == 1 and close > ema(12)"},
+              {"side": "short", "when": "session_bar(NEW_YORK) == 1 and close < ema(12)"}],
+  "exits": {"when": "minutes_to_session_close(NEW_YORK) <= 5"},
+  "sizing": {"mode": "margin_fraction", "value": 0.05}
+}
+```
+
+Sizing: `risk_fraction` of equity per 1 R, `fixed_units`, `margin_fraction` — the deposit as a fraction of equity, with the
+instrument's margin read off the broker (`margins.py`) — and `notional_fraction`, the position's value.
 
 ## The language
 
@@ -51,6 +68,9 @@ comparison. A test refuses any `eval`/`exec`/`compile` in the package.
 
 - **Every name is in one registry** (`vocabulary.py`): the validator checks against it and `GET /language` is printed from
   it, so the two cannot disagree. Catalogue entries with a line output join it at each check.
+- **Sessions follow their city.** `NEW_YORK`, `LONDON` and `TOKYO` (`vocabulary.py`, the chart's session ranges, held
+  equal by `tests/test_session_hours_agree.py`) are read through `session_bar` and `minutes_to_session_close`, by the
+  clock in the session's zone (`sessions.py`) — no exchange holidays or early closes yet. `hour` and the rest stay UTC.
 - **No future.** An offset is a non-negative constant or parameter; `x @ HOUR_4` and `x @ US500` read the last bar of
   that series *available* at the decision — never the one still forming. A chain of `@` is one context
   (`x @ US500 @ DAY` reads US500 at DAY, never the traded instrument at DAY).
@@ -65,6 +85,9 @@ whose instrument has none. The archive holds the bid, so the ask is bid + the ru
 
 Formulas without trade state are computed on numpy for the whole axis at once; formulas with it are interpreted bar by
 bar, reading the first phase's columns (design D4). A test demands both agree with a series cut at each bar.
+
+When the equity marked with the open position reaches zero, the position is closed there as a stop would be
+(`out_of_capital`) and nothing opens again — a floor no account goes below, not the broker's earlier close-out.
 
 A minute whose range covers two events in an unknown order (stop and target, or a stop entry and its stop) is settled
 against the strategy and marked. Every run has a cost model: hourly spread profile, slippage on orders that take
@@ -99,9 +122,9 @@ The profile is kept until the operator changes it (`PUT /costs/{symbol}`, `sourc
 
 ## The report
 
-R first, money as nominal units × points (no contract size, no currency conversion — design D6). Win rate, expectancy,
+R first where there is a stop, % of the equity at entry on every trade, money as nominal units × points (no contract size, no currency conversion — design D6). Win rate, expectancy,
 total R, profit factor, drawdown in R and %, Sharpe and Sortino from daily returns ×√365, Calmar, longest losing streak,
-bars held, exposure, the total without the best five, a split by year, costs by component, and two benchmarks: buy and
+bars held, exposure, the total without the best five, the deepest open loss (MAE), a split by year, costs by component, and two benchmarks: buy and
 hold, and random entry repeated from the run's seed. Every report records what it was made from — revision and hash,
 parameters, costs, range, engine version, seed, and a fingerprint of every series read.
 

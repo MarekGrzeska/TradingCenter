@@ -34,11 +34,13 @@ function Metrics({ report }: { report: Report }) {
       <Metric label="Transakcje" value={num(report.trades)} />
       <Metric label="Zyskowne" value={pct(report.win_rate)} />
       <Metric label="Oczekiwana" value={r(report.expectancy_r)} />
+      <Metric label="Oczekiwana %" value={pct(report.expectancy_pct)} />
       <Metric label="Suma" value={r(report.total_r)} />
       <Metric label="Bez 5 najlepszych" value={r(report.total_r_without_best_5)} />
       <Metric label="Profit factor" value={num(report.profit_factor)} />
       <Metric label="Obsunięcie R" value={r(report.max_drawdown_r)} />
       <Metric label="Obsunięcie %" value={pct(report.max_drawdown_pct)} />
+      <Metric label="Najgłębsza strata otwarta" value={pct(report.worst_mae_pct)} />
       <Metric label="Sharpe" value={num(report.sharpe)} />
       <Metric label="Sortino" value={num(report.sortino)} />
       <Metric label="Calmar" value={num(report.calmar)} />
@@ -55,7 +57,7 @@ function Metrics({ report }: { report: Report }) {
       {random && "median_total_r" in random ? (
         <Metric
           label={`Losowe wejście ×${random.repetitions}`}
-          value={`${r(random.median_total_r)} (${r(random.p5_total_r)} … ${r(random.p95_total_r)})`}
+          value={`${r(random.median_total_r)} (${r(random.p5_total_r)} … ${r(random.p95_total_r)}) · ${pct(random.median_return_pct)} (${pct(random.p5_return_pct)} … ${pct(random.p95_return_pct)})`}
         />
       ) : (
         <Metric label="Losowe wejście" value={random && "skipped" in random ? random.skipped : "—"} />
@@ -63,6 +65,10 @@ function Metrics({ report }: { report: Report }) {
     </dl>
   );
 }
+
+/** Gained or not by money, which a trade without a stop has as well as one with. */
+const gained = (t: Trade) => t.resultMoney >= 0;
+const result = (t: Trade) => (t.resultR !== null ? r(t.resultR) : pct(t.resultPct));
 
 function marksOf(trades: readonly Trade[], barSeconds: number, up: string, down: string): ChartMark[] {
   const marks = trades.flatMap((t): ChartMark[] => [
@@ -77,8 +83,8 @@ function marksOf(trades: readonly Trade[], barSeconds: number, up: string, down:
       time: barStart(t.exitTime.getTime() / 1000, barSeconds),
       position: t.side === "long" ? "aboveBar" : "belowBar",
       shape: "circle",
-      color: t.resultR >= 0 ? up : down,
-      text: `${num(t.resultR)}R`,
+      color: gained(t) ? up : down,
+      text: result(t),
     },
   ]);
   // The library draws marks in time order and drops a list that is not.
@@ -114,8 +120,8 @@ export function ReportPanel({ api, runId, symbol, timeframe }: { api: Strategies
         ? []
         : [
             { price: picked.entryPrice, color: colors.ink, title: `wejście #${picked.seq}` },
-            { price: picked.exitPrice, color: picked.resultR >= 0 ? colors.up : colors.down, title: "wyjście" },
-            { price: picked.initialStop, color: colors.down, title: "stop" },
+            { price: picked.exitPrice, color: gained(picked) ? colors.up : colors.down, title: "wyjście" },
+            ...(picked.initialStop === null ? [] : [{ price: picked.initialStop, color: colors.down, title: "stop" }]),
           ],
     [picked, colors],
   );
@@ -146,7 +152,8 @@ export function ReportPanel({ api, runId, symbol, timeframe }: { api: Strategies
         {found.engineVersion ?? "—"} · ziarno {String((found.request as { seed?: number }).seed ?? "—")} · {at(found.from)} –{" "}
         {at(found.to)} · koszty {COSTS_SOURCE_LABEL[report.costs_source]}
         {report.costs_fetched_at ? `, pobrane ${at(new Date(report.costs_fetched_at))}` : ""}{" "}
-        {JSON.stringify((found.request as { costs?: unknown }).costs)} · {report.annualisation}
+        {JSON.stringify((found.request as { costs?: unknown }).costs)}
+        {report.margin_factor != null ? ` · depozyt ${pct(report.margin_factor)}` : ""} · {report.annualisation}
       </p>
       {report.without_costs && (
         <p role="note" className="rounded bg-warning-soft px-3 py-1 text-sm text-warning">
@@ -200,6 +207,8 @@ export function ReportPanel({ api, runId, symbol, timeframe }: { api: Strategies
                 <th>Wejście</th>
                 <th>Wyjście</th>
                 <th className="text-right">Wynik</th>
+                <th className="text-right">Wynik %</th>
+                <th className="text-right">Najgłębsza strata</th>
                 <th>Przyczyna wyjścia</th>
                 <th>Koszty</th>
               </tr>
@@ -219,7 +228,9 @@ export function ReportPanel({ api, runId, symbol, timeframe }: { api: Strategies
                   <td>
                     {at(t.exitTime)} @ {num(t.exitPrice)}
                   </td>
-                  <td className={`text-right ${t.resultR >= 0 ? "text-up" : "text-down"}`}>{r(t.resultR)}</td>
+                  <td className={`text-right ${gained(t) ? "text-up" : "text-down"}`}>{r(t.resultR)}</td>
+                  <td className={`text-right ${gained(t) ? "text-up" : "text-down"}`}>{pct(t.resultPct)}</td>
+                  <td className="text-right">{pct(t.maePct)}</td>
                   <td>
                     {EXIT_LABEL[t.exitReason] ?? t.exitReason}
                     {t.pessimistic && <span title="minuta mieściła dwa zdarzenia; rozstrzygnięto przeciw strategii"> · pesymistycznie</span>}

@@ -40,6 +40,7 @@ export const EXIT_LABEL: Record<string, string> = {
   trail: "stop kroczący",
   when: "warunek wyjścia",
   max_bars: "limit świec",
+  out_of_capital: "brak kapitału",
   end_of_range: "koniec zakresu",
 };
 

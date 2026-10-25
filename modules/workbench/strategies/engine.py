@@ -17,9 +17,9 @@ from .series import Context, Series
 from .vocabulary import Indicator
 
 # Raised by every change that moves a result — a fill rule, a cost, a rounding. Recorded in each report, and the golden
-# strategies refuse a changed result under an unchanged number (`strategies-backtest`). 2 added the daily equity curve to
-# the report, which moved no number but changed every recording.
-ENGINE_VERSION = 2
+# strategies refuse a changed result under an unchanged number (`strategies-backtest`). What each number changed: the
+# commits that raised it.
+ENGINE_VERSION = 3
 
 
 @dataclass(frozen=True)
@@ -31,9 +31,14 @@ class Trade:
     exit_time: int
     exit_price: float
     units: float
+    # NaN without a stop, which has no 1 R either.
     initial_stop: float
     result_r: float
     result_money: float
+    # Of the equity at entry, which the size was computed from.
+    result_pct: float
+    # The worst the position stood, on the side it closes on, over every minute it was open; 0 if never below entry.
+    mae_pct: float
     costs: dict[str, float]
     exit_reason: str
     pessimistic: bool
@@ -68,7 +73,9 @@ class _Position:
     initial_stop: float
     target: float
     risk: float
+    equity_at_entry: float
     pessimistic: bool = False
+    worst_money: float = 0.0
     slippage_paid: float = 0.0
     spread_paid: float = 0.0
     exit_at_next_minute: str | None = None
@@ -86,6 +93,8 @@ class _Book:
     last_trade_r: float = 0.0
     trades: list[Trade] = field(default_factory=list)
     rejected: int = 0
+    # No equity left: nothing is opened again (`out_of_capital`).
+    broke: bool = False
 
 
 def simulate(
@@ -100,11 +109,15 @@ def simulate(
     range_to: int,
     forced: Sequence[tuple[int, int]] | None = None,
     evaluator: Evaluator | None = None,
+    margin_factor: float | None = None,
 ) -> Result:
     """`forced` replaces the entry conditions with market entries — (bar, +1 long / −1 short), ascending — each taken on
     its bar or, when a position is still open there, on the first flat bar after it: the random-entry benchmark, which
-    owes the strategy as many entries as it made. An `evaluator` already built for these inputs is reused."""
+    owes the strategy as many entries as it made. An `evaluator` already built for these inputs is reused.
+    `margin_factor` is the instrument's deposit as a fraction of a position's value, which `margin_fraction` sizes by."""
     d = checked.document
+    if d.sizing.mode == "margin_fraction" and not (margin_factor is not None and margin_factor > 0):
+        raise ValueError("a strategy sized by its deposit needs the instrument's margin factor")
     evaluator = evaluator or Evaluator(checked, params, catalogue, series, indicators)
     decision = series[(d.symbol, d.timeframe)]
     minute = series[(d.symbol, "MINUTE")]
@@ -133,7 +146,7 @@ def simulate(
         for m in range(int(lo), int(hi)):
             if position is None and order is None:
                 break
-            position, order = _minute(m, minute, position, order, costs, book, checked, evaluator, bar)
+            position, order = _minute(m, minute, position, order, costs, book, checked, evaluator, bar, margin_factor)
         previous_moment = moment
         if order is not None and order.expires_at_bar is not None and bar >= order.expires_at_bar:
             order = None
@@ -174,7 +187,8 @@ def simulate(
     for m in range(int(lo), int(hi)):
         if position is None:
             break
-        position, order = _minute(m, minute, position, None, costs, book, checked, evaluator, int(bars[-1]) if len(bars) else 0)
+        last_bar = int(bars[-1]) if len(bars) else 0
+        position, order = _minute(m, minute, position, None, costs, book, checked, evaluator, last_bar, margin_factor)
     if position is not None:
         last = int(hi) - 1 if hi > 0 else 0
         spread = costs.spread_at(int(minute.starts[last]))
@@ -220,6 +234,8 @@ def _trail(
 
 def _blocked(checked: Checked, evaluator: Evaluator, bar: int, state: State, book: _Book) -> bool:
     limits = checked.document.limits
+    if book.broke:
+        return True
     if limits.daily_stop_r is not None and book.day_r <= limits.daily_stop_r:
         return True
     return limits.no_entry is not None and bool(evaluator.at(checked.formulas["limits.no_entry"], bar, state))
@@ -241,6 +257,7 @@ def _minute(
     checked: Checked,
     evaluator: Evaluator,
     bar: int,
+    margin_factor: float | None,
 ) -> tuple[_Position | None, _Order | None]:
     start = int(minute.starts[m])
     spread = costs.spread_at(start)
@@ -263,7 +280,7 @@ def _minute(
             return None, order
         price, slipped = fill
         order_kind = order.kind
-        position = _open(order, price, slipped, start, costs, checked, evaluator, book, bar)
+        position = _open(order, price, slipped, start, costs, checked, evaluator, book, bar, margin_factor)
         order = None
         if position is None:
             return None, None
@@ -272,10 +289,26 @@ def _minute(
     if position is None:
         return None, order
     exit_side = bid if position.side > 0 else ask
-    stop_hit = exit_side["low"] <= position.stop if position.side > 0 else exit_side["high"] >= position.stop
+    long = position.side > 0
+    stop_hit = exit_side["low"] <= position.stop if long else exit_side["high"] >= position.stop
     target_hit = not np.isnan(position.target) and (
-        exit_side["high"] >= position.target if position.side > 0 else exit_side["low"] <= position.target
+        exit_side["high"] >= position.target if long else exit_side["low"] <= position.target
     )
+    floor = _capital_floor(position, costs, start)
+    floor_hit = exit_side["low"] <= floor if long else exit_side["high"] >= floor
+    # The price falls through the nearer of the two first: a stop beyond the floor is never reached.
+    stop_first = stop_hit and (position.stop >= floor if long else position.stop <= floor)
+    if floor_hit and not stop_first:
+        if target_hit or entered_inside:
+            position.pessimistic = True
+        gapped = exit_side["open"] <= floor if long else exit_side["open"] >= floor
+        level = exit_side["open"] if gapped else floor
+        price = level - costs.slippage if long else level + costs.slippage
+        position.slippage_paid += costs.slippage
+        _close(position, start, price, "out_of_capital", book, costs)
+        # Set here, not left to `_close`'s test of the equity: at the floor it is zero only up to floating point.
+        book.broke = True
+        return None, order
     if stop_hit:
         # Within one minute the data cannot say what came first; the worse order is assumed and marked as assumed.
         if target_hit or entered_inside:
@@ -287,11 +320,20 @@ def _minute(
         reason = "trail" if position.trailed else "stop"
         _close(position, start, price, reason, book, costs)
         return None, order
+    # A minute the position leaves at its target counts too: whether its adverse extreme came first is unknown.
+    worst = exit_side["low"] if long else exit_side["high"]
+    position.worst_money = min(position.worst_money, position.side * (worst - position.entry_price) * position.units)
     if target_hit and not entered_inside:
-        gapped = exit_side["open"] >= position.target if position.side > 0 else exit_side["open"] <= position.target
+        gapped = exit_side["open"] >= position.target if long else exit_side["open"] <= position.target
         _close(position, start, exit_side["open"] if gapped else position.target, "target", book, costs)
         return None, order
     return position, order
+
+
+def _capital_floor(position: _Position, costs: CostModel, moment: int) -> float:
+    """The price, on the side the position closes on, at which the equity marked with it reaches zero."""
+    left = position.equity_at_entry - _financing(position, moment, costs)
+    return position.entry_price - position.side * left / position.units
 
 
 def _fill(order: _Order, bid: dict[str, float], ask: dict[str, float], costs: CostModel) -> tuple[float, bool] | None:
@@ -325,25 +367,29 @@ def _open(
     evaluator: Evaluator,
     book: _Book,
     bar: int,
+    margin_factor: float | None,
 ) -> _Position | None:
     """The position an order became, with its stop and target computed once, here — or `None` when the stop it computes
-    to is no stop (missing, or on the wrong side of the fill), which is counted, never traded."""
+    to is no stop (missing, or on the wrong side of the fill), which is counted, never traded. A document without a stop
+    opens a position without one."""
     state = State(
         position=order.side, entry_price=price, entry_bar=order.signal_bar, bars_in_trade=0, open_r=0.0,
         losses_in_row=book.losses_in_row, last_trade_r=book.last_trade_r, trades_today=book.trades_today,
     )
     d = checked.document
-    stop = float(evaluator.at(checked.formulas["exits.stop"], order.signal_bar, state))
+    stop = risk = np.nan
+    if d.exits.stop is not None:
+        stop = float(evaluator.at(checked.formulas["exits.stop"], order.signal_bar, state))
+        risk = order.side * (price - stop)
+        if np.isnan(stop) or risk <= 0:
+            book.rejected += 1
+            return None
     target = (
         float(evaluator.at(checked.formulas["exits.target"], order.signal_bar, state))
         if d.exits.target is not None else np.nan
     )
-    risk = order.side * (price - stop)
-    if np.isnan(stop) or risk <= 0:
-        book.rejected += 1
-        return None
     equity = book.capital + book.realized
-    units = d.sizing.value if d.sizing.mode == "fixed_units" else equity * d.sizing.value / risk
+    units = _units(d.sizing.mode, d.sizing.value, equity, risk, price, margin_factor)
     if not units > 0:
         book.rejected += 1
         return None
@@ -351,10 +397,21 @@ def _open(
     book.trades_today += 1
     return _Position(
         side=order.side, entry_time=moment, entry_price=price, entry_bar=bar, signal_bar=order.signal_bar,
-        units=units, stop=stop, initial_stop=stop, target=target, risk=risk,
+        units=units, stop=stop, initial_stop=stop, target=target, risk=risk, equity_at_entry=equity,
         slippage_paid=costs.slippage if slipped else 0.0,
         spread_paid=costs.spread_at(moment) if order.side > 0 else 0.0,
     )
+
+
+def _units(mode: str, value: float, equity: float, risk: float, price: float, margin_factor: float | None) -> float:
+    if mode == "fixed_units":
+        return value
+    if mode == "risk_fraction":
+        return equity * value / risk
+    if mode == "notional_fraction":
+        return equity * value / price
+    assert margin_factor is not None  # `simulate` refuses a deposit-sized run without one
+    return equity * value / (price * margin_factor)
 
 
 def _financing(position: _Position, moment: int, costs: CostModel) -> float:
@@ -371,11 +428,15 @@ def _close(
     spread = position.spread_paid if position.side > 0 else paid_now
     money = position.side * (price - position.entry_price) * position.units - financing
     r = money / (position.units * position.risk)
+    worst = min(position.worst_money, position.side * (price - position.entry_price) * position.units)
     _new_day(book, moment)
     book.realized += money
-    book.day_r += r
-    book.losses_in_row = book.losses_in_row + 1 if r < 0 else 0
+    if np.isfinite(r):
+        book.day_r += r
+    book.losses_in_row = book.losses_in_row + 1 if money < 0 else 0
     book.last_trade_r = r
+    if book.capital + book.realized <= 0:
+        book.broke = True
     book.trades.append(Trade(
         side="long" if position.side > 0 else "short",
         signal_bar=position.signal_bar,
@@ -387,6 +448,8 @@ def _close(
         initial_stop=position.initial_stop,
         result_r=r,
         result_money=money,
+        result_pct=money / position.equity_at_entry,
+        mae_pct=worst / position.equity_at_entry,
         costs={
             "spread": spread * position.units,
             "slippage": position.slippage_paid * position.units,

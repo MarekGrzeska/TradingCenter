@@ -218,3 +218,57 @@ def test_a_market_entry_stopped_later_in_its_own_minute_is_certain_not_assumed()
     [trade] = run(strategy(), minutes(rows)).trades
 
     assert trade.exit_reason == "stop" and not trade.pessimistic
+
+
+# 2026-07-02, a Thursday: New York on summer time, 9:30 there is 13:30 UTC.
+JULY_2 = MONDAY + 122 * 86400
+SESSION = strategy(
+    timeframe="MINUTE_5",
+    entries=[{"side": "long", "when": "session_bar(NEW_YORK) == 1"}],
+    exits={"when": "minutes_to_session_close(NEW_YORK) <= 5"},
+)
+
+
+def _offset(rows: dict[int, tuple[float, float, float, float]], by: int) -> dict[int, tuple[float, float, float, float]]:
+    return {t + by: v for t, v in rows.items()}
+
+
+def test_a_position_without_a_stop_leaves_five_minutes_before_new_york_closes() -> None:
+    day = _offset(flat(13 * HOUR, 21 * HOUR, 100.0), JULY_2 - MONDAY)
+
+    [trade] = run(SESSION, minutes(day), range_from=JULY_2).trades
+
+    assert trade.entry_time == JULY_2 + 13 * HOUR + 35 * 60  # the open of the minute after the 13:30–13:35 bar
+    assert trade.exit_time == JULY_2 + 19 * HOUR + 55 * 60 and trade.exit_reason == "when"  # 15:55 in New York
+    assert np.isnan(trade.initial_stop) and np.isnan(trade.result_r)
+
+
+@pytest.mark.parametrize(
+    ("sizing", "margin_factor"),
+    [({"mode": "margin_fraction", "value": 0.05}, 0.05), ({"mode": "notional_fraction", "value": 1}, None)],
+)
+def test_a_deposit_or_a_value_as_a_fraction_of_equity_sizes_the_position(sizing: dict, margin_factor) -> None:
+    day = _offset(flat(13 * HOUR, 21 * HOUR, 20_000.0), JULY_2 - MONDAY)
+
+    [trade] = run(SESSION | {"sizing": sizing}, minutes(day), range_from=JULY_2, margin_factor=margin_factor).trades
+
+    assert trade.units == 0.5
+
+
+def test_a_result_without_a_stop_is_in_percent_of_the_equity_at_entry_and_not_in_r() -> None:
+    day = _offset(flat(13 * HOUR, 16 * HOUR, 100.0) | flat(16 * HOUR, 21 * HOUR, 250.0), JULY_2 - MONDAY)
+
+    [trade] = run(SESSION, minutes(day), range_from=JULY_2).trades
+
+    assert trade.result_money == 150.0 and trade.result_pct == 0.015 and np.isnan(trade.result_r)
+
+
+def test_a_position_that_loses_the_whole_capital_is_closed_and_nothing_opens_after() -> None:
+    rows = flat(9 * HOUR, 11 * HOUR, 20_000.0)
+    rows[11 * HOUR] = (10_050.0, 10_050.0, 9_990.0, 9_990.0)
+    rows |= flat(11 * HOUR + 60, 14 * HOUR, 9_990.0)
+    document = strategy(entries=[{"side": "long", "when": "hour >= 9"}], exits={"max_bars": 100})
+
+    trades = run(document, minutes(rows)).trades
+
+    assert [(t.exit_price, t.exit_reason) for t in trades] == [(10_000.0, "out_of_capital")]

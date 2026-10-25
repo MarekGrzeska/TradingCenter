@@ -20,8 +20,18 @@ RECENT_RUNS = 5
 HOW_TO_WRITE = [
     "A document is JSON with the sections listed; formulas are strings in Python's expression syntax.",
     "One instrument per strategy, and that instrument must have its MINUTE series collected.",
-    "exits.stop is required: it is what 1 R measures.",
-    "Hours and weekdays are UTC.",
+    (
+        "exits.stop is what 1 R measures. A strategy without one needs exits.when or max_bars, and cannot use "
+        "risk_fraction, trail, daily_stop_r, open_r or last_trade_r; its report is in % of equity, not R."
+    ),
+    (
+        "Hours and weekdays are UTC. For a session's open or close use session_bar(S) and minutes_to_session_close(S) "
+        "with NEW_YORK, LONDON or TOKYO: they follow the city's clock, and its changes of time, with no holidays."
+    ),
+    (
+        "sizing: margin_fraction is the deposit as a fraction of equity (the broker's margin is read for you), "
+        "notional_fraction the position's value; at a 5% margin, margin_fraction 0.05 is notional_fraction 1."
+    ),
     (
         "When the operator's description leaves a value open (which hours a session is, what a trend is), ask, or "
         "choose and write the assumption into `notes` — never leave it unsaid."

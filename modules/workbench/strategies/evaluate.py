@@ -13,11 +13,21 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
 from . import formula as f
+from . import sessions
 from .checking import children, through_at
 from .document import Checked
 from .requirements import IndicatorKey, indicator_key
 from .series import PERIOD_SECONDS, Context, Series, align, pick
-from .vocabulary import CONSTANTS, FUNCTIONS, HISTORY, PER_BAR, POSITION, Indicator
+from .vocabulary import (
+    CONSTANTS,
+    FUNCTIONS,
+    HISTORY,
+    PER_BAR,
+    POSITION,
+    SESSION_FUNCTIONS,
+    SESSIONS,
+    Indicator,
+)
 
 _COMPARE: dict[str, Callable] = {
     "<": operator.lt, "<=": operator.le, ">": operator.gt, ">=": operator.ge, "==": operator.eq, "!=": operator.ne,
@@ -59,6 +69,7 @@ class Evaluator:
         self._series = series
         self._indicators = indicators
         self._vectors: dict[tuple[f.Node, Context], np.ndarray] = {}
+        self._session_days: dict[tuple[str, Context], sessions.Days] = {}
         self._stateful: dict[f.Node, bool] = {}
 
     # --- phase one: whole axes -----------------------------------------------------------------------------------
@@ -177,7 +188,22 @@ class Evaluator:
             return out
         if name == "stale":
             return self._stale(args[0], ctx)
+        if name in SESSION_FUNCTIONS:
+            return self._session(name, args[0].id, ctx)  # type: ignore[attr-defined]  # the checker allows a Name only
         raise KeyError(f"`{name}` has no value on a whole axis")
+
+    def _session(self, name: str, session: str, ctx: Context) -> np.ndarray:
+        series = self._series[ctx]
+        if not len(series):
+            return np.full(0, np.nan)
+        key = (session, ctx)
+        if key not in self._session_days:
+            self._session_days[key] = sessions.days(SESSIONS[session], int(series.starts[0]), int(series.available[-1]))
+        days = self._session_days[key]
+        if name == "session_bar":
+            return days.bar_number(series.starts, PERIOD_SECONDS[ctx[1]])
+        # From the decision, which is the bar's close.
+        return days.minutes_to_close(series.available)
 
     def _stale(self, node: f.Node, ctx: Context) -> np.ndarray:
         """True where any series read under `@` inside `node` last moved more than one of its periods ago."""

@@ -71,6 +71,27 @@ def from_broker(symbol: str, hits: list[Any], terms: dict[str, Any]) -> BrokerCo
     return BrokerCosts(costs, raw)
 
 
+@dataclass(frozen=True)
+class BrokerMargin:
+    # A fraction of the position's value; capital.com states it as a percentage.
+    margin_factor: float
+    raw: dict[str, Any]
+
+
+def margin_from_terms(symbol: str, terms: dict[str, Any]) -> BrokerMargin:
+    value = _number(terms, "margin_factor", symbol)
+    unit = terms.get("margin_factor_unit")
+    if unit != "PERCENTAGE":
+        raise BrokerCostsMissing(f"the broker states {symbol}'s deposit in {unit!r}, not as a percentage")
+    if not 0 < value <= 100:
+        raise BrokerCostsMissing(f"the broker's deposit for {symbol} is {value:g}%, which is no deposit")
+    return BrokerMargin(round(value / 100, 10), {"margin_factor": value, "margin_factor_unit": unit})
+
+
+async def fetch_margin(archive: Archive, symbol: str) -> BrokerMargin:
+    return margin_from_terms(symbol, await archive.terms(symbol))
+
+
 async def fetch(archive: Archive, symbol: str) -> BrokerCosts:
     """Both reads at once; `ArchiveUnavailable` when either went unanswered, `BrokerCostsMissing` when one lacks a value."""
     hits, terms = await asyncio.gather(archive.search(symbol), archive.terms(symbol))

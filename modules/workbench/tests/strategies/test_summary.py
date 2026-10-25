@@ -15,7 +15,7 @@ def _said(doc: dict) -> str:
 
 
 def test_every_name_and_function_of_the_language_has_a_phrase() -> None:
-    names = {*v.SERIES, *v.TIME, *v.CONSTANTS, *v.POSITION, *v.HISTORY}
+    names = {*v.SERIES, *v.TIME, *v.CONSTANTS, *v.SESSIONS, *v.POSITION, *v.HISTORY}
 
     assert names <= set(v.NAME_PHRASES)
     assert [fn.name for fn in v.FUNCTIONS.values() if not fn.phrase] == []
@@ -56,3 +56,22 @@ def test_a_variable_is_said_as_what_it_is_not_by_its_name() -> None:
     # Still listed under its name, so the summary can be held against the document.
     assert "«fast» = EMA(10)." in said and "Long, gdy EMA(10) przecina od dołu EMA(30)." in said
     assert "Stop: cena wejścia − (1,5 × ATR(14))." in said
+
+
+def test_a_session_is_said_with_its_hours_in_its_city_and_in_poland_and_without_holidays() -> None:
+    entries = [{"side": "long", "when": "session_bar(NEW_YORK) == 1"}]
+    exits = document()["exits"] | {"when": "minutes_to_session_close(NEW_YORK) <= 5"}
+
+    said = _said(document(entries=entries, exits=exits))
+
+    assert "Long, gdy pierwsza świeca sesji nowojorskiej (9:30–16:00 w Nowym Jorku, zwykle 15:30–22:00 w Polsce)" in said
+    assert "od 5 min przed zamknięciem sesji nowojorskiej" in said and "bez świąt giełdowych" in said
+
+
+def test_a_strategy_without_a_stop_says_so_and_names_its_deposit() -> None:
+    said = _said(document(
+        exits={"when": "minutes_to_session_close(NEW_YORK) <= 5"}, limits={},
+        sizing={"mode": "margin_fraction", "value": 0.05},
+    ))
+
+    assert "Bez stopu" in said and "Depozyt 5% kapitału na pozycję" in said

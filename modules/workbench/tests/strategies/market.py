@@ -93,12 +93,16 @@ def run(
     range_from: int | None = None,
     range_to: int | None = None,
     params: dict[str, float] | None = None,
+    margin_factor: float | None = None,
 ) -> Result:
     checked, problems = validate(document, catalogue(), servable({("US100", "MINUTE")}))
     assert checked is not None, problems
     series = {("US100", "MINUTE"): minute, ("US100", "HOUR"): hours(minute)}
+    if document["timeframe"] not in ("MINUTE", "HOUR"):
+        series[("US100", document["timeframe"])] = bars(minute, document["timeframe"])
     return simulate(
         checked, params or {}, catalogue(), series, {}, costs, capital,
         MONDAY if range_from is None else range_from,
         int(minute.available[-1]) if range_to is None else range_to,
+        margin_factor=margin_factor,
     )

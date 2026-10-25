@@ -26,6 +26,7 @@ RECORDING = pathlib.Path(__file__).with_name("golden.json")
 DAYS = 21
 
 PROFILE = [2.5] * 7 + [1.0] * 14 + [2.5] * 3  # wide at night, narrow through the day, UTC
+MARGIN = 0.05
 COSTS = CostModel(spread=PROFILE, slippage=0.3, overnight_long=0.0002, overnight_short=0.0001, rollover_hour=22)
 
 
@@ -34,6 +35,7 @@ def series() -> dict[tuple[str, str], Series]:
     for symbol, seed, price in (("US100", 11, 18_000.0), ("US500", 12, 5_000.0)):
         minute = minutes(walk(DAYS, seed=seed, start_price=price))
         out[(symbol, "MINUTE")] = minute
+        out[(symbol, "MINUTE_5")] = bars(minute, "MINUTE_5")
         out[(symbol, "HOUR")] = bars(minute, "HOUR")
         out[(symbol, "HOUR_4")] = bars(minute, "HOUR_4")
     return out
@@ -82,6 +84,17 @@ DOCUMENTS: dict[str, dict[str, Any]] = {
         exits={"stop": "entry_price - 60", "when": "open_r > 1 or bars_in_trade > 10"},
         limits={"daily_stop_r": -1.5, "no_entry": "weekday == FRIDAY and hour >= 18"},
     ),
+    # The operator's strategy of 25 October 2026, across the US change of time on 8 March: no stop, held to five minutes
+    # before New York closes, sized by a 5% deposit.
+    "session_without_a_stop": _document(
+        timeframe="MINUTE_5",
+        entries=[
+            {"side": "long", "when": "session_bar(NEW_YORK) == 1 and close > ema(12)"},
+            {"side": "short", "when": "session_bar(NEW_YORK) == 1 and close < ema(12)"},
+        ],
+        exits={"when": "minutes_to_session_close(NEW_YORK) <= 5"},
+        sizing={"mode": "margin_fraction", "value": 0.05},
+    ),
     "minute_scalp": _document(
         timeframe="MINUTE",
         entries=[{"side": "long", "when": "crosses_above(close, average(close, 15))"}],
@@ -114,7 +127,7 @@ def run(name: str, data: dict[tuple[str, str], Series], indicators: dict[Indicat
     document = checked(name)
     start, end = RANGES[name]
     args = {"checked": document, "params": {}, "catalogue": catalogue(), "series": data, "indicators": indicators,
-            "costs": COSTS, "capital": 10_000.0, "range_from": start, "range_to": end}
+            "costs": COSTS, "capital": 10_000.0, "range_from": start, "range_to": end, "margin_factor": MARGIN}
     evaluator = Evaluator(document, {}, catalogue(), data, indicators)
     result = simulate(**args, evaluator=evaluator)
     d = document.document
