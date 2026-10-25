@@ -4,6 +4,7 @@
  */
 
 import { safeLocalStorage } from "../data/storage";
+import { strategyInView, type AgentStrategyInView } from "./strategyInView";
 import { agentActivity, type AgentActivityStore } from "./agentActivity";
 import {
   agentApi,
@@ -251,6 +252,8 @@ export function createAgentChatStore(
   // Everything else a turn may have changed, in a module this store knows nothing about: a chat can create
   // and run a team without any of it passing through `agent`.
   activity: AgentActivityStore = agentActivity,
+  // The strategy open on the Strategies tab, read at send time like the chart.
+  strategy: () => AgentStrategyInView | null = strategyInView,
 ): AgentChatStore {
   let state: AgentChatState = {
     expanded: loadExpanded(storage),
@@ -645,6 +648,7 @@ export function createAgentChatStore(
           trimmed,
           new AbortController().signal,
           chartSnapshot(),
+          strategy(),
         );
       } catch (cause) {
         // Nothing accepted yet — no operator message, no turn, nothing to reload.

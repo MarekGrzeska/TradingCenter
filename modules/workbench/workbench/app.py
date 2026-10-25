@@ -110,6 +110,13 @@ async def lifespan(app: FastAPI):
         if alerts_app is None
         else ConversationLocalTools("alerts", alerts_app.state.mcp_server)
     )
+    # The conversation's alone: not the teams' (a schedule would run backtests nobody asked for and spend the trial
+    # count) and not the alerts' catalogue (a strategy is not a value to watch).
+    strategies_tools = (
+        None
+        if strategies_app is None
+        else ConversationLocalTools("strategies", strategies_app.state.mcp_server)
+    )
     # What a rule can read: every package's read-only tools, called as functions. The door to Telegram has nothing to read.
     alert_tools = AlertTools(
         {
@@ -135,6 +142,7 @@ async def lifespan(app: FastAPI):
             telegram_tools,
             *([] if youtube_tools is None else [youtube_tools]),
             *([] if alerts_tools is None else [alerts_tools]),
+            *([] if strategies_tools is None else [strategies_tools]),
         ],
     )
 

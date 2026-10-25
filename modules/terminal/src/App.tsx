@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { Shell } from "./app/Shell";
 import { NotFound } from "./app/NotFound";
@@ -16,7 +17,9 @@ export function App() {
               path={tab.path}
               element={
                 <ViewErrorBoundary>
-                  <tab.Component />
+                  <Suspense fallback={<p className="p-4 text-sm text-ink-muted">Wczytuję…</p>}>
+                    <tab.Component />
+                  </Suspense>
                 </ViewErrorBoundary>
               }
             />

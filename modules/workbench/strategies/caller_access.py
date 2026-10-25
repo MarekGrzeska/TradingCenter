@@ -1,5 +1,5 @@
-"""Which caller may reach which surface. This package publishes REST alone: no tool surface, so nothing reaches it by
-being admitted to tools elsewhere in the process."""
+"""Which caller may reach which surface. This package publishes REST alone: its tools are called as functions by the
+conversation in this process and never mounted, so nothing reaches them through this door."""
 
 from __future__ import annotations
 
@@ -28,12 +28,15 @@ REST_PATHS: tuple[str, ...] = (
     "/strategies/{strategy_id}",
     "/strategies/{strategy_id}/revisions",
     "/strategies/{strategy_id}/revisions/{n}",
+    "/strategies/{strategy_id}/revisions/{n}/changes",
     "/strategies/{strategy_id}/archive",
     "/strategies/{strategy_id}/restore",
     "/runs",
     "/runs/{run_id}",
     "/runs/{run_id}/cancel",
     "/runs/{run_id}/trades",
+    "/costs",
+    "/costs/{symbol}",
     # FastAPI's own, published by the framework rather than by a router.
     "/docs",
     "/docs/oauth2-redirect",

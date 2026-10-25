@@ -73,6 +73,20 @@ HISTORY: dict[str, str] = {
     "trades_today": "how many positions were opened today, UTC",
 }
 
+# How the summary names each of the above in Polish. Beside them rather than inside, because the dictionaries above are
+# what `GET /language` prints for a model; a test refuses a name without its phrase here.
+NAME_PHRASES: dict[str, str] = {
+    "open": "otwarcie", "high": "maksimum", "low": "minimum", "close": "zamknięcie", "volume": "wolumen",
+    "hour": "godzina", "minute": "minuta", "weekday": "dzień tygodnia",
+    "MONDAY": "poniedziałek", "TUESDAY": "wtorek", "WEDNESDAY": "środa", "THURSDAY": "czwartek", "FRIDAY": "piątek",
+    "SATURDAY": "sobota", "SUNDAY": "niedziela", "LONG": "pozycja długa", "SHORT": "pozycja krótka",
+    "FLAT": "brak pozycji",
+    "position": "pozycja", "entry_price": "cena wejścia", "bars_in_trade": "liczba świec w pozycji",
+    "open_r": "bieżący wynik pozycji w R",
+    "losses_in_row": "liczba strat z rzędu", "last_trade_r": "wynik ostatniej transakcji w R",
+    "trades_today": "liczba transakcji otwartych dziś (UTC)",
+}
+
 
 @dataclass(frozen=True)
 class Function:
@@ -84,6 +98,9 @@ class Function:
     variadic: bool = False
     # Only these places; `None` is everywhere.
     places: frozenset[Place] | None = None
+    # How the summary says it in Polish: `{0}`, `{1}` are the arguments as said, `{all}` every argument of a variadic one.
+    # Empty only by mistake: a test refuses a function the summary could not read back (`strategies-documents`).
+    phrase: str = ""
 
     def signature(self) -> str:
         names = [arg.value for arg in self.args]
@@ -95,25 +112,39 @@ _N, _C, _W = Arg.NUMBER, Arg.CONDITION, Arg.WINDOW
 FUNCTIONS: dict[str, Function] = {
     f.name: f
     for f in (
-        Function("highest", (_N, _W), Type.NUMBER, "the highest value of x over the last n bars, this one included"),
-        Function("lowest", (_N, _W), Type.NUMBER, "the lowest value of x over the last n bars, this one included"),
-        Function("sum", (_N, _W), Type.NUMBER, "the sum of x over the last n bars"),
-        Function("average", (_N, _W), Type.NUMBER, "the arithmetic mean of x over the last n bars"),
-        Function("crosses_above", (_N, _N), Type.CONDITION, "a was at or below b on the previous bar and is above it now"),
-        Function("crosses_below", (_N, _N), Type.CONDITION, "a was at or above b on the previous bar and is below it now"),
-        Function("rising", (_N, _W), Type.CONDITION, "x rose on each of the last n bars"),
-        Function("falling", (_N, _W), Type.CONDITION, "x fell on each of the last n bars"),
-        Function("bars_since", (_C,), Type.NUMBER, "how many bars ago the condition was last true; 0 when it is true now"),
-        Function("value_when", (_C, _N), Type.NUMBER, "x on the last bar the condition was true"),
-        Function("highest_since", (_C, _N), Type.NUMBER, "the highest x since the condition was last true, that bar included"),
-        Function("lowest_since", (_C, _N), Type.NUMBER, "the lowest x since the condition was last true, that bar included"),
-        Function("abs", (_N,), Type.NUMBER, "the absolute value"),
-        Function("min", (_N, _N), Type.NUMBER, "the smallest of its arguments", variadic=True),
-        Function("max", (_N, _N), Type.NUMBER, "the largest of its arguments", variadic=True),
-        Function("stale", (_N,), Type.CONDITION, "the last available value of x is older than one period of its resolution"),
+        Function("highest", (_N, _W), Type.NUMBER, "the highest value of x over the last n bars, this one included",
+            phrase="najwyższe {0} z ostatnich {1}"),
+        Function("lowest", (_N, _W), Type.NUMBER, "the lowest value of x over the last n bars, this one included",
+            phrase="najniższe {0} z ostatnich {1}"),
+        Function("sum", (_N, _W), Type.NUMBER, "the sum of x over the last n bars", phrase="suma {0} z ostatnich {1}"),
+        Function("average", (_N, _W), Type.NUMBER, "the arithmetic mean of x over the last n bars",
+            phrase="średnia {0} z ostatnich {1}"),
+        Function("crosses_above", (_N, _N), Type.CONDITION, "a was at or below b on the previous bar and is above it now",
+            phrase="{0} przecina od dołu {1}"),
+        Function("crosses_below", (_N, _N), Type.CONDITION, "a was at or above b on the previous bar and is below it now",
+            phrase="{0} przecina od góry {1}"),
+        Function("rising", (_N, _W), Type.CONDITION, "x rose on each of the last n bars",
+            phrase="{0} rośnie na każdej z ostatnich {1}"),
+        Function("falling", (_N, _W), Type.CONDITION, "x fell on each of the last n bars",
+            phrase="{0} spada na każdej z ostatnich {1}"),
+        Function("bars_since", (_C,), Type.NUMBER, "how many bars ago the condition was last true; 0 when it is true now",
+            phrase="liczba świec od ostatniego „{0}”"),
+        Function("value_when", (_C, _N), Type.NUMBER, "x on the last bar the condition was true",
+            phrase="{1} z ostatniej świecy, na której {0}"),
+        Function("highest_since", (_C, _N), Type.NUMBER, "the highest x since the condition was last true, that bar included",
+            phrase="najwyższe {1} od ostatniego „{0}”"),
+        Function("lowest_since", (_C, _N), Type.NUMBER, "the lowest x since the condition was last true, that bar included",
+            phrase="najniższe {1} od ostatniego „{0}”"),
+        Function("abs", (_N,), Type.NUMBER, "the absolute value", phrase="wartość bezwzględna {0}"),
+        Function("min", (_N, _N), Type.NUMBER, "the smallest of its arguments", variadic=True,
+            phrase="najmniejsze z: {all}"),
+        Function("max", (_N, _N), Type.NUMBER, "the largest of its arguments", variadic=True,
+            phrase="największe z: {all}"),
+        Function("stale", (_N,), Type.CONDITION, "the last available value of x is older than one period of its resolution",
+            phrase="{0} jest nieaktualne"),
         Function(
             "at_entry", (_N,), Type.NUMBER, "x on the bar the open position was entered",
-            places=frozenset({Place.EXIT}),
+            places=frozenset({Place.EXIT}), phrase="{0} w chwili wejścia",
         ),
     )
 }

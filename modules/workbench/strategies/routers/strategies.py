@@ -5,17 +5,22 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query
+from fastapi.responses import JSONResponse
 
-from .. import documents, store
+from .. import changes, documents, store
 from ..archive import ArchiveUnavailable
 from ..contract import (
+    ChangesOut,
+    ConflictOut,
     ProblemsOut,
+    RevisionEntryOut,
     RevisionOut,
     SavedOut,
     StrategyDetailOut,
     StrategyOut,
     ValidationOut,
 )
+from ..summary import summarize
 from .deps import BIGINT, INTEGER, archive, not_found, pool, refused
 
 router = APIRouter(tags=["strategies"])
@@ -37,14 +42,26 @@ def _summary(s: store.Summary) -> StrategyOut:
 
 
 def _revision(r: store.Revision) -> RevisionOut:
-    return RevisionOut.model_validate(r.__dict__)
+    return RevisionOut.model_validate(r.__dict__ | {"summary": summarize(r.document)})
+
+
+def conflict(latest: int) -> JSONResponse:
+    body = ConflictOut(
+        detail=f"revision {latest} was saved after the one this change was made to; read it before saving",
+        latest_revision=latest,
+    )
+    return JSONResponse(status_code=409, content=body.model_dump())
 
 
 @router.post("/validate", response_model=ValidationOut, responses={503: {"description": "the archive did not answer"}})
 async def validate(raw: dict[str, Any] = _DOCUMENT, reading=Depends(archive)) -> ValidationOut:
     """Exactly what saving would answer, and nothing saved."""
     checked, problems = await _checked(raw, reading)
-    return ValidationOut.model_validate({"valid": checked is not None, "problems": [p.as_dict() for p in problems]})
+    return ValidationOut.model_validate({
+        "valid": checked is not None,
+        "problems": [p.as_dict() for p in problems],
+        "summary": None if checked is None else summarize(checked.canonical),
+    })
 
 
 @router.get("/strategies", response_model=list[StrategyOut])
@@ -79,17 +96,58 @@ async def detail(strategy_id: int = ID, db=Depends(pool)) -> StrategyDetailOut:
 
 @router.post(
     "/strategies/{strategy_id}/revisions", response_model=SavedOut,
-    responses={404: {}, 422: {"model": ProblemsOut}, 503: {"description": "the archive did not answer"}},
+    responses={
+        404: {}, 409: {"model": ConflictOut}, 422: {"model": ProblemsOut},
+        503: {"description": "the archive did not answer"},
+    },
 )
-async def save_revision(strategy_id: int = ID, raw: dict[str, Any] = _DOCUMENT, db=Depends(pool), reading=Depends(archive)):
+async def save_revision(
+    strategy_id: int = ID,
+    raw: dict[str, Any] = _DOCUMENT,
+    based_on: int | None = Query(
+        None, ge=1, le=INTEGER, description="the revision this change was made to; a later one is a 409"
+    ),
+    db=Depends(pool),
+    reading=Depends(archive),
+):
     checked, problems = await _checked(raw, reading)
     if checked is None:
         return refused("the document is not a valid strategy", problems)
     try:
-        saved = await store.save_revision(db, strategy_id, checked, "operator")
+        saved = await store.save_revision(db, strategy_id, checked, "operator", based_on)
     except store.NotFound:
         raise not_found(f"strategy {strategy_id}") from None
+    except store.Conflict as err:
+        return conflict(err.latest)
     return SavedOut(strategy_id=saved.strategy_id, revision=saved.revision, created=saved.created)
+
+
+@router.get("/strategies/{strategy_id}/revisions", response_model=list[RevisionEntryOut], responses={404: {}})
+async def revisions(strategy_id: int = ID, db=Depends(pool)) -> list[RevisionEntryOut]:
+    """Newest first, without the documents."""
+    async with db.acquire() as conn:
+        try:
+            return [RevisionEntryOut.model_validate(e.__dict__) for e in await store.list_revisions(conn, strategy_id)]
+        except store.NotFound:
+            raise not_found(f"strategy {strategy_id}") from None
+
+
+@router.get("/strategies/{strategy_id}/revisions/{n}/changes", response_model=ChangesOut, responses={404: {}})
+async def revision_changes(
+    strategy_id: int = ID,
+    n: int = Path(ge=1, le=INTEGER),
+    against: int | None = Query(None, ge=1, le=INTEGER, description="the revision to compare with; the previous one if left out"),
+    db=Depends(pool),
+) -> ChangesOut:
+    other = against if against is not None else (n - 1 if n > 1 else None)
+    async with db.acquire() as conn:
+        try:
+            revision = await store.get_revision(conn, strategy_id, n)
+            base = None if other is None else await store.get_revision(conn, strategy_id, other)
+        except store.NotFound:
+            raise not_found(f"revision {n} or {other} of strategy {strategy_id}") from None
+    found = [] if base is None else [c.as_dict() for c in changes.between(base.document, revision.document)]
+    return ChangesOut.model_validate({"strategy_id": strategy_id, "n": n, "against": other, "changes": found})
 
 
 @router.get("/strategies/{strategy_id}/revisions/{n}", response_model=RevisionOut, responses={404: {}})

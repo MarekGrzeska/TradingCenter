@@ -11,6 +11,27 @@ importers:
       '@azure/msal-browser':
         specifier: ^5.18.0
         version: 5.18.0
+      '@codemirror/autocomplete':
+        specifier: ^6.20.4
+        version: 6.20.4
+      '@codemirror/commands':
+        specifier: ^6.11.1
+        version: 6.11.1
+      '@codemirror/lang-json':
+        specifier: ^6.0.2
+        version: 6.0.2
+      '@codemirror/language':
+        specifier: ^6.13.1
+        version: 6.13.1
+      '@codemirror/lint':
+        specifier: ^6.9.7
+        version: 6.9.7
+      '@codemirror/state':
+        specifier: ^6.7.6
+        version: 6.7.6
+      '@codemirror/view':
+        specifier: ^6.43.15
+        version: 6.43.15
       '@tanstack/react-query':
         specifier: ^5.101.4
         version: 5.101.4(react@19.2.8)
@@ -205,6 +226,30 @@ packages:
   '@babel/types@7.29.8':
     resolution: {integrity: sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg==}
     engines: {node: '>=6.9.0'}
+
+  '@codemirror/autocomplete@6.20.4':
+    resolution: {integrity: sha512-yF8RhOf2SXlg00+qtupzLhrglcas61boqaONiNcbPIebHCpJocpqTBA6dyrtUrQO47hqyTdeob/3XnYilT7TaQ==}
+
+  '@codemirror/commands@6.11.1':
+    resolution: {integrity: sha512-O/4hG3SC1YwcmQ0d2UVNDs+AsaNWd1iHVxbTeEBuqH+6bExAiPK3iS/BvpY6rZGURALv4ZD3sIgcCmRvw3ehBg==}
+
+  '@codemirror/lang-json@6.0.2':
+    resolution: {integrity: sha512-x2OtO+AvwEHrEwR0FyyPtfDUiloG3rnVTSZV1W8UteaLL8/MajQd8DpvUb2YVzC+/T18aSDv0H9mu+xw0EStoQ==}
+
+  '@codemirror/language@6.13.1':
+    resolution: {integrity: sha512-zfvU2r3TyylQLMj/te+5CnQ0rSqZi8B1oTCBbQkagcLW4Xc6imab6qN+pEJhsuNOLaJqiRyBXp9UhWA1DhVvDw==}
+
+  '@codemirror/lint@6.9.7':
+    resolution: {integrity: sha512-28/+iWLYxKxsvGYhSYL7zaCZqLz5+FFFDq9tVsvGv9kv8RY4fFAchJ5WX9M3YrrRlTIsECjsXPqeNgnSmNP2dg==}
+
+  '@codemirror/state@6.7.6':
+    resolution: {integrity: sha512-kAz+AncRtKuIknedxT1bq4XwXv4UowhbkHU1myPrtVb/jZtImWuV5BXzv5vK6i3kYACsdiZiQKFQQ5Mq7elW8w==}
+
+  '@codemirror/streamparser@6.0.0':
+    resolution: {integrity: sha512-JTFPF6xrfjt0mnfGPgzcLiMwYmvIyNaoizp8BYzv8FE8KrT6GBGDZ190rtt+O7Wke3gG/MFHyiY9YGNeimof4w==}
+
+  '@codemirror/view@6.43.15':
+    resolution: {integrity: sha512-HHsfpqFeHyXLs983pSRe38Xajs0vFWZQ2BuX0m7Ki8w3jZ5iD8cuR3lBz2/5/X53Dhf32SBHKh6rtSTB6tKeGw==}
 
   '@csstools/color-helpers@5.1.0':
     resolution: {integrity: sha512-S11EXWJyy0Mz5SYvRmY8nJYTFFd1LCNV+7cXyAgQtOOuzb4EsgfqDufL+9esx72/eLhsRdGZwaldu/h+E4t4BA==}
@@ -498,6 +543,21 @@ packages:
 
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
+
+  '@lezer/common@1.5.4':
+    resolution: {integrity: sha512-xt3Q4z64xM+xhg4M7NXqw1N//1O74bUFo5kz6fwMeC4qwxSuRdwkYSmjcqCEEKYkNw5e67f2hcNqBoNERAEU0w==}
+
+  '@lezer/highlight@1.2.5':
+    resolution: {integrity: sha512-O1GMVKgtf5YspFaRzpmqkVgMtIk2HG9uMAbH6wdAIdNh3TVzCsch/+cRi+6l2//UGDKe6NB9BW3cvuR5ezMQ0w==}
+
+  '@lezer/json@1.0.3':
+    resolution: {integrity: sha512-BP9KzdF9Y35PDpv04r0VeSTKDeox5vVr3efE7eBbx3r4s3oNLfunchejZhjArmeieBH+nVOpgIiBJpEAv8ilqQ==}
+
+  '@lezer/lr@1.4.11':
+    resolution: {integrity: sha512-UwgZcl1R66H2hDzBrA7kWyYmX6s8p5TQ+e/t7CuvgCtBEPxbEPaHYHu+pJBvTvDotEJpuQkJjbXuHiw5Cixxgw==}
+
+  '@marijn/find-cluster-break@1.0.4':
+    resolution: {integrity: sha512-Wy0V7+SGUjnF9/TkiM1hKVDPj7jKXduPNboMVtHTA8dySMURWqfg/JZ9E2Sq8JgSJmkl7k7Qe9FLeMSrSraWmQ==}
 
   '@mswjs/interceptors@0.41.9':
     resolution: {integrity: sha512-VVPPgHyQ6ShqnrmDWuxjmUIsO9gWyOZFmuOfLd9LfBGQJwZfy0gvv9pbHSJuoFNIYC7ZDX9aoFwowjcdSC4E8w==}
@@ -1175,6 +1235,9 @@ packages:
   cookie@1.1.1:
     resolution: {integrity: sha512-ei8Aos7ja0weRpFzJnEA9UHJ/7XQmqglbRwnf2ATjcB9Wq874VKH9kfjjirM6UhU2/E5fFYadylyhFldcqSidQ==}
     engines: {node: '>=18'}
+
+  crelt@1.0.7:
+    resolution: {integrity: sha512-aK6BbWfhf4U/wCcLHKPJl/xa6VkVstRaPywWtMKGwuOLc/wZTyQYuoxgvZnNsBvv7Kg3YTBQYYBCggcviQczuA==}
 
   cross-spawn@7.0.6:
     resolution: {integrity: sha512-uV2QOWP2nWzsy2aMp8aRibhi9dlzF5Hgh5SHaB9OiTGEyDTiJJyx0uy51QXdyWbtAHNua4XJzUKca3OzKUd3vA==}
@@ -2238,6 +2301,9 @@ packages:
   strip-literal@3.1.0:
     resolution: {integrity: sha512-8r3mkIM/2+PpjHoOtiAW8Rg3jJLHaV7xPwG+YRGrv6FP0wwk/toTpATxWYOW0BKdWwl82VT2tFYi5DlROa0Mxg==}
 
+  style-mod@4.1.4:
+    resolution: {integrity: sha512-XXWIQt633/EpAFx8aZDOTjBzrCaGmhvEQlQo6MVPfa2OzO2cWo+4hV9h+6UkHYlXGfy+ODXKUdP7Pthmcu5ATw==}
+
   style-to-js@1.1.21:
     resolution: {integrity: sha512-RjQetxJrrUJLQPHbLku6U/ocGtzyjbJMP9lCNK7Ag0CNh690nSH8woqWH9u16nMjYBAok+i7JO1NP2pOy8IsPQ==}
 
@@ -2469,6 +2535,9 @@ packages:
         optional: true
       jsdom:
         optional: true
+
+  w3c-keyname@2.2.8:
+    resolution: {integrity: sha512-dpojBhNsCNN7T82Tm7k26A6G9ML3NkhDsnw9n/eoxSRlVBB4CEtIQ/KTCLI2Fwf3ataSXRhYFkQi3SlnFwPvPQ==}
 
   w3c-xmlserializer@5.0.0:
     resolution: {integrity: sha512-o8qghlI8NZHU1lLPrpi2+Uq7abh4GGPpYANlalzWxyWteJOCsr/P+oPBA49TOLu5FTZO4d3F9MnWJfiMo4BkmA==}
@@ -2718,6 +2787,54 @@ snapshots:
       '@babel/helper-string-parser': 7.29.7
       '@babel/helper-validator-identifier': 7.29.7
 
+  '@codemirror/autocomplete@6.20.4':
+    dependencies:
+      '@codemirror/language': 6.13.1
+      '@codemirror/state': 6.7.6
+      '@codemirror/view': 6.43.15
+      '@lezer/common': 1.5.4
+
+  '@codemirror/commands@6.11.1':
+    dependencies:
+      '@codemirror/language': 6.13.1
+      '@codemirror/state': 6.7.6
+      '@codemirror/view': 6.43.15
+      '@lezer/common': 1.5.4
+
+  '@codemirror/lang-json@6.0.2':
+    dependencies:
+      '@codemirror/language': 6.13.1
+      '@lezer/json': 1.0.3
+
+  '@codemirror/language@6.13.1':
+    dependencies:
+      '@codemirror/state': 6.7.6
+      '@codemirror/streamparser': 6.0.0
+      '@codemirror/view': 6.43.15
+      '@lezer/common': 1.5.4
+      '@lezer/highlight': 1.2.5
+      '@lezer/lr': 1.4.11
+      style-mod: 4.1.4
+
+  '@codemirror/lint@6.9.7':
+    dependencies:
+      '@codemirror/state': 6.7.6
+      '@codemirror/view': 6.43.15
+      crelt: 1.0.7
+
+  '@codemirror/state@6.7.6':
+    dependencies:
+      '@marijn/find-cluster-break': 1.0.4
+
+  '@codemirror/streamparser@6.0.0': {}
+
+  '@codemirror/view@6.43.15':
+    dependencies:
+      '@codemirror/state': 6.7.6
+      crelt: 1.0.7
+      style-mod: 4.1.4
+      w3c-keyname: 2.2.8
+
   '@csstools/color-helpers@5.1.0': {}
 
   '@csstools/css-calc@2.1.4(@csstools/css-parser-algorithms@3.0.5(@csstools/css-tokenizer@3.0.4))(@csstools/css-tokenizer@3.0.4)':
@@ -2928,6 +3045,24 @@ snapshots:
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
+
+  '@lezer/common@1.5.4': {}
+
+  '@lezer/highlight@1.2.5':
+    dependencies:
+      '@lezer/common': 1.5.4
+
+  '@lezer/json@1.0.3':
+    dependencies:
+      '@lezer/common': 1.5.4
+      '@lezer/highlight': 1.2.5
+      '@lezer/lr': 1.4.11
+
+  '@lezer/lr@1.4.11':
+    dependencies:
+      '@lezer/common': 1.5.4
+
+  '@marijn/find-cluster-break@1.0.4': {}
 
   '@mswjs/interceptors@0.41.9':
     dependencies:
@@ -3584,6 +3719,8 @@ snapshots:
   convert-source-map@2.0.0: {}
 
   cookie@1.1.1: {}
+
+  crelt@1.0.7: {}
 
   cross-spawn@7.0.6:
     dependencies:
@@ -4889,6 +5026,8 @@ snapshots:
     dependencies:
       js-tokens: 9.0.1
 
+  style-mod@4.1.4: {}
+
   style-to-js@1.1.21:
     dependencies:
       style-to-object: 1.0.14
@@ -5127,6 +5266,8 @@ snapshots:
       - terser
       - tsx
       - yaml
+
+  w3c-keyname@2.2.8: {}
 
   w3c-xmlserializer@5.0.0:
     dependencies:

@@ -22,6 +22,7 @@ from .models import (
     PromptRevision,
     RecordedCall,
     Session,
+    StrategyInView,
     ToolCall,
     UsageAggregate,
 )
@@ -221,12 +222,35 @@ class ChartSnapshotIn(BaseModel):
         )
 
 
+# A strategy document is a few kilobytes; past this the text is not a document someone is editing, and cutting it would
+# hand the model a document that does not exist.
+STRATEGY_DRAFT_MAX_CHARS = 32_000
+
+
+class StrategyInViewIn(BaseModel):
+    strategy_id: int | None = Field(default=None, ge=1, description="null for a new strategy not saved yet")
+    revision: int | None = Field(default=None, ge=1, description="the revision the editor is based on")
+    draft: str | None = Field(
+        default=None,
+        max_length=STRATEGY_DRAFT_MAX_CHARS,
+        description="the editor's text, only when it differs from that revision",
+    )
+
+    def to_view(self) -> StrategyInView:
+        return StrategyInView(strategy_id=self.strategy_id, revision=self.revision, draft=self.draft)
+
+
 class SendMessageIn(BaseModel):
     content: str
     chart: ChartSnapshotIn | None = Field(
         default=None,
         description="what the caller is drawing as it asks; given to the model as context "
         "for this turn only, never written to the transcript",
+    )
+    strategy: StrategyInViewIn | None = Field(
+        default=None,
+        description="the strategy the caller has open as it asks; context for this turn only, never written to "
+        "the transcript",
     )
 
 

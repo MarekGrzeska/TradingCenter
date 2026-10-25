@@ -58,6 +58,10 @@ export interface Endpoints {
   /** `alerts`, for the rules that decide who is told what: the workbench's address plus `/alerts`, when the workbench has the
    *  package — like the YouTube archive, it may be absent, and the tab says so rather than showing no rules. */
   alertsHttp: string;
+  /** `strategies`, for strategies as documents and their backtests: the workbench's address plus `/strategies`, when the
+   *  workbench has the package. Asked with the workbench's scope — it is that process's audience, and no scope of its own
+   *  would be anything but the same string under another name. */
+  strategiesHttp: string;
   /** `capital-gateway`, for the account. It used to have no address here at all; what changed is that the
    *  gateway recognises an authenticated browser. In dev this is a prefix the dev server proxies. */
   gatewayHttp: string;
@@ -74,6 +78,7 @@ const DEFAULT_SOCIAL_HTTP = "/social-api";
 const DEFAULT_YOUTUBE_HTTP = "/youtube-api";
 const DEFAULT_TELEGRAM_HTTP = "/telegram-api";
 const DEFAULT_ALERTS_HTTP = "/alerts-api";
+const DEFAULT_STRATEGIES_HTTP = "/strategies-api";
 
 export interface EnvVars {
   VITE_ARCHIVE_HTTP?: string;
@@ -85,6 +90,7 @@ export interface EnvVars {
   VITE_YOUTUBE_HTTP?: string;
   VITE_TELEGRAM_HTTP?: string;
   VITE_ALERTS_HTTP?: string;
+  VITE_STRATEGIES_HTTP?: string;
   VITE_ENTRA_CLIENT_ID?: string;
   VITE_ENTRA_TENANT_ID?: string;
   VITE_ENTRA_SCOPE?: string;
@@ -166,5 +172,6 @@ export function resolveEndpoints(
     youtubeHttp: resolveHttpBase(env.VITE_YOUTUBE_HTTP || DEFAULT_YOUTUBE_HTTP),
     telegramHttp: resolveHttpBase(env.VITE_TELEGRAM_HTTP || DEFAULT_TELEGRAM_HTTP),
     alertsHttp: resolveHttpBase(env.VITE_ALERTS_HTTP || DEFAULT_ALERTS_HTTP),
+    strategiesHttp: resolveHttpBase(env.VITE_STRATEGIES_HTTP || DEFAULT_STRATEGIES_HTTP),
   };
 }

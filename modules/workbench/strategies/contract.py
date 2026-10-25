@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
+from .costs import CostModel
+
 RunStatus = Literal["queued", "running", "done", "failed", "cancelled"]
+Requester = Literal["operator", "agent"]
 
 
 class ProblemOut(BaseModel):
@@ -35,6 +38,16 @@ class RunCancelledOut(BaseModel):
     was: RunStatus = Field(description="the status the run had when the cancellation arrived")
 
 
+class HeadlineOut(BaseModel):
+    """The few numbers a list of runs shows; the rest is `GET /runs/{id}`. Null where the report has none."""
+
+    trades: int | None
+    total_r: float | None
+    expectancy_r: float | None
+    max_drawdown_r: float | None
+    sharpe: float | None
+
+
 class RunSummaryOut(BaseModel):
     id: int
     strategy_id: int
@@ -43,9 +56,83 @@ class RunSummaryOut(BaseModel):
     reason: str | None
     engine_version: int | None
     request: dict
+    requested_by: Requester
     queued_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
+    headline: HeadlineOut | None = Field(description="null until the run is done")
+
+
+class YearOut(BaseModel):
+    trades: int
+    total_r: float
+
+
+class CostsByComponentOut(BaseModel):
+    spread: float
+    slippage: float
+    financing: float
+
+
+class BuyAndHoldOut(BaseModel):
+    return_pct: float | None
+    entry_price: float | None
+    exit_price: float | None
+
+
+class RandomEntryOut(BaseModel):
+    repetitions: int
+    seed: int
+    entry: Literal["market"]
+    average_trades: float | None
+    median_total_r: float | None
+    p5_total_r: float | None
+    p95_total_r: float | None
+
+
+class SkippedOut(BaseModel):
+    skipped: str
+
+
+class BenchmarksOut(BaseModel):
+    buy_and_hold: BuyAndHoldOut | None
+    random_entry: RandomEntryOut | SkippedOut | None
+
+
+class ReportOut(BaseModel):
+    """Numbers and nothing else — no field judges the strategy (`strategies-reports`). An unmeasurable number is null,
+    never zero."""
+
+    trades: int
+    no_trades: bool
+    rejected_entries: int
+    decision_bars: int
+    pessimistic_resolutions: int
+    win_rate: float | None
+    expectancy_r: float | None
+    total_r: float | None
+    profit_factor: float | None
+    max_drawdown_r: float | None
+    longest_losing_streak: int | None
+    average_bars_held: float | None
+    exposure: float | None
+    total_r_without_best_5: float | None
+    final_equity: float | None
+    return_pct: float | None
+    annual_return_pct: float | None
+    max_drawdown_pct: float | None
+    sharpe: float | None
+    sortino: float | None
+    calmar: float | None
+    by_year: dict[str, YearOut] = Field(description="calendar years (UTC) of the trades' exits")
+    costs: CostsByComponentOut
+    benchmarks: BenchmarksOut
+    annualisation: str
+    equity: list[tuple[int, float | None]] | None = Field(
+        default=None,
+        description="nominal equity at each UTC midnight of the range, epoch seconds — the series the ratios come from; "
+        "null for a report of engine version 1, which did not record it",
+    )
 
 
 class RunOut(BaseModel):
@@ -59,7 +146,8 @@ class RunOut(BaseModel):
     queued_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
-    report: dict | None
+    requested_by: Requester
+    report: ReportOut | None
     provenance: dict | None
 
 
@@ -69,7 +157,25 @@ class StrategyOut(BaseModel):
     created_at: datetime
     archived_at: datetime | None
     latest_revision: int
+    latest_author: Literal["operator", "agent"]
+    changed_at: datetime = Field(description="when the latest revision was saved")
+    symbol: str
+    timeframe: str
     trials: int = Field(description="finished runs of every revision — what was tried, the count overfitting is judged by")
+
+
+class SummarySectionOut(BaseModel):
+    title: str
+    lines: list[str]
+
+
+class SummaryOut(BaseModel):
+    """The document read back in Polish from the document alone, never from a model (`strategies-documents`)."""
+
+    name: str
+    sections: list[SummarySectionOut]
+    hypothesis: str = Field(description="the author's, verbatim")
+    notes: str = Field(description="the author's assumptions, verbatim")
 
 
 class RevisionOut(BaseModel):
@@ -80,6 +186,39 @@ class RevisionOut(BaseModel):
     schema_version: int
     author: Literal["operator", "agent"]
     created_at: datetime
+    summary: SummaryOut | None = Field(description="null only for a document this engine can no longer read")
+
+
+class RevisionEntryOut(BaseModel):
+    n: int
+    author: Literal["operator", "agent"]
+    created_at: datetime
+    content_hash: str
+
+
+class ChangeOut(BaseModel):
+    path: str = Field(description="where in the document, as a problem names it: `entries[0].when`")
+    kind: Literal["added", "removed", "changed"]
+    before: Any = Field(description="null when added")
+    after: Any = Field(description="null when removed")
+
+
+class ChangesOut(BaseModel):
+    strategy_id: int
+    n: int
+    against: int | None = Field(description="the revision compared with; null when `n` is the first and none was named")
+    changes: list[ChangeOut]
+
+
+class ConflictOut(BaseModel):
+    detail: str
+    latest_revision: int
+
+
+class CostProfileOut(BaseModel):
+    symbol: str
+    costs: CostModel
+    updated_at: datetime
 
 
 class StrategyDetailOut(StrategyOut):
@@ -95,6 +234,7 @@ class SavedOut(BaseModel):
 class ValidationOut(BaseModel):
     valid: bool
     problems: list[ProblemOut]
+    summary: SummaryOut | None = Field(default=None, description="present when the document is valid")
 
 
 class FunctionOut(BaseModel):
@@ -157,3 +297,4 @@ class QueueOut(BaseModel):
 class HealthOut(BaseModel):
     database: Literal["reachable"]
     queue: QueueOut
+    max_minute_bars: int = Field(description="the most minute candles one run may cover — a run form says it before sending")

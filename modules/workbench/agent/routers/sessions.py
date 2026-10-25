@@ -176,6 +176,7 @@ async def send_message(
             queue=queue,
             tool_server=request.app.state.agent.tool_server,
             chart=body.chart.to_snapshot() if body.chart is not None else None,
+            strategy=body.strategy.to_view() if body.strategy is not None else None,
             # The operator's own identity, carried no further than the tool sources that act in their
             # name. Absent — local development — those tools act carrying no identity rather than refusing.
             operator_principal=_operator_principal(request),

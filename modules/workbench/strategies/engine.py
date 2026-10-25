@@ -17,8 +17,9 @@ from .series import Context, Series
 from .vocabulary import Indicator
 
 # Raised by every change that moves a result — a fill rule, a cost, a rounding. Recorded in each report, and the golden
-# strategies refuse a changed result under an unchanged number (`strategies-backtest`).
-ENGINE_VERSION = 1
+# strategies refuse a changed result under an unchanged number (`strategies-backtest`). 2 added the daily equity curve to
+# the report, which moved no number but changed every recording.
+ENGINE_VERSION = 2
 
 
 @dataclass(frozen=True)

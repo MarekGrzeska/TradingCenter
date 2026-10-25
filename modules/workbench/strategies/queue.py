@@ -45,6 +45,8 @@ class RunQueue:
         self._wake = asyncio.Event()
         self._loop: asyncio.Task | None = None
         self._running: set[asyncio.Task] = set()
+        # Runs someone in this process is waiting on — the conversation's `run_backtest` — and the event that ends it.
+        self._waiting: dict[int, asyncio.Event] = {}
 
     async def start(self) -> None:
         async with self._pool.acquire() as conn:
@@ -62,6 +64,21 @@ class RunQueue:
 
     def wake(self) -> None:
         self._wake.set()
+
+    async def wait_for(self, run_id: int, timeout: float) -> None:
+        """Returns when the run has ended here, or after `timeout`, whichever is first — what it ended as is the
+        database's to say. `listen` first, before the queue is woken, or a fast run can end before anyone listens."""
+        event = self._waiting.setdefault(run_id, asyncio.Event())
+        try:
+            await asyncio.wait_for(event.wait(), timeout)
+        except TimeoutError:
+            pass
+        finally:
+            self._waiting.pop(run_id, None)
+
+    def listen(self, run_id: int) -> None:
+        """Starts listening for a run's end before the queue is woken; `wait_for` then waits on the same event."""
+        self._waiting.setdefault(run_id, asyncio.Event())
 
     @property
     def busy(self) -> int:
@@ -103,6 +120,10 @@ class RunQueue:
                     await runs.fail(conn, run_id, f"{type(err).__name__}: {err}")
             except Exception:
                 log.exception("run %s could not even be marked failed; the next start marks it interrupted", run_id)
+        finally:
+            listener = self._waiting.get(run_id)
+            if listener is not None:
+                listener.set()
 
     async def _run_unguarded(self, row: asyncpg.Record) -> None:
         run_id = row["id"]

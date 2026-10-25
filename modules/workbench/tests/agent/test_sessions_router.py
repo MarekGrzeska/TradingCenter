@@ -515,6 +515,31 @@ def test_a_turn_carrying_a_chart_snapshot_hands_it_to_the_model() -> None:
     assert [m["content"] for m in messages] == ["what do you see?", "looking"]
 
 
+def test_a_turn_carrying_the_open_strategy_hands_it_and_its_draft_to_the_model() -> None:
+    # specs/agent-chat, "Tura wie, którą strategię operator ma otwartą"
+    provider = _FakeProvider([TextDelta("on it"), UsageReport(1, 1, None, None)])
+    with TestClient(app) as client:
+        app.state.agent.provider = provider
+        session_id = client.post("/sessions", json={}).json()["id"]
+        client.post(
+            f"/sessions/{session_id}/messages",
+            json={
+                "content": "zmień stop na 1,5 ATR",
+                "strategy": {"strategy_id": 7, "revision": 4, "draft": '{"name": "unsaved"}'},
+            },
+        )
+        too_long = client.post(
+            f"/sessions/{session_id}/messages",
+            json={"content": "and this?", "strategy": {"strategy_id": 7, "revision": 4, "draft": "x" * 32_001}},
+        )
+        messages = client.get(f"/sessions/{session_id}/messages").json()
+
+    assert "strategy 7" in provider.prompts[0] and "based_on=4" in provider.prompts[0]
+    assert '{"name": "unsaved"}' in provider.prompts[0]
+    assert too_long.status_code == 422 and len(provider.prompts) == 1
+    assert [m["content"] for m in messages] == ["zmień stop na 1,5 ATR", "on it"]
+
+
 def test_a_turn_without_a_snapshot_runs_the_prompt_untouched() -> None:
     provider = _FakeProvider([TextDelta("fine"), UsageReport(1, 1, None, None)])
     with TestClient(app) as client:

@@ -59,6 +59,7 @@ describe("resolveEndpoints", () => {
         VITE_YOUTUBE_HTTP: "/youtube-api",
         VITE_TELEGRAM_HTTP: "/telegram-api",
         VITE_ALERTS_HTTP: "/alerts-api",
+        VITE_STRATEGIES_HTTP: "/strategies-api",
       },
       devLoc,
     );
@@ -72,6 +73,7 @@ describe("resolveEndpoints", () => {
       youtubeHttp: "/youtube-api",
       telegramHttp: "/telegram-api",
       alertsHttp: "/alerts-api",
+      strategiesHttp: "/strategies-api",
     });
   });
 
@@ -87,6 +89,7 @@ describe("resolveEndpoints", () => {
         VITE_YOUTUBE_HTTP: "https://youtube.example.com",
         VITE_TELEGRAM_HTTP: "https://telegram.example.com",
         VITE_ALERTS_HTTP: "https://alerts.example.com",
+        VITE_STRATEGIES_HTTP: "https://strategies.example.com",
       },
       { protocol: "https:", host: "terminal.example.com" },
     );
@@ -100,6 +103,7 @@ describe("resolveEndpoints", () => {
       youtubeHttp: "https://youtube.example.com",
       telegramHttp: "https://telegram.example.com",
       alertsHttp: "https://alerts.example.com",
+      strategiesHttp: "https://strategies.example.com",
     });
   });
 
@@ -114,6 +118,7 @@ describe("resolveEndpoints", () => {
       youtubeHttp: "/youtube-api",
       telegramHttp: "/telegram-api",
       alertsHttp: "/alerts-api",
+      strategiesHttp: "/strategies-api",
     });
   });
 
@@ -130,6 +135,7 @@ describe("resolveEndpoints", () => {
       youtubeHttp,
       telegramHttp,
       alertsHttp,
+      strategiesHttp,
     } = resolveEndpoints({}, devLoc);
     const routes = new Set(TABS.map((tab) => tab.path));
 
@@ -143,6 +149,7 @@ describe("resolveEndpoints", () => {
       youtubeHttp,
       telegramHttp,
       alertsHttp,
+      strategiesHttp,
     ]
       .filter((base) => base.startsWith("/"))
       .map((base) => base.split("/")[1]);

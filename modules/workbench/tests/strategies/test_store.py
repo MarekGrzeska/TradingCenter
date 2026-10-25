@@ -75,3 +75,17 @@ async def test_a_revision_is_read_by_number_or_as_the_latest(pool) -> None:
 
     assert (latest.n, latest.document["name"]) == (2, "second")
     assert first.document["name"] == document()["name"]
+
+
+async def test_a_save_based_on_a_revision_no_longer_the_latest_is_a_conflict_and_saves_nothing(pool) -> None:
+    first = await store.create(pool, checked(), "operator")
+    await store.save_revision(pool, first.strategy_id, checked(name="agent's"), "agent", based_on=1)
+
+    with pytest.raises(store.Conflict) as refused:
+        await store.save_revision(pool, first.strategy_id, checked(name="operator's"), "operator", based_on=1)
+    unchanged = await store.save_revision(pool, first.strategy_id, checked(name="agent's"), "operator", based_on=1)
+
+    async with pool.acquire() as conn:
+        count = await conn.fetchval("SELECT count(*) FROM strategy_revisions")
+    assert refused.value.latest == 2 and count == 2
+    assert (unchanged.revision, unchanged.created) == (2, False)

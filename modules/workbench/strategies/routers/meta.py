@@ -22,7 +22,11 @@ async def health(request: Request) -> HealthOut:
     async with request.app.state.pool.acquire() as conn:
         waiting = await runs.queued(conn)
     running = request.app.state.queue.busy
-    return HealthOut.model_validate({"database": "reachable", "queue": {"queued": waiting, "running": running}})
+    return HealthOut.model_validate({
+        "database": "reachable",
+        "queue": {"queued": waiting, "running": running},
+        "max_minute_bars": request.app.state.settings.max_minute_bars,
+    })
 
 
 @router.get("/ping", tags=["meta"])
