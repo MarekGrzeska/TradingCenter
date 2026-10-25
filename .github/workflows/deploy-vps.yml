@@ -159,6 +159,7 @@ jobs:
           VITE_YOUTUBE_HTTP="$API/youtube" \
           VITE_TELEGRAM_HTTP="$API/telegram" \
           VITE_ALERTS_HTTP="$API/alerts" \
+          VITE_STRATEGIES_HTTP="$API/strategies" \
           pnpm build
 
       - name: Build the pocket

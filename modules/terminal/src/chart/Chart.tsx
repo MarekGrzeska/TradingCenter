@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LineStyle,
+  createSeriesMarkers,
   type IChartApi,
+  type ISeriesMarkersPluginApi,
   type IPriceLine,
   type ISeriesApi,
   type MouseEventParams,
@@ -76,7 +78,28 @@ export interface ChartProps {
   /** Objects drawn on this instrument, together with the operator's own hand on them. Not indicators and
    *  not on the same lifecycle: they survive a resolution change, because they belong to the instrument. */
   drawings?: ChartDrawings;
+  /** Marks on bars — a backtest's entries and exits. Each `time` is a bar's own start, or it is not drawn. */
+  marks?: readonly ChartMark[];
+  /** Horizontal lines with a label, such as one trade's entry, exit and stop. Replaced whole on every change. */
+  levels?: readonly ChartLevel[];
 }
+
+export interface ChartMark {
+  time: number;
+  position: "aboveBar" | "belowBar";
+  shape: "arrowUp" | "arrowDown" | "circle";
+  color: string;
+  text?: string;
+}
+
+export interface ChartLevel {
+  price: number;
+  color: string;
+  title: string;
+}
+
+const NO_MARKS: readonly ChartMark[] = [];
+const NO_LEVELS: readonly ChartLevel[] = [];
 
 /** What the chart needs to draw the objects on an instrument and let the operator manage them. `remove`
  *  and `patch` answer null on success and the sentence to show on failure — the list keeps what it had. */
@@ -109,6 +132,8 @@ export function Chart({
   onFocusRequestSettled,
   onVisibleRangeChange,
   drawings,
+  marks = NO_MARKS,
+  levels = NO_LEVELS,
 }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -262,6 +287,31 @@ export function Chart({
     if (priceLineRef.current) priceLineRef.current.applyOptions(options);
     else priceLineRef.current = series.createPriceLine(options);
   }, [latestBar]);
+
+  const markersRef = useRef<ISeriesMarkersPluginApi<Time> | null>(null);
+  useEffect(() => {
+    const series = seriesRef.current;
+    if (!series) return;
+    const markers = marks.map((m) => ({ ...m, time: m.time as Time }));
+    if (markersRef.current) markersRef.current.setMarkers(markers);
+    else if (markers.length > 0) markersRef.current = createSeriesMarkers(series, markers);
+  }, [marks]);
+
+  useEffect(() => {
+    const series = seriesRef.current;
+    if (!series) return;
+    const drawn = levels.map((level) =>
+      series.createPriceLine({
+        price: level.price,
+        color: level.color,
+        lineWidth: 1,
+        lineStyle: LineStyle.Dotted,
+        axisLabelVisible: true,
+        title: level.title,
+      }),
+    );
+    return () => drawn.forEach((line) => series.removePriceLine(line));
+  }, [levels]);
 
   useEffect(() => {
     const chart = chartRef.current;

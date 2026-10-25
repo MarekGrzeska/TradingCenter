@@ -1,0 +1,49 @@
+"""The document read back from the document alone (`strategies-documents`, design D4)."""
+
+from __future__ import annotations
+
+from strategies import vocabulary as v
+from strategies.summary import summarize
+
+from .builders import document
+
+
+def _said(doc: dict) -> str:
+    summary = summarize(doc)
+    assert summary is not None
+    return "\n".join(line for section in summary["sections"] for line in section["lines"])
+
+
+def test_every_name_and_function_of_the_language_has_a_phrase() -> None:
+    names = {*v.SERIES, *v.TIME, *v.CONSTANTS, *v.POSITION, *v.HISTORY}
+
+    assert names <= set(v.NAME_PHRASES)
+    assert [fn.name for fn in v.FUNCTIONS.values() if not fn.phrase] == []
+
+
+def test_another_interval_is_named_the_way_the_terminal_names_it() -> None:
+    said = _said(document())
+
+    assert "EMA(20) na h4 powyżej EMA(50) na h4" in said and "HOUR_4" not in said
+
+
+def test_an_hour_of_the_language_is_utc_with_the_hours_in_poland() -> None:
+    said = _said(document())
+
+    assert "w piątek i od 18:00 UTC, czyli 19:00 zimą i 20:00 latem w Polsce" in said
+
+
+def test_the_authors_assumptions_are_given_word_for_word() -> None:
+    summary = summarize(document(notes="Sesja azjatycka to 00:00–07:00 UTC."))
+
+    assert summary is not None and summary["notes"] == "Sesja azjatycka to 00:00–07:00 UTC."
+
+
+def test_the_same_document_is_always_the_same_summary() -> None:
+    assert summarize(document()) == summarize(document())
+
+
+def test_arithmetic_keeps_only_the_parentheses_it_needs() -> None:
+    said = _said(document(exits={"stop": "entry_price - (2 * atr(14) - 1)", "target": "(high - low) * 2"}))
+
+    assert "Stop: cena wejścia − (2 × ATR(14) − 1)." in said and "Cel: (maksimum − minimum) × 2." in said

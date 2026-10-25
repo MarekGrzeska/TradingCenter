@@ -48,6 +48,8 @@ def build(
             "random_entry": random_entry,
         },
         "annualisation": ANNUALISATION,
+        # The series the ratios above were computed from, so a screen draws the curve the drawdown was measured on.
+        "equity": [[mark, value] for mark, value in equity],
     }
     return finite(report)
 

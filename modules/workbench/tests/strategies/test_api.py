@@ -55,8 +55,8 @@ async def test_validate_answers_what_saving_would_and_writes_nothing() -> None:
         bad = (await client.post("/validate", json=strategy(exits={}))).json()
         good = (await client.post("/validate", json=strategy())).json()
 
-    assert bad["valid"] is False and bad["problems"][0]["path"] == "exits.stop"
-    assert good == {"valid": True, "problems": []}
+    assert bad["valid"] is False and bad["problems"][0]["path"] == "exits.stop" and bad["summary"] is None
+    assert good["valid"] is True and good["problems"] == [] and good["summary"]["name"] == "test"
 
 
 async def test_without_the_archive_nothing_is_checked_and_nothing_is_saved() -> None:
@@ -112,10 +112,51 @@ async def test_runs_are_listed_read_and_paged_and_a_missing_one_is_a_404(pool) -
         too_large = await client.get("/runs/99999999999999999999")
 
     assert [r["id"] for r in listed] == [run_id] and listed[0]["status"] == "done"
+    assert listed[0]["requested_by"] == "operator"
+    assert listed[0]["headline"] == {
+        "trades": 1, "total_r": None, "expectancy_r": None, "max_drawdown_r": None, "sharpe": None,
+    }
     assert page["total"] == 1 and page["trades"][0]["costs"] == {"spread": 1.0}
-    assert health == {"database": "reachable", "queue": {"queued": 0, "running": 0}}
+    assert health == {"database": "reachable", "queue": {"queued": 0, "running": 0}, "max_minute_bars": 1_500_000}
     assert missing.status_code == 404 and too_large.status_code == 422
     assert "report" not in listed[0]
+
+
+COSTS = {"spread": 1.0, "slippage": 0.1, "overnight_long": 0.0001, "overnight_short": 0.0, "rollover_hour": 22}
+
+
+@pytest.mark.db
+async def test_revisions_are_listed_compared_and_a_stale_base_is_a_conflict(pool) -> None:
+    async with _client(pool) as client:
+        sid = (await client.post("/strategies", json=strategy())).json()["strategy_id"]
+        tighter = strategy(exits={"stop": "entry_price - 1"})
+        second = await client.post(f"/strategies/{sid}/revisions?based_on=1", json=tighter)
+        stale = await client.post(f"/strategies/{sid}/revisions?based_on=1", json=strategy(name="late"))
+        listed = (await client.get(f"/strategies/{sid}/revisions")).json()
+        changed = (await client.get(f"/strategies/{sid}/revisions/2/changes")).json()
+        first = (await client.get(f"/strategies/{sid}/revisions/1/changes")).json()
+        read = (await client.get(f"/strategies/{sid}/revisions/2")).json()
+
+    assert second.json()["revision"] == 2
+    assert stale.status_code == 409 and stale.json()["latest_revision"] == 2
+    assert [r["n"] for r in listed] == [2, 1] and "document" not in listed[0]
+    assert [c["path"] for c in changed["changes"]] == ["exits.stop"] and changed["against"] == 1
+    assert first == {"strategy_id": sid, "n": 1, "against": None, "changes": []}
+    assert read["summary"]["sections"][0]["title"] == "Instrument"
+
+
+@pytest.mark.db
+async def test_a_cost_profile_is_set_replaced_read_and_refused_when_malformed(pool) -> None:
+    async with _client(pool) as client:
+        missing = await client.get("/costs/US100")
+        await client.put("/costs/US100", json=COSTS)
+        replaced = (await client.put("/costs/US100", json=COSTS | {"spread": 2.0})).json()
+        malformed = await client.put("/costs/US100", json=COSTS | {"spread": [1.0] * 23})
+        listed = (await client.get("/costs")).json()
+
+    assert missing.status_code == 404
+    assert replaced["costs"]["spread"] == 2.0 and [p["symbol"] for p in listed] == ["US100"]
+    assert malformed.status_code == 422 and listed[0]["costs"]["spread"] == 2.0
 
 
 def test_the_package_has_no_road_to_an_account() -> None:

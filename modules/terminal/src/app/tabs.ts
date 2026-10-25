@@ -1,4 +1,4 @@
-import type { ComponentType } from "react";
+import { lazy, type ComponentType } from "react";
 import { AccountsView } from "../accounts/AccountsView";
 import { AlertsView } from "../alerts/AlertsView";
 import { AgentSettingsView } from "../agent/settings/AgentSettingsView";
@@ -17,6 +17,9 @@ import { YoutubeView } from "../youtube/YoutubeView";
  * The one place tabs are declared — routing and the nav bar are both derived from it. `Archive` is gone rather than
  * renamed, so a stale bookmark falls through to the unknown-tab page instead of a silent redirect.
  */
+// Loaded when first opened: its editor is a dependency no other tab pays for (design D9 of the strategies' stage 2).
+const StrategiesView = lazy(() => import("../strategies/StrategiesView").then((m) => ({ default: m.StrategiesView })));
+
 export const TAB_GROUPS = [
   { id: "trading", label: "Trading" },
   { id: "data", label: "Data" },
@@ -55,6 +58,13 @@ export const TABS: TabDefinition[] = [
     group: "trading",
     path: "teams",
     Component: TeamsView,
+  },
+  {
+    id: "strategies",
+    label: "Strategies",
+    group: "trading",
+    path: "strategies",
+    Component: StrategiesView,
   },
   {
     id: "accounts",

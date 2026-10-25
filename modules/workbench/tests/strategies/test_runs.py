@@ -13,6 +13,7 @@ import pytest
 from strategies import runs, store
 from strategies.config import Settings
 from strategies.document import servable, validate
+from strategies.engine import ENGINE_VERSION
 from strategies.queue import RunQueue
 from strategies.runs import RunIn
 
@@ -94,7 +95,7 @@ async def test_a_queued_run_is_computed_in_a_worker_and_leaves_its_trades_and_pr
         await queue.stop()
 
     assert row.status == "done", row.reason
-    assert row.engine_version == 1 and row.provenance is not None
+    assert row.engine_version == ENGINE_VERSION and row.provenance is not None
     assert row.provenance["series"]["US100@MINUTE"]["bars"] > 0 and row.provenance["seed"] == 1
     async with pool.acquire() as conn:
         assert await conn.fetchval("SELECT count(*) FROM run_trades WHERE run_id = $1", run_id) == row.report["trades"]

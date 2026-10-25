@@ -61,7 +61,12 @@ async def list_runs(
     too; the strategy's `trials` counts the finished ones."""
     async with db.acquire() as conn:
         rows = await runs.list_runs(conn, strategy_id, offset, limit)
-    return [RunSummaryOut.model_validate(dict(row) | {"request": store.decoded(row["request"])}) for row in rows]
+    return [
+        RunSummaryOut.model_validate(
+            dict(row) | {"request": store.decoded(row["request"]), "headline": store.decoded(row["headline"])}
+        )
+        for row in rows
+    ]
 
 
 @router.get("/runs/{run_id}", response_model=RunOut, responses={404: {"description": "no such run"}})

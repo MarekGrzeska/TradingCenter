@@ -14,7 +14,7 @@ from strategies.config import Settings
 
 # Emptied between tests so one test's rows are never another's premise. Named in full rather than left to CASCADE, so the
 # statement says what it empties.
-TABLES: tuple[str, ...] = ("run_trades", "runs", "strategy_revisions", "strategies")
+TABLES: tuple[str, ...] = ("run_trades", "runs", "strategy_revisions", "strategies", "cost_profiles")
 
 
 @pytest.fixture(scope="session")

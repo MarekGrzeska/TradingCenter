@@ -108,6 +108,19 @@ const SOURCES = [
 `,
   },
   {
+    name: "strategies",
+    moduleDir: resolve(terminal, "..", "workbench"),
+    pythonModule: "strategies.openapi",
+    output: join(terminal, "src", "data", "contract.strategies.generated.ts"),
+    banner: `/**
+ * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
+ *
+ * Printed from the strategy engine's models by \`python -m strategies.openapi\` — a package of the workbench, served
+ * under /strategies when its database is configured. A report is numbers and nothing else: no field judges a strategy.
+ */
+`,
+  },
+  {
     name: "telegram-gateway",
     moduleDir: resolve(terminal, "..", "workbench"),
     pythonModule: "telegram_gateway.openapi",

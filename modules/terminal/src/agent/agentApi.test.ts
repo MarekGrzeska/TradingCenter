@@ -364,6 +364,27 @@ describe("agentApi.sendMessage", () => {
     });
   });
 
+  it("sends the strategy open on the Strategies tab, with the editor's unsaved text", async () => {
+    let body: unknown = null;
+    server.use(
+      http.post(`${HTTP_BASE}/sessions/7/messages`, async ({ request }) => {
+        body = await request.json();
+        return new Response(emptyCompleteStream(), {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }),
+    );
+
+    await api().sendMessage(7, "zmień stop", new AbortController().signal, null, {
+      strategyId: 7,
+      revision: 4,
+      draft: "{}",
+    });
+
+    expect(body).toEqual({ content: "zmień stop", strategy: { strategy_id: 7, revision: 4, draft: "{}" } });
+  });
+
   it("rejects before yielding anything when the session is missing", async () => {
     server.use(
       http.post(`${HTTP_BASE}/sessions/9/messages`, () =>

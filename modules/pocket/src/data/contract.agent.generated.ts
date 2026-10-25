@@ -501,6 +501,8 @@ export interface components {
             chart?: components["schemas"]["ChartSnapshotIn"] | null;
             /** Content */
             content: string;
+            /** @description the strategy the caller has open as it asks; context for this turn only, never written to the transcript */
+            strategy?: components["schemas"]["StrategyInViewIn"] | null;
         };
         /** SessionOut */
         SessionOut: {
@@ -520,6 +522,24 @@ export interface components {
             last_active_at: string;
             /** Title */
             title: string | null;
+        };
+        /** StrategyInViewIn */
+        StrategyInViewIn: {
+            /**
+             * Draft
+             * @description the editor's text, only when it differs from that revision
+             */
+            draft?: string | null;
+            /**
+             * Revision
+             * @description the revision the editor is based on
+             */
+            revision?: number | null;
+            /**
+             * Strategy Id
+             * @description null for a new strategy not saved yet
+             */
+            strategy_id?: number | null;
         };
         /**
          * ToolCallOut

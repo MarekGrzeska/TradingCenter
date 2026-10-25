@@ -26,7 +26,9 @@ async function parseErrorDetail(response: Response): Promise<{ detail: string; p
   try {
     const body = (await response.json()) as { detail?: unknown };
     if (typeof body.detail === "string") {
-      return { detail: body.detail };
+      // The body beside the sentence, for a refusal that says more than one: the strategies package's problems and the
+      // revision a save collided with travel at the top level next to `detail`.
+      return { detail: body.detail, problem: body };
     }
     // A package's own refusal: `HTTPException(detail=Problem(...).model_dump())` nests the reason one level down.
     if (body.detail && typeof body.detail === "object" && "detail" in body.detail) {

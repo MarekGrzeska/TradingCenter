@@ -36,7 +36,7 @@ may not".
               │ REST + WS, the operator's │ REST, the operator's token
               ▼          token            ▼
           terminal  5173             pocket  5174
-   nine tabs · agent panel        the archive on a phone · a chat
+   tabs · agent panel             the archive on a phone · a chat
 ```
 
 `terminal` and `pocket` are consumers, not peers: they publish no contract of their own and

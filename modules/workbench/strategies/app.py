@@ -15,11 +15,12 @@ from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
+from . import mcp_app
 from .archive import Archive
 from .caller_access import RECORD, CallerAccess
 from .config import Settings
 from .queue import RunQueue
-from .routers import language, meta, runs, strategies
+from .routers import costs, language, meta, runs, strategies
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
 log = logging.getLogger(__name__)
@@ -87,6 +88,9 @@ def create_app() -> FastAPI:
     app.include_router(language.router)
     app.include_router(strategies.router)
     app.include_router(runs.router)
+    app.include_router(costs.router)
+    # The tools, for the host to hand to the conversation; not mounted, so nothing reaches them over the network.
+    app.state.mcp_server = mcp_app.build_server(app)
 
     # In front of the whole application: nothing decides who may call after routing has begun.
     app.add_middleware(CallerAccess, state=app.state, record=RECORD)

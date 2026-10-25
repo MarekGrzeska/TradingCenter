@@ -139,6 +139,31 @@ class ChartSnapshot(BaseModel):
         return sentence
 
 
+class StrategyInView(BaseModel):
+    """The strategy the consumer has open as the question is asked, and the editor's text when it is not that revision.
+    Like the chart snapshot: a description of the instant, never stored. This module knows nothing of strategies; the
+    model reads them with the strategies package's own tools."""
+
+    strategy_id: int | None = None
+    revision: int | None = None
+    draft: str | None = None
+
+    def as_context(self) -> str:
+        if self.strategy_id is None:
+            opened = "The operator has a new, unsaved strategy open in the Strategies tab's editor."
+        else:
+            opened = (
+                f"The operator has strategy {self.strategy_id} open in the Strategies tab, its editor based on "
+                f"revision {self.revision}; read it with read_strategy and save changes with based_on={self.revision}."
+            )
+        if self.draft is None:
+            return opened
+        return opened + (
+            " The editor holds unsaved text that differs from that revision — this, not the saved revision, is what "
+            "the operator is looking at:\n" + self.draft
+        )
+
+
 class ChartFocus(BaseModel):
     """Which fragment of the time axis the chart should show — exactly one of its three shapes filled. Absolute time on
     the wire, so a command sitting in the log for an hour still means what it meant; `last_bars` is the one exception."""

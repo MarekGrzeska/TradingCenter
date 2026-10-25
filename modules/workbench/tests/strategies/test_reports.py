@@ -118,3 +118,23 @@ def test_random_entries_falling_inside_a_trade_are_taken_on_the_next_flat_bar() 
     strategy_trades = _report(WALKING, minute)["trades"]
 
     assert random["benchmarks"]["random_entry"]["average_trades"] >= 0.9 * strategy_trades
+
+
+def test_the_curve_in_the_report_is_the_one_its_drawdown_was_measured_on() -> None:
+    report = _report(WALKING, minutes(walk(10, seed=5)))
+    values = np.array([10_000.0] + [value for _, value in report["equity"]])
+
+    measured = float(np.max((np.maximum.accumulate(values) - values) / np.maximum.accumulate(values)))
+
+    assert measured == pytest.approx(report["max_drawdown_pct"])
+    assert [mark % 86400 for mark, _ in report["equity"]] == [0] * len(report["equity"])
+
+
+def test_every_field_a_report_carries_has_its_place_in_the_contract() -> None:
+    from strategies.contract import ReportOut
+
+    report = _report(WALKING, minutes(walk(10, seed=5)))
+    before_the_curve = {k: v for k, v in report.items() if k != "equity"}
+
+    assert ReportOut.model_validate(report).model_dump(mode="json").keys() == report.keys()
+    assert ReportOut.model_validate(before_the_curve).equity is None

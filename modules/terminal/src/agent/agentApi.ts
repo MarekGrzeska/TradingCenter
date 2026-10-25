@@ -6,6 +6,7 @@ import { workbenchIdentity } from "../data/marketData";
 import { parseIsoToEpochSeconds } from "../data/time";
 import { MarketDataError } from "../data/types";
 import { readAgentStream, type AgentStreamEvent } from "./stream";
+import { strategyInViewToWire, type AgentStrategyInView } from "./strategyInView";
 import { mapToolCall, type AgentToolCall, type RawToolCall } from "./toolCall";
 
 export type { AgentToolCall, ToolOutcome } from "./toolCall";
@@ -179,6 +180,7 @@ export interface AgentApi {
     content: string,
     signal: AbortSignal,
     chart?: AgentChartSnapshot | null,
+    strategy?: AgentStrategyInView | null,
   ): Promise<AsyncGenerator<AgentStreamEvent>>;
   /** Ends the turn running in this conversation. Resolves on 204 — which is also the answer when nothing
    *  was running, because a stop landing just after the turn finished is a race. */
@@ -462,10 +464,14 @@ export function createAgentApi(httpBase: string, identity: Identity = noIdentity
       return raw.map(mapToolCall);
     },
 
-    async sendMessage(id, content, signal, chart = null) {
+    async sendMessage(id, content, signal, chart = null, strategy = null) {
       const response = await http.send(`${httpBase}/sessions/${id}/messages`, {
         method: "POST",
-        body: chart === null ? { content } : { content, chart: chartSnapshotToWire(chart) },
+        body: {
+          content,
+          ...(chart === null ? {} : { chart: chartSnapshotToWire(chart) }),
+          ...(strategy === null ? {} : { strategy: strategyInViewToWire(strategy) }),
+        },
         signal,
       });
       if (response.body === null) {

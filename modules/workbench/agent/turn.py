@@ -12,7 +12,7 @@ import asyncpg
 
 from . import store
 from .graph import LocalTool, StopSignal, build_graph, initial_state
-from .models import ChartSnapshot, RecordedCall
+from .models import ChartSnapshot, RecordedCall, StrategyInView
 from .models_catalogue import ModelCatalogueEntry
 from .prompt import prompt_text
 from .provider import ModelProvider
@@ -72,13 +72,17 @@ class Queue(Protocol):
     def put_nowait(self, event: StreamEvent, /) -> None: ...
 
 
-def _system_prompt(revision, *, has_tools: bool, chart: ChartSnapshot | None) -> str:
-    """The revision's own text, plus one line about what the caller is looking at. Appended to the system
-    prompt rather than pushed into the transcript, so it describes this turn only."""
-    body = prompt_text(revision, has_tools=has_tools)
-    if chart is None:
-        return body
-    return body + "\n\n" + chart.as_context()
+def _system_prompt(
+    revision, *, has_tools: bool, chart: ChartSnapshot | None, strategy: StrategyInView | None = None
+) -> str:
+    """The revision's own text, plus what the caller is looking at. Appended to the system prompt rather than pushed
+    into the transcript, so it describes this turn only."""
+    parts = [prompt_text(revision, has_tools=has_tools)]
+    if chart is not None:
+        parts.append(chart.as_context())
+    if strategy is not None:
+        parts.append(strategy.as_context())
+    return "\n\n".join(parts)
 
 
 class _PoolAccountTrace:
@@ -126,6 +130,7 @@ async def run_turn(
     chart: ChartSnapshot | None = None,
     operator_principal: str | None = None,
     stop: StopSignal | None = None,
+    strategy: StrategyInView | None = None,
 ) -> None:
     async with pool.acquire() as conn:
         messages = await store.get_messages(conn, session_id=session_id)
@@ -167,7 +172,9 @@ async def run_turn(
             initial_state(
                 # Which prompt this turn runs is a fact about the turn, not a change to the prompt.
                 # Measured against `server_tools`: the chart tool is always there, and would hide the archive.
-                system_prompt=_system_prompt(revision, has_tools=bool(server_tools), chart=chart),
+                system_prompt=_system_prompt(
+                    revision, has_tools=bool(server_tools), chart=chart, strategy=strategy
+                ),
                 history=history,
                 model=model_entry.model,
                 on_delta=on_delta,

@@ -60,13 +60,23 @@ def resolved_params(request: RunIn, declared: Mapping[str, Mapping[str, float]])
     return {name: request.params.get(name, spec["default"]) for name, spec in declared.items()}
 
 
-async def enqueue(conn: Conn, request: RunIn, revision: int, params: Mapping[str, float]) -> int:
+async def enqueue(
+    conn: Conn, request: RunIn, revision: int, params: Mapping[str, float], requested_by: str = "operator"
+) -> int:
     recorded = request.model_dump(mode="json", by_alias=True) | {"revision": revision, "params": dict(params)}
     row = await fetch_one(
-        conn, "INSERT INTO runs (strategy_id, revision, request) VALUES ($1, $2, $3::jsonb) RETURNING id",
-        request.strategy_id, revision, json.dumps(recorded),
+        conn,
+        "INSERT INTO runs (strategy_id, revision, request, requested_by) VALUES ($1, $2, $3::jsonb, $4) RETURNING id",
+        request.strategy_id, revision, json.dumps(recorded), requested_by,
     )
     return row["id"]
+
+
+async def waiting_for_agent(conn: Conn) -> int | None:
+    """A run the agent asked for that is still queued or computing — the agent waits for it before asking again."""
+    return await conn.fetchval(
+        "SELECT id FROM runs WHERE status IN ('queued', 'running') AND requested_by = 'agent' ORDER BY id LIMIT 1"
+    )
 
 
 async def interrupted_by_restart(conn: Conn) -> int:
@@ -114,8 +124,9 @@ async def finish(
         )
         await conn.execute(
             "UPDATE runs SET status = 'done', finished_at = now(), engine_version = $2, report = $3::jsonb, "
-            "provenance = $4::jsonb WHERE id = $1 AND status = 'running'",
+            "provenance = $4::jsonb, headline = $5::jsonb WHERE id = $1 AND status = 'running'",
             run_id, engine_version, json.dumps(report), json.dumps(provenance),
+            json.dumps({key: report.get(key) for key in HEADLINE}),
         )
 
 
@@ -146,6 +157,7 @@ class RunRow:
     reason: str | None
     engine_version: int | None
     request: dict
+    requested_by: str
     queued_at: datetime
     started_at: datetime | None
     finished_at: datetime | None
@@ -156,8 +168,8 @@ class RunRow:
 def run_row(row: asyncpg.Record) -> RunRow:
     return RunRow(
         row["id"], row["strategy_id"], row["revision"], row["status"], row["reason"], row["engine_version"],
-        decoded(row["request"]), row["queued_at"], row["started_at"], row["finished_at"], decoded(row["report"]),
-        decoded(row["provenance"]),
+        decoded(row["request"]), row["requested_by"], row["queued_at"], row["started_at"], row["finished_at"],
+        decoded(row["report"]), decoded(row["provenance"]),
     )
 
 
@@ -171,8 +183,14 @@ async def status_of(conn: Conn, run_id: int) -> str | None:
 
 
 
-# A list carries no report or provenance — those are megabytes across a page, and `GET /runs/{id}` has them.
-_LIST = "SELECT id, strategy_id, revision, status, reason, engine_version, request, queued_at, started_at, finished_at"
+# A list carries no report or provenance — those are megabytes across a page, and `GET /runs/{id}` has them. The headline
+# is its own column, written with the report, so polling a list never detoasts a report and its curve.
+_LIST = """
+    SELECT id, strategy_id, revision, status, reason, engine_version, request, requested_by, queued_at, started_at,
+           finished_at, headline
+"""
+
+HEADLINE = ("trades", "total_r", "expectancy_r", "max_drawdown_r", "sharpe")
 
 
 async def list_runs(conn: Conn, strategy_id: int | None, offset: int, limit: int) -> list[asyncpg.Record]:

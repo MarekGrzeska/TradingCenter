@@ -4,9 +4,9 @@ The strategy engine, under `/strategies`. **A strategy is a document**, not code
 is saved, and replayed over the candle archive by an engine written once. A new strategy — or a new indicator in the
 archive's catalogue — needs no change here and no deploy. Research only: nothing in this package can reach an account.
 
-Why it exists and what was weighed: `openspec/changes/a-strategy-is-a-document`, and the research behind it in
-`docs/strategie-i-backtesty-research.html`. Stage 1 of three: the screen and an agent that writes documents from a
-sentence come next, then walk-forward and the other validation.
+Why it exists and what was weighed: `openspec/changes/archive/2026-10-25-a-strategy-is-a-document` (the engine) and
+`openspec/changes/a-strategy-from-a-description` (the screen and the agent), and the research behind both in
+`docs/strategie-i-backtesty-research.html`. Walk-forward and the other validation are stage 3.
 
 **Optional**, like the alerts: mounted only when `STRATEGIES_DATABASE_URL` is set; unset is a working process.
 
@@ -85,6 +85,29 @@ total R, profit factor, drawdown in R and %, Sharpe and Sortino from daily retur
 bars held, exposure, the total without the best five, a split by year, costs by component, and two benchmarks: buy and
 hold, and random entry repeated from the run's seed. Every report records what it was made from — revision and hash,
 parameters, costs, range, engine version, seed, and a fingerprint of every series read.
+
+## The conversation's tools
+
+Eight, in `tools/`, built into a FastMCP server the assembly hands **to the conversation alone** as functions — never to
+the teams (a schedule would spend the queue and the trial count on runs nobody asked for), never to the alerts'
+catalogue, and never mounted at `/mcp` (design D7). `strategy_language`, `list_strategies`, `read_strategy` and
+`validate_strategy` read; `save_strategy` writes a revision authored `agent`, and needs `based_on` — the revision the
+change was made to — or a newer one is a refusal; `run_backtest` queues a run marked `requested_by = agent`, with the
+**instrument's cost profile** and no costs of its own, refuses while another of the agent's runs waits, and waits up to
+`WAIT_SECONDS` for the result; `read_run` and `compare_runs`, which refuses runs of different range, costs or engine.
+No tool sets a cost profile: costs are the operator's, `PUT /costs/{symbol}`. The surface has a character ceiling in
+`tests/strategies/test_tools.py`.
+
+## What the screen reads
+
+- **The summary** (`summary.py`) is the document read back in Polish from the document alone — no model, so a strategy
+  the agent misunderstood reads as what it is. Every registry name has a phrase (`phrase`, `NAME_PHRASES`), and a test
+  refuses one without. In `POST /validate` and every revision read.
+- **Changes** (`changes.py`) between two revisions, by the paths problems use; the history and `save_strategy` share it.
+- **A save based on a stale revision** (`?based_on=`) is a 409 naming the latest, so the editor and the agent never
+  silently undo each other.
+- **The report** is `ReportOut` in the contract, with the daily `equity` curve the ratios were computed from (engine 2;
+  a v1 report has none). A list of runs reads the `headline` column, never the report.
 
 ## Settings
 
