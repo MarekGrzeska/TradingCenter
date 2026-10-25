@@ -17,7 +17,7 @@ from . import costs_store, margins
 from .archive import Archive
 from .costs import CostModel
 from .problems import Problem
-from .reading import minute_bars
+from .reading import execution_bars
 from .series import epoch, moment
 from .store import decoded
 
@@ -39,8 +39,11 @@ class RunIn(BaseModel):
     seed: int = Field(default=1, ge=0)
 
 
-def check_request(request: RunIn, declared: Mapping[str, Mapping[str, float]], max_minute_bars: int) -> list[Problem]:
-    """Everything wrong with a run before it is queued. `declared` is the revision's `params` section."""
+def check_request(
+    request: RunIn, declared: Mapping[str, Mapping[str, float]], settled_on: str | None, max_execution_bars: int
+) -> list[Problem]:
+    """Everything wrong with a run before it is queued. `declared` is the revision's `params` section, `settled_on` its
+    execution series — counted as minutes for a document this engine can no longer read, which its run refuses anyway."""
     problems: list[Problem] = []
     if request.costs is not None and request.without_costs:
         problems.append(Problem(
@@ -50,11 +53,12 @@ def check_request(request: RunIn, declared: Mapping[str, Mapping[str, float]], m
     start, end = epoch(request.from_), epoch(request.to)
     if end <= start:
         problems.append(Problem("to", "a run's range ends after it starts"))
-    bars = minute_bars(start, end)
-    if bars > max_minute_bars:
+    resolution = settled_on or "MINUTE"
+    bars = execution_bars(start, end, resolution)
+    if bars > max_execution_bars:
         problems.append(Problem(
-            "to", f"this range can hold {bars} minute candles of the traded instrument; one run reads at most "
-            f"{max_minute_bars}", hint="shorten the range, or split it into runs",
+            "to", f"this range can hold {bars} {resolution} candles of the traded instrument, which this strategy's fills "
+            f"are settled on; one run reads at most {max_execution_bars}", hint="shorten the range, or split it into runs",
         ))
     for name, value in request.params.items():
         spec = declared.get(name)

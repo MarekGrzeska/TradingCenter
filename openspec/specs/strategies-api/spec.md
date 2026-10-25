@@ -96,7 +96,7 @@ kontrakt konsumenta znał typ każdego pola. Słownik o dowolnych kluczach MUST 
 ### Requirement: Porównanie uruchomień przez REST
 
 Pakiet MUST publikować `GET /runs/compare`, który przyjmuje od dwóch do pięciu różnych identyfikatorów uruchomień i
-stosuje tę samą regułę porównywalności co `compare_runs`: ten sam zakres, ten sam model kosztów i ta sama wersja silnika,
+stosuje tę samą regułę porównywalności co `compare_runs`: ten sam zakres, ten sam model kosztów, ten sam wymagany depozyt i ta sama wersja silnika,
 każde uruchomienie zakończone. Odpowiedź MUST zestawiać, w kolejności podanej przez wołającego, dla każdego uruchomienia
 jego strategię, rewizję, parametry i metryki raportu, opisane w kontrakcie nazwanym modelem. Gdy uruchomienia nie są
 porównywalne, odpowiedź MUST mieć kod 422 i MUST nazywać każdą różnicę i uruchomienie, którego dotyczy. Uruchomienie,

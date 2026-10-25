@@ -45,9 +45,9 @@ class Settings(BaseSettings):
     # How many runs compute at once, each in a worker process of its own. One by default: a run is CPU for minutes, and
     # this process also serves the candle stream and the conversation.
     run_concurrency: int = 1
-    # The most `MINUTE` candles of the traded instrument one run may read, refused before queueing: about four years of
-    # a 24-hour market, sized from the measurement in PR #352.
-    max_minute_bars: int = 1_500_000
+    # The most candles of the execution series one run may read, refused before queueing: about four years of minutes
+    # of a 24-hour market, sized from the measurement in PR #352, and fourteen of five-minute bars.
+    max_execution_bars: int = 1_500_000
     # How long one run may compute before it is stopped and recorded as failed, with that reason.
     run_timeout_seconds: float = 600.0
     # How many times the random-entry benchmark is drawn: its percentiles are only as steady as this, and each draw is a
@@ -79,7 +79,7 @@ class Settings(BaseSettings):
             return None
         return value.strip()
 
-    @field_validator("database_pool_size", "run_concurrency", "max_minute_bars", "random_entry_repetitions")
+    @field_validator("database_pool_size", "run_concurrency", "max_execution_bars", "random_entry_repetitions")
     @classmethod
     def _positive(cls, value: int, info: ValidationInfo) -> int:
         if value < 1:

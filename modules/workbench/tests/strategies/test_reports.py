@@ -61,7 +61,7 @@ def _report(document, minute, *, seed=1, repetitions=10):
     result = simulate(**args, evaluator=evaluator)
     benchmark = reports.random_entry(result, simulate_args=args, evaluator=evaluator, seed=seed, repetitions=repetitions)
     return reports.build(
-        result, decision=series[("US100", "HOUR")], minute=minute, costs=FREE, capital=10_000.0,
+        result, decision=series[("US100", "HOUR")], execution=minute, costs=FREE, capital=10_000.0,
         range_from=args["range_from"], range_to=args["range_to"], random_entry=benchmark,
     )
 

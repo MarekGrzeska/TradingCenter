@@ -12,7 +12,7 @@ import numpy as np
 
 from . import reports
 from .costs import CostModel
-from .document import Checked
+from .document import Checked, execution
 from .engine import ENGINE_VERSION, simulate
 from .evaluate import Evaluator
 from .requirements import IndicatorKey
@@ -48,7 +48,7 @@ def compute(job: Job) -> tuple[dict[str, Any], Callable[[], dict[str, Any] | Non
     }
     result = simulate(**args, evaluator=evaluator)
     report = reports.build(
-        result, decision=job.series[(d.symbol, d.timeframe)], minute=job.series[(d.symbol, "MINUTE")],
+        result, decision=job.series[(d.symbol, d.timeframe)], execution=job.series[(d.symbol, execution(d))],
         costs=job.costs, capital=job.capital, range_from=job.range_from, range_to=job.range_to, random_entry=None,
     )
     outcome = {"engine_version": ENGINE_VERSION, "report": report,

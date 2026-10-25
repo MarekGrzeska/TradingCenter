@@ -35,9 +35,10 @@ class Inputs:
         return {f"{symbol}@{resolution}": s.fingerprint() for (symbol, resolution), s in sorted(self.series.items())}
 
 
-def minute_bars(range_from: int, range_to: int) -> int:
-    """The most minute candles a range can hold — what the run's ceiling is measured in, known before anything is read."""
-    return max(0, (range_to - range_from) // 60)
+def execution_bars(range_from: int, range_to: int, resolution: str) -> int:
+    """The most candles of the execution series a range can hold — what the run's ceiling is measured in, known before
+    anything is read."""
+    return max(0, (range_to - range_from) // PERIOD_SECONDS[resolution])
 
 
 async def read(
@@ -91,3 +92,34 @@ def _pieces(start: int, end: int, resolution: str) -> list[tuple[int, int]]:
     width = CHUNK_BARS * PERIOD_SECONDS[resolution]
     return [(lo, min(lo + width, end)) for lo in range(start, end, width)]
 
+
+def bars_without_minutes(decision: Series, minute: Series, range_from: int, range_to: int) -> str | None:
+    """Why a run settled on minutes cannot be made over this range, or `None`: a decision bar with no minute inside it
+    would leave an order or an exit waiting for the next minute there is, however many days later."""
+    inside = np.flatnonzero((decision.starts >= range_from) & (decision.available <= range_to))
+    starts = decision.starts[inside]
+    ends = starts + PERIOD_SECONDS[decision.resolution]
+    empty = np.searchsorted(minute.starts, ends) == np.searchsorted(minute.starts, starts)
+    if not empty.any():
+        return None
+    holes: list[tuple[int, int]] = []
+    previous = -2
+    for i in np.flatnonzero(empty).tolist():
+        if i == previous + 1:
+            holes[-1] = (holes[-1][0], int(ends[i]))
+        else:
+            holes.append((int(starts[i]), int(ends[i])))
+        previous = i
+    listed = ", ".join(f"{_iso(a)} to {_iso(b)}" for a, b in holes[:3])
+    within = minute.starts[(minute.starts >= range_from) & (minute.starts < range_to)]
+    first = f"the archive's first minute in the range is {_iso(int(within[0]))}" if len(within) else (
+        "the archive has no minute in the range"
+    )
+    return (
+        f"{int(empty.sum())} of {len(inside)} {decision.resolution} bars in the range have no minute under them, and this "
+        f"strategy's stops, targets or orders are settled on minutes — first gaps: {listed}; {first}. Nothing was computed"
+    )
+
+
+def _iso(seconds: int) -> str:
+    return moment(seconds).strftime("%Y-%m-%d %H:%M UTC")

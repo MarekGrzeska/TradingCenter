@@ -58,6 +58,8 @@ export interface Revision {
   author: Author;
   createdAt: Date;
   summary: Summary | null;
+  /** The series fills are settled on: the timeframe, or MINUTE for stops, targets and non-market orders. */
+  execution: string | null;
 }
 
 export interface RevisionEntry {
@@ -176,7 +178,7 @@ export class Refused extends Error {
 export interface Health {
   queued: number;
   running: number;
-  maxMinuteBars: number;
+  maxExecutionBars: number;
 }
 
 export interface StrategiesApi {
@@ -251,6 +253,7 @@ function mapRevision(raw: Schemas["RevisionOut"]): Revision {
     author: raw.author,
     createdAt: new Date(raw.created_at),
     summary: raw.summary ?? null,
+    execution: raw.execution ?? null,
   };
 }
 
@@ -357,7 +360,7 @@ export function createStrategiesApi(httpBase: string, identity: Identity = noIde
   return {
     async health(signal) {
       const raw = await http.json<Schemas["HealthOut"]>(`${httpBase}/health`, { signal });
-      return { queued: raw.queue.queued, running: raw.queue.running, maxMinuteBars: raw.max_minute_bars };
+      return { queued: raw.queue.queued, running: raw.queue.running, maxExecutionBars: raw.max_execution_bars };
     },
 
     language: (signal) => http.json<Language>(`${httpBase}/language`, { signal }),

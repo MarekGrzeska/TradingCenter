@@ -24,7 +24,7 @@ def build(
     result: Result,
     *,
     decision: Series,
-    minute: Series,
+    execution: Series,
     costs: CostModel,
     capital: float,
     range_from: int,
@@ -32,7 +32,7 @@ def build(
     random_entry: dict[str, Any] | None,
 ) -> dict[str, Any]:
     trades = result.trades
-    equity = daily_equity(trades, minute, costs, capital, range_from, range_to)
+    equity = daily_equity(trades, execution, costs, capital, range_from, range_to)
     report: dict[str, Any] = {
         "trades": len(trades),
         "no_trades": not trades,
@@ -44,7 +44,7 @@ def build(
         "by_year": by_year(trades),
         "costs": {k: sum(t.costs[k] for t in trades) for k in ("spread", "slippage", "financing")},
         "benchmarks": {
-            "buy_and_hold": buy_and_hold(minute, costs, capital, range_from, range_to),
+            "buy_and_hold": buy_and_hold(execution, costs, capital, range_from, range_to),
             "random_entry": random_entry,
         },
         "annualisation": ANNUALISATION,
@@ -109,8 +109,8 @@ def daily_equity(
     trades: Sequence[Trade], minute: Series, costs: CostModel, capital: float, range_from: int, range_to: int
 ) -> list[tuple[int, float]]:
     """Equity at each UTC midnight inside the range — whole days only, so every return is a day's. Realised results,
-    plus the open position marked at the last minute close before the mark (bid for a long, ask for a short), less the
-    financing it has accrued, as the realised result of the same trade will be."""
+    plus the open position marked at the last close of the execution series before the mark (bid for a long, ask for a
+    short), less the financing it has accrued, as the realised result of the same trade will be."""
     marks = np.arange((range_from // 86400 + 1) * 86400, range_to + 1, 86400)
     by_exit = sorted(trades, key=lambda t: t.exit_time)
     exit_times = np.array([t.exit_time for t in by_exit], dtype=np.int64)
@@ -177,7 +177,7 @@ def by_year(trades: Sequence[Trade]) -> dict[str, dict[str, float]]:
 
 
 def buy_and_hold(minute: Series, costs: CostModel, capital: float, range_from: int, range_to: int) -> dict[str, Any] | None:
-    """The whole capital long from the range's first minute to its last, with the same costs."""
+    """The whole capital long from the range's first bar of the execution series to its last, with the same costs."""
     inside = np.flatnonzero((minute.starts >= range_from) & (minute.available <= range_to))
     if inside.size == 0:
         return None

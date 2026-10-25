@@ -28,9 +28,12 @@ TERMS = {
 QUOTE = {"symbol": "US100", "name": "US Tech 100", "tradeable": True, "bid": 4049.28, "ask": 4049.58}
 
 
-def archive_of(minute: Series, *, terms: dict | None = None, broker_answers: bool = True) -> Archive:
-    """`terms` replaces what the broker says of the instrument; `broker_answers=False` is a gateway that is down."""
-    by_resolution = {"MINUTE": minute, "HOUR": hours(minute)}
+def archive_of(
+    minute: Series, *, terms: dict | None = None, broker_answers: bool = True, minutes_served: Series | None = None
+) -> Archive:
+    """`terms` replaces what the broker says of the instrument; `broker_answers=False` is a gateway that is down;
+    `minutes_served` is an archive whose minutes begin later than the hours built from `minute`."""
+    by_resolution = {"MINUTE": minute if minutes_served is None else minutes_served, "HOUR": hours(minute)}
 
     def handler(request: httpx.Request) -> httpx.Response:
         path = request.url.path

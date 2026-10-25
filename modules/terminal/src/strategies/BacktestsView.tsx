@@ -183,7 +183,8 @@ export function BacktestsView({
             revision={detail.value.n}
             symbol={document?.symbol ?? ""}
             params={(document?.params ?? {}) as never}
-            maxMinuteBars={health.value.health?.maxMinuteBars ?? null}
+            execution={detail.value.execution ?? "MINUTE"}
+            maxExecutionBars={health.value.health?.maxExecutionBars ?? null}
             onQueued={() => runs.reload()}
           />
         )

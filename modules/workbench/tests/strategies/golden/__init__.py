@@ -13,7 +13,7 @@ import numpy as np
 
 from strategies import reports
 from strategies.costs import CostModel
-from strategies.document import Checked, servable, validate
+from strategies.document import Checked, execution, servable, validate
 from strategies.engine import simulate
 from strategies.evaluate import Evaluator
 from strategies.requirements import IndicatorKey, needs
@@ -132,7 +132,7 @@ def run(name: str, data: dict[tuple[str, str], Series], indicators: dict[Indicat
     result = simulate(**args, evaluator=evaluator)
     d = document.document
     report = reports.build(
-        result, decision=data[(d.symbol, d.timeframe)], minute=data[(d.symbol, "MINUTE")], costs=COSTS,
+        result, decision=data[(d.symbol, d.timeframe)], execution=data[(d.symbol, execution(d))], costs=COSTS,
         capital=10_000.0, range_from=start, range_to=end,
         random_entry=reports.random_entry(result, simulate_args=args, evaluator=evaluator, seed=7, repetitions=5),
     )

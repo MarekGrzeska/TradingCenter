@@ -739,10 +739,10 @@ export interface components {
              */
             database: "reachable";
             /**
-             * Max Minute Bars
-             * @description the most minute candles one run may cover — a run form says it before sending
+             * Max Execution Bars
+             * @description the most candles of its execution series one run may cover — a run form says it before sending
              */
-            max_minute_bars: number;
+            max_execution_bars: number;
             queue: components["schemas"]["QueueOut"];
         };
         /** IndicatorOut */
@@ -1041,6 +1041,11 @@ export interface components {
             document: {
                 [key: string]: unknown;
             };
+            /**
+             * Execution
+             * @description the series fills are settled on: the timeframe, or MINUTE for stops, targets and non-market orders; null as the summary is
+             */
+            execution: string | null;
             /** N */
             n: number;
             /** Schema Version */
@@ -1411,6 +1416,11 @@ export interface components {
         };
         /** ValidationOut */
         ValidationOut: {
+            /**
+             * Execution
+             * @description the series fills are settled on, when the document is valid
+             */
+            execution: string | null;
             /** Problems */
             problems: components["schemas"]["ProblemOut"][];
             /** @description present when the document is valid */

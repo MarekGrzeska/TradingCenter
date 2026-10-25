@@ -66,7 +66,7 @@ async function tick(...ids: number[]) {
 
 function fakeApi(overrides: Partial<StrategiesApi> = {}): StrategiesApi {
   return {
-    health: vi.fn(async () => ({ queued: 0, running: 0, maxMinuteBars: 1_500_000 })),
+    health: vi.fn(async () => ({ queued: 0, running: 0, maxExecutionBars: 1_500_000 })),
     strategies: vi.fn(async () => [strategy(7, "US100 pullback"), strategy(8, "EURUSD breakout")]),
     detail: vi.fn(async () => ({
       item: strategy(7, "US100 pullback"),

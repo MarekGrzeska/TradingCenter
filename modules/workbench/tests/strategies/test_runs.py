@@ -16,11 +16,12 @@ from strategies.costs import CostModel
 from strategies.document import servable, validate
 from strategies.engine import ENGINE_VERSION
 from strategies.queue import RunQueue
+from strategies.reading import bars_without_minutes
 from strategies.runs import RunIn
 
 from .builders import catalogue
 from .fake_archive import archive_of
-from .market import flat, minutes, strategy
+from .market import HOUR, MONDAY, flat, hours, minutes, strategy, walk
 
 COSTS = {"spread": 1.5, "slippage": 0.0, "overnight_long": 0.0, "overnight_short": 0.0, "rollover_hour": 22}
 DECLARED = {"fast": {"default": 20, "min": 10, "max": 30, "step": 5}}
@@ -34,19 +35,50 @@ def request(**changes) -> RunIn:
 
 
 def test_a_parameter_outside_its_declared_range_and_an_unknown_one_are_refused() -> None:
-    problems = runs.check_request(request(params={"fast": 40, "slow": 3}), DECLARED, 1_500_000)
+    problems = runs.check_request(request(params={"fast": 40, "slow": 3}), DECLARED, "MINUTE", 1_500_000)
 
     assert {p.path for p in problems} == {"params.fast", "params.slow"}
 
 
 def test_a_range_past_the_ceiling_is_refused_with_both_numbers() -> None:
-    [problem] = runs.check_request(request(to="2030-03-02T00:00:00Z"), DECLARED, 1_500_000)
+    [problem] = runs.check_request(request(to="2030-03-02T00:00:00Z"), DECLARED, "MINUTE", 1_500_000)
 
     assert "1500000" in problem.message and str((4 * 365 + 1) * 1440) in problem.message
 
 
+def test_the_ceiling_counts_candles_of_the_series_fills_are_settled_on() -> None:
+    ten_years = request(**{"from": "2016-01-01T00:00:00Z", "to": "2026-01-01T00:00:00Z"})
+
+    assert runs.check_request(ten_years, DECLARED, "MINUTE_5", 1_500_000) == []
+    assert [p.path for p in runs.check_request(ten_years, DECLARED, "MINUTE", 1_500_000)] == ["to"]
+
+
+def test_a_decision_bar_with_no_minute_under_it_is_named_with_the_first_minute_there_is() -> None:
+    full = minutes(walk(3))
+    # Monday's minutes gone, Tuesday's 10:00 minute alone missing as well.
+    kept = {t - MONDAY: row for t, row in zip(full.starts.tolist(), _rows(full), strict=True)
+            if t >= MONDAY + 86400 and t != MONDAY + 86400 + 10 * HOUR}
+    message = bars_without_minutes(hours(full), minutes(kept), MONDAY, int(full.available[-1]))
+
+    assert message is not None
+    assert message.startswith("24 of 72 HOUR bars") and "2026-03-02 00:00 UTC to 2026-03-03 00:00 UTC" in message
+    assert "first minute in the range is 2026-03-03 00:00 UTC" in message
+
+
+def test_a_single_missing_minute_is_not_a_gap() -> None:
+    full = minutes(walk(1))
+    kept = {t - MONDAY: row for t, row in zip(full.starts.tolist(), _rows(full), strict=True) if t != MONDAY + 600}
+
+    assert bars_without_minutes(hours(full), minutes(kept), MONDAY, int(full.available[-1])) is None
+
+
+def _rows(series):
+    c = series.columns
+    return list(zip(c["open"].tolist(), c["high"].tolist(), c["low"].tolist(), c["close"].tolist(), strict=True))
+
+
 def test_costs_and_without_costs_at_once_are_refused() -> None:
-    [problem] = runs.check_request(request(without_costs=True), DECLARED, 1_500_000)
+    [problem] = runs.check_request(request(without_costs=True), DECLARED, "MINUTE", 1_500_000)
 
     assert problem.path == "without_costs"
 
@@ -99,8 +131,27 @@ async def test_a_queued_run_is_computed_in_a_worker_and_leaves_its_trades_and_pr
     assert row.status == "done", row.reason
     assert row.engine_version == ENGINE_VERSION and row.provenance is not None
     assert row.provenance["series"]["US100@MINUTE"]["bars"] > 0 and row.provenance["seed"] == 1
+    assert row.provenance["execution"] == "MINUTE"
     async with pool.acquire() as conn:
         assert await conn.fetchval("SELECT count(*) FROM run_trades WHERE run_id = $1", run_id) == row.report["trades"]
+
+
+@pytest.mark.db
+async def test_a_strategy_with_a_stop_over_hours_without_minutes_fails_before_computing(pool) -> None:
+    run_id = await _enqueue(pool, await _strategy(pool))
+    later = minutes(flat(2 * 86400, 5 * 86400, 100.0))
+    queue = RunQueue(pool, archive_of(MINUTES, minutes_served=later), _settings())
+    await queue.start()
+    try:
+        row = await _until(pool, run_id, {"done", "failed"})
+    finally:
+        await queue.stop()
+
+    assert row.status == "failed" and row.reason is not None
+    assert "48 of 120 HOUR bars in the range have no minute under them" in row.reason
+    assert "first minute in the range is 2026-03-04 00:00 UTC" in row.reason
+    async with pool.acquire() as conn:
+        assert await conn.fetchval("SELECT count(*) FROM run_trades WHERE run_id = $1", run_id) == 0
 
 
 @pytest.mark.db

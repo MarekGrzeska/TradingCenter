@@ -241,6 +241,10 @@ class RevisionOut(BaseModel):
     author: Literal["operator", "agent"]
     created_at: datetime
     summary: SummaryOut | None = Field(description="null only for a document this engine can no longer read")
+    execution: str | None = Field(
+        description="the series fills are settled on: the timeframe, or MINUTE for stops, targets and non-market "
+        "orders; null as the summary is"
+    )
 
 
 class RevisionEntryOut(BaseModel):
@@ -318,6 +322,7 @@ class ValidationOut(BaseModel):
     valid: bool
     problems: list[ProblemOut]
     summary: SummaryOut | None = Field(default=None, description="present when the document is valid")
+    execution: str | None = Field(default=None, description="the series fills are settled on, when the document is valid")
 
 
 class FunctionOut(BaseModel):
@@ -383,4 +388,6 @@ class QueueOut(BaseModel):
 class HealthOut(BaseModel):
     database: Literal["reachable"]
     queue: QueueOut
-    max_minute_bars: int = Field(description="the most minute candles one run may cover — a run form says it before sending")
+    max_execution_bars: int = Field(
+        description="the most candles of its execution series one run may cover — a run form says it before sending"
+    )

@@ -8,11 +8,12 @@ from pydantic import ValidationError
 
 from strategies.costs import CostModel
 from strategies.document import servable, validate
+from strategies.engine import simulate
 from strategies.evaluate import Evaluator
 from strategies.series import Series
 
 from .builders import catalogue
-from .market import FREE, HOUR, MONDAY, flat, hours, minutes, run, strategy, walk
+from .market import FREE, HOUR, MONDAY, bars, flat, hours, minutes, run, strategy, walk
 
 SPREAD = CostModel(spread=1.5, slippage=0.0, overnight_long=0.0, overnight_short=0.0, rollover_hour=22)
 
@@ -272,3 +273,32 @@ def test_a_position_that_loses_the_whole_capital_is_closed_and_nothing_opens_aft
     trades = run(document, minutes(rows)).trades
 
     assert [(t.exit_price, t.exit_reason) for t in trades] == [(10_000.0, "out_of_capital")]
+
+
+def _trade_path(trades) -> list[tuple]:
+    return [(t.side, t.entry_time, t.entry_price, t.exit_time, t.exit_price) for t in trades]
+
+
+def test_a_strategy_without_levels_trades_on_its_bars_as_it_would_on_minutes() -> None:
+    """The same entries and exits, once with a stop too far to be touched, which settles them on minutes."""
+    minute = minutes(walk(10))
+    costs = CostModel(spread=1.5, slippage=0.2, overnight_long=0.0002, overnight_short=0.0001, rollover_hour=22)
+    unreachable = {"stop": "entry_price - 100000", "when": SESSION["exits"]["when"]}
+
+    on_bars = run(SESSION, minute, costs=costs).trades
+    on_minutes = run(SESSION | {"exits": unreachable}, minute, costs=costs).trades
+
+    assert len(on_bars) == 8 and _trade_path(on_bars) == _trade_path(on_minutes)
+
+
+def test_a_strategy_without_levels_needs_no_minutes_under_its_bars() -> None:
+    """No minute series at all: an engine that read one would fail on the missing key."""
+    five = bars(minutes(walk(10)), "MINUTE_5")
+    checked, problems = validate(SESSION, catalogue(), servable({("US100", "MINUTE")}))
+    assert checked is not None, problems
+
+    trades = simulate(
+        checked, {}, catalogue(), {("US100", "MINUTE_5"): five}, {}, FREE, 10_000.0, MONDAY, int(five.available[-1])
+    ).trades
+
+    assert len(trades) == 8 and {t.exit_reason for t in trades} == {"when"}

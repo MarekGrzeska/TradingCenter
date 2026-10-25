@@ -413,6 +413,13 @@ ADVISORIES: tuple[tuple[str, str, str, str], ...] = (
 # than ignored, for the reason the advisories above exist: a line read by nothing looks like one that works.
 RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
     (
+        "STRATEGIES_MAX_MINUTE_BARS",
+        (
+            "a run's ceiling is counted in candles of the series its fills are settled on since "
+            "`execution-on-the-decision-series`; STRATEGIES_MAX_EXECUTION_BARS is the line read instead"
+        ),
+    ),
+    (
         "TELEGRAM_SESSION",
         (
             "the owner account is logged in from the terminal's Telegram tab since "

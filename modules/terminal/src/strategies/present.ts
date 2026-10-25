@@ -1,5 +1,6 @@
 /** How the tab says numbers: an empty metric is a dash, never zero (`strategies-reports`), and Polish decimals. */
 
+import { RESOLUTION_SECONDS } from "../chart/chartWindow";
 import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import type { Resolution } from "../data/types";
 import { formatInstant } from "../ui/formatTime";
@@ -44,9 +45,11 @@ export const EXIT_LABEL: Record<string, string> = {
   end_of_range: "koniec zakresu",
 };
 
-/** Minutes a range holds, as the package counts them against its ceiling — calendar minutes, weekends included. */
-export function minutesIn(from: Date, to: Date): number {
-  return Math.max(0, Math.floor((to.getTime() - from.getTime()) / 60_000));
+/** Candles of `resolution` a range holds, as the package counts them against its ceiling — calendar time, weekends
+ *  included. */
+export function barsIn(from: Date, to: Date, resolution: string): number {
+  const seconds = RESOLUTION_SECONDS[resolution as Resolution] ?? 60;
+  return Math.max(0, Math.floor((to.getTime() - from.getTime()) / 1000 / seconds));
 }
 
 /** Whether the list has to keep asking: only while something waits or computes, so an idle tab costs nothing. */
