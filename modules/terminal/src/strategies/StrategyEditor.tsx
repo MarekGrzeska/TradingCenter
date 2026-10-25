@@ -3,7 +3,7 @@ import { autocompletion, type CompletionContext, type CompletionResult } from "@
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import { json, jsonParseLinter } from "@codemirror/lang-json";
 import { bracketMatching, syntaxTree } from "@codemirror/language";
-import { forceLinting, linter, lintGutter, type Diagnostic } from "@codemirror/lint";
+import { linter, lintGutter, setDiagnostics, type Diagnostic } from "@codemirror/lint";
 import { EditorState } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { offersAfterAt, offersForKeys, offersInFormula, type Offer } from "./completions";
@@ -64,6 +64,8 @@ export function StrategyEditor({
   const symbolsRef = useRef(symbols);
   symbolsRef.current = symbols;
 
+  const diagnoseRef = useRef<(view: EditorView) => Diagnostic[]>(() => []);
+
   useEffect(() => {
     if (!host.current) return;
 
@@ -84,6 +86,7 @@ export function StrategyEditor({
         };
       });
     };
+    diagnoseRef.current = diagnose;
 
     const complete = (context: CompletionContext): CompletionResult | null => {
       const known = languageRef.current;
@@ -141,8 +144,11 @@ export function StrategyEditor({
     view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } });
   }, [text]);
 
+  // Pushed, not `forceLinting`: that only runs a lint still pending, and the one after the last keystroke has long run —
+  // with nothing to show, because the check had not answered yet.
   useEffect(() => {
-    if (viewRef.current) forceLinting(viewRef.current);
+    const view = viewRef.current;
+    if (view) view.dispatch(setDiagnostics(view.state, diagnoseRef.current(view)));
   }, [checked]);
 
   return <div ref={host} className="h-full min-h-0 overflow-hidden rounded border border-border" aria-label="Dokument strategii" />;
