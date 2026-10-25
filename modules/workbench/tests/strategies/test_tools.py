@@ -11,7 +11,7 @@ from mcp.server.fastmcp.exceptions import ToolError
 
 from strategies import runs, store
 from strategies.app import create_app
-from strategies.compare import NotComparable, compare
+from strategies.compare import NotComparable, compare, count_problem
 from strategies.config import Settings
 from strategies.costs import CostModel
 from strategies.queue import RunQueue
@@ -219,3 +219,9 @@ async def test_a_draft_reaches_the_editor_without_a_revision_and_a_save_ends_it(
     await _call(app, "save_strategy", document=kept.document, strategy_id=sid, based_on=1)
     async with pool.acquire() as conn:
         assert await drafts.get(conn, sid) is None
+
+
+@pytest.mark.parametrize("run_ids", [[1], [1, 1], [1, 2, 3, 4, 5, 6]])
+def test_one_run_a_repeated_run_or_more_than_five_cannot_be_compared(run_ids: list[int]) -> None:
+    assert count_problem(run_ids) == "compare 2 to 5 different runs"
+    assert count_problem([1, 2]) is None

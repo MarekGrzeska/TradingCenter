@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from typing import Annotated
 
-from .. import runs, store
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from pydantic import Field
+
+from .. import compare, runs, store
 from ..archive import ArchiveUnavailable
 from ..broker_costs import BrokerCostsMissing
 from ..contract import (
+    ComparisonOut,
     ProblemsOut,
     RunAcceptedOut,
     RunCancelledOut,
@@ -85,6 +89,31 @@ def _summary(row) -> RunSummaryOut:
         marks = runs.costs_marks(request, row["requested_by"])
         headline = headline | {"costs_source": marks["costs_source"], "without_costs": marks["without_costs"]}
     return RunSummaryOut.model_validate(dict(row) | {"request": request, "headline": headline})
+
+
+# Before `/runs/{run_id}`: routes match in order, and `compare` would otherwise reach it as a run id that is not a number.
+@router.get(
+    "/runs/compare", response_model=ComparisonOut,
+    responses={404: {"description": "no such run"}, 422: {"model": ProblemsOut}},
+)
+async def compare_runs(
+    run_ids: list[Annotated[int, Field(ge=1, le=BIGINT)]] = Query(alias="run_id", description="2 to 5 different finished runs, in the order to show them"),
+    db=Depends(pool),
+):
+    """The same rule as the agent's `compare_runs`: refused, with every difference named, unless the runs share the
+    range, the costs and the engine version."""
+    if (problem := compare.count_problem(run_ids)) is not None:
+        return refused("these runs cannot be compared", [Problem("run_id", problem)])
+    async with db.acquire() as conn:
+        rows = [await runs.get_run(conn, run_id) for run_id in run_ids]
+    missing = [str(run_id) for run_id, row in zip(run_ids, rows, strict=True) if row is None]
+    if missing:
+        raise not_found(f"run {', '.join(missing)}")
+    try:
+        compared = compare.compare([row for row in rows if row is not None])
+    except compare.NotComparable as err:
+        return refused("these runs cannot be compared", [Problem("run_id", reason) for reason in err.reasons])
+    return ComparisonOut.model_validate({"runs": compared})
 
 
 @router.get("/runs/{run_id}", response_model=RunOut, responses={404: {"description": "no such run"}})

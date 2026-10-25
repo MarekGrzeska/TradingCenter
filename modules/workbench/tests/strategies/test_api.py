@@ -190,6 +190,33 @@ async def test_a_report_says_where_its_costs_came_from_and_marks_a_run_without_t
 
 
 @pytest.mark.db
+async def test_runs_are_compared_on_the_wire_or_refused_with_the_difference_named(pool) -> None:
+    async def finished(client, sid: int, to: str) -> int:
+        body = {"strategy_id": sid, "from": "2026-03-02T00:00:00Z", "to": to, "costs": COSTS}
+        run_id = (await client.post("/runs", json=body)).json()["id"]
+        async with pool.acquire() as conn:
+            await conn.execute("UPDATE runs SET status = 'running' WHERE id = $1", run_id)
+        await runs.finish(pool, run_id, 1, _report(WALKING, minutes(walk(10, seed=5))), {"seed": 1}, [])
+        return run_id
+
+    async with _client(pool) as client:
+        first = (await client.post("/strategies", json=strategy())).json()["strategy_id"]
+        second = (await client.post("/strategies", json=strategy(name="other"))).json()["strategy_id"]
+        a = await finished(client, first, "2026-03-03T00:00:00Z")
+        b = await finished(client, second, "2026-03-03T00:00:00Z")
+        c = await finished(client, second, "2026-03-04T00:00:00Z")
+        compared = await client.get(f"/runs/compare?run_id={b}&run_id={a}")
+        refused = await client.get(f"/runs/compare?run_id={a}&run_id={c}")
+        alone = await client.get(f"/runs/compare?run_id={a}")
+        missing = await client.get(f"/runs/compare?run_id={a}&run_id=999999")
+
+    assert compared.status_code == 200
+    assert [(r["run_id"], r["strategy_id"]) for r in compared.json()["runs"]] == [(b, second), (a, first)]
+    assert refused.status_code == 422 and f"run {c} covers" in refused.json()["problems"][0]["message"]
+    assert alone.status_code == 422 and missing.status_code == 404
+
+
+@pytest.mark.db
 async def test_a_draft_is_read_and_discarded_and_none_is_a_404(pool) -> None:
     from strategies import drafts
 

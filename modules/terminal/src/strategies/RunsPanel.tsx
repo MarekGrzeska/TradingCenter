@@ -13,6 +13,8 @@ export function RunsPanel({
   onPick,
   onCancel,
   strategyNames,
+  checked,
+  onCheck,
 }: {
   runs: readonly RunItem[];
   error: string | null;
@@ -22,6 +24,9 @@ export function RunsPanel({
   strategyNames?: ReadonlyMap<number, string>;
   /** Says its own failure; the list only asks. */
   onCancel(id: number): Promise<void>;
+  /** Given, finished runs can be ticked for a comparison. */
+  checked?: ReadonlySet<number>;
+  onCheck?(id: number): void;
 }) {
   if (runs.length === 0) {
     return (
@@ -34,6 +39,7 @@ export function RunsPanel({
     <table aria-label="Uruchomienia" className="w-full text-xs">
       <thead className="text-left text-ink-muted">
         <tr>
+          {onCheck && <th />}
           <th className="py-1">#</th>
           {strategyNames && <th>Strategia</th>}
           <th>Stan</th>
@@ -55,6 +61,17 @@ export function RunsPanel({
             onClick={() => run.status === "done" && onPick(run.id)}
             className={`border-t border-border ${run.status === "done" ? "cursor-pointer hover:bg-panel" : ""} ${picked === run.id ? "bg-panel-strong" : ""}`}
           >
+            {onCheck && (
+              <td onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  aria-label={`Porównaj uruchomienie ${run.id}`}
+                  disabled={run.status !== "done"}
+                  checked={checked?.has(run.id) ?? false}
+                  onChange={() => onCheck(run.id)}
+                />
+              </td>
+            )}
             <td className="py-1 text-ink">{run.id}</td>
             {strategyNames && <td className="text-ink">{strategyNames.get(run.strategyId) ?? `#${run.strategyId}`}</td>}
             <td className={run.status === "failed" ? "text-critical" : "text-ink-secondary"} title={run.reason ?? undefined}>

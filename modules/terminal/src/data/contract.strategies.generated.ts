@@ -193,6 +193,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/runs/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare Runs
+         * @description The same rule as the agent's `compare_runs`: refused, with every difference named, unless the runs share the
+         *     range, the costs and the engine version.
+         */
+        get: operations["compare_runs_runs_compare_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -484,6 +505,56 @@ export interface components {
             n: number;
             /** Strategy Id */
             strategy_id: number;
+        };
+        /**
+         * ComparedRunOut
+         * @description One run of a comparison: what it was made of and the numbers a reader weighs. Nothing ranks it.
+         */
+        ComparedRunOut: {
+            /** Calmar */
+            calmar: number | null;
+            /** Expectancy R */
+            expectancy_r: number | null;
+            /** Longest Losing Streak */
+            longest_losing_streak: number | null;
+            /** Max Drawdown Pct */
+            max_drawdown_pct: number | null;
+            /** Max Drawdown R */
+            max_drawdown_r: number | null;
+            /** Params */
+            params: {
+                [key: string]: number;
+            };
+            /** Pessimistic Resolutions */
+            pessimistic_resolutions: number | null;
+            /** Profit Factor */
+            profit_factor: number | null;
+            /** Revision */
+            revision: number;
+            /** Run Id */
+            run_id: number;
+            /** Sharpe */
+            sharpe: number | null;
+            /** Sortino */
+            sortino: number | null;
+            /** Strategy Id */
+            strategy_id: number;
+            /** Total R */
+            total_r: number | null;
+            /** Total R Without Best 5 */
+            total_r_without_best_5: number | null;
+            /** Trades */
+            trades: number | null;
+            /** Win Rate */
+            win_rate: number | null;
+        };
+        /** ComparisonOut */
+        ComparisonOut: {
+            /**
+             * Runs
+             * @description in the order asked; same range, costs and engine version
+             */
+            runs: components["schemas"]["ComparedRunOut"][];
         };
         /** ConflictOut */
         ConflictOut: {
@@ -1580,6 +1651,45 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    compare_runs_runs_compare_get: {
+        parameters: {
+            query: {
+                /** @description 2 to 5 different finished runs, in the order to show them */
+                run_id: number[];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ComparisonOut"];
+                };
+            };
+            /** @description no such run */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProblemsOut"];
+                };
             };
         };
     };

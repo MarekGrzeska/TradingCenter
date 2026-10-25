@@ -43,4 +43,20 @@ describe("createStrategiesApi", () => {
     await expect(creating).rejects.toBeInstanceOf(Refused);
     await expect(creating).rejects.toMatchObject({ problems });
   });
+
+  it("asks for the runs to compare in their order and reads a refusal as the differences it names", async () => {
+    const problems = [{ path: "run_id", message: "run 12 covers 2026-01-01 to 2026-02-01, run 11 2026-01-01 to 2026-03-01", column: null, hint: null }];
+    let asked = "";
+    server.use(
+      http.get(`${BASE}/runs/compare`, ({ request }) => {
+        asked = new URL(request.url).search;
+        return HttpResponse.json({ detail: "these runs cannot be compared", problems }, { status: 422 });
+      }),
+    );
+
+    const comparing = createStrategiesApi(BASE).compare([12, 11], signal());
+
+    await expect(comparing).rejects.toMatchObject({ problems });
+    expect(asked).toBe("?run_id=12&run_id=11");
+  });
 });
