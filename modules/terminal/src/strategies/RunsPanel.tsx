@@ -5,29 +5,37 @@ import type { RunItem } from "./strategiesApi";
 
 const day = (d: Date) => formatInstant(d.getTime() / 1000).slice(0, 10);
 
-/** Every run of the open strategy, all its revisions, newest first — which of them the agent asked for included. */
+/** Runs, newest first — which of them the agent asked for included. With `strategyNames`, of several strategies. */
 export function RunsPanel({
   runs,
   error,
   picked,
   onPick,
   onCancel,
+  strategyNames,
 }: {
   runs: readonly RunItem[];
   error: string | null;
   picked: number | null;
   onPick(id: number): void;
+  /** Given, the list is of every strategy and names each run's. */
+  strategyNames?: ReadonlyMap<number, string>;
   /** Says its own failure; the list only asks. */
   onCancel(id: number): Promise<void>;
 }) {
   if (runs.length === 0) {
-    return <p className="text-sm text-ink-muted">{error ?? "Ta strategia nie miała jeszcze uruchomień."}</p>;
+    return (
+      <p className="text-sm text-ink-muted">
+        {error ?? (strategyNames ? "Nie było jeszcze uruchomień." : "Ta strategia nie miała jeszcze uruchomień.")}
+      </p>
+    );
   }
   return (
     <table aria-label="Uruchomienia" className="w-full text-xs">
       <thead className="text-left text-ink-muted">
         <tr>
           <th className="py-1">#</th>
+          {strategyNames && <th>Strategia</th>}
           <th>Stan</th>
           <th>Rew.</th>
           <th>Zakres</th>
@@ -48,6 +56,7 @@ export function RunsPanel({
             className={`border-t border-border ${run.status === "done" ? "cursor-pointer hover:bg-panel" : ""} ${picked === run.id ? "bg-panel-strong" : ""}`}
           >
             <td className="py-1 text-ink">{run.id}</td>
+            {strategyNames && <td className="text-ink">{strategyNames.get(run.strategyId) ?? `#${run.strategyId}`}</td>}
             <td className={run.status === "failed" ? "text-critical" : "text-ink-secondary"} title={run.reason ?? undefined}>
               {STATUS_LABEL[run.status] ?? run.status}
               {run.status === "failed" && run.reason ? ` — ${run.reason}` : ""}

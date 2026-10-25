@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link } from "react-router";
 import { agentActivity, type AgentActivityStore } from "../agent/agentActivity";
 import type { AgentChatStore } from "../agent/agentChatStore";
 import { setStrategyInView } from "../agent/strategyInView";
@@ -11,10 +12,7 @@ import { Button } from "../ui/Button";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { afterTurn, createdDuringTurn, documentText } from "./followTurn";
 import { HistoryPanel } from "./HistoryPanel";
-import { anyPending, interval } from "./present";
-import { ReportPanel } from "./ReportPanel";
-import { RunForm } from "./RunForm";
-import { RunsPanel } from "./RunsPanel";
+import { interval } from "./present";
 import {
   createStrategiesApi,
   Refused,
@@ -23,7 +21,6 @@ import {
   type Language,
   type Draft,
   type Revision,
-  type RunItem,
   type StrategiesApi,
   type StrategyItem,
 } from "./strategiesApi";
@@ -35,13 +32,12 @@ import { useLiveValidation } from "./useLiveValidation";
 
 /**
  * Strategies as documents (`terminal-strategies`): the operator reads what the agent wrote and the summary read back from
- * it, corrects it by hand, runs it and reads the report. Beside the editor is the strategy's own conversation with the
- * agent; the terminal's panel is told which strategy is open too. Everything is read again once a turn ends — the tab
- * never interprets the agent's tool calls.
+ * it, and corrects it by hand; runs and reports are the Backtests tab's. Beside the editor is the strategy's own
+ * conversation with the agent; the terminal's panel is told which strategy is open too. Everything is read again once a
+ * turn ends — the tab never interprets the agent's tool calls.
  */
 
 const signal = () => new AbortController().signal;
-const RUNS_POLL_MS = 3_000;
 
 const BLANK = {
   schema: 1,
@@ -57,8 +53,6 @@ const BLANK = {
   sizing: { mode: "risk_fraction", value: 0.005 },
   limits: {},
 };
-
-type Pane = "history" | "runs";
 
 /** Which strategy the chat's conversation belongs to: its id, or "new" for one begun before the strategy existed. */
 type ChatOwner = { strategy: number | "new"; name: string; conversation: number | null } | null;
@@ -80,8 +74,6 @@ export function StrategiesView({
   const [notice, setNotice] = useState<string | null>(null);
   const [newer, setNewer] = useState<number | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
-  const [pane, setPane] = useState<Pane>("runs");
-  const [pickedRun, setPickedRun] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
 
   const health = useRead<{ present: boolean; health: Health | null }>({
@@ -121,17 +113,6 @@ export function StrategiesView({
     fallbackMessage: "nie udało się wczytać instrumentów archiwum",
     enabled: ready,
   });
-  const [runsPending, setRunsPending] = useState(false);
-  const runs = useRead<RunItem[]>({
-    key: ["strategies", "runs", openId],
-    read: (s) => client.runs(openId as number, s),
-    initial: [],
-    fallbackMessage: "nie udało się wczytać uruchomień",
-    enabled: ready && openId !== null,
-    // Only while something waits or computes: an idle tab asks nothing (db-cost-check).
-    pollMs: runsPending ? RUNS_POLL_MS : undefined,
-  });
-  useEffect(() => setRunsPending(anyPending(runs.value)), [runs.value]);
 
   const baseText = base === null ? (creating ? documentText(BLANK) : "") : documentText(base.document);
   const dirty = (base !== null || creating) && text !== baseText;
@@ -196,7 +177,6 @@ export function StrategiesView({
     setFailure(null);
     setNotice(null);
     setCreating(false);
-    setPickedRun(null);
     try {
       const { item, revision } = await client.detail(id, signal());
       load(revision);
@@ -240,7 +220,6 @@ export function StrategiesView({
         // Text that is the agent's own draft is not the operator's unsaved work.
         const unsaved = dirty && onScreen !== shownDraft.current?.text;
         list.reload();
-        runs.reload();
         void (async () => {
           try {
             if (id !== null && at !== null) {
@@ -314,7 +293,6 @@ export function StrategiesView({
     try {
       await work();
       list.reload();
-      runs.reload();
     } catch (cause: unknown) {
       setFailure(messageOf(cause, fallback));
     }
@@ -334,7 +312,6 @@ export function StrategiesView({
 
   const open_ = list.value.find((s) => s.id === openId) ?? null;
   const valid = validation.valid === true && !validation.stale;
-  const document = base?.document as { symbol?: string; timeframe?: string; params?: Record<string, never> } | undefined;
 
   return (
     <section className="flex h-full min-h-0 gap-3 p-3">
@@ -455,46 +432,12 @@ export function StrategiesView({
 
             {base !== null && (
               <>
-                <nav className="flex gap-2">
-                  <Button size="xs" tone={pane === "runs" ? "primary" : "muted"} onClick={() => setPane("runs")}>
-                    Uruchomienia
-                  </Button>
-                  <Button size="xs" tone={pane === "history" ? "primary" : "muted"} onClick={() => setPane("history")}>
-                    Historia rewizji
-                  </Button>
-                </nav>
-                {pane === "history" ? (
-                  <HistoryPanel key={base.n} api={client} strategyId={base.strategyId} latest={base.n} onRestore={restore} />
-                ) : (
-                  <div className="flex flex-col gap-3">
-                    <RunForm
-                      key={`${base.strategyId}-${base.n}`}
-                      api={client}
-                      strategyId={base.strategyId}
-                      revision={base.n}
-                      symbol={document?.symbol ?? ""}
-                      params={(document?.params ?? {}) as never}
-                      maxMinuteBars={health.value.health?.maxMinuteBars ?? null}
-                      onQueued={() => runs.reload()}
-                    />
-                    <RunsPanel
-                      runs={runs.value}
-                      error={runs.error}
-                      picked={pickedRun}
-                      onPick={setPickedRun}
-                      onCancel={(id) => act(() => client.cancel(id, signal()), "nie udało się anulować uruchomienia")}
-                    />
-                    {pickedRun !== null && (
-                      <ReportPanel
-                        key={pickedRun}
-                        api={client}
-                        runId={pickedRun}
-                        symbol={document?.symbol ?? ""}
-                        timeframe={document?.timeframe ?? "HOUR"}
-                      />
-                    )}
-                  </div>
-                )}
+                <p className="text-sm">
+                  <Link className="text-primary hover:underline" to={`/backtests?strategy=${base.strategyId}`}>
+                    Backtesty tej strategii →
+                  </Link>
+                </p>
+                <HistoryPanel key={base.n} api={client} strategyId={base.strategyId} latest={base.n} onRestore={restore} />
               </>
             )}
           </>

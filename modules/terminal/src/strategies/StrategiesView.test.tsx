@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { createAgentActivityStore, type AgentActivityStore } from "../agent/agentActivity";
 import type { AgentApi, AgentSession } from "../agent/agentApi";
@@ -123,7 +124,7 @@ const pairs = { listPairs: vi.fn(async () => []) } as unknown as ArchiveAdmin;
 
 describe("StrategiesView", () => {
   it("lists a strategy in the terminal's interval names and opens it with its summary", async () => {
-    render(<StrategiesView api={fakeApi()} pairs={pairs} activity={createAgentActivityStore()} />);
+    render(<MemoryRouter><StrategiesView api={fakeApi()} pairs={pairs} activity={createAgentActivityStore()} /></MemoryRouter>);
 
     const entry = await screen.findByRole("button", { name: /US100 pullback/ });
     expect(entry).toHaveTextContent("h4");
@@ -140,7 +141,7 @@ describe("StrategiesView", () => {
         throw new MarketDataError("not-found", "Not Found");
       }),
     });
-    render(<StrategiesView api={absent} pairs={pairs} activity={createAgentActivityStore()} />);
+    render(<MemoryRouter><StrategiesView api={absent} pairs={pairs} activity={createAgentActivityStore()} /></MemoryRouter>);
 
     expect(await screen.findByText("STRATEGIES_DATABASE_URL")).toBeInTheDocument();
   });
@@ -148,7 +149,7 @@ describe("StrategiesView", () => {
   it("takes the agent's revision after a turn, and says the agent saved it", async () => {
     const activity = createAgentActivityStore();
     const api = fakeApi();
-    render(<StrategiesView api={api} pairs={pairs} activity={activity} />);
+    render(<MemoryRouter><StrategiesView api={api} pairs={pairs} activity={activity} /></MemoryRouter>);
     await userEvent.click(await screen.findByRole("button", { name: /US100 pullback/ }));
     await screen.findByText(/rewizja 4/);
 
@@ -163,7 +164,7 @@ describe("StrategiesView", () => {
     const activity = createAgentActivityStore();
     const agent = fakeAgent();
     const api = fakeApi();
-    render(<StrategiesView api={api} pairs={pairs} activity={activity} chat={strategyChat(agent, activity)} />);
+    render(<MemoryRouter><StrategiesView api={api} pairs={pairs} activity={activity} chat={strategyChat(agent, activity)} /></MemoryRouter>);
     await userEvent.click(await screen.findByRole("button", { name: /US100 pullback/ }));
     await screen.findByText(/rewizja 4/);
 
@@ -186,7 +187,7 @@ describe("StrategiesView", () => {
       strategies: vi.fn(async () => [item]),
       detail: vi.fn(async () => ({ item: created, revision: { ...revision(1, "EURUSD breakout"), strategyId: 8 } })),
     });
-    render(<StrategiesView api={api} pairs={pairs} activity={activity} chat={strategyChat(agent, activity)} />);
+    render(<MemoryRouter><StrategiesView api={api} pairs={pairs} activity={activity} chat={strategyChat(agent, activity)} /></MemoryRouter>);
     await userEvent.click(await screen.findByRole("button", { name: "Nowa…" }));
 
     vi.mocked(api.strategies).mockImplementation(async () => [item, created]);
@@ -201,7 +202,7 @@ describe("StrategiesView", () => {
   it("puts the agent's draft into the editor as unsaved text, and discarding it removes it", async () => {
     const activity = createAgentActivityStore();
     const api = fakeApi();
-    render(<StrategiesView api={api} pairs={pairs} activity={activity} />);
+    render(<MemoryRouter><StrategiesView api={api} pairs={pairs} activity={activity} /></MemoryRouter>);
     await userEvent.click(await screen.findByRole("button", { name: /US100 pullback/ }));
     await screen.findByText(/rewizja 4/);
 

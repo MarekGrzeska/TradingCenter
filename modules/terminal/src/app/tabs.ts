@@ -19,6 +19,7 @@ import { YoutubeView } from "../youtube/YoutubeView";
  */
 // Loaded when first opened: its editor is a dependency no other tab pays for (design D9 of the strategies' stage 2).
 const StrategiesView = lazy(() => import("../strategies/StrategiesView").then((m) => ({ default: m.StrategiesView })));
+const BacktestsView = lazy(() => import("../strategies/BacktestsView").then((m) => ({ default: m.BacktestsView })));
 
 export const TAB_GROUPS = [
   { id: "trading", label: "Trading" },
@@ -65,6 +66,13 @@ export const TABS: TabDefinition[] = [
     group: "trading",
     path: "strategies",
     Component: StrategiesView,
+  },
+  {
+    id: "backtests",
+    label: "Backtests",
+    group: "trading",
+    path: "backtests",
+    Component: BacktestsView,
   },
   {
     id: "accounts",
