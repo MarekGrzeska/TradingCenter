@@ -16,7 +16,7 @@ LUNA = ModelCatalogueEntry(
     output_rate_per_1m=Decimal("1.2"),
 )
 SOL = ModelCatalogueEntry(
-    id="gpt-6-sol",
+    id="gpt-6.1-sol",
     model="sol-prod",
     display_name="Sol",
     cost_rank=3,
@@ -31,11 +31,11 @@ def catalogue() -> ModelCatalogue:
 
 
 def test_entries_are_sorted_cheapest_first() -> None:
-    assert [e.id for e in catalogue().entries()] == ["gpt-6-luna", "gpt-6-sol"]
+    assert [e.id for e in catalogue().entries()] == ["gpt-6-luna", "gpt-6.1-sol"]
 
 
 def test_get_returns_the_matching_entry() -> None:
-    assert catalogue().get("gpt-6-sol") is SOL
+    assert catalogue().get("gpt-6.1-sol") is SOL
 
 
 def test_get_an_unknown_model_names_it_in_the_refusal() -> None:
@@ -52,7 +52,7 @@ def test_resolve_with_no_request_falls_back_to_the_default() -> None:
 
 
 def test_resolve_with_a_known_request_returns_it() -> None:
-    assert catalogue().resolve("gpt-6-sol") is SOL
+    assert catalogue().resolve("gpt-6.1-sol") is SOL
 
 
 def test_resolve_with_an_unknown_request_refuses_rather_than_falling_back() -> None:
@@ -63,6 +63,6 @@ def test_resolve_with_an_unknown_request_refuses_rather_than_falling_back() -> N
 
 
 def test_a_model_retired_from_the_catalogue_is_still_a_named_refusal() -> None:
-    only_sol = ModelCatalogue([SOL], default_model_id="gpt-6-sol")
+    only_sol = ModelCatalogue([SOL], default_model_id="gpt-6.1-sol")
     with pytest.raises(ModelNotInCatalogue):
         only_sol.get("gpt-6-luna")
