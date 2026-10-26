@@ -157,6 +157,8 @@ export interface Schedule {
   revisionMode: RevisionMode;
   pinnedRevisionId: number | null;
   cronExpression: string;
+  /** The IANA zone the rhythm is read in as a wall clock — `Europe/Warsaw` unless the schedule named another. */
+  timezone: string;
   /** The same schedule as a rhythm, or `null` for an expression no rhythm describes —
    *  read back by the module, never derived here. */
   recurrence: Recurrence | null;
@@ -174,6 +176,7 @@ export interface Schedule {
 export interface ScheduleTiming {
   recurrence: Recurrence | null;
   cronExpression: string | null;
+  timezone: string;
 }
 
 /** What an operator submits to create or edit a schedule — everything `Schedule` carries
@@ -456,6 +459,7 @@ function mapSchedule(raw: RawSchedule): Schedule {
     revisionMode: raw.revision_mode as RevisionMode,
     pinnedRevisionId: raw.pinned_revision_id,
     cronExpression: raw.cron_expression,
+    timezone: raw.timezone,
     recurrence: raw.recurrence === null || raw.recurrence === undefined
       ? null
       : mapRecurrence(raw.recurrence),
@@ -482,6 +486,7 @@ function mapRecurrence(raw: NonNullable<RawSchedule["recurrence"]>): Recurrence 
 function timingToWire(timing: ScheduleTiming) {
   return {
     cron_expression: timing.cronExpression,
+    timezone: timing.timezone,
     recurrence:
       timing.recurrence === null
         ? null

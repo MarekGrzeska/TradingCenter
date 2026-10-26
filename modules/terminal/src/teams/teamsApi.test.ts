@@ -432,6 +432,7 @@ const wireSchedule = {
   revision_mode: "pinned",
   pinned_revision_id: 3,
   cron_expression: "*/5 * * * *",
+  timezone: "Europe/Warsaw",
   recurrence: {
     kind: "every_minutes",
     minutes: 5,
@@ -459,6 +460,7 @@ describe("schedules", () => {
         revisionMode: "pinned",
         pinnedRevisionId: 3,
         cronExpression: "*/5 * * * *",
+        timezone: "Europe/Warsaw",
         recurrence: {
           kind: "every_minutes",
           minutes: 5,
@@ -492,6 +494,7 @@ describe("schedules", () => {
         revisionMode: "pinned",
         pinnedRevisionId: 3,
         cronExpression: "*/5 * * * *",
+        timezone: "Europe/Warsaw",
         recurrence: null,
       },
       new AbortController().signal,
@@ -501,6 +504,7 @@ describe("schedules", () => {
       revision_mode: "pinned",
       pinned_revision_id: 3,
       cron_expression: "*/5 * * * *",
+      timezone: "Europe/Warsaw",
       recurrence: null,
     });
   });
@@ -520,6 +524,7 @@ describe("schedules", () => {
         revisionMode: "pinned",
         pinnedRevisionId: 3,
         cronExpression: null,
+        timezone: "Europe/Warsaw",
         recurrence: {
           kind: "weekly",
           minutes: null,
@@ -536,6 +541,7 @@ describe("schedules", () => {
       revision_mode: "pinned",
       pinned_revision_id: 3,
       cron_expression: null,
+      timezone: "Europe/Warsaw",
       recurrence: {
         kind: "weekly",
         minutes: null,
@@ -559,6 +565,7 @@ describe("schedules", () => {
     const times = await api().previewNextFires(
       {
         cronExpression: null,
+        timezone: "Europe/Warsaw",
         recurrence: {
           kind: "daily",
           minutes: null,
@@ -593,6 +600,7 @@ describe("schedules", () => {
           revisionMode: "pinned",
           pinnedRevisionId: 3,
           cronExpression: "not a cron",
+          timezone: "Europe/Warsaw",
           recurrence: null,
         },
         new AbortController().signal,

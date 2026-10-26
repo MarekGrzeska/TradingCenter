@@ -7,6 +7,9 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+# The zone a schedule is read in when it names none — the operator's own, and the only one before schedules carried theirs.
+DEFAULT_TIMEZONE = "Europe/Warsaw"
+
 RecurrenceKind = Literal["every_minutes", "hourly", "daily", "weekly", "monthly"]
 
 # Which fields each rhythm needs. A field named here MUST carry a value.

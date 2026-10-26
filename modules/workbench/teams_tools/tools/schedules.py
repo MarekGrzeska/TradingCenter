@@ -25,6 +25,7 @@ _CLOCK_CAVEAT = (
 class SavedSchedule(BaseModel):
     schedule_id: int
     cron_expression: str
+    timezone: str
     next_fire_at: str
     enabled: bool
     note: str
@@ -56,18 +57,22 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         team_id: int,
         cron_expression: str = Field(
             description=(
-                "five-field cron, read as a wall clock in Poland (Europe/Warsaw) — for "
+                "five-field cron, read as a wall clock in `timezone` — for "
                 "example '0 7 * * 1-5' for 07:00 on weekdays, the same 07:00 in summer "
                 "and in winter"
             )
+        ),
+        timezone: str = Field(
+            default="Europe/Warsaw",
+            description="IANA zone the cron is read in — 'America/New_York' for a New York session",
         ),
         pinned_revision_id: int | None = None,
     ) -> SavedSchedule:
         """Run this team on a clock, unattended.
 
-        Times are Polish wall-clock times, always — teams rolls the expression forward in
-        `Europe/Warsaw`, so 07:00 stays 07:00 across a clock change, and the moment it
-        answers with (`next_fire_at`) is that same moment in UTC. By default the schedule
+        Times are wall-clock times in `timezone`, Poland unless named — teams rolls the
+        expression forward there, so 07:00 stays 07:00 across that zone's clock change, and
+        the moment it answers with (`next_fire_at`) is that same moment in UTC. By default the schedule
         is **pinned** to the revision
         given (or the current one), so editing the team later does not silently change
         what the robot does at seven in the morning; pass `pinned_revision_id` from
@@ -84,11 +89,13 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
             "revision_mode": "pinned",
             "pinned_revision_id": pinned_revision_id,
             "cron_expression": cron_expression,
+            "timezone": timezone,
         }
         saved = await _call(teams, context, "POST", f"/teams/{team_id}/schedules", json=body)
         return SavedSchedule(
             schedule_id=saved["id"],
             cron_expression=saved["cron_expression"],
+            timezone=saved["timezone"],
             next_fire_at=saved["next_fire_at"],
             enabled=saved["enabled"],
             note=_CLOCK_CAVEAT,
@@ -173,7 +180,7 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
                 kind="schedule",
                 id=row["id"],
                 describes=(
-                    f"cron {row['cron_expression']} (Europe/Warsaw), "
+                    f"cron {row['cron_expression']} ({row['timezone']}), "
                     f"next {row['next_fire_at']} (UTC)"
                 ),
                 enabled=row["enabled"],
@@ -228,10 +235,13 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         schedule_id: int,
         cron_expression: str = Field(
             description=(
-                "five-field cron, read as a wall clock in Poland (Europe/Warsaw). Weekdays "
+                "five-field cron, read as a wall clock in the schedule's zone. Weekdays "
                 "go in the fifth field — '35 * * * 1,2,3,4,5' is every hour at :35 on "
                 "trading days"
             )
+        ),
+        timezone: str | None = Field(
+            default=None, description="IANA zone to read it in; left out keeps the schedule's own"
         ),
         pinned_revision_id: int | None = None,
     ) -> SavedSchedule:
@@ -251,11 +261,13 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
             if pinned_revision_id is not None
             else current["pinned_revision_id"],
             "cron_expression": cron_expression,
+            "timezone": timezone or current["timezone"],
         }
         saved = await _call(teams, context, "PUT", f"/schedules/{schedule_id}", json=body)
         return SavedSchedule(
             schedule_id=saved["id"],
             cron_expression=saved["cron_expression"],
+            timezone=saved["timezone"],
             next_fire_at=saved["next_fire_at"],
             enabled=saved["enabled"],
             note=_CLOCK_CAVEAT,

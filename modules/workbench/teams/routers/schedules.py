@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -61,8 +62,8 @@ async def _revision_must_be_there(
                 raise HTTPException(404, detail="no such team")
 
 
-def _first_fire_at(cron_expression: str) -> datetime:
-    return next_fire_after(cron_expression, datetime.now(UTC))
+def _first_fire_at(timing: ScheduleIn) -> datetime:
+    return next_fire_after(timing.cron(), datetime.now(UTC), timing.zone())
 
 
 
@@ -85,7 +86,8 @@ async def create_schedule(
             revision_mode=body.revision_mode,
             pinned_revision_id=body.pinned_revision_id,
             cron_expression=body.cron(),
-            next_fire_at=_first_fire_at(body.cron()),
+            timezone=body.timezone,
+            next_fire_at=_first_fire_at(body),
         )
     return ScheduleOut.from_row(dict(row))
 
@@ -137,7 +139,8 @@ async def update_schedule(
             revision_mode=body.revision_mode,
             pinned_revision_id=body.pinned_revision_id,
             cron_expression=body.cron(),
-            next_fire_at=_first_fire_at(body.cron()),
+            timezone=body.timezone,
+            next_fire_at=_first_fire_at(body),
         )
     if row is None:
         raise HTTPException(404, detail="no such schedule")
@@ -212,7 +215,7 @@ async def next_fires(
     if row is None:
         raise HTTPException(404, detail="no such schedule")
 
-    return NextFiresOut(times=_take(row["cron_expression"], count))
+    return NextFiresOut(times=_take(row["cron_expression"], ZoneInfo(row["timezone"]), count))
 
 
 @router.post("/schedules/next-fires")
@@ -223,11 +226,11 @@ async def preview_next_fires(
     ownership check beyond being signed in — a cron expression is not somebody's data."""
     if not 1 <= body.count <= _MAX_NEXT_FIRES:
         raise HTTPException(422, detail=f"count must be between 1 and {_MAX_NEXT_FIRES}")
-    return NextFiresOut(times=_take(body.cron(), body.count))
+    return NextFiresOut(times=_take(body.cron(), body.zone(), body.count))
 
 
-def _take(cron_expression: str, count: int) -> list[datetime]:
-    fires = fires_after(cron_expression, datetime.now(UTC))
+def _take(cron_expression: str, timezone: ZoneInfo, count: int) -> list[datetime]:
+    fires = fires_after(cron_expression, datetime.now(UTC), timezone)
     return [next(fires) for _ in range(count)]
 
 

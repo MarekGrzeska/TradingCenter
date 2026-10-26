@@ -4,6 +4,7 @@ wall clock in Poland and everything stored is UTC — including the two nights a
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from zoneinfo import ZoneInfo
 
 from teams.scheduler.clock import _next_fire_and_skipped
 from teams.scheduler.timing import SCHEDULE_TIMEZONE, fires_after, next_fire_after
@@ -84,3 +85,26 @@ def test_a_week_of_an_hourly_weekday_rhythm_never_lands_on_a_weekend() -> None:
     fires = fires_after("35 * * * 1,2,3,4,5", _utc("2026-08-17T00:00:00"))
     days = {next(fires).astimezone(SCHEDULE_TIMEZONE).isoweekday() for _ in range(200)}
     assert days == {1, 2, 3, 4, 5}
+
+
+NEW_YORK = ZoneInfo("America/New_York")
+
+
+def test_a_new_york_schedule_keeps_new_york_time_in_the_week_the_two_clocks_disagree() -> None:
+    # Poland left summer time on 25 October 2026, New York leaves it on 1 November: that week the open is 14:30 in
+    # Poland rather than 15:30, and a schedule read in Polish time would fire an hour late.
+    fires = fires_after("35 9 * * 1-5", _utc("2026-10-25T12:00:00"), NEW_YORK)
+
+    monday, *_ = [next(fires) for _ in range(5)]
+    assert monday == _utc("2026-10-26T13:35:00")
+    # After New York's own change the same 9:35 is an hour later in UTC.
+    after_change = next_fire_after("35 9 * * 1-5", _utc("2026-11-01T12:00:00"), NEW_YORK)
+    assert after_change == _utc("2026-11-02T14:35:00")
+
+
+def test_weekdays_are_the_schedule_zones_weekdays() -> None:
+    # 20:00 on a Friday in New York is already Saturday in Poland; the schedule says Friday, and Friday it is.
+    friday = next_fire_after("0 20 * * 5", _utc("2026-08-17T00:00:00"), NEW_YORK)
+
+    assert friday.astimezone(NEW_YORK).isoweekday() == 5
+    assert friday.astimezone(SCHEDULE_TIMEZONE).isoweekday() == 6

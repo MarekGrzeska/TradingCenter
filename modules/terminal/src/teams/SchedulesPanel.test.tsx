@@ -44,6 +44,7 @@ const SCHEDULE: Schedule = {
   revisionMode: "pinned",
   pinnedRevisionId: 9,
   cronExpression: "*/5 * * * *",
+  timezone: "Europe/Warsaw",
   recurrence: { kind: "every_minutes", minutes: 5, minute: null, hour: null, weekdays: null, dayOfMonth: null },
   nextFireAt: 1_755_374_700, // 2025-08-16T20:05:00Z
   enabled: true,
@@ -197,6 +198,25 @@ describe("creating and editing a schedule", () => {
     );
     // The list is asked again rather than the panel guessing what changed.
     expect((api.listSchedules as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("posts the time zone the operator chose, and the list says where a rhythm is read", async () => {
+    const inNewYork = { ...SCHEDULE, timezone: "America/New_York" };
+    const api = fakeApi({ listSchedules: vi.fn(async () => [inNewYork]) });
+    renderPanel(api);
+
+    expect(await screen.findByText(/America\/New_York/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "New schedule" }));
+    await userEvent.selectOptions(screen.getByLabelText("Time zone"), "America/New_York");
+    await userEvent.click(screen.getByRole("button", { name: "Create schedule" }));
+
+    await waitFor(() =>
+      expect(api.createSchedule).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({ timezone: "America/New_York" }),
+        expect.anything(),
+      ),
+    );
   });
 
   it("opens a schedule the wizard has no rhythm for on its own expression, and saves it unchanged", async () => {

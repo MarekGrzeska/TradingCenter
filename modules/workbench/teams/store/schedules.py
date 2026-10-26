@@ -8,21 +8,22 @@ from datetime import datetime
 import asyncpg
 from tc_runtime.db import Conn, fetch_one
 
+from ..recurrence import DEFAULT_TIMEZONE
 from .recurring import SCHEDULE_COLUMNS, SCHEDULES
 
 _INSERT_SCHEDULE = f"""
     INSERT INTO schedules (
         team_id, owner_principal, revision_mode, pinned_revision_id,
-        cron_expression, next_fire_at
+        cron_expression, timezone, next_fire_at
     )
-    VALUES ($1, $2, $3, $4, $5, $6)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
     RETURNING {SCHEDULE_COLUMNS}
 """
 
 _UPDATE_SCHEDULE = f"""
     UPDATE schedules
        SET revision_mode = $3, pinned_revision_id = $4, cron_expression = $5,
-           next_fire_at = $6, updated_at = now()
+           timezone = $6, next_fire_at = $7, updated_at = now()
      WHERE id = $1 AND owner_principal = $2
     RETURNING {SCHEDULE_COLUMNS}
 """
@@ -36,6 +37,7 @@ async def create_schedule(
     revision_mode: str,
     pinned_revision_id: int | None,
     cron_expression: str,
+    timezone: str = DEFAULT_TIMEZONE,
     next_fire_at: datetime,
 ) -> asyncpg.Record:
     return await fetch_one(
@@ -46,6 +48,7 @@ async def create_schedule(
         revision_mode,
         pinned_revision_id,
         cron_expression,
+        timezone,
         next_fire_at,
     )
 
@@ -70,6 +73,7 @@ async def update_schedule(
     revision_mode: str,
     pinned_revision_id: int | None,
     cron_expression: str,
+    timezone: str = DEFAULT_TIMEZONE,
     next_fire_at: datetime,
 ) -> asyncpg.Record | None:
     return await conn.fetchrow(
@@ -79,6 +83,7 @@ async def update_schedule(
         revision_mode,
         pinned_revision_id,
         cron_expression,
+        timezone,
         next_fire_at,
     )
 

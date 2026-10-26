@@ -116,9 +116,41 @@ def test_a_schedule_is_created_with_a_next_fire_computed_from_the_cron_expressio
     assert response.status_code == 201, response.text
     body = response.json()
     assert body["cron_expression"] == "*/5 * * * *"
+    # Named nowhere, so read the way every schedule was read before schedules carried a zone.
+    assert body["timezone"] == "Europe/Warsaw"
     assert body["enabled"] is True
     assert body["consecutive_failures"] == 0
     assert body["next_fire_at"] is not None
+
+
+def test_a_schedule_in_new_york_fires_at_new_york_time(client: TestClient) -> None:
+    team_id, revision_id = _team(client)
+
+    saved = client.post(
+        f"/teams/{team_id}/schedules",
+        json={**_schedule_body(revision_id, cron="35 9 * * 1-5"), "timezone": "America/New_York"},
+        headers=OWNER,
+    )
+    assert saved.status_code == 201, saved.text
+    assert saved.json()["timezone"] == "America/New_York"
+
+    times = client.get(f"/schedules/{saved.json()['id']}/next-fires", headers=OWNER).json()["times"]
+    # 9:35 in New York — 13:35 UTC in summer, 14:35 in winter — whatever Poland's clock says that week.
+    assert {time[11:16] for time in [saved.json()["next_fire_at"], *times]} <= {"13:35", "14:35"}
+
+
+def test_a_timezone_nobody_knows_is_refused_naming_it(client: TestClient) -> None:
+    team_id, revision_id = _team(client)
+
+    response = client.post(
+        f"/teams/{team_id}/schedules",
+        json={**_schedule_body(revision_id), "timezone": "Europe/Atlantis"},
+        headers=OWNER,
+    )
+
+    assert response.status_code == 422
+    assert "Europe/Atlantis" in response.text
+    assert client.get(f"/teams/{team_id}/schedules", headers=OWNER).json() == []
 
 
 def test_an_invalid_cron_expression_is_refused(client: TestClient) -> None:

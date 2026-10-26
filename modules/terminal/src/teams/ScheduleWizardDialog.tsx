@@ -11,6 +11,7 @@ import {
   emptyScheduleDraft,
   draftFromSchedule,
   recurrenceOfKind,
+  timezoneChoices,
   withRevisionMode,
   withTiming,
   withWeekdayToggled,
@@ -116,6 +117,23 @@ export function ScheduleWizardDialog({
           </p>
         )}
 
+        <label className="flex items-center gap-2 text-xs text-ink-muted">
+          Time zone
+          <select
+            aria-label="Time zone"
+            value={draft.timezone}
+            onChange={(event) => setDraft({ ...draft, timezone: event.target.value })}
+            className={INPUT}
+          >
+            {timezoneChoices(draft.timezone).map(({ zone, label }) => (
+              <option key={zone} value={zone}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <span className="text-ink-faint">the time above is read on this clock</span>
+        </label>
+
         <NextFiresPreview api={api} draft={draft} />
 
         <label className="flex items-center gap-2 text-xs text-ink-muted">
@@ -138,7 +156,7 @@ export function ScheduleWizardDialog({
           <summary className="cursor-pointer text-xs text-ink-muted">Advanced (cron)</summary>
           <div className="mt-2 flex flex-col gap-2">
             <label className="text-xs text-ink-muted" htmlFor="schedule-cron">
-              Five-field cron, read as a wall clock in Poland
+              Five-field cron, read as a wall clock in the time zone above
             </label>
             <input
               id="schedule-cron"
@@ -313,7 +331,11 @@ function readClock(value: string): { hour: number; minute: number } | Record<str
 function NextFiresPreview({ api, draft }: { api: TeamsApi; draft: ScheduleDraft }) {
   const [times, setTimes] = useState<number[] | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
-  const timing = JSON.stringify({ recurrence: draft.recurrence, cronExpression: draft.cronExpression });
+  const timing = JSON.stringify({
+    recurrence: draft.recurrence,
+    cronExpression: draft.cronExpression,
+    timezone: draft.timezone,
+  });
 
   useEffect(() => {
     const controller = new AbortController();

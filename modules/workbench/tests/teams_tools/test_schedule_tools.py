@@ -30,6 +30,7 @@ def _schedule(**overrides):
         "revision_mode": "pinned",
         "pinned_revision_id": 9,
         "cron_expression": "0 7 * * 1-5",
+        "timezone": "Europe/Warsaw",
         "next_fire_at": "2026-08-18T07:00:00Z",
         "enabled": True,
         "disabled_reason": None,
@@ -249,7 +250,9 @@ async def test_editing_a_schedule_keeps_the_row_it_edits(server) -> None:
     """The whole reason `edit_schedule` exists rather than delete-and-recreate: the
     identifier and the history are what the operator is talking about."""
     mcp, teams = server
-    respx.get(f"{BASE}/schedules/11").mock(return_value=httpx.Response(200, json=_schedule()))
+    respx.get(f"{BASE}/schedules/11").mock(
+        return_value=httpx.Response(200, json=_schedule(timezone="America/New_York"))
+    )
     saved = respx.put(f"{BASE}/schedules/11").mock(
         return_value=httpx.Response(200, json=_schedule(cron_expression="35 * * * 1,2,3,4,5"))
     )
@@ -261,8 +264,9 @@ async def test_editing_a_schedule_keeps_the_row_it_edits(server) -> None:
 
     body = json.loads(saved.calls.last.request.read())
     assert body["cron_expression"] == "35 * * * 1,2,3,4,5"
-    # The revision the schedule already ran stays put when none is named.
+    # The revision and the zone the schedule already had stay put when none is named.
     assert body["pinned_revision_id"] == 9
+    assert body["timezone"] == "America/New_York"
     assert structured["schedule_id"] == 11
     assert not deleted.called
     await teams.aclose()
