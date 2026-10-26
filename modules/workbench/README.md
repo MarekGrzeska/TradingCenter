@@ -54,7 +54,7 @@ read *and move* the demo account through **trading-mcp** — positions, balance 
 orders on the reading side, orders sent, closed, amended and cancelled on the other — and
 ask the **prediction-market archive** what a market prices an event at, of its archive or of
 the provider live, the **post archive** what was said and what a model made of it, and send the operator a
-**Telegram** message. At most eight calls per turn, a number in the code rather than a setting.
+**Telegram** message. At most sixteen calls per turn, a number in the code rather than a setting.
 trading-mcp is configured and fails on its own: absent or unreachable, it costs the model its tools
 and nothing else.
 

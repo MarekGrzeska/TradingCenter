@@ -285,11 +285,12 @@ async def test_a_refused_call_is_announced_like_any_other() -> None:
 async def test_a_call_stopped_by_the_ceiling_is_never_announced() -> None:
     """Nothing was asked of the server, so nothing happened to show. An event here would
     put a call in the operator's panel that never left the module."""
-    asks = [
-        [ToolCallRequest(f"c{i}", "get_last_price", {"symbol": "US100"}), UsageReport(1, 1, None, None)]
-        for i in range(TOOL_CALL_CEILING + 2)
+    # One round asking for more than the ceiling allows: the calls past it are answered, not made.
+    ask = [
+        *(ToolCallRequest(f"c{i}", "get_last_price", {"symbol": "US100"}) for i in range(TOOL_CALL_CEILING + 2)),
+        UsageReport(1, 1, None, None),
     ]
-    provider = FakeProvider([*asks, [TextDelta("giving up"), UsageReport(1, 1, None, None)]])
+    provider = FakeProvider([ask, [TextDelta("giving up"), UsageReport(1, 1, None, None)]])
     announced: list[tuple[RecordedCall, int]] = []
 
     await _run(provider, FakeToolServer(), announced=announced)
@@ -351,9 +352,15 @@ async def test_the_ceiling_stops_the_calls_and_still_gets_an_answer() -> None:
     # One call per round, forever — the shape a looping model actually has.
     asks = [
         [ToolCallRequest(f"c{i}", "get_last_price", {"symbol": "US100"}), UsageReport(1, 1, None, None)]
-        for i in range(TOOL_CALL_CEILING + 2)
+        for i in range(TOOL_CALL_CEILING)
     ]
-    provider = FakeProvider([*asks, [TextDelta("giving up"), UsageReport(1, 1, None, None)]])
+    # Asked for one more with no tools offered: dropped, so the turn ends on the text beside it.
+    beyond = [
+        TextDelta("giving up"),
+        ToolCallRequest("past", "get_last_price", {"symbol": "US100"}),
+        UsageReport(1, 1, None, None),
+    ]
+    provider = FakeProvider([*asks, beyond])
     server = FakeToolServer()
 
     result, _ = await _run(provider, server)
