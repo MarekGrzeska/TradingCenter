@@ -60,7 +60,7 @@ const compared = (runId: number, strategyId: number, totalR: number): ComparedRu
 });
 
 async function tick(...ids: number[]) {
-  for (const id of ids) await userEvent.click(await screen.findByRole("checkbox", { name: `Porównaj uruchomienie ${id}` }));
+  for (const id of ids) await userEvent.click(await screen.findByRole("checkbox", { name: `Zaznacz uruchomienie ${id}` }));
   await userEvent.click(screen.getByRole("button", { name: /Porównaj \(/ }));
 }
 
@@ -138,7 +138,7 @@ describe("BacktestsView", () => {
       deleteRuns: vi.fn(async () => undefined),
     });
     view(api);
-    await userEvent.click(await screen.findByRole("checkbox", { name: "Usuń uruchomienie 11" }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Zaznacz uruchomienie 11" }));
     await userEvent.click(screen.getByRole("button", { name: "Usuń (1)" }));
 
     expect(screen.getByText(/Zniknie 1 uruchomienie, razem z raportem i transakcjami/)).toBeInTheDocument();
@@ -146,15 +146,18 @@ describe("BacktestsView", () => {
     await userEvent.click(screen.getByRole("button", { name: "Usuń" }));
 
     expect(api.deleteRuns).toHaveBeenCalledWith([11], expect.anything());
-    await waitFor(() => expect(screen.queryByRole("checkbox", { name: "Usuń uruchomienie 11" })).toBeNull());
-    expect(screen.getByRole("checkbox", { name: "Usuń uruchomienie 12" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("checkbox", { name: "Zaznacz uruchomienie 11" })).toBeNull());
+    expect(screen.getByRole("checkbox", { name: "Zaznacz uruchomienie 12" })).toBeInTheDocument();
   });
 
-  it("lets a run in progress be cancelled but not ticked for deletion", async () => {
-    view(fakeApi({ runs: vi.fn(async () => [run(11, 7), { ...run(13, 7), status: "running" as const }]) }));
+  it("offers deleting a failed run with a finished one, and says why they cannot be compared", async () => {
+    view(fakeApi({ runs: vi.fn(async () => [run(11, 7), { ...run(13, 7), status: "failed" as const, reason: "no data" }]) }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Zaznacz uruchomienie 11" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Zaznacz uruchomienie 13" }));
 
-    expect(await screen.findByRole("checkbox", { name: "Usuń uruchomienie 13" })).toBeDisabled();
-    expect(screen.getByRole("checkbox", { name: "Usuń uruchomienie 11" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Porównaj (2)" })).toBeDisabled();
+    expect(screen.getByText("porównać można tylko zakończone uruchomienia")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Usuń (2)" })).toBeEnabled();
   });
 
   it("keeps the question open and names the run the package would not delete", async () => {
@@ -163,17 +166,19 @@ describe("BacktestsView", () => {
       deleteRuns: vi.fn(async () => Promise.reject(new Refused("no", [{ path: "run_id", message: reason, column: null, hint: null }]))),
     });
     view(api);
-    await userEvent.click(await screen.findByRole("checkbox", { name: "Usuń uruchomienie 11" }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Zaznacz uruchomienie 11" }));
     await userEvent.click(screen.getByRole("button", { name: "Usuń (1)" }));
     await userEvent.click(screen.getByRole("button", { name: "Usuń" }));
 
     expect(await screen.findByText(reason)).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: "Usuń uruchomienie 11" })).toBeChecked();
+    expect(screen.getByRole("checkbox", { name: "Zaznacz uruchomienie 11" })).toBeChecked();
   });
 
-  it("lets no run that has not finished be ticked", async () => {
+  it("lets no run in progress be ticked, for comparing or deleting", async () => {
     view(fakeApi({ runs: vi.fn(async () => [run(11, 7), { ...run(13, 7), status: "running" as const }]) }));
 
-    expect(await screen.findByRole("checkbox", { name: "Porównaj uruchomienie 13" })).toBeDisabled();
+    expect(await screen.findByRole("checkbox", { name: "Zaznacz uruchomienie 13" })).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Zaznacz uruchomienie 11" })).toBeEnabled();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(2); // one box a row
   });
 });
