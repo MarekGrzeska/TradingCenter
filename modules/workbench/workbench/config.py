@@ -100,8 +100,9 @@ class Settings(BaseSettings):
     gateway_stream_url: str = "ws://localhost:8010/ws/stream"
     gateway_api_key: str
     gateway_scope: str | None = None
-    # Who may reach `/polymarket/mcp` and `/social/mcp` from outside — nobody today, since the conversation calls
-    # those tools in this process — and which browsers reach `/polymarket` and `/social` over REST.
+    # Who may reach every package's `/mcp` from outside — the operator's own MCP client (`operator-mcp-access`); the
+    # conversation calls those tools in this process and never passes this list — and which browsers reach `/polymarket`
+    # and `/social` over REST.
     tool_caller_application_ids: str = ""
     rest_caller_application_ids: str = ""
 
@@ -190,6 +191,10 @@ class Settings(BaseSettings):
                 "SERVER_MODE needs ENTRA_TENANT_ID and ENTRA_AUDIENCES — without them no token could be checked"
             )
         return self
+
+    @property
+    def tool_caller_ids(self) -> frozenset[str]:
+        return frozenset(part.strip() for part in self.tool_caller_application_ids.split(",") if part.strip())
 
     @property
     def audiences(self) -> list[str]:
@@ -395,6 +400,7 @@ class Settings(BaseSettings):
             azure_tenant_id=self.azure_tenant_id,
             migration_lock_wait_seconds=self.migration_lock_wait_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
+            tool_caller_application_ids=self.tool_caller_application_ids,
             # Not the process's REST list: the pocket reads archives, and this package is the operator's research.
             # Read as STRATEGIES_REST_CALLER_APPLICATION_IDS.
         )

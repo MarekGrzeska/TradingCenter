@@ -269,3 +269,31 @@ def test_the_door_and_the_in_process_wrapper_agree_on_the_scope_key():
     from tc_runtime.caller_access import IN_PROCESS_CALLER
 
     assert IN_PROCESS_SCOPE_KEY == IN_PROCESS_CALLER
+
+
+@pytest.mark.parametrize(("application", "status"), [("operator-mcp-client", None), (TERMINAL, 403), (STRANGER, 403)])
+async def test_a_package_tool_surface_answers_from_outside_only_the_listed_client(application, status) -> None:
+    """`operator-mcp-access`: the door and a real package's record, in the order the assembly puts them. The terminal's
+    token — valid, admin — is not a tool caller."""
+    from starlette.applications import Starlette
+    from starlette.routing import Mount
+
+    import market_data.app
+
+    package = market_data.app.create_app()
+    package.state.settings = SimpleNamespace(
+        require_authenticated_principal=True,
+        tool_caller_ids=frozenset({"operator-mcp-client"}),
+        rest_caller_ids=frozenset({TERMINAL}),
+    )
+    verifier = TokenVerifier(tenant_id=TENANT, audiences=[AUDIENCE], fetch_keys=_published_keys)
+    config = dataclasses.replace(edge_config(_server_settings()), verifier=verifier)  # type: ignore[type-var]
+    door = EdgeAuth(Starlette(routes=[Mount("/market", app=package)]), config)
+    transport = httpx.ASGITransport(app=door, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://workbench") as client:
+        answered = await client.post("/market/mcp", headers=_bearer(application), json={})
+
+    if status is None:
+        assert answered.status_code not in (401, 403)
+    else:
+        assert answered.status_code == status

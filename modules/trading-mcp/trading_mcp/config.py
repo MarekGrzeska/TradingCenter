@@ -32,6 +32,13 @@ class Settings(BaseSettings):
     server_mode: bool = False
     internal_caller_application_id: str = "tc-internal"
 
+    # The one way in from outside (`operator-tool-access`): the operator's own MCP client, with an Entra token issued for
+    # the gateway's API to an application named here. Empty — the default — is the module as it was: nothing from the
+    # edge gets in, whatever it holds. Comma-separated, like every caller list in this repository.
+    external_caller_application_ids: str = ""
+    entra_tenant_id: str | None = None
+    entra_audiences: str = ""
+
     @model_validator(mode="after")
     def _server_mode_asks_for_an_identity(self) -> Settings:
         if self.server_mode and not self.require_authenticated_principal:
@@ -39,7 +46,20 @@ class Settings(BaseSettings):
                 "SERVER_MODE needs REQUIRE_AUTHENTICATED_PRINCIPAL=true: the door writes the identity the "
                 "tools are gated on, and a process that does not ask for it admits a caller with none"
             )
+        if self.server_mode and self.external_callers and (not self.entra_tenant_id or not self.audiences):
+            raise ValueError(
+                "EXTERNAL_CALLER_APPLICATION_IDS needs ENTRA_TENANT_ID and ENTRA_AUDIENCES — without them no token "
+                "from those callers could be checked"
+            )
         return self
+
+    @property
+    def external_callers(self) -> frozenset[str]:
+        return frozenset(part.strip() for part in self.external_caller_application_ids.split(",") if part.strip())
+
+    @property
+    def audiences(self) -> list[str]:
+        return [part.strip() for part in self.entra_audiences.split(",") if part.strip()]
 
     @field_validator("capital_gateway_url")
     @classmethod

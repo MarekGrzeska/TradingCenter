@@ -65,7 +65,8 @@ from .config import Settings, alerts_enabled, strategies_enabled, youtube_enable
 from .edge import edge_config, edge_provider
 from .local_tools import ConversationLocalTools, TeamsLocalTools
 from .root_access import RootCallers
-from .team_tools import LocalTeamsTools
+from .team_tools import LocalTeamsTools, SurfaceCallers, create_surface
+from .team_tools import serving as team_tools_serving
 from .telegram_client import package_client, telegram_client
 
 log = logging.getLogger(__name__)
@@ -215,6 +216,14 @@ async def lifespan(app: FastAPI):
             strategies.app.serving(strategies_app, strategies_settings, market=strategies_market)
             if strategies_app is not None and strategies_settings is not None
             else nullcontext()
+        ),
+        team_tools_serving(
+            team_tools_app,
+            team_tools,
+            SurfaceCallers(
+                tool_caller_ids=settings.tool_caller_ids,
+                require_authenticated_principal=settings.require_authenticated_principal,
+            ),
         ),
     ):
         # Every package is serving: what the alerts' clock reads can answer now.
@@ -461,6 +470,11 @@ if strategies_app is not None:
     mount_package(app, "/strategies", strategies_app)
 else:
     log.info("the strategy engine is not part of this process: STRATEGIES_DATABASE_URL is not set")
+
+# The team tools for the operator's own MCP client (`operator-mcp-access`): the conversation calls them as functions and
+# never passes this door, which has a caller record of its own like every package's.
+team_tools_app = create_surface()
+mount_package(app, "/team-tools", team_tools_app)
 
 # After every mount, so the prefixes it lets through to each package's own record are all of them.
 app.add_middleware(

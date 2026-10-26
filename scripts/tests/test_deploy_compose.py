@@ -7,7 +7,6 @@ from __future__ import annotations
 import pathlib
 import re
 
-import pytest
 import yaml
 
 DEPLOY = pathlib.Path(__file__).resolve().parent.parent.parent / "deploy"
@@ -38,11 +37,22 @@ def test_the_database_is_on_a_network_with_no_way_in_or_out() -> None:
 def test_the_proxy_reaches_only_the_applications_it_publishes() -> None:
     assert SERVICES["caddy"]["networks"] == ["edge"]
     on_edge = {name for name, service in SERVICES.items() if "edge" in service.get("networks", [])}
-    assert on_edge == {"caddy", "gateway", "workbench"}
+    assert on_edge == {"caddy", "gateway", "workbench", "trading-mcp"}
 
 
-def test_the_tool_server_is_not_on_the_edge() -> None:
-    assert SERVICES["trading-mcp"]["networks"] == ["services"]
+def test_the_tool_server_admits_from_outside_only_the_operators_client() -> None:
+    """operator-mcp-access: on the edge, with a gateway token of one named application; the workbench still reaches it
+    with the key on `services`."""
+    trading = SERVICES["trading-mcp"]
+    assert trading["networks"] == ["edge", "services"]
+    environment = trading["environment"]
+    assert environment["EXTERNAL_CALLER_APPLICATION_IDS"] == "${CLAUDE_CODE_APPLICATION_ID:?}"
+    assert environment["ENTRA_AUDIENCES"] == "${GATEWAY_ENTRA_AUDIENCES:?}"
+
+
+def test_the_tool_surfaces_answer_the_operators_client_and_no_browser() -> None:
+    callers = SERVICES["workbench"]["environment"]["TOOL_CALLER_APPLICATION_IDS"]
+    assert callers == "${CLAUDE_CODE_APPLICATION_ID:?}"
 
 
 def test_no_service_takes_the_whole_environment_file() -> None:
@@ -89,7 +99,7 @@ def _reverse_proxy_blocks() -> list[str]:
 
 def test_every_proxied_request_is_marked_as_coming_from_outside() -> None:
     blocks = _reverse_proxy_blocks()
-    assert len(blocks) == 2
+    assert len(blocks) == 3
     assert all("import edge_headers" in block for block in blocks)
 
 
@@ -100,10 +110,26 @@ def test_the_marker_is_written_not_forwarded_and_identity_headers_are_removed() 
         assert f"header_up -X-MS-CLIENT-PRINCIPAL{header}\n" in snippet + "\n"
 
 
-@pytest.mark.parametrize("path", ["/ws/stream", "/mcp"])
-def test_the_edge_does_not_carry_the_surfaces_meant_for_the_processes_themselves(path: str) -> None:
-    assert path.lstrip("/").split("/")[0] in CADDYFILE
-    assert "respond @stream 404" in CADDYFILE and "respond @mcp 404" in CADDYFILE
+def _site(name: str) -> str:
+    start = CADDYFILE.index("{$" + name + "} {")
+    depth, index = 0, CADDYFILE.index("{", start + len(name) + 3)
+    while True:
+        depth += {"{": 1, "}": -1}.get(CADDYFILE[index], 0)
+        index += 1
+        if depth == 0:
+            return CADDYFILE[start:index]
+
+
+def test_the_gateway_host_carries_neither_its_stream_nor_a_tool_surface() -> None:
+    gateway = _site("GATEWAY_HOST")
+    assert "respond @stream 404" in gateway and "import no_tool_surface" in gateway
+
+
+def test_the_api_host_carries_the_tool_surfaces_and_trading_mcp_under_its_prefix() -> None:
+    """operator-mcp-access: the processes decide who gets in; the edge only routes and marks."""
+    api = _site("API_HOST")
+    assert "no_tool_surface" not in api
+    assert "handle_path /trading/*" in api and "reverse_proxy trading-mcp:80" in api
 
 
 def test_the_stream_marker_header_name_is_the_one_the_applications_read() -> None:

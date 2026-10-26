@@ -1,5 +1,5 @@
 # The only process listening on a public port. Four names, one certificate each, obtained and renewed by Caddy itself:
-#   API_HOST       the workbench (and with it every archive, under its prefix)
+#   API_HOST       the workbench (and with it every archive, under its prefix), and trading-mcp under `/trading`
 #   GATEWAY_HOST   capital-gateway, which the terminal reads the account from
 #   TERMINAL_HOST  the terminal's built files
 #   POCKET_HOST    the pocket's built files
@@ -50,7 +50,9 @@
 	}
 }
 
-# Tool surfaces are for the processes themselves; nobody outside calls an MCP endpoint, so the edge does not carry one.
+# The gateway publishes no tool surface, so its host carries none. The API host carries every one: the operator's own MCP
+# client reaches them with a token, a named application and the `admin` role, all checked in the process
+# (`operator-mcp-access`).
 (no_tool_surface) {
 	@mcp path_regexp ^(/[A-Za-z0-9_-]+)?/mcp(/.*)?$
 	respond @mcp 404
@@ -59,11 +61,23 @@
 {$API_HOST} {
 	import hardening
 	import cors
-	import no_tool_surface
-	reverse_proxy workbench:80 {
-		import edge_headers
-		# A chat turn and a team's run stream; buffering them would hold the answer back until it ended.
-		flush_interval -1
+
+	# trading-mcp, under a prefix of its own: `/trading/mcp` reaches it as `/mcp`. Its door admits a gateway token here and
+	# the shared key from the workbench, which never comes this way.
+	handle_path /trading/* {
+		reverse_proxy trading-mcp:80 {
+			import edge_headers
+			# A tool call answers as a stream of events, like a chat turn.
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy workbench:80 {
+			import edge_headers
+			# A chat turn and a team's run stream; buffering them would hold the answer back until it ended.
+			flush_interval -1
+		}
 	}
 }
 

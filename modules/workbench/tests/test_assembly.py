@@ -55,3 +55,13 @@ def test_a_prefix_is_taken_once() -> None:
 
     with pytest.raises(ValueError, match="already mounted"):
         mount_package(host, "/pkg", _package())
+
+
+def test_no_package_takes_the_prefix_the_edge_gives_trading_mcp() -> None:
+    """`deploy/Caddyfile` sends `/trading/*` to trading-mcp before the workbench sees it: a package mounted there would be
+    unreachable from outside, silently (`operator-mcp-access`)."""
+    from starlette.routing import Mount
+
+    from workbench.app import app
+
+    assert "/trading" not in {route.path for route in app.routes if isinstance(route, Mount)}

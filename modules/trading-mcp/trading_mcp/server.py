@@ -7,7 +7,7 @@ from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
-from tc_entra_auth import EdgeAuth, EdgeConfig
+from tc_entra_auth import EdgeAuth, EdgeConfig, RolePolicy, TokenVerifier
 from tc_mcp_kit.network_identity import RequireCallerIdentity
 from tc_mcp_kit.tool_schemas import slim_tool_schemas
 
@@ -54,14 +54,22 @@ def build_http_app(settings: Settings, gateway: GatewayClient) -> ASGIApp:
 
 
 def edge_config(settings: Settings) -> EdgeConfig | None:
-    """`None` is not a server, and the door stays as the platform left it. A server has no verifier at all: this
-    module is not published at the edge, so a request carrying the edge marker is refused whatever it presents."""
+    """`None` is not a server, and the door stays as the platform left it. With no external caller named there is no
+    verifier, so a request carrying the edge marker is refused whatever it presents; with one, the edge admits a
+    gateway token of a named application, for an `admin` — a `viewer` has no business with the account."""
     if not settings.server_mode:
         return None
+    callers = settings.external_callers
+    verifier = None
+    if callers:
+        assert settings.entra_tenant_id is not None  # the settings refuse external callers without it
+        verifier = TokenVerifier(tenant_id=settings.entra_tenant_id, audiences=settings.audiences)
     return EdgeConfig(
-        verifier=None,
+        verifier=verifier,
         service_key=settings.capital_gateway_api_key,
         internal_application_id=settings.internal_caller_application_id,
         key_header=GATEWAY_KEY_HEADER.lower().encode(),
         exempt_paths=frozenset({HEALTH_PATH}),
+        role_policy=RolePolicy(),
+        token_applications=callers,
     )

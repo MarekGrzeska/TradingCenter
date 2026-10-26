@@ -63,6 +63,9 @@ class EdgeConfig:
     # What a person's role may reach. `None` is a process with no roles (the gateway before this existed, a test): the
     # token or key is the whole credential, as before.
     role_policy: RolePolicy | None = None
+    # The applications a token may have been issued to, for a process with no caller record of its own behind the door
+    # (trading-mcp). `None` is any application the audience admits; an empty set is none.
+    token_applications: frozenset[str] | None = None
 
 
 # Returns the config once the process has read its settings, `None` when it is not a server (local work, or Azure
@@ -125,6 +128,14 @@ class EdgeAuth:
             return
 
         application, person, name, roles = identity
+        if (
+            EDGE_HEADER in headers
+            and config.token_applications is not None
+            and application not in config.token_applications
+        ):
+            log.warning("refused %s: application %s is not on this process's list", path, application)
+            await _refuse(scope, receive, send, 403, "this caller has no access")
+            return
         policy = config.role_policy
         if policy is not None and not policy.allows(roles, scope.get("method", ""), path):
             log.warning("refused %s %s: roles %s have no access", scope.get("method", ""), path, sorted(roles))
