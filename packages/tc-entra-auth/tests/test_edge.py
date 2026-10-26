@@ -213,3 +213,24 @@ async def test_a_request_before_the_settings_exist_is_refused_not_waved_through(
     async with httpx.AsyncClient(transport=transport, base_url="http://t") as http:
         response = await http.get("/whoami", headers={"X-Gateway-Key": KEY})
     assert response.status_code == 503
+
+
+async def test_a_request_this_process_makes_to_itself_keeps_the_operator_it_carries(tenant):
+    from tc_entra_auth.edge import IN_PROCESS_SCOPE_KEY
+
+    guarded = client(tenant)._transport.app  # type: ignore[attr-defined]
+
+    async def as_this_process(scope, receive, send):
+        await guarded({**scope, IN_PROCESS_SCOPE_KEY: "a test"}, receive, send)
+
+    transport = httpx.ASGITransport(app=as_this_process)
+    async with httpx.AsyncClient(transport=transport, base_url="http://t") as http:
+        response = await http.get("/whoami", headers={"X-MS-CLIENT-PRINCIPAL-ID": "the-operator"})
+    assert response.status_code == 200
+    assert response.json()["person"] == "the-operator"
+
+
+async def test_the_in_process_marker_in_a_header_is_not_a_credential(tenant):
+    async with client(tenant) as http:
+        response = await http.get("/whoami", headers={"tc_runtime.in_process_caller": "x"})
+    assert response.status_code == 401
