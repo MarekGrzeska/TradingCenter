@@ -44,8 +44,8 @@ export function BacktestsView({
   const [pickedRun, setPickedRun] = useState<number | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   // Ids, not rows: a comparison may hold runs of several strategies and survives switching the list's filter.
-  const [checked, setChecked] = useState<ReadonlySet<number>>(new Set());
-  const [marked, setMarked] = useState<ReadonlySet<number>>(new Set());
+  // One selection for comparing and for deleting: two boxes a row was two unlabelled grey squares on a dark screen.
+  const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [compared, setCompared] = useState<{ runs: ComparedRun[] | null; refusal: string[] | null } | null>(null);
 
@@ -124,38 +124,41 @@ export function BacktestsView({
 
   const names = new Map(list.value.map((s) => [s.id, s.name]));
 
-  function toggleChecked(id: number) {
-    const next = new Set(checked);
+  function toggleSelected(id: number) {
+    const next = new Set(selected);
     if (!next.delete(id)) next.add(id);
-    setChecked(next);
+    setSelected(next);
   }
 
-  function toggleMarked(id: number) {
-    const next = new Set(marked);
-    if (!next.delete(id)) next.add(id);
-    setMarked(next);
-  }
-
-  async function deleteMarked() {
-    const ids = [...marked];
+  async function deleteSelected() {
+    const ids = [...selected];
     try {
       await client.deleteRuns(ids, signal());
     } catch (cause: unknown) {
       // Said in the dialog that asked, which stays open: nothing was deleted.
       throw cause instanceof Refused ? new Error(cause.problems.map((p) => p.message).join("; ")) : cause;
     }
-    setMarked(new Set());
-    setChecked(new Set([...checked].filter((id) => !ids.includes(id))));
+    setSelected(new Set());
     setCompared(null);
     if (pickedRun !== null && ids.includes(pickedRun)) setPickedRun(null);
     runs.reload();
     list.reload();
   }
 
+  const unfinished = [...selected].some((id) => runs.value.find((r) => r.id === id)?.status !== "done");
+  const compareBlocked =
+    selected.size === 0
+      ? `zaznacz od 2 do ${MAX_COMPARED} zakończonych uruchomień, żeby je porównać, albo dowolne, żeby je usunąć`
+      : unfinished
+        ? "porównać można tylko zakończone uruchomienia"
+        : selected.size < 2 || selected.size > MAX_COMPARED
+          ? `porównanie bierze od 2 do ${MAX_COMPARED} uruchomień`
+          : null;
+
   async function compare() {
     setFailure(null);
     try {
-      setCompared({ runs: await client.compare([...checked], signal()), refusal: null });
+      setCompared({ runs: await client.compare([...selected], signal()), refusal: null });
     } catch (cause: unknown) {
       if (cause instanceof Refused) setCompared({ runs: null, refusal: cause.problems.map((p) => p.message) });
       else setFailure(messageOf(cause, "nie udało się porównać uruchomień"));
@@ -215,26 +218,26 @@ export function BacktestsView({
         )
       )}
 
-      <div className="flex items-center gap-2 text-xs text-ink-secondary">
-        <Button size="2xs" disabled={checked.size < 2 || checked.size > MAX_COMPARED} onClick={() => void compare()}>
-          Porównaj ({checked.size})
+      <div className="flex flex-wrap items-center gap-2 text-xs text-ink-secondary">
+        <Button size="2xs" disabled={compareBlocked !== null} onClick={() => void compare()}>
+          Porównaj ({selected.size})
         </Button>
-        {checked.size > 0 && (
+        <Button size="2xs" tone="critical" disabled={selected.size === 0} onClick={() => setDeleting(true)}>
+          Usuń ({selected.size})
+        </Button>
+        {selected.size > 0 && (
           <Button
             size="2xs"
             tone="muted"
             onClick={() => {
-              setChecked(new Set());
+              setSelected(new Set());
               setCompared(null);
             }}
           >
             Wyczyść
           </Button>
         )}
-        <span>zaznacz od 2 do {MAX_COMPARED} zakończonych uruchomień</span>
-        <Button size="2xs" tone="muted" disabled={marked.size === 0} onClick={() => setDeleting(true)}>
-          Usuń ({marked.size})
-        </Button>
+        {compareBlocked !== null && <span>{compareBlocked}</span>}
       </div>
       {deleting && (
         <ConfirmDialog
@@ -244,11 +247,11 @@ export function BacktestsView({
           busyLabel="Usuwam…"
           tone="danger"
           fallbackError="nie udało się usunąć uruchomień"
-          onConfirm={deleteMarked}
+          onConfirm={deleteSelected}
           onClose={() => setDeleting(false)}
         >
           <p className="text-xs text-ink-secondary">
-            {runsGoing(marked.size)}, razem z raportem i transakcjami. Nie da się tego cofnąć. Licznik prób strategii zostaje taki, jaki był.
+            {runsGoing(selected.size)}, razem z raportem i transakcjami. Nie da się tego cofnąć. Licznik prób strategii zostaje taki, jaki był.
           </p>
         </ConfirmDialog>
       )}
@@ -256,10 +259,8 @@ export function BacktestsView({
 
       <RunsPanel
         runs={runs.value}
-        checked={checked}
-        onCheck={toggleChecked}
-        marked={marked}
-        onMark={toggleMarked}
+        selected={selected}
+        onSelect={toggleSelected}
         error={runs.error}
         picked={pickedRun}
         onPick={setPickedRun}
