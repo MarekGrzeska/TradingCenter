@@ -13,9 +13,9 @@ router = APIRouter()
 
 @router.get("/tools")
 async def list_tools(request: Request) -> list[ToolOut]:
-    settings = request.app.state.teams.settings
+    state = request.app.state.teams
     try:
-        announced = await announced_tools_by_server(settings)
+        announced = await announced_tools_by_server(state.settings, state.tools.local)
     except ToolServerUnavailable as err:
         raise HTTPException(503, detail=str(err)) from err
     return [

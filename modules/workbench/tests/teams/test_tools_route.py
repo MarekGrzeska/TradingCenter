@@ -35,7 +35,7 @@ def _env(workbench_env: None, db: asyncpg.Connection, migrated_url: str, monkeyp
 
 @pytest.fixture
 def announcing(_env: None, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
-    with serving_sync(("get_last_price", "read_indicators")) as url:
+    with serving_sync(("get_positions", "read_indicators")) as url:
         monkeypatch.setenv("TRADING_MCP_URL", url)
         with TestClient(app) as started:
             yield started
@@ -45,25 +45,25 @@ def test_what_the_server_announces_is_what_the_route_publishes(announcing: TestC
     published = announcing.get("/tools").json()
     by_name = {tool["name"]: tool for tool in published}
 
-    assert {"get_last_price", "read_indicators"} <= set(by_name)
+    assert {"get_positions", "read_indicators"} <= set(by_name)
     # The description travels too — it is the only thing beside the name the picker can
     # show, and this module writes neither of these two.
-    assert by_name["get_last_price"]["description"].startswith("Returns the last price")
+    assert by_name["get_positions"]["description"].startswith("Lists the open positions")
     # And nothing else: an input schema here would be a copy of somebody else's contract.
-    assert set(by_name["get_last_price"]) == {"name", "description", "read_only"}
+    assert set(by_name["get_positions"]) == {"name", "description", "read_only"}
 
 
 def test_a_servers_tools_are_published_with_write_marked(
     _env: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    with serving_sync(("get_last_price", "place_order")) as trading_url:
+    with serving_sync(("get_positions", "place_order")) as trading_url:
         monkeypatch.setenv("TRADING_MCP_URL", trading_url)
         with TestClient(app) as client:
             published = client.get("/tools").json()
 
     by_name = {tool["name"]: tool for tool in published}
-    assert {"get_last_price", "place_order"} <= set(by_name)
-    assert by_name["get_last_price"]["read_only"] is None  # the stand-in sets no
+    assert {"get_positions", "place_order"} <= set(by_name)
+    assert by_name["get_positions"]["read_only"] is None  # the stand-in sets no
     # annotation for this one — unknown, not assumed
     assert by_name["place_order"]["read_only"] is False
 
@@ -77,7 +77,10 @@ def test_no_tool_server_configured_still_announces_what_this_process_serves(
         response = client.get("/tools")
 
     assert response.status_code == 200
-    assert {tool["name"] for tool in response.json()} == set(MEMORY_TOOL_NAMES)
+    names = {tool["name"] for tool in response.json()}
+    assert set(MEMORY_TOOL_NAMES) <= names
+    # The archives' tools reach a run through the assembly, and the picker offers what a run would be given.
+    assert {"get_candles", "compute_indicators"} <= names
 
 
 def test_the_memory_tools_are_published_with_the_write_one_marked(_env: None) -> None:

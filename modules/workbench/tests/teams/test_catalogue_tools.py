@@ -26,6 +26,8 @@ _ENV = {
 }
 
 OWNER = {"X-MS-CLIENT-PRINCIPAL-ID": "operator-1"}
+# trading-mcp's names: the stand-in's defaults are the archive's, which this process now announces itself.
+_TOOLS = ("get_positions", "read_indicators")
 
 
 @pytest.fixture
@@ -35,9 +37,9 @@ def client(
     migrated_url: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> Iterator[TestClient]:
-    """The app against a stand-in tool server announcing three tools. `db` is depended on
+    """The app against a stand-in tool server announcing two tools. `db` is depended on
     for its truncation — every test here starts against an empty catalogue."""
-    with serving_sync() as url:
+    with serving_sync(_TOOLS) as url:
         monkeypatch.setenv("TRADING_MCP_URL", url)
         for key, value in _ENV.items():
             monkeypatch.setenv(key, value)
@@ -66,14 +68,14 @@ def _body(tools: list[str]) -> dict:
 
 def test_a_definition_naming_announced_tools_is_saved(client: TestClient) -> None:
     response = client.post(
-        "/teams", json=_body(["get_last_price", "read_indicators"]), headers=OWNER
+        "/teams", json=_body(["get_positions", "read_indicators"]), headers=OWNER
     )
 
     assert response.status_code == 201, response.text
     team_id = response.json()["id"]
     saved = client.get(f"/teams/{team_id}/revisions/latest", headers=OWNER)
     assert saved.json()["definition"]["agents"][0]["tools"] == [
-        "get_last_price",
+        "get_positions",
         "read_indicators",
     ]
 
@@ -91,7 +93,7 @@ def test_a_definition_naming_a_tool_the_server_does_not_announce_is_refused(
 
 def test_the_names_come_from_the_server_not_from_this_module(client: TestClient) -> None:
     """The assertion that fails the day someone writes a local list of tool names: the stand-in publishes
-    exactly three, and a fourth trading-mcp really has is refused because *this* server does not announce it."""
-    response = client.post("/teams", json=_body(["get_candles"]), headers=OWNER)
+    exactly two, and a fourth trading-mcp really has is refused because *this* server does not announce it."""
+    response = client.post("/teams", json=_body(["close_position"]), headers=OWNER)
 
     assert response.status_code == 422

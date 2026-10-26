@@ -385,15 +385,17 @@ def test_a_fire_that_started_nothing_shows_up_in_the_schedules_history(
 
 
 
-def test_a_trigger_with_no_tool_server_configured_is_refused(client: TestClient) -> None:
+def test_a_trigger_on_an_archive_tool_needs_no_tool_server(client: TestClient) -> None:
+    # The archive is a package of this process: with no server configured its tools are still there to read.
     team_id, revision_id = _team(client)
 
     response = client.post(
-        f"/teams/{team_id}/triggers", json=_trigger_body(revision_id), headers=OWNER
+        f"/teams/{team_id}/triggers",
+        json=_trigger_body(revision_id, tool_name="get_last_price"),
+        headers=OWNER,
     )
 
-    assert response.status_code == 422
-    assert "TRADING_MCP_URL" in response.text
+    assert response.status_code == 201, response.text
 
 
 def test_a_trigger_naming_an_unannounced_tool_is_refused(
@@ -405,12 +407,12 @@ def test_a_trigger_naming_an_unannounced_tool_is_refused(
             team_id, revision_id = _team(started)
             response = started.post(
                 f"/teams/{team_id}/triggers",
-                json=_trigger_body(revision_id, tool_name="get_last_price"),
+                json=_trigger_body(revision_id, tool_name="get_positions"),
                 headers=OWNER,
             )
 
     assert response.status_code == 422
-    assert "get_last_price" in response.text
+    assert "get_positions" in response.text
 
 
 def test_a_trigger_naming_an_announced_tool_is_created(

@@ -60,12 +60,11 @@ def test_a_tool_no_server_announces_is_refused_naming_the_agent_and_the_tool() -
 def test_assigned_tools_with_no_tool_server_are_refused_and_say_so() -> None:
     # Distinct from the case above on purpose: "no server to ask" is a configuration someone can fix, "no server has it"
     # is a definition someone must change — and the first now travels as `unconfigured` rather than as `None`.
-    definition = TeamDefinition(agents=[_agent("scout", tools=["get_candles"])])
+    definition = TeamDefinition(agents=[_agent("scout", tools=["get_positions"])])
     announced = AnnouncedSnapshot(
         by_name={"memory_read": ["team-memory"]},
         unreachable=[],
         unconfigured=("second-mcp", "trading-mcp"),
-        configured_servers=(),
     )
 
     with pytest.raises(DefinitionRefused) as err:
@@ -81,12 +80,11 @@ def test_assigned_tools_with_no_tool_server_are_refused_and_say_so() -> None:
 def test_the_settings_named_are_only_the_ones_without_an_address() -> None:
     """The other half of deriving them: a server that *is* configured must not appear in a
     message telling the operator what to set."""
-    definition = TeamDefinition(agents=[_agent("scout", tools=["get_candles"])])
+    definition = TeamDefinition(agents=[_agent("scout", tools=["get_positions"])])
     announced = AnnouncedSnapshot(
         by_name={"memory_read": ["team-memory"]},
         unreachable=[],
         unconfigured=("trading-mcp",),
-        configured_servers=("second-mcp",),
     )
 
     with pytest.raises(DefinitionRefused) as err:

@@ -217,6 +217,20 @@ def test_a_model_outside_the_catalogue_is_refused_naming_the_agent(client: TestC
     assert "judge" in response.text and "gpt-9-imaginary" in response.text
 
 
+def test_an_archive_tool_this_process_serves_is_assignable(client: TestClient) -> None:
+    # The archives are packages of this process, added to the run's registry by the assembly; the save path
+    # once built its own from settings alone and refused every one of their tools.
+    body = {
+        "name": "tooled",
+        "description": "",
+        "definition": _definition(
+            agents=[_agent("scout", tools=["get_candles", "compute_indicators"]), _agent("judge")]
+        ),
+    }
+
+    assert client.post("/teams", json=body, headers=OWNER).status_code == 201
+
+
 def test_a_tool_no_server_announces_is_refused_naming_the_agent(client: TestClient) -> None:
     # No tool server is configured in these tests, so there is no session to ask. The module still serves
     # the catalogue and refuses only the definition that would need one.
@@ -224,14 +238,14 @@ def test_a_tool_no_server_announces_is_refused_naming_the_agent(client: TestClie
         "name": "tooled",
         "description": "",
         "definition": _definition(
-            agents=[_agent("scout", tools=["get_candles"]), _agent("judge")]
+            agents=[_agent("scout", tools=["get_positions"]), _agent("judge")]
         ),
     }
 
     response = client.post("/teams", json=body, headers=OWNER)
 
     assert response.status_code == 422
-    assert "scout" in response.text and "get_candles" in response.text
+    assert "scout" in response.text and "get_positions" in response.text
     assert client.get("/teams", headers=OWNER).json() == []
 
 

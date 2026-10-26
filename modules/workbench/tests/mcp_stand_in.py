@@ -38,7 +38,7 @@ def _register(mcp: FastMCP, name: str) -> None:
     """The stand-in's catalogue, keyed by name so a test can serve a subset — which is
     how "the server stopped announcing a tool" is reproduced without a second file."""
     if name == "get_last_price":
-        # Deliberately unannotated, and the only one here that is: `read_only=None` is a third answer
+        # Deliberately unannotated, like `get_positions`: `read_only=None` is a third answer
         # trading-mcp could give, and a test pins that it travels as "unknown" rather than as a guess.
         @mcp.tool(name=name, description="Returns the last price for a symbol, in UTC, bid side.")
         def get_last_price(symbol: str) -> str:
@@ -47,6 +47,12 @@ def _register(mcp: FastMCP, name: str) -> None:
                 # FastMCP tool reports one, and it arrives as isError=True.
                 raise ValueError(f"nobody collects {symbol}. Call list_tracked_pairs first.")
             return "US100 last traded at 21000.5 at 2026-08-12T10:00:00Z, 3 minutes ago."
+
+    elif name == "get_positions":
+        # For tests through the whole process, where the archive announces `get_last_price` itself.
+        @mcp.tool(name=name, description="Lists the open positions on the demo account.")
+        def get_positions() -> str:
+            return "no open positions"
 
     elif name == "list_tracked_pairs":
 
