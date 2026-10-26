@@ -5,6 +5,7 @@ import { resolveEndpoints } from "../data/config";
 import { workbenchIdentity } from "../data/marketData";
 import { messageOf, useRead } from "../data/query";
 import { MarketDataError } from "../data/types";
+import { BackButton } from "../ui/BackButton";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
@@ -170,6 +171,17 @@ export function BacktestsView({
   return (
     <section className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-3">
       <header className="flex flex-wrap items-center gap-3">
+        {picked !== null && (
+          <BackButton
+            label="Wszystkie backtesty"
+            size="xs"
+            onClick={() => {
+              setPickedRun(null);
+              setFailure(null);
+              setParams({});
+            }}
+          />
+        )}
         <h1 className="text-base font-semibold text-ink">Backtesty</h1>
         <label className="flex items-center gap-2 text-xs text-ink-secondary">
           Strategia
@@ -275,6 +287,9 @@ export function BacktestsView({
           }
         }}
       />
+      {run !== null && runDocument !== undefined && (
+        <BackButton label="Uruchomienia" size="xs" onClick={() => setPickedRun(null)} />
+      )}
       {run !== null && runDocument !== undefined && (
         <ReportPanel
           key={run.id}

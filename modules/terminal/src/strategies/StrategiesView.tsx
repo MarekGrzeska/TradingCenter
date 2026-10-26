@@ -8,7 +8,9 @@ import { archive, workbenchIdentity } from "../data/marketData";
 import { messageOf, useRead } from "../data/query";
 import type { ArchiveAdmin } from "../data/source";
 import { MarketDataError } from "../data/types";
+import { BackButton } from "../ui/BackButton";
 import { Button } from "../ui/Button";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { afterTurn, createdDuringTurn, documentText } from "./followTurn";
 import { HistoryPanel } from "./HistoryPanel";
@@ -75,6 +77,7 @@ export function StrategiesView({
   const [newer, setNewer] = useState<number | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   const health = useRead<{ present: boolean; health: Health | null }>({
     key: ["strategies", "health"],
@@ -257,6 +260,17 @@ export function StrategiesView({
     [activity, client],
   );
 
+  function closeEditor() {
+    setOpenId(null);
+    setBase(null);
+    setCreating(false);
+    setText("");
+    setNewer(null);
+    setNotice(null);
+    setFailure(null);
+    shownDraft.current = null;
+  }
+
   async function save() {
     setSaving(true);
     setFailure(null);
@@ -372,6 +386,7 @@ export function StrategiesView({
         ) : (
           <>
             <header className="flex flex-wrap items-center gap-2">
+              <BackButton label="Strategie" size="xs" onClick={() => (dirty ? setLeaving(true) : closeEditor())} />
               <h2 className="text-sm font-semibold text-ink">
                 {base === null ? "Nowa strategia" : `${open_?.name ?? ""} · rewizja ${base.n} (${base.author === "agent" ? "agent" : "operator"})`}
               </h2>
@@ -445,6 +460,23 @@ export function StrategiesView({
           </>
         )}
       </div>
+      {leaving && (
+        <ConfirmDialog
+          title="Niezapisane zmiany"
+          confirmLabel="Porzuć i wróć"
+          cancelLabel="Zostań"
+          busyLabel="Wracam…"
+          tone="danger"
+          fallbackError="nie udało się wrócić do listy"
+          onConfirm={async () => {
+            await discardDraft();
+            closeEditor();
+          }}
+          onClose={() => setLeaving(false)}
+        >
+          <p className="text-xs text-ink-secondary">Zmiany w edytorze nie zostały zapisane i przepadną.</p>
+        </ConfirmDialog>
+      )}
     </section>
   );
 }

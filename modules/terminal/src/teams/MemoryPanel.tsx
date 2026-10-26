@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useRead } from "../data/query";
 import { Button } from "../ui/Button";
+import { BackButton } from "../ui/BackButton";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { formatInstant } from "../ui/formatTime";
 import type { TeamMemory, TeamMemoryEntry, TeamsApi } from "./teamsApi";
@@ -40,7 +41,7 @@ export function MemoryPanel({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex items-center gap-2 border-b border-border p-2">
-        <Button onClick={onClose}>← {teamName}</Button>
+        <BackButton label={teamName} onClick={onClose} />
         <h2 className="text-sm font-semibold text-ink">Memory</h2>
       </header>
 

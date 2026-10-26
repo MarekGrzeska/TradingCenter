@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "../ui/Button";
+import { BackButton } from "../ui/BackButton";
 import { MarketDataError } from "../data/types";
 import { AgentSettingsDialog } from "./AgentSettingsDialog";
 import { TeamCanvas } from "./TeamCanvas";
@@ -234,9 +235,7 @@ export function TeamEditor({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex flex-wrap items-center gap-2 border-b border-border p-2">
-        <Button onClick={onClose}>
-          ← Catalogue
-        </Button>
+        <BackButton label="Catalogue" onClick={onClose} />
         {teamId === null ? (
           <>
             <input
