@@ -52,3 +52,9 @@ def test_a_message_longer_than_the_limit_is_cut_and_says_so() -> None:
 
     assert len(cut) == 20
     assert cut.endswith(template.CUT)
+
+
+def test_a_long_message_is_parted_at_a_paragraph_then_a_line_then_a_word() -> None:
+    assert template.parts("aaaa\n\nbb\ncc dd", limit=6) == ["aaaa", "bb", "cc dd"]
+    assert template.parts("a" * 13, limit=5) == ["aaaaa", "aaaaa", "aaa"], "a word longer than a message is cut hard"
+    assert template.parts("short") == ["short"]

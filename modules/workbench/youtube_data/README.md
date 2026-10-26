@@ -65,7 +65,8 @@ One pass every `YOUTUBE_POLL_INTERVAL_SECONDS` — until the operator saves anot
    transcript marked as a stranger's data. An answer the schema rejects is one of the film's `READING_MAX_FAILURES`; a
    provider that could not be reached is none of them.
 4. **tell** — `analysed` → `notified` or `quiet`. Every read film is handed to the alerts package as a `youtube.film.read`
-   event (channel, topic, score, instruments, link and the message to send); what it does with it — tell nobody, tell one
+   event (channel, topic, score, prompt, link and the message to send — score, title, the whole reading as the prompt laid
+   it out, and the link; the alerts package sends a long one in parts); what it does with it — tell nobody, tell one
    person, tell another about this channel only — is a rule the operator sets in the Alerts tab, not something this
    archive decides. The marker is written **after** the alerts package accepts the film; a film not handed over within
    `ALERT_WINDOW_HOURS` is let go as quiet. Without an alerts package every read film ends quiet.

@@ -724,7 +724,7 @@ class ToAnnounce:
 async def analysed_for_alert(conn: Conn, *, limit: int) -> list[ToAnnounce]:
     rows = await conn.fetch(
         f"""
-        SELECT {", ".join(f"v.{c.strip()}" for c in _VIDEO_COLUMNS.split(","))}, r.result - 'text' AS result, r.simulated AS r_simulated, p.name AS prompt_name,
+        SELECT {", ".join(f"v.{c.strip()}" for c in _VIDEO_COLUMNS.split(","))}, r.result, r.simulated AS r_simulated, p.name AS prompt_name,
                (SELECT t.phrase FROM topics t WHERE 'topic:' || t.id::text = ANY (v.origins) ORDER BY t.id LIMIT 1) AS topic_phrase
         FROM videos v JOIN readings r ON r.video_id = v.video_id AND r.prompt_id = v.prompt_id
         JOIN prompts p ON p.id = r.prompt_id

@@ -35,7 +35,9 @@ again after the wait the door named (or a doubling one) for `ALERTS_RETRY_WINDOW
 refused for good (unknown or blocked recipient — not asked twice); throttled (a rule tells at most `ALERTS_MAX_PER_HOUR`
 times an hour, and the operator hears *once* that it was cut). Delivery is at least once: a crash between Telegram taking a
 message and the fire being marked tells twice, never zero times. A one-time rule switches itself off when its message is
-delivered, and takes its "already told" back if the message never arrives.
+delivered, and takes its "already told" back if the message never arrives. A message longer than one Telegram takes
+(16 000 characters at most) goes as several of 3 500, cut at a paragraph, a line or a word; the fire counts the parts
+that arrived (`parts_sent`), so a retry sends only the rest, and it is delivered after the last.
 
 ## Who calls it
 

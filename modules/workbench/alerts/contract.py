@@ -221,7 +221,7 @@ class EventIn(BaseModel):
     source_key: str = Field(min_length=1, max_length=200)
     attributes: dict[str, Any] = Field(default_factory=dict)
     # The message the producer would send on its own, ready — what a rule that writes no template of its own says.
-    text: str = Field(min_length=1, max_length=4000)
+    text: str = Field(min_length=1, max_length=16_000)
 
 
 class EventAccepted(BaseModel):

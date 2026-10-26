@@ -55,6 +55,21 @@ async def test_a_fire_is_sent_to_the_rules_recipient_and_marked_delivered(delive
     assert await db.fetchval("SELECT delivered_at FROM fires WHERE id = $1", fire) == T0
 
 
+async def test_a_message_longer_than_telegram_takes_goes_in_parts_and_a_retry_sends_only_the_rest(
+    deliverer, pool, door, db
+) -> None:
+    paragraphs = ["a" * 3000, "b" * 3000, "c" * 3000]
+    _, fire = await fire_of(pool, text="\n\n".join(paragraphs))
+    door.answers = [Sent(ok=True), Sent(ok=False, transient=True, retry_after_seconds=60, reason="slow down")]
+
+    await deliverer.run(T0)
+    assert (await state_of(db, fire))[0] == "pending"
+    await deliverer.run(T0 + timedelta(seconds=61))
+
+    assert [text for _, text in door.sent] == [paragraphs[0], paragraphs[1], paragraphs[1], paragraphs[2]]
+    assert (await state_of(db, fire))[0] == "delivered"
+
+
 async def test_a_fire_claimed_is_left_alone_until_its_lease_runs_out(deliverer, pool, door) -> None:
     await fire_of(pool)
 
