@@ -212,6 +212,8 @@ export interface StrategiesApi {
   runs(strategyId: number | null, signal: AbortSignal): Promise<RunItem[]>;
   run(id: number, signal: AbortSignal): Promise<Run>;
   trades(id: number, offset: number, limit: number, signal: AbortSignal): Promise<{ total: number; trades: Trade[] }>;
+  /** Every trade of the run as a CSV file for a spreadsheet — not a page. */
+  downloadTrades(id: number, signal: AbortSignal): Promise<Blob>;
   enqueue(request: RunRequest, signal: AbortSignal): Promise<number>;
   cancel(id: number, signal: AbortSignal): Promise<void>;
   /** Finished, failed or cancelled runs, all or none; `Refused` names each that is missing or still in progress. */
@@ -514,6 +516,10 @@ export function createStrategiesApi(httpBase: string, identity: Identity = noIde
         const raw = await http.json<Schemas["RunAcceptedOut"]>(`${httpBase}/runs`, { signal, method: "POST", body });
         return raw.id;
       });
+    },
+
+    async downloadTrades(id, signal) {
+      return (await http.send(`${httpBase}/runs/${id}/trades.csv`, { signal })).blob();
     },
 
     async cancel(id, signal) {
