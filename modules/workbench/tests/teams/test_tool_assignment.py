@@ -225,7 +225,6 @@ async def test_announced_snapshot_says_which_servers_have_no_address() -> None:
     snapshot = await announced_snapshot(settings_for(None))
 
     assert snapshot.unconfigured == ("trading-mcp",)
-    assert snapshot.configured_servers == ()
     assert snapshot.unreachable == []
 
 
@@ -234,7 +233,6 @@ async def test_announced_snapshot_names_an_unreachable_configured_server() -> No
 
     assert set(snapshot.by_name) == set(MEMORY_TOOL_NAMES)
     assert snapshot.unreachable == ["trading-mcp"]
-    assert snapshot.configured_servers == ("trading-mcp",)
 
 
 async def test_an_unknown_agent_key_is_a_programming_error() -> None:

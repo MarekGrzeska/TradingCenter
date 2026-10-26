@@ -4,6 +4,7 @@ server is queried, because a name found on one says nothing about whether a seco
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -225,15 +226,28 @@ class AnnouncedSnapshot:
     # Servers this module knows about and has no address for. A name nobody announces while one of these
     # is unset reads differently from the same name with every server answering.
     unconfigured: tuple[str, ...] = ()
-    # Labels of the servers that *do* have an address — empty means every tool in
-    # `by_name` came from this process itself.
-    configured_servers: tuple[str, ...] = ()
 
 
-async def announced_snapshot(settings: Settings) -> AnnouncedSnapshot:
-    """The save path's view of every source: the servers it can reach, and the tools this process serves itself. Its own
-    registry, opened and closed inside this call, because a session left open when its task returns corrupts the scope stack."""
+def _announcing(settings: Settings, local: Mapping[str, Any] | None) -> ToolServerRegistry:
+    """Fresh sessions to every remote server, beside the in-process sources a run is given: the assembly adds the
+    archives to the run's registry only, and one built from settings alone never names their tools."""
     registry = ToolServerRegistry.from_settings(settings)
+    registry.local.update(local or {})
+    return registry
+
+
+async def _close_remote(registry: ToolServerRegistry) -> None:
+    """Only the sessions this call opened — the borrowed local sources belong to the run's registry."""
+    for server in registry.servers.values():
+        await server.aclose()
+
+
+async def announced_snapshot(
+    settings: Settings, local: Mapping[str, Any] | None = None
+) -> AnnouncedSnapshot:
+    """The save path's view of every source: the servers it can reach, and the tools this process serves itself. Its own
+    sessions, opened and closed inside this call, because a session left open when its task returns corrupts the scope stack."""
+    registry = _announcing(settings, local)
     try:
         resolution = await _resolve_all(registry)
         return AnnouncedSnapshot(
@@ -247,16 +261,17 @@ async def announced_snapshot(settings: Settings) -> AnnouncedSnapshot:
                 if all(tool.read_only is True for _label, tool in hits)
             ),
             unconfigured=tuple(registry.unconfigured()),
-            configured_servers=tuple(server.label for server in registry.remote()),
         )
     finally:
-        await registry.aclose()
+        await _close_remote(registry)
 
 
-async def announced_tools_by_server(settings: Settings) -> list[ToolDescriptor]:
+async def announced_tools_by_server(
+    settings: Settings, local: Mapping[str, Any] | None = None
+) -> list[ToolDescriptor]:
     """Every tool every configured server publishes right now — the shape `GET /tools` wants. Raises naming
     whichever server could not be asked: a partial list is not the complete catalogue the picker needs."""
-    registry = ToolServerRegistry.from_settings(settings)
+    registry = _announcing(settings, local)
     try:
         resolution = await _resolve_all(registry)
         if resolution.failed:
@@ -265,7 +280,7 @@ async def announced_tools_by_server(settings: Settings) -> list[ToolDescriptor]:
             raise ToolServerUnavailable(f"{names} could not be reached: {details}")
         return [tool for hits in resolution.by_name.values() for _label, tool in hits]
     finally:
-        await registry.aclose()
+        await _close_remote(registry)
 
 
 def _agents_wanting(definition: TeamDefinition, tools: list[str]) -> list[str]:

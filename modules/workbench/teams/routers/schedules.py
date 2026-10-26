@@ -233,13 +233,9 @@ def _take(cron_expression: str, count: int) -> list[datetime]:
 
 
 def _check_trigger_tool(tool_name: str, *, announced: AnnouncedSnapshot) -> None:
-    # A trigger's condition is a reading of the world, so the tools this process serves itself are subtracted first:
-    # a team's memory is not the world, and has no run to be read inside of when the clock is the caller.
-    names = (
-        sorted(set(announced.by_name) - MEMORY_TOOL_NAMES)
-        if announced.configured_servers
-        else None
-    )
+    # A trigger's condition is a reading of the world, so a team's memory is subtracted first: it is not the world,
+    # and has no run to be read inside of when the clock is the caller.
+    names = sorted(set(announced.by_name) - MEMORY_TOOL_NAMES) or None
     try:
         check_trigger_tool(tool_name, announced_tools=names, unconfigured=announced.unconfigured)
     except DefinitionRefused as err:
@@ -257,7 +253,8 @@ async def create_trigger(
         revision_mode=body.revision_mode,
         pinned_revision_id=body.pinned_revision_id,
     )
-    announced = await announced_snapshot(request.app.state.teams.settings)
+    state = request.app.state.teams
+    announced = await announced_snapshot(state.settings, state.tools.local)
     _check_trigger_tool(body.tool_name, announced=announced)
 
     async with request.app.state.teams.pool.acquire() as conn:
@@ -318,7 +315,8 @@ async def update_trigger(
         revision_mode=body.revision_mode,
         pinned_revision_id=body.pinned_revision_id,
     )
-    announced = await announced_snapshot(request.app.state.teams.settings)
+    state = request.app.state.teams
+    announced = await announced_snapshot(state.settings, state.tools.local)
     _check_trigger_tool(body.tool_name, announced=announced)
 
     async with request.app.state.teams.pool.acquire() as conn:

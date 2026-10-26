@@ -29,11 +29,12 @@ router = APIRouter()
 async def _check(request: Request, definition: TeamDefinition) -> None:
     """The surroundings half of the save-time check, answering 422 so an unknown model reads exactly like a cycle. Tool
     names are asked of every configured server rather than read from a list; the models are this module's own configuration."""
+    state = request.app.state.teams
     try:
         check_definition(
             definition,
-            model_ids=request.app.state.teams.catalogue.ids(),
-            announced=await announced_snapshot(request.app.state.teams.settings),
+            model_ids=state.catalogue.ids(),
+            announced=await announced_snapshot(state.settings, state.tools.local),
         )
     except DefinitionRefused as err:
         raise HTTPException(422, detail=str(err)) from err
