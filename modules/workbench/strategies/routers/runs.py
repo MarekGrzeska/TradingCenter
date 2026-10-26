@@ -5,9 +5,10 @@ from __future__ import annotations
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Path, Query
+from fastapi.responses import StreamingResponse
 from pydantic import Field
 
-from .. import compare, runs, store
+from .. import compare, runs, store, trades_csv
 from ..archive import ArchiveUnavailable
 from ..broker_costs import BrokerCostsMissing
 from ..contract import (
@@ -174,3 +175,36 @@ async def trades(
         "run_id": run_id, "total": total,
         "trades": [dict(row) | {"costs": store.decoded(row["costs"])} for row in rows],
     })
+
+
+CSV_PAGE = 1000
+
+
+@router.get(
+    "/runs/{run_id}/trades.csv",
+    response_class=StreamingResponse,
+    responses={200: {"content": {"text/csv": {}}, "description": "every trade of the run, one row each"},
+               404: {"description": "no such run"}},
+)
+async def trades_as_csv(run_id: int = Path(ge=1, le=BIGINT), db=Depends(pool)) -> StreamingResponse:
+    """All of a run's trades for a spreadsheet — not a page: read a page at a time so the file's size is not held in memory,
+    each page under its own short use of a connection."""
+    async with db.acquire() as conn:
+        if await runs.status_of(conn, run_id) is None:
+            raise not_found(f"run {run_id}")
+
+    async def chunks():
+        yield trades_csv.header()
+        offset = 0
+        while True:
+            async with db.acquire() as conn:
+                _, rows = await runs.trades_page(conn, run_id, offset, CSV_PAGE)
+            if not rows:
+                return
+            yield trades_csv.rows([dict(row) | {"costs": store.decoded(row["costs"])} for row in rows])
+            offset += CSV_PAGE
+
+    return StreamingResponse(
+        chunks(), media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="run-{run_id}-trades.csv"'},
+    )

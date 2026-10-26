@@ -39,6 +39,7 @@ REST_PATHS: tuple[str, ...] = (
     "/runs/{run_id}",
     "/runs/{run_id}/cancel",
     "/runs/{run_id}/trades",
+    "/runs/{run_id}/trades.csv",
     "/costs",
     "/costs/{symbol}",
     "/costs/{symbol}/from-broker",

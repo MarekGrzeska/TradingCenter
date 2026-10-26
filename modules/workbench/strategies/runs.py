@@ -255,6 +255,7 @@ async def get_run(conn: Conn, run_id: int) -> RunRow | None:
 
 
 MAX_DELETED = 20
+MAX_TRADES_PER_PAGE = 100
 
 
 def delete_count_problem(run_ids: Sequence[int]) -> str | None:

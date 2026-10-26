@@ -115,6 +115,11 @@ finished run deleted is added to `strategies.deleted_trials` in the same transac
 list shows by exactly the ones thrown away. A worker still computing a run that was cancelled and then deleted is
 stopped by the queue like a cancelled one.
 
+A run's trades are read two ways beyond the report's table: the conversation's `read_backtest_trades` (pages of up to 100,
+UTC times, `read_backtest` itself carries none) and `GET /runs/{id}/trades.csv`, every trade as a file — UTF-8 with a byte
+order mark, comma and dot, each time in UTC and in Warsaw, an empty field where a value does not exist (`trades_csv.py`).
+The file is streamed a page of 1,000 at a time, so a run of tens of thousands of trades costs the process one page.
+
 ## Costs
 
 A run's costs come from one of three places, and the run records which in its `request` (`costs_source`): the

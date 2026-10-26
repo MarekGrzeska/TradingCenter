@@ -3,7 +3,7 @@ import { Chart, type ChartLevel, type ChartMark } from "../chart/Chart";
 import { RESOLUTION_SECONDS } from "../chart/chartWindow";
 import { readChartColors } from "../chart/theme";
 import { marketData } from "../data/marketData";
-import { useRead } from "../data/query";
+import { messageOf, useRead } from "../data/query";
 import type { ChartFocusRequest, Resolution } from "../data/types";
 import { Button } from "../ui/Button";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
@@ -96,6 +96,7 @@ export function ReportPanel({ api, runId, symbol, timeframe }: { api: Strategies
   const [offset, setOffset] = useState(0);
   const [picked, setPicked] = useState<Trade | null>(null);
   const [focus, setFocus] = useState<ChartFocusRequest | null>(null);
+  const [downloadFailure, setDownloadFailure] = useState<string | null>(null);
   const resolution = timeframe as Resolution;
   const barSeconds = RESOLUTION_SECONDS[resolution] ?? 3600;
 
@@ -125,6 +126,20 @@ export function ReportPanel({ api, runId, symbol, timeframe }: { api: Strategies
           ],
     [picked, colors],
   );
+
+  async function download() {
+    setDownloadFailure(null);
+    try {
+      const file = await api.downloadTrades(runId, new AbortController().signal);
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(file);
+      link.download = `run-${runId}-trades.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    } catch (cause: unknown) {
+      setDownloadFailure(messageOf(cause, "nie udało się pobrać transakcji"));
+    }
+  }
 
   function pick(trade: Trade) {
     setPicked(trade);
@@ -198,7 +213,15 @@ export function ReportPanel({ api, runId, symbol, timeframe }: { api: Strategies
             <Button size="2xs" disabled={offset + PAGE >= page.value.total} onClick={() => setOffset(offset + PAGE)}>
               ›
             </Button>
+            <Button size="2xs" tone="muted" onClick={() => void download()}>
+              Pobierz transakcje (CSV)
+            </Button>
           </div>
+          {downloadFailure !== null && (
+            <p role="alert" className="text-xs text-critical">
+              {downloadFailure}
+            </p>
+          )}
           <table aria-label="Transakcje" className="w-full text-xs">
             <thead className="text-left text-ink-muted">
               <tr>

@@ -272,3 +272,28 @@ async def test_delete_runs_removes_what_is_asked_and_refuses_the_rest_whole(pool
     assert twice.status_code == 422
     assert deleted.status_code == 200 and deleted.json() == {"deleted": [finished, other]}
     assert gone.status_code == 404 and trials == [1]
+
+
+@pytest.mark.db
+async def test_trades_csv_has_every_trade_across_pages_and_a_missing_run_is_a_404(pool, monkeypatch) -> None:
+    import csv
+    import io
+
+    from strategies.routers import runs as routes
+
+    monkeypatch.setattr(routes, "CSV_PAGE", 50)  # three pages for 154 trades
+    async with _client(pool) as client:
+        sid = (await client.post("/strategies", json=strategy())).json()["strategy_id"]
+        async with pool.acquire() as conn:
+            run_id = await run_in_state(conn, sid, "done", trades=154)
+            empty = await run_in_state(conn, sid, "done")
+        full = await client.get(f"/runs/{run_id}/trades.csv")
+        bare = await client.get(f"/runs/{empty}/trades.csv")
+        missing = await client.get("/runs/99999/trades.csv")
+
+    table = list(csv.reader(io.StringIO(full.text.lstrip("\ufeff"))))
+    assert full.status_code == 200 and full.headers["content-type"].startswith("text/csv")
+    assert f"run-{run_id}-trades.csv" in full.headers["content-disposition"]
+    assert table[0][:4] == ["seq", "side", "entry_time_utc", "entry_time_warsaw"]
+    assert [int(row[0]) for row in table[1:]] == list(range(154))
+    assert bare.text.lstrip("\ufeff").count("\n") == 1 and missing.status_code == 404

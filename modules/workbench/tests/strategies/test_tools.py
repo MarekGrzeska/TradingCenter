@@ -22,12 +22,12 @@ from .market import flat, minutes, strategy
 
 EXPECTED = {
     "strategy_language", "list_strategies", "read_strategy", "validate_strategy", "draft_strategy", "save_strategy",
-    "run_backtest", "read_backtest", "compare_runs", "delete_backtests",
+    "run_backtest", "read_backtest", "read_backtest_trades", "compare_runs", "delete_backtests",
 }
 # Characters of the serialized `list_tools()` the conversation reads before every turn. Measured 8 827 on 25 October 2026
 # when the surface was written; 10 367 with draft_strategy, the ninth tool, the same day. The headroom is for a description
-# that has to say one more thing.
-SURFACE_CEILING_CHARS = 11_500
+# that has to say one more thing. 12 454 on 26 October 2026 with delete_backtests and read_backtest_trades, the eleventh.
+SURFACE_CEILING_CHARS = 13_500
 
 COSTS = CostModel(spread=1.0, slippage=0.0, overnight_long=0.0, overnight_short=0.0, rollover_hour=22)
 MINUTES = minutes(flat(0, 5 * 86400, 100.0))
@@ -48,7 +48,7 @@ async def _call(app, name: str, **arguments):
     return structured
 
 
-async def test_the_surface_is_the_ten_tools_and_none_sets_costs() -> None:
+async def test_the_surface_is_the_eleven_tools_and_none_sets_costs() -> None:
     tools = await _app().state.mcp_server.list_tools()
 
     assert {t.name for t in tools} == EXPECTED
@@ -254,3 +254,26 @@ async def test_the_agent_deletes_runs_on_request_and_the_trials_stay_and_a_run_i
 
     assert answered["deleted"] == [finished] and summary.trials == 1
     assert "operator asked" in described["delete_backtests"] and "no undo" in described["delete_backtests"]
+
+
+@pytest.mark.db
+async def test_the_agent_reads_a_runs_trades_a_page_at_a_time_and_read_backtest_carries_none(pool) -> None:
+    app = _app(pool)
+    saved = await _call(app, "save_strategy", document=strategy())
+    async with pool.acquire() as conn:
+        run_id = await run_in_state(conn, saved["strategy_id"], "done", trades=154)
+
+    first = await _call(app, "read_backtest_trades", run_id=run_id, limit=100)
+    second = await _call(app, "read_backtest_trades", run_id=run_id, offset=100, limit=100)
+    report = await _call(app, "read_backtest", run_id=run_id)
+    with pytest.raises(ToolError, match="1 to 100"):
+        await _call(app, "read_backtest_trades", run_id=run_id, limit=101)
+    with pytest.raises(ToolError, match="may have been deleted"):
+        await _call(app, "read_backtest_trades", run_id=run_id + 999)
+
+    assert (first["total"], len(first["trades"]), first["trades"][0]["seq"]) == (154, 100, 0)
+    assert (second["total"], len(second["trades"]), second["trades"][0]["seq"]) == (154, 54, 100)
+    # A trade without a stop has neither a stop nor R; the rest of it is as recorded.
+    assert first["trades"][0]["initial_stop"] is None and first["trades"][0]["result_r"] is None
+    assert first["trades"][0]["exit_reason"] == "when" and first["trades"][0]["costs"] == {}
+    assert "entry_price" not in json.dumps(report)

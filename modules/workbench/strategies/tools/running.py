@@ -11,6 +11,7 @@ from pydantic import AwareDatetime, BaseModel, Field, ValidationError
 from .. import compare, runs, store
 from ..archive import ArchiveUnavailable
 from ..broker_costs import BrokerCostsMissing
+from ..contract import TradeOut
 from ..document import execution_of
 from ..problems import Problem
 from ..runs import RunIn
@@ -46,6 +47,16 @@ class RunRead(BaseModel):
     provenance: dict[str, Any] | None = Field(
         description="the revision's hash, the series fills were settled on (`execution`), and what the archive never verified"
     )
+
+
+class TradesPage(BaseModel):
+    run_id: int
+    status: str
+    total: int = Field(description="every trade of the run, of which this page is `offset` onward")
+    offset: int
+    # Dicts, as `read_backtest`'s report is: the model reads them every turn as part of the schema, and a typed trade is
+    # two thousand characters of it. The shape is still `TradeOut`'s, which builds each one below.
+    trades: list[dict[str, Any]] = Field(description="in order of `seq`; times are UTC")
 
 
 class RunsDeleted(BaseModel):
@@ -153,6 +164,28 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
             requested_by=row.requested_by, request=row.request, engine_version=row.engine_version, report=report,
             provenance=provenance,
         )
+
+    @mcp.tool(annotations=READ_ONLY)
+    async def read_backtest_trades(run_id: int, offset: int = 0, limit: int = 50) -> TradesPage:
+        """One page of a run's trades, in order: side, entry and exit time (UTC) and price, size, initial stop, result in
+        money, percent of equity at entry and R, the worst open loss, costs, why it closed and whether the order of events
+        inside a minute was assumed against the strategy. `limit` is at most 100; `total` says how many there are, so
+        the next page starts at `offset + limit`. Use it to check a rule against the trades themselves, such as "every
+        position closed before the session ended". Reading pages is not a trial."""
+        if not 1 <= limit <= runs.MAX_TRADES_PER_PAGE or offset < 0:
+            raise refusal(f"a page is 1 to {runs.MAX_TRADES_PER_PAGE} trades from an offset of 0 or more")
+        async with ctx.state.pool.acquire() as conn:
+            status = await runs.status_of(conn, run_id)
+            if status is None:
+                raise refusal(f"run {run_id} does not exist; it may have been deleted")
+            total, rows = await runs.trades_page(conn, run_id, offset, limit)
+        return TradesPage.model_validate({
+            "run_id": run_id, "status": status, "total": total, "offset": offset,
+            "trades": [
+                TradeOut.model_validate(dict(row) | {"costs": store.decoded(row["costs"])}).model_dump(mode="json")
+                for row in rows
+            ],
+        })
 
     @mcp.tool(annotations=READ_ONLY)
     async def compare_runs(run_ids: list[int]) -> Comparison:

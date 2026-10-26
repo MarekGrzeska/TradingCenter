@@ -134,3 +134,56 @@ describe("A trade without a stop", () => {
     expect(row).toHaveTextContent("—");
   });
 });
+
+describe("Downloading a run's trades", () => {
+  const report = {
+    trades: 450, no_trades: false, costs: { spread: 0, slippage: 0, financing: 0 },
+    benchmarks: { buy_and_hold: null, random_entry: null }, annualisation: "365 dni", equity: null,
+    costs_source: "broker", costs_fetched_at: null, without_costs: false,
+  } as unknown as Report;
+  const run = {
+    id: 14, revision: 1, status: "done", from: new Date(), to: new Date(), engineVersion: 4,
+    request: { costs: {} }, report, provenance: {},
+  } as unknown as Run;
+  const trade: Trade = {
+    seq: 200, side: "long", entryTime: new Date("2026-07-02T13:35:00Z"), entryPrice: 100,
+    exitTime: new Date("2026-07-02T19:55:00Z"), exitPrice: 101, units: 1, initialStop: null, resultR: null,
+    resultMoney: 1, resultPct: 0.001, maePct: 0, costs: {}, exitReason: "when", pessimistic: false,
+  };
+
+  function panel(overrides: Partial<StrategiesApi>) {
+    const client = api({
+      run: vi.fn(async () => run),
+      trades: vi.fn(async () => ({ total: 450, trades: [trade] })),
+      ...overrides,
+    });
+    render(<ReportPanel api={client} runId={14} symbol="US100" timeframe="MINUTE_5" />);
+    return client;
+  }
+
+  it("saves the whole run, whatever page of the table is open", async () => {
+    const file = new Blob(["seq\n"], { type: "text/csv" });
+    const clicked: string[] = [];
+    vi.stubGlobal("URL", { createObjectURL: () => "blob:trades", revokeObjectURL: () => {} });
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      clicked.push(this.download);
+    });
+    const client = panel({ downloadTrades: vi.fn(async () => file) });
+    await userEvent.click(await screen.findByRole("button", { name: "›" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Pobierz transakcje (CSV)" }));
+
+    expect(client.downloadTrades).toHaveBeenCalledWith(14, expect.anything());
+    expect(clicked).toEqual(["run-14-trades.csv"]);
+    expect(screen.getByRole("table", { name: "Transakcje" })).toBeInTheDocument();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("says why it could not, and leaves the table as it was", async () => {
+    panel({ downloadTrades: vi.fn(async () => Promise.reject(new Error("serwer nie odpowiada"))) });
+    await userEvent.click(await screen.findByRole("button", { name: "Pobierz transakcje (CSV)" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("serwer nie odpowiada");
+    expect(screen.getByRole("table", { name: "Transakcje" })).toBeInTheDocument();
+  });
+});
