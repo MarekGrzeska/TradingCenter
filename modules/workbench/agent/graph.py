@@ -48,8 +48,10 @@ class AccountTrace(Protocol):
     ) -> None: ...
 
 # A number in the code, not a setting: a safety ceiling in configuration is an invitation to raise it at
-# the moment it is inconvenient. Past about ten a second edit is needed — LangGraph's own recursion limit.
-TOOL_CALL_CEILING = 8
+# the moment it is inconvenient.
+TOOL_CALL_CEILING = 16
+# LangGraph stops a graph after 25 steps by default; one call a round is two steps, plus the closing answer.
+_RECURSION_LIMIT = 2 * TOOL_CALL_CEILING + 5
 
 
 class ConversationState(TypedDict):
@@ -145,7 +147,8 @@ def build_graph(
         return {
             "text": state["text"] + "".join(parts),
             "usages": [*state["usages"], usage],
-            "pending": requests,
+            # Offered nothing, anything asked for cannot be a tool call; acting on it would loop past the ceiling.
+            "pending": requests if offered else [],
             "failed": False,
         }
 
@@ -273,7 +276,7 @@ def build_graph(
     graph.set_entry_point("model")
     graph.add_conditional_edges("model", after_model, {"tools": "tools", END: END})
     graph.add_edge("tools", "model")
-    return graph.compile()
+    return graph.compile().with_config(recursion_limit=_RECURSION_LIMIT)
 
 
 def initial_state(

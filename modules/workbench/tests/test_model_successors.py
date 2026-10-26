@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from workbench import model_successors
 
-GPT_6 = {"gpt-6-luna", "gpt-6.1-sol", "gpt-6-astra"}
+GPT_6 = {"gpt-6-luna", "gpt-6.1-terra", "gpt-6.1-sol", "gpt-6-astra"}
 GPT_5_6 = {"gpt-5.6-luna", "gpt-5.6-terra", "gpt-5.6-sol"}
 
 
@@ -17,7 +17,7 @@ def test_every_retired_model_moves_once_its_successor_is_configured() -> None:
         "gpt-5.6-luna": "gpt-6-luna",
         "gpt-5.6-sol": "gpt-6.1-sol",
         "gpt-6-sol": "gpt-6.1-sol",
-        "gpt-5.6-terra": "gpt-6.1-sol",
+        "gpt-5.6-terra": "gpt-6.1-terra",
     }
 
 

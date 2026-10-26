@@ -22,9 +22,9 @@ from ..tools import ToolDescriptor, ToolOutcome, ToolOutcomeKind
 
 log = logging.getLogger(__name__)
 
-# How many times one agent may go model → tools → model. In the code rather than a setting: a safety
-# ceiling in configuration is an invitation to raise it. Six, not agent's eight, because here it multiplies.
-ROUND_CEILING = 6
+# How many times one agent may go model → tools → model; in the code, because a ceiling in settings invites raising it.
+# An executor needs about five rounds in a row to place one order; the run's cost limit and timeout bound the rest.
+ROUND_CEILING = 12
 
 
 @dataclass(frozen=True)
