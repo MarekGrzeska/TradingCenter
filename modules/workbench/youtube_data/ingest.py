@@ -277,7 +277,7 @@ class Ingest:
                 continue
             discoveries = await self._through_filter(channel, films)
             async with self._pool.acquire() as conn:
-                await store.upsert_films(conn, discoveries, bounds=self._bounds)
+                await store.upsert_films(conn, discoveries, bounds=self._bounds, now=now)
                 await store.record_discovery(conn, channel.channel_id, at=now)
             left = await self._remaining(ceiling)
 

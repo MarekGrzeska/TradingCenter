@@ -236,7 +236,7 @@ async def analyse_film(
 
     async with pool.acquire() as conn:
         await store.upsert_films(
-            conn, [store.Discovery(found[0], origin="manual", prompt_id=prompt_id)]
+            conn, [store.Discovery(found[0], origin="manual", prompt_id=prompt_id)], now=providers.clock.now()
         )
         await store.add_usage(conn, providers.meter.drain(), day=budget.utc_day(providers.clock.now()))
     return Queued(found[0].video_id, found[0].title, created=True, process=True)

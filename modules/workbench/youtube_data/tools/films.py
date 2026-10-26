@@ -96,7 +96,7 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         min_score: int | None = None,
         limit: int = 20,
     ) -> list[VideoSummary]:
-        """Films published in the last few hours, newest first, with an excerpt of what a model made of each.
+        """Films the archive found in the last few hours, newest found first, with an excerpt of what a model made of each.
 
         `min_score` narrows by a reading that is already stored, so it costs nothing and is not a fresh judgement. A film with no `impact_score` has not been read — say so rather than treating it as unimportant.
         Never carries a transcript.

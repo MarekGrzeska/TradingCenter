@@ -25,8 +25,7 @@ def film(video_id: str = "v1", **overrides) -> VideoRef:
         channel_id="UC1",
         channel_title="A Channel",
         title="A film",
-        published_at=NOW - timedelta(hours=1),
-        **overrides,
+        **{"published_at": NOW - timedelta(hours=1), **overrides},
     )
 
 
@@ -123,7 +122,7 @@ async def test_the_queue_holds_what_is_due_and_not_what_is_live_or_finished(db) 
 
 
 async def test_a_reading_overwrites_the_last_one_by_the_same_prompt_and_sits_beside_another_prompts(db) -> None:
-    await store.upsert_films(db, [discovery()])
+    await store.upsert_films(db, [discovery()], now=NOW)
     other = await store.create_prompt(db, name="Technical", body="Levels only.")
     reading = Reading(summary_pl="x", text="## Tezy\n- a", impact_score=4)
 
@@ -164,7 +163,7 @@ async def test_a_film_moves_on_only_by_the_reading_of_its_own_prompt(db) -> None
 
 
 async def test_a_list_carries_no_text_and_one_film_carries_every_reading_the_films_own_first(db) -> None:
-    await store.upsert_films(db, [discovery()])
+    await store.upsert_films(db, [discovery()], now=NOW)
     other = await store.create_prompt(db, name="Technical", body="Levels only.")
     for prompt_id, text in ((other.id, "levels"), (SEEDED_PROMPT_ID, "theses")):
         await store.save_reading(
@@ -224,10 +223,19 @@ async def test_a_channel_filter_is_set_kept_and_taken_off_only_when_asked(db) ->
     assert cleared is not None and cleared.filter is None
 
 
+async def test_a_window_of_films_is_when_the_archive_found_them_not_when_they_were_published(db) -> None:
+    late = film("v1", published_at=NOW - timedelta(days=2))
+    await store.upsert_films(db, [Discovery(late, "channel:UC1", SEEDED_PROMPT_ID)], now=NOW - timedelta(hours=1))
+
+    listed = await store.list_films(db, start=NOW - timedelta(days=1), end=NOW, limit=10)
+
+    assert [f.video.video_id for f in listed] == ["v1"]
+
+
 async def test_a_filtered_out_film_is_kept_with_its_reason_and_listed_only_when_asked_for(db) -> None:
     kept = Discovery(film("v1"), "channel:UC1", SEEDED_PROMPT_ID)
     turned_away = Discovery(film("v2"), "channel:UC1", SEEDED_PROMPT_ID, filtered_reason="a Q&A with viewers")
-    await store.upsert_films(db, [kept, turned_away])
+    await store.upsert_films(db, [kept, turned_away], now=NOW)
 
     window = {"start": NOW - timedelta(days=1), "end": NOW, "limit": 10}
     assert [f.video.video_id for f in await store.list_films(db, **window)] == ["v1"]

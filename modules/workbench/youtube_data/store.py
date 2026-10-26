@@ -385,13 +385,14 @@ def unwanted_reason(ref: VideoRef, bounds: tuple[int, int]) -> str | None:
 
 
 async def upsert_films(
-    conn: Conn, discoveries: Sequence[Discovery], *, bounds: tuple[int, int] | None = None
+    conn: Conn, discoveries: Sequence[Discovery], *, bounds: tuple[int, int] | None = None, now: datetime | None = None
 ) -> int:
     """The films this pass had not seen before, inserted. A film already here is updated only if it has something new —
     a second door it came in by, a length it lacked, a live stream that ended — and is left alone otherwise, which is the
     usual case by a wide margin. With `bounds` (floor, ceiling in seconds) a film outside them is not stored at all: a
     row for a Short is clutter in every list and every answer, and a film the source lists again and again would be
-    stored and dropped on every pass. Returns how many were new."""
+    stored and dropped on every pass. `now` is the archive's clock, which lists are windowed by — in a simulation it is
+    not the database's. Returns how many were new."""
     new = 0
     for found in discoveries:
         ref = found.ref
@@ -401,9 +402,9 @@ async def upsert_films(
             """
             INSERT INTO videos (
                 video_id, channel_id, channel_title, title, published_at, duration_seconds, live_status,
-                origins, prompt_id, simulated, audio_language, state, skip_reason
+                origins, prompt_id, simulated, audio_language, state, skip_reason, discovered_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, ARRAY[$8]::text[], $9, $10, $11, $12, $13)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, ARRAY[$8]::text[], $9, $10, $11, $12, $13, COALESCE($14::timestamptz, now()))
             ON CONFLICT (video_id) DO UPDATE SET
                 origins = (SELECT array_agg(DISTINCT o) FROM unnest(videos.origins || EXCLUDED.origins) AS o),
                 duration_seconds = COALESCE(videos.duration_seconds, EXCLUDED.duration_seconds),
@@ -429,6 +430,7 @@ async def upsert_films(
             ref.audio_language,
             DISCOVERED if found.filtered_reason is None else FILTERED_OUT,
             found.filtered_reason,
+            now,
         )
         new += bool(row and row["inserted"])
     return new
@@ -834,17 +836,18 @@ async def list_films(
     state: str | None = None,
     limit: int,
 ) -> list[Film]:
-    """A window of films, newest first, narrowed by whatever was asked. The window is what the index serves; the rest
-    filters inside it, which is why a window is always part of the question."""
+    """A window of films by when the archive found them, newest first, narrowed by whatever was asked. Not by publication:
+    a film is found hours after it, and a day's films would fall out of a day's window. The window is what the index
+    serves; the rest filters inside it, which is why a window is always part of the question."""
     rows = await conn.fetch(
         _FILM_SELECT
         + """
-        WHERE v.published_at >= $1 AND v.published_at <= $2
+        WHERE v.discovered_at >= $1 AND v.discovered_at <= $2
           AND ($3::text IS NULL OR v.channel_id = $3)
           AND ($4::text IS NULL OR v.origins @> ARRAY[$4]::text[])
           AND ($5::int IS NULL OR r.impact_score >= $5)
           AND CASE WHEN $6::text IS NULL THEN v.state <> 'filtered_out' ELSE v.state = $6 END
-        ORDER BY v.published_at DESC LIMIT $7
+        ORDER BY v.discovered_at DESC LIMIT $7
         """,
         start,
         end,
