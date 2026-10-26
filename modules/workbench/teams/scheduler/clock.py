@@ -12,6 +12,7 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from zoneinfo import ZoneInfo
 
 import asyncpg
 from tc_runtime.db import Conn
@@ -25,7 +26,7 @@ from ..runner.cost import CostLimitReached
 from ..runner.trading import TradeLimitReached
 from ..tools import ToolOutcomeKind, ToolServer, ToolServerRegistry, ToolServerUnavailable
 from ..validation import DefinitionRefused
-from .timing import fires_after
+from .timing import SCHEDULE_TIMEZONE, fires_after
 
 log = logging.getLogger(__name__)
 
@@ -310,12 +311,12 @@ async def _start_and_track(
 
 
 def _next_fire_and_skipped(
-    cron_expression: str, due_at: datetime, now: datetime
+    cron_expression: str, due_at: datetime, now: datetime, timezone: ZoneInfo = SCHEDULE_TIMEZONE
 ) -> tuple[datetime, int]:
     """The schedule's new `next_fire_at` — the first cron slot strictly after `now` — and how many slots
     between the claimed value and now were folded into this one fire."""
     skipped = 0
-    for candidate in fires_after(cron_expression, due_at):
+    for candidate in fires_after(cron_expression, due_at, timezone):
         if candidate <= now:
             skipped += 1
         else:
@@ -330,7 +331,7 @@ async def _fire_schedule(
     await it instead of guessing with a sleep. `Clock.tick()` lets it run detached."""
     now = datetime.now(UTC)
     next_fire_at, skipped = _next_fire_and_skipped(
-        schedule["cron_expression"], schedule["next_fire_at"], now
+        schedule["cron_expression"], schedule["next_fire_at"], now, ZoneInfo(schedule["timezone"])
     )
 
     async with pool.acquire() as conn:

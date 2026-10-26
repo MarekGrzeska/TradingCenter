@@ -8,12 +8,13 @@ from collections.abc import Iterable, Mapping
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from croniter import croniter
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 from .config import ModelCatalogueEntry
-from .recurrence import Recurrence, from_cron, to_cron
+from .recurrence import DEFAULT_TIMEZONE, Recurrence, from_cron, to_cron
 
 
 def _parse_jsonb(value: object) -> Any:
@@ -580,6 +581,19 @@ class ScheduleTiming(BaseModel):
 
     cron_expression: str | None = None
     recurrence: Recurrence | None = None
+    timezone: str = Field(
+        default=DEFAULT_TIMEZONE,
+        description="IANA zone the expression is read in as a wall clock, e.g. America/New_York",
+    )
+
+    @field_validator("timezone")
+    @classmethod
+    def _zone_is_known(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as err:
+            raise ValueError(f"{value!r} is not a timezone the IANA database knows") from err
+        return value
 
     @field_validator("cron_expression")
     @classmethod
@@ -604,6 +618,9 @@ class ScheduleTiming(BaseModel):
             return self.cron_expression
         assert self.recurrence is not None  # enforced by `_one_way_of_saying_it`
         return to_cron(self.recurrence)
+
+    def zone(self) -> ZoneInfo:
+        return ZoneInfo(self.timezone)
 
 
 class ScheduleIn(ScheduleTiming):
@@ -630,6 +647,7 @@ class ScheduleOut(BaseModel):
     revision_mode: str
     pinned_revision_id: int | None
     cron_expression: str
+    timezone: str
     # The same expression as a rhythm, or `None` when it is not one of them — read back here rather than
     # stored, so an operator who wrote their own expression gets it back unchanged.
     recurrence: Recurrence | None
@@ -650,6 +668,7 @@ class ScheduleOut(BaseModel):
             revision_mode=row["revision_mode"],
             pinned_revision_id=row["pinned_revision_id"],
             cron_expression=row["cron_expression"],
+            timezone=row["timezone"],
             recurrence=from_cron(row["cron_expression"]),
             next_fire_at=row["next_fire_at"],
             enabled=row["enabled"],

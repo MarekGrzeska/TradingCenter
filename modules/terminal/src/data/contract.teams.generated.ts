@@ -754,6 +754,12 @@ export interface components {
             /** Cron Expression */
             cron_expression?: string | null;
             recurrence?: components["schemas"]["Recurrence"] | null;
+            /**
+             * Timezone
+             * @description IANA zone the expression is read in as a wall clock, e.g. America/New_York
+             * @default Europe/Warsaw
+             */
+            timezone: string;
         };
         /**
          * NextFiresOut
@@ -880,6 +886,12 @@ export interface components {
              * @enum {string}
              */
             revision_mode: "pinned" | "latest";
+            /**
+             * Timezone
+             * @description IANA zone the expression is read in as a wall clock, e.g. America/New_York
+             * @default Europe/Warsaw
+             */
+            timezone: string;
         };
         /** ScheduleOut */
         ScheduleOut: {
@@ -910,6 +922,8 @@ export interface components {
             revision_mode: string;
             /** Team Id */
             team_id: number;
+            /** Timezone */
+            timezone: string;
             /**
              * Updated At
              * Format: date-time

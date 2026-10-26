@@ -93,7 +93,7 @@ class _Recurring:
 
 SCHEDULE_COLUMNS = """
     id, team_id, owner_principal, revision_mode, pinned_revision_id, cron_expression,
-    next_fire_at, enabled, disabled_reason, consecutive_failures,
+    timezone, next_fire_at, enabled, disabled_reason, consecutive_failures,
     created_at, updated_at
 """
 

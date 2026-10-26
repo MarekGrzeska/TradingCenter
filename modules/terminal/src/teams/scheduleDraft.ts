@@ -18,6 +18,7 @@ export function emptyScheduleDraft(revisionId: number | null): ScheduleDraft {
     pinnedRevisionId: revisionId,
     recurrence: recurrenceOfKind("daily", null),
     cronExpression: null,
+    timezone: DEFAULT_TIMEZONE,
   };
 }
 
@@ -30,7 +31,24 @@ export function draftFromSchedule(schedule: Schedule): ScheduleDraft {
     pinnedRevisionId: schedule.pinnedRevisionId,
     recurrence: schedule.recurrence,
     cronExpression: schedule.recurrence === null ? schedule.cronExpression : null,
+    timezone: schedule.timezone,
   };
+}
+
+/** The operator's own zone, and the module's default when a schedule names none. */
+export const DEFAULT_TIMEZONE = "Europe/Warsaw";
+
+/** The zones the wizard offers: the operator's, and the markets a team trades in. A convenience, not the rule — the
+ *  module takes any IANA name, and a schedule saved with another one keeps it (`timezoneChoices`). */
+export const TIMEZONES: readonly { zone: string; label: string }[] = [
+  { zone: "Europe/Warsaw", label: "Warsaw" },
+  { zone: "America/New_York", label: "New York" },
+  { zone: "Europe/London", label: "London" },
+  { zone: "UTC", label: "UTC" },
+];
+
+export function timezoneChoices(current: string): readonly { zone: string; label: string }[] {
+  return TIMEZONES.some(({ zone }) => zone === current) ? TIMEZONES : [...TIMEZONES, { zone: current, label: current }];
 }
 
 export const RECURRENCE_KINDS: readonly RecurrenceKind[] = [
@@ -169,9 +187,9 @@ export function describeRecurrence(recurrence: Recurrence): string {
 /** How a saved schedule reads on the list: its rhythm, or the expression it is when no
  *  rhythm describes it. */
 export function describeSchedule(schedule: Schedule): string {
-  return schedule.recurrence === null
-    ? schedule.cronExpression
-    : describeRecurrence(schedule.recurrence);
+  const timing = schedule.recurrence === null ? schedule.cronExpression : describeRecurrence(schedule.recurrence);
+  // The list shows every other time in Polish, so a rhythm read elsewhere says where.
+  return schedule.timezone === DEFAULT_TIMEZONE ? timing : `${timing} · ${schedule.timezone}`;
 }
 
 export function emptyTriggerDraft(revisionId: number | null): TriggerDraft {
