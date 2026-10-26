@@ -186,7 +186,7 @@ one topic), and `GET /topics` carries each topic's latest. Cost in units and tok
 ## Surfaces
 
 REST (`contract.py`, generated into the terminal as `contract.youtube.generated.ts`):
-`GET /videos` (window, channel, topic, score, state — `filtered_out` only when asked for; a reading without its text) · `GET /videos/{id}` (every reading, with its text) · `POST /videos/{id}/readings` · `GET|POST /prompts` · `PATCH|DELETE /prompts/{id}` ·
+`GET /videos` (window of when the archive found a film, not of when it was published; channel, topic, score, state — `filtered_out` only when asked for; a reading without its text) · `GET /videos/{id}` (every reading, with its text) · `POST /videos/{id}/readings` · `GET|POST /prompts` · `PATCH|DELETE /prompts/{id}` ·
 `GET /videos/{id}/transcript` (pages) · `POST /videos` (one film named by hand: accepted at once, transcribed and read in the background ahead of the queue) · `GET|POST /channels` ·
 `PATCH|DELETE /channels/{id}` · `GET|POST /topics` · `PATCH|DELETE /topics/{id}` · `GET /topic-runs` (`topic_id`, `since` included and `until` excluded as for `/videos`, `limit`) · `GET /candidates` (`view` open · rejected · decided, `sort` found · published, `topic_id`) ·
 `POST /candidates/{id}/follow-channel|analyse|dismiss|ignore-channel` · `GET /ignored-channels` · `DELETE /ignored-channels/{id}` · `GET /state` ·
