@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Button } from "../ui/Button";
+import { BackButton } from "../ui/BackButton";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { useAgentTurns } from "../agent/useAgentTurns";
 import { useRead } from "../data/query";
@@ -60,15 +61,11 @@ export function TeamRunsView({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex flex-wrap items-center gap-2 border-b border-border p-2">
-        <Button onClick={onClose}>
-          ← Catalogue
-        </Button>
+        <BackButton label="Catalogue" onClick={onClose} />
         <span className="text-sm text-ink">
           {teamName} <span className="text-xs text-ink-faint">· runs</span>
         </span>
-        <Button onClick={onEdit}>
-          ← Edit team
-        </Button>
+        <BackButton label="Edit team" onClick={onEdit} />
         <Button
           tone="primary"
           onClick={() => setStarting(true)}

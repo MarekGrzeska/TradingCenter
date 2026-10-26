@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Button } from "../ui/Button";
+import { BackButton } from "../ui/BackButton";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { MessageBody } from "../agent/MessageBody";
 import { useRead } from "../data/query";
@@ -98,9 +99,7 @@ export function RunMonitor({
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex flex-wrap items-center gap-2 border-b border-border p-2">
         {onClose && (
-          <Button onClick={onClose}>
-            ← Catalogue
-          </Button>
+          <BackButton label="Catalogue" onClick={onClose} />
         )}
         <span className="text-sm text-ink">
           Run {runId}
