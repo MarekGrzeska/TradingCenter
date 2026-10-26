@@ -117,8 +117,8 @@ async def lifespan(app: FastAPI):
         if alerts_app is None
         else ConversationLocalTools("alerts", alerts_app.state.mcp_server)
     )
-    # The conversation's alone: not the teams' (a schedule would run backtests nobody asked for and spend the trial
-    # count) and not the alerts' catalogue (a strategy is not a value to watch).
+    # Every tool to the conversation; a team gets only the three that read (`team_mcp_server`, below) — a schedule would
+    # run backtests nobody asked for and spend the trial count. Not the alerts' catalogue: a strategy is not a value to watch.
     strategies_tools = (
         None
         if strategies_app is None
@@ -245,6 +245,10 @@ async def lifespan(app: FastAPI):
 
         if alerts_app is not None:
             teams_tool_servers.local["alerts"] = TeamsLocalTools("alerts", alerts_app.state.mcp_server)
+        if strategies_app is not None:
+            teams_tool_servers.local["strategies"] = TeamsLocalTools(
+                "strategies", strategies_app.state.team_mcp_server
+            )
 
         # The `try` opens before the schema checks, not after: `ToolServer.__init__` already holds a credential when a
         # scope is configured, and a refused start is exactly the path that would otherwise leak it.
