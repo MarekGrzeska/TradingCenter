@@ -22,12 +22,13 @@ from .market import flat, minutes, strategy
 
 EXPECTED = {
     "strategy_language", "list_strategies", "read_strategy", "validate_strategy", "draft_strategy", "save_strategy",
-    "run_backtest", "read_backtest", "read_backtest_trades", "compare_runs", "delete_backtests",
+    "run_backtest", "read_backtest", "read_backtest_trades", "compare_runs", "delete_backtests", "strategy_signal",
 }
 # Characters of the serialized `list_tools()` the conversation reads before every turn. Measured 8 827 on 25 October 2026
 # when the surface was written; 10 367 with draft_strategy, the ninth tool, the same day. The headroom is for a description
-# that has to say one more thing. 12 454 on 26 October 2026 with delete_backtests and read_backtest_trades, the eleventh.
-SURFACE_CEILING_CHARS = 13_500
+# that has to say one more thing. 12 454 on 26 October 2026 with delete_backtests and read_backtest_trades, the eleventh;
+# 13 214 the same day with strategy_signal, the twelfth (CI on Linux measures a few per cent more than Windows).
+SURFACE_CEILING_CHARS = 14_500
 
 COSTS = CostModel(spread=1.0, slippage=0.0, overnight_long=0.0, overnight_short=0.0, rollover_hour=22)
 MINUTES = minutes(flat(0, 5 * 86400, 100.0))
@@ -48,11 +49,31 @@ async def _call(app, name: str, **arguments):
     return structured
 
 
-async def test_the_surface_is_the_eleven_tools_and_none_sets_costs() -> None:
+async def test_the_surface_is_the_twelve_tools_and_none_sets_costs() -> None:
     tools = await _app().state.mcp_server.list_tools()
 
     assert {t.name for t in tools} == EXPECTED
     assert not [t.name for t in tools if "cost" in t.name]
+
+
+async def test_a_team_gets_the_three_that_read_and_nothing_that_writes() -> None:
+    tools = await _app().state.team_mcp_server.list_tools()
+
+    assert {t.name for t in tools} == {"list_strategies", "read_strategy", "strategy_signal"}
+    assert all(t.annotations is not None and t.annotations.readOnlyHint for t in tools)
+
+
+@pytest.mark.db
+async def test_a_signal_with_no_closed_bar_is_a_refusal_naming_the_gap_and_counts_nothing(pool) -> None:
+    app = _app(pool)
+    saved = await _call(app, "save_strategy", document=strategy())
+
+    # The archive's minutes end in March 2026; the bar that closed last, now, is not in it.
+    with pytest.raises(ToolError, match="the archive has no HOUR bar closing at"):
+        await _call(app, "strategy_signal", strategy_id=saved["strategy_id"], revision=1)
+    read = await _call(app, "read_strategy", strategy_id=saved["strategy_id"])
+
+    assert read["trials"] == 0 and read["recent_runs"] == []
 
 
 async def test_the_descriptions_tell_the_model_how_to_write_and_when_to_run() -> None:

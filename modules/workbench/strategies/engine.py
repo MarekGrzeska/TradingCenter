@@ -45,11 +45,42 @@ class Trade:
 
 
 @dataclass(frozen=True)
+class WorkingOrder:
+    side: str
+    kind: str
+    # NaN for a market order, which takes the next minute's open.
+    price: float
+    signal_bar: int
+
+
+@dataclass(frozen=True)
+class OpenPosition:
+    side: str
+    entry_time: int
+    entry_price: float
+    stop: float
+    target: float
+    # Why the next minute closes it, when the last decision said so: `when` or `max_bars`.
+    exit_due: str | None
+
+
+@dataclass(frozen=True)
+class InFlight:
+    """What the last decision of the range left to happen next — the strategy's signal, read before anything of it is
+    settled to the end of the range (`strategy_signal`)."""
+
+    last_bar: int | None
+    order: WorkingOrder | None
+    position: OpenPosition | None
+
+
+@dataclass(frozen=True)
 class Result:
     trades: list[Trade]
     # Signals that became no trade: a stop on the wrong side of the fill, or no stop at all where it was evaluated.
     rejected_entries: int
     decision_bars: int
+    in_flight: InFlight | None = None
 
 
 @dataclass
@@ -183,6 +214,7 @@ def simulate(
                 order = _Order(1 if entry.side == "long" else -1, entry.order.type, price, bar, expires)
                 break
 
+    in_flight = _in_flight(int(bars[-1]) if len(bars) else None, order, position)
     # What the last decision leaves in flight settles on the minutes up to the end of the range.
     lo, hi = np.searchsorted(minute.starts, [previous_moment, range_to], side="left")
     for m in range(int(lo), int(hi)):
@@ -195,7 +227,22 @@ def simulate(
         spread = costs.spread_at(int(minute.starts[last]))
         price = minute.columns["close"][last] + (spread if position.side < 0 else 0.0)
         _close(position, int(minute.available[last]), price, "end_of_range", book, costs, spread)
-    return Result(book.trades, book.rejected, len(bars))
+    return Result(book.trades, book.rejected, len(bars), in_flight)
+
+
+def _side(side: int) -> str:
+    return "long" if side > 0 else "short"
+
+
+def _in_flight(last_bar: int | None, order: _Order | None, position: _Position | None) -> InFlight:
+    return InFlight(
+        last_bar,
+        None if order is None else WorkingOrder(_side(order.side), order.kind, order.price, order.signal_bar),
+        None if position is None else OpenPosition(
+            _side(position.side), position.entry_time, position.entry_price, position.stop, position.target,
+            position.exit_at_next_minute,
+        ),
+    )
 
 
 def _state(position: _Position | None, book: _Book, bar: int, decision: Series, costs: CostModel, moment: int) -> State:

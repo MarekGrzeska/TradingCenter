@@ -148,9 +148,13 @@ parameters, costs, range, engine version, seed, and a fingerprint of every serie
 
 ## The conversation's tools
 
-Nine, in `tools/`, built into a FastMCP server the assembly hands **to the conversation alone** as functions — never to
-the teams (a schedule would spend the queue and the trial count on runs nobody asked for), never to the alerts'
-catalogue, and never mounted at `/mcp` (design D7). `strategy_language`, `list_strategies`, `read_strategy` and
+Twelve, in `tools/`, built into a FastMCP server the assembly hands to the conversation as functions — never to the
+alerts' catalogue, and never mounted at `/mcp` (design D7). A team gets a second server of three of them that only read,
+`list_strategies`, `read_strategy` and `strategy_signal` (`mcp_app.TEAM_TOOLS`): nothing that saves, drafts, queues or
+deletes, since a schedule would spend the queue and the trial count on runs nobody asked for.
+`strategy_signal` is what the engine would do now for a named revision — `simulate` over the last 2 000 bars, read
+before what the last decision left in flight is settled (`signals.py`, `Result.in_flight`); no run, no trial, no write,
+and no balance: the team sizes the order from the account through `trading-mcp`. `strategy_language`, `list_strategies`, `read_strategy` and
 `validate_strategy` read; `draft_strategy` puts a document into the operator's editor as unsaved text — no revision,
 no trial, one draft per strategy and one for the new strategy (`drafts.py`), ended by any saved revision; `save_strategy`
 writes a revision authored `agent`, and needs `based_on` — the revision the

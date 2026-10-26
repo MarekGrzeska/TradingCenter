@@ -91,6 +91,8 @@ def create_app() -> FastAPI:
     app.include_router(costs.router)
     # The tools, for the host to hand to the conversation; not mounted, so nothing reaches them over the network.
     app.state.mcp_server = mcp_app.build_server(app)
+    # The three of them a team may call, for the teams registry — the same functions, fewer of them.
+    app.state.team_mcp_server = mcp_app.build_team_server(app)
 
     # In front of the whole application: nothing decides who may call after routing has begun.
     app.add_middleware(CallerAccess, state=app.state, record=RECORD)
