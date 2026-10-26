@@ -57,24 +57,19 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         team_id: int,
         cron_expression: str = Field(
             description=(
-                "five-field cron, read as a wall clock in `timezone` — for "
-                "example '0 7 * * 1-5' for 07:00 on weekdays, the same 07:00 in summer "
-                "and in winter"
+                "five-field cron, a wall clock in `timezone` — '0 7 * * 1-5' is 07:00 on weekdays"
             )
         ),
         timezone: str = Field(
             default="Europe/Warsaw",
-            description="IANA zone the cron is read in — 'America/New_York' for a New York session",
+            description="IANA zone, e.g. 'America/New_York'",
         ),
         pinned_revision_id: int | None = None,
     ) -> SavedSchedule:
         """Run this team on a clock, unattended.
 
-        Times are wall-clock times in `timezone`, Poland unless named — teams rolls the
-        expression forward there, so 07:00 stays 07:00 across that zone's clock change, and
-        the moment it answers with (`next_fire_at`) is that same moment in UTC. By default the schedule
-        is **pinned** to the revision
-        given (or the current one), so editing the team later does not silently change
+        07:00 stays 07:00 across the zone's clock change; `next_fire_at` is in UTC. By
+        default the schedule is **pinned** to the revision given (or the current one), so editing the team later does not silently change
         what the robot does at seven in the morning; pass `pinned_revision_id` from
         `read_team` to pin an older one deliberately.
 
@@ -235,13 +230,12 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         schedule_id: int,
         cron_expression: str = Field(
             description=(
-                "five-field cron, read as a wall clock in the schedule's zone. Weekdays "
-                "go in the fifth field — '35 * * * 1,2,3,4,5' is every hour at :35 on "
-                "trading days"
+                "five-field cron in the schedule's zone; '35 * * * 1-5' is hourly at :35 on "
+                "weekdays"
             )
         ),
         timezone: str | None = Field(
-            default=None, description="IANA zone to read it in; left out keeps the schedule's own"
+            default=None, description="IANA zone; omitted keeps the schedule's"
         ),
         pinned_revision_id: int | None = None,
     ) -> SavedSchedule:
