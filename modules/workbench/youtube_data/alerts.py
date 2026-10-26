@@ -23,11 +23,10 @@ from .config import Settings
 
 log = logging.getLogger(__name__)
 
-# Telegram's own ceiling is 4096 and the door refuses rather than truncating, so the message is cut here — where the cut
-# can be marked as one — and a little under.
-MESSAGE_CHARS = 3500
+# The alerts package's ceiling on an event's text, which it sends in as many messages as Telegram needs; cut here, where
+# the cut can be marked as one and the link kept.
+MESSAGE_CHARS = 16_000
 SULK_SECONDS = 600.0
-SUMMARY_CHARS = 900
 # A title and a channel name come from strangers and carry no length of their own.
 LINE_CHARS = 300
 
@@ -38,7 +37,7 @@ EVENT_TYPE = "youtube.film.read"
 EVENT_DESCRIPTION = "A film the model read, with its impact score and the prompt that read it"
 EVENT_SCHEMA = {
     "type": "object",
-    "description": "`text` is the ready message: score and channel, the title, the summary in Polish and the link.",
+    "description": "`text` is the ready message: score and channel, the title, the whole reading by the film's prompt and the link.",
     "properties": {
         "channel": {"type": "string", "x-seen-values": True},
         "channel_slug": {"type": "string"},
@@ -122,10 +121,10 @@ def attributes_of(item: store.ToAnnounce) -> dict:
 
 
 def message(item: store.ToAnnounce, *, limit: int = MESSAGE_CHARS) -> str:
-    """One film as the operator reads it on a phone: what it scored, who said it, what it says and where to watch.
+    """One film as the operator reads it on a phone: what it scored, who said it, the reading laid out as the film's prompt
+    asks, and where to watch.
 
-    In Polish, because the summary is; a film from a simulation says so on its first line, since nothing else in a
-    Telegram message would."""
+    A film from a simulation says so on its first line, since nothing else in a Telegram message would."""
     video, reading = item.video, item.reading
     head = [
         _clip(f"Wpływ {reading['impact_score']}/10 — {video.channel_title}", LINE_CHARS),
@@ -137,11 +136,11 @@ def message(item: store.ToAnnounce, *, limit: int = MESSAGE_CHARS) -> str:
 
     tail = ["", f"https://www.youtube.com/watch?v={video.video_id}"]
 
-    summary = " ".join(str(reading["summary_pl"]).split())
-    room = min(SUMMARY_CHARS, limit - len("\n".join(head + tail)) - 4)
-    if len(summary) > room:
-        summary = summary[: max(room, 0)].rstrip() + "…"
-    return "\n".join([*head, "", summary, *tail])
+    text = str(reading["text"]).strip()
+    room = limit - len("\n".join(head + tail)) - 4
+    if len(text) > room:
+        text = text[: max(room, 0)].rstrip() + "…"
+    return "\n".join([*head, "", text, *tail])
 
 
 def _clip(text: str, limit: int) -> str:

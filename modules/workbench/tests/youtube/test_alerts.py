@@ -281,14 +281,15 @@ def test_a_message_names_the_channel_the_score_and_the_way_to_the_film() -> None
     text = alerts.message(_item())
 
     assert "Wpływ 9/10 — Gold Talk" in text
+    assert "## Tezy\n- złoto rośnie" in text, "the reading laid out by the prompt, not the summary"
     assert text.endswith("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
     assert "SYMULACJA" not in text
 
 
-def test_a_long_summary_is_cut_by_this_package_so_the_door_never_has_to_refuse_it() -> None:
-    long = "Bardzo długie streszczenie. " * 400
+def test_a_long_reading_is_cut_by_this_package_so_the_alerts_package_never_has_to_refuse_it() -> None:
+    long = "Bardzo długi odczyt. " * 400
 
-    text = alerts.message(_item(summary_pl=long), limit=1200)
+    text = alerts.message(_item(text=long), limit=1200)
 
     assert len(text) <= 1200
     assert "…" in text
@@ -296,7 +297,7 @@ def test_a_long_summary_is_cut_by_this_package_so_the_door_never_has_to_refuse_i
 
 
 def test_a_title_nobody_bounded_is_cut_too_and_the_message_stays_under_the_doors_ceiling() -> None:
-    item = _item(summary_pl="Krótko.")
+    item = _item(text="Krótko.")
     item = replace(item, video=replace(item.video, title="Złoto " * 2000, channel_title="Kanał " * 500))
 
     text = alerts.message(item)

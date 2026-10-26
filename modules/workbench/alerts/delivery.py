@@ -12,9 +12,9 @@ from datetime import datetime, timedelta
 
 import asyncpg
 
-from . import store
+from . import store, template
 from .config import Settings
-from .gateway import Gateway
+from .gateway import Gateway, Sent
 
 log = logging.getLogger(__name__)
 
@@ -60,10 +60,18 @@ class Deliverer:
         if self._gateway is None:
             await self._give_up(row, "undeliverable", NO_DOOR)
             return
-        if await self._throttled(row, now):
+        # A fire with a part already on the phone is finished, never throttled: half a message is worse than one too many.
+        if row["parts_sent"] == 0 and await self._throttled(row, now):
             return
 
-        sent = await self._gateway.send(row["destination"], row["bot"], row["text"])
+        # Ok for a fire whose every part arrived before a crash kept it from being settled.
+        sent = Sent(ok=True)
+        for part in template.parts(row["text"])[row["parts_sent"] :]:
+            sent = await self._gateway.send(row["destination"], row["bot"], part)
+            if not sent.ok:
+                break
+            async with self._pool.acquire() as conn:
+                await store.part_sent(conn, row["id"])
         async with self._pool.acquire() as conn, conn.transaction():
             if sent.ok:
                 await store.settle_fire(conn, row["id"], state="delivered", now=now)

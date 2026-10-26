@@ -381,7 +381,7 @@ async def claim_deliveries(conn: Conn, *, now: datetime, limit: int, lease_secon
                        next_attempt_at = $1::timestamptz + make_interval(secs => $3)
                   FROM due
                  WHERE f.id = due.id
-             RETURNING f.id, f.rule_id, f.text, f.created_at, f.attempts
+             RETURNING f.id, f.rule_id, f.text, f.created_at, f.attempts, f.parts_sent
             )
             SELECT leased.*, r.name AS rule_name, r.destination, r.bot, r.mode, r.enabled, r.max_per_hour
               FROM leased JOIN rules r ON r.id = leased.rule_id
@@ -409,6 +409,10 @@ async def settle_fire(
         reason,
         now,
     )
+
+
+async def part_sent(conn: Conn, fire_id: int) -> None:
+    await conn.execute("UPDATE fires SET parts_sent = parts_sent + 1 WHERE id = $1", fire_id)
 
 
 async def retry_fire(conn: Conn, fire_id: int, *, at: datetime, reason: str) -> None:
