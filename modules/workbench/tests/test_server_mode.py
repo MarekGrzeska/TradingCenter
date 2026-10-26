@@ -262,3 +262,10 @@ def edge_config_for_tools(key: str):
         key_header=b"x-gateway-key",
         exempt_paths=frozenset({"/health"}),
     )
+
+
+def test_the_door_and_the_in_process_wrapper_agree_on_the_scope_key():
+    from tc_entra_auth.edge import IN_PROCESS_SCOPE_KEY
+    from tc_runtime.caller_access import IN_PROCESS_CALLER
+
+    assert IN_PROCESS_SCOPE_KEY == IN_PROCESS_CALLER

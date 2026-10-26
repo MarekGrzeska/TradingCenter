@@ -32,6 +32,11 @@ PRINCIPAL_HEADER = b"x-ms-client-principal"
 PRINCIPAL_ID_HEADER = b"x-ms-client-principal-id"
 PRINCIPAL_NAME_HEADER = b"x-ms-client-principal-name"
 
+# Set by `tc_runtime.caller_access.in_process` on a request this process makes to itself. A scope key, not a header, so
+# nothing on the network can write it. Spelled out here because this package cannot import `tc-runtime`; a test in the
+# workbench holds the two equal.
+IN_PROCESS_SCOPE_KEY = "tc_runtime.in_process_caller"
+
 DEFAULT_KEY_HEADER = b"x-gateway-key"
 DEFAULT_INTERNAL_APPLICATION = "tc-internal"
 
@@ -88,6 +93,12 @@ class EdgeAuth:
             await _refuse(scope, receive, send, 503, "the module is still starting")
             return
         if config is None:
+            await self._app(scope, receive, send)
+            return
+
+        if scope.get(IN_PROCESS_SCOPE_KEY):
+            # This process asking itself: untouched, since the operator's principal it carries is the one the routes must
+            # read and the door would replace it with the internal application's.
             await self._app(scope, receive, send)
             return
 
