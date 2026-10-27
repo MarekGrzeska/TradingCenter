@@ -36,6 +36,7 @@ const run = (id: number, sharpe: number | null): RunItem => ({
           maxDrawdownR: null,
           sharpe,
           returnPct: null,
+          annualReturnPct: null,
           costsSource: "broker",
           withoutCosts: false,
         },

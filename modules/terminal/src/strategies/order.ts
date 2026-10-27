@@ -52,6 +52,7 @@ export type RunSortKey =
   | "requestedBy"
   | "trades"
   | "returnPct"
+  | "annualReturnPct"
   | "totalR"
   | "expectancyR"
   | "maxDrawdownR"
