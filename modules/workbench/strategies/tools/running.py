@@ -72,7 +72,7 @@ class Comparison(BaseModel):
 def _headline(report: dict[str, Any] | None) -> dict[str, Any] | None:
     if report is None:
         return None
-    keys = ("trades", "total_r", "expectancy_r", "expectancy_pct", "return_pct", "win_rate", "profit_factor", "max_drawdown_r",
+    keys = ("trades", "total_r", "expectancy_r", "expectancy_pct", "return_pct", "annual_return_pct", "win_rate", "profit_factor", "max_drawdown_r",
             "max_drawdown_pct", "worst_mae_pct", "sharpe")
     return {key: report.get(key) for key in keys}
 

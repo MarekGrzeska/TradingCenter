@@ -728,6 +728,11 @@ export interface components {
          */
         HeadlineOut: {
             /**
+             * Annual Return Pct
+             * @description the report's, so runs of different lengths compare
+             */
+            annual_return_pct: number | null;
+            /**
              * Costs Source
              * @description where the run's costs came from: the request, the instrument's profile read off the broker or typed by the operator, or `none` — a run without costs
              * @enum {string}

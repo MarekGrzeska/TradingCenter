@@ -57,6 +57,7 @@ class HeadlineOut(BaseModel):
     max_drawdown_r: float | None
     sharpe: float | None
     return_pct: float | None = Field(default=None, description="null for a run recorded before engine version 3")
+    annual_return_pct: float | None = Field(default=None, description="the report's, so runs of different lengths compare")
     costs_source: CostsSource = Field(description=_COSTS_SOURCE)
     without_costs: bool = Field(description=_WITHOUT_COSTS)
 

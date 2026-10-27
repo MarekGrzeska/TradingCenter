@@ -174,6 +174,21 @@ describe("BacktestsView", () => {
     expect(screen.getByRole("checkbox", { name: "Zaznacz uruchomienie 11" })).toBeChecked();
   });
 
+  it("orders the runs by the sort picked above the cards, where a narrow panel has no headers", async () => {
+    const annual = (id: number, annualReturnPct: number): RunItem => ({
+      ...run(id, 7),
+      headline: { trades: 10, totalR: null, expectancyR: null, maxDrawdownR: null, sharpe: 1, returnPct: 0.5, annualReturnPct, costsSource: "broker", withoutCosts: false },
+    });
+    view(fakeApi({ runs: vi.fn(async () => [annual(21, 0.2), annual(22, 1.3), annual(23, 0.5)]) }));
+
+    await userEvent.selectOptions(await screen.findByRole("combobox", { name: "Sortuj uruchomienia" }), "annualReturnPct");
+
+    const ids = within(screen.getByRole("table", { name: "Uruchomienia" }))
+      .getAllByRole("checkbox")
+      .map((box) => box.getAttribute("aria-label"));
+    expect(ids).toEqual(["Zaznacz uruchomienie 22", "Zaznacz uruchomienie 23", "Zaznacz uruchomienie 21"]);
+  });
+
   it("lets no run in progress be ticked, for comparing or deleting", async () => {
     view(fakeApi({ runs: vi.fn(async () => [run(11, 7), { ...run(13, 7), status: "running" as const }]) }));
 

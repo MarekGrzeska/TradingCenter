@@ -311,7 +311,7 @@ _LIST = """
            finished_at, headline
 """
 
-HEADLINE = ("trades", "total_r", "expectancy_r", "max_drawdown_r", "sharpe", "return_pct")
+HEADLINE = ("trades", "total_r", "expectancy_r", "max_drawdown_r", "sharpe", "return_pct", "annual_return_pct")
 
 
 async def list_runs(conn: Conn, strategy_id: int | None, offset: int, limit: int) -> list[asyncpg.Record]:

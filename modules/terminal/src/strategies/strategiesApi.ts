@@ -96,6 +96,8 @@ export interface Headline {
   sharpe: number | null;
   /** The one result a run without a stop has; null before engine version 3. */
   returnPct: number | null;
+  /** The report's: the return a run of any length would have made in a year. */
+  annualReturnPct: number | null;
   costsSource: CostsSource;
   withoutCosts: boolean;
 }
@@ -270,6 +272,7 @@ function mapHeadline(raw: Schemas["HeadlineOut"] | null | undefined): Headline |
     maxDrawdownR: raw.max_drawdown_r,
     sharpe: raw.sharpe,
     returnPct: raw.return_pct ?? null,
+    annualReturnPct: raw.annual_return_pct ?? null,
     costsSource: raw.costs_source,
     withoutCosts: raw.without_costs,
   };
@@ -311,6 +314,7 @@ function mapRun(raw: Schemas["RunOut"]): Run {
           expectancy_r: report.expectancy_r,
           max_drawdown_r: report.max_drawdown_r,
           return_pct: report.return_pct,
+          annual_return_pct: report.annual_return_pct,
           sharpe: report.sharpe,
           costs_source: report.costs_source,
           without_costs: report.without_costs,
