@@ -1,6 +1,7 @@
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { Button } from "../ui/Button";
 import { formatInstant } from "../ui/formatTime";
+import { nextSort, sortRuns, type RunSort, type RunSortKey } from "./order";
 import { num, pct, r, STATUS_LABEL, WITHOUT_COSTS_NOTE } from "./present";
 import type { RunItem } from "./strategiesApi";
 
@@ -28,7 +29,39 @@ function columns(named: boolean, inR: boolean, selectable: boolean): string {
     .join(" ");
 }
 
-/** Runs, newest first — which of them the agent asked for included. With `strategyNames`, of several strategies. */
+/** A header that orders the rows by its column; `aria-sort` says which way. */
+function SortHeader({
+  column,
+  sort,
+  onSort,
+  className = "",
+  children,
+}: {
+  column: RunSortKey;
+  sort: RunSort | null;
+  onSort(column: RunSortKey): void;
+  className?: string;
+  children: ReactNode;
+}) {
+  const on = sort?.key === column;
+  return (
+    <span role="columnheader" aria-sort={on ? (sort.descending ? "descending" : "ascending") : "none"} className={className}>
+      <button
+        type="button"
+        onClick={() => onSort(column)}
+        className={`inline-flex items-center gap-0.5 hover:text-ink ${on ? "text-primary" : ""}`}
+      >
+        {children}
+        <span aria-hidden className={on ? "" : "invisible"}>
+          {sort?.descending === false && on ? "▲" : "▼"}
+        </span>
+      </button>
+    </span>
+  );
+}
+
+/** Runs, newest first until a header orders them — which of them the agent asked for included. With `strategyNames`,
+ *  of several strategies. */
 export function RunsPanel({
   runs,
   error,
@@ -51,6 +84,7 @@ export function RunsPanel({
   selected?: ReadonlySet<number>;
   onSelect?(id: number): void;
 }) {
+  const [sort, setSort] = useState<RunSort | null>(null);
   if (runs.length === 0) {
     return (
       <p className="text-sm text-ink-muted">
@@ -72,6 +106,12 @@ export function RunsPanel({
   const below = selectable ? "col-span-2 col-start-2" : "col-span-2";
   const row = `grid ${card} items-baseline gap-x-2 gap-y-0.5 @5xl:[grid-template-columns:var(--runs-cols)] @7xl:[grid-template-columns:var(--runs-cols-r)] @5xl:gap-x-3`;
   const right = "text-right tabular-nums";
+  const sorted = sortRuns(runs, sort, strategyNames);
+  const header = (column: RunSortKey, label: string, className = "") => (
+    <SortHeader column={column} sort={sort} onSort={(c) => setSort((was) => nextSort(was, c))} className={className}>
+      {label}
+    </SortHeader>
+  );
 
   return (
     <div role="table" aria-label="Uruchomienia" className="@container overflow-x-auto text-xs" style={grid}>
@@ -79,27 +119,27 @@ export function RunsPanel({
       <div role="rowgroup" className="hidden @5xl:block">
         <div role="row" className={`${row} border-b border-border px-2 pb-1 text-left text-ink-muted`}>
           {onSelect && <span role="columnheader" aria-label="Zaznaczenie" />}
-          <span role="columnheader">#</span>
-          {named && <span role="columnheader">Strategia</span>}
-          <span role="columnheader">Stan</span>
-          <span role="columnheader">Rew.</span>
-          <span role="columnheader">Zakres</span>
-          <span role="columnheader">Zlecił</span>
-          <span role="columnheader" className={right}>Transakcje</span>
-          <span role="columnheader" className={right}>Zwrot</span>
+          {header("id", "#")}
+          {named && header("strategy", "Strategia")}
+          {header("status", "Stan")}
+          {header("revision", "Rew.")}
+          {header("from", "Zakres")}
+          {header("requestedBy", "Zlecił")}
+          {header("trades", "Transakcje", right)}
+          {header("returnPct", "Zwrot", right)}
           {inR && (
             <>
-              <span role="columnheader" className={`${right} hidden @7xl:block`}>Suma</span>
-              <span role="columnheader" className={`${right} hidden @7xl:block`}>Oczekiwana</span>
-              <span role="columnheader" className={`${right} hidden @7xl:block`}>Obsunięcie</span>
+              {header("totalR", "Suma", `${right} hidden @7xl:block`)}
+              {header("expectancyR", "Oczekiwana", `${right} hidden @7xl:block`)}
+              {header("maxDrawdownR", "Obsunięcie", `${right} hidden @7xl:block`)}
             </>
           )}
-          <span role="columnheader" className={right}>Sharpe</span>
+          {header("sharpe", "Sharpe", right)}
           <span role="columnheader" />
         </div>
       </div>
       <div role="rowgroup">
-        {runs.map((run) => {
+        {sorted.map((run) => {
           const done = run.status === "done";
           // [label, value, shown on a card, the class that places it in the table]
           const metrics: [string, string, boolean, string][] = [
