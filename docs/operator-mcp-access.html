@@ -367,9 +367,9 @@ claude mcp list</code></pre>
           <h3>Ansible na serwerze <span class="tag ok">zrobione 27.10</span></h3>
           <p>Serwerowy <code>/opt/tradingcenter/bin/deploy</code> był z 14.10 i nie przeładowywał Caddy. Playbook uruchomiony z <code>operator_user=ubuntu</code> i <code>ssh_allowed_cidrs=["0.0.0.0/0"]</code>, czyli z tym, co serwer ma dziś. Domyślne wartości odcięłyby SSH. Najpierw <code>--check --diff</code>: zmiana była jedna, ten plik. Od następnego deployu Caddy przeładowuje się sam.</p>
         </div>
-        <div class="fail stop">
-          <h3>Dryf w Terraform <span class="tag stop">raz, przed następnym pełnym apply</span></h3>
-          <p>Pełny <code>terraform apply</code> nadal chce zniszczyć <code>admin_workbench</code> i <code>admin_gateway</code> dla osoby <code>73c09587-…</code>. Osoba ta ma rolę admin w stanie, a nie ma jej w lokalnym <code>terraform.tfvars</code> (<code>admin_user_object_ids</code>). Dopisz ją albo świadomie pozwól jej rolę zabrać.</p>
+        <div class="fail ok">
+          <h3>Dryf w Terraform <span class="tag ok">rozstrzygnięty 27.10</span></h3>
+          <p><code>73c09587-…</code> to Twoje konto Gmail, gość w tenancie, z rolą <code>admin</code> nadaną przy zmianie <code>admin-panel-users-and-roles</code>. Lokalny <code>terraform.tfvars</code> nie miał go w <code>admin_user_object_ids</code>, więc pełny <code>apply</code> odebrałby mu rolę. Po dopisaniu <code>terraform plan</code> mówi „No changes”. Plik jest poza gitem, więc na innej maszynie z Terraform trzeba dopisać to samo. CI nie ma tej zmiennej, ale też nigdy nie robi <code>apply</code>.</p>
         </div>
         <div class="fail">
           <h3>Job <code>plan</code> w CI <span class="tag att">raz</span></h3>
