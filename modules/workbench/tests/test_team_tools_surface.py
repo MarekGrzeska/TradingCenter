@@ -30,7 +30,7 @@ async def models(request: Request) -> JSONResponse:
 
 class _Tools:
     def __init__(self) -> None:
-        self.client = TeamsClient(Starlette(routes=[Route("/models", models)]), operator_identity_optional=False)
+        self.client = TeamsClient(Starlette(routes=[Route("/teams/models", models)]), operator_identity_optional=False)
 
     def network_server(self):
         return build_network_server(self.client)
