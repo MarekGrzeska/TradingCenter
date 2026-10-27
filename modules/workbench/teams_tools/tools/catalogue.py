@@ -260,7 +260,7 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
     async def list_models(context: Context) -> list[dict[str, Any]]:
         """The models an agent may be assigned, cheapest first. A `model_id` outside this
         list is refused at save time, naming the agent that carried it."""
-        return await _call(teams, context, "GET", "/models")
+        return await _call(teams, context, "GET", "/teams/models")
 
     @mcp.tool(annotations=READ_ONLY)
     async def list_tools(context: Context) -> list[dict[str, Any]]:

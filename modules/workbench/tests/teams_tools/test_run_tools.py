@@ -87,7 +87,7 @@ async def test_read_run_gathers_the_trace_and_the_cost(server) -> None:
             ],
         )
     )
-    respx.get(f"{BASE}/usage").mock(
+    respx.get(f"{BASE}/teams/usage").mock(
         return_value=httpx.Response(200, json={"total_cost": "0.42", "by_agent": [], "by_model": []})
     )
 
@@ -110,7 +110,7 @@ async def test_read_run_says_a_working_run_is_not_finished(server) -> None:
         return_value=httpx.Response(200, json=[_step(status="running", output=None)])
     )
     respx.get(f"{BASE}/runs/5/tool-calls").mock(return_value=httpx.Response(200, json=[]))
-    respx.get(f"{BASE}/usage").mock(
+    respx.get(f"{BASE}/teams/usage").mock(
         return_value=httpx.Response(200, json={"total_cost": "0.10", "by_agent": [], "by_model": []})
     )
 
@@ -131,7 +131,7 @@ async def test_read_run_carries_the_reason_a_run_was_stopped(server) -> None:
     )
     respx.get(f"{BASE}/runs/5/steps").mock(return_value=httpx.Response(200, json=[]))
     respx.get(f"{BASE}/runs/5/tool-calls").mock(return_value=httpx.Response(200, json=[]))
-    respx.get(f"{BASE}/usage").mock(
+    respx.get(f"{BASE}/teams/usage").mock(
         return_value=httpx.Response(200, json={"total_cost": "5.00", "by_agent": [], "by_model": []})
     )
 
@@ -149,7 +149,7 @@ async def test_a_very_long_output_is_shortened_rather_than_filling_the_turn(serv
         return_value=httpx.Response(200, json=[_step(output="x" * 5000)])
     )
     respx.get(f"{BASE}/runs/5/tool-calls").mock(return_value=httpx.Response(200, json=[]))
-    respx.get(f"{BASE}/usage").mock(
+    respx.get(f"{BASE}/teams/usage").mock(
         return_value=httpx.Response(200, json={"total_cost": "0", "by_agent": [], "by_model": []})
     )
 

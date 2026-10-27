@@ -85,7 +85,7 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
             _call(teams, context, "GET", f"/runs/{run_id}"),
             _call(teams, context, "GET", f"/runs/{run_id}/steps"),
             _call(teams, context, "GET", f"/runs/{run_id}/tool-calls"),
-            _call(teams, context, "GET", "/usage", params={"run_id": run_id}),
+            _call(teams, context, "GET", "/teams/usage", params={"run_id": run_id}),
         )
 
         per_step: dict[int, int] = {}
