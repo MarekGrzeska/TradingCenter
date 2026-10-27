@@ -176,9 +176,8 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
     async def rename_team(
         context: Context, team_id: int, name: str | None = None, description: str | None = None
     ) -> TeamSummary:
-        """Change a team's name or description, or both. Not a revision: schedules and
-        runs keep pointing where they did. Update both when a revision changes what the
-        team does."""
+        """Change a team's name or description, not a revision. Do it when a revision
+        changes what the team does."""
         if name is None and description is None:
             raise ToolRefusal("nothing to change: name a new name, description or both.")
         body = {"name": name, "description": description}

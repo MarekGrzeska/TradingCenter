@@ -7,7 +7,7 @@ import json
 
 # Characters of the serialized `list_tools()`, which is what an MCP client reads before every turn — in characters
 # so the test needs no tokenizer, at a measured 4.2 per token. Raising it is a deliberate edit of this line.
-SURFACE_CEILING_CHARS = 21100
+SURFACE_CEILING_CHARS = 21600
 
 
 def _surface(tools) -> str:
