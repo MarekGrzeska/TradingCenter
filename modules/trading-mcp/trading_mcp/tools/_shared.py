@@ -86,6 +86,10 @@ async def _send_change(
             ) from err
         trace.outcome(method, path, f"refused ({err.status_code})", who)
         raise ToolRefusal(f"refused: capital-gateway rejected the request — {err.detail}") from err
+    except BaseException as err:
+        # A cancelled call or an unreadable answer may still have reached the account; the trace must not end at "sending".
+        trace.outcome(method, path, f"unknown ({type(err).__name__})", who)
+        raise
     status = payload.get("status") if isinstance(payload, dict) else None
     trace.outcome(method, path, f"answered status={status or '-'}", who)
     return payload

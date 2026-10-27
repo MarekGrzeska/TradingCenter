@@ -236,9 +236,8 @@ resource "azuread_application_pre_authorized" "workbench_cli" {
 
 # --- the operator's own MCP client, as a caller of every tool surface (`operator-mcp-access`) ----------------------------
 
-# Claude Code on the operator's machine: a public client with no secret, signing the operator in through a browser once
-# and refreshing silently after (`scripts/mcp_token.py`). Its own registration rather than `az`'s, so the tool lists name
-# one application that is nothing else, and taking it away takes nothing else with it.
+# Claude Code on the operator's machine (`scripts/mcp_token.py`), a public client. Its own registration rather than `az`'s,
+# so the tool lists name one application that is nothing else, and removing it takes nothing else with it.
 resource "azuread_application" "claude_code" {
   display_name = "app-tradingcenter-claude-code"
 

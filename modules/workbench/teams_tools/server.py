@@ -8,8 +8,8 @@ import logging
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
-from mcp.server.lowlevel.server import request_ctx
 from mcp.server.transport_security import TransportSecuritySettings
+from tc_mcp_kit.tool_call import request_header
 from tc_mcp_kit.tool_schemas import slim_tool_schemas
 
 from . import tools
@@ -71,18 +71,9 @@ class _ActingForTheRequest(FastMCP):
         self._operator_identity_optional = operator_identity_optional
 
     async def call_tool(self, name: str, arguments: dict[str, Any]) -> Any:
-        principal = None if self._operator_identity_optional else _person_of_the_request()
+        principal = None if self._operator_identity_optional else request_header(PERSON_HEADER)
         with carrying(principal):
             return await super().call_tool(name, arguments)
-
-
-def _person_of_the_request() -> str | None:
-    try:
-        request = request_ctx.get().request
-    except LookupError:
-        return None
-    headers = getattr(request, "headers", None)
-    return headers.get(PERSON_HEADER) if headers is not None else None
 
 
 def say_whose_name_the_tools_act_in(operator_identity_optional: bool) -> None:

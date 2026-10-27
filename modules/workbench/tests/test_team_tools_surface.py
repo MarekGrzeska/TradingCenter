@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import base64
 import json
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -16,7 +17,7 @@ from starlette.routing import Mount, Route
 
 from teams_tools.client import TeamsClient
 from teams_tools.server import build_network_server
-from workbench.team_tools import SurfaceCallers, create_surface, serving
+from workbench.team_tools import create_surface, serving
 
 OPERATOR_APP = "operator-mcp-client"
 MCP_HEADERS = {"Accept": "application/json, text/event-stream", "Content-Type": "application/json"}
@@ -52,7 +53,7 @@ async def _list_models(application: str, person: str | None) -> httpx.Response:
     surface = create_surface()
     host = Starlette(routes=[Mount("/team-tools", app=surface)])
     tools = _Tools()
-    callers = SurfaceCallers(tool_caller_ids=frozenset({OPERATOR_APP}), require_authenticated_principal=True)
+    callers = SimpleNamespace(tool_caller_ids=frozenset({OPERATOR_APP}), require_authenticated_principal=True)
     async with (
         serving(surface, tools, callers),  # type: ignore[arg-type]
         httpx.AsyncClient(transport=httpx.ASGITransport(app=host), base_url="https://api.example") as http,

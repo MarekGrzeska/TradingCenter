@@ -1,6 +1,6 @@
 """Who is calling, decided in the process rather than by a platform in front of it."""
 
-from .edge import EDGE_HEADER, EdgeAuth, EdgeConfig
+from .edge import EDGE_HEADER, EdgeAuth, EdgeConfig, application_in
 from .roles import (
     ADMIN_ROLE,
     INTERNAL_ROLE,
@@ -22,5 +22,6 @@ __all__ = [
     "InvalidToken",
     "RolePolicy",
     "TokenVerifier",
+    "application_in",
     "roles_from_header",
 ]

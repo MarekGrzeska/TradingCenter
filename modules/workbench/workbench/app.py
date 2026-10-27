@@ -65,7 +65,7 @@ from .config import Settings, alerts_enabled, strategies_enabled, youtube_enable
 from .edge import edge_config, edge_provider
 from .local_tools import ConversationLocalTools, TeamsLocalTools
 from .root_access import RootCallers
-from .team_tools import LocalTeamsTools, SurfaceCallers, create_surface
+from .team_tools import LocalTeamsTools, create_surface
 from .team_tools import serving as team_tools_serving
 from .telegram_client import package_client, telegram_client
 
@@ -217,14 +217,7 @@ async def lifespan(app: FastAPI):
             if strategies_app is not None and strategies_settings is not None
             else nullcontext()
         ),
-        team_tools_serving(
-            team_tools_app,
-            team_tools,
-            SurfaceCallers(
-                tool_caller_ids=settings.tool_caller_ids,
-                require_authenticated_principal=settings.require_authenticated_principal,
-            ),
-        ),
+        team_tools_serving(team_tools_app, team_tools, settings),
     ):
         # Every package is serving: what the alerts' clock reads can answer now.
         if alerts_app is not None and alerts_settings is not None:

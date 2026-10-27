@@ -9,7 +9,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route, WebSocketRoute
 
-from tc_entra_auth import EdgeAuth, EdgeConfig, TokenVerifier
+from tc_entra_auth import EdgeAuth, EdgeConfig, TokenVerifier, application_in
+from tc_entra_auth.edge import principal_blob
 
 KEY = "shared-service-key"
 EDGE = {"X-TC-Edge": "1"}
@@ -269,3 +270,11 @@ async def test_the_application_list_does_not_bind_a_service_with_the_key(tenant)
         response = await http.get("/whoami", headers={"X-Gateway-Key": KEY})
     assert response.status_code == 200
     assert response.json()["application"] == "tc-internal"
+
+
+@pytest.mark.parametrize(
+    ("blob", "application"),
+    [(principal_blob("app-1"), "app-1"), (None, None), (b"not base64!", None), (base64.b64encode(b"[]"), None)],
+)
+def test_what_the_door_wrote_reads_back_and_nothing_else_does(blob, application):
+    assert application_in(blob) == application

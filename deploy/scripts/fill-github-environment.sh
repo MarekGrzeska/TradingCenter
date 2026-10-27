@@ -113,7 +113,7 @@ pocket="$(repo_var POCKET_ENTRA_CLIENT_ID)"
 workbench_app="$(az ad app list --filter "identifierUris/any(u:u eq 'api://tradingcenter-agent')" --query '[0].appId' -o tsv | tr -d '\r')"
 gateway_app="$(az ad app list --filter "identifierUris/any(u:u eq 'api://tradingcenter-capital-gateway')" --query '[0].appId' -o tsv | tr -d '\r')"
 # The operator's own MCP client (operator-mcp-access): exists once `terraform apply` has created it.
-claude_code="$(az ad app list --display-name app-tradingcenter-claude-code --query '[0].appId' -o tsv | tr -d '\r')"
+claude_code="$(az ad app list --filter "displayName eq 'app-tradingcenter-claude-code'" --query '[0].appId' -o tsv | tr -d '\r')"
 for v in tenant terminal pocket workbench_app gateway_app claude_code; do
   [ -n "${!v}" ] || { echo "could not find $v" >&2; exit 1; }
 done
@@ -129,10 +129,8 @@ set_variable WORKBENCH_ENTRA_AUDIENCES "api://tradingcenter-agent,$workbench_app
 set_variable GATEWAY_ENTRA_AUDIENCES "api://tradingcenter-capital-gateway,$gateway_app"
 
 # The Users tab (access-roles): the service principals that carry the app roles, and the roles' ids. Public.
-sp_of() { az ad sp show --id "$1" --query id -o tsv | tr -d '
-'; }
-role_of() { az ad app show --id "$1" --query "appRoles[?value=='$2'].id | [0]" -o tsv | tr -d '
-'; }
+sp_of() { az ad sp show --id "$1" --query id -o tsv | tr -d '\r'; }
+role_of() { az ad app show --id "$1" --query "appRoles[?value=='$2'].id | [0]" -o tsv | tr -d '\r'; }
 set_variable ACCESS_WORKBENCH_PRINCIPAL "$(sp_of "$workbench_app")"
 set_variable ACCESS_GATEWAY_PRINCIPAL "$(sp_of "$gateway_app")"
 set_variable ACCESS_ROLE_WORKBENCH_ADMIN "$(role_of "$workbench_app" admin)"

@@ -308,11 +308,12 @@
         <table>
           <thead><tr><th>Co</th><th>Komenda</th><th>Wynik</th></tr></thead>
           <tbody>
-            <tr><td><b>tc-entra-auth</b></td><td><code>uv run pytest</code> · ruff · pyright</td><td><span class="tag ok">64 passed · 0 errors</span></td></tr>
-            <tr><td><b>trading-mcp</b></td><td><code>uv run pytest</code> · ruff · pyright</td><td><span class="tag ok">113 passed · 0 errors</span></td></tr>
+            <tr><td><b>tc-entra-auth</b></td><td><code>uv run pytest</code> · ruff · pyright</td><td><span class="tag ok">68 passed · 0 errors</span></td></tr>
+            <tr><td><b>tc-mcp-kit</b></td><td><code>uv run pytest</code> · ruff · pyright</td><td><span class="tag ok">29 passed · 0 errors</span></td></tr>
+            <tr><td><b>trading-mcp</b></td><td><code>uv run pytest</code> · ruff · pyright</td><td><span class="tag ok">114 passed · 0 errors</span></td></tr>
             <tr><td><b>workbench</b> (z <code>db</code>)</td><td><code>uv run pytest</code> · ruff · pyright</td><td><span class="tag ok">3352 passed, 11 skipped</span></td></tr>
             <tr><td><b>capital-gateway</b></td><td><code>uv run pytest</code></td><td><span class="tag ok">269 passed</span></td></tr>
-            <tr><td><b>scripts</b></td><td><code>uv run pytest</code> · ruff · pyright</td><td><span class="tag ok">223 passed</span></td></tr>
+            <tr><td><b>scripts</b></td><td><code>uv run pytest</code> · ruff · pyright</td><td><span class="tag ok">220 passed</span></td></tr>
             <tr><td><b>kontrakty</b></td><td>terminal i pocket <code>contract:check</code></td><td><span class="tag ok">aktualne</span></td></tr>
             <tr><td><b>Caddy</b></td><td><code>caddy validate</code> i przebieg w Dockerze z serwerami echo</td><td><span class="tag ok">/trading/mcp → /mcp · brama /mcp → 404</span></td></tr>
             <tr><td><b>Claude Code</b></td><td><code>claude mcp list</code> i <code>claude -p</code> na lokalnym hoście zastępczym</td><td><span class="tag ok">✔ Connected · osoba dotarła</span></td></tr>
@@ -321,6 +322,7 @@
           </tbody>
         </table>
       </div>
+      <p style="margin-top:16px"><strong>Code review 27.10</strong> znalazło dziesięć uwag, siedem jest poprawionych, a liczby powyżej są już po poprawkach. Najważniejsze: <code>fill-github-environment.sh</code> zgubił dosłowny CR w <code>tr -d</code>; ślad zapisu nie zapisywał skutku przy anulowaniu albo nieczytelnej odpowiedzi; helper zgadywał API z adresu, a teraz dostaje <code>--api</code> przy rejestracji serwera. Pełna tabela jest w <code>openspec/changes/operator-mcp-access/review.md</code>.</p>
       <p style="margin-top:16px">Na prawdziwym tenancie <strong>nic nie było mierzone</strong>, bo rejestracja Entra powstanie dopiero przy <code>apply</code>. Pierwszym pomiarem jest <code>mcp_token.py login</code>, który wypisuje role widziane w obu API.</p>
     </section>
 

@@ -59,8 +59,8 @@ otwierają `/mcp`.
 
 ### Requirement: Operator dostaje token bez interakcji w kliencie
 
-Repozytorium MUST dostarczać operatorowi helper, który wypisuje nagłówek z tokenem dla adresu serwera, o który pyta
-klient MCP, wybierając API po adresie (`/trading/` → brama, reszta → workbench). Helper wywołany przez klienta MUST
+Repozytorium MUST dostarczać operatorowi helper, który wypisuje nagłówek z tokenem dla API wskazanego przy rejestracji
+serwera w kliencie MCP (`/trading/mcp` → brama, reszta → workbench), a nie zgadywanego z adresu. Helper wywołany przez klienta MUST
 NOT otwierać przeglądarki ani czekać na operatora: bez tokenu w pamięci podręcznej MUST zakończyć się błędem, który
 mówi, którą komendą się zalogować. Logowanie interaktywne MUST być osobną komendą. Konfiguracja serwerów w kliencie
 MUST NOT być wpisana do repozytorium tak, żeby każda sesja pracująca nad kodem dostawała narzędzia produkcji.

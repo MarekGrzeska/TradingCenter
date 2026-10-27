@@ -57,6 +57,8 @@ both, and taking one has never implied taking the other.
 - `mounted_server` — one FastMCP under `/mcp` inside a module's own application: the transport
   settings, the `/mcp` ≡ `/mcp/` middleware, and the session manager's lifetime. Five copies
   until the same day; what stays in a module is its name, its instructions and its tools.
+- `tool_call.request_header` — a header of the HTTP request behind the tool call being served, for a server that acts
+  in the name of whoever the door wrote. Two copies (trading-mcp's trace, the team tools) before it was written once.
 - `tool_schemas.slim_tool_schemas` — the published tool surface without the scaffolding
   pydantic emits: `title` repeating the field's own name, `anyOf` of bare types where a
   type list says the same, and defaults on a reply nobody constructs. 22,6% of what the

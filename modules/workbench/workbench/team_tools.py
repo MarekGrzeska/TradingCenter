@@ -8,7 +8,6 @@ import json
 import logging
 import time
 from contextlib import asynccontextmanager
-from dataclasses import dataclass
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP
@@ -24,6 +23,8 @@ from agent.tools import ToolDescriptor, ToolOutcome, ToolOutcomeKind
 from teams_tools.client import TeamsClient
 from teams_tools.operator import carrying
 from teams_tools.server import build_network_server, build_server, say_whose_name_the_tools_act_in
+
+from .config import Settings
 
 log = logging.getLogger(__name__)
 
@@ -119,15 +120,6 @@ SURFACE_RECORD = Record(
 )
 
 
-@dataclass(frozen=True)
-class SurfaceCallers:
-    """What `CallerAccess` reads off the state: the process's tool list, and whether anyone stands in front."""
-
-    tool_caller_ids: frozenset[str]
-    require_authenticated_principal: bool
-    rest_caller_ids: frozenset[str] = frozenset()
-
-
 def create_surface() -> Starlette:
     """Mounted at import, under `/team-tools`; the server behind it is built in the lifespan, once the client it calls
     through exists, and read off the state per request."""
@@ -152,8 +144,9 @@ class _ServerOnTheState:
 
 
 @asynccontextmanager
-async def serving(surface: Starlette, tools: LocalTeamsTools, callers: SurfaceCallers):
-    surface.state.settings = callers
+async def serving(surface: Starlette, tools: LocalTeamsTools, settings: Settings):
+    """`CallerAccess` reads the process's own tool list and principal requirement; with no REST path it reads nothing else."""
     surface.state.mcp_server = tools.network_server()
+    surface.state.settings = settings
     async with tool_surface_session(surface):
         yield

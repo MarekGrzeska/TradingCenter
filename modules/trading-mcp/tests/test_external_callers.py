@@ -140,10 +140,17 @@ async def test_a_write_is_traced_before_it_is_sent_and_after(server, caplog: pyt
     assert lines[-1].startswith("account write outcome: POST /orders answered status=FILLED")
 
 
+@pytest.mark.parametrize(
+    "answer",
+    [httpx.ConnectError("down"), httpx.Response(200, text="<html>not json</html>")],
+    ids=["unreachable", "unreadable"],
+)
 @respx.mock
-async def test_an_unreachable_gateway_is_traced_as_unknown(server, caplog: pytest.LogCaptureFixture) -> None:
-    respx.post(f"{BASE}/orders").mock(side_effect=httpx.ConnectError("down"))
-    with caplog.at_level(logging.INFO, logger="trading_mcp.trace"), pytest.raises(ToolError, match="unknown"):
+async def test_a_write_whose_effect_is_unknown_is_traced_as_unknown(
+    server, caplog: pytest.LogCaptureFixture, answer: Exception | httpx.Response
+) -> None:
+    respx.post(f"{BASE}/orders").mock(side_effect=[answer])
+    with caplog.at_level(logging.INFO, logger="trading_mcp.trace"), pytest.raises(ToolError):
         await server.call_tool("place_order", {"symbol": "GOLD", "direction": "BUY", "size": 0.1})
     lines = [r.getMessage() for r in caplog.records if r.name == "trading_mcp.trace"]
-    assert "unknown" in lines[-1]
+    assert lines[-1].startswith("account write outcome: POST /orders unknown (")

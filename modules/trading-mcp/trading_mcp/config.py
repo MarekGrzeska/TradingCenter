@@ -26,15 +26,13 @@ class Settings(BaseSettings):
     # Whether a platform authenticator stands in front of this module. Off locally, on in Azure.
     require_authenticated_principal: bool = False
 
-    # A server with no platform authenticator (`move-from-azure-to-vps`). This module is never published at the edge,
-    # so what reaches it is another service on the internal network, and proves itself with the gateway's key — the one
-    # shared secret the system has. Anything carrying the edge marker is refused whatever token it holds.
+    # A server with no platform authenticator (`move-from-azure-to-vps`): a service on the internal network proves itself
+    # with the gateway's key, the one shared secret the system has.
     server_mode: bool = False
     internal_caller_application_id: str = "tc-internal"
 
-    # The one way in from outside (`operator-tool-access`): the operator's own MCP client, with an Entra token issued for
-    # the gateway's API to an application named here. Empty — the default — is the module as it was: nothing from the
-    # edge gets in, whatever it holds. Comma-separated, like every caller list in this repository.
+    # The one way in from the edge (`operator-tool-access`): a token for the gateway's API, issued to an application named
+    # here. Empty, the default, refuses everything carrying the edge marker whatever token it holds.
     external_caller_application_ids: str = ""
     entra_tenant_id: str | None = None
     entra_audiences: str = ""
@@ -55,11 +53,15 @@ class Settings(BaseSettings):
 
     @property
     def external_callers(self) -> frozenset[str]:
-        return frozenset(part.strip() for part in self.external_caller_application_ids.split(",") if part.strip())
+        return frozenset(self._listed(self.external_caller_application_ids))
 
     @property
     def audiences(self) -> list[str]:
-        return [part.strip() for part in self.entra_audiences.split(",") if part.strip()]
+        return self._listed(self.entra_audiences)
+
+    @staticmethod
+    def _listed(raw: str) -> list[str]:
+        return [part.strip() for part in raw.split(",") if part.strip()]
 
     @field_validator("capital_gateway_url")
     @classmethod

@@ -50,9 +50,8 @@
 	}
 }
 
-# The gateway publishes no tool surface, so its host carries none. The API host carries every one: the operator's own MCP
-# client reaches them with a token, a named application and the `admin` role, all checked in the process
-# (`operator-mcp-access`).
+# The gateway publishes no tool surface, so its host carries none. The API host carries every one, for the operator's own
+# MCP client: its token, application and `admin` role are checked in the process (`operator-mcp-access`).
 (no_tool_surface) {
 	@mcp path_regexp ^(/[A-Za-z0-9_-]+)?/mcp(/.*)?$
 	respond @mcp 404

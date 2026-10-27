@@ -5,12 +5,12 @@
 """The operator's token for production's tool surfaces, for Claude Code's `headersHelper` (`operator-mcp-access`).
 
     uv run --script scripts/mcp_token.py login   --tenant <id> --client-id <id>   # a browser, once
-    uv run --script scripts/mcp_token.py headers --tenant <id> --client-id <id>   # what Claude Code runs
+    uv run --script scripts/mcp_token.py headers --tenant <id> --client-id <id> --api workbench|gateway
 
 `headers` is silent or it fails: Claude Code gives a helper ten seconds and no screen, so a sign-in it would need is a
-refusal naming `login`. Which API the token is for follows the address Claude Code is connecting to — trading-mcp's
-(`/trading/`) takes the gateway's, every other surface the workbench's. The cache is the macOS keychain where there is
-one, a file readable by the operator alone otherwise; nothing here prints a token anywhere but stdout."""
+refusal naming `login`. `--api` is written into each server's registration by `claude-mcp.sh`: trading-mcp checks tokens
+for the gateway's API, every other surface for the workbench's. The cache is the macOS keychain where there is one, a
+file readable by the operator alone otherwise; nothing here prints a token anywhere but stdout."""
 
 from __future__ import annotations
 
@@ -24,17 +24,12 @@ from typing import Any
 
 WORKBENCH_SCOPE = "api://tradingcenter-agent/access_as_user"
 GATEWAY_SCOPE = "api://tradingcenter-capital-gateway/access_as_user"
-SERVER_URL_VARIABLE = "CLAUDE_CODE_MCP_SERVER_URL"
+SCOPES = {"workbench": WORKBENCH_SCOPE, "gateway": GATEWAY_SCOPE}
 CACHE = Path.home() / ".cache" / "tradingcenter" / "mcp-token-cache.bin"
 
 
 class Refused(Exception):
     """Said on stderr, exit 1: Claude Code then shows the server as failed rather than connecting without a token."""
-
-
-def scope_for(server_url: str) -> str:
-    """trading-mcp checks tokens for the gateway's API; everything under the workbench, the workbench's."""
-    return GATEWAY_SCOPE if "/trading/" in server_url else WORKBENCH_SCOPE
 
 
 def headers_for(token: str, *, edge_marker: bool) -> dict[str, str]:
@@ -95,6 +90,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("command", choices=("login", "headers", "logout"))
     parser.add_argument("--tenant", required=True)
     parser.add_argument("--client-id", required=True)
+    # Named, not read off the server's address: a wrong guess is a 401 that Claude Code reports as a failed sign-in.
+    parser.add_argument("--api", choices=sorted(SCOPES), default="workbench")
     parser.add_argument("--edge-marker", action="store_true", help="add X-TC-Edge for a local SERVER_MODE workbench")
     args = parser.parse_args(argv)
 
@@ -106,8 +103,7 @@ def main(argv: list[str] | None = None) -> int:
             for account in app.get_accounts():
                 app.remove_account(account)
         else:
-            scope = scope_for(os.environ.get(SERVER_URL_VARIABLE, ""))
-            print(json.dumps(headers_for(silent_token(app, scope), edge_marker=args.edge_marker)))
+            print(json.dumps(headers_for(silent_token(app, SCOPES[args.api]), edge_marker=args.edge_marker)))
     except Refused as refusal:
         print(f"mcp_token: {refusal}", file=sys.stderr)
         return 1

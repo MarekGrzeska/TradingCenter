@@ -8,6 +8,7 @@ Raw ASGI, outermost: it must see the request before any record does, and a strea
 from __future__ import annotations
 
 import base64
+import binascii
 import hmac
 import json
 import logging
@@ -45,6 +46,21 @@ def principal_blob(application: str) -> bytes:
     """The platform header's body, with the one claim the records read."""
     document = {"auth_typ": "aad", "claims": [{"typ": "azp", "val": application}]}
     return base64.b64encode(json.dumps(document).encode())
+
+
+def application_in(blob: str | bytes | None) -> str | None:
+    """`principal_blob` read back, for code behind the door that logs who called: `None` for anything it did not write."""
+    if not blob:
+        return None
+    try:
+        document = json.loads(base64.b64decode(blob))
+    except (ValueError, binascii.Error):
+        return None
+    claims = document.get("claims") if isinstance(document, dict) else None
+    for claim in claims or []:
+        if isinstance(claim, dict) and claim.get("typ") == "azp" and claim.get("val"):
+            return str(claim["val"])
+    return None
 
 
 @dataclass(frozen=True)

@@ -23,6 +23,11 @@ from telegram_gateway.config import Settings as TelegramSettings
 from youtube_data.config import Settings as YoutubeSettings
 
 
+def _identifiers(raw: str) -> frozenset[str]:
+    """A comma-separated setting as a set, with blanks and stray spaces dropped — as every package reads its own."""
+    return frozenset(part.strip() for part in raw.split(",") if part.strip())
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -100,9 +105,8 @@ class Settings(BaseSettings):
     gateway_stream_url: str = "ws://localhost:8010/ws/stream"
     gateway_api_key: str
     gateway_scope: str | None = None
-    # Who may reach every package's `/mcp` from outside — the operator's own MCP client (`operator-mcp-access`); the
-    # conversation calls those tools in this process and never passes this list — and which browsers reach `/polymarket`
-    # and `/social` over REST.
+    # Who may reach every package's `/mcp` from outside (the operator's own MCP client; the conversation calls the tools
+    # in this process), and which browsers reach `/polymarket` and `/social` over REST.
     tool_caller_application_ids: str = ""
     rest_caller_application_ids: str = ""
 
@@ -194,7 +198,7 @@ class Settings(BaseSettings):
 
     @property
     def tool_caller_ids(self) -> frozenset[str]:
-        return frozenset(part.strip() for part in self.tool_caller_application_ids.split(",") if part.strip())
+        return _identifiers(self.tool_caller_application_ids)
 
     @property
     def audiences(self) -> list[str]:
