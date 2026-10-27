@@ -161,12 +161,12 @@
   <div class="inner">
     <span class="kicker">Raport implementacji · operator-mcp-access</span>
     <h1>Claude Code na narzędziach produkcji</h1>
-    <p class="lede">Każda powierzchnia MCP produkcji odpowiada teraz <b>jednemu klientowi z zewnątrz</b>: Twojemu Claude Code. Przechodzi on przez trzy kontrole: token Entra, rolę <code>admin</code> i aplikację z listy. Kod, testy i Terraform czekają na gałęzi, <b>niezmergowane i niewdrożone</b>.</p>
+    <p class="lede">Każda powierzchnia MCP produkcji odpowiada teraz <b>jednemu klientowi z zewnątrz</b>: Twojemu Claude Code. Przechodzi on przez trzy kontrole: token Entra, rolę <code>admin</code> i aplikację z listy. Od <b>27 października 2026</b> działa na produkcji: rejestracja Entra jest założona, PR #393 zmergowany i wdrożony. Zostało logowanie na każdej maszynie i kilka rzeczy do zrobienia raz (sekcja 05).</p>
     <div class="strip">
       <span>TradingCenter / openspec/changes/operator-mcp-access</span>
-      <span>26 października 2026</span>
-      <span>gałąź <b>feat/operator-mcp-access</b></span>
-      <span>stan: <b>gotowe do merge</b> po kroku operatora</span>
+      <span>26–27 października 2026</span>
+      <span>PR <b>#393</b> · merge <b>c0778b41</b></span>
+      <span>stan: <b>na produkcji</b></span>
     </div>
   </div>
 </header>
@@ -177,7 +177,7 @@
       <div class="cell"><div class="v">9</div><div class="l">serwerów MCP dostępnych z Claude Code</div></div>
       <div class="cell"><div class="v">82</div><div class="l">narzędzia za nimi, z czego część zapisuje</div></div>
       <div class="cell"><div class="v">3</div><div class="l">kontrole: token · rola · aplikacja</div></div>
-      <div class="cell"><div class="v">0</div><div class="l">merge'ów i wdrożeń</div></div>
+      <div class="cell"><div class="v">2</div><div class="l">kroki na każdej maszynie: login · install</div></div>
     </div>
 
     <section>
@@ -327,29 +327,59 @@
     </section>
 
     <section>
-      <div class="eyebrow">05 · Twój ruch</div>
-      <h2>Rano, w tej kolejności</h2>
+      <div class="eyebrow">05 · Stan</div>
+      <h2>Co zostało zrobione, co zostało do zrobienia</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Krok</th><th>Stan</th><th>Szczegóły</th></tr></thead>
+          <tbody>
+            <tr><td><b>Terraform</b></td><td><span class="tag ok">zrobione 27.10</span></td><td>Zastosowane przez <code>-target</code> tylko na cztery nowe zasoby: rejestrację, service principal i dwie pre-autoryzacje. Nic nie zostało zniszczone. Client id: <code>b19f77e3-c973-465e-83c2-6b80e5892962</code>.</td></tr>
+            <tr><td><b>Środowisko <code>vps</code></b></td><td><span class="tag ok">zrobione 27.10</span></td><td><code>CLAUDE_CODE_APPLICATION_ID</code> ustawione na ten client id.</td></tr>
+            <tr><td><b>Merge i wdrożenie</b></td><td><span class="tag ok">zrobione 27.10</span></td><td>PR #393, merge <code>c0778b41</code>, <code>deploy-vps</code> zielony. Na serwerze działają obrazy z tego commitu.</td></tr>
+            <tr><td><b>Caddy</b></td><td><span class="tag att">przeładowany ręcznie</span></td><td>Deploy nie przeładował Caddy (przyczyna niżej). Po ręcznym <code>caddy reload</code> wszystkie <code>/…/mcp</code> i <code>/trading/mcp</code> bez tokenu odpowiadają 401, <code>/trading/health</code> odpowiada <code>ok</code>, a <code>/mcp</code> na hoście bramy dalej 404.</td></tr>
+            <tr><td><b>Logowanie na prawdziwym tenancie</b></td><td><span class="tag stop">niesprawdzone</span></td><td>Pierwszym pomiarem jest <code>mcp_token.py login</code> poniżej.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 style="margin-top:28px">Na każdej maszynie, z której używasz Claude Code</h3>
+      <p>Token i konfiguracja serwerów należą do maszyny, nie do repozytorium ani konta. Token leży w pęku kluczy systemu (na macOS w Keychain), a serwery w konfiguracji użytkownika Claude Code (<code>~/.claude.json</code>). Helper jest wpisany ścieżką bezwzględną do tego klonu repozytorium i do <code>uv</code>. Dlatego każda maszyna potrzebuje klonu repozytorium, <code>uv</code> i dwóch komend:</p>
+<pre><code>uv run --script scripts/mcp_token.py login \
+  --tenant 1e076190-9713-407c-81dd-2da72233afd7 --client-id b19f77e3-c973-465e-83c2-6b80e5892962
+scripts/claude-mcp.sh install api.57-129-181-251.sslip.io \
+  1e076190-9713-407c-81dd-2da72233afd7 b19f77e3-c973-465e-83c2-6b80e5892962
+claude mcp list</code></pre>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Krok</th><th>Jak często</th><th>Kiedy powtórzyć</th></tr></thead>
+          <tbody>
+            <tr><td><code>mcp_token.py login</code></td><td><span class="tag att">na każdej maszynie</span></td><td>Raz, a potem ponownie, gdy Claude Code pokaże „Dynamic Client Registration rejected (HTTP 401)”. Zwykle po około 90 dniach bez użycia albo po <code>logout</code>.</td></tr>
+            <tr><td><code>claude-mcp.sh install</code></td><td><span class="tag att">na każdej maszynie</span></td><td>Raz, a potem ponownie po przeniesieniu klonu repozytorium, zmianie ścieżki do <code>uv</code> albo zmianie listy serwerów w skrypcie.</td></tr>
+            <tr><td><code>claude-mcp.sh remove</code> · <code>mcp_token.py logout</code></td><td><span class="tag att">na każdej maszynie</span></td><td>Gdy maszyna ma przestać mieć dostęp.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Na Windows <code>claude-mcp.sh</code> trzeba uruchomić w Git Bash; token trafi wtedy do magazynu chronionego DPAPI. Bez pęku kluczy, np. na Linuksie bez keyringa, helper zapisuje token w pliku z prawami <code>0600</code>.</p>
+
+      <h3 style="margin-top:28px">Raz, dla całego systemu</h3>
       <div class="fails">
         <div class="fail stop">
-          <h3>Najpierw dryf w Terraform <span class="tag stop">przed apply</span></h3>
-          <p><code>terraform plan</code> chce zniszczyć <code>admin_workbench</code> i <code>admin_gateway</code> dla osoby <code>73c09587-…</code>. Osoba ta ma rolę admin w stanie, a nie ma jej w Twoim lokalnym <code>terraform.tfvars</code> (<code>admin_user_object_ids</code>). Zwykłe <code>apply</code> odebrałoby jej rolę. Dopisz ją do tfvars albo zastosuj tylko nowe zasoby przez <code>-target</code> (komenda niżej).</p>
+          <h3>Ansible na serwerze <span class="tag stop">raz</span></h3>
+          <p><code>/opt/tradingcenter/bin/deploy</code> na serwerze pochodzi z 14.10 i nie ma przeładowania Caddy, które <code>deploy.sh</code> dostał później. Ten plik trafia na serwer tylko przez <code>deploy/ansible/site.yml</code>, a nie przy deployu. Dopóki Ansible go nie podmieni, każdą zmianę Caddyfile trzeba przeładować ręcznie:<br><code>ssh tc-vps 'sudo docker exec tradingcenter-vps-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile'</code></p>
+        </div>
+        <div class="fail stop">
+          <h3>Dryf w Terraform <span class="tag stop">raz, przed następnym pełnym apply</span></h3>
+          <p>Pełny <code>terraform apply</code> nadal chce zniszczyć <code>admin_workbench</code> i <code>admin_gateway</code> dla osoby <code>73c09587-…</code>. Osoba ta ma rolę admin w stanie, a nie ma jej w lokalnym <code>terraform.tfvars</code> (<code>admin_user_object_ids</code>). Dopisz ją albo świadomie pozwól jej rolę zabrać.</p>
+        </div>
+        <div class="fail">
+          <h3>Job <code>plan</code> w CI <span class="tag att">raz</span></h3>
+          <p><code>terraform.yml</code> pada na każdym PR z <code>infra/</code> od 19.10: tożsamość CI nie może odczytać istniejącego delegated permission grant (<code>Retrieving Delegated Permission Grant</code>). Bez ochrony gałęzi niczego to nie blokuje, ale plan w PR jest przez to bezużyteczny. Brakuje uprawnienia Graph do odczytu grantów dla aplikacji CI.</p>
+        </div>
+        <div class="fail">
+          <h3>Archiwizacja zmiany OpenSpec <span class="tag att">raz</span></h3>
+          <p>Po pierwszym udanym <code>login</code> i <code>claude mcp list</code>: <code>/opsx:archive operator-mcp-access</code>. <code>review.md</code> już jest.</p>
         </div>
       </div>
-      <ol class="steps" style="margin-top:20px">
-        <li>Przejrzyj gałąź: <code>git log main..feat/operator-mcp-access</code>, <code>openspec/changes/operator-mcp-access/</code> (proposal, design, specs, review).</li>
-        <li><code>terraform apply</code> w <code>infra/</code>. Bez rozstrzygniętego dryfu zastosuj tylko nowe zasoby:
-<pre><code>terraform apply \
-  -target=azuread_application.claude_code \
-  -target=azuread_service_principal.claude_code \
-  -target=azuread_application_pre_authorized.workbench_claude_code \
-  -target=azuread_application_pre_authorized.gateway_claude_code</code></pre></li>
-        <li>Zmienna środowiska <code>vps</code>: <code>CLAUDE_CODE_APPLICATION_ID</code> = <code>terraform output -raw claude_code_entra_client_id</code>. Ustawi ją też <code>deploy/scripts/fill-github-environment.sh</code>. Bez niej deploy zatrzyma się przed wysłaniem czegokolwiek.</li>
-        <li>Push, PR, merge. Po merge: <code>deploy-watch</code>.</li>
-        <li>U siebie:
-<pre><code>uv run --script scripts/mcp_token.py login --tenant &lt;tenant&gt; --client-id &lt;id&gt;
-scripts/claude-mcp.sh install &lt;API_HOST&gt; &lt;tenant&gt; &lt;id&gt;
-claude mcp list</code></pre></li>
-      </ol>
     </section>
 
     <section>
@@ -401,6 +431,6 @@ claude mcp list</code></pre></li>
 <footer>
   <div class="inner">
     <span>operator-mcp-access · raport implementacji</span>
-    <span>26.10.2026 · gałąź feat/operator-mcp-access, niezmergowana</span>
+    <span>27.10.2026 · na produkcji od PR #393 (c0778b41)</span>
   </div>
 </footer>
