@@ -363,9 +363,9 @@ claude mcp list</code></pre>
 
       <h3 style="margin-top:28px">Raz, dla całego systemu</h3>
       <div class="fails">
-        <div class="fail stop">
-          <h3>Ansible na serwerze <span class="tag stop">raz</span></h3>
-          <p><code>/opt/tradingcenter/bin/deploy</code> na serwerze pochodzi z 14.10 i nie ma przeładowania Caddy, które <code>deploy.sh</code> dostał później. Ten plik trafia na serwer tylko przez <code>deploy/ansible/site.yml</code>, a nie przy deployu. Dopóki Ansible go nie podmieni, każdą zmianę Caddyfile trzeba przeładować ręcznie:<br><code>ssh tc-vps 'sudo docker exec tradingcenter-vps-caddy-1 caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile'</code></p>
+        <div class="fail ok">
+          <h3>Ansible na serwerze <span class="tag ok">zrobione 27.10</span></h3>
+          <p>Serwerowy <code>/opt/tradingcenter/bin/deploy</code> był z 14.10 i nie przeładowywał Caddy. Playbook uruchomiony z <code>operator_user=ubuntu</code> i <code>ssh_allowed_cidrs=["0.0.0.0/0"]</code>, czyli z tym, co serwer ma dziś. Domyślne wartości odcięłyby SSH. Najpierw <code>--check --diff</code>: zmiana była jedna, ten plik. Od następnego deployu Caddy przeładowuje się sam.</p>
         </div>
         <div class="fail stop">
           <h3>Dryf w Terraform <span class="tag stop">raz, przed następnym pełnym apply</span></h3>
