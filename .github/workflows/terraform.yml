@@ -32,6 +32,8 @@ env:
   TF_VAR_operator_object_id: ${{ vars.TF_VAR_OPERATOR_OBJECT_ID }}
   TF_VAR_postgres_admin_object_id: ${{ vars.TF_VAR_POSTGRES_ADMIN_OBJECT_ID }}
   TF_VAR_postgres_admin_upn: ${{ vars.TF_VAR_POSTGRES_ADMIN_UPN }}
+  # A JSON list; without it CI's plan proposes taking `admin` from everyone listed in the operator's tfvars.
+  TF_VAR_admin_user_object_ids: ${{ vars.TF_VAR_ADMIN_USER_OBJECT_IDS || '[]' }}
 
 jobs:
   plan:

@@ -121,6 +121,14 @@ resource "azuread_app_role_assignment" "github_actions_directory_read" {
   resource_object_id  = data.azuread_service_principal.msgraph.object_id
 }
 
+# Reading `terminal_graph` (a delegated grant) is not covered by `Application.Read.All`: every infra PR's plan failed with
+# 403 on it from 19 October 2026. Read-only, like the one above.
+resource "azuread_app_role_assignment" "github_actions_grant_read" {
+  app_role_id         = data.azuread_service_principal.msgraph.app_role_ids["DelegatedPermissionGrant.Read.All"]
+  principal_object_id = azuread_service_principal.github_actions.object_id
+  resource_object_id  = data.azuread_service_principal.msgraph.object_id
+}
+
 output "github_actions_client_id" {
   value = azuread_application.github_actions.client_id
 }
