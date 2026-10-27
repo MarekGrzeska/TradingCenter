@@ -37,7 +37,10 @@ case "${1:-}" in
     host="$2" tenant="$3" client="$4"
     # Absolute, because Claude Code runs the helper from ~/.claude for a user-scope server, with whatever PATH it has.
     uv_bin="$(command -v uv)" || { echo "uv is not on PATH" >&2; exit 1; }
-    helper="$uv_bin run --quiet --script $here/mcp_token.py headers --tenant $tenant --client-id $client"
+    script="$here/mcp_token.py"
+    # Git Bash hands out /c/... paths, which a Windows shell running the helper cannot resolve.
+    if command -v cygpath >/dev/null; then uv_bin="$(cygpath -m "$uv_bin")" script="$(cygpath -m "$script")"; fi
+    helper="\\\"$uv_bin\\\" run --quiet --script \\\"$script\\\" headers --tenant $tenant --client-id $client"
     remove
     for surface in "${SURFACES[@]}"; do
       IFS=: read -r name path api <<<"$surface"
