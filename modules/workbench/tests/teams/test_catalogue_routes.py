@@ -149,6 +149,23 @@ def test_a_retired_team_leaves_the_catalogue_but_keeps_its_revisions(client: Tes
     assert kept.json()["version"] == 1
 
 
+def test_a_rename_changes_the_label_and_appends_no_revision(client: TestClient) -> None:
+    team_id = _create(client).json()["id"]
+
+    renamed = client.patch(
+        f"/teams/{team_id}", json={"description": "exit at 14:00"}, headers=OWNER
+    )
+
+    assert renamed.status_code == 200
+    assert renamed.json()["name"] == "morning desk"
+    assert renamed.json()["description"] == "exit at 14:00"
+    assert renamed.json()["latest_revision"] == 1
+    assert (
+        client.patch(f"/teams/{team_id}", json={"name": "x"}, headers=STRANGER).status_code == 404
+    )
+    assert client.patch(f"/teams/{team_id}", json={"name": "  "}, headers=OWNER).status_code == 422
+
+
 def test_someone_elses_team_answers_exactly_like_a_missing_one(client: TestClient) -> None:
     # specs/teams-browser-access, "odpowiedź jest nieodróżnialna od odpowiedzi o zespole
     # nieistniejącym" — same status, same body, for every route that names a team.

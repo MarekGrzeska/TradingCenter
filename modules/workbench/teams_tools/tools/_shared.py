@@ -45,6 +45,8 @@ async def _call(
             return await teams.post(path, token=token, json=json)
         if method == "PUT":
             return await teams.put(path, token=token, json=json)
+        if method == "PATCH":
+            return await teams.patch(path, token=token, json=json)
         if method == "DELETE":
             return await teams.delete(path, token=token)
         raise ValueError(f"unsupported method {method}")  # pragma: no cover - programming error

@@ -343,7 +343,8 @@ export interface paths {
         delete: operations["archive_team_teams__team_id__delete"];
         options?: never;
         head?: never;
-        patch?: never;
+        /** Rename Team */
+        patch: operations["rename_team_teams__team_id__patch"];
         trace?: never;
     };
     "/teams/{team_id}/layout": {
@@ -791,6 +792,16 @@ export interface components {
             minutes?: number | null;
             /** Weekdays */
             weekdays?: number[] | null;
+        };
+        /**
+         * RenameTeamIn
+         * @description Not a revision: a run's trace names the definition it ran, never the label the catalogue shows.
+         */
+        RenameTeamIn: {
+            /** Description */
+            description?: string | null;
+            /** Name */
+            name?: string | null;
         };
         /** RunOut */
         RunOut: {
@@ -1883,6 +1894,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_team_teams__team_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RenameTeamIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamOut"];
+                };
             };
             /** @description Validation Error */
             422: {

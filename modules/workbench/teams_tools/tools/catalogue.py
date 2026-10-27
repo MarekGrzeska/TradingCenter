@@ -173,6 +173,20 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         )
 
     @mcp.tool(annotations=WRITE)
+    async def rename_team(
+        context: Context, team_id: int, name: str | None = None, description: str | None = None
+    ) -> TeamSummary:
+        """Change a team's name or description, or both. Not a revision: schedules and
+        runs keep pointing where they did. Update both when a revision changes what the
+        team does."""
+        if name is None and description is None:
+            raise ToolRefusal("nothing to change: name a new name, description or both.")
+        body = {"name": name, "description": description}
+        return TeamSummary.model_validate(
+            await _call(teams, context, "PATCH", f"/teams/{team_id}", json=body)
+        )
+
+    @mcp.tool(annotations=WRITE)
     async def revise_team(
         context: Context,
         team_id: int,
