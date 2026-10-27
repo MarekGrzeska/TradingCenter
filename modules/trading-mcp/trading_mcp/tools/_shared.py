@@ -8,6 +8,7 @@ from typing import Any, Literal
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel
 
+from .. import trace
 from ..client import GatewayClient
 from ..errors import GatewayRefused, GatewayUnavailable, ToolRefusal
 
@@ -65,9 +66,11 @@ async def _send_change(
 ) -> Any:
     """The error translation every write shares, without any reading of what came back. `read_back` is
     what the model should look at before trying again, and it differs by what was being changed."""
+    who = trace.sending(method, path, json)
     try:
-        return await gateway.write(method, path, json=json)
+        payload = await gateway.write(method, path, json=json)
     except GatewayUnavailable as err:
+        trace.outcome(method, path, "unknown (gateway unreachable)", who)
         raise ToolRefusal(
             f"access failure: could not reach capital-gateway ({err}). The effect of "
             f"this request on the account is unknown — {read_back} before trying again; "
@@ -75,12 +78,21 @@ async def _send_change(
         ) from err
     except GatewayRefused as err:
         if err.is_access_failure:
+            trace.outcome(method, path, f"unknown (gateway answered {err.status_code})", who)
             raise ToolRefusal(
                 f"access failure: capital-gateway answered {err.status_code} "
                 f"({err.detail}). The effect of this request on the account is "
                 f"unknown — {read_back} before trying again; do not repeat this call."
             ) from err
+        trace.outcome(method, path, f"refused ({err.status_code})", who)
         raise ToolRefusal(f"refused: capital-gateway rejected the request — {err.detail}") from err
+    except BaseException as err:
+        # A cancelled call or an unreadable answer may still have reached the account; the trace must not end at "sending".
+        trace.outcome(method, path, f"unknown ({type(err).__name__})", who)
+        raise
+    status = payload.get("status") if isinstance(payload, dict) else None
+    trace.outcome(method, path, f"answered status={status or '-'}", who)
+    return payload
 
 
 async def _write(

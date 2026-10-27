@@ -54,14 +54,19 @@ class Settings(BaseSettings):
     # run of the exits — the reason it is a hundred, not a thousand.
     random_entry_repetitions: int = 100
 
-    # The operator's screen, and nobody else: what this package holds is research the operator decides on. There is no
-    # tool surface, so there is no tool caller list.
+    # The operator's screen over REST, and the operator's own MCP client over `/mcp`: what this package holds is research
+    # the operator decides on, and neither list holds anybody else.
     require_authenticated_principal: bool = False
     rest_caller_application_ids: str = ""
+    tool_caller_application_ids: str = ""
 
     @property
     def rest_caller_ids(self) -> frozenset[str]:
         return _identifiers(self.rest_caller_application_ids)
+
+    @property
+    def tool_caller_ids(self) -> frozenset[str]:
+        return _identifiers(self.tool_caller_application_ids)
 
     @field_validator("database_url")
     @classmethod

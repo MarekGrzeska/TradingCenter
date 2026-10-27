@@ -8,6 +8,7 @@ Raw ASGI, outermost: it must see the request before any record does, and a strea
 from __future__ import annotations
 
 import base64
+import binascii
 import hmac
 import json
 import logging
@@ -47,6 +48,21 @@ def principal_blob(application: str) -> bytes:
     return base64.b64encode(json.dumps(document).encode())
 
 
+def application_in(blob: str | bytes | None) -> str | None:
+    """`principal_blob` read back, for code behind the door that logs who called: `None` for anything it did not write."""
+    if not blob:
+        return None
+    try:
+        document = json.loads(base64.b64decode(blob))
+    except (ValueError, binascii.Error):
+        return None
+    claims = document.get("claims") if isinstance(document, dict) else None
+    for claim in claims or []:
+        if isinstance(claim, dict) and claim.get("typ") == "azp" and claim.get("val"):
+            return str(claim["val"])
+    return None
+
+
 @dataclass(frozen=True)
 class EdgeConfig:
     """What the door needs to know. `exempt_paths` are the ones that need no proof at all (a health probe, a handshake
@@ -63,6 +79,9 @@ class EdgeConfig:
     # What a person's role may reach. `None` is a process with no roles (the gateway before this existed, a test): the
     # token or key is the whole credential, as before.
     role_policy: RolePolicy | None = None
+    # The applications a token may have been issued to, for a process with no caller record of its own behind the door
+    # (trading-mcp). `None` is any application the audience admits; an empty set is none.
+    token_applications: frozenset[str] | None = None
 
 
 # Returns the config once the process has read its settings, `None` when it is not a server (local work, or Azure
@@ -125,6 +144,14 @@ class EdgeAuth:
             return
 
         application, person, name, roles = identity
+        if (
+            EDGE_HEADER in headers
+            and config.token_applications is not None
+            and application not in config.token_applications
+        ):
+            log.warning("refused %s: application %s is not on this process's list", path, application)
+            await _refuse(scope, receive, send, 403, "this caller has no access")
+            return
         policy = config.role_policy
         if policy is not None and not policy.allows(roles, scope.get("method", ""), path):
             log.warning("refused %s %s: roles %s have no access", scope.get("method", ""), path, sorted(roles))

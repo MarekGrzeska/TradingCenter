@@ -149,7 +149,9 @@ parameters, costs, range, engine version, seed, and a fingerprint of every serie
 ## The conversation's tools
 
 Twelve, in `tools/`, built into a FastMCP server the assembly hands to the conversation as functions — never to the
-alerts' catalogue, and never mounted at `/mcp` (design D7). A team gets a second server of three of them that only read,
+alerts' catalogue. The same server is mounted at `/mcp` for the operator's own Claude Code alone
+(`operator-mcp-access`, reversing design D7, whose one reason was that no such client existed); a run it queues is the
+agent's, under the same one-at-a-time rule and trial count. A team gets a second server of three of them that only read,
 `list_strategies`, `read_strategy` and `strategy_signal` (`mcp_app.TEAM_TOOLS`): nothing that saves, drafts, queues or
 deletes, since a schedule would spend the queue and the trial count on runs nobody asked for.
 `strategy_signal` is what the engine would do now for a named revision — `simulate` over the last 2 000 bars, read

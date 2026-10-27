@@ -62,11 +62,14 @@ async def serving(app: FastAPI, settings: Settings, *, market: httpx.AsyncClient
         # After the migration: the queue's first act is marking what a previous process left running.
         app.state.queue = RunQueue(pool, app.state.archive, settings)
         await app.state.queue.start()
-        log.info("strategies is serving")
-        try:
-            yield
-        finally:
-            await app.state.queue.stop()
+        # The tool surface's session manager: a mounted application's lifespan is never run, so the task group has to be
+        # started here or every call under `/mcp` fails.
+        async with mcp_app.tool_surface_session(app):
+            log.info("strategies is serving")
+            try:
+                yield
+            finally:
+                await app.state.queue.stop()
 
 
 @asynccontextmanager
@@ -89,12 +92,16 @@ def create_app() -> FastAPI:
     app.include_router(strategies.router)
     app.include_router(runs.router)
     app.include_router(costs.router)
-    # The tools, for the host to hand to the conversation; not mounted, so nothing reaches them over the network.
-    app.state.mcp_server = mcp_app.build_server(app)
+    # The tools: the host hands the server to the conversation, and the operator's MCP client reaches it under `/mcp`.
+    server, tool_app = mcp_app.build_mcp_app(app)
+    app.state.mcp_server = server
+    app.mount(mcp_app.MOUNT_PATH, tool_app)
     # The three of them a team may call, for the teams registry — the same functions, fewer of them.
     app.state.team_mcp_server = mcp_app.build_team_server(app)
 
-    # In front of the whole application: nothing decides who may call after routing has begun.
+    # In front of the whole application, and in this order: the address fix runs before routing, and the caller record
+    # before that, so nothing decides who may call after routing has begun.
+    app.add_middleware(mcp_app.ToolSurfaceAddress)
     app.add_middleware(CallerAccess, state=app.state, record=RECORD)
     return app
 

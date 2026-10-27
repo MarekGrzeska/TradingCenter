@@ -12,6 +12,13 @@ sixth module, not a switch flipped on the fifth one (specs/market-mcp-tools).
 caller identity, and a module that moves money needs its `allowed_applications` list
 to mean something (specs/trading-mcp-transport).
 
+**Two callers, named.** The workbench, on the internal network, with the gateway's key; and the operator's own MCP
+client from outside, under `/trading/mcp` on the API host, with an Entra token for the **gateway's** API issued to an
+application in `EXTERNAL_CALLER_APPLICATION_IDS`, for an `admin` (`openspec/changes/operator-mcp-access`). Empty list,
+the default: nothing from the edge gets in. Every write leaves two lines in `trading_mcp.trace` — before it is sent and
+with its outcome — naming the application and the person; for a caller from outside that is the only trace the
+system keeps.
+
 ## What
 
 - `config.py` — settings, and the one credential this module cannot start without:

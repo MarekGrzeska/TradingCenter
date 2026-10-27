@@ -26,11 +26,16 @@ class Settings(BaseSettings):
     # Whether a platform authenticator stands in front of this module. Off locally, on in Azure.
     require_authenticated_principal: bool = False
 
-    # A server with no platform authenticator (`move-from-azure-to-vps`). This module is never published at the edge,
-    # so what reaches it is another service on the internal network, and proves itself with the gateway's key — the one
-    # shared secret the system has. Anything carrying the edge marker is refused whatever token it holds.
+    # A server with no platform authenticator (`move-from-azure-to-vps`): a service on the internal network proves itself
+    # with the gateway's key, the one shared secret the system has.
     server_mode: bool = False
     internal_caller_application_id: str = "tc-internal"
+
+    # The one way in from the edge (`operator-tool-access`): a token for the gateway's API, issued to an application named
+    # here. Empty, the default, refuses everything carrying the edge marker whatever token it holds.
+    external_caller_application_ids: str = ""
+    entra_tenant_id: str | None = None
+    entra_audiences: str = ""
 
     @model_validator(mode="after")
     def _server_mode_asks_for_an_identity(self) -> Settings:
@@ -39,7 +44,24 @@ class Settings(BaseSettings):
                 "SERVER_MODE needs REQUIRE_AUTHENTICATED_PRINCIPAL=true: the door writes the identity the "
                 "tools are gated on, and a process that does not ask for it admits a caller with none"
             )
+        if self.server_mode and self.external_callers and (not self.entra_tenant_id or not self.audiences):
+            raise ValueError(
+                "EXTERNAL_CALLER_APPLICATION_IDS needs ENTRA_TENANT_ID and ENTRA_AUDIENCES — without them no token "
+                "from those callers could be checked"
+            )
         return self
+
+    @property
+    def external_callers(self) -> frozenset[str]:
+        return frozenset(self._listed(self.external_caller_application_ids))
+
+    @property
+    def audiences(self) -> list[str]:
+        return self._listed(self.entra_audiences)
+
+    @staticmethod
+    def _listed(raw: str) -> list[str]:
+        return [part.strip() for part in raw.split(",") if part.strip()]
 
     @field_validator("capital_gateway_url")
     @classmethod

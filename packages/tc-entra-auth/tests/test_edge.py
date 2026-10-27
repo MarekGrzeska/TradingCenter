@@ -9,7 +9,8 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Route, WebSocketRoute
 
-from tc_entra_auth import EdgeAuth, EdgeConfig, TokenVerifier
+from tc_entra_auth import EdgeAuth, EdgeConfig, TokenVerifier, application_in
+from tc_entra_auth.edge import principal_blob
 
 KEY = "shared-service-key"
 EDGE = {"X-TC-Edge": "1"}
@@ -234,3 +235,46 @@ async def test_the_in_process_marker_in_a_header_is_not_a_credential(tenant):
     async with client(tenant) as http:
         response = await http.get("/whoami", headers={"tc_runtime.in_process_caller": "x"})
     assert response.status_code == 401
+
+
+def listed_client(tenant, applications: frozenset[str] | None) -> httpx.AsyncClient:
+    guarded = EdgeAuth(
+        Starlette(routes=[Route("/whoami", whoami)]),
+        EdgeConfig(
+            verifier=TokenVerifier(tenant_id=TENANT, audiences=[AUDIENCE], fetch_keys=tenant.jwks),
+            service_key=KEY,
+            token_applications=applications,
+        ),
+    )
+    return httpx.AsyncClient(transport=httpx.ASGITransport(app=guarded), base_url="http://t")
+
+
+@pytest.mark.parametrize(
+    ("applications", "status"),
+    [
+        (frozenset({"claude-code-app-id"}), 200),
+        (frozenset({"terminal-app-id"}), 403),
+        (frozenset(), 403),
+        (None, 200),
+    ],
+)
+async def test_a_token_is_admitted_only_from_a_listed_application(tenant, applications, status):
+    token = tenant.token(application="claude-code-app-id")
+    async with listed_client(tenant, applications) as http:
+        response = await http.get("/whoami", headers={**EDGE, "Authorization": f"Bearer {token}"})
+    assert response.status_code == status
+
+
+async def test_the_application_list_does_not_bind_a_service_with_the_key(tenant):
+    async with listed_client(tenant, frozenset()) as http:
+        response = await http.get("/whoami", headers={"X-Gateway-Key": KEY})
+    assert response.status_code == 200
+    assert response.json()["application"] == "tc-internal"
+
+
+@pytest.mark.parametrize(
+    ("blob", "application"),
+    [(principal_blob("app-1"), "app-1"), (None, None), (b"not base64!", None), (base64.b64encode(b"[]"), None)],
+)
+def test_what_the_door_wrote_reads_back_and_nothing_else_does(blob, application):
+    assert application_in(blob) == application

@@ -24,7 +24,7 @@ line-length = 100
 # thing that goes stale, which is the class of bug this whole change exists to close.
 include = ["."]
 # A self-contained script (PEP 723 header): its dependency is installed by `uv run` for that run alone, not into this project.
-exclude = ["yt_ip_test.py", "**/.venv", "**/__pycache__"]
+exclude = ["yt_ip_test.py", "mcp_token.py", "**/.venv", "**/__pycache__"]
 typeCheckingMode = "basic"
 
 [tool.pytest.ini_options]

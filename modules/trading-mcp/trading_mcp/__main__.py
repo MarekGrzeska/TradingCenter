@@ -4,6 +4,7 @@ process that never opens a port cannot be reached, which beats refusing inside t
 from __future__ import annotations
 
 import asyncio
+import logging
 
 import uvicorn
 
@@ -25,6 +26,10 @@ async def _serve() -> None:
 
 
 def main() -> None:
+    # Nothing configured logging here before, so every INFO line — the trace of each write among them — went nowhere.
+    # This module's own at INFO; the libraries' at WARNING, or httpx writes a line per call to the gateway.
+    logging.basicConfig(level=logging.WARNING, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    logging.getLogger("trading_mcp").setLevel(logging.INFO)
     asyncio.run(_serve())
 
 

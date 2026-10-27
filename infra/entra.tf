@@ -232,3 +232,60 @@ resource "azuread_application_pre_authorized" "workbench_cli" {
   authorized_client_id = local.azure_cli_client_id
   permission_ids       = [module.workbench_easy_auth.scope_id]
 }
+
+
+# --- the operator's own MCP client, as a caller of every tool surface (`operator-mcp-access`) ----------------------------
+
+# Claude Code on the operator's machine (`scripts/mcp_token.py`), a public client. Its own registration rather than `az`'s,
+# so the tool lists name one application that is nothing else, and removing it takes nothing else with it.
+resource "azuread_application" "claude_code" {
+  display_name = "app-tradingcenter-claude-code"
+
+  # A native client: Entra accepts any port on loopback for this platform, which is what MSAL's local listener picks.
+  public_client {
+    redirect_uris = ["http://localhost"]
+  }
+
+  required_resource_access {
+    resource_app_id = module.workbench_easy_auth.client_id
+
+    resource_access {
+      id   = module.workbench_easy_auth.scope_id
+      type = "Scope"
+    }
+  }
+
+  # The gateway's API is the one trading-mcp accepts from outside: moving the account is the gateway's `admin`.
+  required_resource_access {
+    resource_app_id = module.capital_gateway_easy_auth.client_id
+
+    resource_access {
+      id   = module.capital_gateway_easy_auth.scope_id
+      type = "Scope"
+    }
+  }
+}
+
+resource "azuread_service_principal" "claude_code" {
+  client_id = azuread_application.claude_code.client_id
+}
+
+# Both, so neither the first sign-in nor the silent token for the second API meets a consent prompt a helper with ten
+# seconds and no screen could not answer. No role assignment: the role is the person's, and the operator holds `admin`.
+resource "azuread_application_pre_authorized" "workbench_claude_code" {
+  application_id       = module.workbench_easy_auth.application_id
+  authorized_client_id = azuread_application.claude_code.client_id
+  permission_ids       = [module.workbench_easy_auth.scope_id]
+}
+
+resource "azuread_application_pre_authorized" "gateway_claude_code" {
+  application_id       = module.capital_gateway_easy_auth.application_id
+  authorized_client_id = azuread_application.claude_code.client_id
+  permission_ids       = [module.capital_gateway_easy_auth.scope_id]
+}
+
+# Public by nature, like the terminal's: a client id travels in every authorization request. `CLAUDE_CODE_APPLICATION_ID`
+# in the environment `vps`, and an argument of `scripts/claude-mcp.sh install`.
+output "claude_code_entra_client_id" {
+  value = azuread_application.claude_code.client_id
+}

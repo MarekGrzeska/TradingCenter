@@ -1,5 +1,5 @@
-"""Which caller may reach which surface. This package publishes REST alone: its tools are called as functions by the
-conversation in this process and never mounted, so nothing reaches them through this door."""
+"""Which caller may reach which surface: REST for the operator's screen, `/mcp` for the operator's own MCP client. The
+conversation calls the same tools as functions in this process and never passes this door."""
 
 from __future__ import annotations
 
@@ -54,7 +54,7 @@ REST_PATHS: tuple[str, ...] = (
 RECORD = Record(
     open_paths=OPEN_PATHS,
     rest_paths=REST_PATHS,
-    tools_prefix=None,
+    tools_prefix="/mcp",
     starting_detail="the strategy engine is still starting",
 )
 

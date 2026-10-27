@@ -33,6 +33,19 @@ provider: any machine that takes cloud-init user-data and runs Ubuntu 24.04 will
    comma-separated: a v1 token carries the first, a v2 token the second.
 5. Run `deploy-vps` by hand (`workflow_dispatch`) once.
 
+## Claude Code on production's tools
+
+Every tool surface — the workbench's `/<package>/mcp`, `/team-tools/mcp` and trading-mcp's `/trading/mcp` — answers the
+operator's own Claude Code and nothing else outside (`openspec/changes/operator-mcp-access`). Once, in this order:
+
+1. `terraform apply` in `infra/` — it creates `app-tradingcenter-claude-code` and pre-authorizes it on both APIs. **Read
+   the plan**: anything it wants to destroy besides what this change adds is drift to settle first.
+2. `CLAUDE_CODE_APPLICATION_ID` (`terraform output -raw claude_code_entra_client_id`) as a variable of the environment
+   `vps` — `fill-github-environment.sh` sets it. The deploy stops before sending anything while it is missing.
+3. After the deploy, on the operator's machine:
+   `uv run --script scripts/mcp_token.py login --tenant <tenant> --client-id <id>` (a browser; it prints the roles each
+   API sees), then `scripts/claude-mcp.sh install <API_HOST> <tenant> <id>` and `claude mcp list`.
+
 ## Backups
 
 The server dumps each database nightly and keeps 14 days; that protects against a bad migration, not against losing the

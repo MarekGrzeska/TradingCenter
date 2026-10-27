@@ -30,12 +30,14 @@ between them but arguments is the second route to condition 1.
   service key, the name a key-holder is given, the paths that need no proof (`exempt_paths`: a health probe, a handshake
   with its own ticket) and the ones whose handler checks the key itself (`key_paths`). Given directly or as a callable
   that returns `None` when the process is not a server and raises `LookupError` before its settings exist — a request
-  in that gap is refused with a 503, never admitted.
+  in that gap is refused with a 503, never admitted. `token_applications` lists the applications a token may have
+  been issued to, for a process with no caller record behind the door (trading-mcp); `None` admits any.
 
 ## What it does not do
 
 It does not decide who may reach what: that stays in each module's record. A valid token of an application nobody
-listed passes this layer and is refused by the record.
+listed passes this layer and is refused by the record — unless the process has no record and names its applications in
+`token_applications`.
 
 Not yet measured against recorded tokens from the real tenant — the tests sign with a generated key, the way Entra does
 (`tests/conftest.py`). `tasks.md` 1.4 keeps that open until the operator supplies a recorded pair.

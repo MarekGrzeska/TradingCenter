@@ -9,10 +9,11 @@ lifespan fills the package's `app.state`; this file only places the routes.
 from __future__ import annotations
 
 from fastapi import FastAPI
+from starlette.applications import Starlette
 from starlette.routing import Mount
 
 
-def mount_package(host: FastAPI, prefix: str, package_app: FastAPI) -> None:
+def mount_package(host: FastAPI, prefix: str, package_app: Starlette) -> None:
     """Place `package_app` under `prefix`. Refuses a prefix that is not one clean segment and a prefix already
     taken: two packages under one path would answer for each other's routes in mount order, silently."""
     if not prefix.startswith("/") or prefix == "/" or prefix.endswith("/") or "/" in prefix[1:]:

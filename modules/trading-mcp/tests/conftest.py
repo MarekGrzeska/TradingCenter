@@ -23,6 +23,9 @@ def _no_ambient_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         "TRADING_MCP_HOST",
         "REQUIRE_AUTHENTICATED_PRINCIPAL",
         "SERVER_MODE",
+        "EXTERNAL_CALLER_APPLICATION_IDS",
+        "ENTRA_TENANT_ID",
+        "ENTRA_AUDIENCES",
     ):
         monkeypatch.delenv(name, raising=False)
 

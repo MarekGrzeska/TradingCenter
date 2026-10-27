@@ -394,11 +394,17 @@ in would cross three arrows to say something simpler than any of them:
         │  trading-mcp                 │
         │  MCP tools · account · orders│
         └──────────────▲───────────────┘
-                       │ MCP (streamable HTTP) · exactly one named caller
+                       │ MCP (streamable HTTP) · two named callers
         ┌──────────────┴───────────────┐
-        │  workbench (teams surface)   │
-        └──────────────────────────────┘
+        │  workbench (teams surface)   │   and, from outside under `/trading/mcp`,
+        └──────────────────────────────┘   the operator's Claude Code
 ```
+
+The second caller came on 26 October 2026 (`operator-mcp-access`): the operator's own Claude Code, through the edge, with
+an Entra token for the **gateway's** API issued to `app-tradingcenter-claude-code`, for an `admin`. The list is still a
+list — `EXTERNAL_CALLER_APPLICATION_IDS`, checked by the door (`EdgeConfig.token_applications`) — and the workbench still
+comes with the key over the internal network. What the outside caller does not get is the conversation's trace in a
+database: its writes are two log lines each in `trading_mcp.trace`, before and after.
 
 A module of its own rather than a switch on something that reads. The archive's tools stay
 read-only to the letter, and the tool server that writes is a separate deployable with a

@@ -1,21 +1,30 @@
 """The team tools as the conversation's registry sees them, and the one thing that knows both `agent`'s tool-source
-protocol and `teams_tools`' registry: a drop-in `ToolServer`, always configured, never retried, raising nothing."""
+protocol and `teams_tools`' registry: a drop-in `ToolServer`, always configured, never retried, raising nothing. And the
+same tools under `/team-tools/mcp`, for the operator's own MCP client (`operator-mcp-access`)."""
 
 from __future__ import annotations
 
 import json
 import logging
 import time
+from contextlib import asynccontextmanager
 from typing import Any
 
+from mcp.server.fastmcp import FastMCP
 from mcp.server.fastmcp.exceptions import ToolError
-from starlette.types import ASGIApp
-from tc_runtime.caller_access import in_process
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse
+from starlette.routing import Mount
+from starlette.types import ASGIApp, Receive, Scope, Send
+from tc_mcp_kit.mounted_server import MOUNT_PATH, ToolSurfaceAddress, tool_surface_session
+from tc_runtime.caller_access import CallerAccess, Record, in_process
 
 from agent.tools import ToolDescriptor, ToolOutcome, ToolOutcomeKind
 from teams_tools.client import TeamsClient
 from teams_tools.operator import carrying
-from teams_tools.server import build_server, say_whose_name_the_tools_act_in
+from teams_tools.server import build_network_server, build_server, say_whose_name_the_tools_act_in
+
+from .config import Settings
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +44,10 @@ class LocalTeamsTools:
         )
         self._mcp = build_server(self._client)
         self._tools: list[ToolDescriptor] | None = None
+
+    def network_server(self) -> FastMCP:
+        """The same tools over the same client, for the network surface below."""
+        return build_network_server(self._client)
 
     async def aclose(self) -> None:
         await self._client.aclose()
@@ -96,3 +109,44 @@ def _text_of(result: Any) -> str:
     return "\n".join(
         block.text for block in result if getattr(block, "type", None) == "text"
     ).strip()
+
+
+# Tools alone: nothing here is REST, and nothing answers without an identity.
+SURFACE_RECORD = Record(
+    open_paths=frozenset(),
+    rest_paths=(),
+    tools_prefix=MOUNT_PATH,
+    starting_detail="the team tools are still starting",
+)
+
+
+def create_surface() -> Starlette:
+    """Mounted at import, under `/team-tools`; the server behind it is built in the lifespan, once the client it calls
+    through exists, and read off the state per request."""
+    surface = Starlette()
+    surface.router.routes.append(Mount(MOUNT_PATH, app=_ServerOnTheState(surface.state)))
+    # In this order, as in every package: the address fix runs before routing, and the caller record before that.
+    surface.add_middleware(ToolSurfaceAddress)
+    surface.add_middleware(CallerAccess, state=surface.state, record=SURFACE_RECORD)
+    return surface
+
+
+class _ServerOnTheState:
+    def __init__(self, state) -> None:
+        self._state = state
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        server = getattr(self._state, "mcp_server", None)
+        if server is None:
+            await JSONResponse({"detail": "the team tools are still starting"}, status_code=503)(scope, receive, send)
+            return
+        await server.session_manager.handle_request(scope, receive, send)
+
+
+@asynccontextmanager
+async def serving(surface: Starlette, tools: LocalTeamsTools, settings: Settings):
+    """`CallerAccess` reads the process's own tool list and principal requirement; with no REST path it reads nothing else."""
+    surface.state.mcp_server = tools.network_server()
+    surface.state.settings = settings
+    async with tool_surface_session(surface):
+        yield

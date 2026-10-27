@@ -6,7 +6,7 @@
 # edge marker the applications trust (`X-TC-Edge`) is only honest if every request from outside passes through Caddy.
 #
 # Three networks, because "internal" has two meanings here:
-#   edge      Caddy <-> the two applications it publishes.
+#   edge      Caddy <-> the three applications it publishes.
 #   services  the applications and trading-mcp, which reach one another by name with the shared key. A normal bridge:
 #             the gateway and the workbench have to reach capital.com, OpenAI, Telegram and the rest of the internet.
 #   data      PostgreSQL and whoever may talk to it. `internal: true` — no route out, and no route in from the host.
@@ -43,7 +43,7 @@ services:
       - caddy-data:/data
       - caddy-config:/config
     networks: [edge]
-    depends_on: [workbench, gateway]
+    depends_on: [workbench, gateway, trading-mcp]
 
   gateway:
     image: ${IMAGE_PREFIX:?}/capital-gateway:${GATEWAY_TAG:?}
@@ -82,6 +82,11 @@ services:
       CAPITAL_GATEWAY_API_KEY: ${GATEWAY_API_KEY:?}
       SERVER_MODE: "true"
       REQUIRE_AUTHENTICATED_PRINCIPAL: "true"
+      # From outside, under `/trading/mcp` on the API host: the operator's own MCP client alone, with a token for the
+      # gateway's API — the right to move the account is the gateway's `admin` (operator-mcp-access).
+      EXTERNAL_CALLER_APPLICATION_IDS: ${CLAUDE_CODE_APPLICATION_ID:?}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:?}
+      ENTRA_AUDIENCES: ${GATEWAY_ENTRA_AUDIENCES:?}
     depends_on:
       gateway:
         condition: service_healthy
@@ -91,7 +96,7 @@ services:
       timeout: 5s
       retries: 4
       start_period: 20s
-    networks: [services]
+    networks: [edge, services]
 
   workbench:
     image: ${IMAGE_PREFIX:?}/workbench:${WORKBENCH_TAG:?}
@@ -139,7 +144,8 @@ services:
       TEAMS_MODELS: ${TEAMS_MODELS:?}
       AGENT_DEFAULT_MODEL_ID: ${AGENT_DEFAULT_MODEL_ID:?}
 
-      TOOL_CALLER_APPLICATION_IDS: ""
+      # Every package's `/mcp` and `/team-tools/mcp`: the operator's own MCP client, nothing else (operator-mcp-access).
+      TOOL_CALLER_APPLICATION_IDS: ${CLAUDE_CODE_APPLICATION_ID:?}
       REST_CALLER_APPLICATION_IDS: ${TERMINAL_APPLICATION_ID:?},${POCKET_APPLICATION_ID:?}
       # Admitted to `/telegram`'s account, bots, recipients and assignments alone: the operator's `az` (a public Microsoft
       # client id) and the terminal, which is where the account is logged in and the purposes are assigned.

@@ -3,6 +3,7 @@ one test per thing a tool decides — the rules underneath are tested at their o
 
 from __future__ import annotations
 
+import base64
 import json
 
 import httpx
@@ -14,6 +15,7 @@ from strategies.app import create_app
 from strategies.compare import NotComparable, compare, count_problem
 from strategies.config import Settings
 from strategies.costs import CostModel
+from strategies.mcp_app import tool_surface_session
 from strategies.queue import RunQueue
 
 from .builders import run_in_state
@@ -91,11 +93,32 @@ async def test_the_surface_stays_under_its_ceiling() -> None:
     assert len(surface) <= SURFACE_CEILING_CHARS, len(surface)
 
 
-async def test_the_tools_are_not_served_over_the_network() -> None:
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=_app()), base_url="http://t") as client:
-        answered = await client.post("/mcp/", json={})
+def _principal(application: str) -> dict[str, str]:
+    blob = base64.b64encode(json.dumps({"claims": [{"typ": "azp", "val": application}]}).encode()).decode()
+    return {"X-MS-CLIENT-PRINCIPAL": blob}
 
-    assert answered.status_code in {403, 404}
+
+@pytest.mark.parametrize(("application", "refused"), [("operator-mcp-client", False), ("terminal", True)])
+async def test_the_tools_are_served_over_the_network_to_a_listed_caller_alone(application: str, refused: bool) -> None:
+    app = _app()
+    app.state.settings = Settings(
+        database_url="postgresql://localhost/x",
+        require_authenticated_principal=True,
+        tool_caller_application_ids="operator-mcp-client",
+        rest_caller_application_ids="terminal",
+        _env_file=None,  # type: ignore[call-arg]
+    )
+    async with (
+        tool_surface_session(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as client,
+    ):
+        answered = await client.post(
+            "/mcp",
+            headers={**_principal(application), "Accept": "application/json, text/event-stream"},
+            json={"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+        )
+
+    assert (answered.status_code == 403) is refused
 
 
 @pytest.mark.db

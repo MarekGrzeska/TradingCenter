@@ -1,0 +1,406 @@
+<title>Claude Code na narzędziach produkcji</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  ol.steps { margin: 0 0 16px; padding-left: 22px; max-width: 74ch; }
+  ol.steps li { margin-bottom: 12px; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Raport implementacji · operator-mcp-access</span>
+    <h1>Claude Code na narzędziach produkcji</h1>
+    <p class="lede">Każda powierzchnia MCP produkcji odpowiada teraz <b>jednemu klientowi z zewnątrz</b>: Twojemu Claude Code. Przechodzi on przez trzy kontrole: token Entra, rolę <code>admin</code> i aplikację z listy. Kod, testy i Terraform czekają na gałęzi, <b>niezmergowane i niewdrożone</b>.</p>
+    <div class="strip">
+      <span>TradingCenter / openspec/changes/operator-mcp-access</span>
+      <span>26 października 2026</span>
+      <span>gałąź <b>feat/operator-mcp-access</b></span>
+      <span>stan: <b>gotowe do merge</b> po kroku operatora</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">9</div><div class="l">serwerów MCP dostępnych z Claude Code</div></div>
+      <div class="cell"><div class="v">82</div><div class="l">narzędzia za nimi, z czego część zapisuje</div></div>
+      <div class="cell"><div class="v">3</div><div class="l">kontrole: token · rola · aplikacja</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">merge'ów i wdrożeń</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Droga</div>
+      <h2>Od Claude Code do narzędzia</h2>
+      <p class="intro">Claude Code nie loguje się sam. Przed każdym połączeniem uruchamia <code>scripts/mcp_token.py headers</code>. Skrypt bierze token z pamięci podręcznej MSAL (Keychain) i wypisuje nagłówek <code>Authorization</code>. Krawędź (Caddy) tylko kieruje ruch i dopisuje znacznik <code>X-TC-Edge</code>. O tym, kto wchodzi, rozstrzyga sam proces.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 300" role="img" aria-label="Claude Code z helperem tokenu idzie przez Caddy na hoście API; ścieżki pakietów trafiają do workbencha, ścieżka /trading do trading-mcp, który woła bramę">
+            <defs>
+              <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="12" y="110" width="160" height="70" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="92" y="138" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Claude Code</text>
+              <text x="92" y="158" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">headersHelper</text>
+
+              <rect x="12" y="10" width="160" height="56" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="92" y="34" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Entra</text>
+              <text x="92" y="52" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">claude-code app</text>
+              <line x1="92" y1="108" x2="92" y2="70" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="100" y="92" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">mcp_token.py</text>
+
+              <rect x="250" y="110" width="170" height="70" fill="#14306b" stroke="#14306b"></rect>
+              <text x="335" y="138" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">Caddy · API_HOST</text>
+              <text x="335" y="158" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#f2c313">X-TC-Edge: 1</text>
+              <line x1="174" y1="145" x2="246" y2="145" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="210" y="136" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">Bearer</text>
+
+              <rect x="510" y="40" width="250" height="96" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="635" y="64" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">workbench</text>
+              <text x="635" y="84" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">/market /polymarket /social</text>
+              <text x="635" y="100" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">/telegram /youtube /alerts</text>
+              <text x="635" y="116" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">/strategies /team-tools  → /mcp</text>
+              <line x1="422" y1="135" x2="506" y2="95" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="458" y="100" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">aud: workbench</text>
+
+              <rect x="510" y="190" width="250" height="70" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="635" y="218" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">trading-mcp</text>
+              <text x="635" y="238" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">/trading/mcp → /mcp · ślad w logu</text>
+              <line x1="422" y1="160" x2="506" y2="215" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="458" y="212" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">aud: brama</text>
+
+              <rect x="830" y="190" width="140" height="70" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="900" y="218" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">gateway</text>
+              <text x="900" y="238" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">demo</text>
+              <line x1="762" y1="225" x2="826" y2="225" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="794" y="216" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">klucz</text>
+
+              <line x1="635" y1="138" x2="635" y2="186" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#a1)"></line>
+              <text x="645" y="166" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.55">rozmowa · klucz (bez zmian)</text>
+
+              <rect x="250" y="250" width="170" height="22" fill="#f2c313"></rect>
+              <text x="335" y="265" text-anchor="middle" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#14306b" letter-spacing="0.06em">GATEWAY_HOST: /mcp → 404</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — jedna droga z zewnątrz. Workbench przyjmuje token wydany dla swojego API, trading-mcp tylko token wydany dla API bramy, więc token workbencha nie otwiera handlu. Rozmowa w terminalu dalej woła trading-mcp kluczem przez sieć wewnętrzną.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Powierzchnie</div>
+      <h2>Dziewięć serwerów, jedna lista</h2>
+      <p>Każdy wiersz to jeden wpis w <code>claude mcp list</code> po <code>scripts/claude-mcp.sh install</code>. Wszystkie sprawdzają tę samą aplikację: <code>TOOL_CALLER_APPLICATION_IDS</code> w workbenchu i <code>EXTERNAL_CALLER_APPLICATION_IDS</code> w trading-mcp. Obie zmienne biorą wartość z <code>CLAUDE_CODE_APPLICATION_ID</code>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Serwer w Claude Code</th><th>Adres</th><th class="n">Narzędzia</th><th>Token dla</th><th>Co było wcześniej</th><th>Zapis</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>tc-market</b></td><td><code>/market/mcp</code></td><td class="n">11</td><td>workbench</td><td>montowane, 404 na krawędzi</td><td><span class="tag ok">tylko odczyt</span></td></tr>
+            <tr><td><b>tc-polymarket</b></td><td><code>/polymarket/mcp</code></td><td class="n">12</td><td>workbench</td><td>montowane, 404 na krawędzi</td><td><span class="tag att">lista obserwacji</span></td></tr>
+            <tr><td><b>tc-social</b></td><td><code>/social/mcp</code></td><td class="n">4</td><td>workbench</td><td>montowane, 404 na krawędzi</td><td><span class="tag ok">tylko odczyt</span></td></tr>
+            <tr><td><b>tc-telegram</b></td><td><code>/telegram/mcp</code></td><td class="n">2</td><td>workbench</td><td>montowane, 404 na krawędzi</td><td><span class="tag stop">wysyła do ludzi</span></td></tr>
+            <tr><td><b>tc-youtube</b></td><td><code>/youtube/mcp</code></td><td class="n">8</td><td>workbench</td><td>montowane, 404 na krawędzi</td><td><span class="tag att">obserwacje</span></td></tr>
+            <tr><td><b>tc-alerts</b></td><td><code>/alerts/mcp</code></td><td class="n">3</td><td>workbench</td><td>montowane, 404 na krawędzi</td><td><span class="tag ok">propozycja, nie reguła</span></td></tr>
+            <tr><td><b>tc-strategies</b></td><td><code>/strategies/mcp</code></td><td class="n">12</td><td>workbench</td><td><b>nowe</b>: wcześniej bez transportu (D7)</td><td><span class="tag att">rewizje, backtesty</span></td></tr>
+            <tr><td><b>tc-team-tools</b></td><td><code>/team-tools/mcp</code></td><td class="n">18</td><td>workbench</td><td><b>nowe</b>: wcześniej tylko funkcje rozmowy</td><td><span class="tag att">zespoły, przebiegi, koszty</span></td></tr>
+            <tr><td><b>tc-trading</b></td><td><code>/trading/mcp</code></td><td class="n">12</td><td><b>brama</b></td><td><b>nowe</b>: wcześniej tylko sieć wewnętrzna</td><td><span class="tag stop">rachunek demo</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Rola <code>viewer</code> nie otwiera żadnego z nich, bo blokuje ją segment <code>mcp</code> w <code>RolePolicy</code>. Token terminala ani pocketu też żadnego nie otwiera: ich aplikacji nie ma na liście narzędziowej.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Decyzje</div>
+      <h2>Co wybrałem i dlaczego</h2>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>D1 · <code>headersHelper</code> zamiast wbudowanego OAuth <span class="tag ok">działa dziś</span></h3>
+          <p>Wbudowany OAuth Claude Code nie działa z Entra z dwóch powodów. Entra nie ma dynamicznej rejestracji klientów, a endpoint v2 odrzuca parametr <code>resource</code>, który wysyła Claude Code (AADSTS9010010, anthropics/claude-code#52871). Helper z MSAL omija oba problemy. Serwer nie musi przy tym publikować metadanych OAuth.</p>
+        </div>
+        <div class="fail ok">
+          <h3>D1 · Własna rejestracja, nie <code>az</code> <span class="tag ok">listy po aplikacji</span></h3>
+          <p>Rejestracja <code>app-tradingcenter-claude-code</code> to klient publiczny pre-autoryzowany na obu API. <code>az</code> działałby bez Terraform, ale dostałby wtedy każde narzędzie, a log nie odróżniłby go od administrowania Telegramem. Odebranie dostępu Claude Code odbierałoby też ten drugi.</p>
+        </div>
+        <div class="fail ok">
+          <h3>D2 · trading-mcp pod <code>/trading</code> na hoście API, z audiencją bramy <span class="tag ok">bez DNS</span></h3>
+          <p>Nie trzeba nowego hosta ani certyfikatu. Prawo do ruszania rachunku to <code>admin</code> na API bramy, to samo, którego terminal potrzebuje do zakładki z rachunkiem.</p>
+        </div>
+        <div class="fail ok">
+          <h3>D3 · <code>EdgeConfig.token_applications</code> <span class="tag ok">raz, w pakiecie</span></h3>
+          <p>trading-mcp nie ma rekordu dostępu jak pakiety workbencha, więc lista wyliczonych aplikacji siedzi w drzwiach (<code>tc-entra-auth</code>). Pole jest domyślnie <code>None</code>, więc brama i workbench działają jak dotąd.</p>
+        </div>
+        <div class="fail">
+          <h3>D4 · Zapisy z zewnątrz z śladem w logu <span class="tag att">słabszy niż baza</span></h3>
+          <p>Rozmowa trzyma ślad zlecenia w bazie, a Claude Code omija rozmowę. trading-mcp nie ma bazy, więc zapisuje dwa wpisy <code>trading_mcp.trace</code>: przed wysłaniem i ze skutkiem, z aplikacją i osobą. Logi rotują (5 × 10 MB). Drugim śladem jest transkrypt Claude Code.</p>
+        </div>
+        <div class="fail ok">
+          <h3>D5 · Osoba ustawiana w <code>call_tool</code>, nie w middleware <span class="tag ok">zmierzone</span></h3>
+          <p>W stanowym streamable-http narzędzie wykonuje się w zadaniu sesji, a nie żądania. Zmienna kontekstowa ustawiona wokół żądania HTTP tam nie dotrze. Podklasa FastMCP czyta więc osobę z żądania bieżącego wywołania. Test przechodzi przez prawdziwą sesję, a <code>claude -p</code> dostał <code>asked_by: person-from-token</code>.</p>
+        </div>
+        <div class="fail ok">
+          <h3>D6 · Strategie zamontowane jak reszta <span class="tag ok">odwraca D7</span></h3>
+          <p>Jedynym powodem D7 było to, że operator nie ma klienta MCP. Teraz go ma. Zespoły dalej dostają tylko trzy narzędzia do odczytu. Backtest zlecony z Claude Code jest backtestem agenta, z tym samym limitem jednego naraz i tym samym licznikiem prób.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Weryfikacja</div>
+      <h2>Co faktycznie uruchomiłem</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Co</th><th>Komenda</th><th>Wynik</th></tr></thead>
+          <tbody>
+            <tr><td><b>tc-entra-auth</b></td><td><code>uv run pytest</code> · ruff · pyright</td><td><span class="tag ok">68 passed · 0 errors</span></td></tr>
+            <tr><td><b>tc-mcp-kit</b></td><td><code>uv run pytest</code> · ruff · pyright</td><td><span class="tag ok">29 passed · 0 errors</span></td></tr>
+            <tr><td><b>trading-mcp</b></td><td><code>uv run pytest</code> · ruff · pyright</td><td><span class="tag ok">114 passed · 0 errors</span></td></tr>
+            <tr><td><b>workbench</b> (z <code>db</code>)</td><td><code>uv run pytest</code> · ruff · pyright</td><td><span class="tag ok">3352 passed, 11 skipped</span></td></tr>
+            <tr><td><b>capital-gateway</b></td><td><code>uv run pytest</code></td><td><span class="tag ok">269 passed</span></td></tr>
+            <tr><td><b>scripts</b></td><td><code>uv run pytest</code> · ruff · pyright</td><td><span class="tag ok">220 passed</span></td></tr>
+            <tr><td><b>kontrakty</b></td><td>terminal i pocket <code>contract:check</code></td><td><span class="tag ok">aktualne</span></td></tr>
+            <tr><td><b>Caddy</b></td><td><code>caddy validate</code> i przebieg w Dockerze z serwerami echo</td><td><span class="tag ok">/trading/mcp → /mcp · brama /mcp → 404</span></td></tr>
+            <tr><td><b>Claude Code</b></td><td><code>claude mcp list</code> i <code>claude -p</code> na lokalnym hoście zastępczym</td><td><span class="tag ok">✔ Connected · osoba dotarła</span></td></tr>
+            <tr><td><b>Terraform</b></td><td><code>validate</code> · <code>plan -lock=false</code></td><td><span class="tag stop">4 add · 2 destroy (dryf)</span></td></tr>
+            <tr><td><b>OpenSpec</b></td><td><code>openspec validate operator-mcp-access --strict</code></td><td><span class="tag ok">valid</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px"><strong>Code review 27.10</strong> znalazło dziesięć uwag, siedem jest poprawionych, a liczby powyżej są już po poprawkach. Najważniejsze: <code>fill-github-environment.sh</code> zgubił dosłowny CR w <code>tr -d</code>; ślad zapisu nie zapisywał skutku przy anulowaniu albo nieczytelnej odpowiedzi; helper zgadywał API z adresu, a teraz dostaje <code>--api</code> przy rejestracji serwera. Pełna tabela jest w <code>openspec/changes/operator-mcp-access/review.md</code>.</p>
+      <p style="margin-top:16px">Na prawdziwym tenancie <strong>nic nie było mierzone</strong>, bo rejestracja Entra powstanie dopiero przy <code>apply</code>. Pierwszym pomiarem jest <code>mcp_token.py login</code>, który wypisuje role widziane w obu API.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Twój ruch</div>
+      <h2>Rano, w tej kolejności</h2>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Najpierw dryf w Terraform <span class="tag stop">przed apply</span></h3>
+          <p><code>terraform plan</code> chce zniszczyć <code>admin_workbench</code> i <code>admin_gateway</code> dla osoby <code>73c09587-…</code>. Osoba ta ma rolę admin w stanie, a nie ma jej w Twoim lokalnym <code>terraform.tfvars</code> (<code>admin_user_object_ids</code>). Zwykłe <code>apply</code> odebrałoby jej rolę. Dopisz ją do tfvars albo zastosuj tylko nowe zasoby przez <code>-target</code> (komenda niżej).</p>
+        </div>
+      </div>
+      <ol class="steps" style="margin-top:20px">
+        <li>Przejrzyj gałąź: <code>git log main..feat/operator-mcp-access</code>, <code>openspec/changes/operator-mcp-access/</code> (proposal, design, specs, review).</li>
+        <li><code>terraform apply</code> w <code>infra/</code>. Bez rozstrzygniętego dryfu zastosuj tylko nowe zasoby:
+<pre><code>terraform apply \
+  -target=azuread_application.claude_code \
+  -target=azuread_service_principal.claude_code \
+  -target=azuread_application_pre_authorized.workbench_claude_code \
+  -target=azuread_application_pre_authorized.gateway_claude_code</code></pre></li>
+        <li>Zmienna środowiska <code>vps</code>: <code>CLAUDE_CODE_APPLICATION_ID</code> = <code>terraform output -raw claude_code_entra_client_id</code>. Ustawi ją też <code>deploy/scripts/fill-github-environment.sh</code>. Bez niej deploy zatrzyma się przed wysłaniem czegokolwiek.</li>
+        <li>Push, PR, merge. Po merge: <code>deploy-watch</code>.</li>
+        <li>U siebie:
+<pre><code>uv run --script scripts/mcp_token.py login --tenant &lt;tenant&gt; --client-id &lt;id&gt;
+scripts/claude-mcp.sh install &lt;API_HOST&gt; &lt;tenant&gt; &lt;id&gt;
+claude mcp list</code></pre></li>
+      </ol>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Pułapki</div>
+      <h2>Co może zaskoczyć</h2>
+      <div class="fails">
+        <div class="fail">
+          <h3>„Dynamic Client Registration rejected (HTTP 401)” <span class="tag att">to nie awaria serwera</span></h3>
+          <p>Tak Claude Code pokazuje helper, który odmówił, czyli brak zalogowania albo token odświeżania wygasły po około 90 dniach bez użycia. Rozwiązanie: <code>mcp_token.py login</code>. Helper nigdy nie loguje się sam, bo Claude Code daje mu 10 sekund.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Zapisy na rachunku bez śladu w bazie <span class="tag stop">nie dopisuj do allowlisty</span></h3>
+          <p><code>place_order</code>, <code>close_position</code>, <code>switch_active_account</code> (zrywa strumień notowań archiwum) i <code>send_telegram_message</code> powinny zostać poza listą uprawnień Claude Code. Wtedy klient pyta za każdym razem.</p>
+        </div>
+        <div class="fail">
+          <h3>Brak sufitu wywołań w turze <span class="tag att">obserwować</span></h3>
+          <p>Sufit wywołań narzędzi z rozmowy nie obowiązuje Claude Code. Jedno wywołanie kosztuje bazę tyle samo co z rozmowy, ale pętla agenta może wołać częściej. Warto zajrzeć do <code>prod-health</code> po tygodniu.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Znalezione i naprawione przed commitem <span class="tag ok">fixed</span></h3>
+          <p>trading-mcp nie konfigurował logowania, więc każdy wpis INFO, w tym cały ślad zapisów, ginął na produkcji. Drugi problem: krok workflow wylicza nazwy zmiennych jawnie i nie podałby nowej. Wyłapał to <code>test_assemble_env</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Pliki</div>
+      <h2>Gdzie co leży</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Obszar</th><th>Pliki</th><th>Co</th></tr></thead>
+          <tbody>
+            <tr><td><b>Krawędź</b></td><td><code>deploy/Caddyfile</code>, <code>deploy/docker-compose.yml</code>, <code>deploy/env.required</code>, <code>.github/workflows/deploy-vps.yml</code>, <code>deploy/scripts/fill-github-environment.sh</code></td><td>API_HOST niesie <code>/mcp</code>; <code>/trading/*</code> → trading-mcp w sieci <code>edge</code>; nowa zmienna</td></tr>
+            <tr><td><b>Entra</b></td><td><code>infra/entra.tf</code></td><td>rejestracja, SP, dwie pre-autoryzacje, output</td></tr>
+            <tr><td><b>Drzwi</b></td><td><code>packages/tc-entra-auth/tc_entra_auth/edge.py</code></td><td><code>token_applications</code></td></tr>
+            <tr><td><b>trading-mcp</b></td><td><code>config.py</code>, <code>server.py</code>, <code>trace.py</code>, <code>tools/_shared.py</code>, <code>__main__.py</code></td><td>zewnętrzni wołający, weryfikator, ślad, logowanie</td></tr>
+            <tr><td><b>Strategie</b></td><td><code>strategies/app.py</code>, <code>mcp_app.py</code>, <code>caller_access.py</code>, <code>config.py</code></td><td>montaż <code>/mcp</code> i lista</td></tr>
+            <tr><td><b>Zespoły</b></td><td><code>teams_tools/server.py</code>, <code>workbench/team_tools.py</code>, <code>workbench/app.py</code></td><td>serwer sieciowy, który działa w imieniu osoby; montaż <code>/team-tools</code></td></tr>
+            <tr><td><b>Operator</b></td><td><code>scripts/mcp_token.py</code>, <code>scripts/claude-mcp.sh</code></td><td>token i rejestracja serwerów w Claude Code</td></tr>
+            <tr><td><b>Testy</b></td><td><code>test_external_callers.py</code>, <code>test_team_tools_surface.py</code>, <code>test_mcp_token.py</code> i rozszerzenia istniejących</td><td>drzwi, osoba w sesji, ślad, krawędź</td></tr>
+            <tr><td><b>Opis</b></td><td><code>CLAUDE.md</code>, <code>deploy/README.md</code>, <code>docs/architecture.md</code>, README pakietów</td><td>nowa pułapka i ścieżka zleceń</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>operator-mcp-access · raport implementacji</span>
+    <span>26.10.2026 · gałąź feat/operator-mcp-access, niezmergowana</span>
+  </div>
+</footer>
