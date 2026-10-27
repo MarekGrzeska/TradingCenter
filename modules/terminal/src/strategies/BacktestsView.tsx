@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router";
 import { agentActivity, type AgentActivityStore } from "../agent/agentActivity";
 import { resolveEndpoints } from "../data/config";
@@ -103,6 +103,18 @@ export function BacktestsView({
   );
 
   const run = runs.value.find((r) => r.id === pickedRun) ?? null;
+  // An open report takes the list's place rather than landing under it; the list stays mounted, hidden, so its order,
+  // ticks and scroll come back with it.
+  const reportOpen = run !== null;
+  const scroller = useRef<HTMLElement>(null);
+  const listScroll = useRef(0);
+  useLayoutEffect(() => {
+    if (scroller.current) scroller.current.scrollTop = reportOpen ? 0 : listScroll.current;
+  }, [reportOpen]);
+  const openRun = (id: number) => {
+    listScroll.current = scroller.current?.scrollTop ?? 0;
+    setPickedRun(id);
+  };
   // The report is drawn on the chart of the strategy the run is of, at the revision it was made of.
   const ofRun = useRead<Revision | null>({
     key: ["strategies", "revision", run?.strategyId, run?.revision],
@@ -169,7 +181,7 @@ export function BacktestsView({
   const runDocument = ofRun.value?.document as { symbol?: string; timeframe?: string } | undefined;
 
   return (
-    <section className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-3">
+    <section ref={scroller} className="flex h-full min-h-0 flex-col gap-3 overflow-y-auto p-3">
       <header className="flex flex-wrap items-center gap-3">
         {picked !== null && (
           <BackButton
@@ -212,6 +224,7 @@ export function BacktestsView({
         </p>
       )}
 
+      <div hidden={reportOpen} className="contents">
       {picked === null ? (
         <p className="text-sm text-ink-muted">Wybierz strategię, żeby uruchomić backtest. Poniżej uruchomienia wszystkich strategii.</p>
       ) : (
@@ -275,7 +288,7 @@ export function BacktestsView({
         onSelect={toggleSelected}
         error={runs.error}
         picked={pickedRun}
-        onPick={setPickedRun}
+        onPick={openRun}
         strategyNames={picked === null ? names : undefined}
         onCancel={async (id) => {
           setFailure(null);
@@ -287,8 +300,11 @@ export function BacktestsView({
           }
         }}
       />
-      {run !== null && runDocument !== undefined && (
-        <BackButton label="Uruchomienia" size="xs" onClick={() => setPickedRun(null)} />
+      </div>
+      {run !== null && (
+        <div>
+          <BackButton label="Uruchomienia" size="xs" onClick={() => setPickedRun(null)} />
+        </div>
       )}
       {run !== null && runDocument !== undefined && (
         <ReportPanel

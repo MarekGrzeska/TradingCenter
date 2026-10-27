@@ -189,6 +189,16 @@ describe("BacktestsView", () => {
     expect(ids).toEqual(["Zaznacz uruchomienie 22", "Zaznacz uruchomienie 23", "Zaznacz uruchomienie 21"]);
   });
 
+  it("opens a run's report in place of the list, and gives the list back", async () => {
+    view(fakeApi({ revision: vi.fn(async () => Promise.reject(new Error("down"))) }));
+
+    await userEvent.click(await screen.findByRole("cell", { name: "#11" }));
+
+    expect(screen.getByRole("table", { name: "Uruchomienia", hidden: true })).not.toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "← Uruchomienia" }));
+    expect(screen.getByRole("table", { name: "Uruchomienia" })).toBeVisible();
+  });
+
   it("lets no run in progress be ticked, for comparing or deleting", async () => {
     view(fakeApi({ runs: vi.fn(async () => [run(11, 7), { ...run(13, 7), status: "running" as const }]) }));
 
