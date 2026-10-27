@@ -14,7 +14,7 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { afterTurn, createdDuringTurn, documentText } from "./followTurn";
 import { HistoryPanel } from "./HistoryPanel";
-import { interval } from "./present";
+import { trials } from "./order";
 import {
   createStrategiesApi,
   Refused,
@@ -29,6 +29,7 @@ import {
 import { StrategyChat } from "./StrategyChat";
 import { createStrategyChatStore } from "./strategyChatStore";
 import { StrategyEditor } from "./StrategyEditor";
+import { StrategyList } from "./StrategyList";
 import { SummaryPanel } from "./SummaryPanel";
 import { useLiveValidation } from "./useLiveValidation";
 
@@ -69,6 +70,7 @@ export function StrategiesView({
   const chat = useMemo(() => chatStore ?? createStrategyChatStore(activity), [chatStore, activity]);
   const chatOwner = useRef<ChatOwner>(null);
   const [archived, setArchived] = useState(false);
+  const [query, setQuery] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
   const [base, setBase] = useState<Revision | null>(null);
@@ -331,9 +333,17 @@ export function StrategiesView({
 
   return (
     <section className="flex h-full min-h-0 gap-3 p-3">
-      <aside aria-label="Strategie" className="flex w-60 shrink-0 flex-col gap-2 overflow-y-auto">
-        <div className="flex items-center gap-2">
+      <aside
+        aria-label="Strategie"
+        className={
+          editing
+            ? "flex w-72 shrink-0 flex-col gap-2 overflow-y-auto border-r border-border pr-3"
+            : "mx-auto flex w-full max-w-[110rem] min-w-0 flex-col gap-3 overflow-y-auto"
+        }
+      >
+        <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-base font-semibold text-ink">Strategie</h1>
+          {list.status === "ready" && <span className="text-xs text-ink-faint">{list.value.length}</span>}
           <Button
             size="xs"
             tone="primary"
@@ -352,45 +362,40 @@ export function StrategiesView({
           >
             Nowa…
           </Button>
+          {!editing && (
+            <span className="text-xs text-ink-muted">Otwórz strategię albo kliknij „Nowa…” i opisz ją w czacie obok edytora.</span>
+          )}
         </div>
-        <label className="flex items-center gap-1 text-xs text-ink-muted">
-          <input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} /> zarchiwizowane
-        </label>
+        <div className={`flex items-center gap-3 text-xs ${editing ? "flex-wrap" : ""}`}>
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="szukaj w nazwach"
+            aria-label="szukaj strategii"
+            className={`${editing ? "w-full" : "w-72"} rounded border border-border bg-panel px-2 py-1 text-ink placeholder:text-ink-faint`}
+          />
+          <label className="flex items-center gap-1 text-ink-muted">
+            <input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} /> zarchiwizowane
+          </label>
+        </div>
         {health.error !== null && <UnreachableNotice onRetry={health.reload}>{health.error}</UnreachableNotice>}
         {list.error !== null && <p className="text-xs text-critical">{list.error}</p>}
         {list.status === "ready" && list.value.length === 0 && (
           <p className="text-xs text-ink-muted">{archived ? "Nic nie jest zarchiwizowane." : "Nie ma jeszcze strategii."}</p>
         )}
-        <ul className="space-y-1">
-          {list.value.map((s) => (
-            <li key={s.id}>
-              <button
-                type="button"
-                onClick={() => void open(s.id)}
-                className={`w-full rounded px-2 py-1 text-left text-xs ${s.id === openId ? "bg-panel-strong text-ink" : "text-ink-secondary hover:bg-panel"}`}
-              >
-                <span className="block font-semibold text-ink">{s.name}</span>
-                {s.symbol} · {interval(s.timeframe)} · rew. {s.latestRevision} ({s.latestAuthor === "agent" ? "agent" : "operator"}) ·{" "}
-                {s.trials} {s.trials === 1 ? "próba" : "prób"}
-              </button>
-            </li>
-          ))}
-        </ul>
+        <StrategyList strategies={list.value} query={query} openId={openId} wide={!editing} onOpen={(id) => void open(id)} />
       </aside>
 
+      {editing && (
       <div className="flex min-w-0 flex-1 flex-col gap-3 overflow-y-auto">
-        {!editing ? (
-          <p className="text-sm text-ink-muted">
-            Wybierz strategię z listy albo kliknij „Nowa…” i opisz ją w czacie obok edytora.
-          </p>
-        ) : (
           <>
             <header className="flex flex-wrap items-center gap-2">
               <BackButton label="Strategie" size="xs" onClick={() => (dirty ? setLeaving(true) : closeEditor())} />
               <h2 className="text-sm font-semibold text-ink">
                 {base === null ? "Nowa strategia" : `${open_?.name ?? ""} · rewizja ${base.n} (${base.author === "agent" ? "agent" : "operator"})`}
               </h2>
-              {open_ !== null && <span className="text-xs text-ink-faint">{open_.trials} prób</span>}
+              {open_ !== null && <span className="text-xs text-ink-faint">{trials(open_.trials)}</span>}
               {dirty && <span className="text-xs text-warning">niezapisane zmiany</span>}
               <Button size="xs" tone="primary" disabled={!valid || !dirty || saving} onClick={() => void save()}>
                 Zapisz
@@ -458,8 +463,8 @@ export function StrategiesView({
               </>
             )}
           </>
-        )}
       </div>
+      )}
       {leaving && (
         <ConfirmDialog
           title="Niezapisane zmiany"
