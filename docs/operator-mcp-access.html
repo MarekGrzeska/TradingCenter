@@ -371,9 +371,9 @@ claude mcp list</code></pre>
           <h3>Dryf w Terraform <span class="tag ok">rozstrzygnięty 27.10</span></h3>
           <p><code>73c09587-…</code> to Twoje konto Gmail, gość w tenancie, z rolą <code>admin</code> nadaną przy zmianie <code>admin-panel-users-and-roles</code>. Lokalny <code>terraform.tfvars</code> nie miał go w <code>admin_user_object_ids</code>, więc pełny <code>apply</code> odebrałby mu rolę. Po dopisaniu <code>terraform plan</code> mówi „No changes”. Plik jest poza gitem, więc na innej maszynie z Terraform trzeba dopisać to samo. CI nie ma tej zmiennej, ale też nigdy nie robi <code>apply</code>.</p>
         </div>
-        <div class="fail">
-          <h3>Job <code>plan</code> w CI <span class="tag att">raz</span></h3>
-          <p><code>terraform.yml</code> pada na każdym PR z <code>infra/</code> od 19.10: tożsamość CI nie może odczytać istniejącego delegated permission grant (<code>Retrieving Delegated Permission Grant</code>). Bez ochrony gałęzi niczego to nie blokuje, ale plan w PR jest przez to bezużyteczny. Brakuje uprawnienia Graph do odczytu grantów dla aplikacji CI.</p>
+        <div class="fail ok">
+          <h3>Job <code>plan</code> w CI <span class="tag ok">naprawiony 27.10</span></h3>
+          <p>Tożsamość CI dostała uprawnienie Graph <code>DelegatedPermissionGrant.Read.All</code>, tylko do odczytu, a CI dostał listę adminów (<code>TF_VAR_ADMIN_USER_OBJECT_IDS</code>). Na PR #394 <code>plan</code> przeszedł pierwszy raz od 19.10, z wynikiem „No changes”. Zmiana OpenSpec <code>ci-terraform-plan-reads-grants</code> jest zarchiwizowana.</p>
         </div>
         <div class="fail">
           <h3>Archiwizacja zmiany OpenSpec <span class="tag att">raz</span></h3>
