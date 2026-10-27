@@ -311,3 +311,27 @@ async def test_a_created_team_is_reported_as_created_even_if_reading_it_back_fai
     assert "Do not create it again" in structured["note"]
     assert structured["agents"] == ["scout"]
     await teams.aclose()
+
+
+@respx.mock
+async def test_rename_team_sends_only_what_was_named(server) -> None:
+    mcp, teams = server
+    renamed = respx.patch(f"{BASE}/teams/4").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "id": 4,
+                "name": "desk",
+                "description": "new",
+                "latest_revision": 3,
+                "created_at": "2026-08-17T00:00:00Z",
+                "updated_at": "2026-08-17T00:00:00Z",
+            },
+        )
+    )
+
+    _content, structured = await mcp.call_tool("rename_team", {"team_id": 4, "description": "new"})
+
+    assert json.loads(renamed.calls.last.request.read()) == {"name": None, "description": "new"}
+    assert structured["description"] == "new"
+    await teams.aclose()

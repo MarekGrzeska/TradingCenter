@@ -11,6 +11,7 @@ from .. import store
 from ..auth import current_principal
 from ..contract import (
     CreateTeamIn,
+    RenameTeamIn,
     SaveLayoutIn,
     SaveRevisionIn,
     TeamDefinition,
@@ -72,6 +73,23 @@ async def get_team(
 ) -> TeamOut:
     async with request.app.state.teams.pool.acquire() as conn:
         row = await store.get_team(conn, team_id=team_id, owner_principal=owner)
+    if row is None:
+        raise HTTPException(404, detail="no such team")
+    return TeamOut.from_row(dict(row))
+
+
+@router.patch("/teams/{team_id}")
+async def rename_team(
+    team_id: int, body: RenameTeamIn, request: Request, owner: str = Depends(current_principal)
+) -> TeamOut:
+    async with request.app.state.teams.pool.acquire() as conn:
+        row = await store.rename_team(
+            conn,
+            team_id=team_id,
+            owner_principal=owner,
+            name=body.name,
+            description=body.description,
+        )
     if row is None:
         raise HTTPException(404, detail="no such team")
     return TeamOut.from_row(dict(row))

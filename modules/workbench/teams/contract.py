@@ -277,6 +277,18 @@ class CreateTeamIn(BaseModel):
         return collapsed
 
 
+class RenameTeamIn(BaseModel):
+    """Not a revision: a run's trace names the definition it ran, never the label the catalogue shows."""
+
+    name: str | None = None
+    description: str | None = None
+
+    @field_validator("name")
+    @classmethod
+    def _name_not_blank(cls, value: str | None) -> str | None:
+        return None if value is None else CreateTeamIn._name_not_blank(value)
+
+
 class SaveRevisionIn(BaseModel):
     definition: TeamDefinition
 

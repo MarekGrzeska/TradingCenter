@@ -12,6 +12,7 @@ from .catalogue import (
     get_team,
     list_teams,
     move_revisions_to_successors,
+    rename_team,
     save_revision,
 )
 from .fires import (
@@ -130,6 +131,7 @@ __all__ = [
     "record_trade",
     "record_trigger_check",
     "record_usage",
+    "rename_team",
     "reset_schedule_failures",
     "reset_trigger_failures",
     "save_layout",

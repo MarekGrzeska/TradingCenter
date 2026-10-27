@@ -53,6 +53,9 @@ class TeamsClient:
     async def put(self, path: str, *, token: str | None, json: dict | None = None) -> Any:
         return await self._request("PUT", path, token=token, json=json)
 
+    async def patch(self, path: str, *, token: str | None, json: dict | None = None) -> Any:
+        return await self._request("PATCH", path, token=token, json=json)
+
     async def delete(self, path: str, *, token: str | None) -> Any:
         """`None` on success — `teams` answers `204`, and `_read` turns an empty body into
         exactly that. A caller with nothing to read is the point of the verb."""

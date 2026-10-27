@@ -62,6 +62,14 @@ _TOUCH_TEAM = """
     UPDATE teams SET updated_at = now() WHERE id = $1
 """
 
+# NULL keeps the column as it is, so a rename that names only the description leaves the name alone.
+_RENAME_TEAM = f"""
+    UPDATE teams t
+       SET name = coalesce($3, t.name), description = coalesce($4, t.description), updated_at = now()
+     WHERE t.id = $1 AND t.owner_principal = $2 AND t.archived_at IS NULL
+    RETURNING t.id, t.name, t.description, t.created_at, t.updated_at, {_LATEST_REVISION}
+"""
+
 # Ownership through the join rather than through `archived_at`: a revision belongs to whoever owns the team,
 # and stays readable after that team is retired, because a run points at it.
 _SELECT_REVISION = """
@@ -135,6 +143,12 @@ async def save_revision(
         )
         await conn.execute(_TOUCH_TEAM, team_id)
     return revision
+
+
+async def rename_team(
+    conn: Conn, *, team_id: int, owner_principal: str, name: str | None, description: str | None
+) -> asyncpg.Record | None:
+    return await conn.fetchrow(_RENAME_TEAM, team_id, owner_principal, name, description)
 
 
 async def get_team(conn: Conn, *, team_id: int, owner_principal: str) -> asyncpg.Record | None:
