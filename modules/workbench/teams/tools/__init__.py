@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from .assignment import (
+    AccountNotListed,
     AnnouncedSnapshot,
     ToolNameCollision,
     ToolNoLongerAnnounced,
@@ -26,6 +27,7 @@ from .memory import MEMORY_TOOL_NAMES, MemoryScope, MemoryToolSource
 
 __all__ = [
     "MEMORY_TOOL_NAMES",
+    "AccountNotListed",
     "AnnouncedSnapshot",
     "MemoryScope",
     "MemoryToolSource",

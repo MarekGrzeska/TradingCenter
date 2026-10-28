@@ -87,6 +87,18 @@ def test_the_catalogue_lists_what_the_operator_saved(client: TestClient) -> None
     assert all(row["latest_revision"] == 1 for row in listed)
 
 
+def test_the_catalogue_names_the_account_of_each_teams_latest_revision(client: TestClient) -> None:
+    # specs/terminal-teams, "Konto jest już używane przez inny zespół" reads this rather than every definition
+    team_id = _create(client).json()["id"]
+    on_x = _definition() | {"trading": {"account_id": "X"}}
+    client.post(f"/teams/{team_id}/revisions", json={"definition": on_x}, headers=OWNER)
+    _create(client, name="no account")
+
+    listed = {row["name"]: row["account_id"] for row in client.get("/teams", headers=OWNER).json()}
+
+    assert listed == {"morning desk": "X", "no account": None}
+
+
 def test_saving_a_revision_appends_and_the_earlier_one_still_reads(client: TestClient) -> None:
     team_id = _create(client).json()["id"]
     changed = _definition(agents=[_agent("scout"), _agent("judge") | {"prompt": "weigh it"}])

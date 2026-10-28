@@ -359,6 +359,7 @@ class _StepRunner:
                 run_step_id=self._step["id"],
                 agent_key=self._agent.key,
                 tool_name=name,
+                account_id=run.plan.account_for(name),
                 symbol=_text_arg(arguments, "symbol"),
                 direction=_text_arg(arguments, "direction"),
                 size=_decimal_arg(arguments, "size"),

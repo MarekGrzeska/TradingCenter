@@ -22,6 +22,7 @@ def check_definition(
     """Raises `DefinitionRefused` naming the agent at fault, or returns. Note the asymmetry with a run: a team whose
     agents carry no tools saves and runs with no server at all, and only an assigned tool needs an announcement."""
     _every_agent_names_a_known_model(definition, model_ids)
+    _no_account_moving_tool_on_an_assigned_account(definition)
     _every_assigned_tool_is_announced(definition, announced)
 
 
@@ -40,6 +41,24 @@ def _every_agent_names_a_known_model(
             raise DefinitionRefused(
                 f"agent {agent.key!r} names model {agent.model_id!r}, which is not in this "
                 f"module's model catalogue ({sorted(known)})"
+            )
+
+
+# trading-mcp's names. The first moves every caller naming no account; the second changes the experiment mid-run.
+ACCOUNT_MOVING_TOOLS = frozenset({"switch_active_account", "top_up_demo_account"})
+
+
+def _no_account_moving_tool_on_an_assigned_account(definition: TeamDefinition) -> None:
+    account = definition.trading.account_id
+    if account is None:
+        return
+    for agent in definition.agents:
+        moving = sorted(ACCOUNT_MOVING_TOOLS.intersection(agent.tools))
+        if moving:
+            raise DefinitionRefused(
+                f"agent {agent.key!r} is assigned tool {moving[0]!r}, which a team trading on its own "
+                f"account ({account}) may not carry — it would change the account for others, or the "
+                "experiment while it runs"
             )
 
 

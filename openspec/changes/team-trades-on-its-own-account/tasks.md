@@ -27,13 +27,14 @@
 
 ## 4. teams
 
-- [ ] 4.1 `TradingLimits.account_id` (opcjonalne) w kontrakcie rewizji
-- [ ] 4.2 Walidacja zapisu: rewizja z kontem i `switch_active_account` albo `top_up_demo_account` u któregoś agenta jest odrzucana z nazwą narzędzia i agenta
-- [ ] 4.3 `assignment.py`: dla zespołu z kontem `account_id` znika ze schematu narzędzi `trading-mcp`
-- [ ] 4.4 Silnik: nadpisuje `account_id` kontem rewizji w każdym wywołaniu narzędzia `trading-mcp`
-- [ ] 4.5 Silnik: przy starcie runu zespołu z kontem `list_accounts`; nieznane konto zatrzymuje run przed pierwszym agentem z nazwą konta
-- [ ] 4.6 Migracja `teams`: nullable `account_id` w tabeli zleceń; `record_trade` je zapisuje, a odczyt zleceń przebiegu je zwraca
-- [ ] 4.7 Testy: nadpisanie konta podanego przez model, odmowa zapisu, odmowa startu, wiersz śladu z kontem (`-m db`), rewizja bez konta bez zmian
+- [x] 4.1 `TradingLimits.account_id` (opcjonalne) w kontrakcie rewizji
+- [x] 4.2 Walidacja zapisu: rewizja z kontem i `switch_active_account` albo `top_up_demo_account` u któregoś agenta jest odrzucana z nazwą narzędzia i agenta
+- [x] 4.3 `assignment.py`: dla zespołu z kontem `account_id` znika ze schematu narzędzi `trading-mcp`
+- [x] 4.4 Silnik: nadpisuje `account_id` kontem rewizji w każdym wywołaniu narzędzia `trading-mcp`
+- [x] 4.5 Silnik: przy starcie runu zespołu z kontem `list_accounts`; nieznane konto zatrzymuje run przed pierwszym agentem z nazwą konta
+- [x] 4.6 Migracja `teams`: nullable `account_id` w tabeli zleceń; `record_trade` je zapisuje, a odczyt zleceń przebiegu je zwraca
+- [x] 4.7 Testy: nadpisanie konta podanego przez model, odmowa zapisu, odmowa startu, wiersz śladu z kontem (`-m db`), rewizja bez konta bez zmian
+- [x] 4.8 Katalog zespołów niesie konto najnowszej rewizji (`account_id` w `TeamOut`), żeby terminal mógł ostrzec o współdzielonym koncie bez czytania definicji
 
 ## 5. Terminal
 

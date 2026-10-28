@@ -4,8 +4,9 @@ server is queried, because a name found on one says nothing about whether a seco
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 from ..config import Settings
@@ -33,6 +34,14 @@ class ToolNoLongerAnnounced(ToolAccessError):
     narrowing: the agent was given that tool on purpose, and it is the run that is refused, not the definition."""
 
 
+class AccountNotListed(ToolAccessError):
+    """The revision trades on an account the gateway no longer lists. The run is refused before any agent,
+    because every account call it would make would be refused one by one."""
+
+
+ACCOUNT_ARGUMENT = "account_id"
+
+
 class ToolNameCollision(ToolAccessError):
     """A revision names a tool more than one configured server announces. Refused rather than resolved by
     picking one: the definition carries only the name. The message names every server announcing it."""
@@ -51,6 +60,13 @@ class ToolPlan:
     # tool name -> the in-process source bound to this run. Separate from `server_by_name` because these
     # are called with *who* is calling: a local source acts on this team's rows and needs the agent.
     local_by_name: dict[str, Any] = field(default_factory=dict)
+    # The revision's account, and the tools it is put into. The model never sees the argument: the schema
+    # it is handed lost it, and `call` overwrites whatever it sent anyway.
+    account_id: str | None = None
+    on_account: frozenset[str] = frozenset()
+
+    def account_for(self, name: str) -> str | None:
+        return self.account_id if name in self.on_account else None
 
     def for_agent(self, key: str) -> tuple[ToolDescriptor, ...]:
         """Exactly what the definition assigned this agent, in the order it named them. A key the plan does
@@ -73,6 +89,8 @@ class ToolPlan:
         local = self.local_by_name.get(name)
         if local is not None:
             return await local.call(name, arguments, agent_key=agent_key)
+        if name in self.on_account:
+            arguments = {**arguments, ACCOUNT_ARGUMENT: self.account_id}
         server = self.server_by_name.get(name)
         if server is None:
             # Unreachable through a run, whose plan is built from the same definition it walks — but a name
@@ -194,15 +212,63 @@ async def plan_tools(
         for name, source in source_by_name.items()
         if source.label not in local_labels
     }
+    account = definition.trading.account_id
+    on_account = frozenset(
+        name
+        for name in assigned
+        if name in server_by_name
+        and server_by_name[name].can_move_the_account
+        and ACCOUNT_ARGUMENT in resolution.by_name[name][0][1].input_schema.get("properties", {})
+    )
+    if account is None:
+        on_account = frozenset()
+    elif on_account:
+        await _check_listed(account, server_by_name[next(iter(on_account))])
     per_agent = {
-        agent.key: tuple(resolution.by_name[name][0][1] for name in agent.tools)
+        agent.key: tuple(
+            _without_account(resolution.by_name[name][0][1])
+            if name in on_account
+            else resolution.by_name[name][0][1]
+            for name in agent.tools
+        )
         for agent in definition.agents
     }
     writes_by_name = {
         name: _moves_the_account(source_by_name[name], hits[0][1])
         for name, hits in resolution.by_name.items()
     }
-    return ToolPlan(per_agent, server_by_name, writes_by_name, local_by_name)
+    return ToolPlan(
+        per_agent,
+        server_by_name,
+        writes_by_name,
+        local_by_name,
+        account_id=account if on_account else None,
+        on_account=on_account,
+    )
+
+
+def _without_account(tool: ToolDescriptor) -> ToolDescriptor:
+    schema = dict(tool.input_schema)
+    schema["properties"] = {
+        k: v for k, v in schema.get("properties", {}).items() if k != ACCOUNT_ARGUMENT
+    }
+    if "required" in schema:
+        schema["required"] = [k for k in schema["required"] if k != ACCOUNT_ARGUMENT]
+    return replace(tool, input_schema=schema)
+
+
+async def _check_listed(account: str, server: ToolServer) -> None:
+    outcome = await server.call("list_accounts", {})
+    if not outcome.ok:
+        raise ToolServerUnavailable(
+            f"could not confirm that account {account} exists: {outcome.text}"
+        )
+    listed = [row.get("id") for row in json.loads(outcome.text).get("result", [])]
+    if account not in listed:
+        raise AccountNotListed(
+            f"this team trades on account {account}, which capital-gateway does not list "
+            f"({and_list(sorted(str(a) for a in listed))})"
+        )
 
 
 def _moves_the_account(server: ToolServer, tool: ToolDescriptor) -> bool:

@@ -129,8 +129,8 @@ class CostLimits(BaseModel):
 
 
 class TradingLimits(BaseModel):
-    """What a revision allows its agents to do to the account: all three optional, an omitted one meaning no limit at
-    all. What is not negotiable lives a module away, in a `trading-mcp` that starts only against the demo account."""
+    """What a revision allows its agents to do to the account, and which account: every field optional, an omitted limit
+    meaning no limit at all. What is not negotiable lives a module away, in a `trading-mcp` that starts only against demo."""
 
     max_order_size: str | None = Field(
         default=None, description="largest size one order may carry; null means no limit"
@@ -141,6 +141,13 @@ class TradingLimits(BaseModel):
     orders_per_day: int | None = Field(
         default=None,
         description="how many orders this team may place per UTC day; null means no limit",
+    )
+    account_id: str | None = Field(
+        default=None,
+        description=(
+            "the demo account this team trades on, an id from the gateway's account list; null means the "
+            "active one. Put into every account tool call by the run, never chosen by the model"
+        ),
     )
 
     @field_validator("max_order_size")
@@ -340,6 +347,8 @@ class TeamOut(BaseModel):
     name: str
     description: str
     latest_revision: int
+    # The latest revision's account, so the catalogue can say which teams share one without loading definitions.
+    account_id: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -350,6 +359,7 @@ class TeamOut(BaseModel):
             name=row["name"],
             description=row["description"],
             latest_revision=row["latest_revision"],
+            account_id=row.get("account_id"),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -493,6 +503,8 @@ class TradeOut(BaseModel):
     run_step_id: int
     agent_key: str
     tool_name: str
+    # Null is the active account: the revision named none, or the trade predates the column.
+    account_id: str | None = None
     symbol: str | None
     direction: str | None
     size: str | None
@@ -514,6 +526,7 @@ class TradeOut(BaseModel):
             run_step_id=row["run_step_id"],
             agent_key=row["agent_key"],
             tool_name=row["tool_name"],
+            account_id=row.get("account_id"),
             symbol=row["symbol"],
             direction=row["direction"],
             size=None if size is None else str(size),

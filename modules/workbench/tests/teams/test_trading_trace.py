@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Sequence
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import asyncpg
@@ -16,7 +17,7 @@ from teams.contract import AgentDefinition, TeamDefinition, TradingLimits
 from teams.models_catalogue import ModelCatalogue
 from teams.provider import ProviderChunk, TextDelta, ToolCallRequest, UsageReport
 from teams.runner import RunRegistry, execute_run
-from teams.tools import ToolDescriptor, ToolOutcomeKind, ToolServer, ToolServerRegistry
+from teams.tools import ToolDescriptor, ToolOutcome, ToolOutcomeKind, ToolServer, ToolServerRegistry
 
 from .mcp_stand_in import settings_for
 from .scripted_provider import Ask, ScriptedProvider
@@ -82,7 +83,6 @@ async def _run(
 async def _trades(pool: asyncpg.Pool, run_id: int) -> list[dict]:
     async with pool.acquire() as conn:
         return [dict(row) for row in await store.get_run_trades(conn, run_id=run_id)]
-
 
 
 async def test_a_placed_order_leaves_a_row_naming_the_agent_and_the_order(
@@ -215,7 +215,8 @@ async def test_an_access_failure_leaves_the_row_as_unknown_not_as_failed(
         definition,
         ScriptedProvider(default=places_orders(1)),
         server=WriteServer(
-            reply="the trading-mcp tool server could not be reached", kind=ToolOutcomeKind.UNAVAILABLE
+            reply="the trading-mcp tool server could not be reached",
+            kind=ToolOutcomeKind.UNAVAILABLE,
         ),
     )
     [row] = await _trades(pool, run_id)
@@ -241,13 +242,10 @@ async def test_a_refused_order_is_recorded_as_refused(pool: asyncpg.Pool) -> Non
     assert row["status"] == "refused"
 
 
-
 async def test_a_run_reaching_its_order_limit_stops_and_says_orders_not_cost(
     pool: asyncpg.Pool,
 ) -> None:
-    definition = TeamDefinition(
-        agents=[a_trader()], trading=TradingLimits(orders_per_run=2)
-    )
+    definition = TeamDefinition(agents=[a_trader()], trading=TradingLimits(orders_per_run=2))
     server = WriteServer()
 
     run_id = await _run(pool, definition, ScriptedProvider(default=places_orders(5)), server=server)
@@ -270,9 +268,7 @@ async def test_an_oversized_order_is_refused_without_stopping_the_run(
 ) -> None:
     """The other half of the same requirement: a size is something an agent can correct,
     so it comes back as a refused call and the run carries on."""
-    definition = TeamDefinition(
-        agents=[a_trader()], trading=TradingLimits(max_order_size="0.5")
-    )
+    definition = TeamDefinition(agents=[a_trader()], trading=TradingLimits(max_order_size="0.5"))
     server = WriteServer()
 
     run_id = await _run(
@@ -344,9 +340,7 @@ async def test_a_revision_saved_before_trading_limits_existed_still_runs(
                 }
             ),
         )
-        stored = await store.get_latest_revision(
-            conn, team_id=team["id"], owner_principal=OWNER
-        )
+        stored = await store.get_latest_revision(conn, team_id=team["id"], owner_principal=OWNER)
 
     from teams.contract import TeamRevisionOut
 
@@ -355,15 +349,12 @@ async def test_a_revision_saved_before_trading_limits_existed_still_runs(
     assert definition.trading.max_order_size is None
 
 
-
 async def test_todays_orders_are_what_the_daily_ceiling_reads(pool: asyncpg.Pool) -> None:
     definition = TeamDefinition(agents=[a_trader()])
     team_id = await _team(pool, definition)
 
     async with pool.acquire() as conn:
-        revision = await store.get_latest_revision(
-            conn, team_id=team_id, owner_principal=OWNER
-        )
+        revision = await store.get_latest_revision(conn, team_id=team_id, owner_principal=OWNER)
         run, _ = await store.create_run(
             conn,
             team_revision_id=revision["id"],  # type: ignore[index]
@@ -418,7 +409,8 @@ async def test_an_unsettled_order_still_counts_against_the_day(pool: asyncpg.Poo
     async with pool.acquire() as conn:
         run = await store.get_run(conn, run_id=run_id, owner_principal=OWNER)
         revision = await conn.fetchrow(
-            "SELECT team_id FROM team_revisions WHERE id = $1", run["team_revision_id"]  # type: ignore[index]
+            "SELECT team_id FROM team_revisions WHERE id = $1",
+            run["team_revision_id"],  # type: ignore[index]
         )
         midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
         placed = await store.team_trades_since(
@@ -431,7 +423,6 @@ async def test_an_unsettled_order_still_counts_against_the_day(pool: asyncpg.Poo
     assert placed == 1
 
 
-
 async def test_the_table_refuses_a_status_it_does_not_know(pool: asyncpg.Pool) -> None:
     """The five statuses are a closed set in the schema rather than a convention in the code: a sixth spelling from a
     future edit fails the insert rather than becoming a value nothing knows how to read."""
@@ -441,9 +432,7 @@ async def test_the_table_refuses_a_status_it_does_not_know(pool: asyncpg.Pool) -
     async with pool.acquire() as conn:
         row = (await store.get_run_trades(conn, run_id=run_id))[0]
         with pytest.raises(asyncpg.CheckViolationError):
-            await conn.execute(
-                "UPDATE trades SET status = 'nearly' WHERE id = $1", row["id"]
-            )
+            await conn.execute("UPDATE trades SET status = 'nearly' WHERE id = $1", row["id"])
 
 
 class _PlacesThenSleeps:
@@ -521,3 +510,44 @@ async def test_a_trade_row_survives_an_interrupted_run(pool: asyncpg.Pool) -> No
     assert len(trades) == 1
     assert trades[0]["status"] == "settled"
     assert trades[0]["provider_order_id"] == "deal-1"
+
+
+class AccountWriteServer(WriteServer):
+    """trading-mcp as it is since `team-trades-on-its-own-account`: an account argument, and accounts to list."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.sent: list[dict] = []
+
+    async def list_tools(self) -> list[ToolDescriptor]:
+        schema = {"type": "object", "properties": {"account_id": {"type": "string"}}}
+        return [replace(tool, input_schema=schema) for tool in await super().list_tools()]
+
+    async def call(self, name: str, arguments: dict) -> ToolOutcome:
+        if name == "list_accounts":
+            return ToolOutcome(ToolOutcomeKind.OK, json.dumps({"result": [{"id": "X"}]}), 1)
+        self.sent.append(arguments)
+        return await super().call(name, arguments)
+
+
+async def test_a_trade_row_names_the_account_the_revision_put_the_order_on(
+    pool: asyncpg.Pool,
+) -> None:
+    # specs/teams-trading, "Zespół składa zlecenie" — the account the module named, not one the model chose
+    server = AccountWriteServer()
+    definition = TeamDefinition(agents=[a_trader()], trading=TradingLimits(account_id="X"))
+
+    run_id = await _run(
+        pool,
+        definition,
+        ScriptedProvider(
+            default=places_orders(
+                1, {"symbol": "GOLD", "direction": "BUY", "size": 1, "account_id": "Y"}
+            )
+        ),
+        server=server,
+    )
+    trades = await _trades(pool, run_id)
+
+    assert [row["account_id"] for row in trades] == ["X"]
+    assert [call["account_id"] for call in server.sent] == ["X"]

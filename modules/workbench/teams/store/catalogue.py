@@ -14,7 +14,9 @@ from ..contract import TeamDefinition
 # `latest_revision` is derived rather than stored: the correlated subquery reads one row per team, and the
 # alternative is a denormalized column two writers could disagree about. The listing still loads no definition.
 _LATEST_REVISION = """
-    (SELECT max(r.version) FROM team_revisions r WHERE r.team_id = t.id) AS latest_revision
+    (SELECT max(r.version) FROM team_revisions r WHERE r.team_id = t.id) AS latest_revision,
+    (SELECT r.definition -> 'trading' ->> 'account_id' FROM team_revisions r
+      WHERE r.team_id = t.id ORDER BY r.version DESC LIMIT 1) AS account_id
 """
 
 _INSERT_TEAM = """
