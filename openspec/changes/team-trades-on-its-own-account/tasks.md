@@ -1,9 +1,9 @@
 ## 1. Bramka: odnowiona sesja wraca na swoje konto (D3)
 
-- [ ] 1.1 `CapitalClient` zna konto docelowe; `_login` przywraca je przed zakończeniem zadania logowania, a odmowa przełączenia kończy logowanie błędem
-- [ ] 1.2 `set_active_account` ustawia konto docelowe sesji domyślnej
-- [ ] 1.3 Test jednostkowy (respx): 401, ponowne logowanie na koncie preferowanym, przełączenie i ponowienie na właściwym koncie; wspólne logowanie dla wielu czekających
-- [ ] 1.4 Test `--run-live-trading`: pomiar 3 (świeży login ląduje na koncie preferowanym, a sesja po wymuszonym logowaniu wraca na swoje konto)
+- [x] 1.1 `CapitalClient` zna konto docelowe; `_login` przywraca je przed zakończeniem zadania logowania, a odmowa przełączenia kończy logowanie błędem
+- [x] 1.2 `set_active_account` ustawia konto docelowe sesji domyślnej
+- [x] 1.3 Test jednostkowy (respx): 401, ponowne logowanie na koncie preferowanym, przełączenie i ponowienie na właściwym koncie; wspólne logowanie dla wielu czekających
+- [x] 1.4 Test `--run-live-trading`: pomiar 3 (świeży login ląduje na koncie preferowanym, a sesja po wymuszonym logowaniu wraca na swoje konto)
 
 ## 2. Bramka: pula sesji i nagłówek konta (D1, D2, D4)
 

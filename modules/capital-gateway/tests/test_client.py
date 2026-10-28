@@ -17,8 +17,7 @@ SESSION = f"{DEMO_BASE_URL}/api/v1/session"
 ACCOUNTS = f"{DEMO_BASE_URL}/api/v1/accounts"
 
 
-@pytest.fixture
-def client() -> CapitalClient:
+def on_account(account_id: str | None = None) -> CapitalClient:
     return CapitalClient(
         Settings(
             capital_api_key="k",
@@ -26,8 +25,14 @@ def client() -> CapitalClient:
             capital_password="p",
             gateway_api_key="g",
             _env_file=None,
-        )
+        ),
+        account_id=account_id,
     )
+
+
+@pytest.fixture
+def client() -> CapitalClient:
+    return on_account()
 
 
 def login_response(cst: str = "cst-1", token: str = "tok-1") -> httpx.Response:
@@ -141,7 +146,6 @@ def test_stream_tokens_refuse_to_answer_before_a_session(client: CapitalClient) 
         client.stream_tokens()
 
 
-
 @respx.mock
 async def test_stream_tokens_prove_the_session_still_answers(client: CapitalClient) -> None:
     """A websocket never receives a 401, so the stream cannot notice its session died. Checking
@@ -225,4 +229,71 @@ async def test_the_first_connection_logs_in_before_asking_for_tokens(
 
     assert login.called
     assert (cst, token) == ("cst-1", "tok-1")
+    await client.aclose()
+
+
+def opened_on(account_id: str, cst: str = "cst-1", token: str = "tok-1") -> httpx.Response:
+    return httpx.Response(
+        200, headers={"CST": cst, "X-SECURITY-TOKEN": token}, json={"currentAccountId": account_id}
+    )
+
+
+@respx.mock
+async def test_a_renewed_session_is_put_back_on_its_account_before_the_retry(
+    client: CapitalClient,
+) -> None:
+    respx.post(SESSION).mock(
+        side_effect=[opened_on("preferred"), opened_on("preferred", "cst-2", "tok-2")]
+    )
+    switch = respx.put(SESSION).mock(return_value=httpx.Response(200, json={}))
+    positions = respx.get(f"{DEMO_BASE_URL}/api/v1/positions").mock(
+        side_effect=[
+            httpx.Response(200, json={"positions": []}),
+            httpx.Response(401, json={"errorCode": "error.invalid.session.token"}),
+            httpx.Response(200, json={"positions": []}),
+        ]
+    )
+    await client.switch_account("other")
+    await client.positions()
+
+    await client.positions()
+
+    # Logged in on "preferred" twice; each time put back on "other" before anything else went out.
+    assert [c.request.read() for c in switch.calls] == [b'{"accountId":"other"}'] * 2
+    assert switch.calls[1].request.headers["CST"] == "cst-2"
+    assert positions.calls[2].request.headers["CST"] == "cst-2"
+    await client.aclose()
+
+
+@respx.mock
+async def test_waiters_on_one_login_all_get_the_restored_account() -> None:
+    client = on_account("other")
+    session = respx.post(SESSION).mock(return_value=opened_on("preferred"))
+    switch = respx.put(SESSION).mock(return_value=httpx.Response(200, json={}))
+    respx.get(ACCOUNTS).mock(return_value=httpx.Response(200, json={"accounts": []}))
+
+    await asyncio.gather(*(client.accounts() for _ in range(5)))
+
+    assert session.call_count == 1
+    assert switch.call_count == 1
+    await client.aclose()
+
+
+@respx.mock
+async def test_a_refused_restore_fails_the_call_instead_of_running_it_elsewhere() -> None:
+    client = on_account("gone")
+    respx.post(SESSION).mock(return_value=opened_on("preferred"))
+    respx.put(SESSION).mock(
+        return_value=httpx.Response(400, json={"errorCode": "error.invalid.accountId"})
+    )
+    orders = respx.post(f"{DEMO_BASE_URL}/api/v1/positions").mock(
+        return_value=httpx.Response(200, json={})
+    )
+
+    with pytest.raises(GatewayError, match="gone") as refused:
+        await client.create_position({"epic": "US100"})
+
+    assert refused.value.status_code == 400
+    assert not orders.called
+    assert not client.authenticated
     await client.aclose()
