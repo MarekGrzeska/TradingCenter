@@ -1,0 +1,402 @@
+<title>Wiele kont demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Research · rachunek demo</span>
+    <h1>Wiele teamów, wiele kont</h1>
+    <p class="lede">Czy kilka teamów może naraz grać na osobnych kontach demo, każdy swoją strategią? <b>Dziś nie da się tego zrobić bezpiecznie.</b> Przeszkoda siedzi w bramce, nie w teamach, i można ją usunąć bez przepisywania teamów.</p>
+    <div class="strip">
+      <span>TradingCenter / capital-gateway · trading-mcp · teams</span>
+      <span>28 października 2026</span>
+      <span>środowisko <b>demo</b></span>
+      <span>stan kodu: <b>main 56ad004b</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">4</div><div class="l">konta demo pod jednym loginem (odczyt 28.10)</div></div>
+      <div class="cell"><div class="v">1</div><div class="l">aktywne konto na całą bramkę</div></div>
+      <div class="cell"><div class="v">1</div><div class="l">sesja MCP do trading-mcp dla wszystkich runów</div></div>
+      <div class="cell"><div class="v">10/s</div><div class="l">budżet zapytań wspólny dla wszystkich</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Krótko</div>
+      <h2>Odpowiedź w trzech zdaniach</h2>
+      <p class="intro"><strong>Teamy już dziś biegną równolegle</strong>: harmonogram pomija tylko nakładający się run <em>tego samego</em> teamu. Ale wszystkie piszą do jednego „aktywnego konta”, które jest stanem globalnym bramki. Dwa teamy przełączające konta przestawiają więc sobie nawzajem konto w trakcie runu.</p>
+      <p>Naprawa to <span class="hl">jedna sesja capital.com na każde konto w bramce</span> i <code>account_id</code> w każdym wywołaniu. Jest to możliwe, bo sesje u capital.com współistnieją (zmierzone 10 sierpnia) i każda ma własne aktywne konto (zmierzone 28 października). <strong>Teamów nie trzeba przerabiać</strong>: rewizja dostaje jedno pole, przypisane konto, a silnik sam dokleja je do każdego wywołania narzędzia handlowego. Model nie widzi tego parametru i nie może go zmienić.</p>
+      <p>Praca przypada na trzy moduły, nie na same teamy: <code>capital-gateway</code> (pula sesji), <code>trading-mcp</code> (parametr konta) i w niewielkim stopniu <code>teams</code> (pole w rewizji, kolumna w tabeli zleceń). Zmienia się kontrakt między modułami, więc potrzebna jest zmiana OpenSpec.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Stan dziś</div>
+      <h2>Jedno aktywne konto na cały system</h2>
+      <p>Każdy run każdego teamu idzie przez jedną sesję MCP (<code>ToolServer</code> w <code>teams/tools/client.py</code>) do <code>trading-mcp</code>, stamtąd do jednego <code>CapitalClient</code> w bramce i dalej do <strong>jednej sesji capital.com</strong>, czyli jednej pary <code>CST</code>/<code>X-SECURITY-TOKEN</code>. Konto wybiera się przez <code>PUT /api/v1/session {accountId}</code>. To polecenie przełącza całą <em>sesję</em>, a nie pojedyncze zapytanie. Żadna trasa bramki (<code>/positions</code>, <code>/orders</code>, <code>/accounts/top-up</code>) nie przyjmuje identyfikatora konta. Wszystkie działają na koncie aktywnym.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 200" role="img" aria-label="Dwa teamy i rozmowa idą przez jeden trading-mcp i jedną bramkę do jednej sesji capital.com, która ma jedno aktywne konto spośród czterech">
+            <defs>
+              <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path></marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="12" y="20" width="130" height="40" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+              <text x="77" y="45" text-anchor="middle" font-size="13" fill="currentColor">team A</text>
+              <rect x="12" y="80" width="130" height="40" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+              <text x="77" y="105" text-anchor="middle" font-size="13" fill="currentColor">team B</text>
+              <rect x="12" y="140" width="130" height="40" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+              <text x="77" y="165" text-anchor="middle" font-size="13" fill="currentColor">rozmowa · terminal</text>
+              <line x1="144" y1="40" x2="226" y2="92" stroke="currentColor" stroke-width="1.2" marker-end="url(#a1)"></line>
+              <line x1="144" y1="100" x2="226" y2="100" stroke="currentColor" stroke-width="1.2" marker-end="url(#a1)"></line>
+              <line x1="144" y1="160" x2="226" y2="108" stroke="currentColor" stroke-width="1.2" marker-end="url(#a1)"></line>
+              <rect x="230" y="76" width="160" height="48" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="310" y="98" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">trading-mcp</text>
+              <text x="310" y="114" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">bez pojęcia konta</text>
+              <line x1="392" y1="100" x2="446" y2="100" stroke="currentColor" stroke-width="1.2" marker-end="url(#a1)"></line>
+              <rect x="450" y="76" width="170" height="48" fill="#14306b" stroke="#14306b"></rect>
+              <text x="535" y="98" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">capital-gateway</text>
+              <text x="535" y="114" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#f2c313">1 klient · 1 sesja</text>
+              <line x1="622" y1="100" x2="676" y2="100" stroke="currentColor" stroke-width="1.2" marker-end="url(#a1)"></line>
+              <rect x="680" y="14" width="288" height="172" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="6 4"></rect>
+              <text x="824" y="34" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">capital.com · jeden login</text>
+              <rect x="700" y="48" width="120" height="30" fill="none" stroke="currentColor" opacity="0.5"></rect>
+              <text x="760" y="68" text-anchor="middle" font-size="12" fill="currentColor" opacity="0.6">EUR</text>
+              <rect x="830" y="48" width="120" height="30" fill="#f2c313" stroke="#f2c313"></rect>
+              <text x="890" y="68" text-anchor="middle" font-size="12" font-weight="700" fill="#14306b">demo2 · aktywne</text>
+              <rect x="700" y="90" width="120" height="30" fill="none" stroke="currentColor" opacity="0.5"></rect>
+              <text x="760" y="110" text-anchor="middle" font-size="12" fill="currentColor" opacity="0.6">random</text>
+              <rect x="830" y="90" width="120" height="30" fill="none" stroke="currentColor" opacity="0.5"></rect>
+              <text x="890" y="110" text-anchor="middle" font-size="12" fill="currentColor" opacity="0.6">devtest</text>
+              <text x="824" y="160" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">PUT /session przełącza wszystkich</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b>: wszyscy wołający dzielą jedno aktywne konto. Konta po prawej to stan z <code>list_accounts</code> z 28 października: EUR (51 000 EUR), demo2 (95 366 USD, aktywne), random (11 222 USD), devtest (1 000 USD).</figcaption>
+      </figure>
+      <div class="table-wrap" style="margin-top:22px">
+        <table>
+          <thead><tr><th>Co</th><th>Gdzie w kodzie</th><th>Co to znaczy dla wielu kont</th></tr></thead>
+          <tbody>
+            <tr><td><b>Jedna sesja dostawcy</b></td><td><code>capital_gateway/client.py</code>: <code>_cst</code>, <code>_security_token</code></td><td>Aktywne konto jest stanem procesu, a nie zapytania.</td></tr>
+            <tr><td><b>Przełączenie konta</b></td><td><code>PUT /accounts/active</code> → <code>PUT /api/v1/session</code></td><td>Przestawia konto wszystkim wołającym jednocześnie.</td></tr>
+            <tr><td><b>Narzędzie dla agenta</b></td><td><code>trading-mcp</code>: <code>switch_active_account</code></td><td>Agent może przestawić konto innemu teamowi w połowie jego runu.</td></tr>
+            <tr><td><b>Runy równolegle</b></td><td><code>teams/runner/starter.py</code>, <code>scheduler/clock.py</code></td><td>Różne teamy biegną jednocześnie. Pomijany jest tylko nakładający się run tego samego teamu.</td></tr>
+            <tr><td><b>Ślad zleceń</b></td><td><code>teams/store/trades.py</code></td><td>Wiersz zawiera run, agenta, symbol i wielkość, ale <strong>nie zawiera konta</strong>.</td></tr>
+            <tr><td><b>Limity handlowe</b></td><td><code>TradingLimits</code> w <code>teams/contract.py</code></td><td>Liczone osobno dla każdego teamu (zlecenia na run i na dzień, maksymalna wielkość). To dobra podstawa izolacji.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Wyścig</div>
+      <h2>Dwa teamy i jedno wspólne konto</h2>
+      <p>Załóżmy, że team A ma grać na koncie <code>random</code>, a team B na <code>devtest</code>. Każdy zaczyna run od <code>switch_active_account</code>. Między decyzją modelu a zleceniem mijają sekundy, bo trwa wywołanie modelu. Przeplot taki jak poniżej nie jest więc przypadkiem brzegowym, tylko wcześniej czy później się zdarzy:</p>
+      <pre><code><span class="c">t0</span>  A: switch_active_account(random)    <span class="c"># sesja → random</span>
+<span class="c">t1</span>  B: switch_active_account(devtest)   <span class="c"># sesja → devtest</span>
+<span class="c">t2</span>  A: get_positions()                  <span class="c"># widzi pozycje B</span>
+<span class="c">t3</span>  A: place_order(US100, BUY, 2)       <span class="c"># </span><span class="k">ląduje na devtest</span><span class="c">, czyli na koncie B</span>
+<span class="c">t4</span>  B: close_position(...)              <span class="c"># może zamknąć pozycję A</span></code></pre>
+      <p>Test strategii na żywo traci wtedy sens: P&amp;L konta nie należy do jednej strategii. Ślad w <code>teams.trades</code> tego nie pokaże, bo nie zapisuje konta.</p>
+      <div class="quote">Jeśli ktoś inny może przestawić konto, strategie nie są od siebie odizolowane.</div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Niedogodności</div>
+      <h2>Problemy obecnego rozwiązania</h2>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Wyścig o aktywne konto <span class="tag stop">złe konto</span></h3>
+          <p>Opisany wyżej. Zamek w <code>trading-mcp</code> go nie rozwiąże: run korzysta z konta przez wiele kroków modelu, a zamek trzymany przez minuty zablokowałby wszystkie pozostałe teamy.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Przełączenie konta a strumień notowań <span class="tag att">nie odtworzone</span></h3>
+          <p>Docstring <code>PUT /accounts/active</code> w <code>app.py</code> twierdzi, że capital.com kończy sesję strumieniową, gdy zmienia się konto. Archiwum świec <code>/market</code>, alerty i wyzwalacze teamów czytają ten strumień. Pomiar 2 tego nie potwierdził: przez 10 s po przełączeniu, także na tej samej sesji, strumień działał bez przerwy. Ryzyko jest więc mniejsze, niż zapowiada kod, a przy puli sesji znika całkiem, bo strumień ma wtedy własną sesję.</p>
+        </div>
+        <div class="fail">
+          <h3>Ponowne logowanie wraca na konto domyślne <span class="tag stop">potwierdzone 28.10</span></h3>
+          <p>Po 401 (sesja wygasa po bezczynności) <code>client.py</code> loguje się od nowa i nie przywraca wybranego konta. Świeży login capital.com zawsze otwiera sesję na koncie preferowanym (demo2), co potwierdził pomiar 3 w sekcji 08. Przełączenie konta znika więc bez śladu. Dotyczy to <em>dzisiejszego</em> systemu, także z jednym teamem.</p>
+        </div>
+        <div class="fail">
+          <h3>Pozycje są wspólne <span class="tag att">brak izolacji odczytu</span></h3>
+          <p><code>get_positions</code> zwraca wszystkie pozycje aktywnego konta. Dwa teamy na jednym koncie widzą swoje pozycje nawzajem, a polecenie „zamknij wszystko” zamyka także cudze. capital.com nie zapisuje, kto otworzył pozycję, więc jedyną czystą granicą jest osobne konto.</p>
+        </div>
+        <div class="fail">
+          <h3>Terminal i rozmowa też przełączają konto <span class="tag att">wspólny przełącznik</span></h3>
+          <p>Widok kont w terminalu, rozmowa w workbenchu i Twój Claude Code wołają ten sam <code>PUT /accounts/active</code>. Przełączenie konta w terminalu w trakcie runu przenosi zlecenia teamu na inne konto.</p>
+        </div>
+        <div class="fail">
+          <h3>Doładowanie działa tylko na aktywnym koncie <span class="tag att">wymaga przełączenia</span></h3>
+          <p><code>top_up_demo_account</code> nie przyjmuje konta (decyzja D1 w <code>demo-account-is-the-operators-to-set</code>), bo dostawca też go nie przyjmuje. Przy puli sesji problem znika: doładowanie idzie sesją wybranego konta.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Opcje</div>
+      <h2>Trzy opcje, z których warto zrobić jedną</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Opcja</th><th>Jak działa</th><th>Zalety</th><th>Wady</th><th>Werdykt</th></tr></thead>
+          <tbody>
+            <tr><td><b>A · przełącz i wykonaj</b></td><td>Każde wywołanie niesie <code>account_id</code>. Bramka pod muteksem robi <code>PUT /session</code>, a potem właściwe zapytanie.</td><td>Mało kodu, jedna sesja.</td><td>Każde wywołanie przełącza konto, więc za każdym razem <strong>zrywa strumień notowań</strong> i zużywa dodatkowe zapytanie z budżetu 10/s.</td><td><span class="tag stop">nie</span></td></tr>
+            <tr><td><b>B · sesja na konto</b></td><td>Bramka trzyma pulę <code>CapitalClient</code>, po jednym na konto. Każdy klient loguje się i przełącza konto raz, a po ponownym logowaniu przełącza je sam od nowa. Strumień ma własną sesję, która nigdy nie zmienia konta. Trasy przyjmują konto.</td><td>Brak wyścigu, strumień nienaruszony, każde zapytanie jest przypisane do konta.</td><td>Cała pula musi mieć jeden wspólny <code>RateGate</code> (dziś każdy klient ma własny). Niezależność kont między sesjami zmierzona 28.10 (sekcja 08).</td><td><span class="tag ok">tak, zmierzone</span></td></tr>
+            <tr><td><b>C · osobne loginy</b></td><td>Osobny użytkownik capital.com i osobna instancja bramki dla każdej strategii.</td><td>Osobne budżety zapytań, pełna izolacja.</td><td>N kontenerów, N zestawów sekretów, N kluczy API. Łamie zasadę jednego wejścia do dostawcy.</td><td><span class="tag att">przesada</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px"><strong>Dlaczego B jest możliwe.</strong> README bramki (sekcja „Sessions coexist — measured, not assumed”) opisuje pomiar: cztery sesje z jednego klucza API działały jednocześnie i nie wylogowywały się nawzajem. Pomiar sprawdził jednak tylko to, że sesje współistnieją. Nie sprawdził, czy każda może mieć inne aktywne konto. Pomiar z 28 października (sekcja 08) to potwierdził.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Teamy</div>
+      <h2>Czy trzeba przerabiać teamy? Nie</h2>
+      <p class="intro">Konto należy do <strong>definicji teamu</strong>, tak jak jego limity handlowe. Ustawiasz je w zakładce Teams, a nie model. Agent dalej woła <code>place_order(symbol, direction, size)</code> i nie wie, na którym koncie gra.</p>
+      <pre><code><span class="c"># teams/contract.py: TradingLimits dostaje jedno pole</span>
+<span class="k">class</span> TradingLimits(BaseModel):
+    max_order_size: str | <span class="k">None</span> = <span class="k">None</span>
+    orders_per_run: int | <span class="k">None</span> = <span class="k">None</span>
+    orders_per_day: int | <span class="k">None</span> = <span class="k">None</span>
+    account_id: str | <span class="k">None</span> = <span class="k">None</span>   <span class="c"># None = konto domyślne, jak dziś</span>
+
+<span class="c"># silnik, przed każdym wywołaniem narzędzia trading-mcp</span>
+arguments[<span class="s">"account_id"</span>] = definition.trading.account_id   <span class="c"># zawsze nadpisuje wartość od modelu</span></code></pre>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Element teamu</th><th>Zmiana</th><th>Zakres</th></tr></thead>
+          <tbody>
+            <tr><td><b>Agenci, prompty, graf</b></td><td>Bez zmian. Wyjątek: prompt, który każe wołać <code>switch_active_account</code>, trzeba zrewidować i usunąć z niego ten krok.</td><td><span class="tag ok">bez zmian</span></td></tr>
+            <tr><td><b>Rewizja</b></td><td>Nowe opcjonalne pole <code>trading.account_id</code>. Stare rewizje bez niego działają jak dziś.</td><td><span class="tag ok">wstecznie zgodne</span></td></tr>
+            <tr><td><b>Przydział narzędzi</b></td><td><code>switch_active_account</code> i <code>top_up_demo_account</code> znikają z narzędzi teamów. Zostają w rozmowie i w Twoim Claude Code. Parametr <code>account_id</code> jest usuwany ze schematu, który widzi model.</td><td><span class="tag att">mała zmiana</span></td></tr>
+            <tr><td><b>Ślad zleceń</b></td><td>Kolumna <code>account_id</code> w <code>teams.trades</code> (migracja). Dzięki niej da się policzyć P&amp;L każdej strategii.</td><td><span class="tag att">migracja</span></td></tr>
+            <tr><td><b>Walidacja przy zapisie</b></td><td>Konto musi istnieć w <code>GET /accounts</code>. Dwa teamy na jednym koncie dostają ostrzeżenie, ale nie blokadę.</td><td><span class="tag att">mała zmiana</span></td></tr>
+            <tr><td><b>Terminal</b></td><td>Wybór konta w edytorze teamu. Widok kont pokazuje pozycje wybranego konta, a nie tylko aktywnego. Wymaga regeneracji kontraktu.</td><td><span class="tag att">UI + kontrakt</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Limity</div>
+      <h2>Co nadal ogranicza liczbę teamów</h2>
+      <div class="fails">
+        <div class="fail">
+          <h3>10 zapytań na sekundę, wspólne dla wszystkich <span class="tag att">wąskie gardło</span></h3>
+          <p>Według README bramki capital.com liczy ten budżet na konto użytkownika (login), a nie na sesję. Pula sesji potrzebuje więc jednego wspólnego limitera, bo inaczej N klientów wyśle N × 10/s i dostawca zacznie odmawiać. W praktyce teamy rzadko składają zlecenia: typowy run to kilka odczytów pozycji i jedno zlecenie, a strumień przy 29 pokojach zużywa ok. 0,05/s. Pięć do dziesięciu teamów zmieści się w tym budżecie.</p>
+        </div>
+        <div class="fail">
+          <h3>Liczba kont demo i doładowań <span class="tag att">limit dostawcy</span></h3>
+          <p>Konta zakłada się w panelu capital.com (dziś są 4). Górnego limitu kont demo nie sprawdzaliśmy. Doładowania mają limity dostawcy (według designu <code>demo-account-is-the-operators-to-set</code>: saldo do 100 000 i 100 operacji na konto na dobę), więc wyrównanie sald przed porównaniem strategii nic nie kosztuje.</p>
+        </div>
+        <div class="fail">
+          <h3>Koszt modeli rośnie liniowo <span class="tag att">pieniądze, nie technika</span></h3>
+          <p>Dziesięć teamów na harmonogramie to dziesięć razy większy rachunek OpenAI na linii teamów. Hamulec już istnieje: <code>limits.daily_limit</code> dla każdego teamu, sprawdzany przed startem runu.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Porównywalność wyników <span class="tag ok">do załatwienia</span></h3>
+          <p>Żeby wyniki dało się porównać, potrzebne są: jedna waluta (konto EUR odpada albo jest liczone osobno), równe saldo startowe (doładowanie do wspólnej kwoty) i ślad zleceń z kontem. Wtedy P&amp;L konta jest P&amp;L strategii i nie trzeba niczego filtrować.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Przed propozycją</div>
+      <h2>Trzy pomiary, zrobione 28 października</h2>
+      <p>Skrypt na API demo capital.com, z tymi samymi danymi logowania co bramka: cztery sesje A–D z jednego klucza API, jedno zlecenie testowe US100 BUY o minimalnej wielkości 0,001, otwarte i zamknięte. Produkcyjna sesja bramki przez cały czas została na demo2, co potwierdził <code>list_accounts</code> po teście.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Pytanie</th><th>Co zmierzono</th><th>Wynik</th></tr></thead>
+          <tbody>
+            <tr><td class="n">1</td><td><b>Czy przełączenie konta w sesji X zostawia sesję Y na jej koncie?</b></td><td>A przełączona na random, B na devtest, C bez zmian. <code>GET /session</code>: A=random, B=devtest, C=demo2. Pozycja otwarta z A jest widoczna w A i <strong>nie</strong> jest widoczna w B. Zamknięta z A.</td><td><span class="tag ok">tak, konto jest per sesja</span></td></tr>
+            <tr><td class="n">2</td><td><b>Czy przełączenie w sesji handlowej zrywa strumień innej sesji?</b></td><td>Strumień US100 na sesji D przez 40 s, przełączenia w A i B, na końcu przełączenie samej D. Notowania w oknach 5 s przed i po: 19→17, 19→24, 18→16. Ani jednego rozłączenia.</td><td><span class="tag ok">nie zrywa</span></td></tr>
+            <tr><td class="n">3</td><td><b>Czy ponowne logowanie wraca na konto preferowane?</b></td><td>Świeży login ląduje na demo2 (<code>preferred=true</code>), także wtedy, gdy inna sesja jest przełączona na random.</td><td><span class="tag att">tak, potwierdzone</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px"><strong>Co z tego wynika.</strong> Opcja B działa: każda sesja ma własne konto, a zlecenie z jednej nie jest widoczne w drugiej. Strumień nie przeszkadza w puli sesji. Co więcej, w tym pomiarze nie zerwało go nawet przełączenie konta na <em>tej samej</em> sesji. Ostrzeżenie w docstringu <code>PUT /accounts/active</code> się nie odtworzyło (okno obserwacji 10 s po przełączeniu). Pomiar 3 potwierdza ukryty błąd dzisiejszego systemu: jeśli ktoś przełączy produkcję na konto inne niż preferowane, bramka po wygaśnięciu sesji wróci na demo2 i nic tego nie zgłosi. Dziś nic to nie psuje, bo produkcja stoi na demo2, czyli na koncie preferowanym.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Plan</div>
+      <h2>Jedna zmiana OpenSpec i jedna poprawka</h2>
+      <p><strong>Poprawka niezależna od planu:</strong> <code>client.py</code> po ponownym logowaniu powinien przywrócić konto, które było aktywne przed wygaśnięciem sesji. To zwykła gałąź z poprawką błędu (pomiar 3), bez OpenSpec.</p>
+      <p>Zmieniają się: kontrakt bramki (<code>dtos.py</code>, trasy), snapshot OpenAPI w <code>trading-mcp</code>, kontrakt teamów i wygenerowany kontrakt terminala. Według <code>CLAUDE.md</code> to zmiana OpenSpec, a nie zwykła gałąź z poprawką.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Krok</th><th>Moduł</th><th>Co</th></tr></thead>
+          <tbody>
+            <tr><td class="n">0</td><td><b>capital-gateway</b></td><td><span class="tag ok">zrobione</span> Pomiary 1–3 z sekcji 08 rozstrzygnęły na korzyść B. Do zrobienia: przenieść je do testów <code>-m live --run-live-trading</code>, żeby zmiana zachowania capital.com była widoczna.</td></tr>
+            <tr><td class="n">1</td><td><b>capital-gateway</b></td><td>Pula sesji po koncie, wspólny <code>RateGate</code>, osobna sesja strumienia i ponowne przełączenie konta po ponownym logowaniu. Trasy kont przyjmują <code>account_id</code> (w nagłówku albo w ścieżce). Bez niego działają na koncie domyślnym, czyli tak jak dziś.</td></tr>
+            <tr><td class="n">2</td><td><b>trading-mcp</b></td><td>Opcjonalny <code>account_id</code> w każdym narzędziu konta i zleceń. Przekazanie go do bramki, konto w śladzie <code>trading_mcp.trace</code>, <code>contract.py check</code>.</td></tr>
+            <tr><td class="n">3</td><td><b>workbench / teams</b></td><td>Pole <code>trading.account_id</code>, wstrzykiwanie konta w silniku, usunięcie <code>switch_active_account</code> z narzędzi teamów, kolumna konta w <code>trades</code> (migracja w <code>lifespan</code>, jak każda).</td></tr>
+            <tr><td class="n">4</td><td><b>terminal</b></td><td>Wybór konta w edytorze teamu i pozycje dla każdego konta. Potem <code>contract-sync</code>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px"><strong>Doraźnie, zanim ta zmiana powstanie:</strong> teamy grające jednocześnie mogą bezpiecznie dzielić <em>jedno</em> konto tylko wtedy, gdy handlują różnymi instrumentami i żaden nie woła <code>switch_active_account</code> ani nie zamyka wszystkich pozycji. Nawet wtedy wyniki mieszają się w saldzie i nie ma izolacji.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>TradingCenter · research wielu kont demo · 28.10.2026</span>
+    <span>Źródła: capital-gateway/client.py, app.py · trading-mcp/tools/account.py · teams/runner, store</span>
+  </div>
+</footer>
