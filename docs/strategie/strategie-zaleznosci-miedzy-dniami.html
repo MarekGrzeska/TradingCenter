@@ -1,0 +1,897 @@
+<title>Szablon dokumentu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+
+<title>Zależności między dniami</title>
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 18px; }
+  .card { background: var(--card); border: 1px solid var(--line); padding: 16px 18px; }
+  .card h3 { font-family: var(--head); font-weight: 700; font-size: 19px; color: var(--ink); margin: 0 0 6px; letter-spacing: -0.015em; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .card p { font-size: 15px; margin: 0 0 8px; }
+  .card .rule { font-family: var(--mono); font-size: 12.5px; color: var(--navy); background: var(--navy-soft); padding: 8px 10px; margin: 8px 0; line-height: 1.55; }
+  .card dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 14px; margin: 8px 0 0; }
+  .card dt { color: var(--ink-3); }
+  .card dd { margin: 0; color: var(--ink); font-variant-numeric: tabular-nums; }
+  td.pos { background: var(--green-soft); }
+  td.neg { background: var(--red-soft); }
+  td.h1 { background: #c9d6ee; } td.h2 { background: #a9bde3; } td.h3 { background: #86a1d6; color: #fff; } td.h4 { background: #5a7cc4; color: #fff; }
+  tr.ref td { color: var(--ink-3); background: #f6f5f0; }
+  tr.best td { background: var(--yellow-soft); }
+  td.nw, th.nw { white-space: nowrap; }
+  ul.plain { margin: 0 0 16px; padding-left: 20px; max-width: 70ch; }
+  ul.plain li { margin-bottom: 6px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--ink-2); margin: 0 0 8px; }
+  .legend i { display: inline-block; width: 14px; height: 3px; vertical-align: middle; margin-right: 6px; }
+  .legend i.sq { height: 10px; width: 10px; border-radius: 2px; }
+</style>
+
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Badanie · zależności między dniami i sesjami</span>
+    <h1>Co wczorajsza sesja i dzień tygodnia mówią o dzisiejszym</h1>
+    <p class="lede">Sprawdziłem kilkadziesiąt zależności między sesjami i dniami US100 od 2017 roku. Przetrwała jedna rodzina: <b>słabe zamknięcie sesji nowojorskiej zapowiada odbicie</b> w nocy i przez 1–2 dni. Do tego jeden filtr do strategii 6, który podnosi jej Sharpe z 1,81 do <b>2,23</b> i o połowę zmniejsza obsunięcie. W dniach tygodnia wyróżnia się poniedziałek, a <b>odbicie po mocnym spadku działa tylko na początku tygodnia</b>.</p>
+    <div class="strip">
+      <span>TradingCenter / strategie</span>
+      <span>27 października 2026</span>
+      <span>US100 · H1 od <b>V 2017</b> · M5/M30 od <b>I 2024</b></span>
+      <span>archiwum i silnik <b>/strategies</b> produkcji · 11 nowych strategii (#31–#41) · 22 przebiegi</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">2,23</div><div class="l">Sharpe #34: strategia 6 bez shortów po spadkowej sesji, max DD 16% (2024–26)</div></div>
+      <div class="cell"><div class="v">+70&nbsp;bp</div><div class="l">netto na transakcję po zamknięciu sesji w dolnych 10% zakresu (2017–26, t 4,6)</div></div>
+      <div class="cell"><div class="v">10 / 0</div><div class="l">bp za noc 18:00→10:00 po zamknięciu w dolnej / górnej połowie zakresu</div></div>
+      <div class="cell"><div class="v">+59 / +12</div><div class="l">bp na transakcję po mocnym spadku: kupno w pon–wt / w śr–pt (#38, 2017–26)</div></div>
+      <div class="cell"><div class="v">+18&nbsp;bp</div><div class="l">poniedziałek, 63% dni wzrostowych; jedyny istotny dzień tygodnia</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Metoda</div>
+      <h2>Najpierw statystyka poza silnikiem, potem silnik</h2>
+      <p class="intro">Każdy dzień rozłożyłem na odcinki czasu nowojorskiego: noc (16:00 → otwarcie), sesję, pierwszą i ostatnią godzinę, Azję (18:00–2:00), Europę (2:00 → otwarcie) i godzinę po zamknięciu. Potem sprawdziłem, które odcinki przewidują które, i dopiero kandydatów, którzy przetrwali, przeliczyłem w silniku.</p>
+      <ul class="plain">
+        <li><strong>Dane.</strong> Świece z archiwum produkcji przez MCP (po 200 na wywołanie): US100 H1 od maja 2017 (55 625 świec), M30 i M5 od stycznia 2024 (34 101 i 204 012), D1 od 2016, BTCUSD D1 i H1, złoto i ropa od 2026. Na H1 sesja zaczyna się o 10:00, na M30 i M5 o 9:30.</li>
+        <li><strong>Koszty.</strong> Spread 1,8 pkt na transakcję i finansowanie longa 2,22 bp za każdą noc przetrzymaną przez 21:00 UTC (weekend ×3), jak w profilu brokera. Bez poślizgu.</li>
+        <li><strong>Podział próby.</strong> 2017–2022 to część, w której szukam, a 2023–2026 to sprawdzenie. Dla M5 porównuję 2024 z 2025–26.</li>
+        <li><strong>Dwie skale wyników.</strong> „Offline” to bp na transakcję bez dźwigni. Silnik to depozyt 20% (4×), procent składany i Sharpe z dziennego kapitału ×√365, jak w poprzednich raportach. Repliki #6 i #24 poza silnikiem dają 393 i 722 transakcje (silnik 388 i 722) i Sharpe 1,84 wobec 1,88, więc obie skale mierzą to samo.</li>
+        <li><strong>Podział pracy.</strong> Trzech subagentów: otwarcie względem wczoraj (luki, poziomy, zakresy), sekwencje wielodniowe z kalendarzem i BTC, oraz przegląd literatury (19 efektów ze źródłami).</li>
+      </ul>
+      <p><span class="hl">W tabelach tego badania jest ok. 200 komórek, więc kilka przekroczy |t| = 2 przypadkiem.</span> Dlatego regułę zostawiam tylko wtedy, gdy ma ten sam znak w obu okresach, leży na płaskowyżu parametrów (nie na jednym progu) i ma mechanizm opisany w literaturze.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Mapa zależności</div>
+      <h2>Odwrócenie wygrywa z kontynuacją</h2>
+      <p>Korelacja rangowa (×100) między odcinkiem znanym w chwili decyzji a odcinkiem, który po nim następuje. Przy ok. 2300 dniach wartość 4 to mniej więcej t = 2.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Co wiadomo</th><th>Co przewiduje</th><th class="n">2017–26</th><th class="n">2017–22</th><th class="n">2023–26</th><th class="n">t</th><th>Ocena</th></tr></thead>
+          <tbody>
+            <tr><td><b>ostatnia godzina sesji (15–16)</b></td><td>noc</td><td class="n">−7,5</td><td class="n">−7,7</td><td class="n">−7,1</td><td class="n">−3,6</td><td><span class="tag ok">stabilne</span></td></tr>
+            <tr><td><b>miejsce zamknięcia w zakresie sesji (IBS)</b></td><td>noc</td><td class="n">−6,1</td><td class="n">−5,8</td><td class="n">−6,5</td><td class="n">−2,9</td><td><span class="tag ok">stabilne</span></td></tr>
+            <tr><td><b>noc (16:00 → 10:00)</b></td><td>sesja od 11:00</td><td class="n">+8,4</td><td class="n">+9,9</td><td class="n">+6,4</td><td class="n">+4,0</td><td><span class="tag att">to strategia 6</span></td></tr>
+            <tr><td><b>Europa (2:00 → 10:00)</b></td><td>sesja NY</td><td class="n">+6,5</td><td class="n">+6,1</td><td class="n">+6,9</td><td class="n">+3,1</td><td><span class="tag att">tylko górny kwintyl</span></td></tr>
+            <tr><td><b>wczorajsza sesja NY</b></td><td>dzisiejsza sesja NY</td><td class="n">−5,0</td><td class="n">−7,0</td><td class="n">−2,1</td><td class="n">−2,4</td><td><span class="tag att">słabnie</span></td></tr>
+            <tr><td>wczorajsza sesja NY</td><td>noc</td><td class="n">−2,0</td><td class="n">−2,1</td><td class="n">−1,9</td><td class="n">−1,0</td><td>słabe</td></tr>
+            <tr><td>wczorajszy zakres / ATR</td><td>dzień (16:00 → 16:00)</td><td class="n">+5,4</td><td class="n">+0,9</td><td class="n">+11,8</td><td class="n">+2,6</td><td>tylko po 2023</td></tr>
+            <tr><td>Azja (18:00 → 2:00)</td><td>sesja NY</td><td class="n">−0,7</td><td class="n">+3,3</td><td class="n">−7,0</td><td class="n">−0,3</td><td><span class="tag stop">zmienia znak</span></td></tr>
+            <tr><td>pierwsza godzina</td><td>ostatnia godzina</td><td class="n">+1,6</td><td class="n">+1,9</td><td class="n">+1,2</td><td class="n">+0,8</td><td>nic</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Dwa pierwsze wiersze to jedno zjawisko: <strong>to, jak sesja się kończy, mówi o nocy</strong>. Gdy ostatnia godzina wyprzedaje i sesja zamyka się przy minimum, noc częściej rośnie. Trzeci wiersz wygląda na najmocniejszy, ale jego dzienny wynik koreluje ze strategią 6 w 0,40. W dni, w które strategia 6 nie handluje, daje −3,6 bp, więc nic nowego nie wnosi. Piąty wiersz to odwrócenie sesji, opisane w raporcie z 26.10. Tu wraca jako filtr do strategii 6 (sekcja 09).</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Zamknięcie przy dole</div>
+      <h2>Słabe zamknięcie odrabia się przez dwie sesje</h2>
+      <p class="intro">Po sesji zamkniętej w dolnych 20% zakresu (418 dni) cena przez dwie kolejne sesje rośnie średnio o 56 bp. Wszystkie dni dają w tym czasie 14 bp, a dni zamknięte w górnych 20% jeszcze mniej.</p>
+      <figure>
+        <div class="legend"><span><i style="background:#2a55b0"></i>zamknięcie w dolnych 20% zakresu (n 418)</span><span><i style="background:#8a8f9e"></i>wszystkie dni (n 2305)</span><span><i style="background:#c27a00"></i>zamknięcie w górnych 20% (n 724)</span></div>
+        <div class="scroll"><svg viewBox="0 0 900 360" role="img" aria-label="Średnia skumulowana zmiana US100 od zamknięcia sesji o 16:00 przez dwie kolejne sesje, dla trzech grup dni">
+<rect x="311.2" y="20" width="90.8" height="292" fill="#e6ebf5"/>
+<text x="356.6" y="34" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#14306b" opacity="0.7">sesja NY</text>
+<rect x="659.2" y="20" width="90.8" height="292" fill="#e6ebf5"/>
+<text x="704.6" y="34" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#14306b" opacity="0.7">sesja NY</text>
+<line x1="54" x2="750" y1="289.5" y2="289.5" stroke="#ebe8de" stroke-width="1"/>
+<text x="46" y="293.5" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">0</text>
+<line x1="54" x2="750" y1="244.6" y2="244.6" stroke="#ebe8de" stroke-width="1"/>
+<text x="46" y="248.6" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">10</text>
+<line x1="54" x2="750" y1="199.7" y2="199.7" stroke="#ebe8de" stroke-width="1"/>
+<text x="46" y="203.7" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">20</text>
+<line x1="54" x2="750" y1="154.8" y2="154.8" stroke="#ebe8de" stroke-width="1"/>
+<text x="46" y="158.8" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">30</text>
+<line x1="54" x2="750" y1="109.8" y2="109.8" stroke="#ebe8de" stroke-width="1"/>
+<text x="46" y="113.8" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">40</text>
+<line x1="54" x2="750" y1="64.9" y2="64.9" stroke="#ebe8de" stroke-width="1"/>
+<text x="46" y="68.9" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">50</text>
+<line x1="54" x2="750" y1="20.0" y2="20.0" stroke="#ebe8de" stroke-width="1"/>
+<text x="46" y="24.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">60</text>
+<line x1="54" x2="750" y1="289.5" y2="289.5" stroke="#85899a" stroke-width="1"/>
+<text x="54.0" y="330" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">16:00 · D0</text>
+<text x="311.2" y="330" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">10:00</text>
+<text x="402.0" y="330" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">16:00 · D+1</text>
+<text x="659.2" y="330" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">10:00</text>
+<text x="750.0" y="330" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">16:00 · D+2</text>
+<text x="46" y="330" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">bp</text>
+<polyline points="54.0,289.5 69.1,288.3 84.3,280.6 99.4,285.1 114.5,275.7 129.7,272.3 144.8,267.6 159.9,264.7 175.0,259.6 190.2,254.2 205.3,241.4 220.4,245.2 235.6,237.3 250.7,236.1 265.8,233.9 281.0,246.4 296.1,226.8 311.2,220.8 326.3,212.4 341.5,208.5 356.6,215.2 371.7,214.1 386.9,172.5 402.0,173.4 417.1,162.3 432.3,149.3 447.4,139.0 462.5,154.4 477.7,152.7 492.8,148.3 507.9,149.0 523.0,140.4 538.2,138.5 553.3,131.2 568.4,132.3 583.6,131.1 598.7,125.3 613.8,124.0 629.0,118.9 644.1,111.8 659.2,106.6 674.3,97.5 689.5,90.4 704.6,77.6 719.7,76.0 734.9,50.6 750.0,37.6" fill="none" stroke="#2a55b0" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="750.0" cy="37.6" r="4" fill="#2a55b0" stroke="#fff" stroke-width="2"/>
+<text x="760.0" y="41.6" font-size="12" fill="#16181d"><tspan font-weight="700">+56,1</tspan> <tspan fill="#4f535e">dolne 20%</tspan></text>
+<circle cx="54.0" cy="289.5" r="7" fill="transparent"><title>dolne 20%, 16:00 ET: +0,0 bp (n = 418)</title></circle>
+<circle cx="69.1" cy="288.3" r="7" fill="transparent"><title>dolne 20%, 17:00 ET: +0,3 bp (n = 418)</title></circle>
+<circle cx="84.3" cy="280.6" r="7" fill="transparent"><title>dolne 20%, 19:00 ET: +2,0 bp (n = 418)</title></circle>
+<circle cx="99.4" cy="285.1" r="7" fill="transparent"><title>dolne 20%, 20:00 ET: +1,0 bp (n = 418)</title></circle>
+<circle cx="114.5" cy="275.7" r="7" fill="transparent"><title>dolne 20%, 21:00 ET: +3,1 bp (n = 418)</title></circle>
+<circle cx="129.7" cy="272.3" r="7" fill="transparent"><title>dolne 20%, 22:00 ET: +3,8 bp (n = 418)</title></circle>
+<circle cx="144.8" cy="267.6" r="7" fill="transparent"><title>dolne 20%, 23:00 ET: +4,9 bp (n = 418)</title></circle>
+<circle cx="159.9" cy="264.7" r="7" fill="transparent"><title>dolne 20%, 24:00 ET: +5,5 bp (n = 418)</title></circle>
+<circle cx="175.0" cy="259.6" r="7" fill="transparent"><title>dolne 20%, 01:00 ET: +6,7 bp (n = 418)</title></circle>
+<circle cx="190.2" cy="254.2" r="7" fill="transparent"><title>dolne 20%, 02:00 ET: +7,9 bp (n = 418)</title></circle>
+<circle cx="205.3" cy="241.4" r="7" fill="transparent"><title>dolne 20%, 03:00 ET: +10,7 bp (n = 418)</title></circle>
+<circle cx="220.4" cy="245.2" r="7" fill="transparent"><title>dolne 20%, 04:00 ET: +9,9 bp (n = 418)</title></circle>
+<circle cx="235.6" cy="237.3" r="7" fill="transparent"><title>dolne 20%, 05:00 ET: +11,6 bp (n = 418)</title></circle>
+<circle cx="250.7" cy="236.1" r="7" fill="transparent"><title>dolne 20%, 06:00 ET: +11,9 bp (n = 418)</title></circle>
+<circle cx="265.8" cy="233.9" r="7" fill="transparent"><title>dolne 20%, 07:00 ET: +12,4 bp (n = 418)</title></circle>
+<circle cx="281.0" cy="246.4" r="7" fill="transparent"><title>dolne 20%, 08:00 ET: +9,6 bp (n = 418)</title></circle>
+<circle cx="296.1" cy="226.8" r="7" fill="transparent"><title>dolne 20%, 09:00 ET: +14,0 bp (n = 418)</title></circle>
+<circle cx="311.2" cy="220.8" r="7" fill="transparent"><title>dolne 20%, 10:00 ET: +15,3 bp (n = 418)</title></circle>
+<circle cx="326.3" cy="212.4" r="7" fill="transparent"><title>dolne 20%, 11:00 ET: +17,2 bp (n = 418)</title></circle>
+<circle cx="341.5" cy="208.5" r="7" fill="transparent"><title>dolne 20%, 12:00 ET: +18,0 bp (n = 418)</title></circle>
+<circle cx="356.6" cy="215.2" r="7" fill="transparent"><title>dolne 20%, 13:00 ET: +16,5 bp (n = 418)</title></circle>
+<circle cx="371.7" cy="214.1" r="7" fill="transparent"><title>dolne 20%, 14:00 ET: +16,8 bp (n = 418)</title></circle>
+<circle cx="386.9" cy="172.5" r="7" fill="transparent"><title>dolne 20%, 15:00 ET: +26,1 bp (n = 418)</title></circle>
+<circle cx="402.0" cy="173.4" r="7" fill="transparent"><title>dolne 20%, 16:00 ET: +25,9 bp (n = 418)</title></circle>
+<circle cx="417.1" cy="162.3" r="7" fill="transparent"><title>dolne 20%, 17:00 ET: +28,3 bp (n = 418)</title></circle>
+<circle cx="432.3" cy="149.3" r="7" fill="transparent"><title>dolne 20%, 19:00 ET: +31,2 bp (n = 418)</title></circle>
+<circle cx="447.4" cy="139.0" r="7" fill="transparent"><title>dolne 20%, 20:00 ET: +33,5 bp (n = 418)</title></circle>
+<circle cx="462.5" cy="154.4" r="7" fill="transparent"><title>dolne 20%, 21:00 ET: +30,1 bp (n = 418)</title></circle>
+<circle cx="477.7" cy="152.7" r="7" fill="transparent"><title>dolne 20%, 22:00 ET: +30,4 bp (n = 418)</title></circle>
+<circle cx="492.8" cy="148.3" r="7" fill="transparent"><title>dolne 20%, 23:00 ET: +31,4 bp (n = 418)</title></circle>
+<circle cx="507.9" cy="149.0" r="7" fill="transparent"><title>dolne 20%, 24:00 ET: +31,3 bp (n = 418)</title></circle>
+<circle cx="523.0" cy="140.4" r="7" fill="transparent"><title>dolne 20%, 01:00 ET: +33,2 bp (n = 418)</title></circle>
+<circle cx="538.2" cy="138.5" r="7" fill="transparent"><title>dolne 20%, 02:00 ET: +33,6 bp (n = 418)</title></circle>
+<circle cx="553.3" cy="131.2" r="7" fill="transparent"><title>dolne 20%, 03:00 ET: +35,2 bp (n = 418)</title></circle>
+<circle cx="568.4" cy="132.3" r="7" fill="transparent"><title>dolne 20%, 04:00 ET: +35,0 bp (n = 418)</title></circle>
+<circle cx="583.6" cy="131.1" r="7" fill="transparent"><title>dolne 20%, 05:00 ET: +35,3 bp (n = 418)</title></circle>
+<circle cx="598.7" cy="125.3" r="7" fill="transparent"><title>dolne 20%, 06:00 ET: +36,6 bp (n = 418)</title></circle>
+<circle cx="613.8" cy="124.0" r="7" fill="transparent"><title>dolne 20%, 07:00 ET: +36,8 bp (n = 418)</title></circle>
+<circle cx="629.0" cy="118.9" r="7" fill="transparent"><title>dolne 20%, 08:00 ET: +38,0 bp (n = 418)</title></circle>
+<circle cx="644.1" cy="111.8" r="7" fill="transparent"><title>dolne 20%, 09:00 ET: +39,6 bp (n = 418)</title></circle>
+<circle cx="659.2" cy="106.6" r="7" fill="transparent"><title>dolne 20%, 10:00 ET: +40,7 bp (n = 418)</title></circle>
+<circle cx="674.3" cy="97.5" r="7" fill="transparent"><title>dolne 20%, 11:00 ET: +42,8 bp (n = 418)</title></circle>
+<circle cx="689.5" cy="90.4" r="7" fill="transparent"><title>dolne 20%, 12:00 ET: +44,3 bp (n = 418)</title></circle>
+<circle cx="704.6" cy="77.6" r="7" fill="transparent"><title>dolne 20%, 13:00 ET: +47,2 bp (n = 418)</title></circle>
+<circle cx="719.7" cy="76.0" r="7" fill="transparent"><title>dolne 20%, 14:00 ET: +47,5 bp (n = 418)</title></circle>
+<circle cx="734.9" cy="50.6" r="7" fill="transparent"><title>dolne 20%, 15:00 ET: +53,2 bp (n = 418)</title></circle>
+<circle cx="750.0" cy="37.6" r="7" fill="transparent"><title>dolne 20%, 16:00 ET: +56,1 bp (n = 418)</title></circle>
+<polyline points="54.0,289.5 69.1,288.2 84.3,284.5 99.4,283.9 114.5,281.5 129.7,281.5 144.8,279.2 159.9,279.1 175.0,277.2 190.2,275.9 205.3,272.3 220.4,268.7 235.6,264.6 250.7,264.9 265.8,265.4 281.0,266.7 296.1,266.3 311.2,263.6 326.3,268.5 341.5,259.4 356.6,261.9 371.7,262.5 386.9,252.8 402.0,260.3 417.1,257.8 432.3,254.8 447.4,250.9 462.5,251.1 477.7,251.1 492.8,247.8 507.9,247.5 523.0,246.5 538.2,246.6 553.3,242.5 568.4,240.6 583.6,236.0 598.7,235.0 613.8,234.4 629.0,236.1 644.1,237.2 659.2,234.0 674.3,236.5 689.5,229.9 704.6,229.7 719.7,226.6 734.9,221.7 750.0,225.7" fill="none" stroke="#8a8f9e" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="750.0" cy="225.7" r="4" fill="#8a8f9e" stroke="#fff" stroke-width="2"/>
+<text x="760.0" y="229.7" font-size="12" fill="#16181d"><tspan font-weight="700">+14,2</tspan> <tspan fill="#4f535e">wszystkie</tspan></text>
+<circle cx="54.0" cy="289.5" r="7" fill="transparent"><title>wszystkie, 16:00 ET: +0,0 bp (n = 2305)</title></circle>
+<circle cx="69.1" cy="288.2" r="7" fill="transparent"><title>wszystkie, 17:00 ET: +0,3 bp (n = 2305)</title></circle>
+<circle cx="84.3" cy="284.5" r="7" fill="transparent"><title>wszystkie, 19:00 ET: +1,1 bp (n = 2305)</title></circle>
+<circle cx="99.4" cy="283.9" r="7" fill="transparent"><title>wszystkie, 20:00 ET: +1,2 bp (n = 2305)</title></circle>
+<circle cx="114.5" cy="281.5" r="7" fill="transparent"><title>wszystkie, 21:00 ET: +1,8 bp (n = 2305)</title></circle>
+<circle cx="129.7" cy="281.5" r="7" fill="transparent"><title>wszystkie, 22:00 ET: +1,8 bp (n = 2305)</title></circle>
+<circle cx="144.8" cy="279.2" r="7" fill="transparent"><title>wszystkie, 23:00 ET: +2,3 bp (n = 2305)</title></circle>
+<circle cx="159.9" cy="279.1" r="7" fill="transparent"><title>wszystkie, 24:00 ET: +2,3 bp (n = 2305)</title></circle>
+<circle cx="175.0" cy="277.2" r="7" fill="transparent"><title>wszystkie, 01:00 ET: +2,7 bp (n = 2305)</title></circle>
+<circle cx="190.2" cy="275.9" r="7" fill="transparent"><title>wszystkie, 02:00 ET: +3,0 bp (n = 2305)</title></circle>
+<circle cx="205.3" cy="272.3" r="7" fill="transparent"><title>wszystkie, 03:00 ET: +3,8 bp (n = 2305)</title></circle>
+<circle cx="220.4" cy="268.7" r="7" fill="transparent"><title>wszystkie, 04:00 ET: +4,6 bp (n = 2305)</title></circle>
+<circle cx="235.6" cy="264.6" r="7" fill="transparent"><title>wszystkie, 05:00 ET: +5,6 bp (n = 2305)</title></circle>
+<circle cx="250.7" cy="264.9" r="7" fill="transparent"><title>wszystkie, 06:00 ET: +5,5 bp (n = 2305)</title></circle>
+<circle cx="265.8" cy="265.4" r="7" fill="transparent"><title>wszystkie, 07:00 ET: +5,4 bp (n = 2305)</title></circle>
+<circle cx="281.0" cy="266.7" r="7" fill="transparent"><title>wszystkie, 08:00 ET: +5,1 bp (n = 2305)</title></circle>
+<circle cx="296.1" cy="266.3" r="7" fill="transparent"><title>wszystkie, 09:00 ET: +5,2 bp (n = 2305)</title></circle>
+<circle cx="311.2" cy="263.6" r="7" fill="transparent"><title>wszystkie, 10:00 ET: +5,8 bp (n = 2305)</title></circle>
+<circle cx="326.3" cy="268.5" r="7" fill="transparent"><title>wszystkie, 11:00 ET: +4,7 bp (n = 2305)</title></circle>
+<circle cx="341.5" cy="259.4" r="7" fill="transparent"><title>wszystkie, 12:00 ET: +6,7 bp (n = 2305)</title></circle>
+<circle cx="356.6" cy="261.9" r="7" fill="transparent"><title>wszystkie, 13:00 ET: +6,2 bp (n = 2305)</title></circle>
+<circle cx="371.7" cy="262.5" r="7" fill="transparent"><title>wszystkie, 14:00 ET: +6,0 bp (n = 2305)</title></circle>
+<circle cx="386.9" cy="252.8" r="7" fill="transparent"><title>wszystkie, 15:00 ET: +8,2 bp (n = 2305)</title></circle>
+<circle cx="402.0" cy="260.3" r="7" fill="transparent"><title>wszystkie, 16:00 ET: +6,5 bp (n = 2305)</title></circle>
+<circle cx="417.1" cy="257.8" r="7" fill="transparent"><title>wszystkie, 17:00 ET: +7,1 bp (n = 2305)</title></circle>
+<circle cx="432.3" cy="254.8" r="7" fill="transparent"><title>wszystkie, 19:00 ET: +7,7 bp (n = 2305)</title></circle>
+<circle cx="447.4" cy="250.9" r="7" fill="transparent"><title>wszystkie, 20:00 ET: +8,6 bp (n = 2305)</title></circle>
+<circle cx="462.5" cy="251.1" r="7" fill="transparent"><title>wszystkie, 21:00 ET: +8,6 bp (n = 2305)</title></circle>
+<circle cx="477.7" cy="251.1" r="7" fill="transparent"><title>wszystkie, 22:00 ET: +8,6 bp (n = 2305)</title></circle>
+<circle cx="492.8" cy="247.8" r="7" fill="transparent"><title>wszystkie, 23:00 ET: +9,3 bp (n = 2305)</title></circle>
+<circle cx="507.9" cy="247.5" r="7" fill="transparent"><title>wszystkie, 24:00 ET: +9,4 bp (n = 2305)</title></circle>
+<circle cx="523.0" cy="246.5" r="7" fill="transparent"><title>wszystkie, 01:00 ET: +9,6 bp (n = 2305)</title></circle>
+<circle cx="538.2" cy="246.6" r="7" fill="transparent"><title>wszystkie, 02:00 ET: +9,6 bp (n = 2305)</title></circle>
+<circle cx="553.3" cy="242.5" r="7" fill="transparent"><title>wszystkie, 03:00 ET: +10,5 bp (n = 2305)</title></circle>
+<circle cx="568.4" cy="240.6" r="7" fill="transparent"><title>wszystkie, 04:00 ET: +10,9 bp (n = 2305)</title></circle>
+<circle cx="583.6" cy="236.0" r="7" fill="transparent"><title>wszystkie, 05:00 ET: +11,9 bp (n = 2305)</title></circle>
+<circle cx="598.7" cy="235.0" r="7" fill="transparent"><title>wszystkie, 06:00 ET: +12,1 bp (n = 2305)</title></circle>
+<circle cx="613.8" cy="234.4" r="7" fill="transparent"><title>wszystkie, 07:00 ET: +12,3 bp (n = 2305)</title></circle>
+<circle cx="629.0" cy="236.1" r="7" fill="transparent"><title>wszystkie, 08:00 ET: +11,9 bp (n = 2305)</title></circle>
+<circle cx="644.1" cy="237.2" r="7" fill="transparent"><title>wszystkie, 09:00 ET: +11,7 bp (n = 2305)</title></circle>
+<circle cx="659.2" cy="234.0" r="7" fill="transparent"><title>wszystkie, 10:00 ET: +12,4 bp (n = 2305)</title></circle>
+<circle cx="674.3" cy="236.5" r="7" fill="transparent"><title>wszystkie, 11:00 ET: +11,8 bp (n = 2305)</title></circle>
+<circle cx="689.5" cy="229.9" r="7" fill="transparent"><title>wszystkie, 12:00 ET: +13,3 bp (n = 2305)</title></circle>
+<circle cx="704.6" cy="229.7" r="7" fill="transparent"><title>wszystkie, 13:00 ET: +13,3 bp (n = 2305)</title></circle>
+<circle cx="719.7" cy="226.6" r="7" fill="transparent"><title>wszystkie, 14:00 ET: +14,0 bp (n = 2305)</title></circle>
+<circle cx="734.9" cy="221.7" r="7" fill="transparent"><title>wszystkie, 15:00 ET: +15,1 bp (n = 2305)</title></circle>
+<circle cx="750.0" cy="225.7" r="7" fill="transparent"><title>wszystkie, 16:00 ET: +14,2 bp (n = 2305)</title></circle>
+<polyline points="54.0,289.5 69.1,289.5 84.3,293.2 99.4,294.7 114.5,293.7 129.7,291.2 144.8,290.8 159.9,293.0 175.0,293.0 190.2,290.9 205.3,288.6 220.4,282.8 235.6,282.4 250.7,280.2 265.8,285.9 281.0,286.2 296.1,286.1 311.2,288.5 326.3,283.7 341.5,275.7 356.6,278.4 371.7,281.7 386.9,278.5 402.0,289.0 417.1,291.3 432.3,289.4 447.4,288.8 462.5,282.1 477.7,280.1 492.8,275.0 507.9,274.6 523.0,276.4 538.2,277.8 553.3,270.6 568.4,266.4 583.6,264.6 598.7,266.0 613.8,267.9 629.0,267.6 644.1,267.1 659.2,258.9 674.3,267.9 689.5,259.8 704.6,250.2 719.7,250.7 734.9,251.1 750.0,262.0" fill="none" stroke="#c27a00" stroke-width="2" stroke-linejoin="round"/>
+<circle cx="750.0" cy="262.0" r="4" fill="#c27a00" stroke="#fff" stroke-width="2"/>
+<text x="760.0" y="266.0" font-size="12" fill="#16181d"><tspan font-weight="700">+6,1</tspan> <tspan fill="#4f535e">górne 20%</tspan></text>
+<circle cx="54.0" cy="289.5" r="7" fill="transparent"><title>górne 20%, 16:00 ET: +0,0 bp (n = 724)</title></circle>
+<circle cx="69.1" cy="289.5" r="7" fill="transparent"><title>górne 20%, 17:00 ET: +0,0 bp (n = 724)</title></circle>
+<circle cx="84.3" cy="293.2" r="7" fill="transparent"><title>górne 20%, 19:00 ET: −0,8 bp (n = 724)</title></circle>
+<circle cx="99.4" cy="294.7" r="7" fill="transparent"><title>górne 20%, 20:00 ET: −1,1 bp (n = 724)</title></circle>
+<circle cx="114.5" cy="293.7" r="7" fill="transparent"><title>górne 20%, 21:00 ET: −0,9 bp (n = 724)</title></circle>
+<circle cx="129.7" cy="291.2" r="7" fill="transparent"><title>górne 20%, 22:00 ET: −0,4 bp (n = 724)</title></circle>
+<circle cx="144.8" cy="290.8" r="7" fill="transparent"><title>górne 20%, 23:00 ET: −0,3 bp (n = 724)</title></circle>
+<circle cx="159.9" cy="293.0" r="7" fill="transparent"><title>górne 20%, 24:00 ET: −0,8 bp (n = 724)</title></circle>
+<circle cx="175.0" cy="293.0" r="7" fill="transparent"><title>górne 20%, 01:00 ET: −0,8 bp (n = 724)</title></circle>
+<circle cx="190.2" cy="290.9" r="7" fill="transparent"><title>górne 20%, 02:00 ET: −0,3 bp (n = 724)</title></circle>
+<circle cx="205.3" cy="288.6" r="7" fill="transparent"><title>górne 20%, 03:00 ET: +0,2 bp (n = 724)</title></circle>
+<circle cx="220.4" cy="282.8" r="7" fill="transparent"><title>górne 20%, 04:00 ET: +1,5 bp (n = 724)</title></circle>
+<circle cx="235.6" cy="282.4" r="7" fill="transparent"><title>górne 20%, 05:00 ET: +1,6 bp (n = 724)</title></circle>
+<circle cx="250.7" cy="280.2" r="7" fill="transparent"><title>górne 20%, 06:00 ET: +2,1 bp (n = 724)</title></circle>
+<circle cx="265.8" cy="285.9" r="7" fill="transparent"><title>górne 20%, 07:00 ET: +0,8 bp (n = 724)</title></circle>
+<circle cx="281.0" cy="286.2" r="7" fill="transparent"><title>górne 20%, 08:00 ET: +0,7 bp (n = 724)</title></circle>
+<circle cx="296.1" cy="286.1" r="7" fill="transparent"><title>górne 20%, 09:00 ET: +0,8 bp (n = 724)</title></circle>
+<circle cx="311.2" cy="288.5" r="7" fill="transparent"><title>górne 20%, 10:00 ET: +0,2 bp (n = 724)</title></circle>
+<circle cx="326.3" cy="283.7" r="7" fill="transparent"><title>górne 20%, 11:00 ET: +1,3 bp (n = 724)</title></circle>
+<circle cx="341.5" cy="275.7" r="7" fill="transparent"><title>górne 20%, 12:00 ET: +3,1 bp (n = 724)</title></circle>
+<circle cx="356.6" cy="278.4" r="7" fill="transparent"><title>górne 20%, 13:00 ET: +2,5 bp (n = 724)</title></circle>
+<circle cx="371.7" cy="281.7" r="7" fill="transparent"><title>górne 20%, 14:00 ET: +1,8 bp (n = 724)</title></circle>
+<circle cx="386.9" cy="278.5" r="7" fill="transparent"><title>górne 20%, 15:00 ET: +2,5 bp (n = 724)</title></circle>
+<circle cx="402.0" cy="289.0" r="7" fill="transparent"><title>górne 20%, 16:00 ET: +0,1 bp (n = 724)</title></circle>
+<circle cx="417.1" cy="291.3" r="7" fill="transparent"><title>górne 20%, 17:00 ET: −0,4 bp (n = 724)</title></circle>
+<circle cx="432.3" cy="289.4" r="7" fill="transparent"><title>górne 20%, 19:00 ET: +0,0 bp (n = 724)</title></circle>
+<circle cx="447.4" cy="288.8" r="7" fill="transparent"><title>górne 20%, 20:00 ET: +0,2 bp (n = 724)</title></circle>
+<circle cx="462.5" cy="282.1" r="7" fill="transparent"><title>górne 20%, 21:00 ET: +1,7 bp (n = 724)</title></circle>
+<circle cx="477.7" cy="280.1" r="7" fill="transparent"><title>górne 20%, 22:00 ET: +2,1 bp (n = 724)</title></circle>
+<circle cx="492.8" cy="275.0" r="7" fill="transparent"><title>górne 20%, 23:00 ET: +3,2 bp (n = 724)</title></circle>
+<circle cx="507.9" cy="274.6" r="7" fill="transparent"><title>górne 20%, 24:00 ET: +3,3 bp (n = 724)</title></circle>
+<circle cx="523.0" cy="276.4" r="7" fill="transparent"><title>górne 20%, 01:00 ET: +2,9 bp (n = 724)</title></circle>
+<circle cx="538.2" cy="277.8" r="7" fill="transparent"><title>górne 20%, 02:00 ET: +2,6 bp (n = 724)</title></circle>
+<circle cx="553.3" cy="270.6" r="7" fill="transparent"><title>górne 20%, 03:00 ET: +4,2 bp (n = 724)</title></circle>
+<circle cx="568.4" cy="266.4" r="7" fill="transparent"><title>górne 20%, 04:00 ET: +5,2 bp (n = 724)</title></circle>
+<circle cx="583.6" cy="264.6" r="7" fill="transparent"><title>górne 20%, 05:00 ET: +5,5 bp (n = 724)</title></circle>
+<circle cx="598.7" cy="266.0" r="7" fill="transparent"><title>górne 20%, 06:00 ET: +5,2 bp (n = 724)</title></circle>
+<circle cx="613.8" cy="267.9" r="7" fill="transparent"><title>górne 20%, 07:00 ET: +4,8 bp (n = 724)</title></circle>
+<circle cx="629.0" cy="267.6" r="7" fill="transparent"><title>górne 20%, 08:00 ET: +4,9 bp (n = 724)</title></circle>
+<circle cx="644.1" cy="267.1" r="7" fill="transparent"><title>górne 20%, 09:00 ET: +5,0 bp (n = 724)</title></circle>
+<circle cx="659.2" cy="258.9" r="7" fill="transparent"><title>górne 20%, 10:00 ET: +6,8 bp (n = 724)</title></circle>
+<circle cx="674.3" cy="267.9" r="7" fill="transparent"><title>górne 20%, 11:00 ET: +4,8 bp (n = 724)</title></circle>
+<circle cx="689.5" cy="259.8" r="7" fill="transparent"><title>górne 20%, 12:00 ET: +6,6 bp (n = 724)</title></circle>
+<circle cx="704.6" cy="250.2" r="7" fill="transparent"><title>górne 20%, 13:00 ET: +8,8 bp (n = 724)</title></circle>
+<circle cx="719.7" cy="250.7" r="7" fill="transparent"><title>górne 20%, 14:00 ET: +8,7 bp (n = 724)</title></circle>
+<circle cx="734.9" cy="251.1" r="7" fill="transparent"><title>górne 20%, 15:00 ET: +8,6 bp (n = 724)</title></circle>
+<circle cx="750.0" cy="262.0" r="7" fill="transparent"><title>górne 20%, 16:00 ET: +6,1 bp (n = 724)</title></circle>
+</svg></div>
+        <figcaption><b>Rys. 1</b> — średnia skumulowana zmiana US100 (bp) od zamknięcia o 16:00 ET przez dwie kolejne sesje, H1 2017–2026, bez kosztów. Niebieskie pasy to sesje NY. Przewaga ponad średnią narasta w nocy (ok. +10 bp do 10:00), w następnej sesji (kolejne +10) i w drugim dniu (+23). Najechanie kursorem pokazuje wartość w danej godzinie.</figcaption>
+      </figure>
+      <p style="margin-top:22px">Najprostsza wersja handlowa to sama noc, ale wejście o 18:00 ET, czyli po godzinie rolowania (21:00 UTC), a wyjście o 10:00, przed następną. Pozycja nie płaci wtedy finansowania, które w raporcie z 26.10 zjadało cały nocny dryf. <span class="hl">Dryf nie jest stały: pojawia się tylko po zamknięciu w dolnej połowie zakresu.</span></p>
+      <figure>
+        <div class="legend"><span><i class="sq" style="background:#2a55b0"></i>2017–2022</span><span><i class="sq" style="background:#c27a00"></i>2023–2026</span></div>
+        <div class="scroll"><svg viewBox="0 0 900 300" role="img" aria-label="Wynik nocy 18:00–10:00 po spadku według kwintyla IBS wczorajszej sesji, osobno dla lat 2017–2022 i 2023–2026">
+<line x1="54" x2="880" y1="244.0" y2="244.0" stroke="#ebe8de"/>
+<text x="46" y="248.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">-10</text>
+<line x1="54" x2="880" y1="207.3" y2="207.3" stroke="#ebe8de"/>
+<text x="46" y="211.3" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">-5</text>
+<line x1="54" x2="880" y1="170.7" y2="170.7" stroke="#ebe8de"/>
+<text x="46" y="174.7" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">0</text>
+<line x1="54" x2="880" y1="134.0" y2="134.0" stroke="#ebe8de"/>
+<text x="46" y="138.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">5</text>
+<line x1="54" x2="880" y1="97.3" y2="97.3" stroke="#ebe8de"/>
+<text x="46" y="101.3" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">10</text>
+<line x1="54" x2="880" y1="60.7" y2="60.7" stroke="#ebe8de"/>
+<text x="46" y="64.7" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">15</text>
+<line x1="54" x2="880" y1="24.0" y2="24.0" stroke="#ebe8de"/>
+<text x="46" y="28.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">20</text>
+<rect x="101.6" y="50.4" width="34" height="120.3" fill="#2a55b0" rx="3"><title>IBS 0,00–0,23, 2017–2022: +16,4 bp</title></rect>
+<text x="118.6" y="44.4" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+16,4</text>
+<rect x="137.6" y="73.1" width="34" height="97.5" fill="#c27a00" rx="3"><title>IBS 0,00–0,23, 2023–2026: +13,3 bp</title></rect>
+<text x="154.6" y="67.1" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+13,3</text>
+<text x="136.6" y="264" text-anchor="middle" font-size="11.5" fill="#4f535e">IBS 0,00–0,23</text>
+<text x="136.6" y="280" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">razem +15,1 · t 3,03</text>
+<rect x="266.8" y="142.1" width="34" height="28.6" fill="#2a55b0" rx="3"><title>IBS 0,23–0,48, 2017–2022: +3,9 bp</title></rect>
+<text x="283.8" y="136.1" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+3,9</text>
+<rect x="302.8" y="100.3" width="34" height="70.4" fill="#c27a00" rx="3"><title>IBS 0,23–0,48, 2023–2026: +9,6 bp</title></rect>
+<text x="319.8" y="94.3" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+9,6</text>
+<text x="301.8" y="264" text-anchor="middle" font-size="11.5" fill="#4f535e">IBS 0,23–0,48</text>
+<text x="301.8" y="280" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">razem +6,3 · t 1,39</text>
+<rect x="432.0" y="170.7" width="34" height="5.9" fill="#2a55b0" rx="3"><title>IBS 0,48–0,72, 2017–2022: −0,8 bp</title></rect>
+<text x="449.0" y="190.5" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">−0,8</text>
+<rect x="468.0" y="170.7" width="34" height="28.6" fill="#c27a00" rx="3"><title>IBS 0,48–0,72, 2023–2026: −3,9 bp</title></rect>
+<text x="485.0" y="213.3" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">−3,9</text>
+<text x="467.0" y="264" text-anchor="middle" font-size="11.5" fill="#4f535e">IBS 0,48–0,72</text>
+<text x="467.0" y="280" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">razem −2,1 · t −0,57</text>
+<rect x="597.2" y="163.3" width="34" height="7.3" fill="#2a55b0" rx="3"><title>IBS 0,72–0,88, 2017–2022: +1,0 bp</title></rect>
+<text x="614.2" y="157.3" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+1,0</text>
+<rect x="633.2" y="166.3" width="34" height="4.4" fill="#c27a00" rx="3"><title>IBS 0,72–0,88, 2023–2026: +0,6 bp</title></rect>
+<text x="650.2" y="160.3" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+0,6</text>
+<text x="632.2" y="264" text-anchor="middle" font-size="11.5" fill="#4f535e">IBS 0,72–0,88</text>
+<text x="632.2" y="280" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">razem +0,8 · t 0,22</text>
+<rect x="762.4" y="170.7" width="34" height="11.7" fill="#2a55b0" rx="3"><title>IBS 0,88–1,00, 2017–2022: −1,6 bp</title></rect>
+<text x="779.4" y="196.4" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">−1,6</text>
+<rect x="798.4" y="150.1" width="34" height="20.5" fill="#c27a00" rx="3"><title>IBS 0,88–1,00, 2023–2026: +2,8 bp</title></rect>
+<text x="815.4" y="144.1" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+2,8</text>
+<text x="797.4" y="264" text-anchor="middle" font-size="11.5" fill="#4f535e">IBS 0,88–1,00</text>
+<text x="797.4" y="280" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">razem +0,1 · t 0,04</text>
+<line x1="54" x2="880" y1="170.7" y2="170.7" stroke="#85899a"/>
+</svg></div>
+        <figcaption><b>Rys. 2</b> — wynik nocy 18:00→10:00 ET (bp netto spreadu, bez finansowania) według kwintyla IBS sesji z dnia poprzedniego. Dolne dwa kwintyle zarabiają w obu okresach, górne trzy są koło zera. Próg 0,2–0,6 daje 9,6–14,8 bp na noc.</figcaption>
+      </figure>
+
+      <h2 style="margin-top:44px">Dlaczego to lepsze od #30</h2>
+      <p>Strategia #30 liczy IBS z doby CFD (do 17:00), wymaga ceny nad SMA200 i ma próg 0,2. Rozłożyłem różnicę na trzy decyzje. Wszystkie wiersze to ta sama reguła wyjścia (IBS &gt; 0,8 albo zamknięcie nad wczorajszym maksimum, najwyżej 5 sesji), offline, bp netto na transakcję.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>IBS liczony</th><th class="n">próg</th><th>SMA200</th><th class="n">n</th><th class="n">bp</th><th class="n">t</th><th class="n">2017–22</th><th class="n">2023–26</th></tr></thead>
+          <tbody>
+            <tr class="best"><td><b>sesja NY, decyzja 16:00</b></td><td class="n">0,1</td><td>nie</td><td class="n">185</td><td class="n">+70,3</td><td class="n">4,57</td><td class="n">+72,8</td><td class="n">+66,4</td></tr>
+            <tr><td>doba CFD, decyzja 17:00</td><td class="n">0,1</td><td>nie</td><td class="n">178</td><td class="n">+53,8</td><td class="n">3,15</td><td class="n">+69,5</td><td class="n">+27,9</td></tr>
+            <tr><td>sesja NY, 16:00</td><td class="n">0,1</td><td>tak</td><td class="n">138</td><td class="n">+48,9</td><td class="n">3,64</td><td class="n">+34,4</td><td class="n">+64,3</td></tr>
+            <tr><td>sesja NY, 16:00</td><td class="n">0,2</td><td>nie</td><td class="n">306</td><td class="n">+49,3</td><td class="n">4,35</td><td class="n">+62,3</td><td class="n">+27,6</td></tr>
+            <tr class="ref"><td>doba CFD, 17:00 (jak #30)</td><td class="n">0,2</td><td>tak</td><td class="n">236</td><td class="n">+35,2</td><td class="n">2,93</td><td class="n">+40,8</td><td class="n">+29,5</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Dwie decyzje dają po ok. +20 bp na transakcję: <strong>zdjęcie filtra SMA200</strong> (najsilniejsze odbicia są w bessie, 2020 i 2022, a filtr je wycina) i <strong>ostrzejszy próg 0,1</strong>. Moment decyzji (16:00 zamiast 17:00) ma znaczenie przy progu 0,1 i w latach 2023–26. Sama definicja zakresu już nie: IBS z zakresu 18:00→16:00 daje +72 bp, tyle samo co z sesji. Siatka progów poniżej pokazuje, że 0,1 nie jest pojedynczym szczęśliwym punktem.</p>
+      <div class="table-wrap"><table><thead><tr><th>Wejście</th><th class="n">wyjście &gt; 0,5</th><th class="n">wyjście &gt; 0,6</th><th class="n">wyjście &gt; 0,7</th><th class="n">wyjście &gt; 0,8</th><th class="n">wyjście &gt; 0,9</th></tr></thead><tbody><tr><td><b>IBS &lt; 0,05</b></td><td class="n h4" title="wejście IBS &lt; 0,05, wyjście IBS &gt; 0,5: 74 bp, t 3,4, 2023–26 110 bp">74 <small>(3,4)</small></td><td class="n h4" title="wejście IBS &lt; 0,05, wyjście IBS &gt; 0,6: 76 bp, t 3,5, 2023–26 109 bp">76 <small>(3,5)</small></td><td class="n h4" title="wejście IBS &lt; 0,05, wyjście IBS &gt; 0,7: 71 bp, t 3,0, 2023–26 92 bp">71 <small>(3,0)</small></td><td class="n h4" title="wejście IBS &lt; 0,05, wyjście IBS &gt; 0,8: 79 bp, t 3,3, 2023–26 97 bp">79 <small>(3,3)</small></td><td class="n h4" title="wejście IBS &lt; 0,05, wyjście IBS &gt; 0,9: 84 bp, t 3,3, 2023–26 90 bp">84 <small>(3,3)</small></td></tr><tr><td><b>IBS &lt; 0,10</b></td><td class="n h3" title="wejście IBS &lt; 0,10, wyjście IBS &gt; 0,5: 59 bp, t 4,3, 2023–26 66 bp">59 <small>(4,3)</small></td><td class="n h3" title="wejście IBS &lt; 0,10, wyjście IBS &gt; 0,6: 63 bp, t 4,6, 2023–26 69 bp">63 <small>(4,6)</small></td><td class="n h3" title="wejście IBS &lt; 0,10, wyjście IBS &gt; 0,7: 64 bp, t 4,3, 2023–26 66 bp">64 <small>(4,3)</small></td><td class="n h4" title="wejście IBS &lt; 0,10, wyjście IBS &gt; 0,8: 70 bp, t 4,6, 2023–26 66 bp">70 <small>(4,6)</small></td><td class="n h4" title="wejście IBS &lt; 0,10, wyjście IBS &gt; 0,9: 77 bp, t 4,7, 2023–26 62 bp">77 <small>(4,7)</small></td></tr><tr><td><b>IBS &lt; 0,15</b></td><td class="n h2" title="wejście IBS &lt; 0,15, wyjście IBS &gt; 0,5: 51 bp, t 4,5, 2023–26 50 bp">51 <small>(4,5)</small></td><td class="n h2" title="wejście IBS &lt; 0,15, wyjście IBS &gt; 0,6: 54 bp, t 4,7, 2023–26 49 bp">54 <small>(4,7)</small></td><td class="n h3" title="wejście IBS &lt; 0,15, wyjście IBS &gt; 0,7: 55 bp, t 4,4, 2023–26 46 bp">55 <small>(4,4)</small></td><td class="n h3" title="wejście IBS &lt; 0,15, wyjście IBS &gt; 0,8: 57 bp, t 4,5, 2023–26 44 bp">57 <small>(4,5)</small></td><td class="n h3" title="wejście IBS &lt; 0,15, wyjście IBS &gt; 0,9: 63 bp, t 4,7, 2023–26 42 bp">63 <small>(4,7)</small></td></tr><tr><td><b>IBS &lt; 0,20</b></td><td class="n h2" title="wejście IBS &lt; 0,20, wyjście IBS &gt; 0,5: 46 bp, t 4,6, 2023–26 43 bp">46 <small>(4,6)</small></td><td class="n h2" title="wejście IBS &lt; 0,20, wyjście IBS &gt; 0,6: 47 bp, t 4,6, 2023–26 37 bp">47 <small>(4,6)</small></td><td class="n h2" title="wejście IBS &lt; 0,20, wyjście IBS &gt; 0,7: 49 bp, t 4,6, 2023–26 32 bp">49 <small>(4,6)</small></td><td class="n h2" title="wejście IBS &lt; 0,20, wyjście IBS &gt; 0,8: 49 bp, t 4,4, 2023–26 28 bp">49 <small>(4,4)</small></td><td class="n h2" title="wejście IBS &lt; 0,20, wyjście IBS &gt; 0,9: 53 bp, t 4,3, 2023–26 23 bp">53 <small>(4,3)</small></td></tr><tr><td><b>IBS &lt; 0,25</b></td><td class="n h1" title="wejście IBS &lt; 0,25, wyjście IBS &gt; 0,5: 39 bp, t 4,1, 2023–26 39 bp">39 <small>(4,1)</small></td><td class="n h1" title="wejście IBS &lt; 0,25, wyjście IBS &gt; 0,6: 38 bp, t 3,9, 2023–26 32 bp">38 <small>(3,9)</small></td><td class="n h2" title="wejście IBS &lt; 0,25, wyjście IBS &gt; 0,7: 42 bp, t 4,1, 2023–26 27 bp">42 <small>(4,1)</small></td><td class="n h1" title="wejście IBS &lt; 0,25, wyjście IBS &gt; 0,8: 39 bp, t 3,5, 2023–26 19 bp">39 <small>(3,5)</small></td><td class="n h2" title="wejście IBS &lt; 0,25, wyjście IBS &gt; 0,9: 41 bp, t 3,5, 2023–26 13 bp">41 <small>(3,5)</small></td></tr><tr><td><b>IBS &lt; 0,30</b></td><td class="n h1" title="wejście IBS &lt; 0,30, wyjście IBS &gt; 0,5: 31 bp, t 3,3, 2023–26 30 bp">31 <small>(3,3)</small></td><td class="n h1" title="wejście IBS &lt; 0,30, wyjście IBS &gt; 0,6: 29 bp, t 3,1, 2023–26 21 bp">29 <small>(3,1)</small></td><td class="n h1" title="wejście IBS &lt; 0,30, wyjście IBS &gt; 0,7: 32 bp, t 3,3, 2023–26 18 bp">32 <small>(3,3)</small></td><td class="n h1" title="wejście IBS &lt; 0,30, wyjście IBS &gt; 0,8: 29 bp, t 2,8, 2023–26 12 bp">29 <small>(2,8)</small></td><td class="n h1" title="wejście IBS &lt; 0,30, wyjście IBS &gt; 0,9: 29 bp, t 2,6, 2023–26 7 bp">29 <small>(2,6)</small></td></tr></tbody></table></div>
+      <p style="margin-top:12px;font-size:14px;color:var(--ink-3)">Tabela 3 — bp netto na transakcję (t) dla progów wejścia i wyjścia, H1 2017–2026, najwyżej 5 sesji. Każda z 30 komórek jest dodatnia z t ≥ 2,6. Ciemniejszy kolor to większa średnia. Wartość dla lat 2023–26 widać po najechaniu kursorem.</p>
+    </section>
+
+
+    <section>
+      <div class="eyebrow">04 · Dni tygodnia</div>
+      <h2>Poniedziałek zarabia, czwartek i piątek stoją</h2>
+      <p class="intro">Dzień liczę od zamknięcia sesji NY (16:00 ET) dnia poprzedniego do zamknięcia tego dnia, więc poniedziałek zawiera weekend. Tabela pokazuje, jak często dany dzień rośnie, ile daje średni dzień wzrostowy, a ile zabiera spadkowy.</p>
+      <div class="table-wrap"><table><thead><tr><th>Dzień</th><th class="n">n</th><th class="n">Średnio bp</th><th class="n">t</th><th class="n">Wzrostów</th><th class="n">Śr. wzrost</th><th class="n">Śr. spadek</th><th class="n">PF</th><th class="n">Noc</th><th class="n">Sesja</th><th class="n">&gt; +1 ATR</th><th class="n">&lt; −1 ATR</th></tr></thead><tbody><tr class="best"><td><b>poniedziałek</b></td><td class="n">443</td><td class="n">+18,0</td><td class="n">2,75</td><td class="n">63%</td><td class="n">+93</td><td class="n">−111</td><td class="n">1,44</td><td class="n">+10,0</td><td class="n">+8,1</td><td class="n">5,0%</td><td class="n">7,2%</td></tr><tr><td><b>wtorek</b></td><td class="n">473</td><td class="n">+7,9</td><td class="n">1,26</td><td class="n">55%</td><td class="n">+94</td><td class="n">−97</td><td class="n">1,18</td><td class="n">+7,2</td><td class="n">+0,7</td><td class="n">4,0%</td><td class="n">5,7%</td></tr><tr><td><b>środa</b></td><td class="n">467</td><td class="n">+9,9</td><td class="n">1,47</td><td class="n">57%</td><td class="n">+97</td><td class="n">−106</td><td class="n">1,22</td><td class="n">+10,1</td><td class="n">−0,1</td><td class="n">6,4%</td><td class="n">6,2%</td></tr><tr><td><b>czwartek</b></td><td class="n">466</td><td class="n">+1,1</td><td class="n">0,15</td><td class="n">53%</td><td class="n">+103</td><td class="n">−115</td><td class="n">1,02</td><td class="n">+3,7</td><td class="n">−2,6</td><td class="n">7,5%</td><td class="n">7,7%</td></tr><tr><td><b>piątek</b></td><td class="n">458</td><td class="n">+1,4</td><td class="n">0,21</td><td class="n">55%</td><td class="n">+97</td><td class="n">−115</td><td class="n">1,03</td><td class="n">+1,4</td><td class="n">0,0</td><td class="n">5,9%</td><td class="n">7,2%</td></tr><tr class="ref"><td>wszystkie dni</td><td class="n">2307</td><td class="n">+7,6</td><td class="n">2,52</td><td class="n">57%</td><td class="n">+97</td><td class="n">−109</td><td class="n">1,16</td><td class="n">+6,4</td><td class="n">+1,2</td><td class="n">5,8%</td><td class="n">6,8%</td></tr></tbody></table></div>
+      <p style="margin-top:12px;font-size:14px;color:var(--ink-3)">Tabela 5 — US100, maj 2017 – październik 2026, bp bez kosztów. Noc to 16:00 → 10:00, sesja to 10:00 → 16:00. Ostatnie dwie kolumny to odsetek dni z ruchem większym niż 1 ATR(14) w górę i w dół.</p>
+      <figure>
+        <div class="legend"><span><i class="sq" style="background:#2a55b0"></i>2017–2022</span><span><i class="sq" style="background:#c27a00"></i>2023–2026</span></div>
+        <div class="scroll"><svg viewBox="0 0 900 290" role="img" aria-label="Średni wynik dnia tygodnia US100 od zamknięcia do zamknięcia, osobno dla lat 2017–2022 i 2023–2026">
+<line x1="54" x2="880" y1="234.0" y2="234.0" stroke="#ebe8de"/>
+<text x="46" y="238.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">-5</text>
+<line x1="54" x2="880" y1="207.8" y2="207.8" stroke="#ebe8de"/>
+<text x="46" y="211.8" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">0</text>
+<line x1="54" x2="880" y1="181.5" y2="181.5" stroke="#ebe8de"/>
+<text x="46" y="185.5" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">5</text>
+<line x1="54" x2="880" y1="155.2" y2="155.2" stroke="#ebe8de"/>
+<text x="46" y="159.2" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">10</text>
+<line x1="54" x2="880" y1="129.0" y2="129.0" stroke="#ebe8de"/>
+<text x="46" y="133.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">15</text>
+<line x1="54" x2="880" y1="102.8" y2="102.8" stroke="#ebe8de"/>
+<text x="46" y="106.8" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">20</text>
+<line x1="54" x2="880" y1="76.5" y2="76.5" stroke="#ebe8de"/>
+<text x="46" y="80.5" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">25</text>
+<line x1="54" x2="880" y1="50.2" y2="50.2" stroke="#ebe8de"/>
+<text x="46" y="54.2" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">30</text>
+<line x1="54" x2="880" y1="24.0" y2="24.0" stroke="#ebe8de"/>
+<text x="46" y="28.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">35</text>
+<rect x="101.6" y="162.6" width="34" height="45.2" fill="#2a55b0" rx="3"><title>poniedziałek, 2017–2022: +8,6 bp</title></rect>
+<text x="118.6" y="156.6" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+8,6</text>
+<rect x="137.6" y="50.2" width="34" height="157.5" fill="#c27a00" rx="3"><title>poniedziałek, 2023–2026: +30,0 bp</title></rect>
+<text x="154.6" y="44.2" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+30,0</text>
+<text x="136.6" y="254" text-anchor="middle" font-size="12.5" fill="#16181d">poniedziałek</text>
+<text x="136.6" y="270" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">razem +18,0 · 63% ↑</text>
+<rect x="266.8" y="139.5" width="34" height="68.2" fill="#2a55b0" rx="3"><title>wtorek, 2017–2022: +13,0 bp</title></rect>
+<text x="283.8" y="133.5" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+13,0</text>
+<rect x="302.8" y="203.6" width="34" height="4.2" fill="#c27a00" rx="3"><title>wtorek, 2023–2026: +0,8 bp</title></rect>
+<text x="319.8" y="197.6" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+0,8</text>
+<text x="301.8" y="254" text-anchor="middle" font-size="12.5" fill="#16181d">wtorek</text>
+<text x="301.8" y="270" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">razem +7,9 · 55% ↑</text>
+<rect x="432.0" y="160.0" width="34" height="47.8" fill="#2a55b0" rx="3"><title>środa, 2017–2022: +9,1 bp</title></rect>
+<text x="449.0" y="154.0" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+9,1</text>
+<rect x="468.0" y="148.9" width="34" height="58.8" fill="#c27a00" rx="3"><title>środa, 2023–2026: +11,2 bp</title></rect>
+<text x="485.0" y="142.9" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+11,2</text>
+<text x="467.0" y="254" text-anchor="middle" font-size="12.5" fill="#16181d">środa</text>
+<text x="467.0" y="270" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">razem +9,9 · 57% ↑</text>
+<rect x="597.2" y="206.2" width="34" height="1.6" fill="#2a55b0" rx="3"><title>czwartek, 2017–2022: +0,3 bp</title></rect>
+<text x="614.2" y="200.2" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+0,3</text>
+<rect x="633.2" y="197.2" width="34" height="10.5" fill="#c27a00" rx="3"><title>czwartek, 2023–2026: +2,0 bp</title></rect>
+<text x="650.2" y="191.2" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+2,0</text>
+<text x="632.2" y="254" text-anchor="middle" font-size="12.5" fill="#16181d">czwartek</text>
+<text x="632.2" y="270" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">razem +1,1 · 53% ↑</text>
+<rect x="762.4" y="207.8" width="34" height="14.7" fill="#2a55b0" rx="3"><title>piątek, 2017–2022: −2,8 bp</title></rect>
+<text x="779.4" y="236.4" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">−2,8</text>
+<rect x="798.4" y="171.0" width="34" height="36.8" fill="#c27a00" rx="3"><title>piątek, 2023–2026: +7,0 bp</title></rect>
+<text x="815.4" y="165.0" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+7,0</text>
+<text x="797.4" y="254" text-anchor="middle" font-size="12.5" fill="#16181d">piątek</text>
+<text x="797.4" y="270" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">razem +1,4 · 55% ↑</text>
+<line x1="54" x2="880" y1="207.8" y2="207.8" stroke="#85899a"/>
+</svg></div>
+        <figcaption><b>Rys. 4</b> — średni wynik dnia tygodnia (bp, zamknięcie → zamknięcie) w obu połowach próby. Przewaga poniedziałku to głównie lata 2023–26 (+30 bp, zdecydowanie najlepszy dzień). W latach 2017–22 dawał +8,6 bp, mniej niż wtorek. Czwartek jest słaby w obu okresach, piątek w 2017–22, wtorek w 2023–26.</figcaption>
+      </figure>
+      <ul class="plain" style="margin-top:22px">
+        <li><strong>Poniedziałek</strong> to jedyny dzień istotnie dodatni: +18 bp, 63% dni wzrostowych, t 2,75. To jednak głównie efekt ostatnich lat: w 2017–22 dawał +8,6 bp, od 2023 daje +30 bp i w każdym roku 2023–26 rośnie w 65–77% poniedziałków. Zysk dzieli się na weekend z nocą (+10) i sesję (+8).</li>
+        <li><strong>Wtorek i środa</strong> są umiarkowanie dodatnie (+8 i +10), ale prawie cały ich zysk powstaje w nocy, a sesja daje ok. 0.</li>
+        <li><strong>Czwartek i piątek</strong> dają po ok. +1 bp. Czwartek ma najwięcej dużych ruchów w obie strony: 7,5% dni powyżej +1 ATR i 7,7% poniżej −1 ATR.</li>
+        <li><strong>Wielkość ruchu jest podobna każdego dnia.</strong> Średni dzień wzrostowy to ok. +95 bp, spadkowy ok. −110. Dni różnią się tym, jak często rosną, a nie tym, jak mocno.</li>
+      </ul>
+      <div class="table-wrap"><table><thead><tr><th>Dzień</th><th class="n">2017</th><th class="n">2018</th><th class="n">2019</th><th class="n">2020</th><th class="n">2021</th><th class="n">2022</th><th class="n">2023</th><th class="n">2024</th><th class="n">2025</th><th class="n">2026</th><th class="n">Lat na plusie</th></tr></thead><tbody><tr><td><b>poniedziałek</b></td><td class="n pos">0</td><td class="n neg">−8</td><td class="n pos">+1</td><td class="n pos">+71</td><td class="n pos">+4</td><td class="n neg">−24</td><td class="n pos">+37</td><td class="n pos">+18</td><td class="n pos">+31</td><td class="n pos">+36</td><td class="n">8/10</td></tr><tr><td><b>wtorek</b></td><td class="n pos">+16</td><td class="n pos">+14</td><td class="n pos">+12</td><td class="n pos">+39</td><td class="n pos">+8</td><td class="n neg">−8</td><td class="n pos">+8</td><td class="n neg">−2</td><td class="n neg">−4</td><td class="n pos">+1</td><td class="n">7/10</td></tr><tr><td><b>środa</b></td><td class="n neg">−6</td><td class="n pos">+2</td><td class="n pos">+15</td><td class="n pos">+26</td><td class="n neg">−4</td><td class="n pos">+11</td><td class="n neg">−8</td><td class="n neg">0</td><td class="n pos">+42</td><td class="n pos">+11</td><td class="n">6/10</td></tr><tr><td><b>czwartek</b></td><td class="n pos">+4</td><td class="n pos">+10</td><td class="n pos">+17</td><td class="n neg">−15</td><td class="n pos">+22</td><td class="n neg">−32</td><td class="n pos">+24</td><td class="n pos">+15</td><td class="n neg">−28</td><td class="n neg">−4</td><td class="n">6/10</td></tr><tr><td><b>piątek</b></td><td class="n pos">+37</td><td class="n neg">−22</td><td class="n pos">+20</td><td class="n neg">−14</td><td class="n pos">+18</td><td class="n neg">−29</td><td class="n pos">+25</td><td class="n pos">+11</td><td class="n neg">−5</td><td class="n neg">−5</td><td class="n">5/10</td></tr></tbody></table></div>
+      <p style="margin-top:12px;font-size:14px;color:var(--ink-3)">Tabela 6 — średni wynik dnia (bp) w kolejnych latach. Poniedziałek jest na plusie w 8 z 10 lat i we wszystkich od 2023. Pozostałe dni nie mają stałego znaku. Na BTCUSD (doba dostawcy, 7 dni) jedynym stabilnym dniem też jest poniedziałek: +41 bp w latach 2017–22 i +36 w 2023–26. Czwartek BTC w 2023–26 daje −32 bp.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Dzień po dniu</div>
+      <h2>Co dzieje się jutro, gdy dziś było mocno</h2>
+      <p class="intro">Każdy dzień trafia do jednej z pięciu równych grup według ruchu w jednostkach ATR. Tabela pokazuje, co średnio robi następny dzień, osobno dla każdej pary dni.</p>
+      <div class="table-wrap"><table><thead><tr><th>Dzień poprzedni</th><th class="n nw">pon → wt</th><th class="n nw">wt → śr</th><th class="n nw">śr → czw</th><th class="n nw">czw → pt</th><th class="n nw">pt → pon</th><th class="n nw">każdy dzień</th></tr></thead><tbody><tr><td class="nw"><b>mocno ↓</b><br><small>&lt; −0,47 ATR</small></td><td class="n pos" title="mocno ↓ (< −0,47 ATR) w pon: następny dzień +33 bp, t 2,0, 61% wzrostów, n 72; 2017–22 +33, 2023–26 +32"><b>+33</b> ★<br><small>61% ↑<br>+33 | +32</small></td><td class="n pos" title="mocno ↓ (< −0,47 ATR) w wt: następny dzień +35 bp, t 2,0, 60% wzrostów, n 98; 2017–22 +34, 2023–26 +37"><b>+35</b> ★<br><small>60% ↑<br>+34 | +37</small></td><td class="n " title="mocno ↓ (< −0,47 ATR) w śr: następny dzień +5 bp, t 0,3, 48% wzrostów, n 88; 2017–22 +5, 2023–26 +5"><b>+5</b><br><small>48% ↑<br>+5 | +5</small></td><td class="n " title="mocno ↓ (< −0,47 ATR) w czw: następny dzień +3 bp, t 0,2, 53% wzrostów, n 99; 2017–22 0, 2023–26 +8"><b>+3</b><br><small>53% ↑<br>0 | +8</small></td><td class="n " title="mocno ↓ (< −0,47 ATR) w pt: następny dzień +3 bp, t 0,2, 59% wzrostów, n 94; 2017–22 −21, 2023–26 +34"><b>+3</b><br><small>59% ↑<br>−21 | +34</small></td><td class="n" style="background:#f6f5f0"><b>+15</b><br><small>56% ↑<br>+10 | +22</small></td></tr><tr><td class="nw"><b>↓</b><br><small>−0,47…−0,06</small></td><td class="n " title="↓ (−0,47…−0,06) w pon: następny dzień +9 bp, t 0,5, 53% wzrostów, n 76; 2017–22 +5, 2023–26 +13"><b>+9</b><br><small>53% ↑<br>+5 | +13</small></td><td class="n " title="↓ (−0,47…−0,06) w wt: następny dzień +8 bp, t 0,5, 59% wzrostów, n 96; 2017–22 +19, 2023–26 −6"><b>+8</b><br><small>59% ↑<br>+19 | −6</small></td><td class="n pos" title="↓ (−0,47…−0,06) w śr: następny dzień +30 bp, t 2,1, 60% wzrostów, n 88; 2017–22 +26, 2023–26 +37"><b>+30</b> ★<br><small>60% ↑<br>+26 | +37</small></td><td class="n " title="↓ (−0,47…−0,06) w czw: następny dzień +9 bp, t 0,6, 62% wzrostów, n 105; 2017–22 +16, 2023–26 +1"><b>+9</b><br><small>62% ↑<br>+16 | +1</small></td><td class="n " title="↓ (−0,47…−0,06) w pt: następny dzień +3 bp, t 0,2, 59% wzrostów, n 86; 2017–22 −12, 2023–26 +28"><b>+3</b><br><small>59% ↑<br>−12 | +28</small></td><td class="n" style="background:#f6f5f0"><b>+12</b><br><small>59% ↑<br>+11 | +12</small></td></tr><tr><td class="nw"><b>płasko</b><br><small>−0,06…+0,23</small></td><td class="n " title="płasko (−0,06…+0,23) w pon: następny dzień −2 bp, t −0,1, 51% wzrostów, n 92; 2017–22 +27, 2023–26 −23"><b>−2</b><br><small>51% ↑<br>+27 | −23</small></td><td class="n " title="płasko (−0,06…+0,23) w wt: następny dzień 0 bp, t 0,0, 52% wzrostów, n 93; 2017–22 +13, 2023–26 −19"><b>0</b><br><small>52% ↑<br>+13 | −19</small></td><td class="n " title="płasko (−0,06…+0,23) w śr: następny dzień +5 bp, t 0,4, 52% wzrostów, n 111; 2017–22 +13, 2023–26 −7"><b>+5</b><br><small>52% ↑<br>+13 | −7</small></td><td class="n " title="płasko (−0,06…+0,23) w czw: następny dzień −6 bp, t −0,4, 49% wzrostów, n 76; 2017–22 −5, 2023–26 −8"><b>−6</b><br><small>49% ↑<br>−5 | −8</small></td><td class="n pos" title="płasko (−0,06…+0,23) w pt: następny dzień +33 bp, t 2,1, 61% wzrostów, n 69; 2017–22 +27, 2023–26 +38"><b>+33</b> ★<br><small>61% ↑<br>+27 | +38</small></td><td class="n" style="background:#f6f5f0"><b>+5</b><br><small>53% ↑<br>+14 | −5</small></td></tr><tr><td class="nw"><b>↑</b><br><small>+0,23…+0,58</small></td><td class="n pos" title="↑ (+0,23…+0,58) w pon: następny dzień +17 bp, t 1,4, 64% wzrostów, n 109; 2017–22 +25, 2023–26 +6"><b>+17</b><br><small>64% ↑<br>+25 | +6</small></td><td class="n " title="↑ (+0,23…+0,58) w wt: następny dzień +5 bp, t 0,4, 55% wzrostów, n 94; 2017–22 −4, 2023–26 +18"><b>+5</b><br><small>55% ↑<br>−4 | +18</small></td><td class="n neg" title="↑ (+0,23…+0,58) w śr: następny dzień −24 bp, t −1,3, 55% wzrostów, n 78; 2017–22 −26, 2023–26 −21"><b>−24</b> ★<br><small>55% ↑<br>−26 | −21</small></td><td class="n " title="↑ (+0,23…+0,58) w czw: następny dzień +8 bp, t 0,6, 55% wzrostów, n 77; 2017–22 +5, 2023–26 +13"><b>+8</b><br><small>55% ↑<br>+5 | +13</small></td><td class="n pos" title="↑ (+0,23…+0,58) w pt: następny dzień +28 bp, t 2,1, 69% wzrostów, n 83; 2017–22 +19, 2023–26 +38"><b>+28</b> ★<br><small>69% ↑<br>+19 | +38</small></td><td class="n" style="background:#f6f5f0"><b>+8</b><br><small>60% ↑<br>+5 | +12</small></td></tr><tr><td class="nw"><b>mocno ↑</b><br><small>&gt; +0,58 ATR</small></td><td class="n " title="mocno ↑ (> +0,58 ATR) w pon: następny dzień −6 bp, t −0,5, 49% wzrostów, n 89; 2017–22 −20, 2023–26 +10"><b>−6</b><br><small>49% ↑<br>−20 | +10</small></td><td class="n " title="mocno ↑ (> +0,58 ATR) w wt: następny dzień −1 bp, t 0,0, 59% wzrostów, n 83; 2017–22 −15, 2023–26 +24"><b>−1</b><br><small>59% ↑<br>−15 | +24</small></td><td class="n neg" title="mocno ↑ (> +0,58 ATR) w śr: następny dzień −22 bp, t −1,3, 48% wzrostów, n 93; 2017–22 −36, 2023–26 −2"><b>−22</b><br><small>48% ↑<br>−36 | −2</small></td><td class="n " title="mocno ↑ (> +0,58 ATR) w czw: następny dzień −10 bp, t −0,7, 53% wzrostów, n 96; 2017–22 −34, 2023–26 +20"><b>−10</b><br><small>53% ↑<br>−34 | +20</small></td><td class="n pos" title="mocno ↑ (> +0,58 ATR) w pt: następny dzień +29 bp, t 3,1, 67% wzrostów, n 91; 2017–22 +36, 2023–26 +19"><b>+29</b> ★<br><small>67% ↑<br>+36 | +19</small></td><td class="n" style="background:#f6f5f0"><b>−2</b><br><small>55% ↑<br>−14 | +14</small></td></tr></tbody></table></div>
+      <p style="margin-top:12px;font-size:14px;color:var(--ink-3)">Tabela 7 — następny dzień (bp, zamknięcie → zamknięcie, bez kosztów). Pod liczbą: odsetek wzrostów oraz średnia w latach 2017–22 | 2023–26. Zielone i czerwone komórki to średnia co najmniej ±15 bp. ★ oznacza komórkę z tym samym znakiem w obu okresach i co najmniej 15 bp w każdym. W każdej komórce jest 69–111 dni. Szczegóły po najechaniu kursorem.</p>
+      <p style="margin-top:18px"><span class="hl">Tabela jako całość się nie powtarza:</span> korelacja 25 średnich między okresami to 0,17, a znak zgadza się w 14 komórkach na 25, prawie jak przy rzucie monetą. Gwiazdki układają się jednak w trzy spójne wzory:</p>
+      <div class="fails">
+        <div class="fail ok"><h3>Mocny spadek odbija tylko na początku tygodnia <span class="tag ok">oba okresy</span></h3><p>Po mocno spadkowym poniedziałku wtorek rośnie średnio o 33 bp (61% wzrostów), a po takim wtorku środa o 35 bp (60%). Obie wartości są takie same w latach 2017–22 i 2023–26. Po mocnym spadku w środę, czwartek albo piątek następny dzień daje tylko +3…+5 bp. Uśrednione dla wszystkich dni (+15 bp) wygląda to na zwykły powrót do średniej, ale cała przewaga siedzi w pierwszych dniach tygodnia.</p></div>
+        <div class="fail ok"><h3>Weekend przenosi siłę piątku <span class="tag ok">oba okresy</span></h3><p>Po płaskim, wzrostowym albo mocno wzrostowym piątku poniedziałek daje +28…+33 bp i rośnie w 61–69% przypadków. Po spadkowym piątku daje ok. +3 bp. To jedyna para dni, w której po mocnym wzroście przychodzi dalszy wzrost, a nie odwrót. Po mocno wzrostowym piątku poniedziałek kończy się mocnym spadkiem tylko w 10% przypadków (normalnie 20%).</p></div>
+        <div class="fail"><h3>Czwartek odwraca środę <span class="tag att">za słabe do handlu</span></h3><p>Po umiarkowanie spadkowej środzie czwartek daje +30 bp (po mocno spadkowej tylko +5), po wzrostowej −24, a po mocno wzrostowej −22. Znak jest ten sam w obu okresach. Jako strategia (long w czwartek po spadkowej środzie, short po wzrostowej) daje jednak tylko +12 bp netto (t 1,7), a w 2023–26 +8,7 bp. Dla porównania ta sama gra „przeciw dniowi” na parze piątek → poniedziałek traci 10,6 bp.</p></div>
+      </div>
+      <h2 style="margin-top:40px">„Co najczęściej” — prawie wszystko po równo</h2>
+      <p>Pytanie „jeśli poniedziałek mocno urósł, co najczęściej robi wtorek” ma rozczarowującą odpowiedź. Każdy z pięciu scenariuszy zdarza się w 10–33% przypadków, a przy braku zależności byłoby to 20%. Kierunek jutra zgaduje się dziś niewiele lepiej niż losowo. Przewaga dni tygodnia leży w <strong>średniej wielkości ruchu</strong>, nie w tym, że jakiś scenariusz dominuje.</p>
+      <div class="table-wrap"><table><thead><tr><th>Jutro →</th><th class="n">mocno ↓</th><th class="n">↓</th><th class="n">płasko</th><th class="n">↑</th><th class="n">mocno ↑</th></tr></thead><tbody><tr><td><b>dziś mocno ↓</b></td><td class="n">19%</td><td class="n">21%</td><td class="n">17%</td><td class="n">22%</td><td class="n">22%</td></tr><tr><td><b>dziś ↓</b></td><td class="n">21%</td><td class="n">17%</td><td class="n">19%</td><td class="n">18%</td><td class="n pos">24%</td></tr><tr><td><b>dziś płasko</b></td><td class="n">23%</td><td class="n">20%</td><td class="n">18%</td><td class="n">18%</td><td class="n">20%</td></tr><tr><td><b>dziś ↑</b></td><td class="n">20%</td><td class="n">17%</td><td class="n">21%</td><td class="n">22%</td><td class="n">20%</td></tr><tr><td><b>dziś mocno ↑</b></td><td class="n">17%</td><td class="n">23%</td><td class="n pos">24%</td><td class="n">21%</td><td class="n">14%</td></tr></tbody></table></div>
+      <p style="margin-top:12px;font-size:14px;color:var(--ink-3)">Tabela 8 — wszystkie pary dni razem: P(jutro w grupie | dziś w grupie). Zaznaczone komórki ≥ 24%. Największe odchylenia w poszczególnych parach: po mocno wzrostowym wtorku środa jest płaska w 33% przypadków. Po mocno wzrostowym piątku poniedziałek jest wzrostowy w 31%, a mocno spadkowy tylko w 10%. Po spadkowym czwartku piątek jest mocno wzrostowy w 31%.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Tydzień jako całość</div>
+      <h2>Spadkowy poniedziałek odwraca tydzień, a nie go wyznacza</h2>
+      <p>Poniedziałek wzrostowy oznacza wzrostowy tydzień w 65% przypadków, ale to w dużej mierze arytmetyka, bo poniedziałek jest częścią tygodnia. Ciekawsze jest to, co dzieje się <em>po</em> poniedziałku:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Poniedziałek</th><th class="n">2017–22: wt–pt rośnie</th><th class="n">2023–26: wt–pt rośnie</th><th class="n">2017–22: śr. wt–pt</th><th class="n">2023–26: śr. wt–pt</th></tr></thead>
+          <tbody>
+            <tr class="best"><td><b>spadkowy</b></td><td class="n">61%</td><td class="n">70%</td><td class="n">+32 bp</td><td class="n">+78 bp</td></tr>
+            <tr><td>wzrostowy</td><td class="n">53%</td><td class="n">53%</td><td class="n">−5 bp</td><td class="n">0 bp</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">To ten sam wzór co w sekcji 05: słabość na początku tygodnia zostaje odrobiona. Strategia „spadkowy poniedziałek → long do piątku” (#39) zarabia jednak w silniku słabo (Sharpe 0,65, 2018 −43%). Cztery noce i cały tydzień ryzyka to za dużo jak na tę przewagę. Lepiej działa ta sama idea w krótkiej formie, czyli #38 (sekcja 08).</p>
+      <p>Nie powtarzają się natomiast: kwintyl całego tygodnia → następny poniedziałek albo tydzień (znaki odwracają się między okresami), poniedziałek z wtorkiem → środa–piątek, ani wielkość poniedziałku → reszta tygodnia (wzór niemonotoniczny, t ≤ 2,1). Na 413 tygodniach mało co da się odróżnić od szumu.</p>
+    </section>
+
+
+    <section>
+      <div class="eyebrow">07 · Long w każdy poniedziałek</div>
+      <h2>Od której sesji kupować poniedziałek</h2>
+      <p class="intro">Long w każdy poniedziałek, zamknięcie na koniec dnia, w czterech wariantach startu: tylko USA, Europa + USA, Azja + Europa + USA oraz cały dzień CFD od niedzielnego otwarcia o 18:00 ET. Żaden wariant nie trzyma pozycji przez weekend, więc nie płaci finansowania ani nie bierze luki z piątku na niedzielę.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Wariant (start → koniec)</th><th>Okno</th><th class="n">Transakcje</th><th class="n">Sharpe</th><th class="n">Zwrot</th><th class="n">Rocznie</th><th class="n">Max DD</th><th class="n">PF</th><th class="n">Trafność</th><th class="n">Lata</th></tr></thead>
+          <tbody>
+            <tr><td><b>USA</b> · 9:30 → 15:55 ET · r99</td><td class="nw">2024–26 M5</td><td class="n">147</td><td class="n">1,20</td><td class="n">+116%</td><td class="n">31%</td><td class="n">25%</td><td class="n">1,55</td><td class="n">59%</td><td class="n nw">+18 · +35 · +33</td></tr>
+            <tr class="best"><td><b>Europa + USA</b> · Londyn 8:00 → 15:55 · r100</td><td class="nw">2024–26 M5</td><td class="n">147</td><td class="n">1,67</td><td class="n">+279%</td><td class="n">60%</td><td class="n">27%</td><td class="n">2,02</td><td class="n">60%</td><td class="n nw">+18 · +64 · +65</td></tr>
+            <tr class="best"><td><b>Azja + Europa + USA</b> · Tokio 9:00 → 15:55 · r101</td><td class="nw">2024–26 M5</td><td class="n">147</td><td class="n">1,68</td><td class="n">+284%</td><td class="n">61%</td><td class="n">26%</td><td class="n">1,98</td><td class="n">62%</td><td class="n nw">+14 · +64 · +70</td></tr>
+            <tr><td><b>cały dzień CFD</b> · niedziela 18:00 → 15:55 · r102</td><td class="nw">2024–26 M5</td><td class="n">138</td><td class="n">1,60</td><td class="n">+236%</td><td class="n">54%</td><td class="n">36%</td><td class="n">1,89</td><td class="n">61%</td><td class="n nw">+28 · +27 · +80</td></tr>
+            <tr><td><b>USA</b> · 10:00 → 15:00 ET · r95</td><td class="nw">2017–26 H1</td><td class="n">488</td><td class="n">0,23</td><td class="n">+30%</td><td class="n">3%</td><td class="n">50%</td><td class="n">1,07</td><td class="n">56%</td><td class="n">4 lata ujemne</td></tr>
+            <tr><td><b>Europa + USA</b> · 8:00 → 15:00 · r96</td><td class="nw">2017–26 H1</td><td class="n">471</td><td class="n">0,57</td><td class="n">+263%</td><td class="n">14%</td><td class="n">66%</td><td class="n">1,40</td><td class="n">56%</td><td class="n">2017–19, 2022 ujemne</td></tr>
+            <tr><td><b>Azja + Europa + USA</b> · Tokio → 15:00 · r97</td><td class="nw">2017–26 H1</td><td class="n">467</td><td class="n">0,76</td><td class="n">+615%</td><td class="n">23%</td><td class="n">61%</td><td class="n">1,52</td><td class="n">57%</td><td class="n">2017–19, 2022 ujemne</td></tr>
+            <tr><td><b>cały dzień CFD</b> · niedziela 18:00 → 15:00 · r98</td><td class="nw">2017–26 H1</td><td class="n">458</td><td class="n">0,64</td><td class="n">+404%</td><td class="n">19%</td><td class="n">64%</td><td class="n">1,43</td><td class="n">56%</td><td class="n">2017–19, 2021–22 ujemne</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:12px;font-size:14px;color:var(--ink-3)">Tabela 9 — silnik produkcji, koszty brokera, depozyt 20%. Strategie #40 (M5) i #41 (H1), jeden dokument z parametrem <code>start</code>. Na H1 sesja USA zaczyna się o 10:00, a wyjście jest o 15:00. W latach 2017–18 brakuje w danych H1 części świec 16:00–17:00 ET, a wtedy zlecenie wyjścia o 16:00 wykonywało się dopiero o 18:00, po przerwie. Pierwszy przebieg H1 z wyjściem o 16:00 (r94, Sharpe 0,38) jest przez to niewiarygodny.</p>
+
+      <figure>
+        <div class="legend"><span><i class="sq" style="background:#2a55b0"></i>poniedziałek 2017–26 (H1)</span><span><i class="sq" style="background:#c27a00"></i>poniedziałek 2024–26 (M5)</span><span><i class="sq" style="background:#8a8f9e"></i>wt–pt 2017–26 (H1)</span></div><div class="scroll"><svg viewBox="0 0 900 280" role="img" aria-label="Średni wynik odcinków poniedziałku: Azja, Europa, USA, w porównaniu z tymi samymi odcinkami we wtorek–piątek">
+<line x1="54" x2="880" y1="224.0" y2="224.0" stroke="#ebe8de"/>
+<text x="46" y="228.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">-5</text>
+<line x1="54" x2="880" y1="173.0" y2="173.0" stroke="#ebe8de"/>
+<text x="46" y="177.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">0</text>
+<line x1="54" x2="880" y1="122.0" y2="122.0" stroke="#ebe8de"/>
+<text x="46" y="126.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">5</text>
+<line x1="54" x2="880" y1="71.0" y2="71.0" stroke="#ebe8de"/>
+<text x="46" y="75.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">10</text>
+<line x1="54" x2="880" y1="20.0" y2="20.0" stroke="#ebe8de"/>
+<text x="46" y="24.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">15</text>
+<rect x="120.7" y="154.6" width="46" height="18.4" fill="#2a55b0" rx="3"><title>Azja, poniedziałek 2017–26 (H1): +1,8 bp</title></rect>
+<text x="143.7" y="148.6" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+1,8</text>
+<rect x="168.7" y="173.0" width="46" height="5.1" fill="#c27a00" rx="3"><title>Azja, poniedziałek 2024–26 (M5): −0,5 bp</title></rect>
+<text x="191.7" y="192.1" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">−0,5</text>
+<rect x="216.7" y="164.8" width="46" height="8.2" fill="#8a8f9e" rx="3"><title>Azja, wt–pt 2017–26 (H1): +0,8 bp</title></rect>
+<text x="239.7" y="158.8" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+0,8</text>
+<text x="191.7" y="244" text-anchor="middle" font-size="12.5" fill="#16181d">Azja</text>
+<text x="191.7" y="260" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">Tokio 9:00 → Londyn 8:00</text>
+<rect x="396.0" y="106.7" width="46" height="66.3" fill="#2a55b0" rx="3"><title>Europa, poniedziałek 2017–26 (H1): +6,5 bp</title></rect>
+<text x="419.0" y="100.7" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+6,5</text>
+<rect x="444.0" y="78.1" width="46" height="94.9" fill="#c27a00" rx="3"><title>Europa, poniedziałek 2024–26 (M5): +9,3 bp</title></rect>
+<text x="467.0" y="72.1" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+9,3</text>
+<rect x="492.0" y="173.0" width="46" height="16.3" fill="#8a8f9e" rx="3"><title>Europa, wt–pt 2017–26 (H1): −1,6 bp</title></rect>
+<text x="515.0" y="203.3" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">−1,6</text>
+<text x="467.0" y="244" text-anchor="middle" font-size="12.5" fill="#16181d">Europa</text>
+<text x="467.0" y="260" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">Londyn 8:00 → NY 9:30</text>
+<rect x="671.3" y="111.8" width="46" height="61.2" fill="#2a55b0" rx="3"><title>USA, poniedziałek 2017–26 (H1): +6,0 bp</title></rect>
+<text x="694.3" y="105.8" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+6,0</text>
+<rect x="719.3" y="27.1" width="46" height="145.9" fill="#c27a00" rx="3"><title>USA, poniedziałek 2024–26 (M5): +14,3 bp</title></rect>
+<text x="742.3" y="21.1" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">+14,3</text>
+<rect x="767.3" y="173.0" width="46" height="20.4" fill="#8a8f9e" rx="3"><title>USA, wt–pt 2017–26 (H1): −2,0 bp</title></rect>
+<text x="790.3" y="207.4" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#16181d">−2,0</text>
+<text x="742.3" y="244" text-anchor="middle" font-size="12.5" fill="#16181d">USA</text>
+<text x="742.3" y="260" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">NY 9:30 → 15:55</text>
+<line x1="54" x2="880" y1="173.0" y2="173.0" stroke="#85899a"/>
+</svg></div>
+        <figcaption><b>Rys. 5</b> — skąd bierze się zysk poniedziałku: średni wynik każdego odcinka dnia liczonego jak osobna transakcja (bp netto spreadu). Azja nic nie daje, Europa i USA po mniej więcej połowie. W dni wt–pt te same odcinki dają ok. zera, więc to nie jest ogólny dryf rynku, tylko cecha poniedziałku.</figcaption>
+      </figure>
+
+      <div class="fails" style="margin-top:22px">
+        <div class="fail ok"><h3>Najlepiej: od Europy albo od Azji <span class="tag ok">Sharpe 1,67–1,68</span></h3><p>W latach 2024–26 poniedziałek od otwarcia Londynu (albo Tokio) do 15:55 ET daje Sharpe 1,67–1,68, ok. 60% rocznie przy 4× dźwigni, obsunięcie 26% i 60–62% zyskownych poniedziałków. Pozycja jest w rynku tylko 1 dzień w tygodniu. Azja niczego nie dodaje ani nie odejmuje, więc start z Londynu jest prostszy i tańszy w ryzyku nocy.</p></div>
+        <div class="fail"><h3>Tylko USA to połowa wyniku <span class="tag att">Sharpe 1,20</span></h3><p>Sama sesja nowojorska daje +14 bp na poniedziałek (2024–26), wobec +24 od Londynu. Ok. 40% zysku poniedziałku powstaje rano w Europie, zanim otworzy się Nowy Jork.</p></div>
+        <div class="fail"><h3>Cały dzień od niedzieli 18:00 <span class="tag att">więcej ryzyka</span></h3><p>Offline to najlepszy wariant (+30 bp, 66% zyskownych), ale w silniku ma większe obsunięcie (36%) i mniej transakcji: gdy w danych brakuje ostatniej świecy piątku, decyzja nie zapada i tydzień przepada. Wieczór niedzieli po otwarciu dokłada zysku, ale też największe pojedyncze straty (marzec 2020).</p></div>
+        <div class="fail stop"><h3>Na całej historii to efekt ostatnich lat <span class="tag stop">reżim</span></h3><p>Od 2017 te same reguły dają Sharpe 0,23–0,76 przy obsunięciach 50–66%, a lata 2017–2019 i 2022 są ujemne. Poniedziałek stał się dobrym dniem dopiero od 2023 (sekcja 04). Filtr „piątek bez mocnego spadku” poprawia lata 2017–22 (+13 zamiast +3 bp), ale od 2023 poniedziałek po spadkowym piątku jest jeszcze lepszy (+34–44 bp). Filtr działa w jednym reżimie i szkodzi w drugim, więc go nie dodaję.</p></div>
+      </div>
+      <p style="margin-top:18px">Wniosek: <strong>long w każdy poniedziałek od otwarcia Londynu do 15:55 ET</strong> to najprostsza strategia z tego badania i na ostatnich trzech latach jedna z mocniejszych (Sharpe 1,67 wobec 1,81 dla strategii 6). Stoi jednak na jednym fakcie: poniedziałek rośnie od 2023. Jeśli to minie, strategia wróci do wyników z lat 2017–2022, czyli do zera.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Nowe strategie</div>
+      <h2>Jedenaście dokumentów, dwadzieścia dwa przebiegi</h2>
+      <p>Wszystkie zapisane w module strategii jako autor „agent”, z depozytem 20% jak reszta archiwum. Dla porównania szare wiersze: dotychczasowa czołówka z raportu „IBS i trzy najlepsze”.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Strategia</th><th>Okno</th><th class="n">Transakcje</th><th class="n">Sharpe</th><th class="n">Zwrot</th><th class="n">Rocznie</th><th class="n">Max DD</th><th class="n">PF</th><th class="n">Trafność</th></tr></thead>
+          <tbody>
+            <tr class="best"><td><b>#34 strategia 6 bez shortów po spadkowej sesji</b> · r86</td><td class="nw">2024–26</td><td class="n">276</td><td class="n">2,23</td><td class="n">+702%</td><td class="n">109%</td><td class="n">16%</td><td class="n">1,95</td><td class="n">62%</td></tr>
+            <tr><td><b>#35 strategia 6 tylko pod prąd wczorajszej sesji</b> · r88</td><td class="nw">2024–26</td><td class="n">175</td><td class="n">1,79</td><td class="n">+324%</td><td class="n">67%</td><td class="n">11%</td><td class="n">2,07</td><td class="n">60%</td></tr>
+            <tr><td><b>#40 long w każdy poniedziałek od Tokio do 15:55</b> · r101</td><td class="nw">2024–26</td><td class="n">147</td><td class="n">1,68</td><td class="n">+284%</td><td class="n">61%</td><td class="n">26%</td><td class="n">1,98</td><td class="n">62%</td></tr>
+            <tr><td><b>#38 mocny spadek w pon lub wt → do pierwszego wzrostu</b> · r91</td><td class="nw">2017–26</td><td class="n">174</td><td class="n">1,39</td><td class="n">+3&nbsp;948%</td><td class="n">48%</td><td class="n">44%</td><td class="n">2,51</td><td class="n">76%</td></tr>
+            <tr><td><b>#33 noc po słabym zamknięciu, w korekcie, noce na pon–śr</b> (rew. 3) · r93</td><td class="nw">2017–26</td><td class="n">222</td><td class="n">1,32</td><td class="n">+1&nbsp;788%</td><td class="n">36%</td><td class="n">28%</td><td class="n">2,46</td><td class="n">60%</td></tr>
+            <tr><td><b>#32 IBS sesji 9:30–16:00, M5</b> · r84</td><td class="nw">2024–26</td><td class="n">46</td><td class="n">0,94</td><td class="n">+242%</td><td class="n">55%</td><td class="n">51%</td><td class="n">3,06</td><td class="n">78%</td></tr>
+            <tr><td><b>#31 IBS sesji 10:00–16:00, H1</b> · r82</td><td class="nw">2024–26</td><td class="n">50</td><td class="n">0,77</td><td class="n">+149%</td><td class="n">38%</td><td class="n">57%</td><td class="n">1,70</td><td class="n">76%</td></tr>
+            <tr><td><b>#31 IBS sesji, H1</b> · r81</td><td class="nw">2017–26</td><td class="n">191</td><td class="n">1,23</td><td class="n">+19&nbsp;048%</td><td class="n">74%</td><td class="n">57%</td><td class="n">1,98</td><td class="n">74%</td></tr>
+            <tr><td><b>#33 noc po słabym zamknięciu w korekcie</b> (rew. 2) · r87</td><td class="nw">2017–26</td><td class="n">385</td><td class="n">0,98</td><td class="n">+1&nbsp;339%</td><td class="n">32%</td><td class="n">40%</td><td class="n">1,51</td><td class="n">55%</td></tr>
+            <tr><td><b>#36 dwa niższe zamknięcia z rzędu</b> · r89</td><td class="nw">2017–26</td><td class="n">270</td><td class="n">0,92</td><td class="n">+2&nbsp;255%</td><td class="n">39%</td><td class="n">40%</td><td class="n">1,56</td><td class="n">70%</td></tr>
+            <tr><td><b>#33 noc po słabym zamknięciu</b> (rew. 1) · r85</td><td class="nw">2017–26</td><td class="n">964</td><td class="n">0,89</td><td class="n">+1&nbsp;450%</td><td class="n">33%</td><td class="n">51%</td><td class="n">1,23</td><td class="n">55%</td></tr>
+            <tr><td><b>#41 long w każdy poniedziałek od Tokio do 15:00, H1</b> · r97</td><td class="nw">2017–26</td><td class="n">467</td><td class="n">0,76</td><td class="n">+615%</td><td class="n">23%</td><td class="n">61%</td><td class="n">1,52</td><td class="n">57%</td></tr>
+            <tr><td><b>#39 spadkowy poniedziałek → long do piątku</b> · r92</td><td class="nw">2017–26</td><td class="n">167</td><td class="n">0,65</td><td class="n">+624%</td><td class="n">23%</td><td class="n">61%</td><td class="n">1,39</td><td class="n">63%</td></tr>
+            <tr><td><b>#37 weekend po piątku bez mocnego spadku</b> · r90</td><td class="nw">2017–26</td><td class="n">331</td><td class="n">0,56</td><td class="n">+230%</td><td class="n">13%</td><td class="n">52%</td><td class="n">1,34</td><td class="n">59%</td></tr>
+            <tr class="ref"><td>#24 strategia 6 + wybicie 30 min · r69</td><td class="nw">2024–26</td><td class="n">722</td><td class="n">1,88</td><td class="n">+924%</td><td class="n">128%</td><td class="n">30%</td><td class="n">1,29</td><td class="n">51%</td></tr>
+            <tr class="ref"><td>#6 otwarcie NY względem EMA12 · r13</td><td class="nw">2024–26</td><td class="n">388</td><td class="n">1,81</td><td class="n">+620%</td><td class="n">101%</td><td class="n">33%</td><td class="n">1,44</td><td class="n">57%</td></tr>
+            <tr class="ref"><td>#30 IBS doby CFD · r70</td><td class="nw">2016–26</td><td class="n">315</td><td class="n">1,26</td><td class="n">+7&nbsp;329%</td><td class="n">49%</td><td class="n">32%</td><td class="n">1,54</td><td class="n">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:12px;font-size:14px;color:var(--ink-3)">Tabela 4 — silnik produkcji, koszty brokera (spread 1,8 pkt, finansowanie 0,0223% za noc na longu), depozyt 20%. Przebieg r83 (#32) przerwał restart produkcji; r84 to jego powtórka.</p>
+
+      <div class="grid2">
+        <div class="card">
+          <h3>#34 · strategia 6 bez shortów po spadkowej sesji <span class="tag ok">najlepsza</span></h3>
+          <p>Strategia 6 bez zmian, z jednym warunkiem: short tylko wtedy, gdy wczorajsza sesja NY zamknęła się nad swoim otwarciem. Short po spadkowej sesji traci (−1 bp na 111 transakcjach), bo indeks po słabej sesji częściej odbija.</p>
+          <div class="rule">short: sb == 1 and close &lt; ema12 and strength &gt; k and y_close &gt; y_open</div>
+          <dl><dt>Sharpe</dt><dd>2,23 (strategia 6: 1,81)</dd><dt>max DD</dt><dd>16% (strategia 6: 33%)</dd><dt>lata</dt><dd>+70% · +82% · +73%</dd><dt>uwaga</dt><dd>filtr wybrany po obejrzeniu tabeli (sekcja 09)</dd></dl>
+        </div>
+        <div class="card">
+          <h3>#35 · strategia 6 tylko pod prąd wczorajszej sesji <span class="tag ok">najniższe DD</span></h3>
+          <p>Symetryczna wersja tej samej hipotezy: long tylko po spadkowej, short tylko po wzrostowej sesji. Ma o połowę mniej transakcji, a Sharpe jest taki sam jak w strategii 6. Zysk na transakcję jest większy, ale zysk łączny nie rośnie.</p>
+          <div class="rule">long: … and y_close &lt; y_open · short: … and y_close &gt; y_open</div>
+          <dl><dt>Sharpe</dt><dd>1,79</dd><dt>max DD</dt><dd>11%, najmniej w archiwum</dd><dt>lata</dt><dd>+42% · +75% · +39%</dd><dt>czas w rynku</dt><dd>3%</dd></dl>
+        </div>
+        <div class="card">
+          <h3>#31 / #32 · zamknięcie sesji przy dole, do odbicia <span class="tag att">ogon</span></h3>
+          <p>Long na zamknięciu sesji, gdy IBS sesji &lt; 0,1. Wyjście na zamknięciu, gdy IBS &gt; 0,8 albo cena jest nad wczorajszym maksimum sesji, najwyżej 5 sesji. Offline +70 bp na transakcję i 74% trafnych.</p>
+          <div class="rule">at_close and ibs &lt; 0,1 → wyjście: ibs &gt; 0,8 or close &gt; y_hi or ~5 sesji</div>
+          <dl><dt>Sharpe</dt><dd>1,23 (2017–26) · 0,94 (M5, 2024–26)</dd><dt>max DD</dt><dd>51–57%: kwiecień 2025, MAE −47%</dd><dt>vs #30</dt><dd>Sharpe jak #30 (1,23 wobec 1,26), rocznie 74% wobec 49%</dd></dl>
+        </div>
+        <div class="card">
+          <h3>#33 · noc po słabym zamknięciu, bez finansowania <span class="tag ok">nowy mechanizm</span></h3>
+          <p>Long od 18:00 do 10:00 ET po sesji zamkniętej w dolnej połowie zakresu. Rewizja 2 dodaje warunek, że indeks jest pod dzienną SMA50. Rewizja 3 zostawia tylko noce kończące się w poniedziałek, wtorek i środę (sekcja 09). Pozycja jest w rynku 5% czasu.</p>
+          <div class="rule">mtc == −60 and ibs_c &lt; 0,5 and close &lt; sma(50) @ DAY and weekday in (pt, pon, wt) → wyjście mtc == 360</div>
+          <dl><dt>Sharpe</dt><dd>1,32 (rew. 2: 0,98, rew. 1: 0,89)</dd><dt>max DD</dt><dd>28% (rew. 2: 40%, rew. 1: 51%)</dd><dt>PF</dt><dd>2,46 (rew. 2: 1,51)</dd><dt>ryzyko</dt><dd>dwa filtry post hoc; spread o 18:00</dd></dl>
+        </div>
+        <div class="card">
+          <h3>#38 · mocny spadek w poniedziałek lub wtorek <span class="tag ok">dni tygodnia</span></h3>
+          <p>Long na zamknięciu poniedziałku albo wtorku, który spadł o więcej niż 0,5 ATR. Wyjście na pierwszym wyższym zamknięciu, najwyżej 5 sesji. Ta sama reguła w środę–piątek daje offline +12 bp zamiast +59. Najlepszy Sharpe na historii od 2017.</p>
+          <div class="rule">at16 and weekday in (pon, wt) and close − yc &lt; −0,5 × ATR → wyjście: close &gt; yc</div>
+          <dl><dt>Sharpe</dt><dd>1,39</dd><dt>max DD</dt><dd>44%</dd><dt>PF · trafność</dt><dd>2,51 · 76%</dd><dt>lata</dt><dd>9 z 10 na plusie (2021: −0,4%)</dd></dl>
+        </div>
+        <div class="card">
+          <h3>#37 / #39 · weekend i cały tydzień <span class="tag att">słabe w silniku</span></h3>
+          <p>#37 trzyma longa przez weekend po piątku bez mocnego spadku (offline +21 bp, t 3,0). #39 trzyma longa od spadkowego poniedziałku do piątku (offline +51 bp, t 2,3). Obie przewagi są prawdziwe, ale ryzyko luki weekendowej i całego tygodnia jest za duże jak na ich wielkość.</p>
+          <dl><dt>#37</dt><dd>Sharpe 0,56 · DD 52% · MAE −52%</dd><dt>#39</dt><dd>Sharpe 0,65 · DD 61% · 2018 −43%</dd></dl>
+        </div>
+        <div class="card">
+          <h3>#36 · dwa niższe zamknięcia z rzędu <span class="tag ok">każdy rok na plusie</span></h3>
+          <p>Long po dwóch kolejnych sesjach zamkniętych niżej (16:00 ET). Wyjście na pierwszym wyższym zamknięciu (reguła Connorsa), najwyżej 5 sesji. 35% sygnałów pokrywa się z IBS sesji &lt; 0,2. Na pozostałych dniach daje offline +40 bp.</p>
+          <div class="rule">at16 and close &lt; yc and yc &lt; yc2 → wyjście: close &gt; yc</div>
+          <dl><dt>Sharpe</dt><dd>0,92</dd><dt>max DD</dt><dd>40%</dd><dt>lata</dt><dd>od +17% (2018) do +70% (2023)</dd></dl>
+        </div>
+      </div>
+
+      <h2 style="margin-top:44px">Wynik w poszczególnych latach</h2>
+      <p>Suma procentów transakcji w roku, z silnika. Strategie M5 mają historię od 2024.</p>
+      <div class="table-wrap"><table><thead><tr><th>Strategia</th><th class="n">2017</th><th class="n">2018</th><th class="n">2019</th><th class="n">2020</th><th class="n">2021</th><th class="n">2022</th><th class="n">2023</th><th class="n">2024</th><th class="n">2025</th><th class="n">2026</th></tr></thead><tbody><tr><td><b>#31 IBS sesji H1 (r81)</b></td><td class="n pos">+31</td><td class="n pos">+7</td><td class="n pos">+25</td><td class="n pos">+195</td><td class="n pos">+41</td><td class="n pos">+102</td><td class="n pos">+93</td><td class="n pos">+70</td><td class="n pos">+35</td><td class="n pos">+1</td></tr><tr><td><b>#33 noc, rew. 1 (r85)</b></td><td class="n pos">+3</td><td class="n pos">+5</td><td class="n pos">+48</td><td class="n pos">+131</td><td class="n pos">+26</td><td class="n neg">−30</td><td class="n pos">+24</td><td class="n pos">+56</td><td class="n pos">+35</td><td class="n pos">+54</td></tr><tr><td><b>#33 noc w korekcie, rew. 2 (r87)</b></td><td class="n pos">+2</td><td class="n pos">+27</td><td class="n pos">+28</td><td class="n pos">+90</td><td class="n pos">+26</td><td class="n pos">+4</td><td class="n pos">+15</td><td class="n pos">+44</td><td class="n pos">+24</td><td class="n pos">+58</td></tr><tr><td><b>#36 dwa niższe zamknięcia (r89)</b></td><td class="n pos">+32</td><td class="n pos">+17</td><td class="n pos">+66</td><td class="n pos">+46</td><td class="n pos">+22</td><td class="n pos">+42</td><td class="n pos">+70</td><td class="n pos">+27</td><td class="n pos">+32</td><td class="n pos">+28</td></tr><tr><td><b>#38 mocny spadek pon/wt (r91)</b></td><td class="n pos">+18</td><td class="n pos">+13</td><td class="n pos">+47</td><td class="n pos">+131</td><td class="n neg">−0,4</td><td class="n pos">+70</td><td class="n pos">+34</td><td class="n pos">+42</td><td class="n pos">+42</td><td class="n pos">+12</td></tr><tr><td><b>#33 noc pon–śr, rew. 3 (r93)</b></td><td class="n neg">−1</td><td class="n pos">+8</td><td class="n pos">+20</td><td class="n pos">+114</td><td class="n pos">+6</td><td class="n pos">+44</td><td class="n pos">+20</td><td class="n pos">+40</td><td class="n pos">+17</td><td class="n pos">+53</td></tr><tr><td><b>#37 weekend (r90)</b></td><td class="n pos">+2</td><td class="n pos">+8</td><td class="n neg">−3</td><td class="n pos">+47</td><td class="n neg">−16</td><td class="n pos">+9</td><td class="n pos">+40</td><td class="n pos">+21</td><td class="n pos">+48</td><td class="n pos">+19</td></tr><tr><td><b>#39 spadkowy pon → pt (r92)</b></td><td class="n pos">+4</td><td class="n neg">−43</td><td class="n pos">+74</td><td class="n neg">−8</td><td class="n pos">+96</td><td class="n pos">+5</td><td class="n pos">+58</td><td class="n pos">+40</td><td class="n pos">+16</td><td class="n pos">+56</td></tr><tr><td><b>#41 poniedziałek od Tokio, H1 (r97)</b></td><td class="n neg">−12</td><td class="n neg">−42</td><td class="n neg">−12</td><td class="n pos">+131</td><td class="n pos">+19</td><td class="n neg">−23</td><td class="n pos">+48</td><td class="n pos">+14</td><td class="n pos">+57</td><td class="n pos">+69</td></tr><tr><td><b>#40 poniedziałek od Tokio, M5 (r101)</b></td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n pos">+14</td><td class="n pos">+64</td><td class="n pos">+70</td></tr><tr><td><b>#32 IBS sesji M5 (r84)</b></td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n pos">+63</td><td class="n pos">+40</td><td class="n pos">+30</td></tr><tr><td><b>#34 strategia 6 bez shortów po spadku (r86)</b></td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n pos">+70</td><td class="n pos">+82</td><td class="n pos">+73</td></tr><tr><td><b>#35 strategia 6 pod prąd wczoraj (r88)</b></td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n">·</td><td class="n pos">+42</td><td class="n pos">+75</td><td class="n pos">+39</td></tr></tbody></table></div>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Połączenie z istniejącymi</div>
+      <h2>Strategia 6 nie lubi grać kontynuacji spadku</h2>
+      <p class="intro">Rozłożyłem transakcje strategii 6 według kierunku wczorajszej sesji NY. Trzy układy zarabiają, czwarty nie: short po dniu, który już spadał.</p>
+      <figure>
+        <div class="scroll"><svg viewBox="0 0 900 210" role="img" aria-label="Średni wynik transakcji strategii 6 w czterech układach względem wczorajszej sesji">
+<line x1="302.5" x2="302.5" y1="10" y2="184" stroke="#ebe8de"/>
+<text x="302.5" y="202" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">0 bp</text>
+<line x1="447.5" x2="447.5" y1="10" y2="184" stroke="#ebe8de"/>
+<text x="447.5" y="202" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">10 bp</text>
+<line x1="592.5" x2="592.5" y1="10" y2="184" stroke="#ebe8de"/>
+<text x="592.5" y="202" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">20 bp</text>
+<line x1="737.5" x2="737.5" y1="10" y2="184" stroke="#ebe8de"/>
+<text x="737.5" y="202" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">30 bp</text>
+<text x="218" y="36" text-anchor="end" font-size="13" fill="#16181d">long po spadkowej sesji</text>
+<rect x="302.5" y="22" width="461.1" height="22" fill="#2a55b0" rx="3"><title>long po spadkowej sesji: +31,8 bp na transakcję, n = 82, t = 2,4</title></rect>
+<text x="771.6" y="38" font-size="12" font-family="Roboto Mono, monospace" fill="#16181d">+31,8 · n 82</text>
+<text x="218" y="78" text-anchor="end" font-size="13" fill="#16181d">long po wzrostowej sesji</text>
+<rect x="302.5" y="64" width="250.9" height="22" fill="#2a55b0" rx="3"><title>long po wzrostowej sesji: +17,3 bp na transakcję, n = 103, t = 2,4</title></rect>
+<text x="561.4" y="80" font-size="12" font-family="Roboto Mono, monospace" fill="#16181d">+17,3 · n 103</text>
+<text x="218" y="120" text-anchor="end" font-size="13" fill="#16181d">short po wzrostowej sesji</text>
+<rect x="302.5" y="106" width="213.1" height="22" fill="#2a55b0" rx="3"><title>short po wzrostowej sesji: +14,7 bp na transakcję, n = 93, t = 2,0</title></rect>
+<text x="523.6" y="122" font-size="12" font-family="Roboto Mono, monospace" fill="#16181d">+14,7 · n 93</text>
+<text x="218" y="162" text-anchor="end" font-size="13" fill="#16181d">short po spadkowej sesji</text>
+<rect x="288.0" y="148" width="14.5" height="22" fill="#8a8f9e" rx="3"><title>short po spadkowej sesji: −1,0 bp na transakcję, n = 111, t = −0,1</title></rect>
+<text x="310.5" y="164" font-size="12" font-family="Roboto Mono, monospace" fill="#16181d">−1,0 · n 111 · odrzucony</text>
+<line x1="302.5" x2="302.5" y1="10" y2="184" stroke="#85899a"/>
+</svg></div>
+        <figcaption><b>Rys. 3</b> — średni wynik transakcji strategii 6 (bp netto, bez dźwigni, M5 2024–2026) według kierunku wczorajszej sesji. W latach 2025–26 odrzucona ćwiartka daje −4,3 i −8,6 bp, a pozostałe są dodatnie w każdym roku.</figcaption>
+      </figure>
+      <p style="margin-top:22px">Ten podział wybrałem po obejrzeniu tabeli, więc trzeba go sprawdzić inaczej. Przemawiają za nim trzy rzeczy:</p>
+      <ul class="plain">
+        <li><strong>Działa przy każdym progu siły.</strong> Dla k od 0 do 0,15 filtr podnosi Sharpe strategii 6 o 0,3–0,55 (k = 0: 1,53 → 1,87; k = 0,075: 1,81 → 2,24; k = 0,15: 1,17 → 1,55).</li>
+        <li><strong>Ma niezależne źródło.</strong> Badanie sesji z 26.10 znalazło na danych od 2017 odwrócenie sesji NY z dnia na dzień, zanim ktokolwiek dzielił strategię 6. Sekcja 03 pokazuje, że po słabej sesji rynek częściej rośnie.</li>
+        <li><strong>Ma ten sam znak na nodze londyńskiej #28,</strong> ale tam jest tylko ok. 90 transakcji i sama noga nie zarabia (−0,8 bp), więc to słabe potwierdzenie.</li>
+      </ul>
+      <p>Przeciw: różnica między ćwiartkami ma t ≈ 1,6, a historia M5 to niecałe trzy lata. Do czasu testu na nowych danych traktuję #34 jako najlepszego kandydata, nie jako pewnik.</p>
+
+
+      <h2 style="margin-top:40px">Dzień tygodnia w istniejących strategiach</h2>
+      <p>Te same strategie rozbite według dnia (offline, bp netto na transakcję, w nawiasie 2017–22 | 2023–26). Wzór z sekcji 05 widać także tutaj.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Strategia</th><th class="n">pon</th><th class="n">wt</th><th class="n">śr</th><th class="n">czw</th><th class="n">pt</th><th>Wniosek</th></tr></thead>
+          <tbody>
+            <tr><td><b>#33 noc po słabym zamknięciu</b> (rew. 2, dzień końca nocy)</td><td class="n pos">+27</td><td class="n pos">+54</td><td class="n pos">+32</td><td class="n">+6</td><td class="n neg">−6</td><td>noce na czwartek i piątek dają +6 i −6 bp (w obu okresach poniżej 12 bp) → <b>rewizja 3</b></td></tr>
+            <tr><td><b>#36 dwa niższe zamknięcia</b> (dzień wejścia)</td><td class="n pos">+57</td><td class="n pos">+44</td><td class="n pos">+41</td><td class="n pos">+45</td><td class="n neg">−10</td><td>wejście w piątek −37 | +21, niejednoznaczne</td></tr>
+            <tr><td><b>#31 IBS sesji</b> (dzień wejścia)</td><td class="n pos">+71</td><td class="n pos">+37</td><td class="n pos">+66</td><td class="n pos">+86</td><td class="n pos">+91</td><td>działa każdego dnia, filtr niepotrzebny</td></tr>
+            <tr><td><b>strategia 6</b> (dzień transakcji, 2024–26)</td><td class="n">+4</td><td class="n">+12</td><td class="n pos">+30</td><td class="n pos">+18</td><td class="n">+9</td><td>poniedziałek najsłabszy: short w dzień, który zwykle rośnie</td></tr>
+            <tr><td><b>#34</b> (dzień transakcji, 2024–26)</td><td class="n pos">+16</td><td class="n pos">+21</td><td class="n pos">+31</td><td class="n pos">+20</td><td class="n">+9</td><td>filtr #34 naprawia poniedziałek (+4 → +16)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Strategia 6 w poniedziałek prawie nie zarabia, bo często gra short w dniu, który rośnie w 63% przypadków. Filtr #34 (bez shortów po spadkowej sesji, w poniedziałek: po spadkowym piątku) podnosi poniedziałek z +4 do +16 bp. Wyjaśnia to część jego przewagi bez żadnej reguły o dniu tygodnia.</p>
+
+      <h2 style="margin-top:40px">Czego nie warto łączyć</h2>
+      <div class="fails">
+        <div class="fail"><h3>Filtr w #24 zamiast w #6 <span class="tag att">bez zysku</span></h3><p>W #24 dni odrzucone filtrem przechodzą do nogi wybicia 30-minutowego, która zarabia +1–3 bp. Sharpe offline zostaje taki sam (1,85 wobec 1,84). Filtr działa tylko wtedy, gdy odrzucony dzień zostaje pusty.</p></div>
+        <div class="fail"><h3>Kilka miar „słabości” naraz <span class="tag att">ta sama informacja</span></h3><p>Suma warunków IBS &lt; 0,5, zamknięcie pod średnią sesji, pod SMA5 i dwa spadki z rzędu daje dla nocy +11,7 bp przy 3–4 spełnionych warunkach, tyle co sam IBS (+10,2). Miary mierzą to samo.</p></div>
+        <div class="fail ok"><h3>Portfel zamiast jednego dokumentu <span class="tag ok">dywersyfikacja</span></h3><p>Miesięczne wyniki #31, #33 i #36 są skorelowane w 0,33–0,59. Równe wagi trzech dają Sharpe miesięczny 1,47, a każda osobno 1,11–1,23. Z #34 korelują w 0,2–0,3, ale #34 sam jest tak mocny, że domieszka obniża jego Sharpe (3,16 → 2,64 offline). Silnik nie liczy portfela, więc to rachunek poza nim.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">10 · Co nie działa</div>
+      <h2>Większość zależności z otwarcia to szum</h2>
+      <p>Tyle samo wartości co znalezione strategie mają rzeczy, których nie warto już sprawdzać.</p>
+      <div class="fails">
+        <div class="fail stop"><h3>Luki na otwarciu <span class="tag stop">sprzeczne</span></h3><p>Na H1 (2017–26, otwarcie 10:00) podążanie za dużą luką daje +7 bp, prawie w całości z 2020. Na M5 (2024–26, otwarcie 9:30) daje −20,5 bp (t −2,1). Granie na domknięcie małej luki: +0,9 bp. Prawdopodobieństwo domknięcia zależy od wielkości luki: poniżej 0,1 ATR ok. 90%, powyżej 1 ATR ok. 10%. To opis, nie przewaga.</p></div>
+        <div class="fail stop"><h3>Wczorajsze maksimum i minimum jako poziomy <span class="tag stop">tracą</span></h3><p>Wybicie wczorajszego szczytu z kontynuacją do zamknięcia: +2,4 (M5) i −1,7 bp (H1). Gra na fałszywe wybicie („sweep”) z powrotem do zakresu: od −4 do −12 bp. To zgodne z wynikami #12 i #17 oraz z literaturą (Larry Williams „Oops” przestał działać po 2022).</p></div>
+        <div class="fail stop"><h3>Wąski dzień, a jutro wybicie <span class="tag stop">odwrotnie</span></h3><p>Po dniu NR7 dzisiejszy zakres to 0,62 ATR wobec średnio 0,72. Zmienność się skupia, nie rozpręża. Wybicie zakresu otwarcia po NR4/NR7 daje na M5 +1–2 bp.</p></div>
+        <div class="fail stop"><h3>Momentum ostatnich 30 minut <span class="tag stop">odwrócone</span></h3><p>Reguła z literatury (Gao i in. 2018, Baltussen i in. 2021): ruch od wczorajszego zamknięcia do 15:30 przewiduje ostatnie pół godziny. Na M30 w latach 2024–26 daje −2,8 bp netto (t −2,8), przy każdym progu. Wersja Gao (pierwsze pół godziny → ostatnie): −0,9 bp.</p></div>
+        <div class="fail stop"><h3>Lustrzane shorty <span class="tag stop">tracą</span></h3><p>Każdy sygnał powrotu do średniej odwrócony na short (IBS &gt; 0,9, dwa wyższe zamknięcia, 10-dniowe maksimum, RSI2 &gt; 90) traci, w latach 2023–26 mocno: short na 10-dniowym maksimum daje w tym okresie −20,6 bp (t −3,9). Dryf indeksu w górę działa tylko w jedną stronę.</p></div>
+        <div class="fail"><h3>Pełna siatka dzień tygodnia × wczoraj <span class="tag att">powtarzają się tylko grupy</span></h3><p>Cała siatka nie powtarza się między okresami: korelacja średnich to 0,17 dla 25 komórek z kubełkami siły ruchu i od −0,22 do 0,31 dla wersji z samym znakiem dnia. Pojedyncza komórka nie przechodzi poprawki na liczbę testów (|t| ≈ 3,2). Przetrwały tylko trzy wzory z sekcji 05, każdy złożony z kilku komórek o tym samym znaku w obu okresach.</p></div>
+        <div class="fail stop"><h3>Weekend i cały tydzień jako pozycja <span class="tag stop">ryzyko luki</span></h3><p>Przewaga poniedziałku po silnym piątku (#37, +21 bp offline) i tygodnia po spadkowym poniedziałku (#39, +51 bp) istnieje, ale w silniku daje Sharpe 0,56 i 0,65 przy obsunięciach 52–61%. Najgorsza luka weekendowa zabrała w trakcie transakcji 52% kapitału przy 4× dźwigni.</p></div>
+        <div class="fail stop"><h3>Przejścia dni tygodnia na BTC <span class="tag stop">szum</span></h3><p>Na BTCUSD (7 dni) korelacja średnich z siatki „dzień × kubełek → jutro” między okresami wynosi −0,13. Stabilny jest tylko sam poniedziałek (+41 / +36 bp).</p></div>
+        <div class="fail stop"><h3>BTC jako sygnał dla US100 <span class="tag stop">nic</span></h3><p>Weekendowy ruch BTC jest już w niedzielnej luce US100 (korelacja 0,41 po 2023), a po otwarciu nic nie dodaje (−0,04). Nocny ruch BTC nie przewiduje sesji NY (+0,02 / −0,01).</p></div>
+        <div class="fail stop"><h3>Stop w powrocie do średniej <span class="tag stop">pogarsza</span></h3><p>Stop 1 ATR w #31 obniża wynik z +75 do +36 bp na transakcję, a obsunięcie przy 4× rośnie z 31% do 46%. Przy 2 ATR wynik spada mniej (+69 bp), ale obsunięcie i tak rośnie (41%); przy 3 ATR jest gorzej. Ogon wynika z dźwigni, nie z braku stopu.</p></div>
+        <div class="fail"><h3>Filtr SMA200 <span class="tag att">wycina najlepsze</span></h3><p>Pod SMA200 odbicia są 2–4 razy większe (RSI2 &lt; 25: +46 bp pod, +13 nad). Filtr chroni przed bessą, ale w tych danych bessa dawała najlepsze odbicia. Wyjątkiem jest noc (#33), gdzie dobrym filtrem okazała się korekta pod SMA50: +21,7 bp wobec +3,2 nad nią.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">11 · Literatura</div>
+      <h2>Co mówią publikacje i co z tego zostaje na US100</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Efekt</th><th>Źródło</th><th>W literaturze</th><th>Na naszych danych</th></tr></thead>
+          <tbody>
+            <tr><td><b>IBS / miejsce zamknięcia</b></td><td>Pagonidis 2013; Pandey &amp; Joshi 2023</td><td>long przy IBS &lt; 0,2, trafność 54–61%</td><td><span class="tag ok">potwierdzone</span> mocniej z sesji niż z doby (#31, #32)</td></tr>
+            <tr><td><b>Odbicie w nocy po wyprzedaży</b></td><td>Boyarchenko i in., RFS 2023</td><td>nocny dryf skupiony po spadkowej sesji</td><td><span class="tag ok">potwierdzone</span> +10–15 bp po słabym zamknięciu (#33)</td></tr>
+            <tr><td><b>Dzienne odwrócenie indeksów</b></td><td>Baltussen, van Bekkum, Da, JFE 2019</td><td>AR(1) indeksów ujemne od 2000 r.</td><td><span class="tag ok">potwierdzone</span> dwa niższe zamknięcia +35 bp (#36), filtr #34</td></tr>
+            <tr><td>Connors RSI(2), Double 7</td><td>Connors; testy 2016–26</td><td>na Nasdaqu słabnie</td><td><span class="tag ok">działa</span> RSI2 &lt; 5: +55 bp/dzień, ale bez SMA200</td></tr>
+            <tr><td>Momentum ostatniego pół godziny</td><td>Gao i in. 2018; Baltussen i in. 2021</td><td>Sharpe 1,1–1,7, po 2013 słabnie</td><td><span class="tag stop">odwrócone</span> −2,8 bp w 2024–26</td></tr>
+            <tr><td>Strefa szumu (noise area)</td><td>Zarattini, Aziz, Barbon 2024</td><td>SPY Sharpe 1,33</td><td>już w archiwum (#25), nie testowane ponownie</td></tr>
+            <tr><td>NR4/NR7 jako filtr momentum</td><td>Crabel; Zarattini i in. tab. 5</td><td>po NR4 +22 bp/dzień na SPY</td><td><span class="tag att">słabe</span> ORB po NR4/NR7 +1–8 bp</td></tr>
+            <tr><td>Domykanie luk</td><td>Plastun i in. 2020</td><td>wysoki odsetek domknięć, ale zwrot ≈ 0</td><td><span class="tag stop">brak przewagi</span> +0,9 bp</td></tr>
+            <tr><td>„Oops”, fałszywe wybicie</td><td>L. Williams; test DAX</td><td>przestało działać po 2022</td><td><span class="tag stop">traci</span> od −4 do −12 bp</td></tr>
+            <tr><td>Przełom miesiąca</td><td>McConnell &amp; Xu 2008</td><td>sporne po 1990</td><td><span class="tag att">słabe</span> +17 bp ponad bazę, t 1,2; dzień +1 zanikł</td></tr>
+            <tr><td><b>Turnaround Tuesday</b></td><td>Cross 1973; Quantified Strategies</td><td>spadkowy poniedziałek → wtorek w górę</td><td><span class="tag ok">potwierdzone szerzej</span> mocny spadek w pon i wt → +33/+35 bp; w śr–pt nie (#38)</td></tr>
+            <tr><td>Efekt poniedziałku / weekendu</td><td>French 1980; Cross 1973</td><td>dawniej ujemny poniedziałek, po 1990 zanikł</td><td><span class="tag ok">odwrócony</span> poniedziałek US100 najlepszy, +30 bp od 2023; po spadkowym piątku ≈ 0</td></tr>
+            <tr><td>Dzień przed świętem · piątek wygasania opcji</td><td>CXO; praktycy</td><td>osłabło</td><td><span class="tag att">nie do zapisania</span> +21 bp (t 2,1) · −21 bp (t −1,9), oba w obu okresach</td></tr>
+            <tr><td>Weekend krypto → poniedziałek</td><td>Mourey i in., FRL 2025</td><td>spadki BTC zapowiadają spadki Nasdaqa</td><td><span class="tag stop">nic</span> już zawarte w niedzielnej luce</td></tr>
+            <tr><td>Nocny dryf i „przeciąganie liny”</td><td>Lou, Polk, Skouras 2019</td><td>przekrojowo, na akcjach</td><td><span class="tag att">tylko warunkowo</span> dryf zjada finansowanie, chyba że wejście jest po 21:00 UTC</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">12 · Zastrzeżenia</div>
+      <h2>Co może zawyżać te liczby</h2>
+      <div class="fails">
+        <div class="fail stop"><h3>Ogon strategii nocnych i wielodniowych <span class="tag stop">ryzyko</span></h3><p>#31 kupił 3 kwietnia 2025 przy zamknięciu w dołku i w trakcie transakcji tracił 47% kapitału, choć skończył na +12%. 22 lipca 2026 stracił 25%. Przy 4× dźwigni obsunięcia wynoszą 40–57%. Depozyt 10% (2×) mniej więcej je połowi. Sharpe się nie zmienia, rośnie tylko wygoda.</p></div>
+        <div class="fail"><h3>Wybór po obejrzeniu danych <span class="tag att">post hoc</span></h3><p>Filtr #34, warunek SMA50 w #33 rew. 2 i filtr dni w #33 rew. 3 wybrałem po obejrzeniu tabel. Filtr dni w #38 wynika z tabeli przejść, którą oglądałem przed jego zapisaniem. Rodzina IBS, noc i #38 mają za to płaskowyż progów i dwa zgodne okresy. Prób na strategiach: #31 dwie, #32 dwie (jedna przerwana), #33 trzy, #34–#39 po jednej, #40 cztery i #41 pięć (warianty sesji, o które prosił operator; r94 z artefaktem danych).</p></div>
+        <div class="fail"><h3>Spread o 18:00 <span class="tag att">koszt</span></h3><p>#33 wchodzi na pierwszej świecy po dziennej przerwie, kiedy spread bywa szerszy niż 1,8 pkt profilu. Wejście o 19:00 daje offline ok. 2 bp mniej na noc. Przy +10–20 bp przewagi to istotne, ale jej nie zjada.</p></div>
+        <div class="fail"><h3>Krótka historia M5 <span class="tag att">próba</span></h3><p>#32, #34 i #35 mają niecałe trzy lata, które były rynkiem wzrostowym z dwiema ostrymi korektami. Strategie H1 (#31, #33, #36) obejmują 2018, 2020 i 2022, a każda z nich (#33 w rewizji 2) ma 2022 na plusie.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">13 · Kolejne kierunki</div>
+      <h2>Co otwiera to badanie</h2>
+      <ul class="plain">
+        <li><strong>Test na nowych danych dla #34, #38 i #33 rew. 3.</strong> Najmocniejsze wyniki mają filtry wybrane po obejrzeniu danych. Kilka miesięcy od dziś bez zmian w dokumentach rozstrzygnie, czy działają.</li>
+        <li><strong>Dlaczego początek tygodnia?</strong> Odbicie po spadku w pon–wt, a nie w śr–pt, może wynikać z przepływów (nowe pieniądze na początku tygodnia, domykanie pozycji przed weekendem) albo z kalendarza danych makro. Rozbicie po tygodniach z FOMC i CPI wymaga kalendarza w języku i w danych.</li>
+        <li><strong>Kalendarz w języku strategii.</strong> Dzień przed świętem (+21 bp) i piątek wygasania opcji (−21 bp) mają ten sam znak w obu okresach, ale język nie zna daty, dnia miesiąca ani świąt. To luka w języku, nie brak strategii.</li>
+        <li><strong>Wielkość pozycji według zmienności bez stopu.</strong> Stop psuje powrót do średniej, a stała dźwignia daje 50% obsunięcia. Depozyt odwrotnie proporcjonalny do ATR (cel zmienności) to brakujący tryb <code>sizing</code>.</li>
+        <li><strong>Profil spreadu zależny od godziny.</strong> #28 i #33 handlują poza sesją NY. Bez godzinowego spreadu ich koszt jest zaniżony.</li>
+        <li><strong>Portfel w silniku.</strong> Rodzina nocna i wielodniowa ma niską korelację z rodziną strategii 6. Dopiero silnik liczący kilka dokumentów na jednym rachunku pokaże, ile to daje po kosztach i z dźwignią.</li>
+        <li><strong>Więcej indeksów.</strong> US500, DE40 i UK100 od 2017 sprawdziłyby, czy słabe zamknięcie i nocne odbicie to cecha indeksów, czy tylko Nasdaqa. Seria MINUTE dla BTCUSD pozwoliłaby przeliczyć momentum BTC (3 wzrostowe dni → +59 bp za 2 dni, ale 4 lata stratne), którego silnik dziś nie przyjmie.</li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Zależności między dniami · archiwum market_data i silnik /strategies produkcji, odczyt 27.10.2026</span>
+    <span>Wyniki historyczne · rachunek demo · tylko badania</span>
+  </div>
+</footer>

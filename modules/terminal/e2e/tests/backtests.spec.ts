@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { createStrategy, daysAgo, finishedRun, openStrategy, queuedRun, strategyDocument, uniqueName } from "../support";
 
-/** Runs, reports and comparisons against a live workbench (`docs/strategie-scenariusze-testowe.html`, sections 05–07). */
+/** Runs, reports and comparisons against a live workbench (`docs/strategie/strategie-scenariusze-testowe.html`, sections 05–07). */
 
 const runs = (page: Page) => page.getByRole("table", { name: "Uruchomienia" });
 const runRow = (page: Page, id: number) => runs(page).getByRole("row").filter({ has: page.getByRole("cell", { name: String(id), exact: true }) });

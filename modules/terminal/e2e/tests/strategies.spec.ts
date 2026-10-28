@@ -9,7 +9,7 @@ import {
   uniqueName,
 } from "../support";
 
-/** The Strategies tab against a live workbench (`docs/strategie-scenariusze-testowe.html`, sections 01–03). */
+/** The Strategies tab against a live workbench (`docs/strategie/strategie-scenariusze-testowe.html`, sections 01–03). */
 
 const ATR_STOP = (multiple: number) => ({
   params: {},

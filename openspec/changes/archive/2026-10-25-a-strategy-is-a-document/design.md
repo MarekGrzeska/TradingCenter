@@ -1,6 +1,6 @@
 ## Context
 
-Motywacja w proposal.md, a cztery poziomy języka i decyzje operatora w `docs/strategie-i-backtesty-research.html`
+Motywacja w proposal.md, a cztery poziomy języka i decyzje operatora w `docs/strategie/strategie-i-backtesty-research.html`
 (sekcje 10 i 12). Ograniczenia, które kształtują podejście:
 
 - Pakiet workbencha nie importuje innego pakietu (`tests/test_layering.py`). Świece i wskaźniki z `/market` czyta

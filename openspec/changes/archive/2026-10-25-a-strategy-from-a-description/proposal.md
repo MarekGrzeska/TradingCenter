@@ -2,7 +2,7 @@
 
 Etap 1 (`a-strategy-is-a-document`) dał silnik i zapis, ale strategię da się dziś napisać tylko ręcznie, jako JSON
 wysłany pod REST, a raport przeczytać jako surowy słownik. Operator zdecydował 24.10.2026, że głównym autorem jest
-agent piszący z opisu po polsku, a edytor służy do podglądu i poprawek (`docs/strategie-i-backtesty-research.html`,
+agent piszący z opisu po polsku, a edytor służy do podglądu i poprawek (`docs/strategie/strategie-i-backtesty-research.html`,
 sekcja „Agent i edytor”). Etap 2 daje temu ekran i narzędzia.
 
 ## What Changes

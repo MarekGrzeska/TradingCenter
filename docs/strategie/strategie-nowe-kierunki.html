@@ -1,0 +1,424 @@
+<title>Nowe kierunki strategii</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Badanie · nowe kierunki strategii</span>
+    <h1>Nowe kierunki: co przeżyło test</h1>
+    <p class="lede">Siedemnaście nowych dokumentów i czterdzieści kilka przebiegów na silniku produkcji, z priorytetem na <b>zwrot roczny</b> i <b>liczbę transakcji</b>. Z dziewięciu nowych pomysłów przeżyły dwa: poranek europejski i odwrócenie końca dnia. Najwięcej dał jednak nie nowy sygnał, tylko <b>składanie nienakładających się nóg w jeden dokument</b>: #58 (pięć nóg) ma Sharpe 2,71, 266% rocznie i 743 transakcje, a #53 (trzy nogi) Sharpe 2,55 przy obsunięciu 25%, wobec 1,88 i 128% dotychczasowego lidera.</p>
+    <div class="strip">
+      <span>TradingCenter / strategie</span>
+      <span>28 października 2026</span>
+      <span>US100 M5 od I 2024 · H1 od V 2017 · D1 od 2016 · BTCUSD H1 od 2017</span>
+      <span>silnik <b>/strategies</b> produkcji, koszty brokera, depozyt 20%</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">17</div><div class="l">nowych strategii (#42–#58), 26 rewizji</div></div>
+      <div class="cell"><div class="v">45</div><div class="l">przebiegów z kosztami brokera</div></div>
+      <div class="cell"><div class="v">2,71</div><div class="l">najlepszy Sharpe na oknie 2024–26 (2,71_WHO)</div></div>
+      <div class="cell"><div class="v">266%</div><div class="l">najwyższy zwrot roczny (266%_WHO)</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Cel i metoda</div>
+      <h2>Najpierw nowe sygnały, potem składanie nóg</h2>
+      <p class="intro">Zadanie: znaleźć kierunki inne niż dotychczasowe (strategia 6, IBS, sesje, dni tygodnia), z naciskiem na zwrot roczny i na liczbę transakcji, bo backtest z kilkudziesięcioma transakcjami nie mówi prawie nic. Wolno było sięgać po wszystkie instrumenty w archiwum.</p>
+      <p>Przebieg pracy: przegląd internetu pod kątem tego, co w latach 2025–2026 jeszcze działa na indeksach (sekcja 02), potem dziewięć nowych rodzin sygnałów zapisanych jako dokumenty w silniku (sekcja 03), a na końcu składanie tego, co przeżyło, z najlepszymi wynikami poprzednich badań w dokumenty wielonogowe (sekcja 04). Każdy dokument ma depozyt 20% (ekspozycja 4× przy wymogu 5%), koszty z profilu brokera (spread 1,8 pkt na US100, finansowanie 2,2 bp za noc longa) i brak stopu, tak jak reszta archiwum. Okno porównawcze to <span class="hl">1.01.2024 – 27.10.2026</span> dla M5; dokumenty H1 i D1 liczone od 2017 i 2016.</p>
+      <p>Silnik liczy jeden przebieg naraz, więc przebiegi szły seryjnie przez MCP po HTTP (ten sam token, którym Claude Code loguje się do produkcji), po 2–5 minut każdy. <strong>Instrumenty:</strong> silnik przyjął BTCUSD na świecach H1 (3817 transakcji w #52), choć notatka z 27.10 mówiła, że bez serii MINUTE odmówi — odmowa dotyczy więc tylko dokumentów M5. Złoto i ropa mają w archiwum tylko 2026 rok, za mało na cokolwiek; bitcoin dostał dwa dokumenty (sekcja 05).</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Przegląd internetu</div>
+      <h2>Co jeszcze działa na indeksach w 2026</h2>
+      <p class="intro">Wspólny mianownik świeżych publikacji: proste sygnały intraday na Nasdaqu przeżywają tylko wtedy, gdy ruch na transakcję jest kilkukrotnie większy od kosztu, a najbardziej znane wyniki nie przetrwały replikacji z realistycznym poślizgiem.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Co mówi źródło</th><th>Źródło</th><th>Co z tego na US100</th></tr></thead>
+          <tbody>
+            <tr><td><b>14 rodzin sygnałów momentum na M5 MNQ nie przechodzi testu poza próbą po kosztach</b>; koszt 1–2 pkt na transakcję zjada ruchy, które sygnał łapie.</td><td><a href="https://arxiv.org/pdf/2605.04004">arXiv 2605.04004</a> (maj 2026)</td><td>Zgodne z sekcją 05: powrót do średniej i momentum na pojedynczych świecach M5 tracą u nas przy spreadzie 1,8 pkt.</td></tr>
+            <tr><td><b>Strefa szumu na NQ</b> (noise band): ok. 10 USD/dzień netto 2020–VII 2026, Sharpe 1,14; 1 pkt poślizgu zabiera 22% przewagi.</td><td><a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7609644">Chuk, SSRN 2026</a></td><td>Mamy to jako #25 (Sharpe 0,88); nie wracałem.</td></tr>
+            <tr><td><b>Replikacja „Beat the Market” (SPY/ES)</b>: Sharpe 1,11 wobec 1,33 w pracy, a od 2025 około zera.</td><td><a href="https://github.com/giovannibrusco/zarattini-2024-momentum-spy">replikacja</a></td><td>Momentum intraday na indeksie słabnie; u nas ostatnie 30 minut wręcz się odwraca (#42).</td></tr>
+            <tr><td><b>ORB 5-min na QQQ</b>: próg opłacalności ok. 2,2 c/akcję poślizgu; 76% zysku filtra z jednego roku (2022).</td><td><a href="https://github.com/giovannibrusco/zarattini-2023-orb-qqq">replikacja</a>, <a href="https://github.com/giovannibrusco/nq-intraday-breakout">audyt NQ</a></td><td>ORB już odrzucony (#8, #15, #27); audyt pokazuje, że konwencja wypełnień zmienia wynik — stąd uwaga na godzinę rolowania (sekcja 07).</td></tr>
+            <tr><td><b>Odwrócenie końca dnia</b>: na pojedynczych akcjach ostatnie 30 minut odwraca ruch z początku dnia; na poziomie indeksu literatura mówi o momentum.</td><td><a href="https://www3.nd.edu/~zda/EOD.pdf">Baltussen, Da, Soebhag 2025</a></td><td>Na US100 2024–26 jest odwrócenie, nie momentum: #42, +6 bp na transakcję, 534 transakcje.</td></tr>
+            <tr><td><b>Przepływy poranne kontynuują, popołudniowe odwracają</b>, odwrócenie skupione w ostatnich dwóch godzinach.</td><td><a href="https://assets.super.so/e46b77e7-ee08-445e-b43f-4ffd88ae0a0e/files/f360fb42-445c-433b-8d78-0059bcf604ca.pdf">working paper</a></td><td>Powrót do średniej na M5 traci cały dzień, ale po południu mniej (#43 rew. 2: Sharpe 0,49 po 12:00 wobec −0,41 cały dzień).</td></tr>
+            <tr><td><b>Nasdaq-100 futures: momentum albo odwrócenie</b> zależnie od znaku wczorajszej i nocnej stopy zwrotu i od poniedziałku.</td><td><a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=712168">Yu, Rentzler, Wolf (JOIM)</a></td><td>To mechanizm filtra #34 i nogi poniedziałkowej; składanie ich w jeden dokument (#51–#55) jest naturalne.</td></tr>
+            <tr><td><b>Zakres nocy na NQ 2015–25</b>: 94% dni łamie poziom nocy; kierunek z położenia otwarcia względem środka zakresu.</td><td><a href="https://tradingstats.net/overnight-high-low-breakout-strategy/">TradingStats</a></td><td>Nie testowałem: rodzina „wczorajsze poziomy” odrzucona 27.10 (+2 / −2 bp).</td></tr>
+            <tr><td><b>„Magic hours”</b>: wybicie zakresu godziny i powrót do środka na NQ 2021–26.</td><td><a href="https://tradingstats.net/magic-hours-trading-strategy-nq/">TradingStats</a></td><td>Przeliczone jako #48: 5923 transakcje, brutto dodatnie, netto −62% rocznie. Spread zjada wszystko.</td></tr>
+            <tr><td><b>Wybicie zmienności</b> (otwarcie ± 0,4 ATR, 7978 transakcji, Sharpe ~1,8) i <b>intraday trend following</b> z pullbackiem M5 (781 transakcji, 58% trafnych).</td><td><a href="https://mistakesoninvesting.substack.com/p/intraday-volatility-breakouts-an">Substack</a>, <a href="https://ungeracademy.com/blog/trend-following-nasdaq-volatility">Unger</a></td><td>Pullback RSI(3) w trendzie dnia (#46): Sharpe 0,10. Wybicie ATR to krewny #24 nogi 2 (+1–3 bp).</td></tr>
+            <tr><td><b>RSI(2) na SPY, 26 lat</b>: 181 transakcji, 82% trafnych, poniżej buy&amp;hold, obsunięcie −14% wobec −55%.</td><td><a href="https://gurufinanceinsights.substack.com/p/i-backtested-the-classic-rsi2-mean">Substack</a></td><td>Na US100 D1 bez SMA200 (#49): Sharpe 0,56–0,62, 82–163 transakcje, obsunięcie 62–80% przy 4×. Rodzina IBS (#31) jest lepsza.</td></tr>
+            <tr><td><b>Sezonowość nocna bitcoina</b> (long 22:00 UTC na 2 godziny) i <b>przełom miesiąca</b>.</td><td><a href="https://quantpedia.com/strategies/intraday-seasonality-in-bitcoin">Quantpedia</a>, <a href="https://quantpedia.com/strategies/turn-of-the-month-in-equity-indexes">Quantpedia</a></td><td>Pierwsze to u nas artefakt przerwy brokera 21:00–21:05 UTC (26.10); drugie wymaga kalendarza, którego język nie ma.</td></tr>
+            <tr><td><b>0DTE i gamma dealerów</b>: ostatnia godzina, pinning, „gamma squeeze” — komentarze praktyków bez metodologii.</td><td><a href="https://www.gexmetrix.com/blog/zero-dte">GEXmetrix</a> i podobne</td><td>Niesprawdzalne u nas (brak danych opcyjnych); zostaje obserwacja, że ostatnie 5 minut niesie dużą część odwrócenia (#42 rew. 3 vs rew. 1).</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Co przetestowałem</div>
+      <h2>Dziewięć nowych rodzin, siedemnaście dokumentów</h2>
+      <p class="intro">Każdy wiersz to najlepszy przebieg danej strategii. Okno 2024–26 dla M5; H1 i D1 od 2017/2016. Zwrot roczny to CAGR kapitału przy depozycie 20%.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Pomysł</th><th>Okno</th><th class="n">Transakcje</th><th class="n">Sharpe</th><th class="n">Rocznie</th><th class="n">Max DD</th><th class="n">PF</th><th>Werdykt</th></tr></thead>
+          <tbody>
+            <tr><td><b>#58</b></td><td>pięć nóg: jak #55 plus noc po słabym zamknięciu w korekcie w pon i wt wieczór (r146, próg poranka 0,5)</td><td>2024–26 M5</td><td class="n">743</td><td class="n">2,71</td><td class="n">266%</td><td class="n">33%</td><td class="n">1,59</td><td><span class="tag ok">najlepsza</span></td></tr>
+            <tr><td><b>#53</b></td><td>trzy nogi: poniedziałek od Londynu, strategia 6 z filtrem #34, odwrócenie końca dnia (r139)</td><td>2024–26 M5</td><td class="n">673</td><td class="n">2,55</td><td class="n">193%</td><td class="n">25%</td><td class="n">1,70</td><td><span class="tag ok">najpłytsze DD</span></td></tr>
+            <tr><td><b>#55</b></td><td>cztery nogi: jak #53 plus poranek europejski w dni bez sygnału (r141, próg poranka 0,5)</td><td>2024–26 M5</td><td class="n">700</td><td class="n">2,61</td><td class="n">220%</td><td class="n">31%</td><td class="n">1,61</td><td><span class="tag ok">działa</span></td></tr>
+            <tr><td><b>#51</b></td><td>poniedziałek od Londynu + strategia 6 z filtrem #34 (r116)</td><td>2024–26 M5</td><td class="n">356</td><td class="n">2,45</td><td class="n">176%</td><td class="n">27%</td><td class="n">1,93</td><td><span class="tag ok">działa</span></td></tr>
+            <tr><td><b>#56</b></td><td>#51 plus noc po słabym zamknięciu w korekcie (pon i wt wieczór) (r135)</td><td>2024–26 M5</td><td class="n">399</td><td class="n">2,54</td><td class="n">216%</td><td class="n">31%</td><td class="n">1,86</td><td><span class="tag ok">najlepsza bez EOD</span></td></tr>
+            <tr><td><b>#45</b></td><td>poranek europejski (2:00 → 10:00 ET) poza progiem gra sesję NY, obie strony (r132, próg 0,5 ATR)</td><td>2024–26 M5</td><td class="n">153</td><td class="n">1,16</td><td class="n">44%</td><td class="n">23%</td><td class="n">1,66</td><td><span class="tag ok">nowy efekt</span></td></tr>
+            <tr><td><b>#42</b></td><td>odwrócenie końca dnia: pod prąd ruchu od wczorajszego zamknięcia, 15:30 → zamknięcie (r138, rew. 4, bez piątku)</td><td>2024–26 M5</td><td class="n">422</td><td class="n">0,88</td><td class="n">11%</td><td class="n">13%</td><td class="n">1,21</td><td><span class="tag ok">nowy efekt, mały</span></td></tr>
+            <tr><td><b>#49</b></td><td>D1 RSI(2) &lt; 10 bez SMA200, wyjście nad wczorajszym maksimum (r129)</td><td>2016–26 D1</td><td class="n">163</td><td class="n">0,62</td><td class="n">21%</td><td class="n">80%</td><td class="n">2,64</td><td><span class="tag att">słabsza od IBS</span></td></tr>
+            <tr><td><b>#57</b></td><td>BTCUSD long przez poniedziałek (r143; weekend + poniedziałek r144)</td><td>2017–26 H1</td><td class="n">492</td><td class="n">0,02 / 0,16</td><td class="n">0% / 1%</td><td class="n">34–41%</td><td class="n">0,98 / 1,04</td><td><span class="tag stop">zero po kosztach</span></td></tr>
+            <tr><td><b>#43</b></td><td>powrót do średniej na M5 (z-score 20 &lt; −2, wyjście na średniej), popołudnie (r117)</td><td>2024–26 M5</td><td class="n">601</td><td class="n">0,49</td><td class="n">8%</td><td class="n">28%</td><td class="n">1,10</td><td><span class="tag att">tylko po południu, mało</span></td></tr>
+            <tr><td><b>#54</b></td><td>D1 Donchian 20/10, tylko long (r127)</td><td>2016–26 D1</td><td class="n">87</td><td class="n">0,34</td><td class="n">6%</td><td class="n">71%</td><td class="n">1,17</td><td><span class="tag stop">punkt odniesienia</span></td></tr>
+            <tr><td><b>#46</b></td><td>cofnięcie RSI(3) w trendzie dnia na M5 (r108)</td><td>2024–26 M5</td><td class="n">538</td><td class="n">0,10</td><td class="n">0%</td><td class="n">22%</td><td class="n">1,01</td><td><span class="tag stop">nic</span></td></tr>
+            <tr><td><b>#50</b></td><td>duża świeca M5 (&gt; 2,5 ATR): odwrócenie / kontynuacja (r114, r115)</td><td>2024–26 M5</td><td class="n">151</td><td class="n">0,09 / −0,28</td><td class="n">0% / −7%</td><td class="n">21%</td><td class="n">1,00</td><td><span class="tag stop">nic</span></td></tr>
+            <tr class="void"><td>#44</td><td>H1 RSI(2) &lt; 10, kupno dołka (r106)</td><td>2017–26 H1</td><td class="n">2554</td><td class="n">0,00</td><td class="n">−13%</td><td class="n">89%</td><td class="n">0,94</td><td><span class="tag stop">bessa 2018, 2022</span></td></tr>
+            <tr class="void"><td>#43</td><td>powrót do średniej na M5, cała sesja / obie strony / noc (r104, r105, r118)</td><td>2024–26 M5</td><td class="n">902–2532</td><td class="n">−0,41 … −1,48</td><td class="n">−15 … −32%</td><td class="n">49–67%</td><td class="n">0,85–0,91</td><td><span class="tag stop">dni trendowe</span></td></tr>
+            <tr class="void"><td>#47</td><td>H1 z-score(20) poza ±2, obie strony (r109)</td><td>2017–26 H1</td><td class="n">2664</td><td class="n">−0,77</td><td class="n">−48%</td><td class="n">100%</td><td class="n">0,78</td><td><span class="tag stop">ruina</span></td></tr>
+            <tr class="void"><td>#48</td><td>nieudane wybicie zakresu poprzedniej godziny, powrót do środka (r110)</td><td>2024–26 M5</td><td class="n">5923</td><td class="n">−1,62</td><td class="n">−62%</td><td class="n">94%</td><td class="n">0,85</td><td><span class="tag stop">spread</span></td></tr>
+            <tr class="void"><td>#52</td><td>BTCUSD H1 RSI(2) &lt; 10 (r128)</td><td>2017–26 H1</td><td class="n">3817</td><td class="n">−2,63</td><td class="n">−33%</td><td class="n">98%</td><td class="n">0,40</td><td><span class="tag stop">ruina</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Pełna lista przebiegów (r103–r147) jest w zakładce Strategie; każdy dokument ma w <code>notes</code> zapisane, które wartości parametrów były testowane i dlaczego powstała kolejna rewizja.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Co działa</div>
+      <h2>Nogi, które się nie nakładają, dodają się prawie bez straty Sharpe</h2>
+      <p class="intro">Trzy dotychczasowe wyniki i dwa nowe efekty zajmują różne pory dnia. Jeden dokument może je grać po kolei, bo silnik trzyma jedną pozycję naraz, a nogi rozróżnia <code>at_entry(…)</code>.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 960 300" role="img" aria-label="Oś czasu dnia w czasie Nowego Jorku od 2:00 do 16:00 z pięcioma nogami: poniedziałek od 3:00 do 15:55, strategia 6 od 9:35 do 14:00, poranek europejski od 10:00 do 15:55 w dni bez sygnału, odwrócenie końca dnia od 15:30 do 16:00, noc od 18:00 do 9:25">
+            <g font-family="Karla, sans-serif">
+              <line x1="60" y1="250" x2="900" y2="250" stroke="currentColor" stroke-width="1.2"></line>
+              <g font-size="11" font-family="Roboto Mono, monospace" fill="currentColor" text-anchor="middle">
+                <line x1="60" y1="245" x2="60" y2="255" stroke="currentColor"></line><text x="60" y="272">2:00</text>
+                <line x1="120" y1="245" x2="120" y2="255" stroke="currentColor"></line><text x="120" y="272">3:00</text>
+                <line x1="300" y1="245" x2="300" y2="255" stroke="currentColor"></line><text x="300" y="272">6:00</text>
+                <line x1="510" y1="245" x2="510" y2="255" stroke="currentColor"></line><text x="510" y="272">9:30</text>
+                <line x1="540" y1="245" x2="540" y2="255" stroke="currentColor"></line><text x="540" y="290">10:00</text>
+                <line x1="660" y1="245" x2="660" y2="255" stroke="currentColor"></line><text x="660" y="272">12:00</text>
+                <line x1="780" y1="245" x2="780" y2="255" stroke="currentColor"></line><text x="780" y="272">14:00</text>
+                <line x1="870" y1="245" x2="870" y2="255" stroke="currentColor"></line><text x="870" y="272">15:30</text>
+                <line x1="900" y1="245" x2="900" y2="255" stroke="currentColor"></line><text x="900" y="290">16:00</text>
+              </g>
+              <text x="480" y="22" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">czas Nowego Jorku (ET) · sesja NY 9:30–16:00 zacieniona</text>
+              <rect x="510" y="30" width="390" height="210" fill="#e6ebf5" opacity="0.6"></rect>
+
+              <text x="52" y="60" text-anchor="end" font-size="13" font-weight="700" fill="currentColor">poniedziałek</text>
+              <rect x="120" y="48" width="777" height="18" fill="#14306b"></rect>
+              <text x="508" y="61" text-anchor="middle" font-size="11" fill="#ffffff">long od otwarcia Londynu 3:00 → 15:55 · #40, 147 transakcji</text>
+
+              <text x="52" y="105" text-anchor="end" font-size="13" font-weight="700" fill="currentColor">wt–pt, 9:35</text>
+              <rect x="515" y="93" width="265" height="18" fill="#14306b"></rect>
+              <text x="647" y="106" text-anchor="middle" font-size="11" fill="#ffffff">strategia 6 z filtrem #34 → 14:00 · ~210</text>
+
+              <text x="52" y="150" text-anchor="end" font-size="13" font-weight="700" fill="currentColor">dni bez sygnału</text>
+              <rect x="540" y="138" width="357" height="18" fill="#1d4291" opacity="0.75"></rect>
+              <text x="718" y="151" text-anchor="middle" font-size="11" fill="#ffffff">poranek europejski 2:00→10:00 poza progiem → 15:55 · #45</text>
+              <line x1="60" y1="147" x2="540" y2="147" stroke="#1d4291" stroke-width="1.4" stroke-dasharray="5 4"></line>
+              <text x="300" y="134" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">pomiar ruchu 2:00 → 10:00</text>
+
+              <text x="52" y="195" text-anchor="end" font-size="13" font-weight="700" fill="currentColor">wt–czw, 15:30</text>
+              <rect x="870" y="183" width="30" height="18" fill="#f2c313"></rect>
+              <text x="860" y="196" text-anchor="end" font-size="11" fill="currentColor">odwrócenie końca dnia pod prąd ruchu od wczorajszego zamknięcia · #42 →</text>
+
+              <text x="52" y="235" text-anchor="end" font-size="13" font-weight="700" fill="currentColor">noc pon / wt</text>
+              <rect x="60" y="223" width="440" height="14" fill="#17734c" opacity="0.8"></rect>
+              <text x="280" y="234" text-anchor="middle" font-size="11" fill="#ffffff">18:00 (po rolowaniu) → 9:25, po słabym zamknięciu pod SMA50 · #33 → #56</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — kiedy każda noga jest w rynku. Granatowe to wyniki z poprzednich badań (#40, #34), niebieska i żółta to nowe efekty z tego badania (#45, #42), zielona to noga nocna z #33. Żadne dwie nie nakładają się w czasie, więc jeden dokument gra je po kolei.</figcaption>
+      </figure>
+
+      <div class="table-wrap" style="margin-top:26px">
+        <table>
+          <thead><tr><th>Dokument</th><th>Nogi</th><th class="n">Transakcje</th><th class="n">Sharpe</th><th class="n">Zwrot</th><th class="n">Rocznie</th><th class="n">Max DD</th><th class="n">PF</th><th class="n">Trafność</th><th>Lata</th></tr></thead>
+          <tbody>
+            <tr><td><b>#58 (r146)</b></td><td>pięć nóg, próg poranka 0,5</td><td class="n">743</td><td class="n">2,71</td><td class="n">+3789%</td><td class="n">266%</td><td class="n">33%</td><td class="n">1,59</td><td class="n">56%</td><td>+134 · +138 · +130</td></tr>
+            <tr><td><b>#55 rew. 3 (r141)</b></td><td>cztery nogi, próg poranka 0,5</td><td class="n">700</td><td class="n">2,61</td><td class="n">+2563%</td><td class="n">220%</td><td class="n">31%</td><td class="n">1,61</td><td class="n">56%</td><td>+111 · +132 · +120</td></tr>
+            <tr><td><b>#53 rew. 3 (r139)</b></td><td>trzy nogi: poniedziałek, strategia 6 z filtrem, koniec dnia</td><td class="n">673</td><td class="n">2,55</td><td class="n">+1971%</td><td class="n">193%</td><td class="n">25%</td><td class="n">1,70</td><td class="n">56%</td><td>+83 · +133 · +117</td></tr>
+            <tr><td><b>#56 (r135)</b></td><td>poniedziałek, strategia 6 z filtrem, noc pon/wt</td><td class="n">399</td><td class="n">2,54</td><td class="n">+2465%</td><td class="n">216%</td><td class="n">31%</td><td class="n">1,86</td><td class="n">61%</td><td>+100 · +124 · +131</td></tr>
+            <tr><td><b>#56, IBS sesji &lt; 0,3 (r147)</b></td><td>ostrzejszy próg nogi nocnej</td><td class="n">379</td><td class="n">2,42</td><td class="n">+1973%</td><td class="n">193%</td><td class="n">30%</td><td class="n">1,96</td><td class="n">61%</td><td>+84 · +107 · +141</td></tr>
+            <tr><td><b>#53 rew. 3, próg EOD 0,1 (r142)</b></td><td>trzy nogi, więcej wejść końca dnia</td><td class="n">718</td><td class="n">2,52</td><td class="n">+1916%</td><td class="n">190%</td><td class="n">24%</td><td class="n">1,64</td><td class="n">55%</td><td>+82 · +138 · +111</td></tr>
+            <tr><td><b>#58 (r145)</b></td><td>pięć nóg, próg poranka 0,3</td><td class="n">774</td><td class="n">2,46</td><td class="n">+2991%</td><td class="n">238%</td><td class="n">33%</td><td class="n">1,40</td><td class="n">56%</td><td>+131 · +146 · +106</td></tr>
+            <tr><td><b>#53 rew. 2 (r125)</b></td><td>trzy nogi, koniec dnia z wyjściem 15:55 i piątkiem</td><td class="n">785</td><td class="n">2,46</td><td class="n">+1669%</td><td class="n">177%</td><td class="n">28%</td><td class="n">1,61</td><td class="n">54%</td><td>+86 · +122 · +109</td></tr>
+            <tr><td><b>#51 (r116)</b></td><td>poniedziałek od Londynu + strategia 6 z filtrem #34</td><td class="n">356</td><td class="n">2,45</td><td class="n">+1657%</td><td class="n">176%</td><td class="n">27%</td><td class="n">1,93</td><td class="n">62%</td><td>+76 · +117 · +121</td></tr>
+            <tr><td><b>#55 rew. 3 (r140)</b></td><td>cztery nogi, próg poranka 0,3</td><td class="n">731</td><td class="n">2,35</td><td class="n">+2017%</td><td class="n">195%</td><td class="n">31%</td><td class="n">1,41</td><td class="n">56%</td><td>+107 · +139 · +96</td></tr>
+            <tr><td><b>#51 rew. 2 (r134, r136, r137)</b></td><td>poniedziałek do 15:30 · k 0,05 · k 0,1</td><td class="n">356 · 425 · 309</td><td class="n">2,39 · 2,23 · 2,19</td><td class="n"></td><td class="n">169 · 162 · 139%</td><td class="n">27–29%</td><td class="n"></td><td class="n"></td><td>płaskowyż k</td></tr>
+            <tr class="void"><td>#34 (r86)</td><td>sama strategia 6 z filtrem</td><td class="n">276</td><td class="n">2,23</td><td class="n">+702%</td><td class="n">109%</td><td class="n">16%</td><td class="n">1,95</td><td class="n">62%</td><td>+70 · +82 · +73</td></tr>
+            <tr class="void"><td>#40 (r100)</td><td>sam poniedziałek od Londynu</td><td class="n">147</td><td class="n">1,67</td><td class="n">+279%</td><td class="n">60%</td><td class="n">27%</td><td class="n">2,02</td><td class="n">60%</td><td>+18 · +64 · +65</td></tr>
+            <tr class="void"><td>#24 (r69)</td><td>dotychczasowy lider: strategia 6 + wybicie 30 min</td><td class="n">722</td><td class="n">1,88</td><td class="n">+924%</td><td class="n">128%</td><td class="n">30%</td><td class="n">1,29</td><td class="n">51%</td><td>+116 · +80 · +71</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px"><strong>Dlaczego to działa arytmetycznie.</strong> Nogi są w rynku w różnych porach, więc ich dzienne wyniki prawie się nie korelują, a kapitał pracuje częściej: #51 jest w rynku 11% czasu, #53 12%, #55 14%, #58 16%, wobec 5% dla samego #34. Zwrot roczny rośnie z ekspozycją, a Sharpe trzyma się, dopóki dokładana noga ma dodatnią oczekiwaną wartość. Noga końca dnia (Sharpe 0,9 osobno) dokłada ~320 transakcji i podnosi Sharpe z 2,45 do 2,55; noga europejska z progiem 0,5 ATR podnosi zwrot (193 → 220%) i Sharpe (2,61), z progiem 0,3 zwrot rośnie, a Sharpe spada (2,35); noga nocna dokłada ~40 transakcji i ok. 40 punktów zwrotu rocznego. Pięć nóg razem (#58): Sharpe 2,71, 266% rocznie, 743 transakcje, obsunięcie 33%.</p>
+
+      <h3 style="margin-top:30px">#45 · Poranek europejski gra sesję NY <span class="tag ok">nowy efekt</span></h3>
+      <p>Badanie z 27.10 pokazało korelację +6,5 (t 3,1) między ruchem 2:00 → 10:00 ET a sesją od 10:00, w obu połowach próby. Jako dokument: na zamknięciu 6. świecy sesji (10:00 ET) ruch od 2:00 w ATR dziennym; long powyżej progu, short poniżej, wyjście 15:55. Każdy rok na plusie przy każdym progu. Im wyższy próg, tym lepiej na transakcję: przy 0,2 ATR 432 transakcje i Sharpe 0,94, przy 0,5 ATR 153 transakcje i 1,16. Sam long (0,63) jest słabszy niż obie strony (0,83), a wyjście o 14:00 (0,78) nie pomaga, inaczej niż w strategii 6. Ten sam sygnał jako noga w #55 działa tylko w dni, w które strategia 6 nie ma sygnału.</p>
+
+      <h3 style="margin-top:22px">#42 · Odwrócenie końca dnia <span class="tag ok">nowy efekt, mały</span></h3>
+      <p>Na zamknięciu świecy 15:25–15:30 ET: ruch od wczorajszego zamknięcia gotówkowego w ATR dziennym; gdy przekracza 0,2, wejście pod prąd do zamknięcia. 534 transakcje, +6 bp na transakcję bez dźwigni, 51% trafnych. Trzy rzeczy wyszły z rewizji: <strong>(1)</strong> ostatnie 5 minut niesie dużą część odwrócenia (wyjście 15:55 zamiast 16:00 obniża Sharpe z 0,75 do 0,42); <strong>(2)</strong> zimą 16:00 ET to 21:00 UTC, godzina rolowania, i wyjście na otwarciu świecy 16:00 płaciło finansowanie za noc w półgodzinnej transakcji — rewizja 4 wychodzi o 16:00 latem, a zimą o 15:55; <strong>(3)</strong> w piątek odwrócenia nie ma (−6 bp na transakcję przy +6…+15 w pozostałe dni), co zgadza się z przenoszeniem siły piątku na poniedziałek z badania 27.10. Odwrócenie od 15:00 (zamiast 15:30) nie działa (Sharpe 0,12), a punkt odniesienia (wczorajsze zamknięcie czy dzisiejsze otwarcie) nie ma znaczenia.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Co nie działa</div>
+      <h2>Powrót do średniej na świecach traci przez dni trendowe i spread</h2>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Powrót do średniej na M5 i H1 <span class="tag stop">−15 … −48% rocznie</span></h3>
+          <p>Z-score(20) poniżej −2 z wyjściem na średniej ma 62–68% trafnych transakcji i mimo to traci: w dni trendowe cena odjeżdża, a limit 2 godzin domyka stratę kilkakrotnie większą od typowego zysku. Na H1 od 2017 (obie strony, #47) to ruina w 7 z 10 lat. Wersja nocna (#43 rew. 2, 2532 transakcje) traci najmocniej. Jedyny ślad przewagi: popołudnie (po 12:00 ET), Sharpe 0,49, zgodnie z literaturą o odwróceniu w ostatnich dwóch godzinach.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Kupno dołka RSI(2) na H1 <span class="tag stop">bessa</span></h3>
+          <p>2554 transakcje od 2017: lata 2019–20 i 2023–26 na plusie, ale 2018 (−65%) i 2022 (−113%) zjadają wszystko. Bez filtra trendu dźwignia 4× nie przeżywa bessy; z filtrem SMA200 badanie 27.10 pokazało, że wycina się najlepsze odbicia. Na bitcoinie (#52) ta sama reguła traci w 9 z 10 lat.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Nieudane wybicie zakresu godziny <span class="tag stop">spread</span></h3>
+          <p>5923 transakcje w 2,8 roku. Sam sygnał jest brutto dodatni (powrót do środka zakresu godziny zdarza się częściej niż kontynuacja), ale 1,8 pkt spreadu razy 4× dźwigni razy sześć tysięcy transakcji to ponad 200% kapitału. Każda strategia z więcej niż ~1000 transakcji na rok musi mieć ruch na transakcję powyżej ~10 bp, inaczej jest pod kreską niezależnie od trafności.</p>
+        </div>
+        <div class="fail">
+          <h3>Pullback w trendzie dnia, duża świeca, Donchian <span class="tag att">zero</span></h3>
+          <p>RSI(3) &lt; 20 nad otwarciem i EMA50 (#46): Sharpe 0,10. Świeca M5 większa niż 2,5 ATR (#50): ani kontynuacja (−0,28), ani odwrócenie (0,09). Klasyczne podążanie za trendem D1 (#54, Donchian 20/10 z 4×): Sharpe 0,34 i 6% rocznie przy obsunięciu 71% — finansowanie i fałszywe wybicia 2018, 2022 i 2024 zjadają dryf indeksu.</p>
+        </div>
+        <div class="fail">
+          <h3>RSI(2) dzienne bez SMA200 <span class="tag att">słabsze od IBS</span></h3>
+          <p>Działa (PF 2,6–2,8, 71–73% trafnych), ale to 82–163 transakcje na dekadę i obsunięcia 62–80% przy 4×. Rodzina IBS z badania 27.10 (#31: Sharpe 1,23, 191 transakcji) mierzy to samo lepiej.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Ranking</div>
+      <h2>Czołówka archiwum po tym badaniu</h2>
+      <p class="intro">Okno 1.01.2024 – 27.10.2026, depozyt 20%, koszty brokera, każda strategia raz, swoim najlepszym przebiegiem. Kupno i trzymanie dało w tym czasie +52%.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Strategia</th><th class="n">Sharpe</th><th class="n">Rocznie</th><th class="n">Max DD</th><th class="n">Transakcje</th><th class="n">PF</th><th>Źródło przewagi</th></tr></thead>
+          <tbody>
+            <tr><td><b>1</b></td><td><b>#58</b> pięć nóg (r146)</td><td class="n">2,71</td><td class="n">266%</td><td class="n">33%</td><td class="n">743</td><td class="n">1,59</td><td>poniedziałek · strategia 6 z filtrem · poranek EU · koniec dnia · noc</td></tr>
+            <tr><td><b>2</b></td><td><b>#55</b> cztery nogi, rew. 3 (r141)</td><td class="n">2,61</td><td class="n">220%</td><td class="n">31%</td><td class="n">700</td><td class="n">1,61</td><td>jak wyżej bez nocy</td></tr>
+            <tr><td><b>3</b></td><td><b>#53</b> trzy nogi, rew. 3 (r139)</td><td class="n">2,55</td><td class="n">193%</td><td class="n">25%</td><td class="n">673</td><td class="n">1,70</td><td>poniedziałek · strategia 6 z filtrem · koniec dnia</td></tr>
+            <tr><td><b>4</b></td><td><b>#56</b> dzień i noc (r135)</td><td class="n">2,54</td><td class="n">216%</td><td class="n">31%</td><td class="n">399</td><td class="n">1,86</td><td>poniedziałek · strategia 6 z filtrem · noc</td></tr>
+            <tr><td><b>5</b></td><td><b>#51</b> poniedziałek + strategia 6 z filtrem (r116)</td><td class="n">2,45</td><td class="n">176%</td><td class="n">27%</td><td class="n">356</td><td class="n">1,93</td><td>dwa wyniki z 27.10</td></tr>
+            <tr><td><b>6</b></td><td>#34 strategia 6 bez shortów po spadkowej sesji (r86)</td><td class="n">2,23</td><td class="n">109%</td><td class="n">16%</td><td class="n">276</td><td class="n">1,95</td><td>otwarcie NY vs EMA12</td></tr>
+            <tr><td><b>7</b></td><td>#24 strategia 6 + wybicie 30 min (r69)</td><td class="n">1,88</td><td class="n">128%</td><td class="n">30%</td><td class="n">722</td><td class="n">1,29</td><td>dotychczasowy lider</td></tr>
+            <tr><td><b>8</b></td><td>#6 otwarcie NY vs EMA12, siła (r13)</td><td class="n">1,81</td><td class="n">101%</td><td class="n">33%</td><td class="n">388</td><td class="n">1,44</td><td>otwarcie NY vs EMA12</td></tr>
+            <tr><td><b>9</b></td><td>#35 strategia 6 pod prąd wczorajszej sesji (r88)</td><td class="n">1,79</td><td class="n">67%</td><td class="n">11%</td><td class="n">175</td><td class="n">2,07</td><td>otwarcie NY vs EMA12</td></tr>
+            <tr><td><b>10</b></td><td>#28 strategia 6 na Londynie i NY (r60)</td><td class="n">1,78</td><td class="n">105%</td><td class="n">41%</td><td class="n">475</td><td class="n">1,42</td><td>otwarcie NY vs EMA12</td></tr>
+            <tr><td><b>11</b></td><td>#40 poniedziałek od Tokio (r101)</td><td class="n">1,68</td><td class="n">61%</td><td class="n">26%</td><td class="n">147</td><td class="n">1,98</td><td>dzień tygodnia</td></tr>
+            <tr><td><b>12</b></td><td><b>#45</b> poranek europejski, próg 0,5 (r132)</td><td class="n">1,16</td><td class="n">44%</td><td class="n">23%</td><td class="n">153</td><td class="n">1,66</td><td>nowy: Europa → NY</td></tr>
+            <tr><td><b>13</b></td><td><b>#42</b> odwrócenie końca dnia, rew. 4 (r138)</td><td class="n">0,88</td><td class="n">11%</td><td class="n">13%</td><td class="n">422</td><td class="n">1,21</td><td>nowy: ostatnie 30 minut</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Pod kątem obu priorytetów naraz — zwrot roczny i liczba transakcji — najlepiej wypada #58: pięć nóg, najwyższy Sharpe i zwrot przy 743 transakcjach. #53 rew. 3 ma o 8 punktów płytsze obsunięcie (25%) przy Sharpe 2,55, bo nie ma nogi europejskiej ani nocnej. Wszystkie cztery czołowe dokumenty to ten sam rdzeń (#51) plus nogi, więc o ich wartości rozstrzygnie test poza próbą, nie kolejna rewizja.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Zastrzeżenia</div>
+      <h2>Co może zawyżać te liczby</h2>
+      <div class="fails">
+        <div class="fail">
+          <h3>Składanie wyników wybranych po obejrzeniu danych <span class="tag att">dopasowanie</span></h3>
+          <p>Filtr #34, start poniedziałku od Londynu, brak piątku w nodze końca dnia i próg poranka europejskiego — każdy z tych elementów wybrano, patrząc na tabele z tych samych lat. Dokument wielonogowy sumuje te wybory. Liczby są więc optymistyczne; rozstrzygnie test na danych od 28.10.2026, bez zmian w dokumentach.</p>
+        </div>
+        <div class="fail">
+          <h3>Niecałe trzy lata M5 <span class="tag att">próba</span></h3>
+          <p>Lata 2024–26 to rynek wzrostowy z dwiema korektami. Noga poniedziałkowa stoi na efekcie widocznym dopiero od 2023 (badanie 27.10: w latach 2017–22 poniedziałek dawał +8,6 bp, od 2023 +30). Gdy minie, #51–#56 wrócą w poniedziałki do zera, a reszta zostanie.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Dźwignia 4× bez stopu <span class="tag stop">ryzyko</span></h3>
+          <p>Obsunięcia 27–33% w najlepszych dokumentach, przy pojedynczych transakcjach po −5…−8% kapitału. Depozyt 10% mniej więcej połowi obsunięcia i zwrot, Sharpe nie zmienia.</p>
+        </div>
+        <div class="fail">
+          <h3>Godzina rolowania i spread na zamknięciu <span class="tag att">koszty</span></h3>
+          <p>Wyjście na otwarciu świecy 21:00 UTC płaci finansowanie za noc, nawet w transakcji półgodzinnej — silnik liczy to poprawnie, ale łatwo to przeoczyć w dokumencie. Ostatnie 5 minut sesji, które niosą odwrócenie, to też moment szerszego spreadu u brokera; profil ma jeden spread 1,8 pkt na cały dzień, więc noga końca dnia jest policzona optymistycznie.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Co przemawia za wynikami <span class="tag ok">odporność</span></h3>
+          <p>Każdy z dokumentów #51–#55 jest na plusie w każdym z trzech lat (+76…+130% rocznie), ich zwrot leży daleko ponad 95. percentylem losowych wejść, a składowe mają mechanizm i niezależne potwierdzenie w badaniach z 26–27.10. Poranek europejski jest dodatni przy każdym progu i w każdym roku.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Kolejne kierunki</div>
+      <h2>Co otwiera to badanie</h2>
+      <p><strong>Test poza próbą.</strong> #53 i #55 (i wciąż #34, #38, #33 rew. 3) czekają na dane od 28.10.2026. Dokumenty zostają bez zmian; za kilka miesięcy jeden przebieg na nowym oknie rozstrzygnie więcej niż kolejna rewizja.</p>
+      <p><strong>Portfel zamiast nóg.</strong> Składanie nóg w jeden dokument to obejście braku portfela w silniku: działa, bo nogi nie nakładają się w czasie. Nocna rodzina (#31, #33, #36) nakłada się z dniem, więc wejdzie tylko do silnika liczącego kilka dokumentów na jednym rachunku.</p>
+      <p><strong>Profil spreadu zależny od godziny.</strong> Noga końca dnia i noga nocna handlują wtedy, gdy spread bywa szerszy niż 1,8 pkt. Bez godzinowego profilu ich koszt jest zaniżony — to luka modelu kosztów, nie strategii.</p>
+      <p><strong>Bitcoin na H1 działa w silniku</strong> — serii MINUTE potrzebują tylko dokumenty M5. Long przez poniedziałek (#57, 492 transakcje od 2017) daje po spreadzie i finansowaniu zero (Sharpe 0,02; z weekendem 0,16), a RSI(2) na H1 (#52) traci w 9 z 10 lat. Żaden efekt z badań 26–27.10 nie przeżywa 6 bp spreadu bitcoina z jedną–trzema nocami finansowania. Następny krok dla BTC to nie kolejny dokument H1, tylko seria MINUTE i sygnały intraday z ruchem powyżej 20 bp na transakcję.</p>
+      <p><strong>Czego nie warto powtarzać.</strong> Powrót do średniej na pojedynczych świecach (M5, H1, noc), kupno dołka RSI na H1 bez filtra, nieudane wybicia zakresu godziny, duże świece, pullback w trendzie dnia, Donchian z dźwignią. Lista odrzuconych z 27.10 (luki, wczorajsze poziomy, NR7, momentum ostatnich 30 minut, lustrzane shorty) pozostaje w mocy; momentum ostatnich 30 minut ma teraz swoją odwrotność w #42.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Dane: silnik /strategies produkcji, przebiegi r103–r147, odczyt 28.10.2026</span>
+    <span>Wyniki historyczne · rachunek demo · tylko badania</span>
+  </div>
+</footer>

@@ -3,7 +3,7 @@
 Po usunięciu platformy strategii (`remove-strategy-platform`) system nie ma żadnego sposobu, żeby sprawdzić
 pomysł na historii. Operator chce modułu do badań, w którym silnik powstaje raz, a strategie są dokumentami
 w bazie, które powstają i zmieniają się bez zmiany kodu i bez wdrożenia. Research, cztery poziomy języka i
-osiem decyzji operatora z 24.10.2026: `docs/strategie-i-backtesty-research.html` (sekcje 10 i 12).
+osiem decyzji operatora z 24.10.2026: `docs/strategie/strategie-i-backtesty-research.html` (sekcje 10 i 12).
 
 ## What Changes
 

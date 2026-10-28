@@ -1,0 +1,387 @@
+<title>IBS i trzy najlepsze strategie</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Strategie · backtesty produkcji</span>
+    <h1>IBS i trzy najlepsze strategie</h1>
+    <p class="lede">Jak działa strategia „zamknięcie przy dole dnia”, skąd jej <b>+7329%</b>, i które trzy strategie z archiwum wypadają najlepiej, gdy porównać je <b>na tym samym oknie</b>.</p>
+    <div class="strip">
+      <span>TradingCenter / strategies</span>
+      <span>27 października 2026</span>
+      <span>US100 · koszty <b>brokera</b></span>
+      <span>źródło: MCP <b>/strategies</b> produkcji, 30 strategii, 75 uruchomień</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">30</div><div class="l">strategii w archiwum, wszystkie na US100</div></div>
+      <div class="cell"><div class="v">75</div><div class="l">zakończonych backtestów z kosztami</div></div>
+      <div class="cell"><div class="v">4×</div><div class="l">ekspozycja: depozyt 20% przy wymogu brokera 5%</div></div>
+      <div class="cell"><div class="v">1,88</div><div class="l">najlepszy Sharpe na wspólnym oknie 2024–2026</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Jak czytać liczby</div>
+      <h2>Całkowity zwrot nie porównuje strategii</h2>
+      <p class="intro">Backtesty w archiwum mają różne zakresy: od miesiąca do prawie jedenastu lat. Przy procencie składanym zwrot całkowity rośnie wykładniczo z długością zakresu, więc dłuższy test zawsze „wygrywa”.</p>
+      <p>Dlatego ranking w sekcji 04 bierze <span class="hl">jedno okno dla wszystkich: 1.01.2024 – 27.10.2026</span> (2,8 roku), ten sam depozyt 20% i koszty z brokera, i sortuje po Sharpe. Każda strategia występuje raz, swoim najlepszym przebiegiem. Zwrot roczny (CAGR) podany obok to wzrost kapitału przeliczony na rok: <code>(końcowy / początkowy)^(365 / dni) − 1</code>.</p>
+      <p>Wszystkie strategie mają ten sam sposób wyznaczania wielkości pozycji: depozyt 20% <strong>bieżącego</strong> kapitału. Przy wymogu 5% to pozycja o wartości 4× kapitału, rosnąca razem z nim. Żadna z omawianych strategii nie ma stopu, więc wyniki są w procentach kapitału, nie w R.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Strategia #30</div>
+      <h2>Zamknięcie przy dole dnia (IBS)</h2>
+      <p class="intro"><strong>IBS (Internal Bar Strength)</strong> mówi, w którym miejscu dziennego zakresu zamknęła się świeca: 0 to zamknięcie na samym minimum, 1 na samym maksimum.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 760 270" role="img" aria-label="Świeca dzienna z zamknięciem blisko minimum i skala IBS od zera do jedności, ze strefą wejścia poniżej 0,2 i strefą wyjścia powyżej 0,8">
+            <g font-family="Karla, sans-serif">
+              <line x1="120" y1="30" x2="120" y2="230" stroke="currentColor" stroke-width="1.6"></line>
+              <rect x="95" y="70" width="50" height="130" fill="#b8322a"></rect>
+              <line x1="150" y1="30" x2="260" y2="30" stroke="currentColor" stroke-dasharray="4 4" opacity="0.5"></line>
+              <line x1="150" y1="200" x2="260" y2="200" stroke="#14306b" stroke-width="1.6" stroke-dasharray="4 4"></line>
+              <line x1="150" y1="230" x2="260" y2="230" stroke="currentColor" stroke-dasharray="4 4" opacity="0.5"></line>
+              <text x="268" y="34" font-size="12" font-family="Roboto Mono, monospace" fill="currentColor">maksimum</text>
+              <text x="268" y="204" font-size="12" font-family="Roboto Mono, monospace" font-weight="700" fill="#14306b">zamknięcie</text>
+              <text x="268" y="234" font-size="12" font-family="Roboto Mono, monospace" fill="currentColor">minimum</text>
+              <text x="120" y="258" text-anchor="middle" font-size="12" fill="currentColor" opacity="0.7">świeca dnia</text>
+
+              <rect x="470" y="30" width="34" height="200" fill="none" stroke="currentColor" stroke-width="1.2"></rect>
+              <rect x="470" y="190" width="34" height="40" fill="#e0f0e8" stroke="#17734c"></rect>
+              <rect x="470" y="30" width="34" height="40" fill="#fdf3d0" stroke="#8a6708"></rect>
+              <text x="462" y="34" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">1,0</text>
+              <text x="462" y="74" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">0,8</text>
+              <text x="462" y="194" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">0,2</text>
+              <text x="462" y="234" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">0,0</text>
+              <polygon points="506,200 520,193 520,207" fill="#14306b"></polygon>
+              <text x="526" y="204" font-size="12" font-weight="700" fill="#14306b">IBS = 0,15</text>
+              <text x="516" y="222" font-size="12" fill="#17734c">strefa wejścia (&lt; 0,2)</text>
+              <text x="516" y="54" font-size="12" fill="#8a6708">strefa wyjścia (&gt; 0,8)</text>
+              <text x="487" y="258" text-anchor="middle" font-size="12" fill="currentColor" opacity="0.7">skala IBS</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — IBS = (zamknięcie − minimum) / (maksimum − minimum), z mianownikiem co najmniej 1 punkt. Dzień na rysunku zamknął się w dolnych 15% zakresu, a to sygnał wejścia, o ile indeks jest nad SMA(200).</figcaption>
+      </figure>
+
+      <p style="margin-top:26px"><strong>Hipoteza.</strong> Indeks w trendzie wzrostowym, który zamknął dzień przy dołku, częściej odbija w ciągu 1–5 dni, niż spada dalej. To krótkoterminowa nadreakcja sprzedających na rynku, który ma dryf w górę. Jest to powrót do średniej, a nie kontynuacja ruchu, więc przewaga jest innego rodzaju niż w strategiach z sekcji 04.</p>
+
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Element</th><th>Reguła</th></tr></thead>
+          <tbody>
+            <tr><td><b>Wejście</b></td><td>tylko long: IBS &lt; <code>ibs_in</code> (domyślnie 0,2) <strong>i</strong> zamknięcie &gt; SMA(200) dziennej</td></tr>
+            <tr><td><b>Realizacja</b></td><td>zlecenie rynkowe po zamknięciu świecy dziennej. Doba CFD kończy się ok. 22:00–23:00 UTC, czyli wieczorem w Nowym Jorku</td></tr>
+            <tr><td><b>Wyjście</b></td><td>IBS &gt; <code>ibs_out</code> (domyślnie 0,8) <strong>albo</strong> zamknięcie powyżej wczorajszego maksimum</td></tr>
+            <tr><td><b>Limit czasu</b></td><td>najwyżej 5 świec w pozycji. W praktyce średnio 2,2 dnia</td></tr>
+            <tr><td><b>Stop</b></td><td>brak</td></tr>
+            <tr><td><b>Koszty</b></td><td>spread 1,8 pkt i finansowanie longa 0,022% wartości pozycji za noc (weekend ×3). Przy 4× to ok. 0,09% kapitału za noc</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Filtr SMA(200) wyłącza strategię na bessę: w 2022 zrobiła tylko 3 transakcje. Jest na rynku ok. 21% czasu i ma 2–3 sygnały w miesiącu.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Skąd +7329%</div>
+      <h2>Mała przewaga, dźwignia i jedenaście lat</h2>
+      <p class="intro">Przebieg r70 (2016-01-01 → 2026-10-27) daje +7329%. To <strong>nie jest błąd</strong>: wszystkie 315 transakcji złożone razem dają dokładnie tę liczbę.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Składnik</th><th class="n">Wartość</th><th>Co znaczy</th></tr></thead>
+          <tbody>
+            <tr><td><b>Ruch indeksu w transakcjach</b></td><td class="n">+285%</td><td>przewaga bez dźwigni i bez kosztów, ok. 13% rocznie przy 21% czasu w rynku</td></tr>
+            <tr><td><b>Dźwignia</b></td><td class="n">4,0×</td><td>sprawdzona na każdej transakcji: ~8 kontraktów przy 10 tys., ~104 przy ~770 tys.</td></tr>
+            <tr><td><b>Zwrot roczny</b></td><td class="n">49%</td><td>1,49<sup>10,8</sup> ≈ 74×, czyli +7300%</td></tr>
+            <tr><td><b>Ten sam zwrot roczny przez 2,8 roku</b></td><td class="n">~+200%</td><td>tyle dałaby strategia na oknie, na którym porównywane są pozostałe</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="quote">Wysoka liczba bierze się z długości testu, nie z siły strategii.</div>
+      <p>Na wspólnym oknie 2024–2026 IBS ma Sharpe 0,68 i rocznie jest wyraźnie słabsza od trójki z sekcji 04. Bez dźwigni (+285%) przegrywa też z kupnem i trzymaniem w tym samym okresie (+451% według benchmarku raportu). Wygrywa tylko tym, że jest w rynku przez 1/5 czasu, więc może bezpieczniej użyć dźwigni.</p>
+
+      <div class="table-wrap" style="margin-top:20px">
+        <table>
+          <thead><tr><th>Przebieg</th><th>Zakres</th><th class="n">Sharpe</th><th class="n">Zwrot</th><th class="n">Rocznie</th><th class="n">Max DD</th><th class="n">Transakcje</th><th class="n">PF</th></tr></thead>
+          <tbody>
+            <tr><td><b>r70</b></td><td>2016 → 2026-10</td><td class="n">1,26</td><td class="n">+7329%</td><td class="n">49%</td><td class="n">32%</td><td class="n">315</td><td class="n">1,54</td></tr>
+            <tr><td><b>r78</b></td><td>2016 → 2024</td><td class="n">1,49</td><td class="n">+4091%</td><td class="n">59%</td><td class="n">30%</td><td class="n">225</td><td class="n">2,39</td></tr>
+            <tr><td><b>r79</b></td><td>2024 → 2026-01</td><td class="n">0,68</td><td class="n">+45%</td><td class="n">20%</td><td class="n">32%</td><td class="n">63</td><td class="n">1,37</td></tr>
+            <tr class="void"><td><b>r80</b></td><td>2026 YTD</td><td class="n">0,11</td><td class="n">−5%</td><td class="n">−6%</td><td class="n">28%</td><td class="n">22</td><td class="n">0,92</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Wynik w poszczególnych latach (suma % transakcji, r70): 2017–2021 od +49% do +117% rocznie, 2022 około zera, 2023 +65%, 2024 +13%, 2025 +56%, 2026 +5%. Krótkie przebiegi (r79, r80) są dodatkowo zaniżone, bo SMA(200) na początku zakresu dopiero się rozgrzewa: przez pierwsze ~200 dni strategia nie handluje.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Ranking</div>
+      <h2>Trzy najlepsze na wspólnym oknie</h2>
+      <p class="intro">Okno 1.01.2024 – 27.10.2026, depozyt 20%, koszty brokera. Kupno i trzymanie dało w tym czasie <strong>+52%</strong>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Strategia</th><th class="n">Sharpe</th><th class="n">Zwrot</th><th class="n">Rocznie</th><th class="n">Max DD</th><th class="n">Transakcje</th><th class="n">PF</th><th class="n">Bez 5 najl.</th></tr></thead>
+          <tbody>
+            <tr><td><b>1</b></td><td><b>#24</b> strategia 6 + wybicie 30-min (r69)</td><td class="n">1,88</td><td class="n">+924%</td><td class="n">128%</td><td class="n">30%</td><td class="n">722</td><td class="n">1,29</td><td class="n">+199%</td></tr>
+            <tr><td><b>2</b></td><td><b>#6</b> otwarcie NY vs EMA12, siła, wyjście 14:00 (r13)</td><td class="n">1,81</td><td class="n">+620%</td><td class="n">101%</td><td class="n">33%</td><td class="n">388</td><td class="n">1,44</td><td class="n">+153%</td></tr>
+            <tr><td><b>3</b></td><td><b>#28</b> reguła strategii 6 na Londynie i NY (r60)</td><td class="n">1,78</td><td class="n">+655%</td><td class="n">105%</td><td class="n">41%</td><td class="n">475</td><td class="n">1,42</td><td class="n">+164%</td></tr>
+            <tr class="void"><td>—</td><td>#30 IBS na tym samym oknie (r79)</td><td class="n">0,68</td><td class="n">+45%</td><td class="n">20%</td><td class="n">32%</td><td class="n">63</td><td class="n">1,37</td><td class="n">+4%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Kolejne miejsca to #20 (Sharpe 1,66) i #21 (1,65), ale to warianty #6 różniące się tylko regułą wyjścia.</p>
+
+      <p style="margin-top:22px"><strong>Wspólny rdzeń: „strategia 6”.</strong> Wszystkie trzy wychodzą od tej samej reguły. Po zamknięciu pierwszej świecy M5 sesji nowojorskiej (9:30–9:35 ET, 15:30–15:35 w Polsce) strategia patrzy, po której stronie EMA(12) jest zamknięcie. Powyżej to long, poniżej short. Wchodzi tylko wtedy, gdy odległość od EMA jest wyraźna: <code>|zamknięcie − EMA12| / ATR(14) dzienne &gt; k</code>, z <code>k = 0,075</code>. Próg to mniej więcej mediana tej miary, więc filtr odrzuca około połowy dni. Mała odległość od EMA to szum. Pozycja jest trzymana do 14:00 ET, bez stopu.</p>
+
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 960 250" role="img" aria-label="Oś czasu dnia w czasie Nowego Jorku od 2:00 do 16:00 z pozycjami trzech strategii: numer 6 od 9:35 do 14:00, numer 28 od 3:05 do 9:25 i od 9:35 do 14:00, numer 24 od 9:35 do 14:00 albo w dni bez sygnału od wybicia po 10:05 do 15:55">
+            <g font-family="Karla, sans-serif">
+              <line x1="60" y1="210" x2="900" y2="210" stroke="currentColor" stroke-width="1.2"></line>
+              <g font-size="11" font-family="Roboto Mono, monospace" fill="currentColor" text-anchor="middle">
+                <line x1="120" y1="205" x2="120" y2="215" stroke="currentColor"></line><text x="120" y="232">3:00</text>
+                <line x1="300" y1="205" x2="300" y2="215" stroke="currentColor"></line><text x="300" y="232">6:00</text>
+                <line x1="510" y1="205" x2="510" y2="215" stroke="currentColor"></line><text x="510" y="232">9:30</text>
+                <line x1="660" y1="205" x2="660" y2="215" stroke="currentColor"></line><text x="660" y="232">12:00</text>
+                <line x1="780" y1="205" x2="780" y2="215" stroke="currentColor"></line><text x="780" y="232">14:00</text>
+                <line x1="900" y1="205" x2="900" y2="215" stroke="currentColor"></line><text x="900" y="232">16:00</text>
+              </g>
+              <text x="60" y="248" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">czas Nowego Jorku (ET)</text>
+              <rect x="510" y="20" width="390" height="180" fill="#e6ebf5" opacity="0.55"></rect>
+              <text x="705" y="16" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#14306b">sesja NY 9:30–16:00</text>
+
+              <text x="12" y="52" font-size="13" font-weight="700" fill="currentColor">#6</text>
+              <rect x="515" y="38" width="265" height="20" fill="#14306b"></rect>
+              <text x="647" y="52" text-anchor="middle" font-size="11" fill="#ffffff">9:35 → 14:00</text>
+
+              <text x="12" y="106" font-size="13" font-weight="700" fill="currentColor">#28</text>
+              <rect x="125" y="92" width="380" height="20" fill="#f2c313"></rect>
+              <text x="315" y="106" text-anchor="middle" font-size="11" fill="#14306b">noga Londyn: 3:05 → 9:25</text>
+              <rect x="515" y="92" width="265" height="20" fill="#14306b"></rect>
+              <text x="647" y="106" text-anchor="middle" font-size="11" fill="#ffffff">noga NY: 9:35 → 14:00</text>
+
+              <text x="12" y="160" font-size="13" font-weight="700" fill="currentColor">#24</text>
+              <rect x="515" y="140" width="265" height="16" fill="#14306b"></rect>
+              <text x="647" y="152" text-anchor="middle" font-size="10.5" fill="#ffffff">dzień z sygnałem: 9:35 → 14:00</text>
+              <rect x="545" y="162" width="350" height="16" fill="none" stroke="#17734c" stroke-width="1.6" stroke-dasharray="5 3"></rect>
+              <text x="720" y="174" text-anchor="middle" font-size="10.5" fill="#17734c">dzień bez sygnału: wybicie 10:05–14:00 → do 15:55</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 2</b> — kiedy każda z trzech strategii jest w rynku. Granatowy pasek to ta sama reguła strategii 6. #28 dokłada noc europejską, #24 wypełnia dni, które strategia 6 odrzuca.</figcaption>
+      </figure>
+
+      <div class="fails" style="margin-top:26px">
+        <div class="fail ok">
+          <h3>1 · #24 Strategia 6 + wybicie 30-minutowe <span class="tag ok">Sharpe 1,88</span></h3>
+          <p><strong>Pomysł:</strong> strategia 6 odrzuca mniej więcej połowę dni, bo otwarcie jest za blisko EMA12. W takie dni kierunek nie znika, tylko pojawia się później. Zamknięcie świecy poza zakresem pierwszych 30 minut wskazuje go i utrzymuje do końca sesji. Dwie nogi razem mają być w rynku prawie codziennie.</p>
+          <p style="margin-top:8px"><strong>Noga 1:</strong> strategia 6 bez zmian (9:35 → 14:00 ET). <strong>Noga 2</strong> działa tylko w dni bez transakcji nogi 1. Między 10:05 a 14:00 ET zamknięcie M5 przebija maksimum albo minimum świec 9:30–10:00 i strategia wchodzi w tę stronę. Wychodzi 5 minut przed zamknięciem albo gdy zamknięcie M5 spadnie po złej stronie środka tego zakresu.</p>
+          <p style="margin-top:8px"><strong>Liczby:</strong> 722 transakcje, 51% zyskownych, 12% czasu w rynku. Wynik jest stabilny: Sharpe 1,89 w latach 2024–2025 i 1,87 w 2026. W poszczególnych latach +116%, +80% i +71% (suma % transakcji). Najdłuższa seria strat to 13. Parametry miały 5 prób.</p>
+        </div>
+        <div class="fail ok">
+          <h3>2 · #6 Otwarcie NY względem EMA12, siła sygnału <span class="tag ok">Sharpe 1,81</span></h3>
+          <p><strong>Pomysł:</strong> kierunek wyznaczony przez pierwszą świecę M5 sesji względem EMA12 utrzymuje się do około 14:00 ET, ale tylko wtedy, gdy zamknięcie jest wyraźnie oddalone od EMA12. To czysta strategia 6, rdzeń dwóch pozostałych.</p>
+          <p style="margin-top:8px"><strong>Reguły:</strong> jedno wejście dziennie o 9:35 ET, long albo short, gdy siła &gt; <code>k</code>. Wyjście 120 minut przed zamknięciem sesji, czyli o 14:00 ET.</p>
+          <p style="margin-top:8px"><strong>Liczby:</strong> 388 transakcji, 57% zyskownych, profit factor 1,44 (najwyższy z trójki), tylko 7% czasu w rynku. Sharpe 1,79 w latach 2024–2025 i 1,88 w 2026. Wynik zależy od progu skokowo: przy <code>k = 0,05</code> Sharpe spada do 1,31, przy 0,1 do 1,52. To sygnał ostrożności.</p>
+        </div>
+        <div class="fail">
+          <h3>3 · #28 Reguła strategii 6 na Londynie i Nowym Jorku <span class="tag att">Sharpe 1,78 · 1 próba</span></h3>
+          <p><strong>Pomysł:</strong> otwarcie gotówkowe w Europie (8:00 w Londynie, zwykle 3:00 ET) to drugi moment dnia, w którym na rynek wchodzi nowy uczestnik. Jeśli reguła strategii 6 działa, bo pierwsza świeca po otwarciu ujawnia nierównowagę, powinna działać także wtedy.</p>
+          <p style="margin-top:8px"><strong>Reguły:</strong> noga Londyn to ta sama reguła na pierwszej świecy M5 sesji londyńskiej (próg <code>kl = 0,075</code>), z wyjściem o 9:25 ET, przed otwarciem NY. Noga NY to strategia 6 bez zmian.</p>
+          <p style="margin-top:8px"><strong>Liczby:</strong> 475 transakcji, 56% zyskownych, profit factor 1,42. Ma najgłębsze obsunięcie z trójki (41%). <strong>Uwaga na koszty:</strong> profil brokera ma jeden spread 1,8 pkt, a w nocy europejskiej bywa szerszy. Strategia ma tylko jeden przebieg i nie była testowana z godzinowym profilem spreadu (np. 3,6 pkt poza sesją NY).</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Zastrzeżenia</div>
+      <h2>Co może zawyżać te liczby</h2>
+      <div class="fails">
+        <div class="fail">
+          <h3>To w praktyce jeden pomysł <span class="tag att">koncentracja</span></h3>
+          <p>Trzy najlepsze (i dwa kolejne miejsca) to warianty strategii 6. Gdy przestanie działać otwarcie NY względem EMA12, przestaną działać wszystkie naraz. Jedyną strategią z innym źródłem przewagi jest IBS: trzyma pozycję przez noc i gra na powrót do średniej.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Dźwignia 4× bez stopu <span class="tag stop">ryzyko</span></h3>
+          <p>Obsunięcia wynoszą 30–41%, a pojedyncza transakcja IBS straciła 21% kapitału. Depozyt nie ogranicza straty, a procent składany powiększa pozycję razem z kapitałem.</p>
+        </div>
+        <div class="fail">
+          <h3>Parametry wybrane na tych samych danych <span class="tag att">dopasowanie</span></h3>
+          <p>Próg <code>k = 0,075</code> wybrano z kilku wartości. #24 i #6 miały po 5 prób. Liczby są więc trochę optymistyczne i potrzebny jest test poza próbą, np. na danych zebranych od dziś.</p>
+        </div>
+        <div class="fail">
+          <h3>Koszty z dzisiejszego profilu <span class="tag att">koszty</span></h3>
+          <p>Spread 1,8 pkt i stawka finansowania są dzisiejsze, a liczone dla całej historii. Dla IBS stopy finansowania były w różnych latach różne. Dla #28 nocny spread jest prawdopodobnie zaniżony.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Co przemawia za wynikami <span class="tag ok">odporność</span></h3>
+          <p>Każda z trójki jest na plusie w każdym roku i ma zwrot wyraźnie powyżej 95. percentyla losowych wejść. Po odjęciu 5 najlepszych transakcji zostaje ponad +150%. Luki w danych to kilka 5-minutowych okien.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Dane: MCP /strategies produkcji, odczyt 27.10.2026</span>
+    <span>Wyniki historyczne · rachunek demo</span>
+  </div>
+</footer>

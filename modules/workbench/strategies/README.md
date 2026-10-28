@@ -8,7 +8,7 @@ Why it exists and what was weighed: `openspec/changes/archive/2026-10-25-a-strat
 `openspec/changes/archive/2026-10-25-a-strategy-from-a-description` (the screen and the agent),
 `openspec/changes/costs-come-from-the-broker` (costs read off capital.com, runs without costs, the strategy's own
 conversation), and the research behind them in
-`docs/strategie-i-backtesty-research.html`. Walk-forward and the other validation are stage 3.
+`docs/strategie/strategie-i-backtesty-research.html`. Walk-forward and the other validation are stage 3.
 
 **Optional**, like the alerts: mounted only when `STRATEGIES_DATABASE_URL` is set; unset is a working process.
 
