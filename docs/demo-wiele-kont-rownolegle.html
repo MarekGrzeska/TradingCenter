@@ -375,6 +375,7 @@ arguments[<span class="s">"account_id"</span>] = definition.trading.account_id  
     <section>
       <div class="eyebrow">09 · Plan</div>
       <h2>Jedna zmiana OpenSpec i jedna poprawka</h2>
+      <p><strong>Stan 28 października wieczorem:</strong> zmiana <code>team-trades-on-its-own-account</code> jest zaimplementowana na gałęzi <code>feat/team-trades-on-its-own-account</code> (grupy 1–5 z <code>tasks.md</code>), ale jeszcze niewdrożona. Przy implementacji wyszła jeszcze jedna rzecz, którą zmierzyliśmy: capital.com przyjmuje <strong>jedno logowanie na sekundę na klucz API</strong>, a drugie w tej samej sekundzie dostaje odpowiedź <code>429 error.too-many.requests</code>. Pula sesji ma więc oprócz wspólnego limitu zapytań także wspólny limit logowań.</p>
       <p><strong>Poprawka niezależna od planu:</strong> <code>client.py</code> po ponownym logowaniu powinien przywrócić konto, które było aktywne przed wygaśnięciem sesji. To zwykła gałąź z poprawką błędu (pomiar 3), bez OpenSpec.</p>
       <p>Zmieniają się: kontrakt bramki (<code>dtos.py</code>, trasy), snapshot OpenAPI w <code>trading-mcp</code>, kontrakt teamów i wygenerowany kontrakt terminala. Według <code>CLAUDE.md</code> to zmiana OpenSpec, a nie zwykła gałąź z poprawką.</p>
       <div class="table-wrap">
