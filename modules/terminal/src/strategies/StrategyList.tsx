@@ -10,19 +10,23 @@ const changed = (d: Date) => formatInstant(d.getTime() / 1000).slice(0, 16);
 export function StrategyList({
   strategies,
   query,
+  timeframe,
   openId,
   wide,
   onOpen,
 }: {
   strategies: readonly StrategyItem[];
   query: string;
+  /** Empty keeps every interval. */
+  timeframe: string;
   openId: number | null;
   wide: boolean;
   onOpen(id: number): void;
 }) {
-  const groups = groupStrategies(strategies, query);
+  const groups = groupStrategies(strategies, query, timeframe);
   if (groups.length === 0 && strategies.length > 0) {
-    return <p className="text-xs text-ink-muted">Żadna nazwa nie pasuje do „{query}”.</p>;
+    const what = [query.trim() !== "" && `„${query.trim()}”`, timeframe !== "" && `interwał ${interval(timeframe)}`].filter(Boolean);
+    return <p className="text-xs text-ink-muted">Żadna strategia nie pasuje: {what.join(", ")}.</p>;
   }
   return (
     <div className={wide ? "space-y-5" : "space-y-3"}>

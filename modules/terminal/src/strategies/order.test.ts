@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupStrategies, nextSort, shortName, sortRuns, trials } from "./order";
+import { filterRuns, groupStrategies, NO_RUN_FILTER, nextSort, shortName, sortRuns, timeframesOf, trials } from "./order";
 import type { RunItem, StrategyItem } from "./strategiesApi";
 
 const strategy = (id: number, name: string, timeframe: string, changed: string): StrategyItem => ({
@@ -56,6 +56,17 @@ describe("groupStrategies", () => {
     expect(groupStrategies([strategy(2, "US100 M5 — ORB 15 min", "MINUTE_5", "2026-10-01T00:00:00Z")], "ema")).toHaveLength(0);
   });
 
+  it("keeps one interval, and offers the intervals from the shortest", () => {
+    const items = [
+      strategy(1, "US100 H1 — cofnięcie do EMA", "HOUR", "2026-10-01T00:00:00Z"),
+      strategy(2, "US100 M5 — ORB 15 min", "MINUTE_5", "2026-10-01T00:00:00Z"),
+    ];
+
+    expect(groupStrategies(items, "", "HOUR").map((g) => g.timeframe)).toEqual(["HOUR"]);
+    expect(groupStrategies(items, "orb", "HOUR")).toHaveLength(0);
+    expect(timeframesOf(items)).toEqual(["MINUTE_5", "HOUR"]);
+  });
+
   it("keeps a name that says nothing but the group", () => {
     expect(shortName(strategy(1, "US100 pullback", "HOUR_4", "2026-10-01T00:00:00Z"))).toBe("US100 pullback");
   });
@@ -80,5 +91,46 @@ describe("sortRuns", () => {
 
     expect(sortRuns(runs, descending).map((r) => r.id)).toEqual([3, 1, 2]);
     expect(sortRuns(runs, nextSort(descending, "sharpe")).map((r) => r.id)).toEqual([1, 3, 2]);
+  });
+});
+
+describe("filterRuns", () => {
+  const strategies = [
+    strategy(1, "US100 H1 — cofnięcie do EMA", "HOUR", "2026-10-01T00:00:00Z"),
+    strategy(2, "US100 M5 — ORB 15 min", "MINUTE_5", "2026-10-01T00:00:00Z"),
+  ];
+  const of = (id: number, strategyId: number, sharpe: number | null, annual: number | null, from: string, to: string): RunItem => {
+    const base = run(id, sharpe);
+    return {
+      ...base,
+      strategyId,
+      from: new Date(from),
+      to: new Date(to),
+      headline: base.headline && { ...base.headline, annualReturnPct: annual },
+    };
+  };
+  const runs = [
+    of(1, 1, 1.5, 0.3, "2025-01-01T00:00:00Z", "2025-12-31T00:00:00Z"),
+    of(2, 2, 0.4, -0.1, "2024-01-01T00:00:00Z", "2026-06-30T00:00:00Z"),
+    of(3, 2, null, null, "2025-03-01T00:00:00Z", "2025-04-01T00:00:00Z"),
+  ];
+  const ids = (filter: Partial<typeof NO_RUN_FILTER>) => filterRuns(runs, { ...NO_RUN_FILTER, ...filter }, strategies).map((r) => r.id);
+
+  it("narrows by the strategy's name and interval", () => {
+    expect(ids({})).toEqual([1, 2, 3]);
+    expect(ids({ name: "orb" })).toEqual([2, 3]);
+    expect(ids({ timeframe: "HOUR" })).toEqual([1]);
+  });
+
+  it("keeps a run whose tested range lies within the days given", () => {
+    expect(ids({ from: "2025-01-01" })).toEqual([1, 3]);
+    expect(ids({ from: "2025-01-01", to: "2025-06-30" })).toEqual([3]);
+  });
+
+  it("takes minimums in percent and Polish decimals, and drops a run with no number in that column", () => {
+    expect(ids({ minSharpe: "0,5" })).toEqual([1]);
+    expect(ids({ minAnnualReturnPct: "-20" })).toEqual([1, 2]);
+    expect(ids({ minAnnualReturnPct: "10" })).toEqual([1]);
+    expect(ids({ minSharpe: "abc" })).toEqual([1, 2, 3]);
   });
 });

@@ -10,8 +10,10 @@ import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { ComparePanel } from "./ComparePanel";
+import { filterRuns, NO_RUN_FILTER, type RunFilter } from "./order";
 import { anyPending, interval, runsGoing } from "./present";
 import { ReportPanel } from "./ReportPanel";
+import { RunFilters } from "./RunFilters";
 import { RunForm } from "./RunForm";
 import { RunsPanel } from "./RunsPanel";
 import {
@@ -49,6 +51,7 @@ export function BacktestsView({
   const [selected, setSelected] = useState<ReadonlySet<number>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [compared, setCompared] = useState<{ runs: ComparedRun[] | null; refusal: string[] | null } | null>(null);
+  const [filter, setFilter] = useState<RunFilter>(NO_RUN_FILTER);
 
   const health = useRead<{ present: boolean; health: Health | null }>({
     key: ["strategies", "health"],
@@ -136,6 +139,8 @@ export function BacktestsView({
   }
 
   const names = new Map(list.value.map((s) => [s.id, s.name]));
+  // Picking one strategy decides its name and interval; what was typed for them waits until "wszystkie" again.
+  const shown = filterRuns(runs.value, picked === null ? filter : { ...filter, name: "", timeframe: "" }, list.value);
 
   function toggleSelected(id: number) {
     const next = new Set(selected);
@@ -282,8 +287,21 @@ export function BacktestsView({
       )}
       {compared !== null && <ComparePanel runs={compared.runs} refusal={compared.refusal} strategyNames={names} />}
 
+      {runs.value.length > 0 && (
+        <RunFilters
+          filter={filter}
+          onChange={setFilter}
+          strategies={list.value}
+          ofOneStrategy={picked !== null}
+          shown={shown.length}
+          total={runs.value.length}
+        />
+      )}
+      {shown.length === 0 && runs.value.length > 0 ? (
+        <p className="text-sm text-ink-muted">Żadne uruchomienie nie pasuje do filtrów.</p>
+      ) : (
       <RunsPanel
-        runs={runs.value}
+        runs={shown}
         selected={selected}
         onSelect={toggleSelected}
         error={runs.error}
@@ -300,6 +318,7 @@ export function BacktestsView({
           }
         }}
       />
+      )}
       </div>
       {run !== null && (
         <div className="flex flex-wrap items-center gap-3">

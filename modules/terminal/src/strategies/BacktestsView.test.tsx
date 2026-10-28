@@ -97,6 +97,18 @@ describe("BacktestsView", () => {
     expect(screen.queryByRole("form", { name: "Uruchomienie" })).toBeNull();
   });
 
+  it("narrows the runs by the strategy's name and says how many are left", async () => {
+    view(fakeApi());
+
+    await userEvent.type(await screen.findByRole("searchbox", { name: "szukaj w nazwach strategii" }), "eurusd");
+
+    expect(screen.getByRole("cell", { name: "EURUSD breakout" })).toBeInTheDocument();
+    expect(screen.queryByRole("cell", { name: "US100 pullback" })).toBeNull();
+    expect(screen.getByText("1 z 2")).toBeInTheDocument();
+    await userEvent.type(screen.getByRole("textbox", { name: "Sharpe co najmniej" }), "1");
+    expect(screen.getByText("Żadne uruchomienie nie pasuje do filtrów.")).toBeInTheDocument();
+  });
+
   it("opens with the strategy the Strategies tab sent, and its run form", async () => {
     const api = fakeApi();
     view(api, "/backtests?strategy=7");
