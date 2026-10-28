@@ -34,7 +34,7 @@ const wireRevision = {
     ],
     edges: [{ from: "agent-1", to: "agent-2" }],
     limits: { run_limit: "0.5", daily_limit: null },
-    trading: { max_order_size: "2", orders_per_run: 3, orders_per_day: null },
+    trading: { max_order_size: "2", orders_per_run: 3, orders_per_day: null, account_id: "X" },
   },
 };
 
@@ -52,7 +52,7 @@ const definition: TeamDefinition = {
   ],
   dependencies: [{ from: "agent-1", to: "agent-2" }],
   limits: { runLimit: "0.5", dailyLimit: null },
-  trading: { maxOrderSize: "2", ordersPerRun: 3, ordersPerDay: null },
+  trading: { maxOrderSize: "2", ordersPerRun: 3, ordersPerDay: null, accountId: "X" },
 };
 
 describe("listTeams", () => {
@@ -78,6 +78,7 @@ describe("listTeams", () => {
         name: "Morning desk",
         description: "two roles",
         latestRevision: 2,
+        accountId: null,
         createdAt: Date.parse("2026-08-15T08:00:00Z") / 1000,
         updatedAt: Date.parse("2026-08-16T09:30:00Z") / 1000,
       },
@@ -128,7 +129,7 @@ describe("a revision, both ways", () => {
         ],
         edges: [{ from: "agent-1", to: "agent-2" }],
         limits: { run_limit: "0.5", daily_limit: null },
-        trading: { max_order_size: "2", orders_per_run: 3, orders_per_day: null },
+        trading: { max_order_size: "2", orders_per_run: 3, orders_per_day: null, account_id: "X" },
       },
     });
   });
@@ -398,6 +399,7 @@ describe("runs", () => {
             result_status: "FILLED",
             provider_order_id: "o-1",
             reference: "r-1",
+            account_id: "X",
             created_at: "2026-08-16T10:01:00Z",
             settled_at: "2026-08-16T10:01:02Z",
           },
@@ -419,6 +421,7 @@ describe("runs", () => {
         resultStatus: "FILLED",
         providerOrderId: "o-1",
         reference: "r-1",
+        accountId: "X",
         createdAt: Date.parse("2026-08-16T10:01:00Z") / 1000,
         settledAt: Date.parse("2026-08-16T10:01:02Z") / 1000,
       },

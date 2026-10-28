@@ -33,7 +33,7 @@ export function emptyDefinition(modelId: string): TeamDefinition {
     limits: { runLimit: null, dailyLimit: null },
     // Three empty trading limits, which is a team allowed to trade without one — the module holds no default
     // and puts no ceiling in for a missing one (specs/teams-trading, "Każda granica…daje się wyłączyć").
-    trading: { maxOrderSize: null, ordersPerRun: null, ordersPerDay: null },
+    trading: { maxOrderSize: null, ordersPerRun: null, ordersPerDay: null, accountId: null },
   };
 }
 

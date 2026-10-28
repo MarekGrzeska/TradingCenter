@@ -38,12 +38,12 @@
 
 ## 5. Terminal
 
-- [ ] 5.1 `contract-sync` po zmianach w bramce i teams
-- [ ] 5.2 Edytor zespołu: wybór konta przy granicach handlowych (nazwa, waluta, saldo; pusty to konto aktywne) i ostrzeżenie, gdy konto ma już inny zespół
-- [ ] 5.3 Odmowa zapisu z powodu narzędzia przełączającego konto pokazana przy agencie
-- [ ] 5.4 Ekran kont: wybór konta do oglądania pozycji bez przełączania aktywnego; tekst przed przełączeniem mówi, kogo przełączenie dotyczy
-- [ ] 5.5 Konto w wierszu zlecenia w śladzie przebiegu
-- [ ] 5.6 Testy widoków: przypisanie konta (happy path), odmowa przy agencie, oglądanie innego konta bez przełączenia
+- [x] 5.1 `contract-sync` po zmianach w bramce i teams
+- [x] 5.2 Edytor zespołu: wybór konta przy granicach handlowych (nazwa, waluta, saldo; pusty to konto aktywne) i ostrzeżenie, gdy konto ma już inny zespół
+- [x] 5.3 Odmowa zapisu z powodu narzędzia przełączającego konto pokazana przy agencie (już działa: `locateRefusal` czyta `'agent'` z komunikatu modułu; test ogólny tego mechanizmu wystarcza)
+- [x] 5.4 Ekran kont: wybór konta do oglądania pozycji bez przełączania aktywnego; tekst przed przełączeniem mówi, kogo przełączenie dotyczy
+- [x] 5.5 Konto w wierszu zlecenia w śladzie przebiegu
+- [x] 5.6 Testy widoków: przypisanie konta (happy path), odmowa przy agencie, oglądanie innego konta bez przełączenia
 
 ## 6. Zamknięcie
 

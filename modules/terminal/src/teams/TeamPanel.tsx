@@ -1,3 +1,4 @@
+import type { DemoAccount } from "../accounts/accountsApi";
 import type { TeamTradingLimits } from "./teamsApi";
 
 /**
@@ -6,11 +7,24 @@ import type { TeamTradingLimits } from "./teamsApi";
  */
 export function TeamPanel({
   trading,
+  accounts,
+  accountsNote,
+  sharedWith,
   onChange,
 }: {
   trading: TeamTradingLimits;
+  /** What the gateway lists; the choice is never typed in. */
+  accounts: DemoAccount[];
+  /** Why the list is empty, when it is — a failed read, rather than an account-less login. */
+  accountsNote: string | null;
+  /** Names of the other teams whose latest revision trades on the chosen account. */
+  sharedWith: string[];
   onChange(patch: Partial<TeamTradingLimits>, kind: string): void;
 }) {
+  const chosen = trading.accountId ?? "";
+  // A revision can name an account the gateway no longer lists; kept as an option so the select does not lie.
+  const unlisted = chosen !== "" && !accounts.some((account) => account.id === chosen);
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto border-l border-border p-3">
       <p className="text-xs text-ink-muted">
@@ -23,6 +37,38 @@ export function TeamPanel({
         <p className="text-xs text-ink-muted">
           Left empty, a limit is no limit. They bind every agent carrying a tool that moves
           the account.
+        </p>
+
+        <Field id="trading-account" label="Account">
+          <select
+            id="trading-account"
+            value={chosen}
+            onChange={(event) =>
+              onChange(
+                { accountId: event.target.value === "" ? null : event.target.value },
+                "select:trading:accountId",
+              )
+            }
+            className="w-full rounded border border-border bg-panel px-2 py-1 text-sm text-ink"
+          >
+            <option value="">the active account</option>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name} · {account.currency} {account.balance.toFixed(2)}
+              </option>
+            ))}
+            {unlisted && <option value={chosen}>{chosen} (not listed by the gateway)</option>}
+          </select>
+        </Field>
+        {accountsNote !== null && <p className="text-xs text-critical">{accountsNote}</p>}
+        {sharedWith.length > 0 && (
+          <p className="text-xs text-warning">
+            Also traded by {sharedWith.join(", ")} — their results will mix in one balance.
+          </p>
+        )}
+        <p className="text-xs text-ink-faint">
+          A team on its own account keeps it whatever the active account is, and may not carry
+          the tools that switch or fund one.
         </p>
 
         <Field id="trading-max-size" label="Largest order size">

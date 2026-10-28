@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import type { DemoAccount } from "../accounts/accountsApi";
 import { Button } from "../ui/Button";
 import { BackButton } from "../ui/BackButton";
 import { MarketDataError } from "../data/types";
@@ -41,6 +42,9 @@ export function TeamEditor({
   onClose,
   onCreated,
   onRuns,
+  accounts = [],
+  accountsNote = null,
+  teams = [],
 }: {
   api: TeamsApi;
   /** `null` opens a team that does not exist yet — saving it is what creates it. */
@@ -55,6 +59,11 @@ export function TeamEditor({
    *  puts it in its own header, so nothing has to look it up a second time. Never called
    *  for a team that does not exist yet — it has no runs to look at. */
   onRuns(runId: number | null, teamName: string): void;
+  /** The gateway's accounts, for the team's own. */
+  accounts?: DemoAccount[];
+  accountsNote?: string | null;
+  /** The catalogue, read for which other teams already trade on the chosen account. */
+  teams?: TeamSummary[];
 }) {
   // The cheapest model in the catalogue is what a new agent starts on — the module publishes the order, so
   // the terminal picks a position rather than a name (`terminal-teams`, no model identifier in this code).
@@ -315,6 +324,16 @@ export function TeamEditor({
         />
         <TeamPanel
           trading={draft.trading}
+          accounts={accounts}
+          accountsNote={accountsNote}
+          sharedWith={teams
+            .filter(
+              (team) =>
+                team.id !== teamId &&
+                !!draft.trading.accountId &&
+                team.accountId === draft.trading.accountId,
+            )
+            .map((team) => team.name)}
           onChange={(patch, kind) => edit(setTradingLimit(draft, patch), kind)}
         />
       </div>
