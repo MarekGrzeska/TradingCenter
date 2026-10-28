@@ -7,14 +7,14 @@
 
 ## 2. Bramka: pula sesji i nagłówek konta (D1, D2, D4)
 
-- [ ] 2.1 Jeden `RateGate` wstrzykiwany do każdego `CapitalClient`
-- [ ] 2.2 `SessionPool`: sesja domyślna, sesje po koncie tworzone leniwie, sprawdzanie identyfikatora na liście kont z pamięcią podręczną
-- [ ] 2.3 Zależność FastAPI czytająca opcjonalny `X-Capital-Account` i wybierająca adapter z puli; nieznane konto daje 400 z nazwą konta, bez logowania i bez zlecenia
-- [ ] 2.4 Nagłówek na `/positions`, `/orders`, `/positions/{id}` (DELETE, PUT), `/working-orders`, `/working-orders/{id}`, `/accounts/top-up`
-- [ ] 2.5 Strumień na własnej sesji z puli; usunięcie ostrzeżenia o zerwaniu z docstringu `PUT /accounts/active` i z README
-- [ ] 2.6 Testy: dwa konta jednocześnie, przełączenie aktywnego nie rusza żądania z nagłówkiem, nieznane konto, korekta salda wskazanego konta
-- [ ] 2.7 Testy `--run-live-trading`: pomiary 1 i 2 (konto per sesja, zlecenie niewidoczne z drugiej sesji, strumień bez przerwy przy przełączeniu)
-- [ ] 2.8 README bramki: sekcja o sesjach na konto i wyniki pomiarów z 28.10
+- [x] 2.1 Jeden `RateGate` wstrzykiwany do każdego `CapitalClient`
+- [x] 2.2 `SessionPool`: sesja domyślna, sesje po koncie tworzone leniwie, sprawdzanie identyfikatora na liście kont z pamięcią podręczną
+- [x] 2.3 Zależność FastAPI czytająca opcjonalny `X-Capital-Account` i wybierająca adapter z puli; nieznane konto daje 400 z nazwą konta, bez logowania i bez zlecenia
+- [x] 2.4 Nagłówek na `/positions`, `/orders`, `/positions/{id}` (DELETE, PUT), `/working-orders`, `/working-orders/{id}`, `/accounts/top-up`
+- [x] 2.5 Strumień na własnej sesji z puli; usunięcie ostrzeżenia o zerwaniu z docstringu `PUT /accounts/active` i z README
+- [x] 2.6 Testy: dwa konta jednocześnie, przełączenie aktywnego nie rusza żądania z nagłówkiem, nieznane konto, korekta salda wskazanego konta
+- [x] 2.7 Testy `--run-live-trading`: pomiary 1 i 2 (konto per sesja, zlecenie niewidoczne z drugiej sesji, strumień bez przerwy przy przełączeniu)
+- [x] 2.8 README bramki: sekcja o sesjach na konto i wyniki pomiarów z 28.10
 
 ## 3. trading-mcp
 

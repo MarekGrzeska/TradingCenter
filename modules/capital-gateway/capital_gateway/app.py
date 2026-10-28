@@ -16,7 +16,16 @@ telemetry.configure()
 
 log = logging.getLogger(__name__)
 
-from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import (
+    Depends,
+    FastAPI,
+    Header,
+    HTTPException,
+    Query,
+    Request,
+    WebSocket,
+    WebSocketDisconnect,
+)
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -49,6 +58,7 @@ from .dtos import (
 from .edge import edge_config, edge_provider
 from .errors import GatewayError
 from .history import parse_candle_ts
+from .pool import SessionPool
 from .stream.forming import Bar
 from .stream.hub import Hub
 from .stream.upstream import Upstream
@@ -73,12 +83,12 @@ async def lifespan(app: FastAPI):
     # Settings first, and outside a try: a live URL or a missing credential must stop
     # the process here rather than surface later as a failing request.
     settings = Settings()  # type: ignore[call-arg]
-    client = CapitalClient(settings)
+    pool = SessionPool(settings)
 
     async def tokens() -> tuple[str, str]:
-        return await stream_tokens_for(client)
+        return await stream_tokens_for(pool.stream)
 
-    adapter = CapitalAdapter(client)
+    adapter = pool.default
 
     async def current_period(epic: str, resolution: Resolution) -> Bar | None:
         """Where the period a room is currently building starts. Only DAY and WEEK, whose boundary
@@ -101,21 +111,20 @@ async def lifespan(app: FastAPI):
 
     hub = Hub(
         lambda epic, resolution, emit: Upstream(
-            settings.capital_stream_url, epic, resolution, tokens, emit, pace=client.pace
+            settings.capital_stream_url, epic, resolution, tokens, emit, pace=pool.stream.pace
         ),
         current_period,
     )
 
     app.state.settings = settings
     app.state.edge = edge_config(settings)
-    app.state.client = client
-    app.state.adapter = adapter
+    app.state.pool = pool
     app.state.hub = hub
     try:
         yield
     finally:
         await hub.aclose()
-        await client.aclose()
+        await pool.aclose()
 
 
 # The routes reachable with no credential: the platform's restart probe, and the schema pages a
@@ -201,7 +210,27 @@ async def _gateway_error_handler(request: Request, exc: GatewayError) -> JSONRes
 
 
 def adapter(request: Request) -> CapitalAdapter:
-    return request.app.state.adapter
+    return request.app.state.pool.default
+
+
+ACCOUNT_HEADER = "X-Capital-Account"
+
+
+async def account_adapter(
+    request: Request,
+    account: str | None = Header(
+        default=None,
+        alias=ACCOUNT_HEADER,
+        description=(
+            "the account this request acts on; omitted, the active one. Naming an account never "
+            "changes which one is active, and an account the provider does not list is a 400"
+        ),
+    ),
+) -> CapitalAdapter:
+    pool: SessionPool = request.app.state.pool
+    if not account:
+        return pool.default
+    return await pool.for_account(account)
 
 
 def hub(websocket: WebSocket) -> Hub:
@@ -234,13 +263,10 @@ class SetActiveAccount(BaseModel):
 
 @app.put("/accounts/active", tags=["accounts"], response_model=Account)
 async def set_active_account(body: SetActiveAccount, a: CapitalAdapter = Depends(adapter)):
-    """Switch the active account. Positions and orders act on it afterwards.
+    """Switch the active account: the one every request naming no account acts on afterwards.
 
-    **Switching drops the quote stream.** capital.com ends the streaming session when the
-    financial account changes, so anything collecting candles through `/ws/quotes` sees a
-    disconnect and reconnects on its own — a gap of seconds, in data nobody is watching at
-    the moment of the switch. Said here because this route answers success while the
-    consequence lands somewhere else entirely.
+    A request naming an account in `X-Capital-Account` is not moved, and the stream rides a session
+    of its own that is never switched.
     """
     return await a.set_active_account(body.account_id)
 
@@ -257,12 +283,11 @@ class TopUp(BaseModel):
 
 
 @app.post("/accounts/top-up", tags=["accounts"], response_model=Account)
-async def top_up(body: TopUp, a: CapitalAdapter = Depends(adapter)):
+async def top_up(body: TopUp, a: CapitalAdapter = Depends(account_adapter)):
     """Move the demo account's balance, and answer with the account as it stands after.
 
-    Acts on the **active** account — there is no account id to pass, because capital.com
-    adjusts the session's own account and a parameter here would promise a choice that
-    does not exist. Switch first if the money belongs somewhere else.
+    Acts on the account named in `X-Capital-Account`, or on the active one: capital.com adjusts
+    the session's own account, and each named account has a session of its own.
     """
     if body.amount == 0:
         raise HTTPException(422, detail="amount must not be zero")
@@ -387,12 +412,12 @@ async def history(
 
 
 @app.get("/positions", tags=["trading"], response_model=list[Position])
-async def positions(a: CapitalAdapter = Depends(adapter)):
+async def positions(a: CapitalAdapter = Depends(account_adapter)):
     return await a.list_positions()
 
 
 @app.post("/orders", tags=["trading"], response_model=Order)
-async def place_order(req: PlaceOrderRequest, a: CapitalAdapter = Depends(adapter)):
+async def place_order(req: PlaceOrderRequest, a: CapitalAdapter = Depends(account_adapter)):
     """Place an order. MARKET fills now (FILLED); LIMIT and STOP rest (WORKING).
 
     The answer is settled, not acknowledged. A deal the provider has not resolved comes
@@ -402,13 +427,13 @@ async def place_order(req: PlaceOrderRequest, a: CapitalAdapter = Depends(adapte
 
 
 @app.delete("/positions/{position_id}", tags=["trading"], response_model=Order)
-async def close_position(position_id: str, a: CapitalAdapter = Depends(adapter)):
+async def close_position(position_id: str, a: CapitalAdapter = Depends(account_adapter)):
     return await a.close_position(position_id)
 
 
 @app.put("/positions/{position_id}", tags=["trading"], response_model=Order)
 async def update_position(
-    position_id: str, req: UpdatePositionRequest, a: CapitalAdapter = Depends(adapter)
+    position_id: str, req: UpdatePositionRequest, a: CapitalAdapter = Depends(account_adapter)
 ):
     """Set or remove stops. A number sets, `null` removes, an omitted field is left
     alone — so amending one stop cannot clear the other."""
@@ -416,13 +441,13 @@ async def update_position(
 
 
 @app.get("/working-orders", tags=["trading"], response_model=list[WorkingOrder])
-async def working_orders(a: CapitalAdapter = Depends(adapter)):
-    """Resting LIMIT and STOP orders on the active account."""
+async def working_orders(a: CapitalAdapter = Depends(account_adapter)):
+    """Resting LIMIT and STOP orders on the named account, or on the active one."""
     return await a.list_working_orders()
 
 
 @app.delete("/working-orders/{order_id}", tags=["trading"], response_model=Order)
-async def cancel_working_order(order_id: str, a: CapitalAdapter = Depends(adapter)):
+async def cancel_working_order(order_id: str, a: CapitalAdapter = Depends(account_adapter)):
     return await a.cancel_working_order(order_id)
 
 

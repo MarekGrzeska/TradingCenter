@@ -4,10 +4,14 @@ they write. Mocks cannot catch a renamed status or a changed dealing rule; a dem
 from __future__ import annotations
 
 import asyncio
+import json
+import time
 
 import pytest
+import websockets
 
 from capital_gateway.adapter import CapitalAdapter
+from capital_gateway.app import stream_tokens_for
 from capital_gateway.client import CapitalClient
 from capital_gateway.config import Settings
 from capital_gateway.dtos import (
@@ -17,6 +21,7 @@ from capital_gateway.dtos import (
     PlaceOrderRequest,
     UpdatePositionRequest,
 )
+from capital_gateway.pool import SessionPool
 
 pytestmark = pytest.mark.live_trading
 
@@ -167,3 +172,79 @@ async def test_a_renewed_session_returns_to_its_own_account(settings: Settings) 
         assert session.json().get("accountId") == other
     finally:
         await client.aclose()
+
+
+async def test_two_accounts_trade_side_by_side_on_their_own_sessions(settings: Settings) -> None:
+    """Measured 28 October 2026 and kept here: an order on one account's session is invisible from
+    another's, and neither moves the active account."""
+    pool = SessionPool(settings)
+    try:
+        accounts = await pool.default.list_accounts()
+        others = [a.id for a in accounts if not a.active]
+        if len(others) < 2:
+            pytest.skip("two accounts besides the active one are needed")
+        active = next(a.id for a in accounts if a.active)
+        x, y = await pool.for_account(others[0]), await pool.for_account(others[1])
+        size, _ = await dealing(x)
+
+        order = await x.place_order(
+            PlaceOrderRequest(symbol=EPIC, direction=Direction.BUY, size=size)
+        )
+        assert order.status is OrderStatus.FILLED, f"provider refused: {order.reason}"
+        try:
+            assert any(p.id == order.id for p in await x.list_positions())
+            assert all(p.id != order.id for p in await y.list_positions())
+            assert all(p.id != order.id for p in await pool.default.list_positions())
+            still_active = [a.id for a in await pool.default.list_accounts() if a.active]
+            assert still_active == [active]
+        finally:
+            await x.close_position(order.id)
+    finally:
+        await pool.aclose()
+
+
+async def test_switching_another_session_leaves_the_stream_talking(settings: Settings) -> None:
+    """Measured 28 October 2026: a session switching accounts does not break another session's stream."""
+    pool = SessionPool(settings)
+    try:
+        accounts = await pool.default.list_accounts()
+        other = next((a.id for a in accounts if not a.active), None)
+        if other is None:
+            pytest.skip("no second account to switch to")
+        cst, token = await stream_tokens_for(pool.stream)
+        quotes: list[float] = []
+        async with websockets.connect(settings.capital_stream_url) as ws:
+            await ws.send(
+                json.dumps(
+                    {
+                        "destination": "marketData.subscribe",
+                        "correlationId": "q",
+                        "cst": cst,
+                        "securityToken": token,
+                        "payload": {"epics": [EPIC]},
+                    }
+                )
+            )
+
+            async def listen(seconds: float) -> None:
+                deadline = time.monotonic() + seconds
+                while (left := deadline - time.monotonic()) > 0:
+                    try:
+                        message = json.loads(await asyncio.wait_for(ws.recv(), left))
+                    except TimeoutError:
+                        return
+                    if message.get("destination") == "quote":
+                        quotes.append(time.monotonic())
+
+            await listen(5)
+            before = len(quotes)
+            if before == 0:
+                pytest.skip(f"{EPIC} is quiet — the market is closed")
+            await (await pool.for_account(other)).list_positions()  # a session standing on `other`
+            await listen(10)
+
+        if len(quotes) == before:
+            await dealing(pool.default)  # skips when the market has just closed
+            pytest.fail("the stream went silent after another session switched")
+    finally:
+        await pool.aclose()

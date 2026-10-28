@@ -48,7 +48,6 @@ def mock_login() -> None:
     respx.get(f"{API}/session").mock(return_value=httpx.Response(200, json={"accountId": "a1"}))
 
 
-
 def test_every_route_appears_in_the_published_schema(client: TestClient) -> None:
     with client:
         schema = client.get("/openapi.json").json()
@@ -170,7 +169,6 @@ def test_the_asset_classes_are_published(client: TestClient) -> None:
     assert set(body) == {"SHARES", "INDICES", "CRYPTO", "CURRENCIES", "COMMODITIES", "OTHER"}
 
 
-
 @respx.mock
 def test_no_response_carries_a_credential_or_a_session_token(client: TestClient) -> None:
     mock_login()
@@ -259,7 +257,6 @@ def test_a_resting_order_without_a_level_is_refused_by_the_schema(client: TestCl
     assert response.status_code == 422
     # Refused here, so the provider was never asked.
     assert orders.call_count == 0
-
 
 
 @pytest.mark.parametrize(
@@ -383,11 +380,153 @@ def test_a_top_up_of_zero_never_reaches_the_provider(client: TestClient) -> None
     assert not route.called
 
 
-def test_switching_accounts_says_it_drops_the_stream(client: TestClient) -> None:
-    """specs/capital-session, "Strumień po przełączeniu konta" — a route description is contract,
-    not commentary: the consequence of this call lands in a different module entirely."""
-    with client:
-        schema = client.get("/openapi.json").json()
+class FakeProvider:
+    """Sessions as capital.com keeps them, measured 28 October 2026: each login opens on the preferred
+    account, `PUT /session` moves only that session, and positions belong to the session's account."""
 
-    description = schema["paths"]["/accounts/active"]["put"]["description"]
-    assert "stream" in description.lower()
+    PREFERRED = "a1"
+
+    def __init__(self) -> None:
+        self.account_of: dict[str, str] = {}
+        self.positions = {"a1": [], "X": [load_position("dx")], "Y": [load_position("dy")]}
+        self.top_ups: list[tuple[str, float]] = []
+
+    def install(self) -> None:
+        respx.post(f"{API}/session").mock(side_effect=self._login)
+        respx.put(f"{API}/session").mock(side_effect=self._switch)
+        respx.get(f"{API}/session").mock(side_effect=self._session)
+        respx.get(f"{API}/accounts").mock(side_effect=self._accounts)
+        respx.get(f"{API}/positions").mock(side_effect=self._positions)
+        respx.post(f"{API}/accounts/topUp").mock(side_effect=self._top_up)
+
+    def _account(self, request: httpx.Request) -> str:
+        return self.account_of[request.headers["CST"]]
+
+    def _login(self, request: httpx.Request) -> httpx.Response:
+        cst = f"cst-{len(self.account_of)}"
+        self.account_of[cst] = self.PREFERRED
+        return httpx.Response(
+            200,
+            headers={"CST": cst, "X-SECURITY-TOKEN": "t"},
+            json={"currentAccountId": self.PREFERRED},
+        )
+
+    def _switch(self, request: httpx.Request) -> httpx.Response:
+        self.account_of[request.headers["CST"]] = json.loads(request.content)["accountId"]
+        return httpx.Response(200, json={})
+
+    def _session(self, request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"accountId": self._account(request)})
+
+    def _accounts(self, request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            json={
+                "accounts": [
+                    {
+                        "accountId": a,
+                        "accountName": a,
+                        "currency": "USD",
+                        "balance": {"balance": 100.0, "available": 100.0, "profitLoss": 0.0},
+                    }
+                    for a in ("a1", "X", "Y")
+                ]
+            },
+        )
+
+    def _positions(self, request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"positions": self.positions[self._account(request)]})
+
+    def _top_up(self, request: httpx.Request) -> httpx.Response:
+        self.top_ups.append((self._account(request), json.loads(request.content)["amount"]))
+        return httpx.Response(200, json={})
+
+
+def load_position(deal_id: str) -> dict:
+    return {
+        "position": {
+            "dealId": deal_id,
+            "direction": "BUY",
+            "size": 1.0,
+            "level": 100.0,
+            "upl": 0.0,
+            "currency": "USD",
+        },
+        "market": {"epic": "US100"},
+    }
+
+
+@pytest.fixture
+def provider() -> FakeProvider:
+    return FakeProvider()
+
+
+def position_ids(response: httpx.Response) -> list[str]:
+    return [p["id"] for p in response.json()]
+
+
+@respx.mock
+def test_two_named_accounts_are_read_side_by_side(
+    client: TestClient, provider: FakeProvider
+) -> None:
+    provider.install()
+
+    with client:
+        on_x = client.get("/positions", headers={"X-Capital-Account": "X"})
+        on_y = client.get("/positions", headers={"X-Capital-Account": "Y"})
+        unnamed = client.get("/positions")
+
+    assert position_ids(on_x) == ["dx"]
+    assert position_ids(on_y) == ["dy"]
+    assert position_ids(unnamed) == []
+
+
+@respx.mock
+def test_switching_the_active_account_does_not_move_a_named_one(
+    client: TestClient, provider: FakeProvider
+) -> None:
+    provider.install()
+
+    with client:
+        assert client.get("/positions", headers={"X-Capital-Account": "X"}).status_code == 200
+        assert client.put("/accounts/active", json={"account_id": "Y"}).status_code == 200
+        on_x = client.get("/positions", headers={"X-Capital-Account": "X"})
+        unnamed = client.get("/positions")
+
+    assert position_ids(on_x) == ["dx"]
+    assert position_ids(unnamed) == ["dy"]
+
+
+@respx.mock
+def test_an_unknown_account_is_refused_and_nothing_is_ordered(
+    client: TestClient, provider: FakeProvider
+) -> None:
+    provider.install()
+    orders = respx.post(f"{API}/positions")
+
+    with client:
+        response = client.post(
+            "/orders",
+            json={"symbol": "US100", "direction": "BUY", "size": 1},
+            headers={"X-Capital-Account": "nope"},
+        )
+
+    assert response.status_code == 400
+    assert "nope" in response.json()["detail"]
+    assert not orders.called
+
+
+@respx.mock
+def test_a_top_up_lands_on_the_named_account(client: TestClient, provider: FakeProvider) -> None:
+    provider.install()
+
+    with client:
+        response = client.post(
+            "/accounts/top-up", json={"amount": 50}, headers={"X-Capital-Account": "X"}
+        )
+        active = [a for a in client.get("/accounts").json() if a["active"]]
+
+    assert response.status_code == 200
+    assert response.json()["id"] == "X"
+    assert provider.top_ups == [("X", 50)]
+    assert [a["id"] for a in active] == ["a1"]

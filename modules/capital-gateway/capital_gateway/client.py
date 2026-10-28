@@ -13,12 +13,17 @@ from .rategate import RateGate
 
 API_PREFIX = "/api/v1"
 _TIMEOUT_SECONDS = 20.0
-_REQUESTS_PER_SECOND = 10
+REQUESTS_PER_SECOND = 10
 
 
 class CapitalClient:
     def __init__(
-        self, settings: Settings, *, gate: RateGate | None = None, account_id: str | None = None
+        self,
+        settings: Settings,
+        *,
+        gate: RateGate | None = None,
+        login_gate: RateGate | None = None,
+        account_id: str | None = None,
     ) -> None:
         self._s = settings
         self._http = httpx.AsyncClient(base_url=settings.capital_base_url, timeout=_TIMEOUT_SECONDS)
@@ -26,7 +31,9 @@ class CapitalClient:
         self._security_token: str | None = None
         self._login_inflight: asyncio.Task[httpx.Response] | None = None
         # Shared by every session of one login: the provider counts the budget per login, not per session.
-        self._gate = gate or RateGate(_REQUESTS_PER_SECOND)
+        self._gate = gate or RateGate(REQUESTS_PER_SECOND)
+        # The provider takes one login per second per API key and answers a second with 429.
+        self._login_gate = login_gate or RateGate(1)
         # The account this session must stand on; None takes whatever a fresh login opens on.
         self._account_id = account_id
 
@@ -75,6 +82,7 @@ class CapitalClient:
         return await self._http.request(method, path, **kwargs)
 
     async def _login(self) -> httpx.Response:
+        await self._login_gate.acquire()
         resp = await self._send(
             "POST",
             f"{API_PREFIX}/session",
