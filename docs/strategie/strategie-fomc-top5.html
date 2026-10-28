@@ -1,0 +1,526 @@
+<title>Pięć strategii FOMC</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7; --card: #ffffff; --band: #14306b; --band-ink: #ffffff; --band-ink-2: #d6dcec; --band-ink-3: #a9b5d2;
+    --band-rule: var(--band-rule); --shadow: var(--shadow);
+    --line: #ddd9cd; --line-soft: #ebe8de; --ink: #16181d; --ink-2: #4f535e; --ink-3: #85899a;
+    --navy: #14306b; --navy-2: #5a7cc4; --navy-soft: #e6ebf5; --yellow: #f2c313; --yellow-soft: #fdf3d0; --att: #8a6708;
+    --green: #17734c; --green-soft: #e0f0e8; --red: #b8322a; --red-soft: #fae7e4; --ref: #f6f5f0;
+    --pre-ink: #e7ecf8; --pre-s: #8fd6b0; --pre-c: #8f9ec4;
+    --p1: #e8f3ed; --p2: #c8e4d4; --p3: #9fd0b4; --m1: #fbeeec; --m2: #f4d0cb; --m3: #eaa79f;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --paper: #10131a; --card: #171b24; --band: #0f2350; --band-ink: #ffffff; --band-ink-2: #c9d2ea; --band-ink-3: #9aa8cc;
+    --band-rule: rgba(255, 255, 255, 0.18); --shadow: rgba(0, 0, 0, 0.5);
+    --line: #2d3342; --line-soft: #242a36; --ink: #eef0f5; --ink-2: #c2c7d2; --ink-3: #8d93a3;
+    --navy: #9fb8ef; --navy-2: #5f7fc4; --navy-soft: #1d2a47; --yellow: #f2c313; --yellow-soft: #3b3215; --att: #e6c65a;
+    --green: #5cc493; --green-soft: #15301f; --red: #f07c70; --red-soft: #3c1d1b; --ref: #1c212b;
+    --pre-ink: #e7ecf8; --pre-s: #8fd6b0; --pre-c: #8f9ec4;
+    --p1: #15301f; --p2: #1d4a30; --p3: #2a6a44; --m1: #361b1a; --m2: #582623; --m3: #80342c;
+    color-scheme: dark; } }
+  :root[data-theme="dark"] { --paper: #10131a; --card: #171b24; --band: #0f2350; --band-ink: #ffffff; --band-ink-2: #c9d2ea; --band-ink-3: #9aa8cc;
+    --band-rule: rgba(255, 255, 255, 0.18); --shadow: rgba(0, 0, 0, 0.5);
+    --line: #2d3342; --line-soft: #242a36; --ink: #eef0f5; --ink-2: #c2c7d2; --ink-3: #8d93a3;
+    --navy: #9fb8ef; --navy-2: #5f7fc4; --navy-soft: #1d2a47; --yellow: #f2c313; --yellow-soft: #3b3215; --att: #e6c65a;
+    --green: #5cc493; --green-soft: #15301f; --red: #f07c70; --red-soft: #3c1d1b; --ref: #1c212b;
+    --pre-ink: #e7ecf8; --pre-s: #8fd6b0; --pre-c: #8f9ec4;
+    --p1: #15301f; --p2: #1d4a30; --p3: #2a6a44; --m1: #361b1a; --m2: #582623; --m3: #80342c;
+    color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding-left: max(30px, env(safe-area-inset-left, 0px)); padding-right: max(30px, env(safe-area-inset-right, 0px)); }
+  @media (max-width: 620px) { .inner { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); } }
+
+  header.hero { background: var(--band); color: var(--band-ink); padding-block: 52px 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: var(--band-ink); margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: var(--band-ink-2); margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: var(--band-ink); font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid var(--band-rule);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: var(--band-ink-3);
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px var(--shadow);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--band-ink); background: var(--band);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--band); color: var(--pre-ink); padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: var(--pre-s); }
+  .c { color: var(--pre-c); }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: var(--att); }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: var(--band-ink-3); margin-top: 70px; padding-block: 22px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 18px; }
+  .card { background: var(--card); border: 1px solid var(--line); padding: 16px 18px; }
+  .card h3 { font-family: var(--head); font-weight: 700; font-size: 19px; color: var(--ink); margin: 0 0 6px; letter-spacing: -0.015em; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .card p { font-size: 15px; margin: 0 0 8px; }
+  .card .rule { font-family: var(--mono); font-size: 12.5px; color: var(--navy); background: var(--navy-soft); padding: 8px 10px; margin: 8px 0; line-height: 1.55; }
+  td.p1 { background: var(--p1); } td.p2 { background: var(--p2); } td.p3 { background: var(--p3); }
+  td.m1 { background: var(--m1); } td.m2 { background: var(--m2); } td.m3 { background: var(--m3); }
+  td.nw, th.nw { white-space: nowrap; }
+  tr.ref td { color: var(--ink-3); background: var(--ref); }
+  tr.best td { background: var(--yellow-soft); }
+  table.dense { font-size: 13px; min-width: 980px; }
+  table.dense td, table.dense th { padding: 7px 8px; }
+  ul.plain { margin: 0 0 16px; padding-left: 20px; max-width: 70ch; }
+  ul.plain li { margin-bottom: 6px; }
+
+  .card, .grid2 > * { min-width: 0; }
+  :focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+
+  body { background: var(--paper); color: var(--ink-2); }
+
+  .rank { display: grid; gap: 10px; margin-top: 20px; }
+  .rank a { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 4px 16px; align-items: center; text-decoration: none;
+    background: var(--card); border: 1px solid var(--line); padding: 14px 18px; color: var(--ink-2); }
+  .rank a:hover { border-color: var(--navy); }
+  .rank .no { font-family: var(--head); font-weight: 800; font-size: 34px; line-height: 1; color: var(--navy); letter-spacing: -0.04em; }
+  .rank .nm { font-family: var(--head); font-weight: 700; font-size: 19px; color: var(--ink); letter-spacing: -0.015em; line-height: 1.2; }
+  .rank .sub { font-size: 14px; color: var(--ink-3); }
+  .rank .fig { font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rank .fig b { font-size: 17px; color: var(--navy); }
+  @media (max-width: 620px) { .rank a { grid-template-columns: 40px minmax(0, 1fr); } .rank .fig { grid-column: 2; text-align: left; } }
+  .strat-head { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+  .strat-head .no { font-family: var(--head); font-weight: 800; font-size: clamp(54px, 8vw, 84px); line-height: 0.85; color: var(--yellow); letter-spacing: -0.05em; }
+  .strat-head h2 { margin: 0; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); background: var(--card); border: 1px solid var(--line); margin: 20px 0 6px; }
+  .facts > div { padding: 12px 16px; border-right: 1px solid var(--line-soft); min-width: 0; }
+  .facts > div:last-child { border-right: none; }
+  .facts .v { font-family: var(--head); font-weight: 800; font-size: 26px; line-height: 1; color: var(--navy); letter-spacing: -0.03em; font-variant-numeric: tabular-nums; }
+  .facts .l { font-size: 12.5px; color: var(--ink-3); margin-top: 6px; line-height: 1.35; }
+  .cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 16px; }
+  .cols > div { min-width: 0; }
+  .cols h3 { font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--navy); margin: 0 0 8px; }
+  .cols p, .cols li { font-size: 15.5px; }
+  .cols ul { margin: 0; padding-left: 18px; }
+  .cols li { margin-bottom: 6px; }
+  .formula { font-family: var(--mono); font-size: 12.5px; color: var(--navy); background: var(--navy-soft); padding: 10px 12px; line-height: 1.6; overflow-x: auto; white-space: pre; margin-top: 10px; }
+  .note { border-left: 4px solid var(--yellow); background: var(--card); padding: 12px 16px; margin-top: 16px; font-size: 15px; max-width: 74ch; }
+  .note.stop { border-left-color: var(--red); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; color: var(--ink-2); margin: 0 0 6px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; vertical-align: -1px; margin-right: 6px; }
+
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Strategie · FOMC · US100</span>
+    <h1>Pięć strategii na FOMC</h1>
+    <p class="lede">Ranking strategii z badania odbioru FOMC na US100. Każda gra jedno zachowanie rynku wokół posiedzenia, które powtarza się w danych: <b>wzrost w nocy przed komunikatem</b>, <b>spadek pod koniec konferencji</b> albo <b>odkupienie spadku w kolejnych dniach</b>. Kierunku pierwszej reakcji nie gra żadna, bo ten nie mówi nic o kolejnych tygodniach.</p>
+    <div class="strip">
+      <span>TradingCenter / strategie</span>
+      <span>28 października 2026</span>
+      <span>US100 · silnik backtestów: M5 1.2024–10.2026 · historia: H1 6.2017–9.2026</span>
+      <span>depozyt <b>20%</b> kapitału ≈ dźwignia 4× · koszty brokera</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <section>
+      <div class="eyebrow">Ranking</div>
+      <h2>Kolejność: wynik, dowód, odporność</h2>
+      <p class="intro">O miejscu decydują trzy rzeczy naraz: wynik w silniku backtestów (2024–26, z kosztami), dowód na dłuższej historii (74 posiedzenia od 2017) i to, czy wynik przeżywa zmianę parametrów.</p>
+      <nav class="rank" aria-label="Pięć strategii">
+        <a href="#s1"><span class="no">1</span><span><span class="nm">#63 Koniec konferencji + fałszywe wybicie</span><br><span class="sub">short 15:15 → 15:55 ET, potem long do D+10 po wybiciu dołem</span></span><span class="fig"><b>Sharpe 1,48</b><br>52% rocznie · 28 transakcji</span></a>
+        <a href="#s2"><span class="no">2</span><span><span class="nm">Noc przed decyzją</span><br><span class="sub">long 16:00 dzień wcześniej → 3:00 ET w dniu decyzji · wymaga kalendarza</span></span><span class="fig"><b>+23 bp netto</b><br>t 4,3 · 72 posiedzenia</span></a>
+        <a href="#s3"><span class="no">3</span><span><span class="nm">#59 Koniec konferencji</span><br><span class="sub">short 15:15 → 16:00 ET w dniu decyzji</span></span><span class="fig"><b>Sharpe 1,07</b><br>obsunięcie 4% · 18 transakcji</span></a>
+        <a href="#s4"><span class="no">4</span><span><span class="nm">#61 Fałszywe wybicie dołem</span><br><span class="sub">long po zamknięciu pod minimum popołudnia decyzji, do D+10</span></span><span class="fig"><b>Sharpe 1,24</b><br>39% rocznie · 10 transakcji</span></a>
+        <a href="#s5"><span class="no">5</span><span><span class="nm">#60 Spadek do D+2</span><br><span class="sub">long od zamknięcia D+2 do D+10, gdy D+2 jest pod ceną sprzed komunikatu</span></span><span class="fig"><b>+118 bp netto</b><br>t 2,1 · 36 posiedzeń</span></a>
+      </nav>
+      <figure>
+        <div class="scroll"><svg viewBox="0 0 940 292" role="img" aria-label="Oś czasu wokół posiedzenia FOMC: kiedy każda z pięciu strategii trzyma pozycję, od wieczoru przed decyzją do dziesiątej sesji po niej">
+<rect x="398.0" y="14" width="99.0" height="232" fill="var(--yellow-soft)"/>
+<text x="447.6" y="28" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="var(--att)">komunikat i konferencja</text>
+<line x1="200.0" x2="200.0" y1="32" y2="258" stroke="var(--line-soft)" stroke-width="1"/>
+<text x="200.0" y="276" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="var(--ink-2)">D−1 16:00</text>
+<line x1="299.0" x2="299.0" y1="32" y2="258" stroke="var(--line-soft)" stroke-width="1"/>
+<text x="299.0" y="276" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="var(--ink-2)">D 3:00</text>
+<line x1="398.0" x2="398.0" y1="32" y2="258" stroke="var(--line-soft)" stroke-width="1"/>
+<text x="398.0" y="276" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="var(--ink-2)">D 14:00</text>
+<line x1="447.6" x2="447.6" y1="32" y2="258" stroke="var(--line-soft)" stroke-width="1"/>
+<text x="447.6" y="276" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="var(--ink-2)">15:15</text>
+<line x1="497.1" x2="497.1" y1="32" y2="258" stroke="var(--line-soft)" stroke-width="1"/>
+<text x="497.1" y="276" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="var(--ink-2)">16:00</text>
+<line x1="580.9" x2="580.9" y1="32" y2="258" stroke="var(--line-soft)" stroke-width="1"/>
+<text x="580.9" y="276" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="var(--ink-2)">D+1</text>
+<line x1="664.6" x2="664.6" y1="32" y2="258" stroke="var(--line-soft)" stroke-width="1"/>
+<text x="664.6" y="276" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="var(--ink-2)">D+2 16:00</text>
+<line x1="916.0" x2="916.0" y1="32" y2="258" stroke="var(--line-soft)" stroke-width="1"/>
+<text x="920.0" y="276" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="var(--ink-2)">D+10 16:00</text>
+<text x="188" y="61" text-anchor="end" font-size="13" font-weight="700" fill="var(--ink)">1 · #63 złożenie</text>
+<rect x="501.6" y="46" width="163.0" height="22" fill="none" stroke="var(--green)" stroke-width="1.2" stroke-dasharray="4 3"/>
+<rect x="447.6" y="46" width="44.9" height="22" fill="var(--red)" fill-opacity="0.85"><title>1 · #63 złożenie: short</title></rect>
+<rect x="664.6" y="46" width="251.4" height="22" fill="var(--green)" fill-opacity="0.85"><title>1 · #63 złożenie: long</title></rect>
+<text x="908.0" y="61" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="var(--card)">od wybicia dołem</text>
+<text x="188" y="103" text-anchor="end" font-size="13" font-weight="700" fill="var(--ink)">2 · noc przed decyzją</text>
+<rect x="200.0" y="88" width="99.0" height="22" fill="var(--green)" fill-opacity="0.85"><title>2 · noc przed decyzją: long</title></rect>
+<text x="188" y="145" text-anchor="end" font-size="13" font-weight="700" fill="var(--ink)">3 · #59 koniec konferencji</text>
+<rect x="447.6" y="130" width="49.5" height="22" fill="var(--red)" fill-opacity="0.85"><title>3 · #59 koniec konferencji: short</title></rect>
+<text x="188" y="187" text-anchor="end" font-size="13" font-weight="700" fill="var(--ink)">4 · #61 fałszywe wybicie</text>
+<rect x="501.6" y="172" width="163.0" height="22" fill="none" stroke="var(--green)" stroke-width="1.2" stroke-dasharray="4 3"/>
+<rect x="664.6" y="172" width="251.4" height="22" fill="var(--green)" fill-opacity="0.85"><title>4 · #61 fałszywe wybicie: long</title></rect>
+<text x="908.0" y="187" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="var(--card)">od wybicia dołem</text>
+<text x="188" y="229" text-anchor="end" font-size="13" font-weight="700" fill="var(--ink)">5 · #60 spadek do D+2</text>
+<rect x="664.6" y="214" width="251.4" height="22" fill="var(--green)" fill-opacity="0.85"><title>5 · #60 spadek do D+2: long</title></rect>
+<text x="908.0" y="229" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="var(--card)">gdy D+2 pod ceną z 14:00</text>
+</svg></div>
+        <figcaption><b>Oś czasu</b> · Kiedy każda strategia trzyma pozycję (czas nowojorski, oś nieliniowa). Czerwone: short, zielone: long; przerywana ramka to okno, w którym może paść wejście. Strategie 1, 3 i 4 dzielą elementy, więc nie gra się ich naraz; 2 i 5 nie nakładają się z niczym.</figcaption>
+      </figure>
+      <div class="note">bp to punkt bazowy, 0,01% ceny. Wyniki „w silniku” są w procentach kapitału przy depozycie 20% (pozycja ≈ 4× kapitał), wyniki „na historii” w bp ceny na transakcję, po kosztach (2 bp spreadu i 2,2 bp finansowania za noc). D to dzień decyzji, D+1 następna sesja itd. 16:00 ET to dziś 21:00 w Polsce, od 1 listopada 22:00.</div>
+    </section>
+
+    <section id="s1">
+      <div class="strat-head"><span class="no">1</span><h2>#63 Koniec konferencji + fałszywe wybicie</h2></div>
+      <p class="intro">Dwie nogi, które nie nakładają się w czasie, w jednym dokumencie: krótko w drugiej połowie konferencji, potem długo, jeśli wieczór lub kolejne dwa dni zepchną indeks pod minimum popołudnia decyzji.</p>
+      <div class="facts">
+        <div><div class="v">1,48</div><div class="l">Sharpe (r160)</div></div>
+        <div><div class="v">52%</div><div class="l">zwrot roczny 2024–26</div></div>
+        <div><div class="v">28</div><div class="l">transakcji: 18 short, 10 long</div></div>
+        <div><div class="v">33%</div><div class="l">maks. obsunięcie</div></div>
+        <div><div class="v">+8%</div><div class="l">wynik bez 5 najlepszych transakcji</div></div>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Jak działa</h3>
+          <ul>
+            <li>Dzień FOMC rozpoznaje po cenie, bo silnik nie zna kalendarza: środa, skok zakresu świec 14:00–14:10 ponad 5× spokojnej godziny przed komunikatem i ruch w czasie konferencji (14:30–15:10) ponad 16,5×.</li>
+            <li><strong>Noga 1</strong>: short o 15:15 ET (20:15 w Polsce), wyjście 15:55.</li>
+            <li><strong>Noga 2</strong>: long na pierwszym zamknięciu świecy M5 poniżej minimum 14:00–16:00 dnia decyzji, od wieczoru do końca D+2. Wyjście na zamknięciu D+10.</li>
+            <li>Bez stopów, depozyt 20% kapitału.</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Dlaczego działa</h3>
+          <p>Obie nogi grają to samo zjawisko z dwóch stron: rynek w pierwszych godzinach po komunikacie przesadza w dół, a potem to odrabia. Koniec konferencji wyprzedaje (strategia 3), a wybicie dołem zakresu w kolejnych godzinach jest częściej fałszywe niż prawdziwe (strategia 4). Short trwa 40 minut, long dwa tygodnie — kapitał nie jest zajęty naraz.</p>
+        </div>
+      </div>
+      <figure>
+        <div class="legend"><span><i style="background:var(--red)"></i>short końca konferencji</span><span><i style="background:var(--green)"></i>long po wybiciu dołem</span></div>
+        <div class="scroll"><svg viewBox="0 0 940 300" role="img" aria-label="Wynik każdej z 28 transakcji strategii #63 w procentach kapitału, krótkie shorty końca konferencji i długie longi po wybiciu dołem">
+<line x1="50" x2="924" y1="234.5" y2="234.5" stroke="var(--line-soft)" stroke-width="1"/>
+<text x="42" y="238.5" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="var(--ink-3)">−10%</text>
+<line x1="50" x2="924" y1="191.6" y2="191.6" stroke="var(--ink-3)" stroke-width="1"/>
+<text x="42" y="195.6" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="var(--ink-3)">0%</text>
+<line x1="50" x2="924" y1="148.7" y2="148.7" stroke="var(--line-soft)" stroke-width="1"/>
+<text x="42" y="152.7" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="var(--ink-3)">+10%</text>
+<line x1="50" x2="924" y1="105.8" y2="105.8" stroke="var(--line-soft)" stroke-width="1"/>
+<text x="42" y="109.8" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="var(--ink-3)">+20%</text>
+<line x1="50" x2="924" y1="62.9" y2="62.9" stroke="var(--line-soft)" stroke-width="1"/>
+<text x="42" y="66.9" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="var(--ink-3)">+30%</text>
+<line x1="50" x2="924" y1="20.0" y2="20.0" stroke="var(--line-soft)" stroke-width="1"/>
+<text x="42" y="24.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="var(--ink-3)">+40%</text>
+<rect x="54.7" y="187.9" width="21.8" height="3.7" fill="var(--red)"><title>2024-01-31 · short · +0,9% kapitału</title></rect>
+<rect x="85.9" y="191.6" width="21.8" height="3.5" fill="var(--red)"><title>2024-03-20 · short · −0,8% kapitału</title></rect>
+<rect x="117.1" y="163.6" width="21.8" height="28.1" fill="var(--red)"><title>2024-05-01 · short · +6,5% kapitału</title></rect>
+<rect x="148.3" y="68.0" width="21.8" height="123.6" fill="var(--green)"><title>2024-05-02 · long · +28,8% kapitału</title></rect>
+<text x="159.2" y="63.0" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="var(--ink-2)">+29</text>
+<rect x="179.5" y="186.6" width="21.8" height="5.0" fill="var(--red)"><title>2024-06-12 · short · +1,2% kapitału</title></rect>
+<rect x="210.8" y="182.4" width="21.8" height="9.2" fill="var(--red)"><title>2024-09-18 · short · +2,1% kapitału</title></rect>
+<rect x="242.0" y="180.0" width="21.8" height="11.6" fill="var(--red)"><title>2024-12-18 · short · +2,7% kapitału</title></rect>
+<rect x="273.2" y="177.2" width="21.8" height="14.4" fill="var(--green)"><title>2024-12-18 · long · +3,4% kapitału</title></rect>
+<rect x="304.4" y="181.1" width="21.8" height="10.5" fill="var(--red)"><title>2025-03-19 · short · +2,4% kapitału</title></rect>
+<rect x="335.6" y="191.6" width="21.8" height="3.6" fill="var(--green)"><title>2025-03-20 · long · −0,8% kapitału</title></rect>
+<rect x="366.8" y="191.6" width="21.8" height="3.5" fill="var(--red)"><title>2025-05-07 · short · −0,8% kapitału</title></rect>
+<rect x="398.0" y="188.8" width="21.8" height="2.8" fill="var(--red)"><title>2025-06-18 · short · +0,7% kapitału</title></rect>
+<rect x="429.3" y="116.7" width="21.8" height="74.9" fill="var(--green)"><title>2025-06-19 · long · +17,5% kapitału</title></rect>
+<text x="440.2" y="111.7" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="var(--ink-2)">+17</text>
+<rect x="460.5" y="191.6" width="21.8" height="1.2" fill="var(--red)"><title>2025-07-30 · short · −0,3% kapitału</title></rect>
+<rect x="491.7" y="150.5" width="21.8" height="41.2" fill="var(--green)"><title>2025-07-31 · long · +9,6% kapitału</title></rect>
+<text x="502.6" y="145.5" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="var(--ink-2)">+10</text>
+<rect x="522.9" y="191.6" width="21.8" height="3.6" fill="var(--red)"><title>2025-09-17 · short · −0,8% kapitału</title></rect>
+<rect x="554.1" y="191.6" width="21.8" height="3.7" fill="var(--red)"><title>2025-10-29 · short · −0,9% kapitału</title></rect>
+<rect x="585.3" y="191.6" width="21.8" height="30.7" fill="var(--green)"><title>2025-10-30 · long · −7,2% kapitału</title></rect>
+<rect x="616.5" y="190.3" width="21.8" height="1.3" fill="var(--red)"><title>2025-12-10 · short · +0,3% kapitału</title></rect>
+<rect x="647.8" y="191.6" width="21.8" height="1.0" fill="var(--green)"><title>2025-12-11 · long · −0,0% kapitału</title></rect>
+<rect x="679.0" y="189.5" width="21.8" height="2.1" fill="var(--red)"><title>2026-01-28 · short · +0,5% kapitału</title></rect>
+<rect x="710.2" y="191.6" width="21.8" height="53.4" fill="var(--green)"><title>2026-01-28 · long · −12,4% kapitału</title></rect>
+<text x="721.1" y="258.0" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="var(--ink-2)">−12</text>
+<rect x="741.4" y="190.2" width="21.8" height="1.5" fill="var(--red)"><title>2026-04-29 · short · +0,3% kapitału</title></rect>
+<rect x="772.6" y="46.2" width="21.8" height="145.5" fill="var(--green)"><title>2026-04-29 · long · +33,9% kapitału</title></rect>
+<text x="783.5" y="41.2" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="var(--ink-2)">+34</text>
+<rect x="803.8" y="168.7" width="21.8" height="22.9" fill="var(--red)"><title>2026-06-17 · short · +5,3% kapitału</title></rect>
+<rect x="835.0" y="162.6" width="21.8" height="29.0" fill="var(--red)"><title>2026-07-29 · short · +6,8% kapitału</title></rect>
+<rect x="866.3" y="30.2" width="21.8" height="161.4" fill="var(--green)"><title>2026-07-29 · long · +37,6% kapitału</title></rect>
+<text x="877.2" y="25.2" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="var(--ink-2)">+38</text>
+<rect x="897.5" y="191.6" width="21.8" height="6.5" fill="var(--red)"><title>2026-09-16 · short · −1,5% kapitału</title></rect>
+<line x1="50.0" x2="50.0" y1="260" y2="270" stroke="var(--ink-3)"/>
+<text x="54.0" y="282" font-size="11" font-family="Roboto Mono, monospace" fill="var(--ink-2)">2024</text>
+<line x1="299.7" x2="299.7" y1="260" y2="270" stroke="var(--ink-3)"/>
+<text x="303.7" y="282" font-size="11" font-family="Roboto Mono, monospace" fill="var(--ink-2)">2025</text>
+<line x1="674.3" x2="674.3" y1="260" y2="270" stroke="var(--ink-3)"/>
+<text x="678.3" y="282" font-size="11" font-family="Roboto Mono, monospace" fill="var(--ink-2)">2026</text>
+</svg></div>
+        <figcaption><b>Każda transakcja #63</b> · Wynik w % kapitału, chronologicznie. Shorty dają małe, częste zyski (największy +7%), longi kilka dużych (+29%, +34%, +38%) i dwie wyraźne straty (−7% w październiku 2025, −12% w styczniu 2026).</figcaption>
+      </figure>
+      <div class="note stop"><strong>Ryzyko</strong>: wynik niosą cztery–pięć dużych odbić. Długość trzymania longa jest dopasowana: wyjście D+5 daje Sharpe 1,01, D+10 1,24, D+15 0,37. Luźniejsze rozpoznanie FOMC (więcej posiedzeń, 3 fałszywe dni) obniża Sharpe do 1,32 przy obsunięciu 40%.</div>
+    </section>
+
+    <section id="s2">
+      <div class="strat-head"><span class="no">2</span><h2>Noc przed decyzją</h2></div>
+      <p class="intro">Najmocniejsze i najstabilniejsze zjawisko w całym badaniu. US100 rośnie w nocy przed komunikatem, głównie zanim otworzy się Europa.</p>
+      <div class="facts">
+        <div><div class="v">+23 bp</div><div class="l">netto na transakcję (mediana +13)</div></div>
+        <div><div class="v">4,3</div><div class="l">statystyka t, 72 posiedzenia 2017–26</div></div>
+        <div><div class="v">69%</div><div class="l">transakcji zyskownych</div></div>
+        <div><div class="v">9 z 10</div><div class="l">lat na plusie (2023: −51 bp)</div></div>
+        <div><div class="v">−77 bp</div><div class="l">najgorsza noc (31.01.2024)</div></div>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Jak działa</h3>
+          <ul>
+            <li>Long na zamknięciu sesji o 16:00 ET w dniu przed komunikatem (zwykle wtorek), wyjście o 3:00 ET w dniu decyzji. Jedna noc finansowania.</li>
+            <li>W czasie polskim: 21:00 → 8:00 (do 1 listopada), 22:00 → 9:00 po zmianie czasu w USA.</li>
+            <li>Wariant do 14:00 ET daje +29 bp netto, ale z gorszą statystyką (t 2,7) — ranek dokłada mało, a dokłada ryzyka.</li>
+          </ul>
+          <div class="formula">                 2017–19  2020–22  2023–26
+noc przed FOMC     +18      +43      +20 bp
+noc przed środą     +6       +3       +4 bp</div>
+        </div>
+        <div>
+          <h3>Dlaczego działa</h3>
+          <p>To znany w literaturze „dryf przed komunikatem FOMC” (Lucca i Moench, Journal of Finance 2015). Najczęstsze wyjaśnienie: inwestorzy płacą premię za trzymanie ryzyka do momentu, gdy niepewność się rozstrzyga, a przed komunikatem zdejmują zabezpieczenia. W cienkim rynku azjatyckim i wczesnoeuropejskim przesuwa to cenę w górę. Na US100 efekt trwa od lat i jest kilka razy większy niż w zwykłą noc.</p>
+        </div>
+      </div>
+      <div class="note"><strong>Dlaczego nie ma tej strategii w silniku</strong>: o 16:00 dnia przed posiedzeniem nic w cenie nie zdradza, że jutro jest FOMC. Silnik potrzebuje kalendarza zdarzeń w języku strategii. Liczby pochodzą z obliczeń na dokładnych datach z kalendarza Rezerwy Federalnej, poza silnikiem. Daty posiedzeń są znane z rocznym wyprzedzeniem, więc ręcznie da się ją grać już dziś.</div>
+    </section>
+
+    <section id="s3">
+      <div class="strat-head"><span class="no">3</span><h2>#59 Koniec konferencji</h2></div>
+      <p class="intro">Najczystsza ze strategii: 45 minut w rynku na posiedzenie, małe obsunięcie, dowód sięgający 2017 roku.</p>
+      <div class="facts">
+        <div><div class="v">1,07</div><div class="l">Sharpe (r152); 1,19 przy luźniejszym rozpoznaniu</div></div>
+        <div><div class="v">9%</div><div class="l">zwrot roczny 2024–26</div></div>
+        <div><div class="v">4%</div><div class="l">maks. obsunięcie</div></div>
+        <div><div class="v">61%</div><div class="l">transakcji zyskownych</div></div>
+        <div><div class="v">−1,8%</div><div class="l">najgorsza transakcja</div></div>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Jak działa</h3>
+          <ul>
+            <li>Rozpoznanie dnia FOMC jak w strategii 1, decyzja na świecy 15:10 ET.</li>
+            <li>Short od 15:15 ET (20:15 w Polsce) do zamknięcia sesji o 16:00 (zimą 15:55, żeby nie płacić finansowania o 21:00 UTC).</li>
+          </ul>
+          <div class="formula">US100 15:15 → 16:00 w dniu decyzji
+FOMC 2024–26     −36 bp, 64% spadków
+zwykła środa      +7 bp
+H1 2017–26, ostatnia godzina:
+  z konferencją  −21 bp (68 posiedzeń)
+  bez konferencji +5 bp (6 posiedzeń)</div>
+        </div>
+        <div>
+          <h3>Dlaczego działa</h3>
+          <p>Pierwsza połowa konferencji zwykle podnosi indeks (średnio +11 bp do 15:00), druga go oddaje. Najbardziej prawdopodobne powody: do 15:15 najważniejsze zdania już padły, uczestnicy zamykają przed sesyjnym zamknięciem pozycje otwarte na komunikat, a pytania dziennikarzy o ryzyka brzmią ostrożniej niż sam komunikat. Bez konferencji ostatnia godzina nie spada, więc źródłem jest konferencja, a nie pora dnia. BTCUSD w tej samej godzinie też traci średnio 25 bp.</p>
+        </div>
+      </div>
+      <div class="note stop"><strong>Ryzyko</strong>: rozkład ma grube ogony. Cztery posiedzenia (1.05.2024, 18.12.2024, 17.06.2026, 29.07.2026) dały większość wyniku, mediana to połowa średniej. Na historii 2017–26 trzy lata na dziesięć były na plusie dla tej godziny, czyli stratne dla shortu (2017, 2021, 2025).</div>
+    </section>
+
+    <section id="s4">
+      <div class="strat-head"><span class="no">4</span><h2>#61 Fałszywe wybicie dołem</h2></div>
+      <p class="intro">Gdy po decyzji indeks spada pod minimum popołudnia, częściej wraca, niż jedzie dalej. Strategia kupuje to wybicie i czeka dwa tygodnie.</p>
+      <div class="facts">
+        <div><div class="v">1,24</div><div class="l">Sharpe (r154)</div></div>
+        <div><div class="v">39%</div><div class="l">zwrot roczny 2024–26</div></div>
+        <div><div class="v">10</div><div class="l">transakcji</div></div>
+        <div><div class="v">33%</div><div class="l">maks. obsunięcie</div></div>
+        <div><div class="v">−12%</div><div class="l">najgorsza transakcja (28.01.2026)</div></div>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Jak działa</h3>
+          <ul>
+            <li>Minimum świec 14:00–15:55 ET dnia decyzji wyznacza dolną granicę reakcji.</li>
+            <li>Long na pierwszym zamknięciu świecy M5 pod tą granicą: od 16:00 dnia decyzji do końca D+2.</li>
+            <li>Wyjście na zamknięciu sesji D+10.</li>
+          </ul>
+          <div class="formula">okno wejścia   noc D0   do D+2   do D+4
+Sharpe          1,18     1,24     1,23
+wyjście         D+5      D+10     D+15
+Sharpe          1,01     1,24     0,37</div>
+        </div>
+        <div>
+          <h3>Dlaczego działa</h3>
+          <p>Po komunikacie rynek opcji zdejmuje premię za niepewność, a wieczorny handel kontraktami jest cienki. Spadek pod minimum dnia decyzji często wynika z tego braku płynności, a nie z nowej informacji. Na H1 2017–26 po takim wybiciu indeks do D+10 rósł od poziomu wybicia średnio o 124 bp, w 2024–26 o 373 bp (8 z 9). Do tego dochodzi zwykły dryf indeksu w górę. Mechanizm z płynnością i opcjami to hipoteza; dane pokazują tylko skutek.</p>
+        </div>
+      </div>
+      <div class="note stop"><strong>Ryzyko</strong>: reguła grubego ogona, nie wysokiej trafności. Na dokładnych datach 2024–26 dała 13 transakcji, 7 zyskownych, średnio +172 bp. Okno wejścia prawie nie zmienia wyniku, ale długość trzymania tak — D+10 wybrałem po obejrzeniu danych. W 2017–19 ta sama reguła traciła (−118 bp na transakcję).</div>
+    </section>
+
+    <section id="s5">
+      <div class="strat-head"><span class="no">5</span><h2>#60 Spadek do D+2</h2></div>
+      <p class="intro">Wolniejsza wersja strategii 4: czeka dwa dni i kupuje tylko wtedy, gdy indeks nadal jest pod ceną sprzed komunikatu.</p>
+      <div class="facts">
+        <div><div class="v">+118 bp</div><div class="l">netto na transakcję, 2017–26</div></div>
+        <div><div class="v">2,1</div><div class="l">statystyka t, 36 posiedzeń</div></div>
+        <div><div class="v">72%</div><div class="l">transakcji zyskownych</div></div>
+        <div><div class="v">3 z 3</div><div class="l">podokresy na plusie: +27 / +172 / +125 bp</div></div>
+        <div><div class="v">0,51</div><div class="l">Sharpe w silniku, tylko 6 transakcji</div></div>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Jak działa</h3>
+          <ul>
+            <li>Cena odniesienia: zamknięcie świecy 13:55 ET w dniu decyzji, tuż przed komunikatem.</li>
+            <li>Na zamknięciu sesji D+2 (zwykle piątek): jeśli zamknięcie jest pod tą ceną — long.</li>
+            <li>Wyjście na zamknięciu D+10.</li>
+          </ul>
+          <div class="formula">8 sesji po D+2:
+D+2 pod ceną z 14:00   +135 bp brutto, 71% wzrostów
+zwykły 3-dniowy spadek  +73 bp brutto, 63% wzrostów</div>
+        </div>
+        <div>
+          <h3>Dlaczego działa</h3>
+          <p>Reakcja na FOMC nie przewiduje kolejnych tygodni, a im dłużej po posiedzeniu, tym częściej rynek oddaje to, co zrobił w pierwszych dniach. Spadek, który przetrwał dwa dni, jest więc częściej przesadą niż początkiem trendu, a indeks ma do tego dryf w górę. Na BTCUSD jest odwrotnie (po takim spadku −102 bp), więc to cecha indeksu akcji, a nie ogólna reguła.</p>
+        </div>
+      </div>
+      <div class="note stop"><strong>Ryzyko</strong>: przewaga nad zwykłym kupowaniem spadków to mniej więcej jeden błąd standardowy, więc może w dużej części być zwykłym dryfem rynku byka. W silniku tylko 6 transakcji, bo rozpoznanie po cenie pominęło dwa największe spadki (31.07.2024, 18.03.2026) — z kalendarzem byłoby ich 8.</div>
+    </section>
+
+    <section>
+      <div class="eyebrow">Poza piątką</div>
+      <h2>Co odpadło i dlaczego</h2>
+      <ul class="plain">
+        <li><strong>Pierwsza świeca M5 po komunikacie</strong> — 45% trafień i +1 bp przy graniu jej kierunku do 16:00. Szum o dużej amplitudzie.</li>
+        <li><strong>Noc po decyzji (#62)</strong> — Sharpe 0,92 w 2024–26, ale na historii 2017–26 −2 bp netto (2020–22 −68 bp). W #63 jej noga i tak nie otwiera się, bo wypada na tej samej świecy co wyjście z shortu.</li>
+        <li><strong>Granie kierunku popołudnia, konferencji lub D+1 na tygodnie</strong> — korelacja z dalszym ruchem bliska zeru lub ujemna.</li>
+        <li><strong>Tygodnie parzyste cyklu FOMC</strong> — na US100 2017–26 brak efektu (+7,2 wobec +6,5 bp dziennie).</li>
+      </ul>
+    </section>
+
+    <section>
+      <div class="eyebrow">Dziś</div>
+      <h2>28 października: posiedzenie trwa</h2>
+      <ul class="plain">
+        <li><strong>Strategia 2</strong> już się rozegrała: od wczorajszego zamknięcia do 8:00 w Polsce US100 +47 bp, dwa razy więcej niż średnio.</li>
+        <li><strong>Komunikat 19:00, konferencja 19:30</strong> (w USA czas zmienia się dopiero 1 listopada).</li>
+        <li><strong>Strategie 1 i 3</strong>: okno shortu 20:15–21:00 (w #63 do 20:55).</li>
+        <li><strong>Strategie 1 i 4</strong>: od 21:00 do piątkowego zamknięcia patrzymy na minimum świec 19:00–21:00; wyjście z ewentualnego longa na zamknięciu 11 listopada (22:00 w Polsce).</li>
+        <li><strong>Strategia 5</strong>: decyzja w piątek 30.10 o 21:00 względem ceny tuż przed komunikatem.</li>
+      </ul>
+      <p>To opis tego, co działało w historii, a nie rekomendacja. Moduł strategii tylko bada; o handlu decyduje operator.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Dane: archiwum US100 produkcji do 27.10.2026, kalendarz federalreserve.gov · strategie #59–#63, przebiegi r148–r165</span>
+    <span>Wyniki historyczne · tylko badania, nie rekomendacja</span>
+  </div>
+</footer>

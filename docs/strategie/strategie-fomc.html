@@ -1,0 +1,878 @@
+<title>FOMC: odpowiedź rynku</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; margin-top: 18px; }
+  .card { background: var(--card); border: 1px solid var(--line); padding: 16px 18px; }
+  .card h3 { font-family: var(--head); font-weight: 700; font-size: 19px; color: var(--ink); margin: 0 0 6px; letter-spacing: -0.015em; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .card p { font-size: 15px; margin: 0 0 8px; }
+  .card .rule { font-family: var(--mono); font-size: 12.5px; color: var(--navy); background: var(--navy-soft); padding: 8px 10px; margin: 8px 0; line-height: 1.55; }
+  td.p1 { background: #e8f3ed; } td.p2 { background: #c8e4d4; } td.p3 { background: #9fd0b4; }
+  td.m1 { background: #fbeeec; } td.m2 { background: #f4d0cb; } td.m3 { background: #eaa79f; }
+  td.nw, th.nw { white-space: nowrap; }
+  tr.ref td { color: var(--ink-3); background: #f6f5f0; }
+  tr.best td { background: var(--yellow-soft); }
+  table.dense { font-size: 13px; min-width: 980px; }
+  table.dense td, table.dense th { padding: 7px 8px; }
+  ul.plain { margin: 0 0 16px; padding-left: 20px; max-width: 70ch; }
+  ul.plain li { margin-bottom: 6px; }
+</style>
+
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Badanie · FOMC i US100</span>
+    <h1>FOMC: co rynek mówi, a co robi potem</h1>
+    <p class="lede">Dwadzieścia dwa posiedzenia od stycznia 2024 na świecach M5 i siedemdziesiąt cztery od 2017 na H1. Sama decyzja jest zdyskontowana, więc patrzyłem tylko na <b>odbiór przez rynek</b>: pierwsze pięć minut, konferencję, kolejne sesje, tydzień, czas do następnego posiedzenia — i na to, gdzie rynek stał wcześniej. Wynik: <b>pierwsza reakcja nie mówi nic o kolejnych tygodniach</b>, „prawdziwa odpowiedź” nie wyłania się też w następnych dniach jako trend, a najmocniejsze i najstabilniejsze zjawisko to <b>noc przed decyzją</b>.</p>
+    <div class="strip">
+      <span>TradingCenter / strategie</span>
+      <span>28 października 2026 · dzień posiedzenia</span>
+      <span>US100 M5 od I 2024 · H1 od VI 2017 · BTCUSD H1</span>
+      <span>silnik <b>/strategies</b> produkcji, koszty brokera, depozyt 20%</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">+27</div><div class="l">bp w nocy przed decyzją (16:00 → 3:00 ET), t 5,0 na 72 posiedzeniach; noce przed innymi środami +4</div></div>
+      <div class="cell"><div class="v">−21</div><div class="l">bp w ostatniej godzinie dnia z konferencją, t −2,1 (68 posiedzeń); 2024–26 od 15:15 −36</div></div>
+      <div class="cell"><div class="v">45%</div><div class="l">trafień, gdy grać kierunek pierwszej świecy M5 do 16:00 (średnio +1 bp)</div></div>
+      <div class="cell"><div class="v">≈0</div><div class="l">korelacja reakcji dnia decyzji z kolejnymi 10 sesjami (ρ −0,04, 74 posiedzenia)</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Pytanie i dane</div>
+      <h2>Odbiór decyzji, nie decyzja</h2>
+      <p class="intro">Pytanie operatora: jak wygląda pierwsza świeca M5 po komunikacie, co wnosi konferencja, czy pierwsza odpowiedź jest „fałszywa”, a prawdziwa przychodzi w kolejnych dniach i tygodniach, które sygnały najlepiej mówią o średnioterminowym kierunku, jakie ma znaczenie miejsce rynku przed posiedzeniem i co dzieje się między posiedzeniami.</p>
+      <p><strong>Daty</strong>: wszystkie planowe komunikaty FOMC z kalendarza Rezerwy Federalnej (federalreserve.gov, strony historyczne 2017–2020 i kalendarz 2021–2026) — 22 od 31.01.2024 do 16.09.2026 (posiedzenie 28.10.2026 trwa) i 74 od czerwca 2017. Komunikat o 14:00 czasu nowojorskiego, konferencja od 14:30 (do 2018 tylko co drugie posiedzenie, od 2019 każde). Posiedzenia nadzwyczajne z marca 2020 pominięte.</p>
+      <p><strong>Ceny</strong>: US100 (CFD capital.com) z archiwum produkcji — M5 od stycznia 2024 (pierwsza świeca, konferencja minuta po minucie), H1 od czerwca 2017 (dłuższa historia dla wszystkiego, co nie wymaga pięciu minut). Punkt odniesienia <code>P0</code> to zamknięcie świecy 13:55 ET, czyli cena tuż przed komunikatem. Wszystko w punktach bazowych (bp, 100 bp = 1%) logarytmicznej zmiany. Zamknięcie dnia to 16:00 ET.</p>
+      <p><strong>Metoda</strong>: najpierw badanie zdarzeń na dokładnych datach (poza silnikiem), potem strategie w silniku produkcji. <span class="hl">Silnik nie zna kalendarza</span>, więc dzień FOMC musi rozpoznać po cenie — o tym w części 09. Decyzji nie modeluję: jest w tabeli jako etykieta, nic więcej.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · 22 posiedzenia</div>
+      <h2>Każde posiedzenie od 2024, odcinek po odcinku</h2>
+      <p>Kolory mówią o wielkości ruchu, nie o istotności. Kolumny od lewej: co rynek zrobił od poprzedniego posiedzenia, w nocy i rano przed komunikatem, w pierwszej świecy, do konferencji, w czasie konferencji, w ostatnim półgodzinie, całe popołudnie, a potem od zamknięcia dnia decyzji.</p>
+      <div class="table-wrap">
+        <table class="dense">
+          <thead><tr><th>data</th><th>decyzja</th><th class="n">od poprz. FOMC</th><th class="n">noc i ranek przed</th><th class="n">1. M5</th><th class="n">do 14:30</th><th class="n">konferencja 14:30–15:30</th><th class="n">15:30–16:00</th><th class="n">14:00–16:00</th><th class="n">D+1</th><th class="n">D+5</th><th class="n">D+10</th><th class="n">do kolejnego FOMC</th></tr></thead>
+          <tbody>
+<tr><td class="nw"><b>31.01.2024</b></td><td class="nw">bez zmian</td><td class="n p2">+540</td><td class="n m2">−115</td><td class="n m1">−23</td><td class="n m1">−30</td><td class="n">−19</td><td class="n m1">−32</td><td class="n m2">−81</td><td class="n p2">+119</td><td class="n p3">+353</td><td class="n p3">+377</td><td class="n p2">+506</td></tr>
+<tr><td class="nw"><b>20.03.2024</b></td><td class="nw">bez zmian · SEP</td><td class="n p2">+505</td><td class="n">+2</td><td class="n p1">+49</td><td class="n p1">+54</td><td class="n p2">+63</td><td class="n">−1</td><td class="n p2">+116</td><td class="n p1">+42</td><td class="n">+24</td><td class="n m2">−196</td><td class="n m2">−498</td></tr>
+<tr><td class="nw"><b>01.05.2024</b></td><td class="nw">bez zmian</td><td class="n m2">−445</td><td class="n m1">−53</td><td class="n p1">+29</td><td class="n p1">+53</td><td class="n p2">+90</td><td class="n m3">−163</td><td class="n">−20</td><td class="n p2">+128</td><td class="n p3">+432</td><td class="n p3">+712</td><td class="n p3">+1181</td></tr>
+<tr><td class="nw"><b>12.06.2024</b></td><td class="nw">bez zmian · SEP</td><td class="n p3">+1037</td><td class="n p2">+144</td><td class="n">−19</td><td class="n">+5</td><td class="n m1">−32</td><td class="n">+13</td><td class="n">−14</td><td class="n p1">+53</td><td class="n p2">+255</td><td class="n p1">+145</td><td class="n">−90</td></tr>
+<tr><td class="nw"><b>31.07.2024</b></td><td class="nw">bez zmian</td><td class="n m2">−348</td><td class="n p3">+258</td><td class="n">+0</td><td class="n p1">+22</td><td class="n">−18</td><td class="n p1">+31</td><td class="n p1">+35</td><td class="n m3">−240</td><td class="n m3">−799</td><td class="n m2">−178</td><td class="n">+51</td></tr>
+<tr><td class="nw"><b>18.09.2024</b></td><td class="nw">−50 bp · SEP</td><td class="n">+42</td><td class="n">+8</td><td class="n p1">+54</td><td class="n p1">+58</td><td class="n m1">−34</td><td class="n m2">−78</td><td class="n m1">−54</td><td class="n p3">+249</td><td class="n p3">+318</td><td class="n p2">+234</td><td class="n p3">+852</td></tr>
+<tr><td class="nw"><b>07.11.2024</b></td><td class="nw">−25 bp</td><td class="n p3">+714</td><td class="n p2">+138</td><td class="n">−2</td><td class="n">+2</td><td class="n p1">+22</td><td class="n">−5</td><td class="n">+19</td><td class="n">+7</td><td class="n m1">−97</td><td class="n m2">−179</td><td class="n p2">+403</td></tr>
+<tr><td class="nw"><b>18.12.2024</b></td><td class="nw">−25 bp · SEP</td><td class="n p2">+413</td><td class="n">−10</td><td class="n m1">−29</td><td class="n m2">−98</td><td class="n m3">−164</td><td class="n m2">−105</td><td class="n m3">−368</td><td class="n m1">−47</td><td class="n p1">+133</td><td class="n p2">+175</td><td class="n">+74</td></tr>
+<tr><td class="nw"><b>29.01.2025</b></td><td class="nw">bez zmian</td><td class="n p1">+123</td><td class="n m1">−49</td><td class="n">−15</td><td class="n m1">−31</td><td class="n p2">+87</td><td class="n m1">−26</td><td class="n p1">+30</td><td class="n p1">+44</td><td class="n p1">+115</td><td class="n p1">+141</td><td class="n m3">−887</td></tr>
+<tr><td class="nw"><b>19.03.2025</b></td><td class="nw">bez zmian · SEP</td><td class="n m3">−945</td><td class="n p1">+58</td><td class="n p1">+27</td><td class="n p1">+33</td><td class="n p1">+44</td><td class="n">−2</td><td class="n p2">+75</td><td class="n">−31</td><td class="n p1">+92</td><td class="n m1">−84</td><td class="n">+2</td></tr>
+<tr><td class="nw"><b>07.05.2025</b></td><td class="nw">bez zmian</td><td class="n">+27</td><td class="n m1">−24</td><td class="n">+2</td><td class="n m1">−24</td><td class="n">+0</td><td class="n p2">+87</td><td class="n p2">+63</td><td class="n p2">+101</td><td class="n p3">+704</td><td class="n p3">+591</td><td class="n p3">+926</td></tr>
+<tr><td class="nw"><b>18.06.2025</b></td><td class="nw">bez zmian · SEP</td><td class="n p3">+893</td><td class="n p1">+33</td><td class="n m1">−21</td><td class="n">−6</td><td class="n m1">−41</td><td class="n">+13</td><td class="n m1">−34</td><td class="n m1">−85</td><td class="n p2">+238</td><td class="n p3">+414</td><td class="n p3">+748</td></tr>
+<tr><td class="nw"><b>30.07.2025</b></td><td class="nw">bez zmian</td><td class="n p3">+709</td><td class="n p1">+39</td><td class="n">−5</td><td class="n">+5</td><td class="n m2">−67</td><td class="n p1">+37</td><td class="n m1">−25</td><td class="n m1">−56</td><td class="n">−15</td><td class="n p2">+211</td><td class="n p2">+363</td></tr>
+<tr><td class="nw"><b>17.09.2025</b></td><td class="nw">−25 bp · SEP</td><td class="n p2">+389</td><td class="n m1">−26</td><td class="n p1">+22</td><td class="n">−7</td><td class="n p1">+37</td><td class="n m1">−22</td><td class="n">+7</td><td class="n p1">+89</td><td class="n p1">+111</td><td class="n p2">+232</td><td class="n p3">+748</td></tr>
+<tr><td class="nw"><b>29.10.2025</b></td><td class="nw">−25 bp</td><td class="n p3">+713</td><td class="n p1">+35</td><td class="n">−5</td><td class="n">−2</td><td class="n m1">−20</td><td class="n p1">+34</td><td class="n">+11</td><td class="n m2">−158</td><td class="n m2">−201</td><td class="n m2">−239</td><td class="n m1">−213</td></tr>
+<tr><td class="nw"><b>10.12.2025</b></td><td class="nw">−25 bp · SEP</td><td class="n m1">−181</td><td class="n m1">−32</td><td class="n">+15</td><td class="n">+20</td><td class="n p2">+65</td><td class="n">−13</td><td class="n p2">+73</td><td class="n">−33</td><td class="n m3">−444</td><td class="n">−49</td><td class="n p1">+104</td></tr>
+<tr><td class="nw"><b>28.01.2026</b></td><td class="nw">bez zmian</td><td class="n">+66</td><td class="n p1">+37</td><td class="n">−7</td><td class="n">−19</td><td class="n">+20</td><td class="n">−10</td><td class="n">−8</td><td class="n m1">−57</td><td class="n m3">−441</td><td class="n m3">−322</td><td class="n m2">−540</td></tr>
+<tr><td class="nw"><b>18.03.2026</b></td><td class="nw">bez zmian · SEP</td><td class="n m2">−489</td><td class="n m1">−50</td><td class="n">+10</td><td class="n">−10</td><td class="n m1">−54</td><td class="n m1">−28</td><td class="n m2">−92</td><td class="n">−29</td><td class="n m1">−110</td><td class="n m2">−169</td><td class="n p3">+1043</td></tr>
+<tr><td class="nw"><b>29.04.2026</b></td><td class="nw">bez zmian</td><td class="n p3">+1014</td><td class="n p1">+29</td><td class="n">−17</td><td class="n">−14</td><td class="n p1">+36</td><td class="n">+9</td><td class="n p1">+31</td><td class="n p1">+89</td><td class="n p3">+500</td><td class="n p3">+767</td><td class="n p3">+1027</td></tr>
+<tr><td class="nw"><b>17.06.2026</b></td><td class="nw">bez zmian · SEP</td><td class="n p3">+972</td><td class="n p1">+55</td><td class="n m2">−95</td><td class="n m2">−73</td><td class="n m1">−36</td><td class="n m1">−47</td><td class="n m3">−156</td><td class="n p3">+234</td><td class="n m2">−156</td><td class="n">+47</td><td class="n m3">−734</td></tr>
+<tr><td class="nw"><b>29.07.2026</b></td><td class="nw">bez zmian</td><td class="n m3">−662</td><td class="n m2">−72</td><td class="n p1">+30</td><td class="n p1">+22</td><td class="n m1">−24</td><td class="n m2">−136</td><td class="n m2">−139</td><td class="n p3">+328</td><td class="n p3">+810</td><td class="n p3">+898</td><td class="n p3">+701</td></tr>
+<tr><td class="nw"><b>16.09.2026</b></td><td class="nw">+25 bp · SEP</td><td class="n p3">+623</td><td class="n p2">+78</td><td class="n">+12</td><td class="n">−6</td><td class="n m2">−110</td><td class="n p1">+40</td><td class="n m2">−76</td><td class="n p2">+172</td><td class="n p3">+514</td><td class="n p3">+496</td><td class="n">—</td></tr>
+<tr class="ref"><td><b>średnio</b></td><td></td><td class="n">+260</td><td class="n">+22</td><td class="n">+1</td><td class="n">−2</td><td class="n">−7</td><td class="n">−18</td><td class="n">−28</td><td class="n">+42</td><td class="n">+106</td><td class="n">+183</td><td class="n">+275</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px">„Do 14:30” to ruch od ceny sprzed komunikatu do 14:30 (zawiera pierwszą świecę). D+1, D+5, D+10 i „do kolejnego FOMC” liczone od zamknięcia dnia decyzji. Zwykły dryf indeksu w tym okresie: +7,8 bp na sesję, czyli około +80 bp na 10 sesji.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Pierwsze pięć minut</div>
+      <h2>Pierwsza świeca to szum o dużej amplitudzie</h2>
+      <p class="intro">Świeca 14:00–14:05 ma medianę zakresu 36 bp — 3,7 raza więcej niż zwykła świeca o tej porze — i nie niesie kierunku.</p>
+      <ul class="plain">
+        <li>Granie kierunku pierwszej świecy do 16:00: <strong>+1 bp średnio, 45% trafień</strong> (22 posiedzenia). Maksymalny ruch na korzyść i na niekorzyść po pierwszej świecy mają tę samą medianę: 54 bp.</li>
+        <li>W 59% przypadków cena wraca przez poziom sprzed komunikatu w ciągu 30 minut; w 55% tego samego popołudnia pada i maksimum, i minimum pierwszej świecy.</li>
+        <li>Korelacja rang pierwszej świecy z resztą popołudnia: ρ +0,10; z D+10: +0,05; z ruchem do kolejnego posiedzenia: +0,31 (p 0,17 — przy 22 obserwacjach to nic).</li>
+      </ul>
+      <figure>
+        <div class="scroll"><svg viewBox="0 0 920 340" role="img" aria-label="Średnia i mediana zmiany US100 od ceny z 13:55 ET w dzień decyzji FOMC, od 13:35 do 16:00, na tle zwykłych śród">
+<rect x="309.2" y="26" width="280.6" height="268" fill="#fdf3d0"/>
+<text x="449.4" y="40" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#8a6708">konferencja</text>
+<line x1="52" x2="730" y1="276.1" y2="276.1" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="280.1" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">−40</text>
+<line x1="52" x2="730" y1="240.4" y2="240.4" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="244.4" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">−30</text>
+<line x1="52" x2="730" y1="204.7" y2="204.7" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="208.7" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">−20</text>
+<line x1="52" x2="730" y1="168.9" y2="168.9" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="172.9" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">−10</text>
+<line x1="52" x2="730" y1="133.2" y2="133.2" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="137.2" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">0</text>
+<line x1="52" x2="730" y1="97.5" y2="97.5" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="101.5" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">10</text>
+<line x1="52" x2="730" y1="61.7" y2="61.7" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="65.7" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">20</text>
+<line x1="52" x2="730" y1="26.0" y2="26.0" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="30.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">30</text>
+<line x1="52" x2="730" y1="133.2" y2="133.2" stroke="#85899a" stroke-width="1"/>
+<line x1="168.9" x2="168.9" y1="26" y2="294" stroke="#14306b" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text x="173.9" y="40" font-size="10.5" font-family="Roboto Mono, monospace" fill="#14306b">14:00 decyzja</text>
+<text x="168.9" y="312" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">14:00</text>
+<text x="309.2" y="312" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">14:30</text>
+<text x="449.4" y="312" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">15:00</text>
+<text x="589.7" y="312" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">15:30</text>
+<text x="730.0" y="312" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">16:00</text>
+<text x="44" y="18" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">bp</text>
+<polyline points="52.0,131.1 75.4,134.6 98.8,139.3 122.1,133.9 145.5,132.8 168.9,133.2 192.3,135.0 215.7,132.5 239.0,132.8 262.4,135.0 285.8,126.8 309.2,125.0 332.6,126.8 355.9,127.1 379.3,128.2 402.7,128.9 426.1,130.7 449.4,138.2 472.8,135.7 496.2,134.6 519.6,136.8 543.0,131.8 566.3,131.4 589.7,130.3 613.1,120.3 636.5,119.3 659.9,116.0 683.2,110.3 706.6,108.9 730.0,113.2" fill="none" stroke="#85899a" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="730.0" cy="113.2" r="4" fill="#85899a" stroke="#fff" stroke-width="2"/>
+<text x="740.0" y="117.2" font-size="12" fill="#16181d"><tspan font-weight="700">+6</tspan> <tspan fill="#4f535e">zwykła środa</tspan></text>
+<circle cx="52.0" cy="131.1" r="6" fill="transparent"><title>zwykła środa, 13:35 ET: +0,6 bp</title></circle>
+<circle cx="75.4" cy="134.6" r="6" fill="transparent"><title>zwykła środa, 13:40 ET: −0,4 bp</title></circle>
+<circle cx="98.8" cy="139.3" r="6" fill="transparent"><title>zwykła środa, 13:45 ET: −1,7 bp</title></circle>
+<circle cx="122.1" cy="133.9" r="6" fill="transparent"><title>zwykła środa, 13:50 ET: −0,2 bp</title></circle>
+<circle cx="145.5" cy="132.8" r="6" fill="transparent"><title>zwykła środa, 13:55 ET: +0,1 bp</title></circle>
+<circle cx="168.9" cy="133.2" r="6" fill="transparent"><title>zwykła środa, 14:00 ET: +0,0 bp</title></circle>
+<circle cx="192.3" cy="135.0" r="6" fill="transparent"><title>zwykła środa, 14:05 ET: −0,5 bp</title></circle>
+<circle cx="215.7" cy="132.5" r="6" fill="transparent"><title>zwykła środa, 14:10 ET: +0,2 bp</title></circle>
+<circle cx="239.0" cy="132.8" r="6" fill="transparent"><title>zwykła środa, 14:15 ET: +0,1 bp</title></circle>
+<circle cx="262.4" cy="135.0" r="6" fill="transparent"><title>zwykła środa, 14:20 ET: −0,5 bp</title></circle>
+<circle cx="285.8" cy="126.8" r="6" fill="transparent"><title>zwykła środa, 14:25 ET: +1,8 bp</title></circle>
+<circle cx="309.2" cy="125.0" r="6" fill="transparent"><title>zwykła środa, 14:30 ET: +2,3 bp</title></circle>
+<circle cx="332.6" cy="126.8" r="6" fill="transparent"><title>zwykła środa, 14:35 ET: +1,8 bp</title></circle>
+<circle cx="355.9" cy="127.1" r="6" fill="transparent"><title>zwykła środa, 14:40 ET: +1,7 bp</title></circle>
+<circle cx="379.3" cy="128.2" r="6" fill="transparent"><title>zwykła środa, 14:45 ET: +1,4 bp</title></circle>
+<circle cx="402.7" cy="128.9" r="6" fill="transparent"><title>zwykła środa, 14:50 ET: +1,2 bp</title></circle>
+<circle cx="426.1" cy="130.7" r="6" fill="transparent"><title>zwykła środa, 14:55 ET: +0,7 bp</title></circle>
+<circle cx="449.4" cy="138.2" r="6" fill="transparent"><title>zwykła środa, 15:00 ET: −1,4 bp</title></circle>
+<circle cx="472.8" cy="135.7" r="6" fill="transparent"><title>zwykła środa, 15:05 ET: −0,7 bp</title></circle>
+<circle cx="496.2" cy="134.6" r="6" fill="transparent"><title>zwykła środa, 15:10 ET: −0,4 bp</title></circle>
+<circle cx="519.6" cy="136.8" r="6" fill="transparent"><title>zwykła środa, 15:15 ET: −1,0 bp</title></circle>
+<circle cx="543.0" cy="131.8" r="6" fill="transparent"><title>zwykła środa, 15:20 ET: +0,4 bp</title></circle>
+<circle cx="566.3" cy="131.4" r="6" fill="transparent"><title>zwykła środa, 15:25 ET: +0,5 bp</title></circle>
+<circle cx="589.7" cy="130.3" r="6" fill="transparent"><title>zwykła środa, 15:30 ET: +0,8 bp</title></circle>
+<circle cx="613.1" cy="120.3" r="6" fill="transparent"><title>zwykła środa, 15:35 ET: +3,6 bp</title></circle>
+<circle cx="636.5" cy="119.3" r="6" fill="transparent"><title>zwykła środa, 15:40 ET: +3,9 bp</title></circle>
+<circle cx="659.9" cy="116.0" r="6" fill="transparent"><title>zwykła środa, 15:45 ET: +4,8 bp</title></circle>
+<circle cx="683.2" cy="110.3" r="6" fill="transparent"><title>zwykła środa, 15:50 ET: +6,4 bp</title></circle>
+<circle cx="706.6" cy="108.9" r="6" fill="transparent"><title>zwykła środa, 15:55 ET: +6,8 bp</title></circle>
+<circle cx="730.0" cy="113.2" r="6" fill="transparent"><title>zwykła środa, 16:00 ET: +5,6 bp</title></circle>
+<polyline points="52.0,155.0 75.4,156.8 98.8,162.5 122.1,150.0 145.5,135.7 168.9,133.2 192.3,136.8 215.7,142.8 239.0,147.9 262.4,143.9 285.8,155.4 309.2,147.9 332.6,127.1 355.9,95.3 379.3,105.0 402.7,128.2 426.1,115.0 449.4,110.0 472.8,114.3 496.2,93.2 519.6,82.1 543.0,87.8 566.3,126.1 589.7,136.4 613.1,192.9 636.5,144.6 659.9,159.6 683.2,163.9 706.6,133.6 730.0,173.9" fill="none" stroke="#14306b" stroke-width="1.8" stroke-dasharray="5 4" stroke-linejoin="round"/>
+<circle cx="730.0" cy="173.9" r="4" fill="#14306b" stroke="#fff" stroke-width="2"/>
+<text x="740.0" y="177.9" font-size="12" fill="#16181d"><tspan font-weight="700">−11</tspan> <tspan fill="#4f535e">FOMC mediana</tspan></text>
+<circle cx="52.0" cy="155.0" r="6" fill="transparent"><title>FOMC mediana, 13:35 ET: −6,1 bp</title></circle>
+<circle cx="75.4" cy="156.8" r="6" fill="transparent"><title>FOMC mediana, 13:40 ET: −6,6 bp</title></circle>
+<circle cx="98.8" cy="162.5" r="6" fill="transparent"><title>FOMC mediana, 13:45 ET: −8,2 bp</title></circle>
+<circle cx="122.1" cy="150.0" r="6" fill="transparent"><title>FOMC mediana, 13:50 ET: −4,7 bp</title></circle>
+<circle cx="145.5" cy="135.7" r="6" fill="transparent"><title>FOMC mediana, 13:55 ET: −0,7 bp</title></circle>
+<circle cx="168.9" cy="133.2" r="6" fill="transparent"><title>FOMC mediana, 14:00 ET: +0,0 bp</title></circle>
+<circle cx="192.3" cy="136.8" r="6" fill="transparent"><title>FOMC mediana, 14:05 ET: −1,0 bp</title></circle>
+<circle cx="215.7" cy="142.8" r="6" fill="transparent"><title>FOMC mediana, 14:10 ET: −2,7 bp</title></circle>
+<circle cx="239.0" cy="147.9" r="6" fill="transparent"><title>FOMC mediana, 14:15 ET: −4,1 bp</title></circle>
+<circle cx="262.4" cy="143.9" r="6" fill="transparent"><title>FOMC mediana, 14:20 ET: −3,0 bp</title></circle>
+<circle cx="285.8" cy="155.4" r="6" fill="transparent"><title>FOMC mediana, 14:25 ET: −6,2 bp</title></circle>
+<circle cx="309.2" cy="147.9" r="6" fill="transparent"><title>FOMC mediana, 14:30 ET: −4,1 bp</title></circle>
+<circle cx="332.6" cy="127.1" r="6" fill="transparent"><title>FOMC mediana, 14:35 ET: +1,7 bp</title></circle>
+<circle cx="355.9" cy="95.3" r="6" fill="transparent"><title>FOMC mediana, 14:40 ET: +10,6 bp</title></circle>
+<circle cx="379.3" cy="105.0" r="6" fill="transparent"><title>FOMC mediana, 14:45 ET: +7,9 bp</title></circle>
+<circle cx="402.7" cy="128.2" r="6" fill="transparent"><title>FOMC mediana, 14:50 ET: +1,4 bp</title></circle>
+<circle cx="426.1" cy="115.0" r="6" fill="transparent"><title>FOMC mediana, 14:55 ET: +5,1 bp</title></circle>
+<circle cx="449.4" cy="110.0" r="6" fill="transparent"><title>FOMC mediana, 15:00 ET: +6,5 bp</title></circle>
+<circle cx="472.8" cy="114.3" r="6" fill="transparent"><title>FOMC mediana, 15:05 ET: +5,3 bp</title></circle>
+<circle cx="496.2" cy="93.2" r="6" fill="transparent"><title>FOMC mediana, 15:10 ET: +11,2 bp</title></circle>
+<circle cx="519.6" cy="82.1" r="6" fill="transparent"><title>FOMC mediana, 15:15 ET: +14,3 bp</title></circle>
+<circle cx="543.0" cy="87.8" r="6" fill="transparent"><title>FOMC mediana, 15:20 ET: +12,7 bp</title></circle>
+<circle cx="566.3" cy="126.1" r="6" fill="transparent"><title>FOMC mediana, 15:25 ET: +2,0 bp</title></circle>
+<circle cx="589.7" cy="136.4" r="6" fill="transparent"><title>FOMC mediana, 15:30 ET: −0,9 bp</title></circle>
+<circle cx="613.1" cy="192.9" r="6" fill="transparent"><title>FOMC mediana, 15:35 ET: −16,7 bp</title></circle>
+<circle cx="636.5" cy="144.6" r="6" fill="transparent"><title>FOMC mediana, 15:40 ET: −3,2 bp</title></circle>
+<circle cx="659.9" cy="159.6" r="6" fill="transparent"><title>FOMC mediana, 15:45 ET: −7,4 bp</title></circle>
+<circle cx="683.2" cy="163.9" r="6" fill="transparent"><title>FOMC mediana, 15:50 ET: −8,6 bp</title></circle>
+<circle cx="706.6" cy="133.6" r="6" fill="transparent"><title>FOMC mediana, 15:55 ET: −0,1 bp</title></circle>
+<circle cx="730.0" cy="173.9" r="6" fill="transparent"><title>FOMC mediana, 16:00 ET: −11,4 bp</title></circle>
+<polyline points="52.0,154.3 75.4,153.9 98.8,156.8 122.1,144.3 145.5,136.4 168.9,133.2 192.3,131.4 215.7,147.5 239.0,162.1 262.4,151.1 285.8,148.9 309.2,140.7 332.6,128.6 355.9,118.9 379.3,87.8 402.7,83.2 426.1,90.0 449.4,100.3 472.8,120.3 496.2,108.9 519.6,102.5 543.0,123.6 566.3,142.8 589.7,166.1 613.1,184.3 636.5,211.1 659.9,210.7 683.2,200.7 706.6,214.7 730.0,231.8" fill="none" stroke="#14306b" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="730.0" cy="231.8" r="4" fill="#14306b" stroke="#fff" stroke-width="2"/>
+<text x="740.0" y="235.8" font-size="12" fill="#16181d"><tspan font-weight="700">−28</tspan> <tspan fill="#4f535e">FOMC średnia</tspan></text>
+<circle cx="52.0" cy="154.3" r="6" fill="transparent"><title>FOMC średnia, 13:35 ET: −5,9 bp</title></circle>
+<circle cx="75.4" cy="153.9" r="6" fill="transparent"><title>FOMC średnia, 13:40 ET: −5,8 bp</title></circle>
+<circle cx="98.8" cy="156.8" r="6" fill="transparent"><title>FOMC średnia, 13:45 ET: −6,6 bp</title></circle>
+<circle cx="122.1" cy="144.3" r="6" fill="transparent"><title>FOMC średnia, 13:50 ET: −3,1 bp</title></circle>
+<circle cx="145.5" cy="136.4" r="6" fill="transparent"><title>FOMC średnia, 13:55 ET: −0,9 bp</title></circle>
+<circle cx="168.9" cy="133.2" r="6" fill="transparent"><title>FOMC średnia, 14:00 ET: +0,0 bp</title></circle>
+<circle cx="192.3" cy="131.4" r="6" fill="transparent"><title>FOMC średnia, 14:05 ET: +0,5 bp</title></circle>
+<circle cx="215.7" cy="147.5" r="6" fill="transparent"><title>FOMC średnia, 14:10 ET: −4,0 bp</title></circle>
+<circle cx="239.0" cy="162.1" r="6" fill="transparent"><title>FOMC średnia, 14:15 ET: −8,1 bp</title></circle>
+<circle cx="262.4" cy="151.1" r="6" fill="transparent"><title>FOMC średnia, 14:20 ET: −5,0 bp</title></circle>
+<circle cx="285.8" cy="148.9" r="6" fill="transparent"><title>FOMC średnia, 14:25 ET: −4,4 bp</title></circle>
+<circle cx="309.2" cy="140.7" r="6" fill="transparent"><title>FOMC średnia, 14:30 ET: −2,1 bp</title></circle>
+<circle cx="332.6" cy="128.6" r="6" fill="transparent"><title>FOMC średnia, 14:35 ET: +1,3 bp</title></circle>
+<circle cx="355.9" cy="118.9" r="6" fill="transparent"><title>FOMC średnia, 14:40 ET: +4,0 bp</title></circle>
+<circle cx="379.3" cy="87.8" r="6" fill="transparent"><title>FOMC średnia, 14:45 ET: +12,7 bp</title></circle>
+<circle cx="402.7" cy="83.2" r="6" fill="transparent"><title>FOMC średnia, 14:50 ET: +14,0 bp</title></circle>
+<circle cx="426.1" cy="90.0" r="6" fill="transparent"><title>FOMC średnia, 14:55 ET: +12,1 bp</title></circle>
+<circle cx="449.4" cy="100.3" r="6" fill="transparent"><title>FOMC średnia, 15:00 ET: +9,2 bp</title></circle>
+<circle cx="472.8" cy="120.3" r="6" fill="transparent"><title>FOMC średnia, 15:05 ET: +3,6 bp</title></circle>
+<circle cx="496.2" cy="108.9" r="6" fill="transparent"><title>FOMC średnia, 15:10 ET: +6,8 bp</title></circle>
+<circle cx="519.6" cy="102.5" r="6" fill="transparent"><title>FOMC średnia, 15:15 ET: +8,6 bp</title></circle>
+<circle cx="543.0" cy="123.6" r="6" fill="transparent"><title>FOMC średnia, 15:20 ET: +2,7 bp</title></circle>
+<circle cx="566.3" cy="142.8" r="6" fill="transparent"><title>FOMC średnia, 15:25 ET: −2,7 bp</title></circle>
+<circle cx="589.7" cy="166.1" r="6" fill="transparent"><title>FOMC średnia, 15:30 ET: −9,2 bp</title></circle>
+<circle cx="613.1" cy="184.3" r="6" fill="transparent"><title>FOMC średnia, 15:35 ET: −14,3 bp</title></circle>
+<circle cx="636.5" cy="211.1" r="6" fill="transparent"><title>FOMC średnia, 15:40 ET: −21,8 bp</title></circle>
+<circle cx="659.9" cy="210.7" r="6" fill="transparent"><title>FOMC średnia, 15:45 ET: −21,7 bp</title></circle>
+<circle cx="683.2" cy="200.7" r="6" fill="transparent"><title>FOMC średnia, 15:50 ET: −18,9 bp</title></circle>
+<circle cx="706.6" cy="214.7" r="6" fill="transparent"><title>FOMC średnia, 15:55 ET: −22,8 bp</title></circle>
+<circle cx="730.0" cy="231.8" r="6" fill="transparent"><title>FOMC średnia, 16:00 ET: −27,6 bp</title></circle>
+</svg></div>
+        <figcaption><b>Rys. 1</b> · Ścieżka US100 od ceny z 13:55 ET w dniu decyzji, 22 posiedzenia 2024–26, na tle 122 zwykłych śród. Rozrzut jest duży: o 15:05 dolny i górny kwartyl pojedynczych posiedzeń to −46 i +43 bp. Najpierw spadek do −8 bp w kwadrans, odbicie na otwarciu konferencji do +14 bp, potem zejście od około 15:10 do zamknięcia.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Konferencja</div>
+      <h2>Konferencja najpierw podnosi, a jej koniec sprzedaje</h2>
+      <p class="intro">To jedyne powtarzalne zachowanie w samym dniu decyzji: od mniej więcej 15:15 ET do zamknięcia US100 traci.</p>
+      <ul class="plain">
+        <li>M5 2024–26, 15:15 → 16:00: <strong>−36 bp</strong> średnio, mediana −19, t −2,35, 64% spadków. Ten sam fragment zwykłej środy: +7 bp. Pierwsza połowa konferencji (14:30–15:00) średnio +11 bp.</li>
+        <li>H1 2017–26, 15:00 → 16:00: <strong>−21 bp przy konferencji</strong> (t −2,05, 68 posiedzeń), <strong>+5 bp bez konferencji</strong> (6 posiedzeń 2017–18). Spadek jest więc związany z konferencją, nie z samą godziną.</li>
+        <li>Nie zależy od kierunku dotychczasowej reakcji: po konferencji, która do 15:15 podnosiła, końcówka −46 bp (13 razy), po takiej, która obniżała, −22 bp (9 razy). Rozkład ma grube ogony — 2024-05-01, 2024-12-18, 2026-06-17 i 2026-07-29 dały razem większość wyniku; mediana jest o połowę mniejsza od średniej.</li>
+        <li>Lata: 2017 +10, 2018 −25, 2019 −5, 2020 −27, 2021 +25, 2022 −25, 2023 −28, 2024 −67, 2025 +13, 2026 −63 bp (średnio na posiedzenie). Trzy lata z dziesięciu na plusie.</li>
+        <li>Kierunek samej konferencji (14:30–15:30) nie mówi nic o kolejnych dniach: korelacja rang z D+1 +0,02, z D+10 −0,14; ten sam znak co kolejne 10 sesji tylko w 36% posiedzeń 2024–26.</li>
+        <li>BTCUSD w tej samej godzinie: <strong>−25 bp</strong> (t −1,9, 2017–26), po +25 bp w godzinie 14:00–15:00 — ten sam kształt na innym rynku.</li>
+      </ul>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Fałszywa i prawdziwa odpowiedź</div>
+      <h2>Pierwsza odpowiedź nie jest prawdziwa — ale kolejne dni też nie</h2>
+      <p class="intro">Hipoteza: reakcja w dniu decyzji jest „fałszywa”, a prawdziwy kierunek pokazuje się w następnych dniach. Sprawdziłem ją tak: dla każdej chwili po komunikacie (15:00, 16:00, D+1 … D+10) — czy ruch od 14:00 do tej chwili przewiduje ruch od tej chwili dalej.</p>
+      <figure>
+        <div class="scroll"><svg viewBox="0 0 920 300" role="img" aria-label="Korelacja rang między ruchem od 14:00 do danej chwili a ruchem od tej chwili do D+20 i do kolejnego posiedzenia, 74 posiedzenia 2017–2026">
+<line x1="52" x2="900" y1="244.0" y2="244.0" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="248.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">−0,4</text>
+<line x1="52" x2="900" y1="208.3" y2="208.3" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="212.3" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">−0,3</text>
+<line x1="52" x2="900" y1="172.7" y2="172.7" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="176.7" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">−0,2</text>
+<line x1="52" x2="900" y1="137.0" y2="137.0" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="141.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">−0,1</text>
+<line x1="52" x2="900" y1="101.3" y2="101.3" stroke="#85899a" stroke-width="1"/>
+<text x="44" y="105.3" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">0</text>
+<line x1="52" x2="900" y1="65.7" y2="65.7" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="69.7" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">+0,1</text>
+<line x1="52" x2="900" y1="30.0" y2="30.0" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="34.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">+0,2</text>
+<text x="112.6" y="262" text-anchor="middle" font-size="11.5" font-family="Roboto Mono, monospace" fill="#4f535e">15:00</text>
+<rect x="73.8" y="79.9" width="36.3" height="21.4" fill="#14306b"><title>15:00 → D+20: ρ = +0,06, ten sam znak 53%, n = 74</title></rect>
+<rect x="114.1" y="83.5" width="36.3" height="17.8" fill="#5a7cc4"><title>15:00 → next FOMC: ρ = +0,05, ten sam znak 60%, n = 73</title></rect>
+<text x="233.7" y="262" text-anchor="middle" font-size="11.5" font-family="Roboto Mono, monospace" fill="#4f535e">16:00</text>
+<rect x="194.9" y="101.3" width="36.3" height="21.4" fill="#14306b"><title>16:00 → D+20: ρ = −0,06, ten sam znak 59%, n = 74</title></rect>
+<rect x="235.3" y="101.3" width="36.3" height="25.0" fill="#5a7cc4"><title>16:00 → next FOMC: ρ = −0,07, ten sam znak 59%, n = 73</title></rect>
+<text x="354.9" y="262" text-anchor="middle" font-size="11.5" font-family="Roboto Mono, monospace" fill="#4f535e">D+1</text>
+<rect x="316.1" y="101.3" width="36.3" height="17.8" fill="#14306b"><title>D+1 → D+20: ρ = −0,05, ten sam znak 56%, n = 74</title></rect>
+<rect x="356.4" y="101.3" width="36.3" height="17.8" fill="#5a7cc4"><title>D+1 → next FOMC: ρ = −0,05, ten sam znak 53%, n = 73</title></rect>
+<text x="476.0" y="262" text-anchor="middle" font-size="11.5" font-family="Roboto Mono, monospace" fill="#4f535e">D+2</text>
+<rect x="437.2" y="101.3" width="36.3" height="49.9" fill="#14306b"><title>D+2 → D+20: ρ = −0,14, ten sam znak 53%, n = 74</title></rect>
+<rect x="477.6" y="101.3" width="36.3" height="32.1" fill="#5a7cc4"><title>D+2 → next FOMC: ρ = −0,09, ten sam znak 47%, n = 73</title></rect>
+<text x="597.1" y="262" text-anchor="middle" font-size="11.5" font-family="Roboto Mono, monospace" fill="#4f535e">D+3</text>
+<rect x="558.4" y="101.3" width="36.3" height="74.9" fill="#14306b"><title>D+3 → D+20: ρ = −0,21, ten sam znak 54%, n = 74</title></rect>
+<rect x="598.7" y="101.3" width="36.3" height="57.1" fill="#5a7cc4"><title>D+3 → next FOMC: ρ = −0,16, ten sam znak 59%, n = 73</title></rect>
+<text x="718.3" y="262" text-anchor="middle" font-size="11.5" font-family="Roboto Mono, monospace" fill="#4f535e">D+5</text>
+<rect x="679.5" y="101.3" width="36.3" height="96.3" fill="#14306b"><title>D+5 → D+20: ρ = −0,27, ten sam znak 45%, n = 74</title></rect>
+<rect x="719.9" y="101.3" width="36.3" height="67.8" fill="#5a7cc4"><title>D+5 → next FOMC: ρ = −0,19, ten sam znak 49%, n = 73</title></rect>
+<text x="839.4" y="262" text-anchor="middle" font-size="11.5" font-family="Roboto Mono, monospace" fill="#4f535e">D+10</text>
+<rect x="800.7" y="101.3" width="36.3" height="92.7" fill="#14306b"><title>D+10 → D+20: ρ = −0,26, ten sam znak 50%, n = 74</title></rect>
+<rect x="841.0" y="101.3" width="36.3" height="46.4" fill="#5a7cc4"><title>D+10 → next FOMC: ρ = −0,13, ten sam znak 56%, n = 73</title></rect>
+<text x="52" y="288" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">chwila, do której znamy reakcję (od 14:00)</text>
+<rect x="590" y="6" width="12" height="10" fill="#14306b"/><text x="606" y="15" font-size="11.5" fill="#4f535e">reszta do D+20</text>
+<rect x="720" y="6" width="12" height="10" fill="#5a7cc4"/><text x="736" y="15" font-size="11.5" fill="#4f535e">reszta do kolejnego FOMC</text>
+</svg></div>
+        <figcaption><b>Rys. 2</b> · Korelacja rang (ρ) między ruchem od ceny sprzed komunikatu do danej chwili a ruchem od tej chwili do D+20 i do następnego posiedzenia; 74 posiedzenia 2017–26. Słupek nad zerem znaczyłby „prawdziwą odpowiedź już widać”. Żaden nie jest istotnie nad zerem.</figcaption>
+      </figure>
+      <p style="margin-top:18px"><strong>Pierwsza połowa hipotezy się potwierdza</strong>: reakcja z dnia decyzji jest bez znaczenia dla tygodni po niej (ρ do reszty cyklu −0,07; w 2024–26 popołudnie i kolejne 10 sesji miały ten sam znak tylko w 27% posiedzeń — reakcja była częściej odwracana niż kontynuowana).</p>
+      <p><strong>Druga połowa się nie potwierdza</strong>: nie ma takiego dnia w pierwszych dwóch tygodniach, od którego dotychczasowy ruch zaczyna wskazywać dalszy kierunek. Im dłużej po posiedzeniu, tym korelacja jest <em>bardziej ujemna</em> — ruch do D+5 wobec reszty do D+20 ρ −0,27, do D+10 ρ −0,26. Rynek po FOMC nie „odkrywa” kierunku, tylko częściowo oddaje to, co zrobił w pierwszych dniach. W 2024–26 dzień po decyzji (D+1) wskazywał kolejne dni (ρ +0,48 z D+2…D+5, p 0,02), ale w 2017–23 ten sam pomiar dawał 0,01 — to cecha ostatnich lat, nie reguła.</p>
+      <figure>
+        <div class="scroll"><svg viewBox="0 0 920 360" role="img" aria-label="Wykres punktowy: reakcja popołudnia 14:00–16:00 a zmiana przez kolejne dziesięć sesji, 74 posiedzenia">
+<line x1="60" x2="900" y1="296.8" y2="296.8" stroke="#ebe8de"/>
+<text x="52" y="300.8" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">−1000</text>
+<line x1="60" x2="900" y1="230.9" y2="230.9" stroke="#ebe8de"/>
+<text x="52" y="234.9" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">−500</text>
+<line x1="60" x2="900" y1="165.0" y2="165.0" stroke="#85899a"/>
+<text x="52" y="169.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">0</text>
+<line x1="60" x2="900" y1="99.1" y2="99.1" stroke="#ebe8de"/>
+<text x="52" y="103.1" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">+500</text>
+<line x1="60" x2="900" y1="33.2" y2="33.2" stroke="#ebe8de"/>
+<text x="52" y="37.2" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">+1000</text>
+<line x1="60.0" x2="60.0" y1="20" y2="310" stroke="#ebe8de"/>
+<text x="60.0" y="328" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">−400</text>
+<line x1="180.0" x2="180.0" y1="20" y2="310" stroke="#ebe8de"/>
+<text x="180.0" y="328" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">−300</text>
+<line x1="300.0" x2="300.0" y1="20" y2="310" stroke="#ebe8de"/>
+<text x="300.0" y="328" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">−200</text>
+<line x1="420.0" x2="420.0" y1="20" y2="310" stroke="#ebe8de"/>
+<text x="420.0" y="328" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">−100</text>
+<line x1="540.0" x2="540.0" y1="20" y2="310" stroke="#85899a"/>
+<text x="540.0" y="328" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">0</text>
+<line x1="660.0" x2="660.0" y1="20" y2="310" stroke="#ebe8de"/>
+<text x="660.0" y="328" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">+100</text>
+<line x1="780.0" x2="780.0" y1="20" y2="310" stroke="#ebe8de"/>
+<text x="780.0" y="328" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">+200</text>
+<line x1="900.0" x2="900.0" y1="20" y2="310" stroke="#ebe8de"/>
+<text x="900.0" y="328" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">+300</text>
+<text x="900" y="352" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">reakcja 14:00 → 16:00, bp</text>
+<text x="66" y="32" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">kolejne 10 sesji, bp</text>
+<circle cx="483.0" cy="159.2" r="4" fill="#85899a" fill-opacity="0.55"><title>2017-06-14: popołudnie −48 bp, 10 sesji +44 bp</title></circle>
+<circle cx="559.6" cy="172.2" r="4" fill="#85899a" fill-opacity="0.55"><title>2017-07-26: popołudnie +16 bp, 10 sesji −54 bp</title></circle>
+<circle cx="551.9" cy="159.4" r="4" fill="#85899a" fill-opacity="0.55"><title>2017-09-20: popołudnie +10 bp, 10 sesji +43 bp</title></circle>
+<circle cx="565.9" cy="162.7" r="4" fill="#85899a" fill-opacity="0.55"><title>2017-11-01: popołudnie +22 bp, 10 sesji +17 bp</title></circle>
+<circle cx="549.0" cy="164.7" r="4" fill="#85899a" fill-opacity="0.55"><title>2017-12-13: popołudnie +8 bp, 10 sesji +2 bp</title></circle>
+<circle cx="542.9" cy="220.6" r="4" fill="#85899a" fill-opacity="0.55"><title>2018-01-31: popołudnie +2 bp, 10 sesji −422 bp</title></circle>
+<circle cx="467.4" cy="215.8" r="4" fill="#85899a" fill-opacity="0.55"><title>2018-03-21: popołudnie −60 bp, 10 sesji −386 bp</title></circle>
+<circle cx="469.2" cy="109.0" r="4" fill="#85899a" fill-opacity="0.55"><title>2018-05-02: popołudnie −59 bp, 10 sesji +424 bp</title></circle>
+<circle cx="471.6" cy="209.3" r="4" fill="#85899a" fill-opacity="0.55"><title>2018-06-13: popołudnie −57 bp, 10 sesji −336 bp</title></circle>
+<circle cx="571.4" cy="149.8" r="4" fill="#85899a" fill-opacity="0.55"><title>2018-08-01: popołudnie +26 bp, 10 sesji +116 bp</title></circle>
+<circle cx="480.7" cy="257.7" r="4" fill="#85899a" fill-opacity="0.55"><title>2018-09-26: popołudnie −49 bp, 10 sesji −704 bp</title></circle>
+<circle cx="539.6" cy="256.1" r="4" fill="#85899a" fill-opacity="0.55"><title>2018-11-08: popołudnie −0 bp, 10 sesji −691 bp</title></circle>
+<circle cx="117.2" cy="122.1" r="4" fill="#85899a" fill-opacity="0.55"><title>2018-12-19: popołudnie −352 bp, 10 sesji +326 bp</title></circle>
+<circle cx="658.2" cy="125.3" r="4" fill="#85899a" fill-opacity="0.55"><title>2019-01-30: popołudnie +98 bp, 10 sesji +301 bp</title></circle>
+<circle cx="600.7" cy="136.4" r="4" fill="#85899a" fill-opacity="0.55"><title>2019-03-20: popołudnie +51 bp, 10 sesji +217 bp</title></circle>
+<circle cx="412.4" cy="208.0" r="4" fill="#85899a" fill-opacity="0.55"><title>2019-05-01: popołudnie −106 bp, 10 sesji −326 bp</title></circle>
+<circle cx="606.7" cy="135.2" r="4" fill="#85899a" fill-opacity="0.55"><title>2019-06-19: popołudnie +56 bp, 10 sesji +226 bp</title></circle>
+<circle cx="365.6" cy="226.6" r="4" fill="#85899a" fill-opacity="0.55"><title>2019-07-31: popołudnie −145 bp, 10 sesji −467 bp</title></circle>
+<circle cx="592.4" cy="223.2" r="4" fill="#85899a" fill-opacity="0.55"><title>2019-09-18: popołudnie +44 bp, 10 sesji −442 bp</title></circle>
+<circle cx="613.0" cy="136.1" r="4" fill="#85899a" fill-opacity="0.55"><title>2019-10-30: popołudnie +61 bp, 10 sesji +219 bp</title></circle>
+<circle cx="570.0" cy="117.2" r="4" fill="#85899a" fill-opacity="0.55"><title>2019-12-11: popołudnie +25 bp, 10 sesji +363 bp</title></circle>
+<circle cx="503.2" cy="93.0" r="4" fill="#85899a" fill-opacity="0.55"><title>2020-01-29: popołudnie −31 bp, 10 sesji +546 bp</title></circle>
+<circle cx="544.8" cy="161.3" r="4" fill="#85899a" fill-opacity="0.55"><title>2020-04-29: popołudnie +4 bp, 10 sesji +28 bp</title></circle>
+<circle cx="580.3" cy="176.3" r="4" fill="#85899a" fill-opacity="0.55"><title>2020-06-10: popołudnie +34 bp, 10 sesji −86 bp</title></circle>
+<circle cx="580.7" cy="105.7" r="4" fill="#85899a" fill-opacity="0.55"><title>2020-07-29: popołudnie +34 bp, 10 sesji +450 bp</title></circle>
+<circle cx="412.4" cy="146.2" r="4" fill="#85899a" fill-opacity="0.55"><title>2020-09-16: popołudnie −106 bp, 10 sesji +142 bp</title></circle>
+<circle cx="548.5" cy="174.8" r="4" fill="#85899a" fill-opacity="0.55"><title>2020-11-05: popołudnie +7 bp, 10 sesji −75 bp</title></circle>
+<circle cx="565.0" cy="163.4" r="4" fill="#85899a" fill-opacity="0.55"><title>2020-12-16: popołudnie +21 bp, 10 sesji +12 bp</title></circle>
+<circle cx="404.4" cy="113.4" r="4" fill="#85899a" fill-opacity="0.55"><title>2021-01-27: popołudnie −113 bp, 10 sesji +391 bp</title></circle>
+<circle cx="724.7" cy="175.8" r="4" fill="#85899a" fill-opacity="0.55"><title>2021-03-17: popołudnie +154 bp, 10 sesji −82 bp</title></circle>
+<circle cx="531.0" cy="253.4" r="4" fill="#85899a" fill-opacity="0.55"><title>2021-04-28: popołudnie −8 bp, 10 sesji −670 bp</title></circle>
+<circle cx="507.2" cy="112.8" r="4" fill="#85899a" fill-opacity="0.55"><title>2021-06-16: popołudnie −27 bp, 10 sesji +396 bp</title></circle>
+<circle cx="567.2" cy="163.8" r="4" fill="#85899a" fill-opacity="0.55"><title>2021-07-28: popołudnie +23 bp, 10 sesji +9 bp</title></circle>
+<circle cx="561.6" cy="201.3" r="4" fill="#85899a" fill-opacity="0.55"><title>2021-09-22: popołudnie +18 bp, 10 sesji −275 bp</title></circle>
+<circle cx="660.6" cy="150.9" r="4" fill="#85899a" fill-opacity="0.55"><title>2021-11-03: popołudnie +100 bp, 10 sesji +107 bp</title></circle>
+<circle cx="867.8" cy="153.3" r="4" fill="#85899a" fill-opacity="0.55"><title>2021-12-15: popołudnie +273 bp, 10 sesji +89 bp</title></circle>
+<circle cx="264.4" cy="84.6" r="4" fill="#85899a" fill-opacity="0.55"><title>2022-01-26: popołudnie −230 bp, 10 sesji +610 bp</title></circle>
+<circle cx="722.0" cy="62.6" r="4" fill="#85899a" fill-opacity="0.55"><title>2022-03-16: popołudnie +152 bp, 10 sesji +776 bp</title></circle>
+<circle cx="891.7" cy="310.0" r="4" fill="#85899a" fill-opacity="0.55"><title>2022-05-04: popołudnie +293 bp, 10 sesji −1254 bp</title></circle>
+<circle cx="607.7" cy="175.6" r="4" fill="#85899a" fill-opacity="0.55"><title>2022-06-15: popołudnie +56 bp, 10 sesji −80 bp</title></circle>
+<circle cx="713.0" cy="85.9" r="4" fill="#85899a" fill-opacity="0.55"><title>2022-07-27: popołudnie +144 bp, 10 sesji +600 bp</title></circle>
+<circle cx="208.6" cy="171.7" r="4" fill="#85899a" fill-opacity="0.55"><title>2022-09-21: popołudnie −276 bp, 10 sesji −51 bp</title></circle>
+<circle cx="201.2" cy="71.3" r="4" fill="#85899a" fill-opacity="0.55"><title>2022-11-02: popołudnie −282 bp, 10 sesji +711 bp</title></circle>
+<circle cx="351.0" cy="257.1" r="4" fill="#85899a" fill-opacity="0.55"><title>2022-12-14: popołudnie −158 bp, 10 sesji −699 bp</title></circle>
+<circle cx="818.2" cy="131.3" r="4" fill="#85899a" fill-opacity="0.55"><title>2023-02-01: popołudnie +232 bp, 10 sesji +256 bp</title></circle>
+<circle cx="325.6" cy="123.3" r="4" fill="#85899a" fill-opacity="0.55"><title>2023-03-22: popołudnie −179 bp, 10 sesji +316 bp</title></circle>
+<circle cx="428.4" cy="109.6" r="4" fill="#85899a" fill-opacity="0.55"><title>2023-05-03: popołudnie −93 bp, 10 sesji +420 bp</title></circle>
+<circle cx="594.7" cy="167.8" r="4" fill="#85899a" fill-opacity="0.55"><title>2023-06-14: popołudnie +46 bp, 10 sesji −21 bp</title></circle>
+<circle cx="582.2" cy="199.1" r="4" fill="#85899a" fill-opacity="0.55"><title>2023-07-26: popołudnie +35 bp, 10 sesji −259 bp</title></circle>
+<circle cx="371.6" cy="183.1" r="4" fill="#85899a" fill-opacity="0.55"><title>2023-09-20: popołudnie −140 bp, 10 sesji −137 bp</title></circle>
+<circle cx="652.3" cy="64.4" r="4" fill="#85899a" fill-opacity="0.55"><title>2023-11-01: popołudnie +94 bp, 10 sesji +763 bp</title></circle>
+<circle cx="676.9" cy="137.8" r="4" fill="#85899a" fill-opacity="0.55"><title>2023-12-13: popołudnie +114 bp, 10 sesji +206 bp</title></circle>
+<circle cx="442.7" cy="115.3" r="5" fill="#14306b" fill-opacity="0.85"><title>2024-01-31: popołudnie −81 bp, 10 sesji +377 bp</title></circle>
+<circle cx="679.6" cy="190.8" r="5" fill="#14306b" fill-opacity="0.85"><title>2024-03-20: popołudnie +116 bp, 10 sesji −196 bp</title></circle>
+<circle cx="516.4" cy="71.1" r="5" fill="#14306b" fill-opacity="0.85"><title>2024-05-01: popołudnie −20 bp, 10 sesji +712 bp</title></circle>
+<circle cx="522.7" cy="145.9" r="5" fill="#14306b" fill-opacity="0.85"><title>2024-06-12: popołudnie −14 bp, 10 sesji +145 bp</title></circle>
+<circle cx="582.1" cy="188.4" r="5" fill="#14306b" fill-opacity="0.85"><title>2024-07-31: popołudnie +35 bp, 10 sesji −178 bp</title></circle>
+<circle cx="475.4" cy="134.2" r="5" fill="#14306b" fill-opacity="0.85"><title>2024-09-18: popołudnie −54 bp, 10 sesji +234 bp</title></circle>
+<circle cx="562.6" cy="188.6" r="5" fill="#14306b" fill-opacity="0.85"><title>2024-11-07: popołudnie +19 bp, 10 sesji −179 bp</title></circle>
+<circle cx="98.9" cy="141.9" r="5" fill="#14306b" fill-opacity="0.85"><title>2024-12-18: popołudnie −368 bp, 10 sesji +175 bp</title></circle>
+<circle cx="575.8" cy="146.4" r="5" fill="#14306b" fill-opacity="0.85"><title>2025-01-29: popołudnie +30 bp, 10 sesji +141 bp</title></circle>
+<circle cx="629.8" cy="176.1" r="5" fill="#14306b" fill-opacity="0.85"><title>2025-03-19: popołudnie +75 bp, 10 sesji −84 bp</title></circle>
+<circle cx="616.1" cy="87.1" r="5" fill="#14306b" fill-opacity="0.85"><title>2025-05-07: popołudnie +63 bp, 10 sesji +591 bp</title></circle>
+<circle cx="499.0" cy="110.5" r="5" fill="#14306b" fill-opacity="0.85"><title>2025-06-18: popołudnie −34 bp, 10 sesji +414 bp</title></circle>
+<circle cx="510.2" cy="137.1" r="5" fill="#14306b" fill-opacity="0.85"><title>2025-07-30: popołudnie −25 bp, 10 sesji +211 bp</title></circle>
+<circle cx="548.9" cy="134.5" r="5" fill="#14306b" fill-opacity="0.85"><title>2025-09-17: popołudnie +7 bp, 10 sesji +232 bp</title></circle>
+<circle cx="553.6" cy="196.5" r="5" fill="#14306b" fill-opacity="0.85"><title>2025-10-29: popołudnie +11 bp, 10 sesji −239 bp</title></circle>
+<circle cx="627.1" cy="171.5" r="5" fill="#14306b" fill-opacity="0.85"><title>2025-12-10: popołudnie +73 bp, 10 sesji −49 bp</title></circle>
+<circle cx="529.8" cy="207.5" r="5" fill="#14306b" fill-opacity="0.85"><title>2026-01-28: popołudnie −8 bp, 10 sesji −322 bp</title></circle>
+<circle cx="429.8" cy="187.3" r="5" fill="#14306b" fill-opacity="0.85"><title>2026-03-18: popołudnie −92 bp, 10 sesji −169 bp</title></circle>
+<circle cx="577.2" cy="63.9" r="5" fill="#14306b" fill-opacity="0.85"><title>2026-04-29: popołudnie +31 bp, 10 sesji +767 bp</title></circle>
+<circle cx="352.2" cy="158.8" r="5" fill="#14306b" fill-opacity="0.85"><title>2026-06-17: popołudnie −156 bp, 10 sesji +47 bp</title></circle>
+<circle cx="373.6" cy="46.6" r="5" fill="#14306b" fill-opacity="0.85"><title>2026-07-29: popołudnie −139 bp, 10 sesji +898 bp</title></circle>
+<circle cx="448.7" cy="99.6" r="5" fill="#14306b" fill-opacity="0.85"><title>2026-09-16: popołudnie −76 bp, 10 sesji +496 bp</title></circle>
+<circle cx="670" cy="28" r="5" fill="#14306b"/><text x="680" y="32" font-size="11.5" fill="#4f535e">2024–26</text>
+<circle cx="760" cy="28" r="4" fill="#85899a" fill-opacity="0.55"/><text x="770" y="32" font-size="11.5" fill="#4f535e">2017–23</text>
+</svg></div>
+        <figcaption><b>Rys. 3</b> · Reakcja popołudnia (14:00 → 16:00) a kolejne 10 sesji, 74 posiedzenia. Chmura bez nachylenia; wartości obcięte do zakresu osi.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Sygnał na tygodnie</div>
+      <h2>Spadek po FOMC jest odkupowany</h2>
+      <p class="intro">Jeśli coś mówi o kolejnych tygodniach, to nie kierunek reakcji, tylko jej znak w połączeniu z dryfem indeksu: gdy dwa dni po decyzji US100 wciąż jest pod ceną sprzed komunikatu, kolejne dwa tygodnie są wyraźnie lepsze od przeciętnych.</p>
+      <figure>
+        <div class="scroll"><svg viewBox="0 0 920 330" role="img" aria-label="Średnia ścieżka US100 od pięciu dni przed do piętnastu dni po FOMC, osobno gdy zamknięcie D+2 było pod ceną z 14:00 i nad nią">
+<rect x="275.3" y="24" width="414.7" height="260" fill="#e6ebf5" opacity="0.6"/>
+<text x="281.3" y="38" font-size="10.5" font-family="Roboto Mono, monospace" fill="#14306b">po sygnale (zamknięcie D+2)</text>
+<line x1="52" x2="690" y1="262.3" y2="262.3" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="266.3" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">−200</text>
+<line x1="52" x2="690" y1="219.0" y2="219.0" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="223.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">−100</text>
+<line x1="52" x2="690" y1="175.7" y2="175.7" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="179.7" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">0</text>
+<line x1="52" x2="690" y1="132.3" y2="132.3" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="136.3" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">100</text>
+<line x1="52" x2="690" y1="89.0" y2="89.0" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="93.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">200</text>
+<line x1="52" x2="690" y1="45.7" y2="45.7" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="49.7" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">300</text>
+<line x1="52" x2="690" y1="175.7" y2="175.7" stroke="#85899a" stroke-width="1"/>
+<text x="52.0" y="302" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">D-5</text>
+<text x="179.6" y="302" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">D-1</text>
+<text x="211.5" y="302" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">D</text>
+<text x="275.3" y="302" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">D+2</text>
+<text x="371.0" y="302" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">D+5</text>
+<text x="530.5" y="302" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">D+10</text>
+<text x="690.0" y="302" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">D+15</text>
+<text x="44" y="16" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">bp</text>
+<polyline points="52.0,187.6 83.9,184.6 115.8,181.6 147.7,178.6 179.6,175.7 211.5,172.7 243.4,169.7 275.3,166.7 307.2,163.7 339.1,160.8 371.0,157.8 402.9,154.8 434.8,151.8 466.7,148.8 498.6,145.9 530.5,142.9 562.4,139.9 594.3,136.9 626.2,133.9 658.1,130.9 690.0,128.0" fill="none" stroke="#85899a" stroke-width="1.5" stroke-dasharray="4 4"/>
+<circle cx="690.0" cy="128.0" r="4" fill="#85899a" stroke="#fff" stroke-width="2"/>
+<text x="700.0" y="132.0" font-size="12" fill="#16181d"><tspan font-weight="700">+110</tspan> <tspan fill="#4f535e">zwykły dryf indeksu</tspan></text>
+<polyline points="52.0,198.8 83.9,190.0 115.8,181.7 147.7,176.8 179.6,175.7 211.5,153.6 243.4,114.4 275.3,91.2 307.2,70.4 339.1,66.6 371.0,71.7 402.9,70.5 434.8,72.1 466.7,74.0 498.6,63.5 530.5,63.3 562.4,61.1 594.3,63.1 626.2,54.4 658.1,57.6 690.0,41.9" fill="none" stroke="#17734c" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="690.0" cy="41.9" r="4" fill="#17734c" stroke="#fff" stroke-width="2"/>
+<text x="700.0" y="45.9" font-size="12" fill="#16181d"><tspan font-weight="700">+309</tspan> <tspan fill="#4f535e">D+2 nad ceną z 14:00 (n = 38)</tspan></text>
+<circle cx="52.0" cy="198.8" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D-5: −54 bp od zamknięcia D−1</title></circle>
+<circle cx="83.9" cy="190.0" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D-4: −33 bp od zamknięcia D−1</title></circle>
+<circle cx="115.8" cy="181.7" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D-3: −14 bp od zamknięcia D−1</title></circle>
+<circle cx="147.7" cy="176.8" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D-2: −3 bp od zamknięcia D−1</title></circle>
+<circle cx="179.6" cy="175.7" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D-1: +0 bp od zamknięcia D−1</title></circle>
+<circle cx="211.5" cy="153.6" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D: +51 bp od zamknięcia D−1</title></circle>
+<circle cx="243.4" cy="114.4" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D+1: +141 bp od zamknięcia D−1</title></circle>
+<circle cx="275.3" cy="91.2" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D+2: +195 bp od zamknięcia D−1</title></circle>
+<circle cx="307.2" cy="70.4" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D+3: +243 bp od zamknięcia D−1</title></circle>
+<circle cx="339.1" cy="66.6" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D+4: +252 bp od zamknięcia D−1</title></circle>
+<circle cx="371.0" cy="71.7" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D+5: +240 bp od zamknięcia D−1</title></circle>
+<circle cx="402.9" cy="70.5" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D+6: +243 bp od zamknięcia D−1</title></circle>
+<circle cx="434.8" cy="72.1" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D+7: +239 bp od zamknięcia D−1</title></circle>
+<circle cx="466.7" cy="74.0" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D+8: +235 bp od zamknięcia D−1</title></circle>
+<circle cx="498.6" cy="63.5" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D+9: +259 bp od zamknięcia D−1</title></circle>
+<circle cx="530.5" cy="63.3" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D+10: +259 bp od zamknięcia D−1</title></circle>
+<circle cx="562.4" cy="61.1" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D+11: +264 bp od zamknięcia D−1</title></circle>
+<circle cx="594.3" cy="63.1" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D+12: +260 bp od zamknięcia D−1</title></circle>
+<circle cx="626.2" cy="54.4" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D+13: +280 bp od zamknięcia D−1</title></circle>
+<circle cx="658.1" cy="57.6" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D+14: +272 bp od zamknięcia D−1</title></circle>
+<circle cx="690.0" cy="41.9" r="6" fill="transparent"><title>D+2 nad ceną z 14:00 (n = 38), D+15: +309 bp od zamknięcia D−1</title></circle>
+<polyline points="52.0,170.2 83.9,180.1 115.8,188.8 147.7,182.9 179.6,175.7 211.5,179.7 243.4,230.7 275.3,270.0 307.2,259.2 339.1,248.6 371.0,250.0 402.9,240.8 434.8,232.1 466.7,222.0 498.6,207.0 530.5,207.1 562.4,209.6 594.3,206.4 626.2,194.1 658.1,205.0 690.0,176.4" fill="none" stroke="#b8322a" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="690.0" cy="176.4" r="4" fill="#b8322a" stroke="#fff" stroke-width="2"/>
+<text x="700.0" y="180.4" font-size="12" fill="#16181d"><tspan font-weight="700">−2</tspan> <tspan fill="#4f535e">D+2 pod ceną z 14:00 (n = 36)</tspan></text>
+<circle cx="52.0" cy="170.2" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D-5: +13 bp od zamknięcia D−1</title></circle>
+<circle cx="83.9" cy="180.1" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D-4: −10 bp od zamknięcia D−1</title></circle>
+<circle cx="115.8" cy="188.8" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D-3: −30 bp od zamknięcia D−1</title></circle>
+<circle cx="147.7" cy="182.9" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D-2: −17 bp od zamknięcia D−1</title></circle>
+<circle cx="179.6" cy="175.7" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D-1: +0 bp od zamknięcia D−1</title></circle>
+<circle cx="211.5" cy="179.7" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D: −9 bp od zamknięcia D−1</title></circle>
+<circle cx="243.4" cy="230.7" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D+1: −127 bp od zamknięcia D−1</title></circle>
+<circle cx="275.3" cy="270.0" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D+2: −218 bp od zamknięcia D−1</title></circle>
+<circle cx="307.2" cy="259.2" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D+3: −193 bp od zamknięcia D−1</title></circle>
+<circle cx="339.1" cy="248.6" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D+4: −168 bp od zamknięcia D−1</title></circle>
+<circle cx="371.0" cy="250.0" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D+5: −172 bp od zamknięcia D−1</title></circle>
+<circle cx="402.9" cy="240.8" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D+6: −150 bp od zamknięcia D−1</title></circle>
+<circle cx="434.8" cy="232.1" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D+7: −130 bp od zamknięcia D−1</title></circle>
+<circle cx="466.7" cy="222.0" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D+8: −107 bp od zamknięcia D−1</title></circle>
+<circle cx="498.6" cy="207.0" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D+9: −72 bp od zamknięcia D−1</title></circle>
+<circle cx="530.5" cy="207.1" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D+10: −73 bp od zamknięcia D−1</title></circle>
+<circle cx="562.4" cy="209.6" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D+11: −78 bp od zamknięcia D−1</title></circle>
+<circle cx="594.3" cy="206.4" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D+12: −71 bp od zamknięcia D−1</title></circle>
+<circle cx="626.2" cy="194.1" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D+13: −43 bp od zamknięcia D−1</title></circle>
+<circle cx="658.1" cy="205.0" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D+14: −68 bp od zamknięcia D−1</title></circle>
+<circle cx="690.0" cy="176.4" r="6" fill="transparent"><title>D+2 pod ceną z 14:00 (n = 36), D+15: −2 bp od zamknięcia D−1</title></circle>
+</svg></div>
+        <figcaption><b>Rys. 4</b> · Średnia ścieżka US100 od zamknięcia D−1, podzielona po zamknięciu D+2 względem ceny sprzed komunikatu; 74 posiedzenia 2017–26. Grupa „pod” odrabia od D+2 do D+15 około 216 bp, grupa „nad” dokłada 114 bp — przy zwykłym dryfie około 90 bp na 13 sesji.</figcaption>
+      </figure>
+      <ul class="plain" style="margin-top:18px">
+        <li>Long od zamknięcia D+2 do D+10, gdy D+2 jest pod ceną z 14:00: <strong>+118 bp netto na transakcję</strong> (36 posiedzeń, t 2,1, 72% zysków), na plusie w 2017–19 (+27), 2020–22 (+172) i 2023–26 (+125).</li>
+        <li>Wybicie dołem zakresu 14:00–16:00 dnia decyzji w ciągu dwóch dni: kupno na poziomie wybicia i trzymanie do D+10 daje +91 bp netto (35 razy), ale 2017–19 −118, 2020–22 +77, 2023–26 +297. W 2024–26 po 8 z 9 takich wybić indeks był wyżej po 10 sesjach.</li>
+        <li><strong>Kontrola</strong>: zwykły 3-dniowy spadek indeksu (bez FOMC) daje w tym samym oknie +73 bp i 63% wzrostów, spadek po FOMC +135 bp i 71%. Różnica jest w kierunku hipotezy, ale to mniej więcej jeden błąd standardowy — dane nie odróżniają pewnie „spadku po FOMC” od zwykłego kupowania spadków na rosnącym indeksie.</li>
+        <li><strong>BTCUSD zachowuje się odwrotnie</strong>: gdy D+2 jest pod ceną z 14:00, kolejne 8 dni średnio −102 bp (46% wzrostów), gdy nad — +186 bp. Odkupywanie spadku po FOMC to cecha indeksu akcji, nie reguła dla każdego ryzykownego aktywa.</li>
+        <li><strong>Sygnału na spadki w kolejnych tygodniach nie znalazłem</strong>: żadna kombinacja reakcji i miejsca rynku nie dawała stabilnie ujemnych 10–20 sesji.</li>
+      </ul>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Gdzie byliśmy przed FOMC</div>
+      <h2>Miejsce rynku przed posiedzeniem zmienia mało</h2>
+      <p>Tercyle każdej cechy na 74 posiedzeniach 2017–26. Kolor w kolumnach D+10 i D+20 to odchylenie od zwykłego dryfu (69 i 138 bp), liczba to sam wynik.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>cecha przed posiedzeniem</th><th>tercyl</th><th class="n">n</th><th class="n">14:00–16:00</th><th class="n">D+1</th><th class="n">D+10</th><th class="n">D+20</th><th class="n">D+10 w górę</th></tr></thead>
+          <tbody>
+<tr><td><b>ruch w nocy i rano przed decyzją (16:00 D−1 → 14:00)</b></td><td class="nw">dolna (−161 … −8)</td><td class="n">25</td><td class="n">−5</td><td class="n">+13</td><td class="n p2">+139</td><td class="n p2">+236</td><td class="n">72%</td></tr>
+<tr><td></td><td class="nw">środkowa (−6 … +39)</td><td class="n">24</td><td class="n">−13</td><td class="n">−2</td><td class="n">+58</td><td class="n p1">+175</td><td class="n">62%</td></tr>
+<tr><td></td><td class="nw">górna (+40 … +333)</td><td class="n">25</td><td class="n">−18</td><td class="n m1">−43</td><td class="n m1">+30</td><td class="n m1">+82</td><td class="n">48%</td></tr>
+<tr><td><b>ruch od poprzedniego posiedzenia</b></td><td class="nw">dolna (−1787 … +35)</td><td class="n">25</td><td class="n">−11</td><td class="n m2">−74</td><td class="n p1">+113</td><td class="n p2">+204</td><td class="n">52%</td></tr>
+<tr><td></td><td class="nw">środkowa (+42 … +453)</td><td class="n">24</td><td class="n">−8</td><td class="n p1">+45</td><td class="n">+82</td><td class="n p1">+187</td><td class="n">75%</td></tr>
+<tr><td></td><td class="nw">górna (+455 … +1344)</td><td class="n">25</td><td class="n">−16</td><td class="n">−1</td><td class="n m1">+33</td><td class="n m1">+103</td><td class="n">56%</td></tr>
+<tr><td><b>ruch z 20 sesji</b></td><td class="nw">dolna (−1570 … +124)</td><td class="n">25</td><td class="n">−19</td><td class="n m2">−54</td><td class="n p1">+128</td><td class="n">+161</td><td class="n">56%</td></tr>
+<tr><td></td><td class="nw">środkowa (+125 … +372)</td><td class="n">24</td><td class="n">−8</td><td class="n m1">−23</td><td class="n m2">−15</td><td class="n">+108</td><td class="n">54%</td></tr>
+<tr><td></td><td class="nw">górna (+390 … +1637)</td><td class="n">25</td><td class="n">−8</td><td class="n p1">+43</td><td class="n p1">+112</td><td class="n p2">+221</td><td class="n">72%</td></tr>
+<tr><td><b>miejsce w zakresie 20 sesji (0 = dno, 1 = szczyt)</b></td><td class="nw">dolna (0,07–0,63)</td><td class="n">25</td><td class="n">−16</td><td class="n m2">−71</td><td class="n">+77</td><td class="n">+161</td><td class="n">52%</td></tr>
+<tr><td></td><td class="nw">środkowa (0,64–0,88)</td><td class="n">24</td><td class="n m1">−25</td><td class="n">+15</td><td class="n">+81</td><td class="n">+163</td><td class="n">67%</td></tr>
+<tr><td></td><td class="nw">górna (0,89–1,00)</td><td class="n">25</td><td class="n">+5</td><td class="n p1">+25</td><td class="n">+71</td><td class="n p1">+169</td><td class="n">64%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul class="plain" style="margin-top:16px">
+        <li><strong>Noc i ranek przed decyzją</strong> to jedyna cecha z monotonicznym wzorem: gdy rynek wszedł w komunikat po spadku, kolejne 10 i 20 sesji były najmocniejsze, a po wzroście ponad +40 bp najsłabsze (D+1 −43 bp). Rynek, który „kupił plotkę”, oddaje część po fakcie. Grupa „spadek przed” była mocna w każdym z trzech podokresów (D+20: +163, +249, +275 bp), grupa „wzrost przed” nie zawsze.</li>
+        <li>Ruch od poprzedniego posiedzenia, z 20 sesji, odległość od SMA50 i miejsce w zakresie nie dają stabilnego wzoru — w tabeli przekroju kierunek „trend przed × reakcja” zmienia znak między podokresami, a komórki mają po 3–11 posiedzeń.</li>
+        <li>Reakcja zgodna z trendem przed posiedzeniem wyprzedzała lepsze kolejne 20 sesji (+241 bp wobec +63 przy reakcji pod prąd), ale znowu bez stabilności w podokresach.</li>
+      </ul>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Między posiedzeniami</div>
+      <h2>Najmocniejsze jest to, co dzieje się przed komunikatem</h2>
+      <p class="intro">Noc przed decyzją US100 rośnie: od zamknięcia o 16:00 dnia poprzedniego do 3:00 ET <strong>+27 bp, t 5,0</strong>, na 72 posiedzeniach od 2017 — wobec +4 bp w noce przed innymi środami. Do 14:00 suma rośnie do +34 bp (t 3,1).</p>
+      <figure>
+        <div class="scroll"><svg viewBox="0 0 920 320" role="img" aria-label="Skumulowana zmiana US100 od zamknięcia 16:00 dnia przed decyzją FOMC do 16:00 dnia decyzji, na tle innych śród">
+<rect x="52.0" y="24" width="273.3" height="246" fill="#fdf3d0"/>
+<text x="188.6" y="38" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#8a6708">noc: Azja i otwarcie Europy</text>
+<line x1="52" x2="720" y1="245.4" y2="245.4" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="249.4" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">0</text>
+<line x1="52" x2="720" y1="196.2" y2="196.2" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="200.2" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">10</text>
+<line x1="52" x2="720" y1="147.0" y2="147.0" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="151.0" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">20</text>
+<line x1="52" x2="720" y1="97.8" y2="97.8" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="101.8" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">30</text>
+<line x1="52" x2="720" y1="48.6" y2="48.6" stroke="#ebe8de" stroke-width="1"/>
+<text x="44" y="52.6" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="#85899a">40</text>
+<line x1="52" x2="720" y1="245.4" y2="245.4" stroke="#85899a" stroke-width="1"/>
+<line x1="659.3" x2="659.3" y1="24" y2="270" stroke="#14306b" stroke-width="1.2" stroke-dasharray="3 3"/>
+<text x="654.3" y="38" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="#14306b">14:00</text>
+<text x="52.0" y="288" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">D-1 18:00</text>
+<text x="173.5" y="288" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">D-1 22:00</text>
+<text x="294.9" y="288" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">D 02:00</text>
+<text x="416.4" y="288" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">D 06:00</text>
+<text x="537.8" y="288" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">D 10:00</text>
+<text x="659.3" y="288" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">D 14:00</text>
+<text x="720.0" y="288" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="#4f535e">D 16:00</text>
+<text x="44" y="16" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="#85899a">bp</text>
+<polyline points="52.0,240.5 82.4,236.5 112.7,238.5 143.1,234.1 173.5,225.7 203.8,225.2 234.2,223.8 264.5,223.8 294.9,226.2 325.3,224.7 355.6,211.0 386.0,200.6 416.4,203.1 446.7,204.1 477.1,205.1 507.5,213.9 537.8,210.5 568.2,205.1 598.5,201.1 628.9,196.7 659.3,192.3 689.6,185.4 720.0,198.7" fill="none" stroke="#85899a" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="720.0" cy="198.7" r="4" fill="#85899a" stroke="#fff" stroke-width="2"/>
+<text x="730.0" y="202.7" font-size="12" fill="#16181d"><tspan font-weight="700">+10</tspan> <tspan fill="#4f535e">inne środy</tspan></text>
+<circle cx="52.0" cy="240.5" r="6" fill="transparent"><title>inne środy, D-1 18:00 ET: +1,0 bp</title></circle>
+<circle cx="82.4" cy="236.5" r="6" fill="transparent"><title>inne środy, D-1 19:00 ET: +1,8 bp</title></circle>
+<circle cx="112.7" cy="238.5" r="6" fill="transparent"><title>inne środy, D-1 20:00 ET: +1,4 bp</title></circle>
+<circle cx="143.1" cy="234.1" r="6" fill="transparent"><title>inne środy, D-1 21:00 ET: +2,3 bp</title></circle>
+<circle cx="173.5" cy="225.7" r="6" fill="transparent"><title>inne środy, D-1 22:00 ET: +4,0 bp</title></circle>
+<circle cx="203.8" cy="225.2" r="6" fill="transparent"><title>inne środy, D-1 23:00 ET: +4,1 bp</title></circle>
+<circle cx="234.2" cy="223.8" r="6" fill="transparent"><title>inne środy, D-1 00:00 ET: +4,4 bp</title></circle>
+<circle cx="264.5" cy="223.8" r="6" fill="transparent"><title>inne środy, D 01:00 ET: +4,4 bp</title></circle>
+<circle cx="294.9" cy="226.2" r="6" fill="transparent"><title>inne środy, D 02:00 ET: +3,9 bp</title></circle>
+<circle cx="325.3" cy="224.7" r="6" fill="transparent"><title>inne środy, D 03:00 ET: +4,2 bp</title></circle>
+<circle cx="355.6" cy="211.0" r="6" fill="transparent"><title>inne środy, D 04:00 ET: +7,0 bp</title></circle>
+<circle cx="386.0" cy="200.6" r="6" fill="transparent"><title>inne środy, D 05:00 ET: +9,1 bp</title></circle>
+<circle cx="416.4" cy="203.1" r="6" fill="transparent"><title>inne środy, D 06:00 ET: +8,6 bp</title></circle>
+<circle cx="446.7" cy="204.1" r="6" fill="transparent"><title>inne środy, D 07:00 ET: +8,4 bp</title></circle>
+<circle cx="477.1" cy="205.1" r="6" fill="transparent"><title>inne środy, D 08:00 ET: +8,2 bp</title></circle>
+<circle cx="507.5" cy="213.9" r="6" fill="transparent"><title>inne środy, D 09:00 ET: +6,4 bp</title></circle>
+<circle cx="537.8" cy="210.5" r="6" fill="transparent"><title>inne środy, D 10:00 ET: +7,1 bp</title></circle>
+<circle cx="568.2" cy="205.1" r="6" fill="transparent"><title>inne środy, D 11:00 ET: +8,2 bp</title></circle>
+<circle cx="598.5" cy="201.1" r="6" fill="transparent"><title>inne środy, D 12:00 ET: +9,0 bp</title></circle>
+<circle cx="628.9" cy="196.7" r="6" fill="transparent"><title>inne środy, D 13:00 ET: +9,9 bp</title></circle>
+<circle cx="659.3" cy="192.3" r="6" fill="transparent"><title>inne środy, D 14:00 ET: +10,8 bp</title></circle>
+<circle cx="689.6" cy="185.4" r="6" fill="transparent"><title>inne środy, D 15:00 ET: +12,2 bp</title></circle>
+<circle cx="720.0" cy="198.7" r="6" fill="transparent"><title>inne środy, D 16:00 ET: +9,5 bp</title></circle>
+<polyline points="52.0,254.3 82.4,206.5 112.7,184.4 143.1,170.6 173.5,167.2 203.8,141.6 234.2,139.1 264.5,141.1 294.9,127.3 325.3,113.5 355.6,105.2 386.0,98.3 416.4,96.3 446.7,98.3 477.1,100.8 507.5,87.0 537.8,84.5 568.2,96.3 598.5,99.8 628.9,93.4 659.3,80.6 689.6,45.2 720.0,138.6" fill="none" stroke="#14306b" stroke-width="2.4" stroke-linejoin="round"/>
+<circle cx="720.0" cy="138.6" r="4" fill="#14306b" stroke="#fff" stroke-width="2"/>
+<text x="730.0" y="142.6" font-size="12" fill="#16181d"><tspan font-weight="700">+22</tspan> <tspan fill="#4f535e">FOMC (n = 74)</tspan></text>
+<circle cx="52.0" cy="254.3" r="6" fill="transparent"><title>FOMC (n = 74), D-1 18:00 ET: −1,8 bp</title></circle>
+<circle cx="82.4" cy="206.5" r="6" fill="transparent"><title>FOMC (n = 74), D-1 19:00 ET: +7,9 bp</title></circle>
+<circle cx="112.7" cy="184.4" r="6" fill="transparent"><title>FOMC (n = 74), D-1 20:00 ET: +12,4 bp</title></circle>
+<circle cx="143.1" cy="170.6" r="6" fill="transparent"><title>FOMC (n = 74), D-1 21:00 ET: +15,2 bp</title></circle>
+<circle cx="173.5" cy="167.2" r="6" fill="transparent"><title>FOMC (n = 74), D-1 22:00 ET: +15,9 bp</title></circle>
+<circle cx="203.8" cy="141.6" r="6" fill="transparent"><title>FOMC (n = 74), D-1 23:00 ET: +21,1 bp</title></circle>
+<circle cx="234.2" cy="139.1" r="6" fill="transparent"><title>FOMC (n = 74), D-1 00:00 ET: +21,6 bp</title></circle>
+<circle cx="264.5" cy="141.1" r="6" fill="transparent"><title>FOMC (n = 74), D 01:00 ET: +21,2 bp</title></circle>
+<circle cx="294.9" cy="127.3" r="6" fill="transparent"><title>FOMC (n = 74), D 02:00 ET: +24,0 bp</title></circle>
+<circle cx="325.3" cy="113.5" r="6" fill="transparent"><title>FOMC (n = 74), D 03:00 ET: +26,8 bp</title></circle>
+<circle cx="355.6" cy="105.2" r="6" fill="transparent"><title>FOMC (n = 74), D 04:00 ET: +28,5 bp</title></circle>
+<circle cx="386.0" cy="98.3" r="6" fill="transparent"><title>FOMC (n = 74), D 05:00 ET: +29,9 bp</title></circle>
+<circle cx="416.4" cy="96.3" r="6" fill="transparent"><title>FOMC (n = 74), D 06:00 ET: +30,3 bp</title></circle>
+<circle cx="446.7" cy="98.3" r="6" fill="transparent"><title>FOMC (n = 74), D 07:00 ET: +29,9 bp</title></circle>
+<circle cx="477.1" cy="100.8" r="6" fill="transparent"><title>FOMC (n = 74), D 08:00 ET: +29,4 bp</title></circle>
+<circle cx="507.5" cy="87.0" r="6" fill="transparent"><title>FOMC (n = 74), D 09:00 ET: +32,2 bp</title></circle>
+<circle cx="537.8" cy="84.5" r="6" fill="transparent"><title>FOMC (n = 74), D 10:00 ET: +32,7 bp</title></circle>
+<circle cx="568.2" cy="96.3" r="6" fill="transparent"><title>FOMC (n = 74), D 11:00 ET: +30,3 bp</title></circle>
+<circle cx="598.5" cy="99.8" r="6" fill="transparent"><title>FOMC (n = 74), D 12:00 ET: +29,6 bp</title></circle>
+<circle cx="628.9" cy="93.4" r="6" fill="transparent"><title>FOMC (n = 74), D 13:00 ET: +30,9 bp</title></circle>
+<circle cx="659.3" cy="80.6" r="6" fill="transparent"><title>FOMC (n = 74), D 14:00 ET: +33,5 bp</title></circle>
+<circle cx="689.6" cy="45.2" r="6" fill="transparent"><title>FOMC (n = 74), D 15:00 ET: +40,7 bp</title></circle>
+<circle cx="720.0" cy="138.6" r="6" fill="transparent"><title>FOMC (n = 74), D 16:00 ET: +21,7 bp</title></circle>
+</svg></div>
+        <figcaption><b>Rys. 5</b> · Skumulowana zmiana od zamknięcia o 16:00 dnia przed komunikatem, godzina po godzinie (czas ET, H1 2017–26). Większość przychodzi w nocy, przed otwarciem Europy; ranek w Nowym Jorku dodaje niewiele, a ostatnia godzina dnia decyzji oddaje połowę.</figcaption>
+      </figure>
+      <ul class="plain" style="margin-top:18px">
+        <li>Stabilne w podokresach: noc przed FOMC +18 / +43 / +20 bp w 2017–19 / 2020–22 / 2023–26, noce przed innymi środami +6 / +3 / +4. To znany „dryf przed ogłoszeniem” (Lucca i Moench, 2015) — na US100 nadal działa, choć w 2024–26 słabiej niż w 2020–22. Na BTCUSD ta sama noc +31 bp (t 1,6).</li>
+        <li>Cykl tygodni między posiedzeniami (Cieslak, Morse, Vissing-Jorgensen: zarobek w tygodniach parzystych) na US100 2017–26 nie istnieje: tygodnie parzyste +7,2 bp dziennie, nieparzyste +6,5.</li>
+        <li>Trzeci dzień po decyzji wypada średnio +37 bp (t 2,1), ale to zwykle poniedziałek — znany efekt dnia tygodnia, nie FOMC.</li>
+        <li>Publikacja protokołu (3 tygodnie po posiedzeniu, też 14:00): pierwsza świeca prawie bez ruchu (|8| bp), popołudnie +19 bp (t 1,9, 22 publikacje) — słabo, do sprawdzenia na dłuższej historii.</li>
+      </ul>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Strategie i backtesty</div>
+      <h2>Pięć dokumentów, cztery iteracje</h2>
+      <p class="intro">Silnik nie ma kalendarza, więc każda strategia FOMC zaczyna się od rozpoznania dnia po cenie. Iteracje 1–2 poprawiały rozpoznanie, 3 — okna wejścia i wyjścia, 4 — składanie nóg w jeden dokument.</p>
+      <div class="grid2">
+        <div class="card"><h3>Iteracja 1 <span class="tag att">4 fałszywe dni</span></h3><p>Środa, suma zakresów świec 14:00–14:10 większa niż 6,9 średniego zakresu świecy 13:00–13:55. 18 z 22 posiedzeń, ale też dwie publikacje protokołu i dwie inne środy — strategie wielodniowe wchodziły po fałszywym sygnale i blokowały prawdziwy.</p></div>
+        <div class="card"><h3>Iteracja 2 <span class="tag ok">0 fałszywych dni</span></h3><p>Drugi krok: konferencja. Suma zakresów dziewięciu świec 14:30–15:10 większa niż 16,5 średniej. Protokół nie ma konferencji i odpada. 18 z 22 posiedzeń, zero innych dni; pominięte 31.07.2024, 7.11.2024 (czwartek), 29.01.2025 i 18.03.2026 — spokojne reakcje. Decyzja na świecy 15:10.</p></div>
+        <div class="card"><h3>Iteracja 3 <span class="tag att">okna</span></h3><p>Luźniejsze rozpoznanie (3,5 / 14: 20 posiedzeń i 3 fałszywe dni), wyjście z wybicia dołem po D+5, D+10 i D+15, okno wybicia: tylko noc po decyzji albo do końca D+4.</p></div>
+        <div class="card"><h3>Iteracja 4 <span class="tag ok">złożenie</span></h3><p>#63: koniec konferencji i wybicie dołem → long do D+10 w jednym dokumencie: 28 transakcji, Sharpe 1,48, 52% rocznie, obsunięcie 33%, PF 5,61; bez pięciu najlepszych transakcji 8%. Trzecia noga (noc po decyzji) nie otworzyła się ani razu: jej wejście wypadało na tej samej świecy co wyjście z shortu, a silnik nie otwiera nowej pozycji na świecy, na której zamyka poprzednią.</p></div>
+      </div>
+      <div class="card" style="margin-top:14px"><p class="rule">rng = high − low · calm = value_when(sb == 54, average(rng, 12)) · s1 = value_when(sb == 57, sum(rng, 3))<br>fomc_bar = weekday == WEDNESDAY and sb == 69 and s1 &gt; p.k1 × calm and sum(rng, 9) &gt; p.k2 × calm · since = bars_since(fomc_bar)</p></div>
+      <div class="table-wrap" style="margin-top:18px">
+        <table>
+          <thead><tr><th>strategia</th><th>wariant</th><th class="n">transakcje</th><th class="n">Sharpe</th><th class="n">rocznie</th><th class="n">max DD</th><th class="n">PF</th><th class="n">trafienia</th><th>lata (wynik / transakcje)</th></tr></thead>
+          <tbody>
+<tr><td class="nw"><b>#59 r1</b> <span style="color:var(--ink-3)">r148</span></td><td style="min-width:240px">koniec konferencji, rozpoznanie jednostopniowe (k 6,9)</td><td class="n">22</td><td class="n"><b>1,06</b></td><td class="n">8%</td><td class="n">4%</td><td class="n">3,45</td><td class="n">59%</td><td style="font-size:12.5px;min-width:190px">2024: 13% / 8 · 2025: -1% / 8 · 2026: 12% / 6</td></tr>
+<tr><td class="nw"><b>#59 r2</b> <span style="color:var(--ink-3)">r152</span></td><td style="min-width:240px">koniec konferencji, rozpoznanie dwustopniowe 5 / 16,5</td><td class="n">18</td><td class="n"><b>1,07</b></td><td class="n">9%</td><td class="n">4%</td><td class="n">3,83</td><td class="n">61%</td><td style="font-size:12.5px;min-width:190px">2024: 13% / 6 · 2025: -1% / 7 · 2026: 11% / 5</td></tr>
+<tr><td class="nw"><b>#59 r2</b> <span style="color:var(--ink-3)">r156</span></td><td style="min-width:240px">to samo, rozpoznanie luźniejsze 3,5 / 14</td><td class="n">23</td><td class="n"><b>1,19</b></td><td class="n">10%</td><td class="n">3%</td><td class="n">3,85</td><td class="n">61%</td><td style="font-size:12.5px;min-width:190px">2024: 13% / 8 · 2025: 1% / 9 · 2026: 13% / 6</td></tr>
+<tr><td class="nw"><b>#62 r1</b> <span style="color:var(--ink-3)">r151</span></td><td style="min-width:240px">noc po decyzji, rozpoznanie jednostopniowe</td><td class="n">22</td><td class="n"><b>0,79</b></td><td class="n">9%</td><td class="n">13%</td><td class="n">1,90</td><td class="n">55%</td><td style="font-size:12.5px;min-width:190px">2024: 14% / 8 · 2025: -4% / 8 · 2026: 16% / 6</td></tr>
+<tr><td class="nw"><b>#62 r2</b> <span style="color:var(--ink-3)">r155</span></td><td style="min-width:240px">noc po decyzji, dwustopniowe</td><td class="n">18</td><td class="n"><b>0,92</b></td><td class="n">10%</td><td class="n">13%</td><td class="n">2,24</td><td class="n">61%</td><td style="font-size:12.5px;min-width:190px">2024: 15% / 6 · 2025: -4% / 7 · 2026: 18% / 5</td></tr>
+<tr><td class="nw"><b>#60 r1</b> <span style="color:var(--ink-3)">r149</span></td><td style="min-width:240px">D+2 pod ceną z 14:00 → long do D+10, jednostopniowe</td><td class="n">9</td><td class="n"><b>0,27</b></td><td class="n">4%</td><td class="n">25%</td><td class="n">1,26</td><td class="n">44%</td><td style="font-size:12.5px;min-width:190px">2024: -8% / 2 · 2025: 33% / 5 · 2026: -10% / 2</td></tr>
+<tr><td class="nw"><b>#60 r2</b> <span style="color:var(--ink-3)">r153</span></td><td style="min-width:240px">to samo, dwustopniowe</td><td class="n">6</td><td class="n"><b>0,51</b></td><td class="n">9%</td><td class="n">24%</td><td class="n">2,46</td><td class="n">50%</td><td style="font-size:12.5px;min-width:190px">2025: 34% / 5 · 2026: -7% / 1</td></tr>
+<tr><td class="nw"><b>#61 r1</b> <span style="color:var(--ink-3)">r150</span></td><td style="min-width:240px">wybicie dołem zakresu 14–16 → long do D+10, jednostopniowe</td><td class="n">13</td><td class="n"><b>0,95</b></td><td class="n">30%</td><td class="n">33%</td><td class="n">2,75</td><td class="n">54%</td><td style="font-size:12.5px;min-width:190px">2024: 19% / 3 · 2025: 19% / 6 · 2026: 55% / 4</td></tr>
+<tr class="best"><td class="nw"><b>#61 r2</b> <span style="color:var(--ink-3)">r154</span></td><td style="min-width:240px">to samo, dwustopniowe</td><td class="n">10</td><td class="n"><b>1,24</b></td><td class="n">39%</td><td class="n">33%</td><td class="n">5,69</td><td class="n">60%</td><td style="font-size:12.5px;min-width:190px">2024: 29% / 1 · 2025: 22% / 6 · 2026: 59% / 3</td></tr>
+<tr><td class="nw"><b>#61 r2</b> <span style="color:var(--ink-3)">r157</span></td><td style="min-width:240px">to samo, rozpoznanie 3,5 / 14</td><td class="n">15</td><td class="n"><b>1,09</b></td><td class="n">41%</td><td class="n">41%</td><td class="n">3,21</td><td class="n">60%</td><td style="font-size:12.5px;min-width:190px">2024: 19% / 3 · 2025: 47% / 8 · 2026: 51% / 4</td></tr>
+<tr><td class="nw"><b>#61 r2</b> <span style="color:var(--ink-3)">r158</span></td><td style="min-width:240px">wyjście D+5</td><td class="n">10</td><td class="n"><b>1,01</b></td><td class="n">22%</td><td class="n">34%</td><td class="n">2,51</td><td class="n">70%</td><td style="font-size:12.5px;min-width:190px">2024: 30% / 2 · 2025: -1% / 5 · 2026: 41% / 3</td></tr>
+<tr><td class="nw"><b>#61 r2</b> <span style="color:var(--ink-3)">r159</span></td><td style="min-width:240px">wyjście D+15</td><td class="n">10</td><td class="n"><b>0,37</b></td><td class="n">3%</td><td class="n">69%</td><td class="n">1,10</td><td class="n">40%</td><td style="font-size:12.5px;min-width:190px">2024: 29% / 1 · 2025: -36% / 5 · 2026: 39% / 4</td></tr>
+<tr><td class="nw"><b>#61 r2</b> <span style="color:var(--ink-3)">r162</span></td><td style="min-width:240px">wybicie tylko w nocy po decyzji</td><td class="n">9</td><td class="n"><b>1,18</b></td><td class="n">35%</td><td class="n">33%</td><td class="n">5,39</td><td class="n">56%</td><td style="font-size:12.5px;min-width:190px">2024: 29% / 1 · 2025: 13% / 5 · 2026: 59% / 3</td></tr>
+<tr><td class="nw"><b>#61 r2</b> <span style="color:var(--ink-3)">r163</span></td><td style="min-width:240px">wybicie do końca D+4</td><td class="n">11</td><td class="n"><b>1,23</b></td><td class="n">40%</td><td class="n">33%</td><td class="n">5,86</td><td class="n">64%</td><td style="font-size:12.5px;min-width:190px">2024: 29% / 1 · 2025: 22% / 6 · 2026: 61% / 4</td></tr>
+<tr class="best"><td class="nw"><b>#63 r1</b> <span style="color:var(--ink-3)">r160</span></td><td style="min-width:240px">koniec konferencji + wybicie dołem (noga nocy nie weszła)</td><td class="n">28</td><td class="n"><b>1,48</b></td><td class="n">52%</td><td class="n">33%</td><td class="n">5,61</td><td class="n">64%</td><td style="font-size:12.5px;min-width:190px">2024: 41% / 7 · 2025: 23% / 13 · 2026: 71% / 8</td></tr>
+<tr><td class="nw"><b>#63 r1</b> <span style="color:var(--ink-3)">r161</span></td><td style="min-width:240px">to samo, rozpoznanie 3,5 / 14</td><td class="n">38</td><td class="n"><b>1,32</b></td><td class="n">55%</td><td class="n">40%</td><td class="n">3,50</td><td class="n">63%</td><td style="font-size:12.5px;min-width:190px">2024: 31% / 11 · 2025: 49% / 17 · 2026: 64% / 10</td></tr>
+<tr><td class="nw"><b>#63 r2</b> <span style="color:var(--ink-3)">r164</span></td><td style="min-width:240px">dwie nogi: bez nocy po decyzji</td><td class="n">28</td><td class="n"><b>1,48</b></td><td class="n">52%</td><td class="n">33%</td><td class="n">5,61</td><td class="n">64%</td><td style="font-size:12.5px;min-width:190px">2024: 41% / 7 · 2025: 23% / 13 · 2026: 71% / 8</td></tr>
+<tr><td class="nw"><b>#63 r2</b> <span style="color:var(--ink-3)">r165</span></td><td style="min-width:240px">dwie nogi, rozpoznanie 3,5 / 14</td><td class="n">38</td><td class="n"><b>1,32</b></td><td class="n">55%</td><td class="n">40%</td><td class="n">3,50</td><td class="n">63%</td><td style="font-size:12.5px;min-width:190px">2024: 31% / 11 · 2025: 49% / 17 · 2026: 64% / 10</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px">Okno 1.01.2024 – 27.10.2026, US100 M5, koszty brokera (spread, finansowanie za noc), depozyt 20% kapitału, bez stopów. Strategie zapisane jako autor „agent”: <strong>#59</strong> koniec konferencji, <strong>#60</strong> D+2 pod ceną z 14:00, <strong>#61</strong> wybicie dołem zakresu, <strong>#62</strong> noc po decyzji, <strong>#63</strong> złożenie trzech nóg.</p>
+      <ul class="plain">
+        <li><strong>Koniec konferencji (#59)</strong> — Sharpe 1,07 przy obsunięciu 4%: mało transakcji, ale wynik czysty. 2025 na zero; zysk niosą cztery duże spadki.</li>
+        <li><strong>Wybicie dołem (#61)</strong> — najlepszy pojedynczy dokument: Sharpe 1,24, 39% rocznie, ale <strong>10 transakcji</strong> i obsunięcie 33% (jedna strata przy 4-krotnej dźwigni z depozytu 20%). Wyjście D+10 lepsze niż D+5 (1,01) i D+15 (0,37, obsunięcie 69%) — wynik wrażliwy na długość trzymania, czyli dopasowany. Na dokładnych datach M5 2024–26 ta sama reguła daje 13 transakcji, 7 zyskownych, średnio +172 bp netto — większość z czterech dużych odbić (1.05.2024, 18.06.2025, 29.04.2026, 29.07.2026). To reguła grubego ogona, nie wysokiej trafności.</li>
+        <li><strong>D+2 pod ceną z 14:00 (#60)</strong> — w silniku tylko 6 transakcji, bo rozpoznanie pominęło dwa największe spadki (31.07.2024, 18.03.2026). Na dokładnych datach i dłuższej historii to najmocniejsza reguła wielodniowa (poniżej).</li>
+        <li><strong>Noc po decyzji (#62)</strong> — Sharpe 0,92 w 2024–26, ale na H1 2017–26 ta sama noc ma −2 bp netto (2020–22 −68). Do traktowania jako cecha ostatnich lat.</li>
+        <li><strong>Złożenie (#63)</strong> — najlepszy wynik badania: short końca konferencji i long po wybiciu dołem nie nakładają się w czasie, więc dodają się: Sharpe 1,48, 52% rocznie, 28 transakcji, każdy rok na plusie (2024: 41% · 2025: 23% · 2026: 71%). Ale bez pięciu najlepszych transakcji zostaje 8% — wynik niosą cztery–pięć dużych odbić.</li>
+      </ul>
+      <p style="margin-top:18px"><strong>Na dokładnych datach</strong> (poza silnikiem, H1 2017–26, koszty: 2 bp spreadu na transakcję i 2,2 bp finansowania za noc) — tak wyglądałyby te nogi, gdyby silnik znał kalendarz:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>reguła</th><th class="n">n</th><th class="n">bp netto / transakcję</th><th class="n">t</th><th class="n">zyskowne</th><th class="n">2017–19</th><th class="n">2020–22</th><th class="n">2023–26</th></tr></thead>
+          <tbody>
+<tr class="best"><td>noc przed: long 16:00 D−1 → 3:00 D</td><td class="n">72</td><td class="n"><b>+23</b></td><td class="n">+4,25</td><td class="n">69%</td><td class="n">+14</td><td class="n">+39</td><td class="n">+16</td></tr>
+<tr><td>noc i ranek przed: long 16:00 D−1 → 14:00 D</td><td class="n">74</td><td class="n"><b>+29</b></td><td class="n">+2,74</td><td class="n">59%</td><td class="n">+13</td><td class="n">+63</td><td class="n">+15</td></tr>
+<tr><td>koniec konferencji: short 15:00 → 16:00</td><td class="n">74</td><td class="n"><b>+17</b></td><td class="n">+1,78</td><td class="n">53%</td><td class="n">+7</td><td class="n">+6</td><td class="n">+33</td></tr>
+<tr><td>noc po: long 16:00 → 10:00 D+1</td><td class="n">74</td><td class="n"><b>−2</b></td><td class="n">−0,12</td><td class="n">55%</td><td class="n">+5</td><td class="n">−68</td><td class="n">+45</td></tr>
+<tr><td>wybicie dołem zakresu 14–16 → long do D+10</td><td class="n">35</td><td class="n"><b>+91</b></td><td class="n">+1,24</td><td class="n">60%</td><td class="n">−118</td><td class="n">+77</td><td class="n">+297</td></tr>
+<tr><td>D+2 pod ceną z 14:00 → long D+2 → D+10</td><td class="n">36</td><td class="n"><b>+118</b></td><td class="n">+2,10</td><td class="n">72%</td><td class="n">+27</td><td class="n">+172</td><td class="n">+125</td></tr>
+<tr class="ref"><td>każde FOMC: long 16:00 → D+10 (odniesienie)</td><td class="n">74</td><td class="n"><b>+43</b></td><td class="n">+0,92</td><td class="n">54%</td><td class="n">−106</td><td class="n">+37</td><td class="n">+153</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px"><span class="hl">Najmocniejszej reguły — nocy przed decyzją — silnik nie może dziś policzyć</span>: o 16:00 dnia przed posiedzeniem nic w cenie nie zdradza, że jutro jest FOMC. Do tego potrzebny jest kalendarz zdarzeń w języku strategii.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">10 · Dziś, 28 października</div>
+      <h2>Posiedzenie trwa — co mówią dane</h2>
+      <p>Komunikat o 14:00 ET, czyli <strong>19:00 w Polsce</strong> (USA zmienia czas dopiero 1 listopada, więc różnica wynosi dziś 5 godzin); konferencja od 19:30. Przed posiedzeniem (zamknięcie 27.10, 29 653): od poprzedniego posiedzenia +242 bp (środkowy tercyl), z 20 sesji −228 bp, 52 bp pod SMA50, w dolnej trzeciej części zakresu 20 sesji, około 5,5% pod szczytem. Noc przed decyzją już się odbyła: do 6:30 ET (11:30 w Polsce) +42 bp, powyżej średniej.</p>
+      <ul class="plain">
+        <li>Pierwsza świeca 19:00–19:05 — według tych danych bez informacji o kierunku na kolejne tygodnie.</li>
+        <li>Końcówka konferencji: historycznie od 20:15 do 21:00 w Polsce US100 częściej spadał (64% w 2024–26).</li>
+        <li>Sygnał na tygodnie: zamknięcie w piątek 30.10 (21:00 w Polsce) względem ceny tuż przed komunikatem (zamknięcie świecy 18:55–19:00). Pod nią — historycznie kolejne dwa tygodnie wyraźnie lepsze niż przeciętne; nad nią — przeciętne.</li>
+        <li>Wzrost przed komunikatem: jeśli od wczorajszego zamknięcia do 19:00 utrzyma się powyżej +40 bp (dziś rano +42), to górny tercyl — po nim D+1 wypadał średnio −43 bp, a kolejne 10 sesji +30 bp (48% wzrostów), wobec +139 bp po wejściu w komunikat ze spadkiem.</li>
+      </ul>
+      <p>To opis historii, nie rekomendacja — moduł strategii tylko bada, decyzja należy do operatora.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">11 · Zastrzeżenia</div>
+      <h2>Co może zawyżać te liczby</h2>
+      <ul class="plain">
+        <li><strong>Mała próba</strong>: 22 posiedzenia na M5, 74 na H1. Strategie w silniku mają 6–23 transakcji; ich Sharpe opisuje kilka zdarzeń, a nie rozkład.</li>
+        <li><strong>Wybór po obejrzeniu danych</strong>: okno 15:15, próg rozpoznania, wyjście D+10 i warunek D+2 wybrałem, patrząc na te same posiedzenia, na których je liczę. Tylko noc przed decyzją i spadek w ostatniej godzinie mają poparcie poza tym oknem (literatura i podokresy 2017–23).</li>
+        <li><strong>Byczy rynek</strong>: US100 przez cały okres rośnie, więc każda reguła „long po czymś” wygląda dobrze. Dlatego porównuję z dryfem i z kontrolą na zwykłych dniach.</li>
+        <li><strong>Rozpoznanie po cenie</strong> pomija posiedzenia ze spokojną reakcją — strategie w silniku grają tylko FOMC „widoczne” w cenie, co samo jest selekcją.</li>
+        <li><strong>Jeden instrument</strong>: bez rentowności obligacji i dolara nie da się odróżnić reakcji na stopy od reakcji na ryzyko; tam „prawdziwa odpowiedź” może być widoczna wcześniej niż na indeksie.</li>
+      </ul>
+    </section>
+
+    <section>
+      <div class="eyebrow">12 · Co dalej</div>
+      <h2>Kalendarz w języku strategii odblokowuje najlepszą regułę</h2>
+      <ul class="plain">
+        <li><strong>Kalendarz zdarzeń jako seria</strong> (np. dni do i od posiedzenia FOMC, publikacji protokołu, CPI) — zmiana języka strategii, więc zmiana OpenSpec. Odblokowuje noc przed decyzją (t 4,3 netto na dokładnych datach), daje dokładne daty zamiast rozpoznania i pozwala policzyć #59–#63 na wszystkich 22 posiedzeniach.</li>
+        <li><strong>Test na nowych danych</strong>: #59, #61 i #63 bez zmian w dokumentach na posiedzeniach od 28.10.2026 (osiem w roku — pierwsza sensowna ocena po roku).</li>
+        <li><strong>Rentowności i dolar</strong> w archiwum — wtedy da się sprawdzić, czy kierunek po FOMC widać wcześniej na obligacjach niż na indeksie.</li>
+        <li>Odrzucone kierunki (nie powtarzać bez nowej hipotezy): granie pierwszej świecy, granie kierunku popołudnia lub D+1 na tygodnie, cykl tygodni parzystych, decyzja jako sygnał.</li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Dane: archiwum US100 i BTCUSD produkcji do 27.10.2026, kalendarz federalreserve.gov · przebiegi r148–r165</span>
+    <span>Wyniki historyczne · rachunek demo · tylko badania</span>
+  </div>
+</footer>
