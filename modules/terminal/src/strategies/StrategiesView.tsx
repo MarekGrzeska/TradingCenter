@@ -14,7 +14,8 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { afterTurn, createdDuringTurn, documentText } from "./followTurn";
 import { HistoryPanel } from "./HistoryPanel";
-import { trials } from "./order";
+import { timeframesOf, trials } from "./order";
+import { interval } from "./present";
 import {
   createStrategiesApi,
   Refused,
@@ -71,6 +72,7 @@ export function StrategiesView({
   const chatOwner = useRef<ChatOwner>(null);
   const [archived, setArchived] = useState(false);
   const [query, setQuery] = useState("");
+  const [timeframe, setTimeframe] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
   const [creating, setCreating] = useState(false);
   const [base, setBase] = useState<Revision | null>(null);
@@ -385,6 +387,19 @@ export function StrategiesView({
             aria-label="szukaj strategii"
             className={`${editing ? "w-full" : "w-72"} rounded border border-border bg-panel px-2 py-1 text-ink placeholder:text-ink-faint`}
           />
+          <select
+            aria-label="Interwał strategii"
+            value={timeframe}
+            onChange={(e) => setTimeframe(e.target.value)}
+            className="rounded border border-border bg-panel px-2 py-1 text-ink"
+          >
+            <option value="">każdy interwał</option>
+            {timeframesOf(list.value).map((tf) => (
+              <option key={tf} value={tf}>
+                {interval(tf)}
+              </option>
+            ))}
+          </select>
           <label className="flex items-center gap-1 text-ink-muted">
             <input type="checkbox" checked={archived} onChange={(e) => setArchived(e.target.checked)} /> zarchiwizowane
           </label>
@@ -394,7 +409,7 @@ export function StrategiesView({
         {list.status === "ready" && list.value.length === 0 && (
           <p className="text-xs text-ink-muted">{archived ? "Nic nie jest zarchiwizowane." : "Nie ma jeszcze strategii."}</p>
         )}
-        <StrategyList strategies={list.value} query={query} openId={openId} wide={!editing} onOpen={(id) => void open(id)} />
+        <StrategyList strategies={list.value} query={query} timeframe={timeframe} openId={openId} wide={!editing} onOpen={(id) => void open(id)} />
       </aside>
 
       {editing && (
