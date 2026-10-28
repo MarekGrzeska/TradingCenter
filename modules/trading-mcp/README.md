@@ -39,7 +39,9 @@ system keeps.
   who may reach this module over the network, and the one exempt path (`/health`).
 - `server.py` / `__main__.py` — the FastMCP instance and its one transport.
 - `tools/account.py` — `get_positions`, `get_working_orders`, `get_balance`: reads,
-  annotated `readOnlyHint=True`.
+  annotated `readOnlyHint=True`. Every tool that reads or changes the account takes an optional
+  `account_id`, sent as the gateway's `X-Capital-Account` and never turned into a switch of the
+  active account, which would move every other caller with it.
 - `tools/instruments.py` — `get_instrument_terms` and `size_for_margin`: reads, and the
   only arithmetic in the module. The terms are the provider's own — the deposit it
   requires, the smallest and largest order it takes, the step sizes move in — none of

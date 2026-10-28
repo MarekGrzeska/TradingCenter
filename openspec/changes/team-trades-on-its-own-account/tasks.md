@@ -18,12 +18,12 @@
 
 ## 3. trading-mcp
 
-- [ ] 3.1 Opcjonalne `account_id` w `get_positions`, `get_working_orders`, `get_balance`, `place_order`, `close_position`, `amend_stops`, `cancel_working_order`, `top_up_demo_account`, przekazywane jako `X-Capital-Account`
-- [ ] 3.2 `get_balance` z `account_id` czyta wskazane konto, a nie aktywne
-- [ ] 3.3 Konto w obu liniach `trading_mcp.trace` każdego zapisu
-- [ ] 3.4 Opis `switch_active_account` bez ostrzeżenia o strumieniu; w razie potrzeby świadoma korekta sufitu powierzchni narzędzi
-- [ ] 3.5 `scripts/contract.py` — odświeżenie snapshotu OpenAPI bramki i `check`
-- [ ] 3.6 Testy: konto trafia do nagłówka, brak konta to brak nagłówka, nieznane konto to odmowa, a nie awaria dostępu
+- [x] 3.1 Opcjonalne `account_id` w `get_positions`, `get_working_orders`, `get_balance`, `place_order`, `close_position`, `amend_stops`, `cancel_working_order`, `top_up_demo_account`, przekazywane jako `X-Capital-Account`
+- [x] 3.2 `get_balance` z `account_id` czyta wskazane konto, a nie aktywne
+- [x] 3.3 Konto w obu liniach `trading_mcp.trace` każdego zapisu
+- [x] 3.4 Opis `switch_active_account` bez ostrzeżenia o strumieniu; w razie potrzeby świadoma korekta sufitu powierzchni narzędzi
+- [x] 3.5 `scripts/contract.py` — odświeżenie snapshotu OpenAPI bramki i `check`
+- [x] 3.6 Testy: konto trafia do nagłówka, brak konta to brak nagłówka, nieznane konto to odmowa, a nie awaria dostępu
 
 ## 4. teams
 

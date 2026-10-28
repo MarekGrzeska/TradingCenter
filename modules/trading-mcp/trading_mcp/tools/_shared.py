@@ -3,10 +3,10 @@ seams that turn a `GatewayClient` outcome into what a tool answers."""
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from mcp.types import ToolAnnotations
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .. import trace
 from ..client import GatewayClient
@@ -18,6 +18,13 @@ READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotent
 # Applied to every tool that can change the account. `idempotentHint=False` because none of the four
 # repeat safely: a second `place_order` is a second position.
 WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=False)
+
+
+# Every tool that reads or changes the account takes it. Naming one never switches the active account.
+AccountId = Annotated[
+    str | None,
+    Field(description="the account to act on, an id from `list_accounts`; omitted, the active one"),
+]
 
 
 class OrderResultOut(BaseModel):
@@ -34,9 +41,9 @@ class OrderResultOut(BaseModel):
     level: float | None = None
 
 
-async def _read(gateway: GatewayClient, path: str) -> Any:
+async def _read(gateway: GatewayClient, path: str, account: str | None = None) -> Any:
     try:
-        return await gateway.get(path)
+        return await gateway.get(path, account=account)
     except GatewayUnavailable as err:
         raise ToolRefusal(
             f"access failure: could not reach capital-gateway ({err}). This is a "
@@ -63,12 +70,13 @@ async def _send_change(
     json: dict | None = None,
     *,
     read_back: str,
+    account: str | None = None,
 ) -> Any:
     """The error translation every write shares, without any reading of what came back. `read_back` is
     what the model should look at before trying again, and it differs by what was being changed."""
-    who = trace.sending(method, path, json)
+    who = trace.sending(method, path, json, account)
     try:
-        payload = await gateway.write(method, path, json=json)
+        payload = await gateway.write(method, path, json=json, account=account)
     except GatewayUnavailable as err:
         trace.outcome(method, path, "unknown (gateway unreachable)", who)
         raise ToolRefusal(
@@ -96,7 +104,12 @@ async def _send_change(
 
 
 async def _write(
-    gateway: GatewayClient, method: str, path: str, json: dict | None = None
+    gateway: GatewayClient,
+    method: str,
+    path: str,
+    json: dict | None = None,
+    *,
+    account: str | None = None,
 ) -> OrderResultOut:
     """Send the write, and translate what came back into two outcomes: an access failure whose effect
     is unknown, or a refusal that never touched the account. The demo check is not here — it ran once."""
@@ -106,6 +119,7 @@ async def _write(
         path,
         json=json,
         read_back="read positions or working orders",
+        account=account,
     )
 
     status: str = payload["status"]

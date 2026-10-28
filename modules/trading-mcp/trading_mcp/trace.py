@@ -22,18 +22,28 @@ def caller() -> tuple[str, str]:
     return application or UNKNOWN, request_header("x-ms-client-principal-id") or UNKNOWN
 
 
-def sending(method: str, path: str, body: dict[str, Any] | None) -> tuple[str, str]:
+def sending(
+    method: str, path: str, body: dict[str, Any] | None, account: str | None = None
+) -> tuple[str, str, str]:
     application, person = caller()
+    on = account or "active"
     log.info(
-        "account write sending: %s %s body=%s application=%s person=%s",
+        "account write sending: %s %s body=%s account=%s application=%s person=%s",
         method,
         path,
         json.dumps(body, sort_keys=True) if body is not None else "-",
+        on,
         application,
         person,
     )
-    return application, person
+    return on, application, person
 
 
-def outcome(method: str, path: str, result: str, who: tuple[str, str]) -> None:
-    log.info("account write outcome: %s %s %s application=%s person=%s", method, path, result, *who)
+def outcome(method: str, path: str, result: str, who: tuple[str, str, str]) -> None:
+    log.info(
+        "account write outcome: %s %s %s account=%s application=%s person=%s",
+        method,
+        path,
+        result,
+        *who,
+    )

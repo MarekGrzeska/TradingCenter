@@ -16,6 +16,8 @@ from .errors import GatewayRefused, GatewayUnavailable, NotDemoEnvironment
 # Matches `capital_gateway/config.py`'s `API_KEY_HEADER`. Duplicated rather than imported: no shared
 # library between modules.
 GATEWAY_KEY_HEADER = "X-Gateway-Key"
+# The gateway's own name for "act on this account"; omitted, it acts on the active one.
+ACCOUNT_HEADER = "X-Capital-Account"
 
 DEMO_ENVIRONMENT = "demo"
 
@@ -55,17 +57,22 @@ class GatewayClient:
                 f"{DEMO_ENVIRONMENT!r} — this module never touches a live account."
             )
 
-    async def get(self, path: str, params: dict | None = None) -> dict:
+    async def get(
+        self, path: str, params: dict | None = None, *, account: str | None = None
+    ) -> dict:
         """A read. Retried once on a `5xx` before this module gives up on it."""
-        response = await self._send("GET", path, params=params)
+        headers = _on(account)
+        response = await self._send("GET", path, params=params, headers=headers)
         if response.status_code >= 500:
-            response = await self._send("GET", path, params=params)
+            response = await self._send("GET", path, params=params, headers=headers)
         return _parsed(response)
 
-    async def write(self, method: str, path: str, json: dict | None = None) -> dict:
+    async def write(
+        self, method: str, path: str, json: dict | None = None, *, account: str | None = None
+    ) -> dict:
         """A request that changes the account. Sent exactly once — see the module
         docstring — whatever the gateway answers or fails to."""
-        response = await self._send(method, path, json=json)
+        response = await self._send(method, path, json=json, headers=_on(account))
         return _parsed(response)
 
     async def _send(self, method: str, path: str, **kwargs) -> httpx.Response:
@@ -80,6 +87,10 @@ class GatewayClient:
             raise GatewayUnavailable(f"the gateway is unreachable: {err}") from err
 
         return response
+
+
+def _on(account: str | None) -> dict[str, str]:
+    return {ACCOUNT_HEADER: account} if account else {}
 
 
 def _parsed(response: httpx.Response) -> dict:

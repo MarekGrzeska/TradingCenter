@@ -9,7 +9,7 @@ from mcp.server.fastmcp import FastMCP
 
 from ..client import GatewayClient
 from ..errors import ToolRefusal
-from ._shared import WRITE, OrderResultOut, _write
+from ._shared import WRITE, AccountId, OrderResultOut, _write
 
 
 def register(mcp: FastMCP, gateway: GatewayClient) -> None:
@@ -23,6 +23,7 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
         stop_loss: float | None = None,
         take_profit: float | None = None,
         good_till: str | None = None,
+        account_id: AccountId = None,
     ) -> OrderResultOut:
         """Place an order on the demo account. MARKET fills now; LIMIT and STOP rest
         until the market reaches `level`, which both require. `stop_loss` and
@@ -66,12 +67,12 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
         if good_till is not None:
             body["good_till"] = good_till
 
-        return await _write(gateway, "POST", "/orders", json=body)
+        return await _write(gateway, "POST", "/orders", json=body, account=account_id)
 
     @mcp.tool(annotations=WRITE)
-    async def close_position(position_id: str) -> OrderResultOut:
+    async def close_position(position_id: str, account_id: AccountId = None) -> OrderResultOut:
         """Close an open position by id. Read `get_positions` first for the id."""
-        return await _write(gateway, "DELETE", f"/positions/{position_id}")
+        return await _write(gateway, "DELETE", f"/positions/{position_id}", account=account_id)
 
     @mcp.tool(annotations=WRITE)
     async def amend_stops(
@@ -80,6 +81,7 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
         take_profit: float | None = None,
         clear_stop_loss: bool = False,
         clear_take_profit: bool = False,
+        account_id: AccountId = None,
     ) -> OrderResultOut:
         """Set or clear an open position's stop-loss and take-profit, independently.
         Both are **price levels**, not distances and not sizes.
@@ -109,10 +111,12 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
         elif take_profit is not None:
             body["take_profit"] = take_profit
 
-        return await _write(gateway, "PUT", f"/positions/{position_id}", json=body)
+        return await _write(
+            gateway, "PUT", f"/positions/{position_id}", json=body, account=account_id
+        )
 
     @mcp.tool(annotations=WRITE)
-    async def cancel_working_order(order_id: str) -> OrderResultOut:
+    async def cancel_working_order(order_id: str, account_id: AccountId = None) -> OrderResultOut:
         """Cancel a resting LIMIT or STOP order by id. Read `get_working_orders`
         first for the id."""
-        return await _write(gateway, "DELETE", f"/working-orders/{order_id}")
+        return await _write(gateway, "DELETE", f"/working-orders/{order_id}", account=account_id)
