@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { agentActivity, type AgentActivityStore } from "../agent/agentActivity";
 import type { AgentChatStore } from "../agent/agentChatStore";
 import { setStrategyInView } from "../agent/strategyInView";
@@ -80,6 +80,7 @@ export function StrategiesView({
   const [failure, setFailure] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [leaving, setLeaving] = useState(false);
+  const [params, setParams] = useSearchParams();
 
   const health = useRead<{ present: boolean; health: Health | null }>({
     key: ["strategies", "health"],
@@ -195,6 +196,15 @@ export function StrategiesView({
       setFailure(messageOf(cause, "nie udało się otworzyć strategii"));
     }
   }
+
+  // `?strategy=` is how the Backtests tab sends the operator to a run's strategy; consumed once, so the list stays the list.
+  const requested = Number(params.get("strategy")) || null;
+  useEffect(() => {
+    if (!ready || requested === null) return;
+    setParams({}, { replace: true });
+    void open(requested);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, requested]);
 
   // The agent's draft last put into the editor: a later read showing the same `seq` is not news, and a revision the agent
   // saves while the editor still holds exactly this text replaces it rather than being reported as newer.
