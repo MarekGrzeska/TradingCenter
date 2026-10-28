@@ -137,6 +137,16 @@ describe("StrategiesView", () => {
     expect(strategyInView()).toEqual({ strategyId: 7, revision: 4, draft: null });
   });
 
+  it("opens the strategy a link names with ?strategy=", async () => {
+    render(
+      <MemoryRouter initialEntries={["/strategies?strategy=7"]}>
+        <StrategiesView api={fakeApi()} pairs={pairs} activity={createAgentActivityStore()} />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText("US100, decyzje na zamknięciu świecy h1.")).toBeInTheDocument();
+  });
+
   it("names the setting when the workbench has no strategies package", async () => {
     const absent = fakeApi({
       health: vi.fn(async () => {

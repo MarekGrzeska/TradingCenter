@@ -195,6 +195,7 @@ describe("BacktestsView", () => {
     await userEvent.click(await screen.findByRole("cell", { name: "#11" }));
 
     expect(screen.getByRole("table", { name: "Uruchomienia", hidden: true })).not.toBeVisible();
+    expect(screen.getByRole("link", { name: /US100 pullback/ })).toHaveAttribute("href", "/strategies?strategy=7");
     await userEvent.click(screen.getByRole("button", { name: "← Uruchomienia" }));
     expect(screen.getByRole("table", { name: "Uruchomienia" })).toBeVisible();
   });

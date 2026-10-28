@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { agentActivity, type AgentActivityStore } from "../agent/agentActivity";
 import { resolveEndpoints } from "../data/config";
 import { workbenchIdentity } from "../data/marketData";
@@ -302,8 +302,11 @@ export function BacktestsView({
       />
       </div>
       {run !== null && (
-        <div>
+        <div className="flex flex-wrap items-center gap-3">
           <BackButton label="Uruchomienia" size="xs" onClick={() => setPickedRun(null)} />
+          <Link className="text-sm text-primary hover:underline" to={`/strategies?strategy=${run.strategyId}`}>
+            {names.get(run.strategyId) ?? `strategia #${run.strategyId}`} →
+          </Link>
         </div>
       )}
       {run !== null && runDocument !== undefined && (
