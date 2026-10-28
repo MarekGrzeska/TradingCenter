@@ -1,0 +1,1244 @@
+<title>Strategie na US100 — dłużej w rynku</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Strategie · US100 CFD · druga runda propozycji</span>
+    <h1>Dłużej w rynku: jedenaście strategii na US100 do zbacktestowania</h1>
+    <p class="lede">Strategia 6 nie ma lepszego sygnału niż S4. Ma dłuższy oddech. Ten dokument sprawdza w badaniach, <b>gdzie przewaga otwarcia trwa dłużej</b>, ile kosztuje każda dodatkowa godzina i noc, i zapisuje wnioski jako dokumenty, które silnik przyjmuje bez zmian.</p>
+    <div class="strip">
+      <span>TradingCenter / strategie</span>
+      <span>27 października 2026 · rew. <b>01</b></span>
+      <span>środowisko <b>demo</b></span>
+      <span>11 dokumentów <b>przeszło walidator</b> silnika; żaden nie został zapisany ani uruchomiony</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">11</div><div class="l">dokumentów gotowych do wklejenia w edytor</div></div>
+      <div class="cell"><div class="v">0,01%</div><div class="l">zysku na świecę M5 w pozycji — tyle samo w S4 i w strategii 6</div></div>
+      <div class="cell"><div class="v">16:00</div><div class="l">tu kończy się momentum śróddzienne (Baltussen i in. 2021)</div></div>
+      <div class="cell"><div class="v">0,09%</div><div class="l">kapitału kosztuje każda noc longa przy depozycie 20%</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Punkt wyjścia</div>
+      <h2>Strategia 6 nie wie więcej niż S4. Dłużej trzyma.</h2>
+      <p class="intro">Porównanie z poprzedniej rundy dało jedną liczbę, od której zaczyna się ten dokument. Na każdą świecę M5 spędzoną w pozycji S4 zarabia prawie tyle samo co strategia 6. Strategia 6 wygrywa, bo siedzi w rynku 53 świece, a S4 jedenaście.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Miara</th><th class="n">Strategia 6 · run 13</th><th class="n">S4 · 2024–2025</th><th class="n">S1b · 2024–2025</th></tr></thead>
+          <tbody>
+            <tr><td><b>Zysk na transakcję</b> (kapitału, po kosztach)</td><td class="n">0,58%</td><td class="n">0,11%</td><td class="n">0,11%</td></tr>
+            <tr><td><b>Świece M5 w pozycji</b></td><td class="n">53</td><td class="n">11</td><td class="n">25</td></tr>
+            <tr><td><b>Zysk na świecę w pozycji</b></td><td class="n">0,011%</td><td class="n">0,010%</td><td class="n">0,004%</td></tr>
+            <tr><td><b>Spread jako część zysku brutto</b></td><td class="n">≈ 5%</td><td class="n">≈ 25%</td><td class="n">≈ 25%</td></tr>
+            <tr><td><b>Sharpe</b></td><td class="n">1,81</td><td class="n">0,81</td><td class="n">0,93</td></tr>
+            <tr><td><b>Ponad 95. percentylem losowego wejścia</b></td><td class="n">tak</td><td class="n">nie</td><td class="n">nie</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Spread to 1,8 pkt na transakcję. Przy ekspozycji około 4x to 0,025–0,045% kapitału, zależnie od poziomu indeksu w latach 2024–2026.</p>
+      <p>Druga lekcja przychodzi z zewnątrz. Krueger (wrzesień 2026) powtórzył na pięciu indeksach CFD z lat 2015–2026 regułę Zarattiniego i Aziza: kierunek pierwszej świecy 5-minutowej, stop za jej drugim końcem, cel 10 R albo zamknięcie. Brutto wynik się zgadza, na NQ +0,13 R na transakcję. Netto zostaje +0,002 R, bo przy stopie wielkości pierwszej świecy spread to 6–12% ryzyka każdej transakcji. Kierunek pierwszej świecy ma wartość, tylko ciasny stop płaci za nią za dużo. Strategia 6 omija tę pułapkę: nie ma stopu i trzyma pozycję ponad cztery godziny, więc ten sam spread to u niej około 5% średniego zysku.</p>
+      <p><span class="hl">Dłużej działa na dwa sposoby naraz</span>: więcej ruchu na transakcję i mniejszy udział kosztu wejścia. Pytanie tego dokumentu nie brzmi więc „jaki lepszy sygnał”, tylko „jak długo ten sam sygnał jeszcze pracuje i co kosztuje każda dodatkowa godzina”.</p>
+      <div class="quote">Kierunek otwarcia jest wart mniej więcej tyle samo w każdej świecy. Wygrywa ten, kto trzyma go dłużej i płaci za wejście raz.</div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Literatura</div>
+      <h2>Gdzie ruch dnia trwa, a gdzie się kończy</h2>
+      <p class="intro">Przejrzane: badania recenzowane o momentum śróddziennym i nocnym, prace praktyków z pełnymi regułami, niezależne replikacje i to, co o strukturze rynku wiadomo w październiku 2026. Każdy wiersz ma wagę źródła i propozycję, do której prowadzi.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Teza</th><th>Liczby</th><th>Źródło i waga</th><th>Prowadzi do</th></tr></thead>
+          <tbody>
+            <tr><td><b>Kierunek dnia przewiduje ostatnie 30 minut</b></td><td>Zwrot od wczorajszego zamknięcia do 15:30 przewiduje ostatnie 30 minut na ponad 60 kontraktach futures z lat 1974–2020, w tym NQ od 1996. Sharpe prostej strategii 0,87–1,73 na klasę aktywów. Efekt istotny tylko przy ujemnej gammie dealerów (6,63 przy t 4,78 wobec 0,82 przy t 1,03). Po 16:00 nie trwa, w ciągu 1–2 dni się odwraca.</td><td>Baltussen, Da, Lammers, Martens, JFE 2021 — <span class="tag ok">wysoka</span></td><td>K1, K2, K3, R2</td></tr>
+            <tr><td><b>Noc i pierwsze 30 minut przewidują ostatnie 30</b></td><td>SPY 1993–2013 i dziesięć ETF-ów; silniej w dni zmienne, z dużym obrotem i z danymi makro. Reguła long albo gotówka: 6,3% rocznie brutto wobec −0,5% za samo trzymanie ostatnich półgodzin.</td><td>Gao, Han, Li, Zhou, JFE 2018; CXO Advisory — <span class="tag ok">wysoka</span></td><td>N2, K4</td></tr>
+            <tr><td><b>Ta przewidywalność słabnie i żyje w reżimach</b></td><td>Poza próbą efekt znika w ujęciu kalendarzowym; model przełączania znajduje dwa reżimy, a wersja z progiem zarabia więcej niż zawsze aktywna.</td><td>Rosa, Journal of Futures Markets 2022 — <span class="tag ok">wysoka</span></td><td>próg k strategii 6, K4, N2</td></tr>
+            <tr><td><b>Momentum śróddzienne jest globalne</b></td><td>Pierwsza półgodzina przewiduje ostatnią w 12 z 16 rynków rozwiniętych.</td><td>Li, Sakkas, Urquhart, Journal of Financial Markets 2022, za Zarattinim — <span class="tag ok">wysoka</span></td><td>E1</td></tr>
+            <tr><td><b>Strefa szumu: wejście dopiero poza zwykłym ruchem dnia</b></td><td>SPY 2007–2024, decyzje co 30 minut, wyjście na granicy strefy albo VWAP: 380% netto, 9,7% rocznie, Sharpe 1,24, obsunięcie 12% przy 1x; z celowaniem zmienności do 4x 1 985% i Sharpe 1,33. Po dniu NR4 22 pb dziennie zamiast 12. Niższy RSI(5) dzień wcześniej, lepszy wynik. Replikacja na TradingView: wyraźnie słabiej.</td><td>Zarattini, Aziz, Barbon, 2024–2025 — <span class="tag att">średnia</span>, praktycy bez próby poza próbą</td><td>N1, K4, N3</td></tr>
+            <tr><td><b>Kierunek pierwszej świecy 5-minutowej (ORB)</b></td><td>QQQ 2016–2023: trafność 24%, +0,13 R na transakcję, 33% rocznie przy 4x — z prowizją, bez spreadu. Replikacja na pięciu indeksach CFD 2015–2026: NQ +0,131 R brutto i +0,002 R netto; przewaga nad losowym kierunkiem +0,12 R (t 2,1), zjedzona przez koszt przy ciasnym stopie.</td><td>Zarattini i Aziz 2023; Krueger 2026 — <span class="tag att">średnia</span></td><td>strategia 6, N3, K5</td></tr>
+            <tr><td><b>Lewarowane ETF i opcje pod koniec dnia</b></td><td>Rebalansowanie i zabezpieczanie tworzą momentum na zamknięciu i odwrócenie następnego dnia; wpływ ETF lewarowanych maleje, bo ich przepływy są przewidywalne i przyciągają płynność.</td><td>Barbon, Beckmeyer, Buraschi, Moerke, SFI 2022 — <span class="tag att">średnia</span></td><td>K3</td></tr>
+            <tr><td><b>Dryf nocny przy otwarciu Europy zniknął</b></td><td>1998–2020: około 3,7% rocznie w godzinie 2:00–3:00 ET, ponad 60% zwrotu ES. 2021–2025: płasko, ten sam obraz na NQ. Rozproszenie nierównowag na zamknięciu spadło z 6,5% do 2,9%.</td><td>Boyarchenko, Larsen, Whelan, RFS 2023 i Liberty Street Economics, lipiec 2026 — <span class="tag ok">wysoka</span></td><td>R1, ostrożność w E1</td></tr>
+            <tr><td><b>Noc kontra sesja</b></td><td>Noc średnio na plusie, sesja płaska albo na minusie, ale handel tym wymaga skrajnego obrotu. Odwrócenie noc → sesja istnieje, a po kosztach alfa jest ujemna.</td><td>Glasserman i in. 2025; praca magisterska, Turku 2026 — <span class="tag att">średnia</span></td><td>R2</td></tr>
+            <tr><td><b>Dzienny powrót do średniej</b></td><td>NAS100 2016–2026, RSI(2) poniżej 5 nad SMA200: 65 transakcji, 2,4% rocznie wobec 20,2% kupna i trzymania. IBS na QQQ: 15,1% rocznie w oryginale, 5,5% w replikacji.</td><td>sprzedawca testów; forum QuantConnect — <span class="tag stop">niska</span></td><td>W1, R4</td></tr>
+            <tr><td><b>Wąski dzień przed szerokim (NR4, NR7)</b></td><td>Zakres najwęższy z 4 albo 7 dni zapowiada rozszerzenie; tabele autora z lat 80.</td><td>Crabel 1990 — <span class="tag att">średnia</span></td><td>N3, K4</td></tr>
+            <tr><td><b>Rozmiar według zmienności</b></td><td>W próbie poprawia Sharpe, ale wersje wykonalne w czasie rzeczywistym nie wygrywają z niezarządzanymi (103 strategie).</td><td>Moreira i Muir 2017; Cederburg, O'Doherty, Wang, Yan — <span class="tag ok">wysoka</span></td><td>sekcja 17</td></tr>
+            <tr><td><b>Struktura rynku w 2026</b></td><td>Lewarowane ETF na rekordzie około 218 mld USD; opcje 0DTE to około 60–65% obrotu opcjami na SPX; SEC zatwierdziła handel akcjami na Nasdaq przez 23 godziny na dobę (10 kwietnia 2026), start planowany na koniec 2026.</td><td>Citadel Securities i Blockonomi, wtórne; Simpson Thacher — <span class="tag att">średnia</span></td><td>kontekst dla K3 i E1</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Wniosek z przeglądu: <span class="hl">ruch dnia trwa do 16:00, a potem się odwraca</span>. Trzy niezależne źródła mówią to samo o zamknięciu, a NY Fed mówi, że najbardziej znany efekt nocny zniknął po 2021 roku. „Dłużej w rynku” znaczy więc „do zamknięcia”, nie „przez noc”. Handel 23/5 na Nasdaq, jeśli ruszy, może zmienić rolę otwarcia o 9:30 — strategię 6 i K1–K5 trzeba będzie wtedy sprawdzić ponownie.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Ekonomia</div>
+      <h2>Ile kosztuje każda dodatkowa godzina i noc</h2>
+      <p class="intro">Dłuższe trzymanie w ciągu dnia jest za darmo: spread płaci się przy wejściu i wyjściu, nie za godzinę. Noc kosztuje osobno i dla longa nie jest tania.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Co</th><th class="n">Ile</th><th>Uwagi</th></tr></thead>
+          <tbody>
+            <tr><td><b>Spread za transakcję</b></td><td class="n">1,8 pkt</td><td>profil kosztów capital.com z 25 października 2026</td></tr>
+            <tr><td><b>To samo jako część wartości pozycji</b></td><td class="n">0,006%</td><td>przy 29 400 pkt; w 2024 roku 0,008–0,011%, bo spread jest stały w punktach</td></tr>
+            <tr><td><b>Przy depozycie 20% (ekspozycja 4x)</b></td><td class="n">0,025–0,045%</td><td>kapitału na transakcję; strategia 6 zarabia średnio 0,58%</td></tr>
+            <tr><td><b>Godzina dłużej w ciągu dnia</b></td><td class="n">0</td><td>ten sam spread; rośnie tylko najgorsza otwarta strata</td></tr>
+            <tr><td><b>Noc longa</b></td><td class="n">0,0223%</td><td>wartości pozycji; 8,1% rocznie</td></tr>
+            <tr><td><b>Noc longa przy depozycie 20%</b></td><td class="n">0,089%</td><td>kapitału; weekend 0,27%, bo silnik liczy każdą dobę kalendarzową</td></tr>
+            <tr><td><b>Rok nocy longa przy depozycie 20%</b></td><td class="n">32,5%</td><td>kapitału — tyle musi zarobić strategia, która stale trzyma longa</td></tr>
+            <tr><td><b>Noc shorta</b></td><td class="n">≈ 0</td><td>według profilu brokera</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Dla porównania: dryf nocny z lat 1998–2020 to 3,7% rocznie, około 0,015% na noc — mniej niż finansowanie longa nawet przy ekspozycji 1x. Momentum śróddzienne kończy się z zamknięciem sesji, a w ciągu 1–2 dni się odwraca. Noc dla pozycji momentum to koszt bez przewagi.</p>
+      <p>Zostają cztery drogi do „dłużej w rynku”, a propozycje poniżej dzielą się według nich.</p>
+      <div class="fails">
+        <div class="fail ok"><h3>Dłużej w ciągu dnia <span class="tag ok">K1 · K2 · N1 · N2 · N3</span></h3><p>Ten sam spread, więcej ruchu na transakcję. Ryzyko: bez stopu rośnie najgorsza otwarta strata.</p></div>
+        <div class="fail"><h3>Więcej okien w ciągu doby <span class="tag att">K3 · E1</span></h3><p>Drugi spread dziennie, ale drugie źródło przewagi: ostatnia godzina albo otwarcie Londynu.</p></div>
+        <div class="fail"><h3>Więcej dni <span class="tag att">K5</span></h3><p>Noga w dni, które strategia 6 dziś odrzuca filtrem siły.</p></div>
+        <div class="fail stop"><h3>Przez noce, ale z inną przewagą <span class="tag stop">W1</span></h3><p>Tylko powrót do średniej po słabym dniu, bo momentum nocy nie przeżywa.</p></div>
+      </div>
+      <div class="quote">Momentum śróddzienne kończy się z zamknięciem sesji. Finansowanie nocy dopiero się zaczyna.</div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Mapa</div>
+      <h2>Jedenaście propozycji na jednej osi czasu</h2>
+      <p class="intro">Kiedy każda propozycja jest w rynku, w czasie nowojorskim. Litera mówi o pochodzeniu: K to kombinacje ze strategią 6, N nowe strategie dnia, E eksploracja bez badań za sobą, W strategia wielodniowa.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 396" style="min-width:760px" role="img" aria-label="Okna w rynku w czasie nowojorskim: strategia 6 od 9:35 do 14:00; K1 do 15:55; K2 do 14:00 i warunkowo do 15:55; K3 dwie nogi 9:35–14:00 i 15:00–15:55; K5 dodaje warunkowe wybicie 10:05–15:55; N1 i N3 warunkowo od 10:00 do 15:55; N2 od 10:00 do 15:55; E1 od 3:05 do 9:25 i od 9:35 do 14:00">
+<defs><pattern id="hatch" patternUnits="userSpaceOnUse" width="6" height="6" patternTransform="rotate(45)"><rect width="6" height="6" fill="#86a4dc"></rect><line x1="0" y1="0" x2="0" y2="6" stroke="#14306b" stroke-width="1.6" opacity="0.45"></line></pattern></defs>
+<g font-family="Karla, sans-serif">
+<rect x="262.0" y="6" width="18" height="12" rx="3" fill="#14306b"></rect>
+<text x="288.0" y="16" font-size="12" fill="currentColor">w rynku przez całe okno, gdy był sygnał</text>
+<rect x="552.0" y="6" width="18" height="12" rx="3" fill="url(#hatch)"></rect>
+<text x="578.0" y="16" font-size="12" fill="currentColor">tylko póki trwa warunek (zysk, cena poza strefą, wybicie)</text>
+<rect x="624.1" y="42" width="313.8" height="320" fill="#f2c313" opacity="0.16"></rect>
+<text x="781.0" y="38" text-anchor="middle" font-size="10" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.09em" fill="#14306b">SESJA NY 9:30–16:00 ET</text>
+<line x1="262.0" y1="42" x2="262.0" y2="362" stroke="#ddd9cd" stroke-width="1"></line>
+<text x="262.0" y="380" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">02:00</text>
+<line x1="310.3" y1="42" x2="310.3" y2="362" stroke="#ddd9cd" stroke-width="1"></line>
+<line x1="358.6" y1="42" x2="358.6" y2="362" stroke="#ddd9cd" stroke-width="1"></line>
+<text x="358.6" y="380" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">04:00</text>
+<line x1="406.8" y1="42" x2="406.8" y2="362" stroke="#ddd9cd" stroke-width="1"></line>
+<line x1="455.1" y1="42" x2="455.1" y2="362" stroke="#ddd9cd" stroke-width="1"></line>
+<text x="455.1" y="380" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">06:00</text>
+<line x1="503.4" y1="42" x2="503.4" y2="362" stroke="#ddd9cd" stroke-width="1"></line>
+<line x1="551.7" y1="42" x2="551.7" y2="362" stroke="#ddd9cd" stroke-width="1"></line>
+<text x="551.7" y="380" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">08:00</text>
+<line x1="599.9" y1="42" x2="599.9" y2="362" stroke="#ddd9cd" stroke-width="1"></line>
+<line x1="648.2" y1="42" x2="648.2" y2="362" stroke="#ddd9cd" stroke-width="1"></line>
+<text x="648.2" y="380" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">10:00</text>
+<line x1="696.5" y1="42" x2="696.5" y2="362" stroke="#ddd9cd" stroke-width="1"></line>
+<line x1="744.8" y1="42" x2="744.8" y2="362" stroke="#ddd9cd" stroke-width="1"></line>
+<text x="744.8" y="380" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">12:00</text>
+<line x1="793.0" y1="42" x2="793.0" y2="362" stroke="#ddd9cd" stroke-width="1"></line>
+<line x1="841.3" y1="42" x2="841.3" y2="362" stroke="#ddd9cd" stroke-width="1"></line>
+<text x="841.3" y="380" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">14:00</text>
+<line x1="889.6" y1="42" x2="889.6" y2="362" stroke="#ddd9cd" stroke-width="1"></line>
+<line x1="937.9" y1="42" x2="937.9" y2="362" stroke="#ddd9cd" stroke-width="1"></line>
+<text x="937.9" y="380" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">16:00</text>
+<text x="248.0" y="77.0" text-anchor="end" font-size="12.5" fill="currentColor"><tspan font-weight="700">Strategia 6</tspan><tspan font-weight="700"> · dziś</tspan></text>
+<rect x="628.1" y="63.0" width="213.2" height="20.0" rx="4" fill="#14306b"><title>Strategia 6 · dziś: 9:35–14:00 ET, całe okno, gdy był sygnał</title></rect>
+<text x="248.0" y="111.0" text-anchor="end" font-size="12.5" fill="currentColor"><tspan font-weight="700">K1</tspan><tspan font-weight="400"> · do zamknięcia</tspan></text>
+<rect x="628.1" y="97.0" width="305.7" height="20.0" rx="4" fill="#14306b"><title>K1 · do zamknięcia: 9:35–15:55 ET, całe okno, gdy był sygnał</title></rect>
+<text x="248.0" y="145.0" text-anchor="end" font-size="12.5" fill="currentColor"><tspan font-weight="700">K2</tspan><tspan font-weight="400"> · po 14:00 tylko zysk</tspan></text>
+<rect x="628.1" y="131.0" width="212.2" height="20.0" rx="4" fill="#14306b"><title>K2 · po 14:00 tylko zysk: 9:35–14:00 ET, całe okno, gdy był sygnał</title></rect>
+<rect x="842.3" y="131.0" width="91.5" height="20.0" rx="4" fill="url(#hatch)"><title>K2 · po 14:00 tylko zysk: 14:00–15:55 ET, tylko póki trwa warunek</title></rect>
+<text x="248.0" y="179.0" text-anchor="end" font-size="12.5" fill="currentColor"><tspan font-weight="700">K3</tspan><tspan font-weight="400"> · dwie nogi</tspan></text>
+<rect x="628.1" y="165.0" width="213.2" height="20.0" rx="4" fill="#14306b"><title>K3 · dwie nogi: 9:35–14:00 ET, całe okno, gdy był sygnał</title></rect>
+<rect x="889.6" y="165.0" width="44.3" height="20.0" rx="4" fill="#14306b"><title>K3 · dwie nogi: 15:00–15:55 ET, całe okno, gdy był sygnał</title></rect>
+<text x="248.0" y="213.0" text-anchor="end" font-size="12.5" fill="currentColor"><tspan font-weight="700">K5</tspan><tspan font-weight="400"> · + wybicie w inne dni</tspan></text>
+<rect x="628.1" y="199.0" width="213.2" height="9.0" rx="4" fill="#14306b"><title>K5 · + wybicie w inne dni: 9:35–14:00 ET, całe okno, gdy był sygnał</title></rect>
+<rect x="652.2" y="210.0" width="281.6" height="9.0" rx="4" fill="url(#hatch)"><title>K5 · + wybicie w inne dni: 10:05–15:55 ET, tylko póki trwa warunek</title></rect>
+<text x="248.0" y="247.0" text-anchor="end" font-size="12.5" fill="currentColor"><tspan font-weight="700">N1</tspan><tspan font-weight="400"> · strefa szumu</tspan></text>
+<rect x="648.2" y="233.0" width="285.6" height="20.0" rx="4" fill="url(#hatch)"><title>N1 · strefa szumu: 10:00–15:55 ET, tylko póki trwa warunek</title></rect>
+<text x="248.0" y="281.0" text-anchor="end" font-size="12.5" fill="currentColor"><tspan font-weight="700">N2</tspan><tspan font-weight="400"> · kontrola z literatury</tspan></text>
+<rect x="648.2" y="267.0" width="285.6" height="20.0" rx="4" fill="#14306b"><title>N2 · kontrola z literatury: 10:00–15:55 ET, całe okno, gdy był sygnał</title></rect>
+<text x="248.0" y="315.0" text-anchor="end" font-size="12.5" fill="currentColor"><tspan font-weight="700">N3</tspan><tspan font-weight="400"> · ORB 30 po NR4</tspan></text>
+<rect x="652.2" y="301.0" width="281.6" height="20.0" rx="4" fill="url(#hatch)"><title>N3 · ORB 30 po NR4: 10:05–15:55 ET, tylko póki trwa warunek</title></rect>
+<text x="248.0" y="349.0" text-anchor="end" font-size="12.5" fill="currentColor"><tspan font-weight="700">E1</tspan><tspan font-weight="400"> · Londyn i Nowy Jork</tspan></text>
+<rect x="314.3" y="335.0" width="305.7" height="20.0" rx="4" fill="#14306b"><title>E1 · Londyn i Nowy Jork: 3:05–9:25 ET, całe okno, gdy był sygnał</title></rect>
+<rect x="628.1" y="335.0" width="213.2" height="20.0" rx="4" fill="#14306b"><title>E1 · Londyn i Nowy Jork: 9:35–14:00 ET, całe okno, gdy był sygnał</title></rect>
+<text x="962.0" y="392" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">godziny ET · w Polsce zwykle +6 h</text>
+</g></svg>
+        </div>
+        <figcaption><b>Rys. 1</b> Pełny pasek: pozycja trwa przez całe okno, gdy był sygnał. Kreskowany: tylko póki trwa warunek. K4 i E2 mają okno strategii 6, tylko w mniej dni; W1 trzyma od 1 do 5 dni i nie mieści się na tej osi. Godziny każdego paska pokazują się po najechaniu i są w tabeli poniżej.</figcaption>
+      </figure>
+      <div class="table-wrap" style="margin-top:22px">
+        <table>
+          <thead><tr><th>ID</th><th>Propozycja</th><th>W rynku</th><th>Uruchomienie</th><th>Priorytet</th></tr></thead>
+          <tbody>
+            <tr><td><b>K1</b></td><td>Strategia 6 do zamknięcia sesji</td><td>9:35–15:55 ET (6,3 h) w dni z sygnałem</td><td>szybkie, bez stanu pozycji</td><td><span class="tag ok">wysoki</span></td></tr>
+<tr><td><b>K2</b></td><td>Po 14:00 zostaje tylko zysk</td><td>9:35–14:00 ET, w dni z zyskiem do 15:55</td><td>6–9 minut, stan pozycji liczony świeca po świecy</td><td><span class="tag att">średni</span></td></tr>
+<tr><td><b>K3</b></td><td>Dwie nogi: otwarcie i ostatnia godzina</td><td>9:35–14:00 i 15:00–15:55 ET (albo 15:30–15:55)</td><td>szybkie</td><td><span class="tag ok">wysoki</span></td></tr>
+<tr><td><b>K4</b></td><td>Strategia 6 tylko w dni z przewagą z literatury</td><td>9:35–14:00 ET, w mniej dni</td><td>szybkie</td><td><span class="tag att">średni</span></td></tr>
+<tr><td><b>K5</b></td><td>Wybicie w dni bez sygnału otwarcia</td><td>9:35–14:00 ET w dni z sygnałem, od wybicia do 15:55 w pozostałe</td><td>6–9 minut</td><td><span class="tag att">średni, po N3</span></td></tr>
+<tr><td><b>N1</b></td><td>Strefa szumu (noise area)</td><td>od wyjścia ze strefy (najwcześniej 10:00) do powrotu albo 15:55; w badaniu średnio 1,8 transakcji dziennie</td><td>6–9 minut</td><td><span class="tag att">średni</span></td></tr>
+<tr><td><b>N2</b></td><td>Kontrola: kierunek od wczorajszego zamknięcia do 10:00</td><td>10:00–15:55 ET (5,9 h) w dni z sygnałem</td><td>szybkie</td><td><span class="tag ok">wysoki jako kontrola</span></td></tr>
+<tr><td><b>N3</b></td><td>Wybicie zakresu 30 minut po dniu NR4, do zamknięcia</td><td>od wybicia (10:05–14:00) do 15:55 ET</td><td>6–9 minut</td><td><span class="tag att">średni</span></td></tr>
+<tr><td><b>E1</b></td><td>Ta sama reguła na otwarciu Londynu</td><td>3:05–9:25 i 9:35–14:00 ET</td><td>szybkie</td><td><span class="tag stop">niski, eksploracja</span></td></tr>
+<tr><td><b>E2</b></td><td>Potwierdzenie z BTCUSD</td><td>9:35–14:00 ET, w mniej dni</td><td>szybkie</td><td><span class="tag stop">niski, eksploracja</span></td></tr>
+<tr><td><b>W1</b></td><td>IBS: zamknięcie przy dole dnia, 1–5 dni</td><td>1–5 dni, od wieczora do wieczora czasu NY</td><td>szybkie</td><td><span class="tag stop">niski</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Wszystkie dokumenty mają depozyt 20% jak strategia 6, więc ich wyniki w procentach są wprost porównywalne z runem 13. Wszystkie są bez stopu u brokera, więc rozliczają się na M5 (W1 na D1) i sięgają do stycznia 2024 (W1 do 2016).</p>
+    </section>
+
+    <section id="k1">
+      <div class="eyebrow">05 · K1 · kombinacja · M5 · bez stopu</div>
+      <h2>Strategia 6 do zamknięcia sesji</h2>
+      <p class="intro">Najprostszy test wniosku z porównania: S4 zarabia na świecę w pozycji prawie tyle co strategia 6, tylko krócej siedzi. Jeśli przewaga trwa po 14:00, przesunięcie wyjścia podnosi zysk na transakcję przy tym samym spreadzie. Literatura mówi, że powinna trwać: kierunek dnia przewiduje ostatnie 30 minut na ponad 60 rynkach futures (Baltussen i in. 2021), a widać go już po pierwszej półgodzinie (Gao i in. 2018).</p>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr><td style="width:160px"><b>Mechanizm</b></td><td>Wejście identyczne jak w strategii 6. Wyjście sterowane jednym parametrem: <code>p.exit_min</code> minut przed zamknięciem (120 = dzisiejsze 14:00 ET, 5 = 15:55 ET). Nic poza tym się nie zmienia, więc różnica w wyniku to czysty efekt dłuższego trzymania.</td></tr>
+            <tr><td><b>Co testować</b></td><td><code>p.exit_min</code> = 120 (kontrola, powinna odtworzyć run 13), 60, 30 i 5 na zakresie 2024-01-01 → 2026-10-27, porównanie przez compare_runs z runem 13. Patrzeć rok po roku: przewaga po 14:00 obecna w jednym roku z trzech to nie przewaga.</td></tr>
+            <tr><td><b>Pułapka</b></td><td>Godzina 14:00 w strategii 6 może nie być przypadkiem. Jeśli między 14:00 a 15:00 rynek zwykle się cofa, pełne trzymanie pogorszy wynik mimo dobrej ostatniej półgodziny — wtedy odpowiedzią jest K3, nie K1. Najgorsza otwarta strata urośnie: dłużej w pozycji bez stopu to głębszy dołek niż dzisiejsze −34,7%.</td></tr>
+            <tr><td><b>W rynku</b></td><td>9:35–15:55 ET (6,3 h) w dni z sygnałem</td></tr>
+            <tr><td><b>Historia</b></td><td>M5 od stycznia 2024</td></tr>
+            <tr><td><b>Uruchomienie</b></td><td>szybkie, bez stanu pozycji</td></tr>
+            <tr><td><b>Priorytet</b></td><td><span class="tag ok">wysoki</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Dokument sprawdzony walidatorem silnika 27 października 2026 — do wklejenia w edytor strategii bez zmian.</p>
+      <pre style="white-space:pre-wrap; word-break:break-word"><code>{
+  "schema": 1,
+  "name": "US100 M5 — otwarcie NY względem EMA12 — siła — wyjście z parametru (domyślnie 15:55 ET) — depozyt 20%",
+  "symbol": "US100",
+  "timeframe": "MINUTE_5",
+  "hypothesis": "Kierunek pierwszej świecy M5 sesji NY względem EMA12 (strategia 6) utrzymuje się dłużej niż do 14:00 ET: przepływy zabezpieczające opcji i lewarowanych ETF pchają cenę w kierunku dnia aż do 16:00, więc trzymanie do końca sesji zbiera więcej tego samego ruchu przy tym samym koszcie spreadu.",
+  "notes": "Wejście bez zmian względem strategii 6 rewizji 1: decyzja na zamknięciu pierwszej świecy M5 sesji NEW_YORK (9:35 ET), long gdy close &gt; EMA12, short gdy close &lt; EMA12, oba tylko gdy |close − EMA12| / ATR(14) z ostatniej zamkniętej świecy dziennej &gt; p.k. Zmienione tylko wyjście: p.exit_min minut przed zamknięciem sesji (120 = 14:00 ET jak w strategii 6, 5 = 15:55 ET). Wartości do testu ustalone przed pierwszym uruchomieniem: 120, 60, 30, 5. Bez stopu i celu, więc rozliczenie na M5 i historia od stycznia 2024. Depozyt 20% kapitału (ekspozycja około 4x) jak w strategii 6. Sesja bez świąt i skróconych sesji: w dni zamknięcia o 13:00 ET pozycja trwa po faktycznym końcu handlu akcjami.",
+  "params": {
+    "k": {
+      "default": 0.075,
+      "min": 0,
+      "max": 0.15,
+      "step": 0.025
+    },
+    "exit_min": {
+      "default": 5,
+      "min": 0,
+      "max": 120,
+      "step": 5
+    }
+  },
+  "let": {
+    "ema12": "ema(12)",
+    "strength": "abs(close - ema12) / (atr(14) @ DAY)"
+  },
+  "entries": [
+    {
+      "side": "long",
+      "when": "session_bar(NEW_YORK) == 1 and close &gt; ema12 and strength &gt; p.k"
+    },
+    {
+      "side": "short",
+      "when": "session_bar(NEW_YORK) == 1 and close &lt; ema12 and strength &gt; p.k"
+    }
+  ],
+  "exits": {
+    "when": "minutes_to_session_close(NEW_YORK) &lt;= p.exit_min"
+  },
+  "sizing": {
+    "mode": "margin_fraction",
+    "value": 0.2
+  }
+}</code></pre>
+    </section>
+    <section id="k2">
+      <div class="eyebrow">06 · K2 · kombinacja · M5 · bez stopu</div>
+      <h2>Po 14:00 zostaje tylko zysk</h2>
+      <p class="intro">Kompromis między 14:00 a zamknięciem. Dzień, w którym kierunek otwarcia sprawdził się do 14:00, ma przepływy zabezpieczające po swojej stronie, bo przewidywalność ostatniej półgodziny rośnie z wielkością ruchu dnia. Dzień, w którym się nie sprawdził, nie ma po 14:00 czego dowieźć.</p>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr><td style="width:160px"><b>Mechanizm</b></td><td>Wejście strategii 6. O 14:00 ET pozycja bez zysku jest zamykana. Pozycja z zyskiem zostaje i do 15:55 ET ma stop na zamknięciu świecy M5 w cenie wejścia.</td></tr>
+            <tr><td><b>Co testować</b></td><td><code>p.cut_min</code> 120 i 60. Porównać z K1 na tym samym zakresie: K2 ma sens tylko wtedy, gdy daje lepszy stosunek zwrotu do obsunięcia niż K1, bo sam zwrot będzie zwykle niższy.</td></tr>
+            <tr><td><b>Pułapka</b></td><td>Warunek „na plusie” jest liczony przed kosztami i na zamknięciu M5, więc pozycja minimalnie na plusie zostaje. Stop w cenie wejścia po 14:00 może ciąć zwycięzców tuż przed ruchem ostatniej półgodziny — dlatego K3 sprawdza okno 15:00–16:00 osobno.</td></tr>
+            <tr><td><b>W rynku</b></td><td>9:35–14:00 ET, w dni z zyskiem do 15:55</td></tr>
+            <tr><td><b>Historia</b></td><td>M5 od stycznia 2024</td></tr>
+            <tr><td><b>Uruchomienie</b></td><td>6–9 minut, stan pozycji liczony świeca po świecy</td></tr>
+            <tr><td><b>Priorytet</b></td><td><span class="tag att">średni</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Dokument sprawdzony walidatorem silnika 27 października 2026 — do wklejenia w edytor strategii bez zmian.</p>
+      <pre style="white-space:pre-wrap; word-break:break-word"><code>{
+  "schema": 1,
+  "name": "US100 M5 — otwarcie NY względem EMA12 — po 14:00 ET trzymaj tylko zysk — depozyt 20%",
+  "symbol": "US100",
+  "timeframe": "MINUTE_5",
+  "hypothesis": "Dzień, w którym kierunek z otwarcia sprawdził się do 14:00 ET, częściej kończy się w tym kierunku, bo popołudniowe przepływy zabezpieczające idą za ruchem dnia; dzień, w którym się nie sprawdził, nie ma po 14:00 czego dowieźć. Stąd wyjście asymetryczne: pozycja bez zysku zamykana o 14:00 jak w strategii 6, pozycja z zyskiem trzymana do 15:55, póki zysk nie zniknie.",
+  "notes": "Wejście jak w strategii 6 rewizji 1 (p.k = 0,075). Wyjście, które nastąpi pierwsze: (1) od p.cut_min minut przed zamknięciem sesji NEW_YORK (120 = 14:00 ET) na pierwszym zamknięciu M5, przy którym pozycja nie jest na plusie względem ceny wejścia (przed kosztami); (2) 5 minut przed zamknięciem sesji. To stop na zamknięciu świecy w punkcie wejścia, uzbrojony dopiero po 14:00, a nie zlecenie u brokera, więc rozliczenie zostaje na M5 i historia od 2024. Formuły stanu pozycji silnik liczy świeca po świecy: uruchomienie na 2024–2026 trwa kilka minut. Wartości do testu: p.cut_min 120 i 60.",
+  "params": {
+    "k": {
+      "default": 0.075,
+      "min": 0,
+      "max": 0.15,
+      "step": 0.025
+    },
+    "cut_min": {
+      "default": 120,
+      "min": 30,
+      "max": 180,
+      "step": 30
+    }
+  },
+  "let": {
+    "ema12": "ema(12)",
+    "strength": "abs(close - ema12) / (atr(14) @ DAY)"
+  },
+  "entries": [
+    {
+      "side": "long",
+      "when": "session_bar(NEW_YORK) == 1 and close &gt; ema12 and strength &gt; p.k"
+    },
+    {
+      "side": "short",
+      "when": "session_bar(NEW_YORK) == 1 and close &lt; ema12 and strength &gt; p.k"
+    }
+  ],
+  "exits": {
+    "when": "minutes_to_session_close(NEW_YORK) &lt;= 5 or (minutes_to_session_close(NEW_YORK) &lt;= p.cut_min and position * (close - entry_price) &lt;= 0)"
+  },
+  "sizing": {
+    "mode": "margin_fraction",
+    "value": 0.2
+  }
+}</code></pre>
+    </section>
+    <section id="k3">
+      <div class="eyebrow">07 · K3 · kombinacja strategii 6 i S4 · M5 · bez stopu</div>
+      <h2>Dwie nogi: otwarcie i ostatnia godzina</h2>
+      <p class="intro">Łączy dwie istniejące strategie: strategię 6 (otwarcie do 14:00) i S4 (ostatnia godzina). S4 miała dobry zysk na świecę, ale za krótko siedziała i grała słabszym sygnałem. Tu dostaje sygnał z literatury: zwrot od wczorajszego zamknięcia do 15:00 albo 15:30, który przewiduje ostatnie 30 minut lepiej niż sama pierwsza półgodzina (Baltussen i in. 2021). Między 14:00 a 15:00 strategia jest płaska — jeśli tam siedzi popołudniowy szum, K3 go omija, a K1 nie.</p>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr><td style="width:160px"><b>Mechanizm</b></td><td>Noga 1 = strategia 6 bez zmian. Noga 2: decyzja o 15:00 (albo 15:30) w kierunku zwrotu od wczorajszego zamknięcia gotówkowego, liczonego w dziennym ATR; wyjście o 15:55. Noga 2 gra także w dni bez nogi 1, więc strategia jest w rynku prawie codziennie.</td></tr>
+            <tr><td><b>Co testować</b></td><td><code>p.leg2_min</code> 60 i 30; <code>p.k2</code> 0 (sam znak, jak w badaniu) i 0,25. Nogę 2 ocenić osobno z CSV transakcji, po wejściach o 15:00 albo 15:30.</td></tr>
+            <tr><td><b>Pułapka</b></td><td>Badanie mierzy ostatnie 30 minut, nie 60 — wariant 15:00 rozciąga tezę. Efekt jest silny tylko przy ujemnej gammie dealerów (współczynnik 6,63 wobec nieistotnego 0,82 przy dodatniej), a tego silnik nie widzi; zastępczy filtr RSI(5) daje K4. Dwie nogi to dwa spready dziennie.</td></tr>
+            <tr><td><b>W rynku</b></td><td>9:35–14:00 i 15:00–15:55 ET (albo 15:30–15:55)</td></tr>
+            <tr><td><b>Historia</b></td><td>M5 od stycznia 2024</td></tr>
+            <tr><td><b>Uruchomienie</b></td><td>szybkie</td></tr>
+            <tr><td><b>Priorytet</b></td><td><span class="tag ok">wysoki</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Dokument sprawdzony walidatorem silnika 27 października 2026 — do wklejenia w edytor strategii bez zmian.</p>
+      <pre style="white-space:pre-wrap; word-break:break-word"><code>{
+  "schema": 1,
+  "name": "US100 M5 — dwie nogi dnia: otwarcie NY (strategia 6) i ostatnia godzina z prądem dnia — depozyt 20%",
+  "symbol": "US100",
+  "timeframe": "MINUTE_5",
+  "hypothesis": "Dzień ma dwa okna, w których kierunek się utrzymuje: od otwarcia do około 14:00 ET (strategia 6) i ostatnie 30–60 minut, gdy zabezpieczanie krótkiej gammy i rebalansowanie lewarowanych ETF idą w kierunku ruchu od wczorajszego zamknięcia (Baltussen, Da, Lammers, Martens 2021). Środek popołudnia nie ma przewagi, więc w nim strategia nie siedzi.",
+  "notes": "Noga 1 = strategia 6 rewizji 1 bez zmian: wejście o 9:35 ET, wyjście o 14:00 ET (okno od 120 do p.leg2_min minut przed zamknięciem sesji NEW_YORK zamyka każdą pozycję). Noga 2: na zamknięciu świecy kończącej się p.leg2_min minut przed zamknięciem (60 = 15:00 ET, 30 = 15:30 ET) wejście w kierunku zwrotu od wczorajszego zamknięcia gotówkowego (close świecy 78, 16:00 ET), liczonego w ATR(14) dziennym, gdy |zwrot| &gt; p.k2. Wyjście 5 minut przed zamknięciem sesji. Noga 2 gra także w dni, w które noga 1 nie weszła. Brak świecy 15:55 ET w archiwum zostawia zamknięcie z wcześniejszego dnia. Bez stopu, rozliczenie na M5, historia od 2024, depozyt 20%. Wartości do testu: p.leg2_min 60 i 30, p.k2 0 i 0,25.",
+  "params": {
+    "k": {
+      "default": 0.075,
+      "min": 0,
+      "max": 0.15,
+      "step": 0.025
+    },
+    "leg2_min": {
+      "default": 60,
+      "min": 30,
+      "max": 90,
+      "step": 30
+    },
+    "k2": {
+      "default": 0,
+      "min": 0,
+      "max": 0.5,
+      "step": 0.125
+    }
+  },
+  "let": {
+    "sb": "session_bar(NEW_YORK)",
+    "mtc": "minutes_to_session_close(NEW_YORK)",
+    "datr": "atr(14) @ DAY",
+    "ema12": "ema(12)",
+    "strength": "abs(close - ema12) / datr",
+    "pc": "value_when(sb == 78, close)",
+    "rod": "(close - pc) / datr",
+    "leg2": "p.leg2_min - 5 &lt; mtc &lt;= p.leg2_min"
+  },
+  "entries": [
+    {
+      "side": "long",
+      "when": "sb == 1 and close &gt; ema12 and strength &gt; p.k"
+    },
+    {
+      "side": "short",
+      "when": "sb == 1 and close &lt; ema12 and strength &gt; p.k"
+    },
+    {
+      "side": "long",
+      "when": "leg2 and rod &gt; p.k2"
+    },
+    {
+      "side": "short",
+      "when": "leg2 and rod &lt; -p.k2"
+    }
+  ],
+  "exits": {
+    "when": "mtc &lt;= 5 or p.leg2_min &lt; mtc &lt;= 120"
+  },
+  "sizing": {
+    "mode": "margin_fraction",
+    "value": 0.2
+  }
+}</code></pre>
+    </section>
+    <section id="k4">
+      <div class="eyebrow">08 · K4 · kombinacja · M5 · bez stopu</div>
+      <h2>Strategia 6 tylko w dni z przewagą z literatury</h2>
+      <p class="intro">Zarattini, Aziz i Barbon (2024) zmierzyli na 17 latach SPY trzy rzeczy, które da się tu odtworzyć. Po dniu NR4 momentum śróddzienne zarabiało 22 pb dziennie zamiast 12 (Sharpe 3,2 zamiast 1,7). Im niższy RSI(5) dzień wcześniej, tym lepiej (−3,25 pb na punkt RSI, p = 0,001). Przy wysokiej zmienności Sharpe rośnie. Rosa (2022) dodaje, że ta przewidywalność żyje w reżimach, a wersja z progiem wygrywa z zawsze aktywną.</p>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr><td style="width:160px"><b>Mechanizm</b></td><td>Strategia 6 plus trzy przełączniki, każdy domyślnie wyłączony: <code>p.rsi_max</code> (RSI(5) dzienny nie wyżej niż próg), <code>p.nr</code> (wczorajszy dzień NR4), <code>p.vol_min</code> (ATR14 / ATR100 dzienne co najmniej tyle).</td></tr>
+            <tr><td><b>Co testować</b></td><td>Wartości ustalone z góry: <code>rsi_max</code> 50, <code>nr</code> 1, <code>vol_min</code> 1 — każdy osobno; kombinacja tylko tych, które przejdą pojedynczo. Kryterium: wyższy Sharpe i zysk na transakcję niż w strategii 6. Niższy zwrot całkowity jest oczekiwany, bo ubywa transakcji.</td></tr>
+            <tr><td><b>Pułapka</b></td><td>To najłatwiejsze miejsce na dopasowanie: trzy filtry z siatką wartości dają dziesiątki wariantów, z których któryś zawsze wygra na latach 2024–2025. Dlatego jedna wartość na filtr, ustalona przed uruchomieniem. NR4 liczy się tu na dobie CFD z nocą, a w badaniu na sesji gotówkowej.</td></tr>
+            <tr><td><b>W rynku</b></td><td>9:35–14:00 ET, w mniej dni</td></tr>
+            <tr><td><b>Historia</b></td><td>M5 od stycznia 2024</td></tr>
+            <tr><td><b>Uruchomienie</b></td><td>szybkie</td></tr>
+            <tr><td><b>Priorytet</b></td><td><span class="tag att">średni</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Dokument sprawdzony walidatorem silnika 27 października 2026 — do wklejenia w edytor strategii bez zmian.</p>
+      <pre style="white-space:pre-wrap; word-break:break-word"><code>{
+  "schema": 1,
+  "name": "US100 M5 — otwarcie NY względem EMA12 — filtry z literatury: RSI(5) dzienny, NR4, reżim zmienności — depozyt 20%",
+  "symbol": "US100",
+  "timeframe": "MINUTE_5",
+  "hypothesis": "Momentum śróddzienne nie jest stałe: jest silniejsze po spadkach z ostatnich dni (dealerzy przechodzą na krótką gammę), po dniu o wąskim zakresie (ściśnięcie przed rozszerzeniem) i w reżimie podwyższonej zmienności. Strategia 6 grana tylko w takie dni ma mieć wyższy zysk na transakcję i wyższy Sharpe przy mniejszej liczbie transakcji.",
+  "notes": "Wejście i wyjście strategii 6 (p.exit_min = 120 to 14:00 ET), plus trzy filtry, każdy domyślnie wyłączony. p.rsi_max: RSI(5) z ostatniej zamkniętej świecy dziennej nie wyżej niż próg (Zarattini, Aziz, Barbon 2024: im niższy RSI(5) dzień wcześniej, tym silniejsze momentum śróddzienne; pośrednik pozycji gamma dealerów); 100 wyłącza. p.nr = 1: wczorajsza świeca dzienna to NR4, najwęższy zakres z czterech (tamże: 22 pb na dzień zamiast 12); 0 wyłącza. p.vol_min: ATR(14) dzienne co najmniej p.vol_min razy ATR(100) dziennego (Gao i in. 2018, Rosa 2022); 0 wyłącza. Świeca dzienna archiwum to doba dostawcy z nocą, nie sesja gotówkowa — NR4 na niej nie jest tym samym co w badaniu. Wartości do testu ustalone z góry: rsi_max 50, nr 1, vol_min 1; każdy filtr osobno, kombinacja tylko tych, które przejdą pojedynczo.",
+  "params": {
+    "k": {
+      "default": 0.075,
+      "min": 0,
+      "max": 0.15,
+      "step": 0.025
+    },
+    "exit_min": {
+      "default": 120,
+      "min": 0,
+      "max": 120,
+      "step": 5
+    },
+    "rsi_max": {
+      "default": 100,
+      "min": 30,
+      "max": 100,
+      "step": 10
+    },
+    "nr": {
+      "default": 0,
+      "min": 0,
+      "max": 1,
+      "step": 1
+    },
+    "vol_min": {
+      "default": 0,
+      "min": 0,
+      "max": 1.5,
+      "step": 0.25
+    }
+  },
+  "let": {
+    "ema12": "ema(12)",
+    "datr": "atr(14) @ DAY",
+    "strength": "abs(close - ema12) / datr",
+    "rsi5": "rsi(5) @ DAY",
+    "rng": "(high - low) @ DAY",
+    "nr4": "rng &lt;= (lowest(high - low, 4) @ DAY)",
+    "volr": "datr / (atr(100) @ DAY)",
+    "ok": "rsi5 &lt;= p.rsi_max and (p.nr == 0 or nr4) and volr &gt;= p.vol_min"
+  },
+  "entries": [
+    {
+      "side": "long",
+      "when": "session_bar(NEW_YORK) == 1 and close &gt; ema12 and strength &gt; p.k and ok"
+    },
+    {
+      "side": "short",
+      "when": "session_bar(NEW_YORK) == 1 and close &lt; ema12 and strength &gt; p.k and ok"
+    }
+  ],
+  "exits": {
+    "when": "minutes_to_session_close(NEW_YORK) &lt;= p.exit_min"
+  },
+  "sizing": {
+    "mode": "margin_fraction",
+    "value": 0.2
+  }
+}</code></pre>
+    </section>
+    <section id="k5">
+      <div class="eyebrow">09 · K5 · kombinacja strategii 6 i ORB · M5 · bez stopu</div>
+      <h2>Wybicie w dni bez sygnału otwarcia</h2>
+      <p class="intro">Strategia 6 jest w rynku mniej więcej co drugi dzień, bo filtr siły odrzuca słabe otwarcia. W takie dni kierunek często pojawia się później. Druga noga, czyli wybicie zakresu pierwszych 30 minut trzymane do zamknięcia, zamienia te dni w transakcje. To więcej czasu w rynku przez więcej dni, a nie dłużej w jednym.</p>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr><td style="width:160px"><b>Mechanizm</b></td><td>Noga 1 = strategia 6. Noga 2 tylko wtedy, gdy dziś nie było transakcji: zamknięcie M5 przecina zakres 9:30–10:00 między 10:05 a 14:00 ET; wyjście o 15:55 albo na zamknięciu po złej stronie środka zakresu.</td></tr>
+            <tr><td><b>Co testować</b></td><td>Najpierw N3 z <code>p.nr</code> = 0, czyli sama noga 2 — jeśli sama nie zarabia, K5 nie ma sensu. Potem K5 z <code>p.exit1_min</code> 120 i z wartością, która wygra w K1.</td></tr>
+            <tr><td><b>Pułapka</b></td><td>Dni odrzucone przez strategię 6 to dni z otwarciem blisko EMA12 — mogą być systematycznie dniami bez trendu. Wtedy noga 2 płaci spread za szum. Wynik nogi 2 oceniać osobno z CSV, po wejściach po 10:05.</td></tr>
+            <tr><td><b>W rynku</b></td><td>9:35–14:00 ET w dni z sygnałem, od wybicia do 15:55 w pozostałe</td></tr>
+            <tr><td><b>Historia</b></td><td>M5 od stycznia 2024</td></tr>
+            <tr><td><b>Uruchomienie</b></td><td>6–9 minut</td></tr>
+            <tr><td><b>Priorytet</b></td><td><span class="tag att">średni, po N3</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Dokument sprawdzony walidatorem silnika 27 października 2026 — do wklejenia w edytor strategii bez zmian.</p>
+      <pre style="white-space:pre-wrap; word-break:break-word"><code>{
+  "schema": 1,
+  "name": "US100 M5 — strategia 6 plus wybicie 30-minutowe w dni bez sygnału otwarcia — depozyt 20%",
+  "symbol": "US100",
+  "timeframe": "MINUTE_5",
+  "hypothesis": "Strategia 6 odrzuca mniej więcej połowę dni, bo otwarcie jest za blisko EMA12. W takie dni kierunek nie jest nieobecny, tylko pojawia się później: zamknięcie poza zakresem pierwszych 30 minut wskazuje go i utrzymuje do zamknięcia sesji. Dwie nogi razem mają być w rynku prawie codziennie, zamiast co drugi dzień.",
+  "notes": "Noga 1 = strategia 6 rewizji 1: wejście o 9:35 ET, wyjście p.exit1_min minut przed zamknięciem sesji NEW_YORK (120 = 14:00 ET). Noga 2 tylko w dni bez transakcji (trades_today == 0, czyli strategia 6 odrzuciła dzień filtrem siły): zamknięcie M5 przecina zakres pierwszych 30 minut sesji (świece 1–6, 9:30–10:00 ET), między 10:05 a 14:00 ET. Noga 2 wychodzi 5 minut przed zamknięciem albo na zamknięciu M5 po złej stronie środka zakresu. Nogi rozróżnia at_entry(sb): wejście na świecy 1 lub 2 to noga 1. Bez stopu u brokera, rozliczenie na M5, historia od 2024. Formuły stanu pozycji: uruchomienie trwa kilka minut. Najpierw przetestować samą nogę 2 (propozycja N3).",
+  "params": {
+    "k": {
+      "default": 0.075,
+      "min": 0,
+      "max": 0.15,
+      "step": 0.025
+    },
+    "exit1_min": {
+      "default": 120,
+      "min": 5,
+      "max": 120,
+      "step": 5
+    }
+  },
+  "let": {
+    "sb": "session_bar(NEW_YORK)",
+    "mtc": "minutes_to_session_close(NEW_YORK)",
+    "datr": "atr(14) @ DAY",
+    "ema12": "ema(12)",
+    "strength": "abs(close - ema12) / datr",
+    "orh": "value_when(sb == 6, highest(high, 6))",
+    "orl": "value_when(sb == 6, lowest(low, 6))",
+    "orm": "(orh + orl) / 2"
+  },
+  "entries": [
+    {
+      "side": "long",
+      "when": "sb == 1 and close &gt; ema12 and strength &gt; p.k"
+    },
+    {
+      "side": "short",
+      "when": "sb == 1 and close &lt; ema12 and strength &gt; p.k"
+    },
+    {
+      "side": "long",
+      "when": "sb &gt; 6 and mtc &gt;= 120 and trades_today == 0 and crosses_above(close, orh)"
+    },
+    {
+      "side": "short",
+      "when": "sb &gt; 6 and mtc &gt;= 120 and trades_today == 0 and crosses_below(close, orl)"
+    }
+  ],
+  "exits": {
+    "when": "mtc &lt;= 5 or (at_entry(sb) &lt;= 2 and mtc &lt;= p.exit1_min) or (at_entry(sb) &gt; 2 and position * (close - orm) &lt; 0)"
+  },
+  "sizing": {
+    "mode": "margin_fraction",
+    "value": 0.2
+  }
+}</code></pre>
+    </section>
+    <section id="n1">
+      <div class="eyebrow">10 · N1 · nowa · M5 · bez stopu</div>
+      <h2>Strefa szumu (noise area)</h2>
+      <p class="intro">Najlepiej udokumentowana strategia śróddzienna, która siedzi w rynku tak długo, jak trwa trend. Na SPY w latach 2007–2024: 380% netto, 9,7% rocznie, Sharpe 1,24 i obsunięcie 12% przy ekspozycji 1x; z celowaniem zmienności do 4x 1 985% i Sharpe 1,33 (Zarattini, Aziz, Barbon 2024). Wchodzi dopiero, gdy ruch od otwarcia przekracza to, co zwykle dzieje się do tej godziny, i trzyma, póki cena nie wróci do strefy.</p>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr><td style="width:160px"><b>Mechanizm</b></td><td>Granice: max(otwarcie, wczorajsze zamknięcie) + σ(t) i min(…) − σ(t), gdzie σ(t) = <code>p.vm</code> × dzienny ATR × √(minuty od otwarcia / 390) przybliża średni ruch od otwarcia do danej godziny. Decyzje tylko o pełnych i połówkowych godzinach, od 10:00 do 15:30. Wyjście, gdy zamknięcie wraca do strefy, albo o 15:55.</td></tr>
+            <tr><td><b>Co testować</b></td><td><code>p.vm</code> 0,45 (w przybliżeniu mnożnik 1 z badania) i 0,65 (około 1,5, najlepszy wynik skorygowany o ryzyko w badaniu). Potem jeden wariant z <code>p.nr</code> = 1 i jeden z <code>p.rsi_max</code> = 50, tylko jeśli wersja bazowa przejdzie.</td></tr>
+            <tr><td><b>Pułapka</b></td><td>Trzy różnice wobec badania, każda może kosztować wynik. σ(t) liczy się z ATR zamiast z 14 dni tej samej minuty, bo język nie ma takiego odczytu. Nie ma VWAP w stopie kroczącym (wolumen CFD jest niewiarygodny). W badaniu zmiana stopu z przeciwnej granicy na bieżącą granicę razem z VWAP podwoiła Sharpe, z 0,61 do 1,24 — N1 ma tylko pierwszą połowę tej zmiany. Nie ma celowania zmienności. Niezależna replikacja na TradingView dała wynik wyraźnie słabszy niż publikacja.</td></tr>
+            <tr><td><b>W rynku</b></td><td>od wyjścia ze strefy (najwcześniej 10:00) do powrotu albo 15:55; w badaniu średnio 1,8 transakcji dziennie</td></tr>
+            <tr><td><b>Historia</b></td><td>M5 od stycznia 2024</td></tr>
+            <tr><td><b>Uruchomienie</b></td><td>6–9 minut</td></tr>
+            <tr><td><b>Priorytet</b></td><td><span class="tag att">średni</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Dokument sprawdzony walidatorem silnika 27 października 2026 — do wklejenia w edytor strategii bez zmian.</p>
+      <pre style="white-space:pre-wrap; word-break:break-word"><code>{
+  "schema": 1,
+  "name": "US100 M5 — wyjście ze strefy szumu (noise area) co pół godziny, do zamknięcia — depozyt 20%",
+  "symbol": "US100",
+  "timeframe": "MINUTE_5",
+  "hypothesis": "Cena wychodząca poza strefę, w której zwykle porusza się od otwarcia do danej godziny, pokazuje nierównowagę popytu i podaży, która trwa do końca sesji (Zarattini, Aziz, Barbon 2024: SPY 2007–2024, Sharpe 1,24 przy pełnej ekspozycji). Pozycja trwa, póki cena nie wróci do strefy, więc w dni trendowe siedzi w rynku od 10:00 do zamknięcia, a w dni bez trendu nie wchodzi wcale.",
+  "notes": "Strefa szumu w przybliżeniu: górna granica = max(otwarcie 9:30 ET, wczorajsze zamknięcie 16:00 ET) + σ(t), dolna = min(…) − σ(t). W badaniu σ(t) to średni bezwzględny ruch od otwarcia do tej samej minuty z 14 dni; język nie ma odczytu tej samej minuty n sesji temu, więc σ(t) = p.vm × ATR(14) dzienne × √(t / 390), t = minuty od otwarcia. Pierwiastek liczony jednym krokiem Newtona (sq), błąd poniżej 5% od 10:00 ET. p.vm = 0,45 odpowiada mnożnikowi 1 z badania przy założeniu, że średni ruch sesji gotówkowej to około 0,45 ATR doby CFD; 0,65 to w przybliżeniu mnożnik 1,5 (najlepszy wynik skorygowany o ryzyko w badaniu). Decyzje tylko co pół godziny (świece kończące się o :00 i :30), wejścia od 10:00 do 15:30 ET. Wyjście na decyzji półgodzinnej, gdy zamknięcie wraca do strefy (long poniżej górnej granicy, short powyżej dolnej), albo 5 minut przed zamknięciem. Zamiast VWAP z badania sama granica strefy, bo wolumen CFD jest niewiarygodny. Filtry p.rsi_max i p.nr jak w propozycji K4, domyślnie wyłączone. Bez stopu u brokera, rozliczenie na M5, historia od 2024. Formuły stanu pozycji: kilka minut na uruchomienie. Wartości do testu: p.vm 0,45 i 0,65.",
+  "params": {
+    "vm": {
+      "default": 0.45,
+      "min": 0.3,
+      "max": 0.8,
+      "step": 0.05
+    },
+    "rsi_max": {
+      "default": 100,
+      "min": 30,
+      "max": 100,
+      "step": 10
+    },
+    "nr": {
+      "default": 0,
+      "min": 0,
+      "max": 1,
+      "step": 1
+    }
+  },
+  "let": {
+    "sb": "session_bar(NEW_YORK)",
+    "mtc": "minutes_to_session_close(NEW_YORK)",
+    "o930": "value_when(sb == 1, open)",
+    "pc": "value_when(sb == 78, close)",
+    "x": "max((390 - mtc) / 390, 0.01)",
+    "y0": "(x + 0.4) / 1.265",
+    "sq": "0.5 * (y0 + x / y0)",
+    "sig": "p.vm * (atr(14) @ DAY) * sq",
+    "ub": "max(o930, pc) + sig",
+    "lb": "min(o930, pc) - sig",
+    "chk": "minute == 25 or minute == 55",
+    "rsi5": "rsi(5) @ DAY",
+    "rng": "(high - low) @ DAY",
+    "nr4": "rng &lt;= (lowest(high - low, 4) @ DAY)",
+    "ok": "rsi5 &lt;= p.rsi_max and (p.nr == 0 or nr4)"
+  },
+  "entries": [
+    {
+      "side": "long",
+      "when": "chk and sb &gt;= 6 and mtc &gt;= 30 and close &gt; ub and ok"
+    },
+    {
+      "side": "short",
+      "when": "chk and sb &gt;= 6 and mtc &gt;= 30 and close &lt; lb and ok"
+    }
+  ],
+  "exits": {
+    "when": "mtc &lt;= 5 or (chk and position * (close - (ub if position == LONG else lb)) &lt; 0)"
+  },
+  "sizing": {
+    "mode": "margin_fraction",
+    "value": 0.2
+  }
+}</code></pre>
+    </section>
+    <section id="n2">
+      <div class="eyebrow">11 · N2 · kontrola · M5 · bez stopu</div>
+      <h2>Kontrola: kierunek od wczorajszego zamknięcia do 10:00</h2>
+      <p class="intro">Strategia 6 to wariant znanego efektu: kierunek początku dnia trzyma się w ciągu dnia. N2 zapisuje ten efekt tak, jak mierzy go literatura (Gao i in. 2018: noc plus pierwsze 30 minut). Jeśli N2 daje to samo co strategia 6, EMA12 i próg siły niczego nie dodają. Jeśli N2 jest dużo słabsza, strategia 6 łapie coś więcej — albo jest dopasowana do lat 2024–2025.</p>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr><td style="width:160px"><b>Mechanizm</b></td><td>O 10:00 ET wejście w kierunku zwrotu od wczorajszego zamknięcia gotówkowego (16:00), w dziennym ATR, gdy |zwrot| &gt; <code>p.k</code>; wyjście o 15:55 albo o 14:00.</td></tr>
+            <tr><td><b>Co testować</b></td><td><code>p.k</code> 0 i 0,2; <code>p.exit_min</code> 5 i 120. Cztery szybkie uruchomienia.</td></tr>
+            <tr><td><b>Pułapka</b></td><td>Zwrot od 16:00 zawiera noc, więc w dni dużych luk N2 gra w kierunku luki, a duże luki częściej się domykają, niż kontynuują. Wejście dopiero o 10:00 omija część tego ryzyka, ale nie całe.</td></tr>
+            <tr><td><b>W rynku</b></td><td>10:00–15:55 ET (5,9 h) w dni z sygnałem</td></tr>
+            <tr><td><b>Historia</b></td><td>M5 od stycznia 2024</td></tr>
+            <tr><td><b>Uruchomienie</b></td><td>szybkie</td></tr>
+            <tr><td><b>Priorytet</b></td><td><span class="tag ok">wysoki jako kontrola</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Dokument sprawdzony walidatorem silnika 27 października 2026 — do wklejenia w edytor strategii bez zmian.</p>
+      <pre style="white-space:pre-wrap; word-break:break-word"><code>{
+  "schema": 1,
+  "name": "US100 M5 — kierunek od wczorajszego zamknięcia do 10:00 ET, trzymany do zamknięcia (kontrola dla strategii 6) — depozyt 20%",
+  "symbol": "US100",
+  "timeframe": "MINUTE_5",
+  "hypothesis": "Zwrot od wczorajszego zamknięcia gotówkowego do końca pierwszych 30 minut sesji przewiduje dalszą część dnia (Gao, Han, Li, Zhou 2018 dla ostatnich 30 minut; tu trzymane od 10:00 do zamknięcia). To ten sam pomysł co strategia 6, zapisany sygnałem z literatury zamiast EMA12, więc służy jako kontrola: czy EMA12 dodaje coś ponad znany efekt.",
+  "notes": "Zwrot = (close świecy 6 sesji NEW_YORK, czyli 10:00 ET, − wczorajsze zamknięcie gotówkowe, czyli close świecy 78) / ATR(14) z ostatniej zamkniętej świecy dziennej. Wejście rynkowe po 10:00 ET w kierunku zwrotu, gdy |zwrot| &gt; p.k; wyjście p.exit_min minut przed zamknięciem sesji. Rosa (2022): wersja z progiem zarabia więcej niż zawsze aktywna. Brak świecy 15:55 ET w archiwum zostawia zamknięcie z wcześniejszego dnia. Bez stopu, rozliczenie na M5, historia od 2024, depozyt 20%. Wartości do testu: p.k 0 i 0,2; p.exit_min 5 i 120. Jeśli wynik jest bliski strategii 6, EMA12 nic nie dodaje; jeśli dużo gorszy, strategia 6 łapie coś więcej albo jest dopasowana do próby.",
+  "params": {
+    "k": {
+      "default": 0.2,
+      "min": 0,
+      "max": 0.5,
+      "step": 0.1
+    },
+    "exit_min": {
+      "default": 5,
+      "min": 0,
+      "max": 120,
+      "step": 5
+    }
+  },
+  "let": {
+    "sb": "session_bar(NEW_YORK)",
+    "pc": "value_when(sb == 78, close)",
+    "r": "(close - pc) / (atr(14) @ DAY)"
+  },
+  "entries": [
+    {
+      "side": "long",
+      "when": "sb == 6 and r &gt; p.k"
+    },
+    {
+      "side": "short",
+      "when": "sb == 6 and r &lt; -p.k"
+    }
+  ],
+  "exits": {
+    "when": "minutes_to_session_close(NEW_YORK) &lt;= p.exit_min"
+  },
+  "sizing": {
+    "mode": "margin_fraction",
+    "value": 0.2
+  }
+}</code></pre>
+    </section>
+    <section id="n3">
+      <div class="eyebrow">12 · N3 · nowa · M5 · bez stopu</div>
+      <h2>Wybicie zakresu 30 minut po dniu NR4, do zamknięcia</h2>
+      <p class="intro">S1b z poprzedniej rundy (ORB 15 minut, cel 2 R) miała profit factor 1,11 w latach 2024–2025 i 1,05 w 2026 — przewaga jest, ale cienka. Dwie zmiany z literatury. Trzymanie do zamknięcia zamiast celu, bo krótki cel i ciasny stop to dokładnie to, co w replikacji Kruegera zjadło przewagę ORB na CFD. Granie tylko po dniu NR4, po którym zmienność się rozszerza (Crabel 1990; u Zarattiniego NR4 prawie podwaja zysk momentum).</p>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr><td style="width:160px"><b>Mechanizm</b></td><td>Zakres 9:30–10:00 ET. Zamknięcie M5 poza zakresem między 10:05 a 14:00 daje wejście, najwyżej raz dziennie. Wyjście o 15:55 albo na zamknięciu za środkiem zakresu (<code>p.sf</code> = 0,5) lub za jego drugim końcem (<code>p.sf</code> = 1).</td></tr>
+            <tr><td><b>Co testować</b></td><td><code>p.nr</code> 1 i 0, <code>p.sf</code> 0,5 i 1. Wersja z <code>p.nr</code> = 0 jest jednocześnie nogą 2 propozycji K5.</td></tr>
+            <tr><td><b>Pułapka</b></td><td>Dzień NR4 to mniej więcej co czwarty dzień, więc w latach 2024–2026 będzie ich około 170, a transakcji jeszcze mniej. Wariant z filtrem da się ocenić tylko obok wersji bez filtra. Świeca dzienna to doba CFD, więc NR4 liczy także noc.</td></tr>
+            <tr><td><b>W rynku</b></td><td>od wybicia (10:05–14:00) do 15:55 ET</td></tr>
+            <tr><td><b>Historia</b></td><td>M5 od stycznia 2024</td></tr>
+            <tr><td><b>Uruchomienie</b></td><td>6–9 minut</td></tr>
+            <tr><td><b>Priorytet</b></td><td><span class="tag att">średni</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Dokument sprawdzony walidatorem silnika 27 października 2026 — do wklejenia w edytor strategii bez zmian.</p>
+      <pre style="white-space:pre-wrap; word-break:break-word"><code>{
+  "schema": 1,
+  "name": "US100 M5 — wybicie zakresu 30 minut po dniu NR4, trzymane do zamknięcia — depozyt 20%",
+  "symbol": "US100",
+  "timeframe": "MINUTE_5",
+  "hypothesis": "Po dniu o najwęższym zakresie z czterech zmienność się rozszerza (Crabel 1990), a zamknięcie poza zakresem pierwszych 30 minut wskazuje kierunek tego rozszerzenia; trzymane do końca sesji zbiera cały ruch zamiast celu 2 R. Zarattini, Aziz, Barbon (2024) mierzą, że po NR4 momentum śróddzienne zarabiało prawie dwa razy więcej niż bezwarunkowo.",
+  "notes": "Zakres = szczyt i dołek pierwszych sześciu świec M5 sesji NEW_YORK (9:30–10:00 ET). Wejście rynkowe po zamknięciu M5 przecinającym zakres, między 10:05 a 14:00 ET, najwyżej jedno dziennie. Wyjście 5 minut przed zamknięciem albo na zamknięciu M5 za poziomem obrony: long poniżej szczyt − p.sf × szerokość zakresu (0,5 = środek, 1 = dołek), short lustrzanie. Filtr p.nr = 1 (domyślnie włączony): wczorajsza świeca dzienna to NR4; świeca dzienna archiwum to doba dostawcy z nocą. Bez stopu u brokera i bez celu — trzymanie do zamknięcia zamiast celu 2 R z S1, bo w replikacji ORB na CFD (Krueger 2026) ciasny stop i spread zjadały całą przewagę. Rozliczenie na M5, historia od 2024. Formuły stanu pozycji: kilka minut na uruchomienie. Wartości do testu: p.nr 1 i 0, p.sf 0,5 i 1.",
+  "params": {
+    "nr": {
+      "default": 1,
+      "min": 0,
+      "max": 1,
+      "step": 1
+    },
+    "sf": {
+      "default": 0.5,
+      "min": 0.25,
+      "max": 1,
+      "step": 0.25
+    }
+  },
+  "let": {
+    "sb": "session_bar(NEW_YORK)",
+    "mtc": "minutes_to_session_close(NEW_YORK)",
+    "orh": "value_when(sb == 6, highest(high, 6))",
+    "orl": "value_when(sb == 6, lowest(low, 6))",
+    "lvl": "orh - p.sf * (orh - orl)",
+    "lvs": "orl + p.sf * (orh - orl)",
+    "rng": "(high - low) @ DAY",
+    "nr4": "rng &lt;= (lowest(high - low, 4) @ DAY)",
+    "ok": "p.nr == 0 or nr4"
+  },
+  "entries": [
+    {
+      "side": "long",
+      "when": "sb &gt; 6 and mtc &gt;= 120 and trades_today == 0 and crosses_above(close, orh) and ok"
+    },
+    {
+      "side": "short",
+      "when": "sb &gt; 6 and mtc &gt;= 120 and trades_today == 0 and crosses_below(close, orl) and ok"
+    }
+  ],
+  "exits": {
+    "when": "mtc &lt;= 5 or (position == LONG and close &lt; lvl) or (position == SHORT and close &gt; lvs)"
+  },
+  "sizing": {
+    "mode": "margin_fraction",
+    "value": 0.2
+  }
+}</code></pre>
+    </section>
+    <section id="e1">
+      <div class="eyebrow">13 · E1 · eksploracja · M5 · bez stopu</div>
+      <h2>Ta sama reguła na otwarciu Londynu</h2>
+      <p class="intro">Jeśli strategia 6 działa, bo pierwsza świeca po wejściu nowej grupy uczestników ujawnia nierównowagę, to otwarcie europejskie jest drugim takim momentem dnia: 8:00 w Londynie, zwykle 3:00 ET. Okno 3:05–9:25 ET to ponad sześć godzin, w których strategia dziś nie jest w rynku. Momentum śróddzienne występuje w 12 z 16 rynków rozwiniętych (Li, Sakkas, Urquhart 2022), ale US100 w godzinach europejskich nikt nie badał. To rozwinięcie pomysłu „Londyn → Nowy Jork” z sekcji 14 pierwszej rundy.</p>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr><td style="width:160px"><b>Mechanizm</b></td><td>Noga Londyn: reguła strategii 6 na pierwszej świecy M5 sesji LONDON, wyjście o 9:25 ET. Noga Nowy Jork = strategia 6.</td></tr>
+            <tr><td><b>Co testować</b></td><td>Jedno uruchomienie z kosztami brokera i jedno z godzinowym profilem spreadu: 1,8 pkt w sesji NY, 3,6 pkt w pozostałych godzinach. Nogę Londyn ocenić osobno z CSV.</td></tr>
+            <tr><td><b>Pułapka</b></td><td>U brokera spread o 3:00 ET jest szerszy niż w sesji; bez profilu godzinowego wynik będzie zawyżony. Godzina 2:00–3:00 ET to dawny dryf nocny, który zniknął po 2021 roku — noga Londyn wchodzi tuż po nim, więc nie gra tego efektu, ale może trafić na jego resztki. Brak badania: wynik dodatni wymaga potwierdzenia w 2026.</td></tr>
+            <tr><td><b>W rynku</b></td><td>3:05–9:25 i 9:35–14:00 ET</td></tr>
+            <tr><td><b>Historia</b></td><td>M5 od stycznia 2024</td></tr>
+            <tr><td><b>Uruchomienie</b></td><td>szybkie</td></tr>
+            <tr><td><b>Priorytet</b></td><td><span class="tag stop">niski, eksploracja</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Dokument sprawdzony walidatorem silnika 27 października 2026 — do wklejenia w edytor strategii bez zmian.</p>
+      <pre style="white-space:pre-wrap; word-break:break-word"><code>{
+  "schema": 1,
+  "name": "US100 M5 — reguła strategii 6 na otwarciu Londynu i Nowego Jorku, dwie nogi — depozyt 20%",
+  "symbol": "US100",
+  "timeframe": "MINUTE_5",
+  "hypothesis": "Otwarcie gotówkowe w Europie (8:00 w Londynie, zwykle 3:00 ET) to drugi moment dnia, w którym napływa nowy uczestnik rynku; jeśli reguła strategii 6 działa, bo pierwsza świeca po otwarciu ujawnia nierównowagę, to powinna działać także wtedy i utrzymywać się do otwarcia Nowego Jorku. Dwie nogi to około 10–11 godzin w rynku zamiast 4,4.",
+  "notes": "Noga Londyn: ta sama reguła co strategia 6, ale na pierwszej świecy M5 sesji LONDON (8:00 czasu londyńskiego): kierunek close względem EMA12, siła |close − EMA12| / ATR(14) dzienne &gt; p.kl. Wyjście nogi Londyn na zamknięciu świecy kończącej się o 9:25 ET (395 minut przed zamknięciem sesji NEW_YORK), przed otwarciem gotówki. Noga Nowy Jork = strategia 6 bez zmian (9:35–14:00 ET). W tygodniach, gdy USA i Wielka Brytania zmieniają czas w różne dni, 8:00 w Londynie to 2:00 albo 4:00 ET — nadal przed otwarciem NY. Koszty: profil brokera podaje jeden spread 1,8 pkt, a w nocy bywa szerszy, więc ten wariant uruchomić także z godzinowym profilem spreadu (24 wartości, jedna na godzinę UTC), na przykład 3,6 pkt poza sesją NY. Brak bezpośredniego badania: eksploracja, wartości z góry p.kl = p.k = 0,075.",
+  "params": {
+    "k": {
+      "default": 0.075,
+      "min": 0,
+      "max": 0.15,
+      "step": 0.025
+    },
+    "kl": {
+      "default": 0.075,
+      "min": 0,
+      "max": 0.15,
+      "step": 0.025
+    }
+  },
+  "let": {
+    "mtc": "minutes_to_session_close(NEW_YORK)",
+    "ema12": "ema(12)",
+    "strength": "abs(close - ema12) / (atr(14) @ DAY)"
+  },
+  "entries": [
+    {
+      "side": "long",
+      "when": "session_bar(LONDON) == 1 and close &gt; ema12 and strength &gt; p.kl"
+    },
+    {
+      "side": "short",
+      "when": "session_bar(LONDON) == 1 and close &lt; ema12 and strength &gt; p.kl"
+    },
+    {
+      "side": "long",
+      "when": "session_bar(NEW_YORK) == 1 and close &gt; ema12 and strength &gt; p.k"
+    },
+    {
+      "side": "short",
+      "when": "session_bar(NEW_YORK) == 1 and close &lt; ema12 and strength &gt; p.k"
+    }
+  ],
+  "exits": {
+    "when": "390 &lt; mtc &lt;= 395 or mtc &lt;= 120"
+  },
+  "sizing": {
+    "mode": "margin_fraction",
+    "value": 0.2
+  }
+}</code></pre>
+    </section>
+    <section id="e2">
+      <div class="eyebrow">14 · E2 · eksploracja · M5 · drugi instrument</div>
+      <h2>Potwierdzenie z BTCUSD</h2>
+      <p class="intro">Archiwum zbiera BTCUSD na M5, a język czyta inne instrumenty (<code>close @ &quot;BTCUSD&quot;</code>). BTC handluje całą dobę i w weekend, a od kilku lat porusza się razem z Nasdaq jako miara apetytu na ryzyko. Filtr: strategia 6 wchodzi tylko wtedy, gdy kierunek BTC od wczorajszego zamknięcia NY się zgadza. W poniedziałek to jedyne źródło informacji o weekendzie.</p>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr><td style="width:160px"><b>Mechanizm</b></td><td>Strategia 6 plus warunek znaku zmiany BTCUSD od 16:00 ET poprzedniej sesji do decyzji o 9:35.</td></tr>
+            <tr><td><b>Co testować</b></td><td>Jedna wartość ustalona z góry: <code>p.b</code> = 0. Bez siatki.</td></tr>
+            <tr><td><b>Pułapka</b></td><td>Brak badania naukowego, są tylko obserwacje traderów. US100 CFD też handluje w nocy, więc informacja z BTC może już być w cenie na otwarciu — wtedy filtr tylko zmniejszy liczbę transakcji. Korelacja BTC z Nasdaq zmienia się w czasie, więc wynik z lat 2024–2026 może nie przetrwać zmiany reżimu.</td></tr>
+            <tr><td><b>W rynku</b></td><td>9:35–14:00 ET, w mniej dni</td></tr>
+            <tr><td><b>Historia</b></td><td>M5 od stycznia 2024 (BTCUSD też)</td></tr>
+            <tr><td><b>Uruchomienie</b></td><td>szybkie</td></tr>
+            <tr><td><b>Priorytet</b></td><td><span class="tag stop">niski, eksploracja</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Dokument sprawdzony walidatorem silnika 27 października 2026 — do wklejenia w edytor strategii bez zmian.</p>
+      <pre style="white-space:pre-wrap; word-break:break-word"><code>{
+  "schema": 1,
+  "name": "US100 M5 — strategia 6 z potwierdzeniem BTCUSD od wczorajszego zamknięcia NY — depozyt 20%",
+  "symbol": "US100",
+  "timeframe": "MINUTE_5",
+  "hypothesis": "BTCUSD handluje całą dobę i w weekend, a od kilku lat porusza się razem z Nasdaq jako miara apetytu na ryzyko. Jeśli kierunek otwarcia US100 zgadza się z kierunkiem BTC od wczorajszego zamknięcia NY, sygnał strategii 6 jest potwierdzony przez drugi rynek; jeśli się nie zgadza, otwarcie częściej jest szumem.",
+  "notes": "Strategia 6 rewizji 1 (wejście 9:35 ET, wyjście 14:00 ET) z jednym filtrem: zmiana BTCUSD od wczorajszego zamknięcia gotówkowego NY (świeca 78 sesji NEW_YORK, 16:00 ET) do decyzji musi mieć znak transakcji i przekraczać p.b (0 = sam znak). W poniedziałek odcinek obejmuje weekend, kiedy BTC handluje, a US100 nie — to jest testowana informacja. Kurs BTCUSD czytany z archiwum na tych samych świecach M5 (od 2024). Brak badań naukowych dla tej zależności, tylko obserwacje rynkowe: propozycja eksploracyjna z jedną wartością ustaloną z góry (p.b = 0).",
+  "params": {
+    "k": {
+      "default": 0.075,
+      "min": 0,
+      "max": 0.15,
+      "step": 0.025
+    },
+    "b": {
+      "default": 0,
+      "min": 0,
+      "max": 0.02,
+      "step": 0.005
+    }
+  },
+  "let": {
+    "ema12": "ema(12)",
+    "strength": "abs(close - ema12) / (atr(14) @ DAY)",
+    "btc": "close @ \"BTCUSD\"",
+    "btc_pc": "value_when(session_bar(NEW_YORK) == 78, btc)",
+    "btc_r": "btc / btc_pc - 1"
+  },
+  "entries": [
+    {
+      "side": "long",
+      "when": "session_bar(NEW_YORK) == 1 and close &gt; ema12 and strength &gt; p.k and btc_r &gt; p.b"
+    },
+    {
+      "side": "short",
+      "when": "session_bar(NEW_YORK) == 1 and close &lt; ema12 and strength &gt; p.k and btc_r &lt; -p.b"
+    }
+  ],
+  "exits": {
+    "when": "minutes_to_session_close(NEW_YORK) &lt;= 120"
+  },
+  "sizing": {
+    "mode": "margin_fraction",
+    "value": 0.2
+  }
+}</code></pre>
+    </section>
+    <section id="w1">
+      <div class="eyebrow">15 · W1 · wielodniowa · D1 · bez stopu</div>
+      <h2>IBS: zamknięcie przy dole dnia, 1–5 dni</h2>
+      <p class="intro">Jedyna tu przewaga, która nie jest momentum i trzyma pozycję przez noce: po dniu zamkniętym przy samym dole zakresu indeks w trendzie wzrostowym częściej odbija. To dywersyfikacja względem strategii 6, a historia DAY od 2016 roku daje dziesięć lat próby. Dowody po 2016 są jednak słabe: test RSI(2) na NAS100 z lat 2016–2026 dał 2,4% rocznie przy 20,2% za kupno i trzymanie, a replikacja IBS na QQQ — 5,5% rocznie zamiast 15,1% z oryginału.</p>
+      <div class="table-wrap">
+        <table>
+          <tbody>
+            <tr><td style="width:160px"><b>Mechanizm</b></td><td>IBS = (close − low) / (high − low) świecy dziennej. Wejście long, gdy IBS &lt; <code>p.ibs_in</code> i close nad SMA200. Wyjście, gdy IBS &gt; <code>p.ibs_out</code> albo close nad wczorajszym szczytem, najpóźniej po 5 dniach.</td></tr>
+            <tr><td><b>Co testować</b></td><td><code>ibs_in</code> 0,2 i 0,1; <code>ibs_out</code> 0,8. Zakres 2016-01-01 → 2026-10-27, osobno lata 2016–2023 i 2024–2026, bo stały spread w punktach zawyża koszt, gdy indeks stał na 4–10 tys.</td></tr>
+            <tr><td><b>Pułapka</b></td><td>Każda noc to 0,089% kapitału przy depozycie 20%, weekend potrójnie. Przy 2–3 nocach na transakcję to 0,2–0,3% kapitału — tyle, ile może wynosić cała przewaga. Świeca dzienna CFD zamyka się wieczorem czasu NY, więc to nie jest IBS z sesji gotówkowej QQQ.</td></tr>
+            <tr><td><b>W rynku</b></td><td>1–5 dni, od wieczora do wieczora czasu NY</td></tr>
+            <tr><td><b>Historia</b></td><td>DAY od 2016</td></tr>
+            <tr><td><b>Uruchomienie</b></td><td>szybkie</td></tr>
+            <tr><td><b>Priorytet</b></td><td><span class="tag stop">niski</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Dokument sprawdzony walidatorem silnika 27 października 2026 — do wklejenia w edytor strategii bez zmian.</p>
+      <pre style="white-space:pre-wrap; word-break:break-word"><code>{
+  "schema": 1,
+  "name": "US100 D1 — zamknięcie przy dole dnia (IBS) w trendzie wzrostowym, 1–5 dni — depozyt 20%",
+  "symbol": "US100",
+  "timeframe": "DAY",
+  "hypothesis": "Dzień zamknięty przy samym dole swojego zakresu (niski IBS) w indeksie, który jest nad SMA200, częściej odbija w kolejnych 1–5 dniach, niż spada dalej: krótkoterminowa nadreakcja sprzedających w rynku z dryfem w górę. To przewaga innego rodzaju niż momentum strategii 6 (powrót do średniej, nie kontynuacja), trzymana przez noce.",
+  "notes": "Świeca dzienna archiwum = doba dostawcy CFD (około 23:00–22:00 UTC), więc IBS liczy się z całej doby, decyzja zapada po zamknięciu dnia, a wejście jest po otwarciu następnej świecy (wieczór w Nowym Jorku). IBS = (close − low) / (high − low), mianownik nie mniejszy niż 1 punkt. Wejście long, gdy IBS &lt; p.ibs_in i close &gt; SMA(200) dziennej. Wyjście, gdy IBS &gt; p.ibs_out albo close powyżej wczorajszego szczytu, najpóźniej po 5 świecach. Tylko long. Finansowanie longa 0,022% wartości za każdą noc, weekend liczy się potrójnie; przy depozycie 20% to około 0,09% kapitału za noc. Historia DAY od 2016: jedyna propozycja z próbą dziesięcioletnią, ale stały spread 1,8 pkt zawyża koszt względny w latach, gdy indeks stał niżej. Wartości do testu: ibs_in 0,2 i 0,1; ibs_out 0,8.",
+  "params": {
+    "ibs_in": {
+      "default": 0.2,
+      "min": 0.05,
+      "max": 0.3,
+      "step": 0.05
+    },
+    "ibs_out": {
+      "default": 0.8,
+      "min": 0.5,
+      "max": 0.9,
+      "step": 0.1
+    }
+  },
+  "let": {
+    "ibs": "(close - low) / max(high - low, 1)",
+    "trend": "close &gt; sma(200)"
+  },
+  "entries": [
+    {
+      "side": "long",
+      "when": "ibs &lt; p.ibs_in and trend"
+    }
+  ],
+  "exits": {
+    "when": "ibs &gt; p.ibs_out or close &gt; high[1]",
+    "max_bars": 5
+  },
+  "sizing": {
+    "mode": "margin_fraction",
+    "value": 0.2
+  }
+}</code></pre>
+    </section>
+
+    <section>
+      <div class="eyebrow">16 · Odrzucone na papierze</div>
+      <h2>Cztery pomysły, którym rachunek odpowiada przed backtestem</h2>
+      <p class="intro">Każdy z nich jest najprostszą odpowiedzią na „dłużej w rynku” i każdy przegrywa z kosztem albo z dowodami, zanim silnik cokolwiek policzy.</p>
+      <div class="fails">
+        <div class="fail stop"><h3>Dryf nocny przy otwarciu Europy (2:00–3:00 ET) <span class="tag stop">odrzucone</span></h3><p>Kusi, bo w latach 1998–2020 ta jedna godzina dawała ponad 60% zwrotu kontraktu ES. Od 2021 roku jest płasko, także na NQ (NY Fed, lipiec 2026). Nawet dawne 3,7% rocznie to około 0,015% na noc, mniej niż 0,022% finansowania longa. Zdanie zmieniłby powrót rozproszenia nierównowag na zamknięciu — autorzy przewidują, że wtedy dryf wróci w tym samym oknie, a test na H1 z lat 2017–2020 i 2021–2026 będzie tani.</p></div>
+<div class="fail stop"><h3>Zwycięzcy strategii 6 przez noc <span class="tag stop">odrzucone</span></h3><p>Najprostsze „dłużej”. Momentum śróddzienne kończy się z zamknięciem sesji i odwraca w ciągu 1–2 dni (Baltussen i in. 2021). Noc kosztuje 0,089% kapitału, weekend 0,27%, i niesie lukę bez stopu przy ekspozycji 4x. Zdanie zmieniłby dowód kontynuacji przez noc na NQ, którego w przejrzanych źródłach nie ma.</p></div>
+<div class="fail stop"><h3>Rdzeń trendowy: long US100 na tygodnie <span class="tag stop">odrzucone</span></h3><p>Najdłużej w rynku i łapie dryf Nasdaq, ale to beta, nie przewaga. Na CFD przy depozycie 20% finansowanie kosztuje 32,5% kapitału rocznie, przy ekspozycji 1x 8,1% — około połowy historycznego rocznego zwrotu Nasdaq. Taniej trzymać ETF poza rachunkiem CFD. Zdanie zmieniłby broker z niższym finansowaniem albo wariant short-only jako zabezpieczenie, bo short nie płaci za noc.</p></div>
+<div class="fail stop"><h3>Ścisły RSI(2) Connorsa <span class="tag stop">odrzucone</span></h3><p>Klasyk o wysokiej trafności. Na NAS100 w latach 2016–2026 dał 65 transakcji i 2,4% rocznie wobec 20,2% kupna i trzymania — za mało transakcji, żeby cokolwiek ocenić, i za mało czasu w rynku, żeby zarobić. Zamiast niego W1: ta sama teza, więcej transakcji.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">17 · Poza silnikiem</div>
+      <h2>Czego dziś nie zbudujemy i co by to zmieniło</h2>
+      <p class="intro">Uzupełnienie listy z pierwszej rundy o to, czego wymagają badania z tego dokumentu. Część ma obejście, które weszło do propozycji; część czeka na zmianę silnika.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Pomysł</th><th>Czego wymaga</th><th>Dlaczego nie dziś</th><th>Obejście albo zmiana</th></tr></thead>
+          <tbody>
+            <tr><td><b>Celowanie zmienności</b><br><span class="tag att">obejście</span></td><td>rozmiar odwrotny do niedawnej zmienności, do 4x — w badaniu strefy szumu to on zamienia 380% w 1 985%</td><td><code>sizing.value</code> jest stałą liczbą</td><td><code>risk_fraction</code> ze stopem w ATR daje rozmiar odwrotny do zmienności, ale stop przenosi rozliczenie na minuty, czyli około 11 tygodni historii. Zmiana silnika: rozmiar jako formuła.</td></tr>
+<tr><td><b>Dokładna strefa szumu</b><br><span class="tag att">obejście</span></td><td>średni ruch od otwarcia do tej samej minuty z 14 sesji</td><td><code>x[n]</code> liczy świece, a doba CFD ma ich różną liczbę; brak odczytu „ta sama świeca sesji n dni temu”</td><td>przybliżenie ATR × √t w N1. Zmiana silnika: funkcja w rodzaju <code>session_value(x, n)</code>.</td></tr>
+<tr><td><b>VWAP jako stop kroczący</b><br><span class="tag att">obejście</span></td><td>wolumen obrotu</td><td>wolumen CFD to aktywność kwotowań dostawcy, nie obrót</td><td>granica strefy w N1; to ograniczenie danych, nie silnika.</td></tr>
+<tr><td><b>Gamma dealerów (GEX, NGE)</b><br><span class="tag att">obejście</span></td><td>pozycje opcyjne na SPX i NDX</td><td>archiwum nie zbiera danych opcyjnych</td><td>RSI(5) dzienny jako pośrednik w K4, za Zarattinim.</td></tr>
+<tr><td><b>Nierównowaga zleceń na zamknięciu</b><br><span class="tag att">obejście</span></td><td>dane aukcji zamknięcia (MOC)</td><td>brak w archiwum</td><td>zwrot dnia jako pośrednik w K3 — od niego zależą przepływy lewarowanych ETF.</td></tr>
+<tr><td><b>Kalendarz: przełom miesiąca, trzeci piątek, rebalansowanie</b><br><span class="tag stop">nie dziś</span></td><td>dzień miesiąca</td><td>język zna godzinę, minutę i dzień tygodnia; dowody na przełom miesiąca po 1990 roku są zresztą sprzeczne</td><td>zmiana silnika: <code>day_of_month</code> i <code>trading_day_of_month</code>.</td></tr>
+<tr><td><b>Portfel dwóch strategii naraz</b><br><span class="tag stop">nie dziś</span></td><td>dwie pozycje jednocześnie, na przykład strategia 6 i W1</td><td>jeden dokument to jedna pozycja</td><td>porównanie dziennych krzywych kapitału poza silnikiem. Zmiana silnika: backtest portfela.</td></tr>
+<tr><td><b>Inny rozmiar dla każdej nogi</b><br><span class="tag att">obejście</span></td><td>rozmiar na wejście, na przykład mniejsza noga Londyn w E1</td><td>rozmiar jest jeden na dokument</td><td>osobne dokumenty dla nóg.</td></tr>
+<tr><td><b>Święta i skrócone sesje</b><br><span class="tag att">obejście</span></td><td>kalendarz giełdy</td><td>sesje są liczone bez świąt</td><td>kilka dni w roku szumu, zaakceptowane jak w pierwszej rundzie.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">18 · Plan testów</div>
+      <h2>Kolejność, wartości z góry i jedna miara porównania</h2>
+      <p class="intro">Wszystko wyżej to hipotezy. Ten plan ustala przed pierwszym uruchomieniem, jak je ocenić, żeby werdykt nie zależał od tego, co wyjdzie po drodze.</p>
+      <ol style="font-size:15px; line-height:1.7; padding-left:22px">
+        <li><b>Kontrola strategii 6.</b> Uruchomić ją z k = 0,05 i 0,1 na 2024-01-01 → 2026-10-27. Notatki strategii mówią, że przy 0,05 wynik wyraźnie słabnie — to może być pik, nie plateau. Jeśli 0,1 też słabnie, k = 0,075 jest dopasowane i każda propozycja K dziedziczy to dopasowanie.</li>
+        <li><b>Czy dłużej w ciągu dnia.</b> K1, N2 i K3 — wszystkie szybkie.</li>
+        <li><b>Filtry i eksploracja.</b> K4, E2, E1.</li>
+        <li><b>Wolne, ze stanem pozycji.</b> K2, N1, N3, a po N3 K5 — każde po 6–9 minut.</li>
+        <li><b>Wielodniowa.</b> W1 na 2016–2026 i osobno na podzakresach.</li>
+        <li><b>Potwierdzenie.</b> Zwycięzcy na 2026-01-01 → 2026-10-27 osobno, bez zmiany parametrów.</li>
+      </ol>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Wartości ustalone z góry</th><th class="n">Uruchomień</th><th>Czas</th></tr></thead>
+          <tbody>
+            <tr><td><b>Strategia 6</b></td><td>k 0,05 · 0,1</td><td class="n">2</td><td>szybkie</td></tr>
+<tr><td><b>K1</b></td><td>exit_min 60 · 30 · 5 (120 to run 13)</td><td class="n">3</td><td>szybkie</td></tr>
+<tr><td><b>K2</b></td><td>cut_min 120 · 60</td><td class="n">2</td><td>6–9 min</td></tr>
+<tr><td><b>K3</b></td><td>leg2_min 60 · 30 × k2 0 · 0,25</td><td class="n">4</td><td>szybkie</td></tr>
+<tr><td><b>K4</b></td><td>rsi_max 50 · nr 1 · vol_min 1, każdy osobno</td><td class="n">3</td><td>szybkie</td></tr>
+<tr><td><b>K5</b></td><td>exit1_min 120</td><td class="n">1</td><td>6–9 min</td></tr>
+<tr><td><b>N1</b></td><td>vm 0,45 · 0,65</td><td class="n">2</td><td>6–9 min</td></tr>
+<tr><td><b>N2</b></td><td>k 0 · 0,2 × exit_min 5 · 120</td><td class="n">4</td><td>szybkie</td></tr>
+<tr><td><b>N3</b></td><td>nr 1 · 0 × sf 0,5 · 1</td><td class="n">4</td><td>6–9 min</td></tr>
+<tr><td><b>E1</b></td><td>koszty brokera · profil spreadu 1,8 / 3,6</td><td class="n">2</td><td>szybkie</td></tr>
+<tr><td><b>E2</b></td><td>b 0</td><td class="n">1</td><td>szybkie</td></tr>
+<tr><td><b>W1</b></td><td>ibs_in 0,2 · 0,1 (2016–2026)</td><td class="n">2</td><td>szybkie</td></tr>
+<tr><td><b>Razem</b></td><td></td><td class="n"><b>30</b></td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:22px"><b>Jak porównywać z runem 13.</b></p>
+      <ul style="font-size:15px; line-height:1.7; padding-left:22px">
+        <li>Ten sam zakres 2024-01-01 → 2026-10-27, ten sam profil kosztów i ten sam depozyt 20%. compare_runs odmawia porównania przy różnych zakresach i słusznie.</li>
+        <li>Najpierw miary niezależne od dźwigni: Sharpe, Sortino, profit factor, trafność.</li>
+        <li>Potem zwrot przy tym samym ryzyku: drugi przebieg z depozytem 0,2 × (20% / maksymalne obsunięcie pierwszego przebiegu). Dopiero ten zwrot porównuje się wprost.</li>
+        <li>Zysk na świecę w pozycji, czyli expectancy_pct przez średnią liczbę świec w pozycji. Odróżnia gorszy sygnał od krótszego trzymania; dla W1 zysk na dzień.</li>
+        <li>Odporność: wynik bez pięciu najlepszych transakcji, rok po roku, losowe wejście p95.</li>
+        <li>Parametry wybiera się tylko na latach 2024–2025. Rok 2026 zostaje nietknięty do kroku potwierdzenia.</li>
+      </ul>
+      <div class="fails">
+        <div class="fail ok"><h3>Propozycja przechodzi, gdy spełnia wszystkie pięć warunków <span class="tag ok">ustalone przed testem</span></h3><p>1) zwrot ponad 95. percentylem losowego wejścia; 2) wynik bez pięciu najlepszych transakcji na plusie; 3) co najmniej dwa z trzech lat na plusie; 4) Sharpe w 2026 co najmniej 0,7 Sharpe z lat 2024–2025; 5) dla K1–K5 i E1–E2: przy tym samym obsunięciu lepsza od strategii 6 w co najmniej dwóch latach z trzech.</p></div>
+        <div class="fail"><h3>Trzydzieści uruchomień to spodziewane 1–2 fałszywe sukcesy <span class="tag att">wielokrotne testowanie</span></h3><p>Przy progu 5% tyle wariantów przypadkiem wygląda dobrze. Warunek 4 jest po to, żeby żadnego z nich nie wdrożyć na podstawie lat 2024–2025.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">19 · Źródła</div>
+      <h2>Skąd te liczby</h2>
+      <p>Odczytane 27 października 2026. Pełny tekst przeczytany dla Zarattiniego i in. (2024), Baltussena i in. (2021), wpisu NY Fed z lipca 2026 i replikacji Kruegera; reszta ze streszczeń i stron źródłowych. Liczby praktyków i sprzedawców testów są bez próby poza próbą — dlatego tutaj są hipotezami, nie wynikami.</p>
+      <ul style="font-size:14.5px; line-height:1.7; padding-left:20px">
+        <li><a href="https://pure.eur.nl/en/publications/hedging-demand-and-market-intraday-momentum/">Baltussen, Da, Lammers, Martens — Hedging demand and market intraday momentum, Journal of Financial Economics 142 (2021)</a></li>
+<li><a href="https://www3.nd.edu/~zda/intramom.pdf">Ta sama praca, pełny tekst (PDF)</a></li>
+<li><a href="https://profiles.wustl.edu/en/publications/market-intraday-momentum/">Gao, Han, Li, Zhou — Market intraday momentum, Journal of Financial Economics 129 (2018)</a></li>
+<li><a href="https://cxoadvisory.com/calendar-effects/first-and-last-half-hours-of-trading-linked">CXO Advisory — First and last half-hours of trading linked (niezależne sprawdzenie Gao i in.)</a></li>
+<li><a href="https://ideas.repec.org/a/wly/jfutmk/v42y2022i12p2218-2234.html">Rosa — Understanding intraday momentum strategies, Journal of Futures Markets 42(12), 2022</a></li>
+<li><a href="https://alexandria.unisg.ch/server/api/core/bitstreams/a99aba00-f967-49b3-aceb-f544dc386e0b/content">Zarattini, Aziz, Barbon — Beat the Market: An Effective Intraday Momentum Strategy for S&amp;P500 ETF (SPY), wersja z 3 lutego 2025 (pełny tekst przeczytany)</a></li>
+<li><a href="https://in.tradingview.com/script/gJeM3LZ5-Out-of-the-Noise-Intraday-Strategy-with-VWAP-YuL">Replikacja strefy szumu na TradingView: Out of the Noise, z VWAP</a></li>
+<li><a href="https://www.cxoadvisory.com/technical-trading/day-trading-with-an-opening-range-breakout-strategy">Zarattini, Aziz — Can Day Trading Really Be Profitable? (ORB 5 minut na QQQ), streszczenie CXO Advisory</a></li>
+<li><a href="https://www.mql5.com/en/blogs/post/776235">Krueger — The opening-range breakout paper, replicated on five indices: gross reproduced, net zero (25 września 2026)</a></li>
+<li><a href="https://papers.ssrn.com/abstract=3925725">Barbon, Beckmeyer, Buraschi, Moerke — Liquidity Provision to Leveraged ETFs and Equity Options Rebalancing Flows (SFI 22-40)</a></li>
+<li><a href="https://www.newyorkfed.org/medialibrary/media/research/staff_reports/sr917.pdf">Boyarchenko, Larsen, Whelan — The Overnight Drift, NY Fed Staff Report 917 (Review of Financial Studies 2023)</a></li>
+<li><a href="https://libertystreeteconomics.newyorkfed.org/2026/07/the-disappearing-overnight-drift/">Boyarchenko, Larsen, Whelan — The Disappearing Overnight Drift, Liberty Street Economics, 1 lipca 2026</a></li>
+<li><a href="https://arxiv.org/html/2507.04481v1">Glasserman i in. — zwroty nocne i sesyjne, arXiv 2507.04481 (2025)</a></li>
+<li><a href="https://www.utupub.fi/bitstreams/88057d2a-1ee8-4c05-9592-c535a21b502c/download">Praca magisterska, Uniwersytet w Turku (2026): odwrócenie noc → sesja w latach 2011–2024 i koszty</a></li>
+<li><a href="https://backtrex.com/en/backtests/connors-rsi-2-nasdaq-100">Backtrex — Connors RSI(2) na Nasdaq 100, 2016–2026</a></li>
+<li><a href="https://www.quantconnect.com/forum/discussion/12403/who-039-s-wrong-me-or-amibroker/">QuantConnect — replikacja IBS na QQQ (15,1% wobec 5,5% rocznie)</a></li>
+<li><a href="https://store.traders.com/-v07-c04-orb-pdf.html">Crabel — Opening Range Breakout, cz. 5, Technical Analysis of Stocks &amp; Commodities</a></li>
+<li><a href="https://www.lehigh.edu/~xuy219/research/COWY.pdf">Cederburg, O'Doherty, Wang, Yan — On the performance of volatility-managed portfolios</a></li>
+<li><a href="https://www.citadelsecurities.com/news-and-insights/global-market-intelligence/1h-2026-market-structure-flows/">Citadel Securities — 1H 2026 Market Structure &amp; Flows (strona odmówiła dostępu; liczba za streszczeniem wyszukiwarki)</a></li>
+<li><a href="https://blockonomi.com/options-trading-statistics-2026">Blockonomi — Options Trading Statistics 2026 (udział 0DTE za Cboe, niezweryfikowany)</a></li>
+<li><a href="https://www.stblaw.com/about-us/publications/view/2026/04/29/looking-ahead-to-extended-trading-sec-approves-nasdaq-s-23-5-trading-proposal">Simpson Thacher — SEC zatwierdza handel Nasdaq 23/5 (29 kwietnia 2026)</a></li>
+<li><a href="https://fedinprint.org/item/fedawp/13394/original">Federal Reserve, working paper — przełom miesiąca w kontraktach S&amp;P 500</a></li>
+<li><a href="https://quantpedia.com/strategies/turn-of-the-month-in-equity-indexes">Quantpedia — Turn of the Month in Equity Indexes</a></li>
+<li><a href="strategie-us100-propozycje.html">Pierwsza runda: docs/strategie-us100-propozycje.html</a></li>
+<li><a href="strategie-us100-wyniki-backtestow.html">Wyniki pierwszej rundy: docs/strategie-us100-wyniki-backtestow.html</a></li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Strategie na US100 · dłużej w rynku · 27 października 2026</span>
+    <span>Poprzednie: strategie-us100-propozycje.html · strategie-us100-wyniki-backtestow.html</span>
+  </div>
+</footer>

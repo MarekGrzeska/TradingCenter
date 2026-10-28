@@ -1,0 +1,507 @@
+<title>US100 — trzy strategie ponad losowym wejściem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 22px; font-size: 13.5px; color: var(--ink-2); margin: 0 0 10px; }
+  .legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 7px; vertical-align: -1px; }
+  .cards3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-top: 8px; }
+  .scard { background: var(--card); border: 1px solid var(--line); border-top: 6px solid var(--navy); padding: 18px 20px 16px; }
+  .scard.ok { border-top-color: var(--green); }
+  .scard.att { border-top-color: var(--yellow); }
+  .scard .id { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; color: var(--ink-3); }
+  .scard h3 { font-family: var(--head); font-weight: 700; font-size: 20px; letter-spacing: -0.018em; color: var(--ink); margin: 4px 0 10px; line-height: 1.15; }
+  .scard .big { font-family: var(--head); font-weight: 800; font-size: 44px; line-height: 0.95; letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums; }
+  .scard .sub { font-size: 13px; color: var(--ink-3); margin: 6px 0 12px; }
+  .scard dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 14px; margin: 0 0 12px; font-size: 14px; }
+  .scard dt { color: var(--ink-3); }
+  .scard dd { margin: 0; font-family: var(--mono); font-size: 13px; color: var(--ink); text-align: right; }
+  .scard p { font-size: 14.5px; margin: 0; }
+  .spec { display: grid; grid-template-columns: 150px 1fr; gap: 0; background: var(--card); border: 1px solid var(--line); margin: 6px 0 18px; }
+  .spec div { padding: 10px 16px; border-bottom: 1px solid var(--line-soft); font-size: 15px; }
+  .spec div:nth-child(odd) { font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--navy); background: var(--navy-soft); }
+  .spec div:nth-last-child(-n+2) { border-bottom: none; }
+  @media (max-width: 620px) { .spec { grid-template-columns: 1fr; } }
+  h3.sub { font-family: var(--head); font-weight: 700; font-size: 22px; letter-spacing: -0.02em; color: var(--ink); margin: 34px 0 10px; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Strategie · US100 CFD · wyniki</span>
+    <h1>Trzy strategie ponad losowym wejściem</h1>
+    <p class="lede">Z jedenastu propozycji z dokumentu <a href="strategie-us100-dluzej-w-rynku.html" style="color:#f2c313">„Dłużej w rynku”</a> trzy dały wyniki, których poprzednia runda nie znała: <b>każda jest wyraźnie ponad 95. percentylem losowego wejścia</b> przy tych samych kosztach i tej samej liczbie transakcji. Ten dokument zbiera ich liczby, mówi, co każda dodaje do strategii 6, i wylicza, co w tych liczbach może być za ładne.</p>
+    <div class="strip">
+      <span>TradingCenter / strategie</span>
+      <span>27 października 2026 · rew. <b>01</b></span>
+      <span>koszty <b>capital.com</b>: spread 1,8 pkt, finansowanie z warunków instrumentu, poślizg 0</span>
+      <span>kapitał 10 000 · depozyt 20% (≈ 4×) · ziarno 1 · silnik v4</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">3</div><div class="l">strategie ponad 95. percentylem losowego wejścia; z trzynastu poprzedniej rundy nie przebiła go żadna</div></div>
+      <div class="cell"><div class="v">4,32</div><div class="l">Calmar #69 — najlepszy stosunek zwrotu do obsunięcia, strategia 6 ma 3,05</div></div>
+      <div class="cell"><div class="v">10 lat</div><div class="l">próby #70 (2016–2026); pozostałe dwie mają M5 od stycznia 2024</div></div>
+      <div class="cell"><div class="v">−35%</div><div class="l">najgorsza otwarta strata jednej transakcji — żadna z trzech nie ma stopu</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Wynik w trzech zdaniach</div>
+      <h2>Jedna poprawia strategię 6, jedna jest od niej niezależna, jedna jej tylko dorównuje</h2>
+      <p class="intro"><span class="hl">#69</span> to strategia 6 z drugą nogą w dni, które strategia 6 odrzuca — lepsza od niej w każdym roku i przy mniejszym obsunięciu. <span class="hl">#70</span> to zupełnie inna przewaga (powrót do średniej przez noce, nie momentum śróddzienne) z dziesięcioletnią historią, ale wrażliwa na jedyny parametr. <span class="hl">#60</span> dokłada do strategii 6 nogę londyńską, która w sumie daje około 5% i podnosi obsunięcie z 33% do 41%.</p>
+      <div class="cards3">
+        <div class="scard ok">
+          <div class="id">STRATEGIA 24 · RUN 69 · M5</div>
+          <h3>Strategia 6 plus wybicie 30-minutowe w dni bez sygnału otwarcia</h3>
+          <div class="big">+923,9%</div>
+          <div class="sub">2024-01-01 → 2026-10-27 · 722 transakcje · <span class="tag ok">najlepsza z trzech</span></div>
+          <dl>
+            <dt>Rocznie</dt><dd>+128,2%</dd>
+            <dt>Sharpe · Sortino</dt><dd>1,88 · 3,30</dd>
+            <dt>Max obsunięcie</dt><dd>29,7%</dd>
+            <dt>Profit factor</dt><dd>1,29</dd>
+            <dt>Losowe wejście p95</dt><dd>+118,9%</dd>
+            <dt>Bez 5 najlepszych</dt><dd>+198,9%</dd>
+          </dl>
+          <p>W rynku prawie codziennie zamiast co drugi dzień. Wynik trzyma się w obu połowach próby osobno.</p>
+        </div>
+        <div class="scard att">
+          <div class="id">STRATEGIA 30 · RUN 70 · D1</div>
+          <h3>Zamknięcie przy dole dnia (IBS) w trendzie wzrostowym, 1–5 dni</h3>
+          <div class="big">+7328,9%</div>
+          <div class="sub">2016-01-01 → 2026-10-27 · 315 transakcji · <span class="tag att">kandydat z zastrzeżeniem</span></div>
+          <dl>
+            <dt>Rocznie</dt><dd>+48,9%</dd>
+            <dt>Sharpe · Sortino</dt><dd>1,26 · 2,01</dd>
+            <dt>Max obsunięcie</dt><dd>32,0%</dd>
+            <dt>Profit factor</dt><dd>1,54</dd>
+            <dt>Losowe wejście p95</dt><dd>+1118,6%</dd>
+            <dt>Bez 5 najlepszych</dt><dd>+426,0%</dd>
+          </dl>
+          <p>Trafność 71%, najdłuższa seria strat to 3. Przy <code>ibs_in = 0,1</code> zamiast 0,2 spada pod losowe wejście.</p>
+        </div>
+        <div class="scard att">
+          <div class="id">STRATEGIA 28 · RUN 60 · M5</div>
+          <h3>Reguła strategii 6 na otwarciu Londynu i Nowego Jorku, dwie nogi</h3>
+          <div class="big">+654,9%</div>
+          <div class="sub">2024-01-01 → 2026-10-27 · 475 transakcji · <span class="tag att">nie dodaje do strategii 6</span></div>
+          <dl>
+            <dt>Rocznie</dt><dd>+104,8%</dd>
+            <dt>Sharpe · Sortino</dt><dd>1,78 · 2,84</dd>
+            <dt>Max obsunięcie</dt><dd>41,5%</dd>
+            <dt>Profit factor</dt><dd>1,42</dd>
+            <dt>Losowe wejście p95</dt><dd>+58,3%</dd>
+            <dt>Bez 5 najlepszych</dt><dd>+164,4%</dd>
+          </dl>
+          <p>Prawie cały wynik to noga nowojorska, czyli strategia 6 bez zmian (run 13: +620,1%).</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Wszystkie miary obok siebie</div>
+      <h2>Te same koszty, ten sam depozyt, strategia 6 jako miara</h2>
+      <p class="intro">Wszystkie cztery uruchomienia mają profil kosztów brokera z 25 października, kapitał 10 000 i depozyt 20% kapitału na pozycję. #69, #60 i run 13 mają też ten sam zakres, więc ich kolumny porównuje się wprost. #70 ma zakres dziesięcioletni — jego wiersze porównuje się z jego własnymi punktami odniesienia, nie z resztą.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Miara</th><th class="n">#69</th><th class="n">#60</th><th class="n">Strategia 6 · run 13</th><th class="n">#70 IBS</th></tr></thead>
+          <tbody>
+            <tr><td><b>Zakres</b></td><td class="n">2024 – 27.10.2026</td><td class="n">2024 – 27.10.2026</td><td class="n">2024 – 27.10.2026</td><td class="n">2016 – 27.10.2026</td></tr>
+            <tr><td><b>Transakcji</b></td><td class="n">722</td><td class="n">475</td><td class="n">388</td><td class="n">315</td></tr>
+            <tr><td><b>Zwrot</b></td><td class="n">+923,9%</td><td class="n">+654,9%</td><td class="n">+620,1%</td><td class="n">+7328,9%</td></tr>
+            <tr><td><b>Zwrot roczny</b></td><td class="n">+128,2%</td><td class="n">+104,8%</td><td class="n">+101,4%</td><td class="n">+48,9%</td></tr>
+            <tr><td><b>Sharpe</b></td><td class="n">1,88</td><td class="n">1,78</td><td class="n">1,81</td><td class="n">1,26</td></tr>
+            <tr><td><b>Sortino</b></td><td class="n">3,30</td><td class="n">2,84</td><td class="n">3,12</td><td class="n">2,01</td></tr>
+            <tr><td><b>Calmar</b> (roczny / max DD)</td><td class="n">4,32</td><td class="n">2,53</td><td class="n">3,05</td><td class="n">1,53</td></tr>
+            <tr><td><b>Profit factor</b></td><td class="n">1,29</td><td class="n">1,42</td><td class="n">1,44</td><td class="n">1,54</td></tr>
+            <tr><td><b>Trafność</b></td><td class="n">50,6%</td><td class="n">55,6%</td><td class="n">57,0%</td><td class="n">71,4%</td></tr>
+            <tr><td><b>Zysk na transakcję</b> (kapitału)</td><td class="n">0,37%</td><td class="n">0,49%</td><td class="n">0,58%</td><td class="n">1,52%</td></tr>
+            <tr><td><b>Max obsunięcie</b></td><td class="n">29,7%</td><td class="n">41,5%</td><td class="n">33,2%</td><td class="n">32,0%</td></tr>
+            <tr><td><b>Najgorsza otwarta strata</b> jednej transakcji</td><td class="n">−34,7%</td><td class="n">−34,7%</td><td class="n">−34,7%</td><td class="n">−32,8%</td></tr>
+            <tr><td><b>Najdłuższa seria strat</b></td><td class="n">13</td><td class="n">12</td><td class="n">12</td><td class="n">3</td></tr>
+            <tr><td><b>Czas w rynku</b></td><td class="n">11,8%</td><td class="n">9,1%</td><td class="n">6,9%</td><td class="n">20,6%</td></tr>
+            <tr><td><b>Średnio w pozycji</b></td><td class="n">≈ 4 h (47,5 × M5)</td><td class="n">≈ 4,75 h (57 × M5)</td><td class="n">≈ 4,4 h (53 × M5)</td><td class="n">2,2 dnia</td></tr>
+            <tr><td><b>Bez 5 najlepszych transakcji</b></td><td class="n">+198,9%</td><td class="n">+164,4%</td><td class="n">+153,3%</td><td class="n">+426,0%</td></tr>
+            <tr><td><b>Losowe wejście</b> · mediana / p95</td><td class="n">−40,0% / +118,9%</td><td class="n">−16,8% / +58,3%</td><td class="n">−22,4% / +53,8%</td><td class="n">+86,5% / +1118,6%</td></tr>
+            <tr><td><b>Kup i trzymaj</b> (bez dźwigni)</td><td class="n">+51,7%</td><td class="n">+51,7%</td><td class="n">+51,2%</td><td class="n">+451,5%</td></tr>
+            <tr><td><b>Koszt spreadu</b> · finansowania</td><td class="n">9 487 · 199</td><td class="n">4 646 · 0</td><td class="n">3 861 · 0</td><td class="n">31 557 · 191 525</td></tr>
+            <tr><td><b>Kapitał końcowy</b> z 10 000</td><td class="n">102 391</td><td class="n">75 489</td><td class="n">72 010</td><td class="n">742 899</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px"><strong>Te zwroty to procent składany przy ekspozycji około 4×.</strong> Depozyt 20% kapitału przy depozycie brokera 5% daje pozycję wartą mniej więcej cztery razy kapitał, a każda transakcja liczy rozmiar od bieżącego kapitału. Dlatego +7329% w dziesięć lat to „tylko” +48,9% rocznie, a różnica między +924% a +620% to różnica między +128% a +101% rocznie. Miary, które nie zależą od dźwigni — Sharpe, Sortino, Calmar, profit factor — mówią o strategiach więcej niż zwrot.</p>
+      <p>Losowe wejście z raportu to sto przebiegów z tą samą liczbą transakcji i tymi samymi kosztami, tylko z losowym momentem wejścia. W poprzedniej rundzie (<a href="strategie-us100-wyniki-backtestow.html">wyniki backtestów</a>) żadna z trzynastu strategii nie przebiła jego 95. percentyla — przebijała go tylko strategia 6. Tu przebijają wszystkie trzy, a #69 i #60 — także bez swoich pięciu najlepszych transakcji.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Rok po roku</div>
+      <h2>#69 wygrywa ze strategią 6 w każdym roku, #60 w dwóch z trzech</h2>
+      <p class="intro">Porównanie lat jest uczciwsze niż porównanie sum, bo procent składany powiększa każdą różnicę z pierwszego roku przez dwa kolejne.</p>
+      <figure>
+        <div class="legend"><span><i style="background:#8a8fa3"></i>Strategia 6 · run 13</span><span><i style="background:#2f5fb8"></i>#69 · strategia 6 + wybicie</span><span><i style="background:#c27c0e"></i>#60 · strategia 6 + Londyn</span></div><div class="scroll"><svg viewBox="0 0 980 330" role="img" aria-label="Zwrot rok po roku: strategia 6, #69 i #60, lata 2024–2026">
+<g font-family="Karla, sans-serif">
+<line x1="64" y1="290.0" x2="960" y2="290.0" stroke="currentColor" stroke-width="1.2" opacity="0.8"></line>
+<text x="56" y="294.0" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">0,0%</text>
+<line x1="64" y1="235.2" x2="960" y2="235.2" stroke="currentColor" stroke-width="0.6" opacity="0.22"></line>
+<text x="56" y="239.2" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">+25,0%</text>
+<line x1="64" y1="180.4" x2="960" y2="180.4" stroke="currentColor" stroke-width="0.6" opacity="0.22"></line>
+<text x="56" y="184.4" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">+50,0%</text>
+<line x1="64" y1="125.6" x2="960" y2="125.6" stroke="currentColor" stroke-width="0.6" opacity="0.22"></line>
+<text x="56" y="129.6" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">+75,0%</text>
+<line x1="64" y1="70.8" x2="960" y2="70.8" stroke="currentColor" stroke-width="0.6" opacity="0.22"></line>
+<text x="56" y="74.8" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">+100,0%</text>
+<line x1="64" y1="16.0" x2="960" y2="16.0" stroke="currentColor" stroke-width="0.6" opacity="0.22"></line>
+<text x="56" y="20.0" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">+125,0%</text>
+<path d="M115.3,290.0 V104.2 Q115.3,100.2 119.3,100.2 H175.3 Q179.3,100.2 179.3,104.2 V290.0 Z" fill="#8a8fa3"><title>Strategia 6 · run 13 · 2024: +86,6% · 132 transakcji</title></path>
+<text x="147.3" y="94.2" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+86,6%</text>
+<path d="M181.3,290.0 V39.5 Q181.3,35.5 185.3,35.5 H241.3 Q245.3,35.5 245.3,39.5 V290.0 Z" fill="#2f5fb8"><title>#69 · strategia 6 + wybicie · 2024: +116,1% · 256 transakcji</title></path>
+<text x="213.3" y="29.5" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+116,1%</text>
+<path d="M247.3,290.0 V99.4 Q247.3,95.4 251.3,95.4 H307.3 Q311.3,95.4 311.3,99.4 V290.0 Z" fill="#c27c0e"><title>#60 · strategia 6 + Londyn · 2024: +88,8% · 158 transakcji</title></path>
+<text x="279.3" y="89.4" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+88,8%</text>
+<text x="213.3" y="316" text-anchor="middle" font-size="12.5" fill="currentColor">2024</text>
+<path d="M414.0,290.0 V128.5 Q414.0,124.5 418.0,124.5 H474.0 Q478.0,124.5 478.0,128.5 V290.0 Z" fill="#8a8fa3"><title>Strategia 6 · run 13 · 2025: +75,5% · 135 transakcji</title></path>
+<text x="446.0" y="118.5" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+75,5%</text>
+<path d="M480.0,290.0 V118.2 Q480.0,114.2 484.0,114.2 H540.0 Q544.0,114.2 544.0,118.2 V290.0 Z" fill="#2f5fb8"><title>#69 · strategia 6 + wybicie · 2025: +80,2% · 256 transakcji</title></path>
+<text x="512.0" y="108.2" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+80,2%</text>
+<path d="M546.0,290.0 V147.6 Q546.0,143.6 550.0,143.6 H606.0 Q610.0,143.6 610.0,147.6 V290.0 Z" fill="#c27c0e"><title>#60 · strategia 6 + Londyn · 2025: +66,8% · 162 transakcji</title></path>
+<text x="578.0" y="137.6" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+66,8%</text>
+<text x="512.0" y="316" text-anchor="middle" font-size="12.5" fill="currentColor">2025</text>
+<path d="M712.7,290.0 V158.8 Q712.7,154.8 716.7,154.8 H772.7 Q776.7,154.8 776.7,158.8 V290.0 Z" fill="#8a8fa3"><title>Strategia 6 · run 13 · 2026: +61,7% · 121 transakcji</title></path>
+<text x="744.7" y="148.8" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+61,7%</text>
+<path d="M778.7,290.0 V137.7 Q778.7,133.7 782.7,133.7 H838.7 Q842.7,133.7 842.7,137.7 V290.0 Z" fill="#2f5fb8"><title>#69 · strategia 6 + wybicie · 2026: +71,3% · 210 transakcji</title></path>
+<text x="810.7" y="127.7" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+71,3%</text>
+<path d="M844.7,290.0 V129.8 Q844.7,125.8 848.7,125.8 H904.7 Q908.7,125.8 908.7,129.8 V290.0 Z" fill="#c27c0e"><title>#60 · strategia 6 + Londyn · 2026: +74,9% · 155 transakcji</title></path>
+<text x="876.7" y="119.8" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+74,9%</text>
+<text x="810.7" y="316" text-anchor="middle" font-size="12.5" fill="currentColor">2026 (do 27.10)</text>
+</g></svg></div>
+        <figcaption><b>Rys. 1</b> — zwrot w procentach kapitału w każdym roku, ten sam zakres, koszty i depozyt. Strategia 6 (run 13) to punkt odniesienia: #69 i #60 mają jej nogę nowojorską bez zmian, więc różnica słupków to wkład drugiej nogi. Najechanie na słupek pokazuje liczbę transakcji.</figcaption>
+      </figure>
+      <div class="table-wrap" style="margin-top:22px">
+        <table>
+          <thead><tr><th>Rok</th><th class="n">Strategia 6</th><th class="n">#69</th><th class="n">Wkład nogi 2 w #69</th><th class="n">#60</th><th class="n">Wkład Londynu w #60</th></tr></thead>
+          <tbody>
+            <tr><td><b>2024</b></td><td class="n">+86,6%</td><td class="n">+116,1%</td><td class="n">×1,158</td><td class="n">+88,8%</td><td class="n">×1,012</td></tr>
+            <tr><td><b>2025</b></td><td class="n">+75,5%</td><td class="n">+80,2%</td><td class="n">×1,027</td><td class="n">+66,8%</td><td class="n">×0,951</td></tr>
+            <tr><td><b>2026</b> do 27.10</td><td class="n">+61,7%</td><td class="n">+71,3%</td><td class="n">×1,059</td><td class="n">+74,9%</td><td class="n">×1,082</td></tr>
+            <tr><td><b>Razem</b></td><td class="n">+620,1%</td><td class="n">+923,9%</td><td class="n">×1,422</td><td class="n">+654,9%</td><td class="n">×1,048</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">„Wkład” to iloraz kapitału na koniec roku do kapitału strategii 6 w tym samym roku. To przybliżenie: noga nowojorska jest ta sama, ale przy innym kapitale ma inny rozmiar. Wniosek z tabeli jest prosty. Noga 2 w #69 dodała coś w każdym roku, najwięcej w 2024. Noga londyńska w #60 raz dodała 8%, raz zabrała 5% — to szum, a nie przewaga, i do tego kosztował 8 punktów obsunięcia.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · #69 · strategia 24 · M5 · bez stopu</div>
+      <h2>Strategia 6 plus wybicie 30-minutowe</h2>
+      <p class="intro">Strategia 6 odrzuca mniej więcej połowę dni, bo otwarcie jest za blisko EMA12. Hipoteza #69: w takie dni kierunek nie znika, tylko pojawia się później, i zamknięcie poza zakresem pierwszych 30 minut wskazuje go do końca sesji.</p>
+      <div class="spec">
+        <div>Noga 1</div><div>Strategia 6 bez zmian. Pierwsza świeca M5 sesji NY (9:30–9:35 ET): long, gdy close &gt; EMA12, short, gdy poniżej, i tylko gdy |close − EMA12| / ATR(14) dzienne &gt; <code>k = 0,075</code>. Wyjście 120 minut przed zamknięciem sesji (14:00 ET).</div>
+        <div>Noga 2</div><div>Tylko w dni bez transakcji (<code>trades_today == 0</code>). Między 10:05 a 14:00 ET zamknięcie M5 przecina szczyt albo dołek pierwszych 30 minut sesji. Wyjście 5 minut przed zamknięciem albo na zamknięciu M5 po złej stronie środka zakresu.</div>
+        <div>Rozmiar</div><div>Depozyt 20% kapitału, ekspozycja ≈ 4×. Bez stopu u brokera, rozliczenie na zamknięciu M5.</div>
+        <div>W rynku</div><div>11,8% czasu, prawie każdego dnia sesyjnego. Finansowanie prawie zerowe (199 przez trzy lata), bo obie nogi zamykają się przed nocą.</div>
+      </div>
+      <h3 class="sub">Inne uruchomienia tego samego dokumentu</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th class="n">Run</th><th>Wariant</th><th>Zakres</th><th class="n">Transakcji</th><th class="n">Zwrot</th><th class="n">Sharpe</th><th class="n">Calmar</th><th class="n">Max DD</th></tr></thead>
+          <tbody>
+            <tr><td class="n">69</td><td><b>k = 0,075</b> · cały zakres</td><td>2024 – 27.10.2026</td><td class="n">722</td><td class="n">+923,9%</td><td class="n">1,88</td><td class="n">4,32</td><td class="n">29,7%</td></tr>
+            <tr><td class="n">72</td><td>k = 0,075 · tylko 2024–2025</td><td>2024–2025</td><td class="n">512</td><td class="n">+448,5%</td><td class="n">1,89</td><td class="n">4,53</td><td class="n">29,7%</td></tr>
+            <tr><td class="n">73</td><td>k = 0,075 · tylko 2026</td><td>2026 – 27.10</td><td class="n">210</td><td class="n">+86,7%</td><td class="n">1,87</td><td class="n">4,52</td><td class="n">25,4%</td></tr>
+            <tr><td class="n">76</td><td>k = 0,05</td><td>2024 – 27.10.2026</td><td class="n">725</td><td class="n">+560,5%</td><td class="n">1,54</td><td class="n">2,87</td><td class="n">33,3%</td></tr>
+            <tr class="void"><td class="n">77</td><td colspan="7">w trakcie liczenia w chwili pisania</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Sharpe i Calmar są takie same w 2024–2025 i w samym 2026. To najmocniejszy argument za #69: przewaga nie skupiła się w jednym kawałku próby. Rok 2026 nie jest jednak czystą próbą poza próbą — <code>k = 0,075</code> pochodzi ze strategii 6, która powstała na tych samych latach. Przy <code>k = 0,05</code> wynik wyraźnie słabnie, a plan z dokumentu „Dłużej w rynku” zakładał też sprawdzenie <code>k = 0,1</code>. Dopiero oba sąsiednie punkty powiedzą, czy 0,075 leży na płaskowyżu, czy na szczycie.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · #70 · strategia 30 · D1 · bez stopu</div>
+      <h2>IBS: zamknięcie przy dole dnia, 1–5 dni</h2>
+      <p class="intro">Jedyna z trzech przewaga, która nie jest momentum i trzyma pozycję przez noce. Dzień zamknięty przy samym dole zakresu w indeksie nad SMA200 częściej odbija w kolejnych dniach, niż spada dalej. Jako jedyna ma za sobą dziesięć lat historii, w tym rok 2022.</p>
+      <div class="spec">
+        <div>Wejście</div><div>Long, gdy IBS = (close − low) / (high − low) świecy dziennej &lt; <code>ibs_in = 0,2</code> i close &gt; SMA(200). Zlecenie rynkowe na otwarciu następnej świecy, czyli wieczorem czasu NY.</div>
+        <div>Wyjście</div><div>IBS &gt; <code>ibs_out = 0,8</code> albo close nad wczorajszym szczytem, najpóźniej po 5 świecach. Tylko long.</div>
+        <div>Rozmiar</div><div>Depozyt 20% kapitału, ekspozycja ≈ 4×. Każda noc kosztuje około 0,09% kapitału, weekend potrójnie.</div>
+        <div>W rynku</div><div>20,6% dni, średnio 2,2 dnia na transakcję.</div>
+      </div>
+      <figure>
+        <div class="scroll"><svg viewBox="0 0 980 320" role="img" aria-label="#70 IBS: zwrot w każdym roku 2016–2026">
+<g font-family="Karla, sans-serif">
+<line x1="64" y1="260.4" x2="960" y2="260.4" stroke="currentColor" stroke-width="1.2" opacity="0.8"></line>
+<text x="56" y="264.4" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">0,0%</text>
+<line x1="64" y1="211.6" x2="960" y2="211.6" stroke="currentColor" stroke-width="0.6" opacity="0.22"></line>
+<text x="56" y="215.6" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">+25,0%</text>
+<line x1="64" y1="162.7" x2="960" y2="162.7" stroke="currentColor" stroke-width="0.6" opacity="0.22"></line>
+<text x="56" y="166.7" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">+50,0%</text>
+<line x1="64" y1="113.8" x2="960" y2="113.8" stroke="currentColor" stroke-width="0.6" opacity="0.22"></line>
+<text x="56" y="117.8" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">+75,0%</text>
+<line x1="64" y1="64.9" x2="960" y2="64.9" stroke="currentColor" stroke-width="0.6" opacity="0.22"></line>
+<text x="56" y="68.9" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">+100,0%</text>
+<line x1="64" y1="16.0" x2="960" y2="16.0" stroke="currentColor" stroke-width="0.6" opacity="0.22"></line>
+<text x="56" y="20.0" text-anchor="end" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">+125,0%</text>
+<path d="M78.7,260.4 V255.8 Q78.7,251.8 82.7,251.8 H126.69999999999999 Q130.7,251.8 130.7,255.8 V260.4 Z" fill="#2f5fb8"><title>#70 · 2016: +4,4% · 10 transakcji</title></path>
+<text x="104.7" y="245.8" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+4,4%</text>
+<text x="104.7" y="306" text-anchor="middle" font-size="12.5" fill="currentColor">2016</text>
+<path d="M160.2,260.4 V162.4 Q160.2,158.4 164.2,158.4 H208.2 Q212.2,158.4 212.2,162.4 V260.4 Z" fill="#2f5fb8"><title>#70 · 2017: +52,2% · 27 transakcji</title></path>
+<text x="186.2" y="152.4" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+52,2%</text>
+<text x="186.2" y="306" text-anchor="middle" font-size="12.5" fill="currentColor">2017</text>
+<path d="M241.6,260.4 V160.4 Q241.6,156.4 245.6,156.4 H289.6 Q293.6,156.4 293.6,160.4 V260.4 Z" fill="#2f5fb8"><title>#70 · 2018: +53,2% · 33 transakcji</title></path>
+<text x="267.6" y="150.4" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+53,2%</text>
+<text x="267.6" y="306" text-anchor="middle" font-size="12.5" fill="currentColor">2018</text>
+<path d="M323.1,260.4 V168.0 Q323.1,164.0 327.1,164.0 H371.1 Q375.1,164.0 375.1,168.0 V260.4 Z" fill="#2f5fb8"><title>#70 · 2019: +49,3% · 37 transakcji</title></path>
+<text x="349.1" y="158.0" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+49,3%</text>
+<text x="349.1" y="306" text-anchor="middle" font-size="12.5" fill="currentColor">2019</text>
+<path d="M404.5,260.4 V35.4 Q404.5,31.4 408.5,31.4 H452.5 Q456.5,31.4 456.5,35.4 V260.4 Z" fill="#2f5fb8"><title>#70 · 2020: +117,1% · 33 transakcji</title></path>
+<text x="430.5" y="25.4" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+117,1%</text>
+<text x="430.5" y="306" text-anchor="middle" font-size="12.5" fill="currentColor">2020</text>
+<path d="M486.0,260.4 V141.0 Q486.0,137.0 490.0,137.0 H534.0 Q538.0,137.0 538.0,141.0 V260.4 Z" fill="#2f5fb8"><title>#70 · 2021: +63,1% · 43 transakcji</title></path>
+<text x="512.0" y="131.0" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+63,1%</text>
+<text x="512.0" y="306" text-anchor="middle" font-size="12.5" fill="currentColor">2021</text>
+<path d="M567.5,260.4 V260.4 Q567.5,261.8 568.9000000000001,261.8 H618.0999999999999 Q619.5,261.8 619.5,260.4 V260.4 Z" fill="#b8322a"><title>#70 · 2022: −0,7% · 3 transakcji</title></path>
+<text x="593.5" y="275.8" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">−0,7%</text>
+<text x="593.5" y="306" text-anchor="middle" font-size="12.5" fill="currentColor">2022</text>
+<path d="M648.9,260.4 V137.5 Q648.9,133.5 652.9,133.5 H696.9 Q700.9,133.5 700.9,137.5 V260.4 Z" fill="#2f5fb8"><title>#70 · 2023: +64,9% · 39 transakcji</title></path>
+<text x="674.9" y="127.5" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+64,9%</text>
+<text x="674.9" y="306" text-anchor="middle" font-size="12.5" fill="currentColor">2023</text>
+<path d="M730.4,260.4 V238.4 Q730.4,234.4 734.4,234.4 H778.4 Q782.4,234.4 782.4,238.4 V260.4 Z" fill="#2f5fb8"><title>#70 · 2024: +13,3% · 38 transakcji</title></path>
+<text x="756.4" y="228.4" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+13,3%</text>
+<text x="756.4" y="306" text-anchor="middle" font-size="12.5" fill="currentColor">2024</text>
+<path d="M811.8,260.4 V154.3 Q811.8,150.3 815.8,150.3 H859.8 Q863.8,150.3 863.8,154.3 V260.4 Z" fill="#2f5fb8"><title>#70 · 2025: +56,3% · 28 transakcji</title></path>
+<text x="837.8" y="144.3" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+56,3%</text>
+<text x="837.8" y="306" text-anchor="middle" font-size="12.5" fill="currentColor">2025</text>
+<path d="M893.3,260.4 V254.5 Q893.3,250.5 897.3,250.5 H941.3 Q945.3,250.5 945.3,254.5 V260.4 Z" fill="#2f5fb8"><title>#70 · 2026: +5,1% · 24 transakcji</title></path>
+<text x="919.3" y="244.5" text-anchor="middle" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+5,1%</text>
+<text x="919.3" y="306" text-anchor="middle" font-size="12.5" fill="currentColor">2026*</text>
+</g></svg></div>
+        <figcaption><b>Rys. 2</b> — zwrot #70 w każdym roku. 2022 to trzy transakcje: indeks był pod SMA200 i filtr trendu wyłączył strategię na cały rok bessy. *2026 do 27 października.</figcaption>
+      </figure>
+      <p style="margin-top:18px">Dobre wiadomości są trzy. Dziesięć z jedenastu lat na plusie, a jedyny ujemny to rok, w którym strategia prawie nie grała. Najdłuższa seria strat to trzy transakcje. Koszty są tu raczej zawyżone niż zaniżone: stały spread 1,8 pkt przy indeksie na poziomie 4–10 tys. to względnie trzy–sześć razy więcej niż dziś, a finansowanie liczone jest z dzisiejszych stóp także dla lat 2016–2021, kiedy były bliskie zera. Finansowanie zjadło 191 525 przy kapitale końcowym 742 899.</p>
+      <p>Złe wiadomości są dwie i ważą więcej. <strong>Pierwsza to wrażliwość na parametr.</strong> Ten sam dokument z <code>ibs_in = 0,1</code> (run 71) dał +386,9%, Sharpe 0,65 i obsunięcie 36,6% — poniżej 95. percentyla losowego wejścia (+400,4%). Jedna zmiana progu przesuwa strategię z „wyraźnie ponad losowym” do „nie odróżnia się od losowego”. <strong>Druga to ostatnie lata.</strong> 2024 dał +13,3%, 2026 do października +5,1%, a pięć najlepszych transakcji odpowiada za przejście od +426% do +7329%. Wynik dziesięciolecia mocno opiera się na 2017–2021 i 2023.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th class="n">Run</th><th>ibs_in</th><th class="n">Transakcji</th><th class="n">Zwrot</th><th class="n">Sharpe</th><th class="n">Calmar</th><th class="n">Max DD</th><th class="n">Losowe p95</th></tr></thead>
+          <tbody>
+            <tr><td class="n">70</td><td><b>0,2</b></td><td class="n">315</td><td class="n">+7328,9%</td><td class="n">1,26</td><td class="n">1,53</td><td class="n">32,0%</td><td class="n">+1118,6%</td></tr>
+            <tr><td class="n">71</td><td><b>0,1</b></td><td class="n">161</td><td class="n">+386,9%</td><td class="n">0,65</td><td class="n">0,43</td><td class="n">36,6%</td><td class="n">+400,4%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · #60 · strategia 28 · M5 · bez stopu</div>
+      <h2>Reguła strategii 6 na otwarciu Londynu</h2>
+      <p class="intro">Hipoteza: jeśli pierwsza świeca po otwarciu ujawnia nierównowagę, ta sama reguła powinna działać o 8:00 w Londynie (zwykle 3:00 ET) i trzymać do 9:25 ET. Liczby mówią, że nie bardzo.</p>
+      <div class="spec">
+        <div>Noga Londyn</div><div>Pierwsza świeca M5 sesji LONDON, kierunek close względem EMA12, siła |close − EMA12| / ATR(14) dzienne &gt; <code>kl = 0,075</code>. Wyjście na świecy kończącej się o 9:25 ET.</div>
+        <div>Noga NY</div><div>Strategia 6 bez zmian, 9:35–14:00 ET.</div>
+        <div>Rozmiar</div><div>Depozyt 20% kapitału, ekspozycja ≈ 4×. Bez nocy, więc bez finansowania.</div>
+      </div>
+      <p>Strategia 6 sama miała 388 transakcji, #60 ma 475, więc noga londyńska otworzyła około 87 pozycji w niespełna trzy lata — filtr siły o 3:00 ET odcina prawie wszystkie dni. Te 87 transakcji zmieniło kapitał końcowy o 5%, obniżyło Sharpe z 1,81 do 1,78 i podniosło obsunięcie z 33,2% do 41,5%. <strong>Zwrot #60 jest wysoki, bo wysoki jest zwrot strategii 6.</strong></p>
+      <p>Do tego koszt nogi londyńskiej jest zaniżony. Profil brokera podaje jeden spread 1,8 pkt na całą dobę, a przed otwarciem Nowego Jorku bywa szerszy. Notatki strategii same proszą o uruchomienie z godzinowym profilem spreadu, na przykład 3,6 pkt poza sesją NY. Tego uruchomienia jeszcze nie ma.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Zastrzeżenia</div>
+      <h2>Co w tych liczbach może być za ładne</h2>
+      <div class="fails">
+        <div class="fail stop"><h3>Brak stopu i otwarta strata −35% <span class="tag stop">ryzyko</span></h3><p>Żadna z trzech strategii nie ma stopu u brokera. Najgorsza otwarta strata jednej transakcji to −34,7% kapitału w #69, #60 i strategii 6 (to ta sama transakcja nogi nowojorskiej) i −32,8% w #70. Po takiej transakcji trzeba +53%, żeby wrócić do punktu wyjścia, a bez stopu nic nie ogranicza dnia gorszego niż najgorszy z historii.</p></div>
+        <div class="fail"><h3>Koszty: poślizg zero, spread stały <span class="tag att">optymistyczne</span></h3><p>Poślizg jest zerowy we wszystkich uruchomieniach, a wejścia są zleceniami rynkowymi na otwarciu sesji, gdy spread bywa najszerszy. Przy 722 transakcjach #69 każdy dodatkowy punkt spreadu na transakcję to około 5% zysku. Dla #70 stały spread i dzisiejsze finansowanie działają w drugą stronę — zawyżają koszt w latach 2016–2021.</p></div>
+        <div class="fail"><h3>Parametry nie są poza próbą <span class="tag att">dopasowanie</span></h3><p><code>k = 0,075</code> w #69 i #60 przyszło ze strategii 6, zbudowanej na tych samych latach 2024–2026. <code>ibs_in = 0,2</code> w #70 to lepsza z dwóch sprawdzonych wartości, a druga przegrywa z losowym wejściem. Licznik prób: strategia 24 — 4 (plus jedna w toku), strategia 30 — 2, strategia 28 — 1.</p></div>
+        <div class="fail"><h3>Pięć transakcji robi dużą część wyniku <span class="tag att">koncentracja</span></h3><p>Bez pięciu najlepszych transakcji: #69 +924% → +199%, #60 +655% → +164%, #70 +7329% → +426%. Przy procencie składanym to w części arytmetyka, ale #70 bez nich ląduje poniżej kupna i trzymania bez dźwigni (+451%).</p></div>
+        <div class="fail"><h3>Rozmiar pozycji przy kapitale 743 tys. <span class="tag att">nierealne w kwotach</span></h3><p>Procent składany przy 4× oznacza, że pod koniec próby #70 otwiera pozycję wartą około 3 mln w walucie rachunku. Procenty i Sharpe są miarodajne, kwoty końcowe nie — broker ogranicza rozmiar, a rynek nocny płynność.</p></div>
+        <div class="fail ok"><h3>Dane M5: trzy pięciominutowe dziury <span class="tag ok">bez wpływu</span></h3><p>Silnik zgłosił brak świec M5 20.08.2026 15:35, 06.09.2026 21:51 i 13.10.2026 08:20 UTC, po pięć minut. Przy ponad 200 tys. świec decyzyjnych to nie zmienia wyniku, ale 20 sierpnia przypada w środku sesji nowojorskiej.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Dalej</div>
+      <h2>Co uruchomić, zanim któraś trafi na demo</h2>
+      <div class="fails">
+        <div class="fail ok"><h3>#69: sąsiedzi k i ten sam poziom ryzyka</h3><p>Uruchomienie z <code>k = 0,1</code> na 2024 – 27.10.2026. Potem drugi przebieg z depozytem 0,2 × (20% / 29,7%) ≈ 13,5%, żeby porównać zwrot ze strategią 6 przy tym samym obsunięciu, jak zakłada plan. Jeśli 0,1 nie słabnie, #69 jest pierwszym kandydatem na demo przez zespół czytający <code>strategy_signal</code>: najwyżej jedno wejście dziennie: o 9:35 ET albo, gdy go nie było, między 10:05 a 14:00 ET.</p></div>
+        <div class="fail"><h3>#70: podzakresy i sąsiedni próg</h3><p>Osobno 2016–2023 i 2024 – 27.10.2026, jak zakładał plan, oraz <code>ibs_in = 0,15</code> i <code>0,25</code>. Jeśli wynik spada stromo po obu stronach 0,2, to próg jest dopasowany. #70 trzyma przez noce, a #69 zamyka przed nocą — to dwie różne przewagi i warto policzyć korelację ich dziennych wyników, zanim zapadnie decyzja o łączeniu.</p></div>
+        <div class="fail stop"><h3>#60: godzinowy profil spreadu albo odłożyć</h3><p>Jedno uruchomienie z profilem 3,6 pkt poza sesją NY. Jeśli noga londyńska nie przeżyje uczciwego spreadu, #60 wraca do roli strategii 6 z dodatkowym ryzykiem i nie ma powodu jej rozwijać.</p></div>
+        <div class="fail stop"><h3>Wszystkie trzy: wariant ze stopem katastroficznym</h3><p>Stop na zamknięciu świecy daleko od wejścia (na przykład 1–1,5 dziennego ATR) nie zmieni wielu transakcji, ale obetnie dzień z −35%. To pierwsza zmiana, którą trzeba zobaczyć w backteście przed demo.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Gdzie to jest</div>
+      <h2>Strategie i uruchomienia w terminalu</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th class="n">Run</th><th class="n">Strategia</th><th>Nazwa</th><th>Parametry</th></tr></thead>
+          <tbody>
+            <tr><td class="n">69</td><td class="n">24</td><td>US100 M5 — strategia 6 plus wybicie 30-minutowe w dni bez sygnału otwarcia — depozyt 20%</td><td><code>k 0,075 · exit1_min 120</code></td></tr>
+            <tr><td class="n">70</td><td class="n">30</td><td>US100 D1 — zamknięcie przy dole dnia (IBS) w trendzie wzrostowym, 1–5 dni — depozyt 20%</td><td><code>ibs_in 0,2 · ibs_out 0,8</code></td></tr>
+            <tr><td class="n">60</td><td class="n">28</td><td>US100 M5 — reguła strategii 6 na otwarciu Londynu i Nowego Jorku, dwie nogi — depozyt 20%</td><td><code>k 0,075 · kl 0,075</code></td></tr>
+            <tr><td class="n">13</td><td class="n">6</td><td>Strategia 6 — punkt odniesienia</td><td><code>k 0,075</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Wszystkie są w zakładce Strategies, autor agent, rewizja 1. Transakcje i dzienna krzywa kapitału każdego uruchomienia są w Backtests. Propozycje, z których powstały: <a href="strategie-us100-dluzej-w-rynku.html">docs/strategie-us100-dluzej-w-rynku.html</a>, propozycje K5 (#69), E1 (#60) i W1 (#70).</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>US100 · trzy strategie ponad losowym wejściem · 27 października 2026</span>
+    <span>Uruchomienia 13, 60, 69–73, 76 · dane: read_backtest, silnik v4</span>
+  </div>
+</footer>

@@ -1,0 +1,371 @@
+<title>US100 — wyniki backtestów</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Strategie · US100 CFD · wyniki</span>
+    <h1>Trzynaście strategii, dwie warte dalszej pracy</h1>
+    <p class="lede">Osiem propozycji z <a href="strategie-us100-propozycje.html" style="color:#f2c313">dokumentu z propozycjami</a> zapisanych i przeliczonych przez narzędzia strategii, plus pięć wariantów, które dało się sprawdzić na latach historii. <b>Żadna nie przeszła wszystkich kryteriów.</b> Dwie mają spójną przewagę w próbie uczącej i poza nią.</p>
+    <div class="strip">
+      <span>TradingCenter / strategie</span>
+      <span>27 października 2026 · rew. <b>01</b></span>
+      <span>koszty <b>capital.com</b>: spread 1,8 pkt, finansowanie z warunków instrumentu</span>
+      <span>kapitał 10 000 · ziarno 1 · silnik v4</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">13</div><div class="l">strategii zapisanych (id 7–19)</div></div>
+      <div class="cell"><div class="v">28</div><div class="l">uruchomień, w tym jedno odrzucone i jedno puste</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">strategii, które spełniły wszystkie kryteria</div></div>
+      <div class="cell"><div class="v">2</div><div class="l">kandydatów do testu na demo: S4 i S1b</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Wynik w trzech zdaniach</div>
+      <h2>Co wiemy po dniu eksperymentów</h2>
+      <p class="intro"><span class="hl">Momentum śróddzienne (S4)</span> to jedyna strategia, której przewaga na transakcję jest taka sama w latach 2024–2025 i w 2026: około 0,11% kapitału, profit factor 1,27–1,36. <span class="hl">ORB 15 minut (S1b)</span> zarabiał w każdym z trzech lat, ale coraz mniej: +43%, +8%, +9%. Domykanie luk, sweep płynności, cofnięcie do EMA i ściśnięcie zmienności przegrały z kosztami albo z losowym wejściem.</p>
+      <div class="fails">
+        <div class="fail ok"><h3>S4 · pierwsze 30 minut gra ostatnią godzinę <span class="tag ok">kandydat</span></h3><p>Próg siły ruchu p.k = 0,2 dziennego ATR wybrany w 2024–2025, w 2026 bez zmian: +11,0% przy obsunięciu 11,2%, filtr zmienności dodaje 3 punkty. Słabość: bez pięciu najlepszych transakcji wynik spada do −7–9%, a 2024 był ujemny. Literatura (Gao, Han, Li, Zhou) przewiduje słaby, ale prawdziwy efekt — i tak to wygląda.</p></div>
+        <div class="fail ok"><h3>S1b · ORB 15 minut z wyjściami na zamknięciu M5 <span class="tag att">kandydat z zastrzeżeniem</span></h3><p>Jedyna strategia, której wynik bez pięciu najlepszych transakcji jest dodatni w próbie uczącej (+24%). Poza próbą przewaga topnieje do PF 1,05 przy obsunięciu 27%. Warto sprawdzić wariant tylko long, który według statystyk ES/NQ jest silniejszy.</p></div>
+        <div class="fail stop"><h3>S2, S6, S7, S8 <span class="tag stop">odpadają</span></h3><p>Mała luka: −42%, gorzej niż 5. percentyl losowego wejścia — trafność 59%, ale straty po 0,5 ATR zjadają małe zyski. Sweep: −31%. Cofnięcie do EMA na H1: PF 0,83 w 2018–2022 i 0,87 w 2023–2026, poniżej losowego wejścia. Ściśnięcie: +19% w cztery lata przy buy &amp; hold +135% i obsunięciu 46%.</p></div>
+        <div class="fail"><h3>S3, S5 i wszystkie wersje ze stopem na minutach <span class="tag att">bez werdyktu</span></h3><p>Archiwum minut zaczyna się 11 sierpnia 2026, więc każda strategia ze stopem miała 3–48 transakcji. Prawie wszystkie przegrały sierpień i wygrały wrzesień–październik — to reżim rynku, nie informacja o strategii.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Dane</div>
+      <h2>Ile historii naprawdę było</h2>
+      <p class="intro">Plan z dokumentu z propozycjami zakładał minuty od 23 lutego 2026. Pierwsze uruchomienie ze stopem odmówiło liczenia: <strong>minuty są od 11 sierpnia 2026, 09:14 UTC</strong>. To zmieniło cały plan.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Seria</th><th>Pierwsza świeca w archiwum</th><th>Co deklaruje describe_coverage</th><th>Do czego wystarcza</th></tr></thead>
+          <tbody>
+            <tr><td><b>MINUTE</b></td><td>11.08.2026, z przerwą 13.09 22:07 – 15.09 20:46</td><td>zakres od 19.01.2026, „earliest reachable” 22.02.2026</td><td>stopy, cele, zlecenia oczekujące: ~10 tygodni</td></tr>
+            <tr><td><b>MINUTE_5</b></td><td>styczeń 2024</td><td>zakres od 31.12.2015</td><td>strategie sesyjne bez stopu brokerskiego</td></tr>
+            <tr><td><b>MINUTE_15</b></td><td>styczeń 2024</td><td>—</td><td>S6b</td></tr>
+            <tr><td><b>HOUR</b></td><td>co najmniej 2018 (sprawdzone 2019)</td><td>zakres od 31.12.2015, „earliest reachable” 01.05.2017</td><td>swing na latach</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Narzędzie pokrycia zwraca granice zakresów, a nie gęstość. Zakres M5 „od 2015” jest pusty do końca 2023, a uruchomienie na 2022–2023 skończyło się po cichu wynikiem zero transakcji i zerem świec decyzyjnych. Silnik nie odmówił, tylko liczba w raporcie to zdradziła. <span class="hl">Warto, żeby uruchomienie bez żadnej świecy decyzyjnej było odmową</span>, tak jak uruchomienie bez minut pod stopem.</p>
+      <p>Drugi problem dotyczy kosztów. Profil ma jeden spread w punktach i finansowanie z dzisiejszych stóp. Przy indeksie 6 400 w 2018 roku 1,8 punktu to względnie cztery razy więcej niż dziś, a finansowanie było wtedy bliskie zera. Uruchomienia sprzed 2023 roku zawyżają koszty. Dlatego S7b dostało drugi zakres 2023–2026, a S8b liczone było tylko na nim.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Długa historia</div>
+      <h2>Uruchomienia, które coś mówią</h2>
+      <p class="intro">Strategie bez stopu brokerskiego rozliczają się na własnym interwale i sięgają lat wstecz. Stop i cel są w nich sprawdzane na zamknięciu świecy, a wyjście następuje na otwarciu następnej. Pozycja to depozyt 20% kapitału, czyli ekspozycja około 4×, jak w strategiach 2–6 operatora. Wynik jest w procentach kapitału.</p>
+      <figure>
+        <div class="scroll"><svg viewBox="0 0 980 362" role="img" aria-label="Zwrot w procentach kapitału dla każdego długiego uruchomienia; zielone to kandydaci, czerwone odpadły">
+<g font-family="Karla, sans-serif">
+<line x1="340.8" y1="10" x2="340.8" y2="326" stroke="currentColor" stroke-width="0.6" opacity="0.25"></line>
+<text x="340.8" y="346" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">−100,0%</text>
+<line x1="522.4" y1="10" x2="522.4" y2="326" stroke="currentColor" stroke-width="0.6" opacity="0.25"></line>
+<text x="522.4" y="346" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">−50,0%</text>
+<line x1="703.9" y1="10" x2="703.9" y2="326" stroke="currentColor" stroke-width="1.4" opacity="0.8"></line>
+<text x="703.9" y="346" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">+0,0%</text>
+<line x1="885.5" y1="10" x2="885.5" y2="326" stroke="currentColor" stroke-width="0.6" opacity="0.25"></line>
+<text x="885.5" y="346" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">+50,0%</text>
+<text x="240" y="29" text-anchor="end" font-size="12.5" fill="currentColor">S4 2024–2025 k 0</text>
+<rect x="703.9" y="17" width="23.1" height="17" fill="#c9a227"></rect>
+<text x="733.0" y="29" text-anchor="start" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+6,4%</text>
+<text x="240" y="55" text-anchor="end" font-size="12.5" fill="currentColor">S4 2024–2025 k 0,1</text>
+<rect x="703.9" y="43" width="31.0" height="17" fill="#c9a227"></rect>
+<text x="740.9" y="55" text-anchor="start" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+8,5%</text>
+<text x="240" y="81" text-anchor="end" font-size="12.5" fill="currentColor">S4 2024–2025 k 0,2</text>
+<rect x="703.9" y="69" width="87.6" height="17" fill="#17734c"></rect>
+<text x="797.6" y="81" text-anchor="start" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+24,1%</text>
+<text x="240" y="107" text-anchor="end" font-size="12.5" fill="currentColor">S4 2026 k 0,2 OOS</text>
+<rect x="703.9" y="95" width="40.1" height="17" fill="#17734c"></rect>
+<text x="750.0" y="107" text-anchor="start" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+11,0%</text>
+<text x="240" y="133" text-anchor="end" font-size="12.5" fill="currentColor">S4 2026 k 0,2 vol OOS</text>
+<rect x="703.9" y="121" width="50.6" height="17" fill="#17734c"></rect>
+<text x="760.5" y="133" text-anchor="start" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+13,9%</text>
+<text x="240" y="159" text-anchor="end" font-size="12.5" fill="currentColor">S1b 2024–2025 </text>
+<rect x="703.9" y="147" width="195.3" height="17" fill="#17734c"></rect>
+<text x="905.3" y="159" text-anchor="start" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+53,8%</text>
+<text x="240" y="185" text-anchor="end" font-size="12.5" fill="currentColor">S1b 2026 OOS</text>
+<rect x="703.9" y="173" width="33.9" height="17" fill="#c9a227"></rect>
+<text x="743.8" y="185" text-anchor="start" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+9,3%</text>
+<text x="240" y="211" text-anchor="end" font-size="12.5" fill="currentColor">S2b 2024–2025 </text>
+<rect x="551.7" y="199" width="152.3" height="17" fill="#b8322a"></rect>
+<text x="545.7" y="211" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">−41,9%</text>
+<text x="240" y="237" text-anchor="end" font-size="12.5" fill="currentColor">S6b 2024–2025 </text>
+<rect x="592.5" y="225" width="111.5" height="17" fill="#b8322a"></rect>
+<text x="586.5" y="237" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">−30,7%</text>
+<text x="240" y="263" text-anchor="end" font-size="12.5" fill="currentColor">S7b 2018–2022 </text>
+<rect x="367.6" y="251" width="336.4" height="17" fill="#b8322a"></rect>
+<text x="361.6" y="263" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">−92,6%</text>
+<text x="240" y="289" text-anchor="end" font-size="12.5" fill="currentColor">S7b 2023–2026 </text>
+<rect x="393.5" y="277" width="310.4" height="17" fill="#b8322a"></rect>
+<text x="387.5" y="289" text-anchor="end" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">−85,5%</text>
+<text x="240" y="315" text-anchor="end" font-size="12.5" fill="currentColor">S8b 2023–2026 </text>
+<rect x="703.9" y="303" width="70.4" height="17" fill="#b8322a"></rect>
+<text x="780.4" y="315" text-anchor="start" font-size="11" font-family="Roboto Mono, monospace" fill="currentColor">+19,4%</text>
+</g></svg></div>
+        <figcaption><b>Rys. 1</b> — zwrot z każdego długiego uruchomienia. OOS to próba poza próbą: parametry wybrane wcześniej, bez zmian. Kolor to werdykt z tabeli niżej.</figcaption>
+      </figure>
+      <div class="table-wrap" style="margin-top:22px">
+        <table>
+          <thead><tr><th class="n">Run</th><th>Strategia i wariant</th><th>Zakres</th><th class="n">Transakcji</th><th class="n">Zwrot</th><th class="n">PF</th><th class="n">Bez top 5</th><th class="n">Max DD</th><th>Werdykt</th></tr></thead>
+          <tbody>
+<tr><td class="n">14</td><td><b>S4</b> p.k = 0</td><td>2024–2025</td><td class="n">513</td><td class="n">+6,4%</td><td class="n">1,03</td><td class="n">−19,0%</td><td class="n">23,4%</td><td><span class="tag att">słabo</span></td></tr>
+<tr><td class="n">15</td><td><b>S4</b> p.k = 0,1</td><td>2024–2025</td><td class="n">342</td><td class="n">+8,5%</td><td class="n">1,06</td><td class="n">−15,3%</td><td class="n">19,7%</td><td><span class="tag att">słabo</span></td></tr>
+<tr><td class="n">16</td><td><b>S4</b> p.k = 0,2</td><td>2024–2025</td><td class="n">212</td><td class="n">+24,1%</td><td class="n">1,29</td><td class="n">−2,8%</td><td class="n">15,2%</td><td><span class="tag ok">kandydat</span></td></tr>
+<tr><td class="n">17</td><td><b>S4</b> p.k = 0,2 · poza próbą</td><td>2026</td><td class="n">103</td><td class="n">+11,0%</td><td class="n">1,27</td><td class="n">−9,3%</td><td class="n">11,2%</td><td><span class="tag ok">kandydat</span></td></tr>
+<tr><td class="n">18</td><td><b>S4</b> p.k = 0,2 · p.vol = 1 · poza próbą</td><td>2026</td><td class="n">98</td><td class="n">+13,9%</td><td class="n">1,36</td><td class="n">−6,7%</td><td class="n">8,9%</td><td><span class="tag ok">kandydat</span></td></tr>
+<tr><td class="n">35</td><td><b>S1b</b> ORB, wyjścia na zamknięciu M5</td><td>2024–2025</td><td class="n">471</td><td class="n">+53,8%</td><td class="n">1,11</td><td class="n">+24,1%</td><td class="n">17,9%</td><td><span class="tag ok">kandydat</span></td></tr>
+<tr><td class="n">36</td><td><b>S1b</b> ORB · poza próbą</td><td>2026</td><td class="n">190</td><td class="n">+9,3%</td><td class="n">1,05</td><td class="n">−12,3%</td><td class="n">26,9%</td><td><span class="tag att">słabo</span></td></tr>
+<tr><td class="n">37</td><td><b>S2b</b> mała luka, wyjścia na M5</td><td>2024–2025</td><td class="n">305</td><td class="n">−41,9%</td><td class="n">0,83</td><td class="n">−68,5%</td><td class="n">51,1%</td><td><span class="tag stop">odpada</span></td></tr>
+<tr><td class="n">38</td><td><b>S6b</b> sweep, wyjścia na M15</td><td>2024–2025</td><td class="n">282</td><td class="n">−30,7%</td><td class="n">0,86</td><td class="n">−58,3%</td><td class="n">50,0%</td><td><span class="tag stop">odpada</span></td></tr>
+<tr><td class="n">39</td><td><b>S7b</b> cofnięcie do EMA, H1</td><td>2018–2022</td><td class="n">648</td><td class="n">−92,6%</td><td class="n">0,83</td><td class="n">—</td><td class="n">95,2%</td><td><span class="tag stop">odpada</span></td></tr>
+<tr><td class="n">41</td><td><b>S7b</b> cofnięcie do EMA, H1</td><td>2023–2026</td><td class="n">468</td><td class="n">−85,5%</td><td class="n">0,87</td><td class="n">—</td><td class="n">89,4%</td><td><span class="tag stop">odpada</span></td></tr>
+<tr><td class="n">40</td><td><b>S8b</b> ściśnięcie, H1</td><td>2023–2026</td><td class="n">313</td><td class="n">+19,4%</td><td class="n">1,04</td><td class="n">−50,1%</td><td class="n">46,4%</td><td><span class="tag stop">odpada</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Losowe wejście z raportu jest w tych samych warunkach bardzo hojne. Przy ekspozycji 4× jego 95. percentyl to +33% do +79% zależnie od zakresu, więc <strong>żadna strategia go nie przebiła</strong>. S4 i S1b są w górnej części rozkładu, nie poza nim. Z drugiej strony S2b i S6b wypadły na 5. percentylu lub niżej, czyli gorzej niż rzut monetą z tymi samymi kosztami. S7b w 2018–2022 przegrało prawie wszystko, ale mediana losowego wejścia też straciła 79%: to wyrok na model kosztów tamtej epoki, nie tylko na sygnał. Na 2023–2026, z kosztami pasującymi do epoki: −85,5%, profit factor 0,87, obsunięcie 89,4% — poniżej 5. percentyla losowego wejścia (−83,7%). Sygnał przegrywa niezależnie od epoki kosztów.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · S4 z bliska</div>
+      <h2>Jedyny parametr, który dobrano, i co z tego wyszło</h2>
+      <p class="intro">Trzy wartości progu w próbie uczącej, jedna wybrana i przeniesiona bez zmian na 2026. Wynik rośnie z progiem monotonicznie. To dobry znak, bo próg nie trafił w pojedynczy szczęśliwy punkt.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>p.k</th><th class="n">2024</th><th class="n">2025</th><th class="n">2026 (OOS)</th><th class="n">Zysk na transakcję</th><th class="n">Trafność</th></tr></thead>
+          <tbody>
+            <tr><td><b>0</b> każdy dzień</td><td class="n">−5,5%</td><td class="n">+15,7%</td><td class="n">—</td><td class="n">0,02%</td><td class="n">48,9%</td></tr>
+            <tr><td><b>0,1</b></td><td class="n">−9,0%</td><td class="n">+20,3%</td><td class="n">—</td><td class="n">0,03%</td><td class="n">50,9%</td></tr>
+            <tr><td><b>0,2</b></td><td class="n">−9,7%</td><td class="n">+33,4%</td><td class="n">+11,5%</td><td class="n">0,11%</td><td class="n">50,5% · 54,4%</td></tr>
+            <tr><td><b>0,2</b> + ATR% dzienny ≥ 1</td><td class="n">—</td><td class="n">—</td><td class="n">+14,1%</td><td class="n">0,14%</td><td class="n">56,1%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Ostrzeżenie jest w kolumnie 2024: każdy próg stracił w tamtym roku. Strategia zarabia w latach dużej zmienności (2025, 2026), co zgadza się z literaturą, ale znaczy też, że spokojny rok ją wyzeruje. Filtr ATR% ≥ 1 w 2026 odciął tylko 5 dni, bo cały rok był zmienny. Właściwy test filtra to 2024 i to jest następne uruchomienie do zrobienia.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Minuty</div>
+      <h2>Wersje ze stopem: dwa kawałki po pięć tygodni</h2>
+      <p class="intro">Oryginalne dokumenty ze stopem, celem i zleceniami stop, rozliczane minuta po minucie. Ryzyko 0,5% kapitału na transakcję, wynik w R. Zakresy to 12.08–12.09 i 16.09–27.10 2026, bo przerwy w minutach nie da się przekroczyć jednym uruchomieniem.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Strategia</th><th class="n">Runy</th><th class="n">Trans. 12.08–12.09</th><th class="n">Wynik</th><th class="n">Trans. 16.09–27.10</th><th class="n">Wynik</th><th class="n">Razem</th><th class="n">Razem R</th></tr></thead>
+          <tbody>
+<tr><td><b>S1</b> ORB 15 min</td><td class="n">21 · 20</td><td class="n">21</td><td class="n">−9,0 R</td><td class="n">27</td><td class="n">+6,6 R</td><td class="n"><b>48</b></td><td class="n"><b>−2,4 R</b></td></tr>
+<tr><td><b>S2</b> mała luka</td><td class="n">23 · 22</td><td class="n">17</td><td class="n">−0,1 R</td><td class="n">16</td><td class="n">−1,6 R</td><td class="n"><b>33</b></td><td class="n"><b>−1,7 R</b></td></tr>
+<tr><td><b>S3</b> duża luka z prądem</td><td class="n">25 · 24</td><td class="n">3</td><td class="n">−0,1 R</td><td class="n">6</td><td class="n">+0,8 R</td><td class="n"><b>9</b></td><td class="n"><b>+0,7 R</b></td></tr>
+<tr><td><b>S5</b> powrót do średniej nocą</td><td class="n">27 · 26</td><td class="n">4</td><td class="n">+3,1 R</td><td class="n">9</td><td class="n">−6,1 R</td><td class="n"><b>13</b></td><td class="n"><b>−3,0 R</b></td></tr>
+<tr><td><b>S6</b> sweep wczorajszego ekstremum</td><td class="n">29 · 28</td><td class="n">15</td><td class="n">−3,4 R</td><td class="n">12</td><td class="n">+1,7 R</td><td class="n"><b>27</b></td><td class="n"><b>−1,7 R</b></td></tr>
+<tr><td><b>S7</b> cofnięcie do EMA w trendzie H4</td><td class="n">31 · 30</td><td class="n">11</td><td class="n">−3,5 R</td><td class="n">19</td><td class="n">+0,7 R</td><td class="n"><b>30</b></td><td class="n"><b>−2,9 R</b></td></tr>
+<tr><td><b>S8</b> ściśnięcie Bollinger/Keltner</td><td class="n">33 · 32</td><td class="n">7</td><td class="n">−3,6 R</td><td class="n">9</td><td class="n">+2,1 R</td><td class="n"><b>16</b></td><td class="n"><b>−1,4 R</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:18px">Sześć z siedmiu strategii ma przeciwne znaki w obu kawałkach, i prawie zawsze w tę samą stronę: sierpień źle, wrzesień–październik dobrze. Strategie podążające za ruchem (S1, S6, S7, S8) zyskały na rajdzie do rekordu 6 października, a S5, która gra przeciw ruchowi, straciła na nim 6 R. Przy 3–27 transakcjach na kawałek to opis rynku, nie test strategii. Jedno uruchomienie S1 na pierwotnym zakresie 23.02–11.09 zostało odrzucone przez silnik, bo pod 34 434 świecami M5 nie było minut.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Dalej</div>
+      <h2>Co zrobić z tym jutro</h2>
+      <div class="fails">
+        <div class="fail ok"><h3>S4 na demo przez zespół</h3><p>Rewizja 2 z p.k = 0,2 jako domyślnym. Zespół z jednym przebiegiem o 15:05 ET czyta <code>strategy_signal</code> i składa zlecenie, drugi o 15:55 ET zamyka. Dwa przebiegi dziennie, zero uznaniowości. Po sześciu tygodniach porównanie z backtestem tego samego okresu.</p></div>
+        <div class="fail ok"><h3>S4 z filtrem zmienności na 2024</h3><p>Jedno uruchomienie z p.vol = 1 na 2024–2025 rozstrzygnie, czy filtr ratuje spokojne lata. Jeśli tak, filtr wchodzi do rewizji 2. Jeśli nie, S4 jest strategią na zmienne lata i trzeba to zapisać w notatkach.</p></div>
+        <div class="fail"><h3>S1b tylko long i z filtrem trendu dziennego</h3><p>Dwa uruchomienia na 2024–2025, potem 2026 bez zmian. To jedyna droga, na której ORB może odzyskać przewagę z 2024 roku.</p></div>
+        <div class="fail"><h3>Wersje ze stopem za trzy miesiące</h3><p>Minuty zbierają się same. Pod koniec stycznia 2027 będzie ich pół roku i S1, S3, S5 z prawdziwym stopem dadzą się porównać z wariantami na zamknięciu świecy. Wtedy też widać, ile kosztuje stop na zamknięciu zamiast stopu u brokera.</p></div>
+        <div class="fail stop"><h3>Dwie poprawki w systemie</h3><p>Uruchomienie bez świecy decyzyjnej powinno być odmową, a nie raportem z zerem transakcji. Opis pokrycia powinien mówić, od kiedy świece naprawdę są, a nie tylko gdzie zaczyna się zakres. Obie to drobne zmiany w pakiecie strategii i w archiwum.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Gdzie to jest</div>
+      <h2>Strategie w terminalu</h2>
+      <p>Wszystkie są w zakładce Strategies, autor <code>agent</code>, rewizja 1. Każde uruchomienie jest w Backtests z pełnym raportem i transakcjami do pobrania jako CSV. Licznik prób każdej strategii obejmuje uruchomienia z tego dokumentu.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Skrót</th><th class="n">Id</th><th>Nazwa</th></tr></thead>
+          <tbody>
+<tr><td><b>S1</b></td><td class="n">8</td><td>US100 M5 — ORB 15 min sesji NY</td></tr>
+<tr><td><b>S2</b></td><td class="n">9</td><td>US100 M5 — domknięcie małej luki otwarcia NY</td></tr>
+<tr><td><b>S3</b></td><td class="n">10</td><td>US100 M5 — duża luka otwarcia NY z prądem</td></tr>
+<tr><td><b>S4</b></td><td class="n">7</td><td>US100 M5 — momentum śróddzienne: pierwsze 30 minut gra ostatnią godzinę</td></tr>
+<tr><td><b>S5</b></td><td class="n">11</td><td>US100 M15 — powrót do średniej przed otwarciem NY</td></tr>
+<tr><td><b>S6</b></td><td class="n">12</td><td>US100 M15 — zgarnięcie płynności za ekstremum wczorajszego dnia</td></tr>
+<tr><td><b>S7</b></td><td class="n">13</td><td>US100 H1 — cofnięcie do EMA w trendzie H4</td></tr>
+<tr><td><b>S8</b></td><td class="n">14</td><td>US100 H1 — wybicie po ściśnięciu zmienności</td></tr>
+<tr><td><b>S1b</b></td><td class="n">15</td><td>… ORB — wyjścia na zamknięciu M5</td></tr>
+<tr><td><b>S2b</b></td><td class="n">16</td><td>… mała luka — wyjścia na zamknięciu M5</td></tr>
+<tr><td><b>S6b</b></td><td class="n">17</td><td>… sweep — wyjścia na zamknięciu M15</td></tr>
+<tr><td><b>S7b</b></td><td class="n">18</td><td>… cofnięcie do EMA — wyjścia na zamknięciu H1</td></tr>
+<tr><td><b>S8b</b></td><td class="n">19</td><td>… ściśnięcie — wyjścia na zamknięciu H1</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>US100 · wyniki backtestów · 27 października 2026</span>
+    <span>Uruchomienia 14–41 · propozycje: docs/strategie-us100-propozycje.html</span>
+  </div>
+</footer>

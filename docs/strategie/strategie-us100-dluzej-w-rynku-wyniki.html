@@ -1,0 +1,369 @@
+<title>US100 — dłużej w rynku: wyniki</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+
+  table.wide { min-width: 980px; font-size: 13.5px; }
+  table.wide td, table.wide th { padding: 9px 11px; }
+  tr.ref td { background: var(--navy-soft); }
+  tr.win td { background: var(--green-soft); }
+  .ok { color: var(--green); font-weight: 700; }
+  .no { color: var(--red); font-weight: 700; }
+  ul.plain { margin: 0 0 16px; padding-left: 20px; max-width: 68ch; }
+  ul.plain li { margin-bottom: 6px; }
+</style>
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Strategie · US100 CFD · druga runda · wyniki</span>
+    <h1>Dłużej w rynku: wygrywa więcej dni, nie dłuższy dzień</h1>
+    <p class="lede">Jedenaście propozycji z <a href="strategie-us100-dluzej-w-rynku.html" style="color:#f2c313">dokumentu „Dłużej w rynku”</a> zapisanych w silniku i przeliczonych według planu ustalonego z góry. <b>Jedna przeszła wszystkie pięć warunków: K5</b>, czyli strategia 6 plus wybicie zakresu 30 minut w dni, w które strategia 6 nie wchodzi. Trzymanie dłużej w ciągu dnia, druga noga na koniec sesji i filtry z literatury wypadły gorzej niż sama strategia 6.</p>
+    <div class="strip">
+      <span>TradingCenter / strategie</span>
+      <span>27 października 2026 · rew. <b>01</b></span>
+      <span>koszty <b>capital.com</b>: spread 1,8 pkt, finansowanie z warunków instrumentu</span>
+      <span>2024-01-01 → 2026-10-27 · kapitał 10 000 · depozyt 20% · ziarno 1 · silnik v4</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">11</div><div class="l">strategii zapisanych na produkcji (id 20–30)</div></div>
+      <div class="cell"><div class="v">39</div><div class="l">uruchomień (run 42–80), w tym jedno przerwane przez deploy</div></div>
+      <div class="cell"><div class="v">1</div><div class="l">propozycja spełnia wszystkie pięć warunków: K5</div></div>
+      <div class="cell"><div class="v">+924%</div><div class="l">K5 na 2024–2026 wobec +620% strategii 6 (run 13), przy mniejszym obsunięciu</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Wynik w skrócie</div>
+      <h2>Co wiemy po drugiej rundzie</h2>
+      <p class="intro">Przewaga strategii 6 nie trwa po 14:00 ET. <span class="hl">Za to te same godziny w innych dniach coś dają</span>. Wybicie zakresu pierwszych 30 minut, grane tylko w dni odrzucone przez filtr siły, zarabia średnio +0,13% kapitału na transakcję. Robi to w każdym roku, także w 2026, którego nie używano do wyboru parametrów.</p>
+      <div class="fails">
+        <div class="fail ok"><h3>K5 · strategia 6 + wybicie w dni bez sygnału <span class="tag ok">przechodzi wszystkie 5 warunków</span></h3><p>+924% wobec +620% strategii 6, Sharpe 1,88 wobec 1,81, obsunięcie 29,7% wobec 33,2%. Lepsza w każdym z trzech lat (+116 / +80 / +71% wobec +87 / +75 / +62%). Sharpe w 2026 wynosi 1,87, w latach 2024–2025 wynosił 1,89. Zastrzeżenie: dziedziczy szczyt przy k = 0,075 (sekcja 05).</p></div>
+        <div class="fail"><h3>E1 · noga Londyn + strategia 6 <span class="tag att">bez werdyktu</span></h3><p>+655%, ale obsunięcie 41,5%. Noga Londyn to 87 transakcji po +0,08% — przy tym samym ryzyku przegrywa ze strategią 6. Nie dało się jej sprawdzić z szerszym spreadem nocnym, bo <code>run_backtest</code> nie przyjmuje profilu kosztów, a bez tego wynik jest zawyżony.</p></div>
+        <div class="fail stop"><h3>K1, K2, K3 · dłużej albo drugi raz tego samego dnia <span class="tag stop">odpadają</span></h3><p>Każde wyjście później niż 14:00 obniża Sharpe (1,54–1,66) i podnosi obsunięcie. Druga noga o 15:00 lub 15:30 traci średnio 0,03% na transakcję w ponad 700 transakcjach. Godzina 14:00 w strategii 6 nie jest przypadkiem.</p></div>
+        <div class="fail stop"><h3>K4, E2 · filtry <span class="tag stop">odpadają</span></h3><p>Żaden filtr nie podnosi zysku na transakcję ponad 0,58% strategii 6. Każdy tylko zabiera dni. NR4 zostawia +5,5%, RSI(5) ≤ 50 +67%, zmienność +217%, BTC +190%.</p></div>
+        <div class="fail stop"><h3>N1, N2, N3 · nowe strategie dnia <span class="tag stop">odpadają</span></h3><p>Kontrola z literatury (N2) jest na minusie we wszystkich czterech wariantach: −10% do −49%. EMA12 i próg siły strategii 6 dodają więc coś ponad znany efekt. Strefa szumu (N1) ma PF 1,06–1,16 i w 2026 zarabia około zera. N3 po dniu NR4 traci 21%, bez filtra ledwie wychodzi na plus.</p></div>
+        <div class="fail stop"><h3>W1 · IBS na D1 <span class="tag stop">przewaga wygasła</span></h3><p>Lata 2016–2023: +4091%, PF 2,39. Lata 2024–2025: +45%, poniżej losowego wejścia (p95 +178%). Rok 2026: −4,8%. Ten sam obraz co w replikacjach z literatury.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Jak liczono</div>
+      <h2>Ten sam zakres, te same koszty, plan ustalony z góry</h2>
+      <p>Wszystkie przebiegi M5 liczono na 2024-01-01 → 2026-10-27, z kosztami brokera z 25 października 2026, depozytem 20% i ziarnem 1. To dokładnie te same ustawienia co w runie 13. <code>compare_runs</code> przyjął run 13 razem z K1, K3, K5 i E1 bez zastrzeżeń: ten sam zakres, koszty i wersja silnika. Wartości parametrów to te z planu w sekcji 18 dokumentu z propozycjami, bez poprawek po drodze.</p>
+      <ul class="plain">
+        <li><strong>Lata</strong> w tabelach to <code>by_year</code> silnika, czyli suma wyników transakcji w procentach kapitału przy wejściu, bez składania. Zwrot całkowity jest składany, dlatego jest wyższy niż suma lat.</li>
+        <li><strong>Na świecę</strong> to zysk na transakcję podzielony przez średnią liczbę świec M5 w pozycji. Odróżnia gorszy sygnał od krótszego trzymania.</li>
+        <li><strong>Warunek 5</strong> (lepsza od strategii 6 przy tym samym obsunięciu) policzono w przybliżeniu: lata wariantu przeskalowane stosunkiem obsunięć. Pełny drugi przebieg z innym depozytem wymagałby nowej rewizji każdej strategii, bo depozyt jest w dokumencie, nie w parametrach. Tam, gdzie wynik był rozstrzygający, przybliżenie nie zmienia werdyktu.</li>
+        <li><strong>Run 51</strong> (K3, pierwszy wariant) przerwał restart workbencha przy deployu PR #397 („interrupted by a restart”). Powtórzono go jako run 52. Przerwany przebieg też liczy się jako próba strategii 22.</li>
+        <li><strong>Nie uruchomiono</strong> drugiego wariantu E1 z godzinowym profilem spreadu. Narzędzie nie przyjmuje kosztów innych niż profil instrumentu. Z tego powodu jest 29 zaplanowanych uruchomień zamiast 30.</li>
+      </ul>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Krok 1 · próg k strategii 6</div>
+      <h2>0,075 to szczyt, nie plateau</h2>
+      <p class="intro">Przy k = 0,05 zwrot spada do +328%, a przy k = 0,1 do +370%. W runie 13 przy k = 0,075 było +620%. Sharpe idzie 1,31 → 1,81 → 1,52. W 2026 wariant k = 0,1 zarabia tylko +31% wobec +62%.</p>
+      <div class="table-wrap"><table class="wide"><thead><tr><th class="n">Run</th><th>Wariant</th><th class="n">Zwrot</th><th class="n">Sharpe</th><th class="n">PF</th><th class="n">Trans.</th><th class="n">Obsun.</th><th class="n">Na trans.</th><th class="n">Na świecę</th><th class="n">Bez 5 najl.</th><th class="n">vs losowe p95</th><th class="n">Lata 2024 / 2025 / 2026</th></tr></thead><tbody><tr class="ref"><td class="n">13</td><td><b>S6</b> · k 0,075</td><td class="n">+620%</td><td class="n">1,81</td><td class="n">1,44</td><td class="n">388</td><td class="n">33,2%</td><td class="n">0,58%</td><td class="n">0,0109%</td><td class="n">+153%</td><td class="n">≥ +54%</td><td class="n">+87 / +75 / +62</td></tr><tr><td class="n">42</td><td><b>S6</b> · k 0,05</td><td class="n">+328%</td><td class="n">1,31</td><td class="n">1,27</td><td class="n">499</td><td class="n">33,2%</td><td class="n">0,35%</td><td class="n">0,0067%</td><td class="n">+106%</td><td class="n">≥ +61%</td><td class="n">+60 / +58 / +58</td></tr><tr><td class="n">43</td><td><b>S6</b> · k 0,1</td><td class="n">+370%</td><td class="n">1,52</td><td class="n">1,37</td><td class="n">310</td><td class="n">33,2%</td><td class="n">0,58%</td><td class="n">0,0109%</td><td class="n">+108%</td><td class="n">≥ +65%</td><td class="n">+75 / +72 / +31</td></tr></tbody></table></div>
+      <p style="margin-top:16px">Kierunek otwarcia działa przy każdym progu: wszystkie trzy warianty są ponad 95. percentylem losowego wejścia i bez pięciu najlepszych transakcji zostają na plusie. Sama wartość 0,075 jest jednak dopasowana do próby. Każda propozycja K dziedziczy ją, w tym zwycięska K5. Realistyczne oczekiwanie dla strategii 6 leży gdzieś między +330 a +620% na tym zakresie, nie na górnej granicy.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Dłużej w ciągu dnia · K1 · K2</div>
+      <h2>Po 14:00 nie ma czego zbierać</h2>
+      <p class="intro">K1 przesuwa samo wyjście, przy tych samych 388 wejściach. Przy wyjściu o 15:55 zysk na transakcję jest prawie ten sam co przy 14:00 (0,58%), ale pozycja siedzi 76 świec zamiast 53. Zysk na świecę spada o jedną trzecią, a obsunięcie rośnie z 33,2 do 38,7%.</p>
+      <div class="table-wrap"><table class="wide"><thead><tr><th class="n">Run</th><th>Wariant</th><th class="n">Zwrot</th><th class="n">Sharpe</th><th class="n">PF</th><th class="n">Trans.</th><th class="n">Obsun.</th><th class="n">Na trans.</th><th class="n">Na świecę</th><th class="n">Bez 5 najl.</th><th class="n">vs losowe p95</th><th class="n">Lata 2024 / 2025 / 2026</th></tr></thead><tbody><tr class="ref"><td class="n">13</td><td><b>S6</b> · k 0,075</td><td class="n">+620%</td><td class="n">1,81</td><td class="n">1,44</td><td class="n">388</td><td class="n">33,2%</td><td class="n">0,58%</td><td class="n">0,0109%</td><td class="n">+153%</td><td class="n">≥ +54%</td><td class="n">+87 / +75 / +62</td></tr><tr><td class="n">44</td><td><b>K1</b> · exit_min 60</td><td class="n">+510%</td><td class="n">1,66</td><td class="n">1,41</td><td class="n">388</td><td class="n">33,8%</td><td class="n">0,54%</td><td class="n">0,0083%</td><td class="n">+145%</td><td class="n">≥ +83%</td><td class="n">+86 / +56 / +66</td></tr><tr><td class="n">45</td><td><b>K1</b> · exit_min 30</td><td class="n">+496%</td><td class="n">1,54</td><td class="n">1,39</td><td class="n">388</td><td class="n">35,9%</td><td class="n">0,54%</td><td class="n">0,0076%</td><td class="n">+136%</td><td class="n">≥ +104%</td><td class="n">+86 / +57 / +66</td></tr><tr><td class="n">46</td><td><b>K1</b> · exit_min 5</td><td class="n">+562%</td><td class="n">1,56</td><td class="n">1,39</td><td class="n">388</td><td class="n">38,7%</td><td class="n">0,58%</td><td class="n">0,0076%</td><td class="n">+145%</td><td class="n">≥ +91%</td><td class="n">+88 / +79 / +57</td></tr><tr><td class="n">61</td><td><b>K2</b> · cut_min 120</td><td class="n">+590%</td><td class="n">1,65</td><td class="n">1,41</td><td class="n">388</td><td class="n">33,2%</td><td class="n">0,58%</td><td class="n">0,0089%</td><td class="n">+145%</td><td class="n">≥ +101%</td><td class="n">+86 / +87 / +50</td></tr><tr><td class="n">62</td><td><b>K2</b> · cut_min 60</td><td class="n">+546%</td><td class="n">1,57</td><td class="n">1,42</td><td class="n">388</td><td class="n">31,7%</td><td class="n">0,56%</td><td class="n">0,0079%</td><td class="n">+140%</td><td class="n">≥ +71%</td><td class="n">+82 / +75 / +61</td></tr></tbody></table></div>
+      <p style="margin-top:16px">Wyjścia o 15:00 i 15:30 są gorsze niż oba końce. Popołudnie między 14:00 a 15:30 częściej oddaje zysk, a ostatnie pół godziny trochę go odbudowuje — dokładnie pułapka opisana w propozycji. K2, czyli trzymanie po 14:00 tylko zyskownych pozycji, też nie pomaga: 590% przy cut_min 120 i 546% przy 60. Stop w cenie wejścia po 14:00 tnie zwycięzców, zanim cokolwiek dowiozą. Teza Baltussena o ostatnich 30 minutach może być prawdziwa dla futures, ale na tym CFD przy tym wejściu nie dodaje nic do strategii 6.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Więcej dni · K5</div>
+      <h2>Wybicie w dni, które strategia 6 odrzuca</h2>
+      <p class="intro">K5 zostawia strategię 6 bez zmian i dokłada drugą nogę w dni bez jej sygnału: zamknięcie M5 poza zakresem 9:30–10:00 ET, wejście między 10:05 a 14:00, wyjście o 15:55 albo po złej stronie środka zakresu. <span class="hl">To jedyna propozycja, która poprawia naraz zwrot i każdą miarę ryzyka</span>: Sharpe, Sortino (3,30 wobec 3,12), Calmar (4,32 wobec 3,05) i obsunięcie. Profit factor (1,29 wobec 1,44) i zysk na transakcję spadają, bo dochodzi 334 mniejszych transakcji.</p>
+      <div class="table-wrap"><table class="wide"><thead><tr><th class="n">Run</th><th>Wariant</th><th class="n">Zwrot</th><th class="n">Sharpe</th><th class="n">PF</th><th class="n">Trans.</th><th class="n">Obsun.</th><th class="n">Na trans.</th><th class="n">Na świecę</th><th class="n">Bez 5 najl.</th><th class="n">vs losowe p95</th><th class="n">Lata 2024 / 2025 / 2026</th></tr></thead><tbody><tr class="ref"><td class="n">13</td><td><b>S6</b> · k 0,075</td><td class="n">+620%</td><td class="n">1,81</td><td class="n">1,44</td><td class="n">388</td><td class="n">33,2%</td><td class="n">0,58%</td><td class="n">0,0109%</td><td class="n">+153%</td><td class="n">≥ +54%</td><td class="n">+87 / +75 / +62</td></tr><tr><td class="n">69</td><td><b>K5</b> · k 0,075</td><td class="n">+924%</td><td class="n">1,88</td><td class="n">1,29</td><td class="n">722</td><td class="n">29,7%</td><td class="n">0,37%</td><td class="n">0,0078%</td><td class="n">+199%</td><td class="n">≥ +119%</td><td class="n">+116 / +80 / +71</td></tr></tbody></table></div>
+      <p style="margin-top:16px"><strong>Skąd bierze się wynik.</strong> Transakcje rozdzielone po godzinie wejścia (czas NY, z <code>run_trades</code>):</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Noga</th><th>Zakres</th><th class="n">Transakcji</th><th class="n">Średnio</th><th class="n">Suma</th><th class="n">Trafność</th></tr></thead>
+          <tbody>
+            <tr><td><b>1 · strategia 6</b> (9:35)</td><td>2024-01 → 2026-10</td><td class="n">388</td><td class="n">+0,58%</td><td class="n">+223,8%</td><td class="n">57,0%</td></tr>
+            <tr class="win"><td><b>2 · wybicie</b> (10:05–14:00)</td><td>2024-01 → 2026-10</td><td class="n">334</td><td class="n">+0,13%</td><td class="n">+43,9%</td><td class="n">43,1%</td></tr>
+            <tr><td><b>2 · wybicie</b></td><td>2024–2025 (run 72)</td><td class="n">245</td><td class="n">+0,14%</td><td class="n">+34,3%</td><td class="n">43,3%</td></tr>
+            <tr><td><b>2 · wybicie</b></td><td>2026 (run 73)</td><td class="n">89</td><td class="n">+0,11%</td><td class="n">+9,6%</td><td class="n">42,7%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Ciekawe jest porównanie z N3 bez filtra NR4 (run 67). To ta sama reguła wybicia, tylko grana każdego dnia: 710 transakcji po +0,08%, PF 1,05, w 2026 −3%. W dni odrzucone przez strategię 6 ta sama reguła daje +0,13%, czyli w dni z sygnałem otwarcia zostaje jej około +0,03%. Hipoteza z propozycji się potwierdza: gdy otwarcie jest blisko EMA12, kierunek dnia pojawia się później, a nie wcale. Druga noga ma niską trafność (43%) i pozytywną asymetrię — typowy profil wybicia trzymanego do zamknięcia.</p>
+
+      <p><strong>Potwierdzenie na 2026.</strong> Te same parametry, zakresy liczone osobno. Strategia 6 obok jako punkt odniesienia:</p>
+      <div class="table-wrap"><table><thead><tr><th class="n">Run</th><th>Zakres</th><th class="n">Zwrot</th><th class="n">Sharpe</th><th class="n">PF</th><th class="n">Trans.</th><th class="n">Obsun.</th><th class="n">Bez 5 najl.</th><th class="n">Losowe p95</th></tr></thead><tbody><tr><td class="n">72</td><td>2024-01-01 → 2026-01-01</td><td class="n">+449%</td><td class="n">1,89</td><td class="n">1,34</td><td class="n">512</td><td class="n">29,7%</td><td class="n">+127%</td><td class="n">+120%</td></tr><tr><td class="n">73</td><td>2026-01-01 → 2026-10-27</td><td class="n">+87%</td><td class="n">1,87</td><td class="n">1,25</td><td class="n">210</td><td class="n">25,4%</td><td class="n">+33%</td><td class="n">+60%</td></tr><tr><td class="n">74</td><td>2024-01-01 → 2026-01-01</td><td class="n">+315%</td><td class="n">1,79</td><td class="n">1,55</td><td class="n">267</td><td class="n">33,2%</td><td class="n">+98%</td><td class="n">+52%</td></tr><tr><td class="n">75</td><td>2026-01-01 → 2026-10-27</td><td class="n">+73%</td><td class="n">1,88</td><td class="n">1,37</td><td class="n">121</td><td class="n">21,9%</td><td class="n">+22%</td><td class="n">+67%</td></tr></tbody></table></div>
+      <p style="margin-top:16px">Sharpe K5 w 2026 wynosi 1,87, w latach 2024–2025 wynosił 1,89, czyli stosunek 0,99 przy progu 0,7. Strategia 6 trzyma się tak samo (1,88 wobec 1,79), więc 2026 nie jest dla K5 łatwiejszym rokiem niż dla bazy. W 2026 K5 jest jednak ledwie nad losowym wejściem (+87% wobec p95 +60%) i bez pięciu najlepszych transakcji zostaje +33%.</p>
+
+      <p><strong>Odporność na próg k.</strong> Dwa dodatkowe uruchomienia spoza planu, bo krok 1 pokazał szczyt:</p>
+      <div class="table-wrap"><table class="wide"><thead><tr><th class="n">Run</th><th>Wariant</th><th class="n">Zwrot</th><th class="n">Sharpe</th><th class="n">PF</th><th class="n">Trans.</th><th class="n">Obsun.</th><th class="n">Na trans.</th><th class="n">Na świecę</th><th class="n">Bez 5 najl.</th><th class="n">vs losowe p95</th><th class="n">Lata 2024 / 2025 / 2026</th></tr></thead><tbody><tr><td class="n">76</td><td><b>K5</b> · k 0,05</td><td class="n">+560%</td><td class="n">1,54</td><td class="n">1,23</td><td class="n">725</td><td class="n">33,3%</td><td class="n">0,31%</td><td class="n">0,0063%</td><td class="n">+157%</td><td class="n">≥ +134%</td><td class="n">+90 / +71 / +64</td></tr><tr><td class="n">69</td><td><b>K5</b> · k 0,075</td><td class="n">+924%</td><td class="n">1,88</td><td class="n">1,29</td><td class="n">722</td><td class="n">29,7%</td><td class="n">0,37%</td><td class="n">0,0078%</td><td class="n">+199%</td><td class="n">≥ +119%</td><td class="n">+116 / +80 / +71</td></tr><tr><td class="n">77</td><td><b>K5</b> · k 0,1</td><td class="n">+456%</td><td class="n">1,46</td><td class="n">1,18</td><td class="n">721</td><td class="n">41,6%</td><td class="n">0,28%</td><td class="n">0,0061%</td><td class="n">+128%</td><td class="n">≥ +209%</td><td class="n">+107 / +67 / +32</td></tr></tbody></table></div>
+      <p style="margin-top:16px">K5 bije strategię 6 przy tym samym k w zwrocie przy każdej wartości (+561% wobec +328%, +924% wobec +620%, +456% wobec +370%). Przy k = 0,05 wygrywa też w Sharpe (1,54 wobec 1,31). Przy k = 0,1 przegrywa w Sharpe (1,46 wobec 1,52) i ma obsunięcie 41,6%. Przewaga drugiej nogi nie wynika tylko ze szczytu, ale skala +924% już tak.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Więcej okien w ciągu doby · K3 · E1</div>
+      <h2>Druga noga traci, Londyn prawie nic nie daje</h2>
+      <div class="table-wrap"><table class="wide"><thead><tr><th class="n">Run</th><th>Wariant</th><th class="n">Zwrot</th><th class="n">Sharpe</th><th class="n">PF</th><th class="n">Trans.</th><th class="n">Obsun.</th><th class="n">Na trans.</th><th class="n">Na świecę</th><th class="n">Bez 5 najl.</th><th class="n">vs losowe p95</th><th class="n">Lata 2024 / 2025 / 2026</th></tr></thead><tbody><tr class="ref"><td class="n">13</td><td><b>S6</b> · k 0,075</td><td class="n">+620%</td><td class="n">1,81</td><td class="n">1,44</td><td class="n">388</td><td class="n">33,2%</td><td class="n">0,58%</td><td class="n">0,0109%</td><td class="n">+153%</td><td class="n">≥ +54%</td><td class="n">+87 / +75 / +62</td></tr><tr><td class="n">52</td><td><b>K3</b> · leg2_min 60 · k2 0</td><td class="n">+464%</td><td class="n">1,41</td><td class="n">1,24</td><td class="n">1111</td><td class="n">29,3%</td><td class="n">0,18%</td><td class="n">0,0072%</td><td class="n">+135%</td><td class="n">≥ +62%</td><td class="n">+65 / +90 / +50</td></tr><tr><td class="n">53</td><td><b>K3</b> · leg2_min 60 · k2 0,25</td><td class="n">+495%</td><td class="n">1,46</td><td class="n">1,27</td><td class="n">876</td><td class="n">31,5%</td><td class="n">0,24%</td><td class="n">0,0080%</td><td class="n">+142%</td><td class="n">≥ +209%</td><td class="n">+76 / +77 / +55</td></tr><tr><td class="n">54</td><td><b>K3</b> · leg2_min 30 · k2 0</td><td class="n">+292%</td><td class="n">1,24</td><td class="n">1,22</td><td class="n">1109</td><td class="n">31,8%</td><td class="n">0,15%</td><td class="n">0,0069%</td><td class="n">+96%</td><td class="n">≥ +76%</td><td class="n">+54 / +59 / +53</td></tr><tr><td class="n">55</td><td><b>K3</b> · leg2_min 30 · k2 0,25</td><td class="n">+344%</td><td class="n">1,35</td><td class="n">1,26</td><td class="n">881</td><td class="n">30,5%</td><td class="n">0,20%</td><td class="n">0,0077%</td><td class="n">+107%</td><td class="n">≥ +157%</td><td class="n">+63 / +58 / +57</td></tr><tr><td class="n">60</td><td><b>E1</b> · kl 0,075</td><td class="n">+655%</td><td class="n">1,78</td><td class="n">1,42</td><td class="n">475</td><td class="n">41,5%</td><td class="n">0,49%</td><td class="n">0,0085%</td><td class="n">+164%</td><td class="n">≥ +58%</td><td class="n">+89 / +67 / +75</td></tr></tbody></table></div>
+      <p style="margin-top:16px">Tabela wyżej pokazuje pełne strategie. Same drugie nogi, wydzielone z <code>run_trades</code>, wyglądają tak:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Noga</th><th class="n">Run</th><th class="n">Transakcji</th><th class="n">Średnio</th><th class="n">Suma</th><th class="n">Trafność</th></tr></thead>
+          <tbody>
+            <tr><td><b>K3</b> · 15:00, k2 0</td><td class="n">52</td><td class="n">723</td><td class="n">−0,026%</td><td class="n">−18,7%</td><td class="n">49,2%</td></tr>
+            <tr><td><b>K3</b> · 15:00, k2 0,25</td><td class="n">53</td><td class="n">488</td><td class="n">−0,031%</td><td class="n">−15,1%</td><td class="n">49,0%</td></tr>
+            <tr><td><b>E1</b> · Londyn 3:05–9:25 ET</td><td class="n">60</td><td class="n">87</td><td class="n">+0,077%</td><td class="n">+6,7%</td><td class="n">49,4%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">K3: zwrot od wczorajszego zamknięcia nie przewiduje ostatniej godziny ani ostatnich 30 minut na tym CFD. Wariant 15:30 wypada gorzej niż 15:00. To dwa spready dziennie za rzut monetą. Jedyny pozytyw: dodatkowe transakcje dywersyfikują, więc obsunięcie K3 spada do 29–32%.</p>
+      <p>E1: noga Londyn zarabia po kosztach brokera ułamek tego, co noga NY, i podnosi obsunięcie do 41,5%. Przy profilu spreadu 3,6 pkt w nocy, czyli 1,8 pkt więcej na transakcję, przy ekspozycji 4x i indeksie około 25 000 pkt kosztowałoby to około 0,03% kapitału na transakcję. Średnia noga +0,077% spadłaby wtedy do około +0,05%. Bez tego testu E1 zostaje eksploracją.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Filtry · K4 · E2</div>
+      <h2>Filtry zabierają dni, nie dodają przewagi</h2>
+      <div class="table-wrap"><table class="wide"><thead><tr><th class="n">Run</th><th>Wariant</th><th class="n">Zwrot</th><th class="n">Sharpe</th><th class="n">PF</th><th class="n">Trans.</th><th class="n">Obsun.</th><th class="n">Na trans.</th><th class="n">Na świecę</th><th class="n">Bez 5 najl.</th><th class="n">vs losowe p95</th><th class="n">Lata 2024 / 2025 / 2026</th></tr></thead><tbody><tr class="ref"><td class="n">13</td><td><b>S6</b> · k 0,075</td><td class="n">+620%</td><td class="n">1,81</td><td class="n">1,44</td><td class="n">388</td><td class="n">33,2%</td><td class="n">0,58%</td><td class="n">0,0109%</td><td class="n">+153%</td><td class="n">≥ +54%</td><td class="n">+87 / +75 / +62</td></tr><tr><td class="n">56</td><td><b>K4</b> · rsi_max 50</td><td class="n">+67%</td><td class="n">0,66</td><td class="n">1,22</td><td class="n">154</td><td class="n">33,2%</td><td class="n">0,45%</td><td class="n">0,0085%</td><td class="n">−2%</td><td class="n">≥ +60%</td><td class="n">+19 / +32 / +18</td></tr><tr><td class="n">57</td><td><b>K4</b> · nr 1</td><td class="n">+6%</td><td class="n">0,20</td><td class="n">1,05</td><td class="n">103</td><td class="n">29,9%</td><td class="n">0,11%</td><td class="n">0,0022%</td><td class="n">−23%</td><td class="n">< +45%</td><td class="n">+19 / −23 / +16</td></tr><tr><td class="n">58</td><td><b>K4</b> · vol_min 1</td><td class="n">+217%</td><td class="n">1,22</td><td class="n">1,40</td><td class="n">211</td><td class="n">33,2%</td><td class="n">0,65%</td><td class="n">0,0122%</td><td class="n">+67%</td><td class="n">≥ +63%</td><td class="n">+47 / +34 / +56</td></tr><tr><td class="n">59</td><td><b>E2</b> · b 0</td><td class="n">+190%</td><td class="n">1,18</td><td class="n">1,46</td><td class="n">198</td><td class="n">29,7%</td><td class="n">0,63%</td><td class="n">0,0120%</td><td class="n">+59%</td><td class="n">≥ +55%</td><td class="n">+38 / +42 / +45</td></tr></tbody></table></div>
+      <p style="margin-top:16px">Kryterium z planu to wyższy Sharpe i zysk na transakcję niż w strategii 6. Żaden filtr go nie spełnia. Zysk na transakcję zostaje przy 0,6% albo spada: RSI(5) ≤ 50 daje 0,5%, NR4 0,1%. Sharpe spada w każdym wariancie, bo mniej dni w rynku to większa zmienność wyniku dziennego. Wynik NR4 przeczy badaniu Zarattiniego dla SPY. Przyczyną może być doba CFD z nocą w miejsce sesji gotówkowej — ostrzeżenie z propozycji się sprawdziło. Kombinacji filtrów nie liczono, bo żaden nie przeszedł pojedynczo.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Nowe strategie dnia · N1 · N2 · N3</div>
+      <h2>Literatura bez EMA12 nie zarabia</h2>
+      <div class="table-wrap"><table class="wide"><thead><tr><th class="n">Run</th><th>Wariant</th><th class="n">Zwrot</th><th class="n">Sharpe</th><th class="n">PF</th><th class="n">Trans.</th><th class="n">Obsun.</th><th class="n">Na trans.</th><th class="n">Na świecę</th><th class="n">Bez 5 najl.</th><th class="n">vs losowe p95</th><th class="n">Lata 2024 / 2025 / 2026</th></tr></thead><tbody><tr class="ref"><td class="n">13</td><td><b>S6</b> · k 0,075</td><td class="n">+620%</td><td class="n">1,81</td><td class="n">1,44</td><td class="n">388</td><td class="n">33,2%</td><td class="n">0,58%</td><td class="n">0,0109%</td><td class="n">+153%</td><td class="n">≥ +54%</td><td class="n">+87 / +75 / +62</td></tr><tr><td class="n">47</td><td><b>N2</b> · k 0 · exit_min 5</td><td class="n">−14%</td><td class="n">0,19</td><td class="n">0,98</td><td class="n">727</td><td class="n">60,9%</td><td class="n">0,04%</td><td class="n">0,0006%</td><td class="n">−52%</td><td class="n">< +149%</td><td class="n">−9 / −5 / +44</td></tr><tr><td class="n">48</td><td><b>N2</b> · k 0 · exit_min 120</td><td class="n">−49%</td><td class="n">−0,23</td><td class="n">0,92</td><td class="n">727</td><td class="n">69,2%</td><td class="n">−0,04%</td><td class="n">−0,0009%</td><td class="n">−95%</td><td class="n">< +117%</td><td class="n">−13 / −21 / +2</td></tr><tr><td class="n">49</td><td><b>N2</b> · k 0,2 · exit_min 5</td><td class="n">−10%</td><td class="n">0,18</td><td class="n">0,98</td><td class="n">481</td><td class="n">58,4%</td><td class="n">0,05%</td><td class="n">0,0008%</td><td class="n">−50%</td><td class="n">< +134%</td><td class="n">−2 / −18 / +45</td></tr><tr><td class="n">50</td><td><b>N2</b> · k 0,2 · exit_min 120</td><td class="n">−40%</td><td class="n">−0,19</td><td class="n">0,91</td><td class="n">481</td><td class="n">60,1%</td><td class="n">−0,05%</td><td class="n">−0,0010%</td><td class="n">−84%</td><td class="n">< +123%</td><td class="n">−5 / −42 / +23</td></tr><tr><td class="n">63</td><td><b>N1</b> · vm 0,45</td><td class="n">+38%</td><td class="n">0,48</td><td class="n">1,06</td><td class="n">664</td><td class="n">38,4%</td><td class="n">0,08%</td><td class="n">0,0031%</td><td class="n">−24%</td><td class="n">≥ +19%</td><td class="n">+30 / +20 / +3</td></tr><tr><td class="n">64</td><td><b>N1</b> · vm 0,65</td><td class="n">+74%</td><td class="n">0,88</td><td class="n">1,16</td><td class="n">499</td><td class="n">26,9%</td><td class="n">0,13%</td><td class="n">0,0056%</td><td class="n">+12%</td><td class="n">≥ +15%</td><td class="n">+39 / +27 / +1</td></tr><tr><td class="n">65</td><td><b>N3</b> · nr 1 · sf 0,5</td><td class="n">−21%</td><td class="n">−0,45</td><td class="n">0,83</td><td class="n">173</td><td class="n">35,0%</td><td class="n">−0,12%</td><td class="n">−0,0028%</td><td class="n">−50%</td><td class="n">< +23%</td><td class="n">−11 / −15 / +6</td></tr><tr><td class="n">66</td><td><b>N3</b> · nr 1 · sf 1</td><td class="n">−21%</td><td class="n">−0,36</td><td class="n">0,85</td><td class="n">173</td><td class="n">33,2%</td><td class="n">−0,11%</td><td class="n">−0,0020%</td><td class="n">−52%</td><td class="n">< +21%</td><td class="n">−17 / −1 / −1</td></tr><tr><td class="n">67</td><td><b>N3</b> · nr 0 · sf 0,5</td><td class="n">+42%</td><td class="n">0,49</td><td class="n">1,05</td><td class="n">710</td><td class="n">35,7%</td><td class="n">0,08%</td><td class="n">0,0020%</td><td class="n">−17%</td><td class="n">≥ +32%</td><td class="n">+24 / +38 / −3</td></tr><tr><td class="n">68</td><td><b>N3</b> · nr 0 · sf 1</td><td class="n">+37%</td><td class="n">0,46</td><td class="n">1,04</td><td class="n">710</td><td class="n">41,1%</td><td class="n">0,09%</td><td class="n">0,0016%</td><td class="n">−13%</td><td class="n">≥ +28%</td><td class="n">+29 / +27 / +5</td></tr></tbody></table></div>
+      <p style="margin-top:16px"><strong>N2</strong> miała być kontrolą: kierunek od wczorajszego zamknięcia do 10:00, sygnał z Gao i in. Wynik jest ujemny w każdym wariancie i w obu latach 2024–2025. Wyjątkiem jest rok 2026: +44% i +45% przy wyjściu 15:55. To zgodne z Rosą (2022), czyli z przewidywalnością żyjącą w reżimach. Dla strategii 6 wniosek jest dobry: jej przewaga nie jest po prostu znanym efektem momentum otwarcia, bo ten sam pomysł zapisany sygnałem z literatury przegrywa.</p>
+      <p><strong>N1</strong>, strefa szumu w przybliżeniu ATR × √t: PF 1,06–1,16, w 2026 około zera. Brakuje dokładnej strefy z tej samej minuty, VWAP i celowania zmienności. Bez nich zostaje szkielet, który ledwie pokrywa spread. <strong>N3</strong>: po dniu NR4 −21% przy obu poziomach obrony. Bez filtra +37–42% przy PF 1,04–1,05 i bez pięciu najlepszych na minusie. Ta sama reguła dopiero w K5, ograniczona do dni bez sygnału otwarcia, zaczyna działać.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Wielodniowa · W1</div>
+      <h2>IBS: dekada przewagi, która skończyła się w 2024</h2>
+      <div class="table-wrap"><table><thead><tr><th class="n">Run</th><th>Zakres</th><th class="n">Zwrot</th><th class="n">Sharpe</th><th class="n">PF</th><th class="n">Trans.</th><th class="n">Obsun.</th><th class="n">Bez 5 najl.</th><th class="n">Losowe p95</th></tr></thead><tbody><tr><td class="n">70</td><td>2016-01-01 → 2026-10-27</td><td class="n">+7 329%</td><td class="n">1,26</td><td class="n">1,54</td><td class="n">315</td><td class="n">32,0%</td><td class="n">+426%</td><td class="n">+1 119%</td></tr><tr><td class="n">71</td><td>2016-01-01 → 2026-10-27</td><td class="n">+387%</td><td class="n">0,65</td><td class="n">1,40</td><td class="n">161</td><td class="n">36,6%</td><td class="n">+137%</td><td class="n">+400%</td></tr><tr><td class="n">78</td><td>2016-01-01 → 2024-01-01</td><td class="n">+4 091%</td><td class="n">1,49</td><td class="n">2,39</td><td class="n">225</td><td class="n">30,3%</td><td class="n">+362%</td><td class="n">+470%</td></tr><tr><td class="n">79</td><td>2024-01-01 → 2026-01-01</td><td class="n">+45%</td><td class="n">0,68</td><td class="n">1,37</td><td class="n">63</td><td class="n">32,0%</td><td class="n">+4%</td><td class="n">+177%</td></tr><tr><td class="n">80</td><td>2026-01-01 → 2026-10-27</td><td class="n">−5%</td><td class="n">0,11</td><td class="n">0,92</td><td class="n">22</td><td class="n">28,1%</td><td class="n">−44%</td><td class="n">+66%</td></tr></tbody></table></div>
+      <p style="margin-top:16px">Na całym zakresie 2016–2026 W1 przy ibs_in 0,2 wygląda imponująco: +7329% przy depozycie 20% i PF 1,54. Prawie cały ten wynik pochodzi jednak z lat 2016–2023 (+4091%, PF 2,39). W latach 2024–2025 zostaje +45% przy Sharpe 0,68, poniżej 95. percentyla losowego wejścia (+178%). W 2026 −4,8% przy Sharpe 0,11, więc warunek 4 nie przechodzi z dużym zapasem. Finansowanie nocy kosztowało na całym zakresie więcej niż spread. Wariant ibs_in 0,1 ma o połowę mniej transakcji i jest słabszy prawie w każdym roku, a w 2024 i 2026 na minusie. Wniosek zgadza się z replikacjami IBS na QQQ z literatury: efekt był, ale się zużył.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">10 · Werdykt</div>
+      <h2>Pięć warunków dla najlepszego wariantu każdej propozycji</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Propozycja</th><th class="n">Run</th><th>1 · ponad losowe p95</th><th>2 · bez 5 najl. &gt; 0</th><th>3 · ≥ 2 z 3 lat na plusie</th><th>4 · Sharpe 2026 ≥ 0,7 × 2024–25</th><th>5 · lepsza od S6 przy tym samym obsunięciu</th></tr></thead>
+          <tbody>
+            <tr class="ref"><td><b>S6</b> (odniesienie)</td><td class="n">13</td><td class="ok">+620 ≥ +54</td><td class="ok">+153%</td><td class="ok">3 z 3</td><td class="ok">1,88 / 1,79</td><td>—</td></tr>
+            <tr class="win"><td><b>K5</b> · wybicie w dni bez sygnału</td><td class="n">69</td><td class="ok">+924 ≥ +119</td><td class="ok">+199%</td><td class="ok">3 z 3</td><td class="ok">1,87 / 1,89</td><td class="ok">3 z 3, przy niższym obsunięciu</td></tr>
+            <tr><td><b>E1</b> · Londyn + NY</td><td class="n">60</td><td class="ok">+655 ≥ +58</td><td class="ok">+164%</td><td class="ok">3 z 3</td><td>nie liczono</td><td class="no">0 z 3 po przeskalowaniu 33,2 / 41,5</td></tr>
+            <tr><td><b>K1</b> · wyjście 15:55</td><td class="n">46</td><td class="ok">+562 ≥ +91</td><td class="ok">+145%</td><td class="ok">3 z 3</td><td>nie liczono</td><td class="no">0 z 3 po przeskalowaniu 33,2 / 38,7</td></tr>
+            <tr><td><b>K2</b> · cut 120</td><td class="n">61</td><td class="ok">+590 ≥ +101</td><td class="ok">+145%</td><td class="ok">3 z 3</td><td>nie liczono</td><td class="no">1 z 3 (2025)</td></tr>
+            <tr><td><b>K3</b> · 15:00, k2 0,25</td><td class="n">53</td><td class="ok">+495 ≥ +209</td><td class="ok">+142%</td><td class="ok">3 z 3</td><td>nie liczono</td><td class="no">1 z 3 (2025)</td></tr>
+            <tr><td><b>K4</b> · zmienność ≥ 1</td><td class="n">58</td><td class="ok">+217 ≥ +63</td><td class="ok">+67%</td><td class="ok">3 z 3</td><td>nie liczono</td><td class="no">0 z 3</td></tr>
+            <tr><td><b>E2</b> · BTC</td><td class="n">59</td><td class="ok">+190 ≥ +55</td><td class="ok">+59%</td><td class="ok">3 z 3</td><td>nie liczono</td><td class="no">0 z 3</td></tr>
+            <tr><td><b>N1</b> · vm 0,65</td><td class="n">64</td><td class="ok">+74 ≥ +15</td><td class="ok">+12%</td><td class="ok">3 z 3</td><td class="no">2026: +1%</td><td>nie dotyczy</td></tr>
+            <tr><td><b>N3</b> · nr 0, sf 0,5</td><td class="n">67</td><td class="ok">+42 ≥ +32</td><td class="no">−17%</td><td class="ok">2 z 3</td><td class="no">2026: −3%</td><td>nie dotyczy</td></tr>
+            <tr><td><b>N2</b> · k 0,2, wyjście 15:55</td><td class="n">49</td><td class="no">−10 &lt; +134</td><td class="no">−50%</td><td class="no">1 z 3</td><td>—</td><td>nie dotyczy</td></tr>
+            <tr><td><b>W1</b> · ibs_in 0,2 (2016–2026)</td><td class="n">70</td><td class="ok">+7329 ≥ +1119</td><td class="ok">+426%</td><td class="ok">10 z 11</td><td class="no">0,11 / 0,68</td><td>nie dotyczy</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Warunek 4 liczono osobnymi przebiegami tylko dla K5 i W1, bo pozostałe odpadały już na warunku 5 albo na latach.</p>
+      <div class="quote">K5 to strategia 6, która w dni bez sygnału przestaje czekać na następny dzień.</div>
+    </section>
+
+    <section>
+      <div class="eyebrow">11 · Zastrzeżenia i co dalej</div>
+      <h2>Zanim K5 trafi na demo</h2>
+      <div class="fails">
+        <div class="fail"><h3>Wielokrotne testowanie</h3><p>39 uruchomień na jedenastu strategiach. Przy progu 5% jeden lub dwa „sukcesy” są spodziewane z przypadku. Za K5 przemawia to, że wygrywa w każdym roku z osobna, w 2026 ma ten sam Sharpe co w latach 2024–2025 i bije strategię 6 przy każdym z trzech progów k. Przeciw: to wciąż jedna próba z jednego okresu rynku.</p></div>
+        <div class="fail"><h3>Druga noga jest cienka</h3><p>+0,13% kapitału na transakcję wobec kosztu spreadu 0,025–0,045%, czyli koszt zjada 20–35% zysku. Szerszy spread na wybiciu albo poślizg rzędu 1 pkt łatwo zetną przewagę o połowę. Ten backtest liczy poślizg 0.</p></div>
+        <div class="fail"><h3>Bez stopu i z ekspozycją 4x</h3><p>Najgorsza otwarta strata jest w K5 taka sama jak w strategii 6: −34,7% kapitału na jednej transakcji. K5 jest w rynku przez 11,8% czasu zamiast 6,9%, więc okazji do takiego dnia jest więcej. Dwie transakcje drugiej nogi przeszły przez noc (skrócone sesje bez świecy 15:55), stąd 199 jednostek finansowania.</p></div>
+        <div class="fail"><h3>Następne kroki</h3><p>1) K5 na rachunku demo, równolegle ze strategią 6, z tym samym depozytem — prawdziwy spread i poślizg wybicia. 2) Przebieg K5 i strategii 6 przy depozycie przeskalowanym do 20% obsunięcia, czyli nowe rewizje z innym <code>sizing.value</code>. 3) Profil kosztów godzinowy w <code>run_backtest</code>: bez niego E1 i każda noga poza sesją NY są nieocenialne. 4) Kalendarz świąt i skróconych sesji w silniku.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">12 · Indeks</div>
+      <h2>Strategie zapisane w tej rundzie</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Skrót</th><th class="n">Id</th><th>Nazwa</th><th class="n">Uruchomienia</th></tr></thead>
+          <tbody>
+<tr><td><b>K1</b></td><td class="n">20</td><td>US100 M5 — otwarcie NY względem EMA12 — siła — wyjście z parametru (domyślnie 15:55 ET)</td><td class="n">44–46</td></tr>
+<tr><td><b>K2</b></td><td class="n">21</td><td>US100 M5 — otwarcie NY względem EMA12 — po 14:00 ET trzymaj tylko zysk</td><td class="n">61–62</td></tr>
+<tr><td><b>K3</b></td><td class="n">22</td><td>US100 M5 — dwie nogi dnia: otwarcie NY i ostatnia godzina z prądem dnia</td><td class="n">51 (przerwany), 52–55</td></tr>
+<tr><td><b>K4</b></td><td class="n">23</td><td>US100 M5 — otwarcie NY względem EMA12 — filtry z literatury: RSI(5), NR4, reżim zmienności</td><td class="n">56–58</td></tr>
+<tr class="win"><td><b>K5</b></td><td class="n">24</td><td>US100 M5 — strategia 6 plus wybicie 30-minutowe w dni bez sygnału otwarcia</td><td class="n">69, 72–73, 76–77</td></tr>
+<tr><td><b>N1</b></td><td class="n">25</td><td>US100 M5 — wyjście ze strefy szumu (noise area) co pół godziny, do zamknięcia</td><td class="n">63–64</td></tr>
+<tr><td><b>N2</b></td><td class="n">26</td><td>US100 M5 — kierunek od wczorajszego zamknięcia do 10:00 ET, trzymany do zamknięcia</td><td class="n">47–50</td></tr>
+<tr><td><b>N3</b></td><td class="n">27</td><td>US100 M5 — wybicie zakresu 30 minut po dniu NR4, trzymane do zamknięcia</td><td class="n">65–68</td></tr>
+<tr><td><b>E1</b></td><td class="n">28</td><td>US100 M5 — reguła strategii 6 na otwarciu Londynu i Nowego Jorku, dwie nogi</td><td class="n">60</td></tr>
+<tr><td><b>E2</b></td><td class="n">29</td><td>US100 M5 — strategia 6 z potwierdzeniem BTCUSD od wczorajszego zamknięcia NY</td><td class="n">59</td></tr>
+<tr><td><b>W1</b></td><td class="n">30</td><td>US100 D1 — zamknięcie przy dole dnia (IBS) w trendzie wzrostowym, 1–5 dni</td><td class="n">70–71, 78–80</td></tr>
+<tr class="ref"><td><b>S6</b></td><td class="n">6</td><td>strategia 6 (operatora), bez zmian — kontrola progu i podzakresy</td><td class="n">13, 42–43, 74–75</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Wszystkie dokumenty zapisano jako rewizję 1, bez zmian względem wersji z dokumentu z propozycjami, z autorem „agent”. Każde uruchomienie jest próbą przypisaną do swojej strategii i widać je na karcie Strategie w terminalu.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>US100 · dłużej w rynku · wyniki · 27 października 2026</span>
+    <span>Uruchomienia 42–80 · propozycje: docs/strategie-us100-dluzej-w-rynku.html</span>
+  </div>
+</footer>
