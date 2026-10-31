@@ -22,9 +22,10 @@ async def test_no_two_packages_offer_the_conversation_the_same_tool_name() -> No
             package.create_app().state.mcp_server
             for package in (
                 market_data.app, polymarket_data.app, social_data.app, telegram_gateway.app,
-                youtube_data.app, alerts.app, strategies.app,
+                alerts.app, strategies.app,
             )
         ),
+        youtube_data.app.create_app().state.local_mcp_server,
     ]
     names: Counter[str] = Counter()
     for server in servers:

@@ -110,7 +110,7 @@ async def lifespan(app: FastAPI):
     youtube_tools = (
         None
         if youtube_app is None
-        else ConversationLocalTools("youtube-data", youtube_app.state.mcp_server)
+        else ConversationLocalTools("youtube-data", youtube_app.state.local_mcp_server)
     )
 
     alerts_tools = (
@@ -131,7 +131,7 @@ async def lifespan(app: FastAPI):
             "market-data": market_app.state.mcp_server,
             "polymarket-data": polymarket_app.state.mcp_server,
             "social-data": social_app.state.mcp_server,
-            **({} if youtube_app is None else {"youtube-data": youtube_app.state.mcp_server}),
+            **({} if youtube_app is None else {"youtube-data": youtube_app.state.local_mcp_server}),
         }
     )
 
@@ -242,7 +242,7 @@ async def lifespan(app: FastAPI):
         )
         if youtube_app is not None:
             teams_tool_servers.local["youtube-data"] = TeamsLocalTools(
-                "youtube-data", youtube_app.state.mcp_server
+                "youtube-data", youtube_app.state.local_mcp_server
             )
 
         if alerts_app is not None:
