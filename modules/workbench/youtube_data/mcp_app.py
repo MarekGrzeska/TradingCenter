@@ -39,9 +39,12 @@ INSTRUCTIONS = (
 
 
 def build_server(app) -> FastMCP:
+    """What this process's models call as functions — the conversation, the teams and the alerts' reads."""
     return _build("youtube-data", INSTRUCTIONS, lambda mcp: tools.register(mcp, ToolContext(app=app)))
 
 
 def build_mcp_app(app) -> tuple[FastMCP, ASGIApp]:
-    """The streamable-http transport and the server behind it, to be mounted under `/mcp`."""
-    return _mount(build_server(app))
+    """The streamable-http transport and the server behind it, to be mounted under `/mcp`: the same tools and the prompts'
+    words, because its one caller is the operator's own client."""
+    server = _build("youtube-data", INSTRUCTIONS, lambda mcp: tools.register_for_the_operator(mcp, ToolContext(app=app)))
+    return _mount(server)
