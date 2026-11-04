@@ -218,7 +218,7 @@ async def lifespan(app: FastAPI):
             else nullcontext()
         ),
         team_tools_serving(team_tools_app, team_tools, settings),
-        chart_tools.serving(chart_tools_app, conversation_pool, conversation_tools, settings),
+        chart_tools.serving(chart_tools_app, conversation_pool, market_tools, settings),
     ):
         # Every package is serving: what the alerts' clock reads can answer now.
         if alerts_app is not None and alerts_settings is not None:
