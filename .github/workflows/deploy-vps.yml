@@ -211,6 +211,8 @@ jobs:
           GATEWAY_HOST: ${{ vars.GATEWAY_HOST }}
           TERMINAL_HOST: ${{ vars.TERMINAL_HOST }}
           POCKET_HOST: ${{ vars.POCKET_HOST }}
+          # AgenticEnglish's web app (docs/tradingcenter-edge.md there). Not probed below: it answers 502 whenever that project is down.
+          ENGLISH_HOST: ${{ vars.ENGLISH_HOST }}
           ACME_EMAIL: ${{ vars.ACME_EMAIL }}
           IMAGE_PREFIX: ${{ vars.IMAGE_PREFIX }}
           ENTRA_TENANT_ID: ${{ vars.ENTRA_TENANT_ID }}

@@ -108,7 +108,14 @@ running_images() {
   done
 }
 
+# The network AgenticEnglish's api and Caddy share (docs/tradingcenter-edge.md in that repository); internal, created
+# once, never removed. Compose refuses to start a service on an external network that does not exist.
+ensure_english_network() {
+  docker network inspect agentic-english-edge >/dev/null 2>&1     || docker network create --internal agentic-english-edge >/dev/null
+}
+
 release() {
+  ensure_english_network
   sha="${arg:?release <sha>}"
   [ -f tags.env ] && cp tags.env tags.env.prev || : > tags.env.prev
   printf 'GATEWAY_TAG=%s\nTRADING_MCP_TAG=%s\nWORKBENCH_TAG=%s\n' "$sha" "$sha" "$sha" > tags.env
@@ -131,6 +138,7 @@ release() {
 }
 
 rollback_to_previous() {
+  ensure_english_network
   if [ -s tags.env.prev ]; then
     cp tags.env.prev tags.env
     $COMPOSE up -d --remove-orphans

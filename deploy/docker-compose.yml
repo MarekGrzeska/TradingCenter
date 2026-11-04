@@ -34,6 +34,7 @@ services:
       GATEWAY_HOST: ${GATEWAY_HOST:?}
       TERMINAL_HOST: ${TERMINAL_HOST:?}
       POCKET_HOST: ${POCKET_HOST:?}
+      ENGLISH_HOST: ${ENGLISH_HOST:?}
       ACME_EMAIL: ${ACME_EMAIL:?}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
@@ -42,7 +43,7 @@ services:
       - ./www:/srv/www:ro
       - caddy-data:/data
       - caddy-config:/config
-    networks: [edge]
+    networks: [edge, english]
     depends_on: [workbench, gateway, trading-mcp]
 
   gateway:
@@ -254,6 +255,11 @@ networks:
   services: {}
   data:
     internal: true
+  # AgenticEnglish's web app: created by whichever deploy runs first (deploy.sh, and that project's own), never removed
+  # by `down`; internal, with only this Caddy and that project's api on it.
+  english:
+    external: true
+    name: agentic-english-edge
 
 volumes:
   pg-data:

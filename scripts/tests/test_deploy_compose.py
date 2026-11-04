@@ -35,9 +35,16 @@ def test_the_database_is_on_a_network_with_no_way_in_or_out() -> None:
 
 
 def test_the_proxy_reaches_only_the_applications_it_publishes() -> None:
-    assert SERVICES["caddy"]["networks"] == ["edge"]
+    assert SERVICES["caddy"]["networks"] == ["edge", "english"]
     on_edge = {name for name, service in SERVICES.items() if "edge" in service.get("networks", [])}
     assert on_edge == {"caddy", "gateway", "workbench", "trading-mcp"}
+
+
+def test_the_english_network_is_external_and_holds_only_caddy() -> None:
+    """AgenticEnglish's web app: the one network shared with that project, internal and created outside both."""
+    assert COMPOSE["networks"]["english"] == {"external": True, "name": "agentic-english-edge"}
+    on_english = {name for name, service in SERVICES.items() if "english" in service.get("networks", [])}
+    assert on_english == {"caddy"}
 
 
 def test_the_tool_server_admits_from_outside_only_the_operators_client() -> None:
@@ -99,7 +106,7 @@ def _reverse_proxy_blocks() -> list[str]:
 
 def test_every_proxied_request_is_marked_as_coming_from_outside() -> None:
     blocks = _reverse_proxy_blocks()
-    assert len(blocks) == 3
+    assert len(blocks) == 4  # gateway, workbench, trading-mcp, AgenticEnglish's web app
     assert all("import edge_headers" in block for block in blocks)
 
 
@@ -138,3 +145,12 @@ def test_the_stream_marker_header_name_is_the_one_the_applications_read() -> Non
     # `packages/tc-entra-auth/tc_entra_auth/edge.py` — EDGE_HEADER, in bytes and lower-case.
     source = (DEPLOY.parent / "packages/tc-entra-auth/tc_entra_auth/edge.py").read_text(encoding="utf-8")
     assert f'EDGE_HEADER = b"{from_edge.group(1).lower()}"' in source
+
+
+def test_the_english_host_only_carries_traffic_to_agentic_english() -> None:
+    """No compression (it would buffer the tutor's event stream) and no CORS: the app calls its own host only."""
+    english = _site("ENGLISH_HOST")
+    assert "reverse_proxy agentic-english-web:8081" in english
+    assert "flush_interval -1" in english
+    assert "encode" not in english
+    assert "import cors" not in english
