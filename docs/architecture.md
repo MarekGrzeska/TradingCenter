@@ -2,11 +2,11 @@
 
 ## The shape
 
-One repository, three processes, no shared runtime. A module is a directory under `modules/`
+One repository, four processes, no shared runtime. A module is a directory under `modules/`
 that runs on its own and publishes a contract, and it is a process because it has a rule of
 writing nobody else has: the gateway is the only door to the provider, `trading-mcp` the only
 thing that moves an account, and the `workbench` everything else — the conversation, the teams,
-three archives and the door to Telegram, as packages of one process. Nothing imports across a process boundary at runtime; source may be
+three archives and the door to Telegram, as packages of one process — and `claude-agent` the operator's own session, the one process holding no secret of the system ("The agent on the server"). Nothing imports across a process boundary at runtime; source may be
 shared at build time through `packages/`, under the conditions in "What may be shared, and what
 may not".
 
@@ -376,6 +376,21 @@ under `/social` and `/polymarket` and nothing else — the conversation's tools 
 whole. The roles are managed in the directory through Microsoft Graph by the terminal's Users tab, with the admin's own
 delegated token: no process of this system holds a credential that writes the directory, which is what keeps this from being a
 new security boundary. A role change reaches a person when their token next renews. (`openspec/changes/admin-panel-users-and-roles`.)
+
+## The agent on the server
+
+`claude-agent` is the fourth process (`openspec/changes/operator-agent-on-telegram`): the operator's Claude Code in one tmux
+session, on the subscription, reached from a phone through a Telegram bot of its own. It is a process because its rule is
+the opposite of the others' — it holds a subscription login and a bot token and **no secret of the system** — and it reaches
+the system exactly the way the operator's Claude Code at the desk does: `https://API_HOST/…/mcp` through Caddy, with an Entra
+token. No port, no `edge`, `services` or `data`; a network of its own with a way out and nothing of this project on it.
+
+The token is the operator's, delegated, issued to the registration `app-tradingcenter-vps-agent` after a device-code sign-in.
+Delegated rather than an application token, because the team tools own what they create by the token's `oid`: an
+application's `oid` would hand the agent a catalogue of its own, invisible in the terminal. Its own registration, so the two
+caller lists that admit it (`TOOL_CALLER_APPLICATION_IDS`, `EXTERNAL_CALLER_APPLICATION_IDS`) and every `trading_mcp.trace`
+line name it apart from the desk client — and dropping it from those lists closes every surface to it without a new image.
+Its bot is never one of `/telegram`'s: the workbench long-polls every bot it holds, and Telegram allows one poller per token.
 
 ## The order path
 

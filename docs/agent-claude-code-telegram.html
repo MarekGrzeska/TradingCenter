@@ -308,14 +308,14 @@
 
     <section>
       <div class="eyebrow">04 · Tożsamość</div>
-      <h2>Własna rejestracja, nie Twój token</h2>
-      <p class="intro">Twój Claude Code przedstawia się jako <code>app-tradingcenter-claude-code</code>: token delegowany, wydany na Ciebie, odświeżany w przeglądarce. Na serwerze nikt się nie zaloguje w przeglądarce, a <span class="hl">Twój refresh token w kontenerze byłby Twoją tożsamością w rękach modelu</span>.</p>
+      <h2>Własna rejestracja, Twój token</h2>
+      <p class="intro">Twój Claude Code przedstawia się jako <code>app-tradingcenter-claude-code</code>. Agent dostaje <strong>własną rejestrację</strong> <code>app-tradingcenter-vps-agent</code>, ale token jest <strong>delegowany, w Twoim imieniu</strong>: logujesz się raz, kodem urządzenia. Tak jest zapisane w <code>design.md</code> (D1) zmiany <code>operator-agent-on-telegram</code>. Pierwsza wersja tego dokumentu proponowała token aplikacji, a niżej jest powód zmiany.</p>
       <div class="table-wrap">
         <table>
           <thead><tr><th>Opcja</th><th>Jak</th><th>Ocena</th></tr></thead>
           <tbody>
-            <tr><td><b>A. Rejestracja agenta</b> (rekomendacja)</td><td>nowa aplikacja Entra <code>app-tradingcenter-vps-agent</code>, przepływ <code>client_credentials</code>, rola aplikacji <code>admin</code> przypisana jej service principalowi, <code>azp</code> na listach wywołujących</td><td><span class="tag ok">czysto</span> osobny <code>azp</code> w logach, odwołanie jednym usunięciem, nic osobistego na serwerze</td></tr>
-            <tr><td><b>B. Twój token skopiowany</b></td><td>cache MSAL z <code>mcp_token.py login</code> wgrany do wolumenu</td><td><span class="tag stop">odrzucone</span> agent działa jako osoba, wygasa po 90 dniach bezczynności, w logach go nie odróżnisz</td></tr>
+            <tr><td><b>A. Rejestracja agenta, token delegowany</b> (wybrane)</td><td>klient publiczny z kodem urządzenia, pre-autoryzowany na API workbencha i bramy; <code>azp</code> agenta, <code>oid</code> i rola <code>admin</code> Twoje</td><td><span class="tag ok">wybrane</span> zespoły z Telegrama są Twoje i widać je w terminalu; osobny <code>azp</code> w logach; bez zmian ról w <code>infra/</code> i w <code>tc-entra-auth</code></td></tr>
+            <tr><td><b>B. Token aplikacji</b> (<code>client_credentials</code>)</td><td>rola <code>admin</code> przypisana service principalowi agenta</td><td><span class="tag stop">odrzucone</span> narzędzia zespołów biorą właściciela z <code>oid</code>, a <code>oid</code> SP oznacza pusty katalog i zespoły niewidoczne w terminalu; do tego zmiana <code>allowed_member_types</code></td></tr>
             <tr><td><b>C. Klucz współdzielony</b></td><td><code>GATEWAY_API_KEY</code> i nowy <code>service_key</code> workbencha</td><td><span class="tag stop">odrzucone</span> klucz otwiera REST bramki bez strażnika trading-mcp i łamie decyzję „nikt nie woła workbencha po sieci”</td></tr>
           </tbody>
         </table>
@@ -323,39 +323,29 @@
       <h2 style="margin-top:34px; font-size:24px">Co zmienia się w <code>infra/</code> i w <code>deploy/</code></h2>
       <div class="fails">
         <div class="fail">
-          <h3>Rola dla aplikacji <span class="tag att">infra</span></h3>
-          <p><code>infra/modules/easy-auth-app/main.tf:49</code> ma dziś <code>allowed_member_types = ["User"]</code>. Token aplikacji (app-only) dostaje <code>roles</code> tylko z ról, które dopuszczają <code>"Application"</code>. Sprawdzone w kodzie: <code>RolePolicy</code> wpuszcza każdego, kto ma <code>admin</code>, i nie pyta, czy to osoba. Nie trzeba więc ruszać <code>tc-entra-auth</code>, wystarczy rozszerzyć rolę i przypisać ją SP agenta na obu API (workbench, gateway).</p>
+          <h3>Rejestracja agenta <span class="tag att">infra</span></h3>
+          <p><code>infra/entra.tf</code>: <code>app-tradingcenter-vps-agent</code>, klient publiczny z <code>fallback_public_client_enabled</code>, pre-autoryzowany na scope'ach workbencha i bramy, tak jak klient przy biurku. Bez przypisania roli, bo rola <code>admin</code> jest Twoja.</p>
         </div>
         <div class="fail">
           <h3>Listy wywołujących <span class="tag att">deploy</span></h3>
-          <p><code>TOOL_CALLER_APPLICATION_IDS</code> (workbench) i <code>EXTERNAL_CALLER_APPLICATION_IDS</code> (trading-mcp) w <code>deploy/docker-compose.yml</code> są dziś jedną wartością <code>${CLAUDE_CODE_APPLICATION_ID}</code>. Trzeba je zamienić na listę obu id, plus nowa nazwa w <code>deploy/env.required</code> i w środowisku <code>vps</code>.</p>
+          <p><code>TOOL_CALLER_APPLICATION_IDS</code> i <code>EXTERNAL_CALLER_APPLICATION_IDS</code> to teraz <code>CLAUDE_CODE_APPLICATION_ID</code> i <code>AGENT_APPLICATION_ID</code>. Zdjęcie drugiego id odcina agenta od wszystkiego bez nowego obrazu.</p>
         </div>
         <div class="fail stop">
           <h3>Kolejność: najpierw <code>apply</code> <span class="tag stop">fail-closed</span></h3>
-          <p>Jak przy rolach: Terraform <code>apply</code> robisz Ty, przed merge. Wdrożenie przed <code>apply</code> zostawi agenta z tokenem bez roli. Odmowa jest bezpieczna, ale wygląda jak martwy serwer MCP.</p>
+          <p>Terraform <code>apply</code> robisz Ty, przed merge. Bez <code>AGENT_APPLICATION_ID</code> w środowisku <code>vps</code> deploy zatrzyma się, zanim cokolwiek wyśle.</p>
         </div>
       </div>
-      <p style="margin-top:20px">Helper tokenu to mniejszy brat <code>scripts/mcp_token.py</code>. Pyta o token z sekretem aplikacji, trzyma go w pamięci do wygaśnięcia (~1 h) i wypisuje nagłówek. Claude Code daje helperowi 10 sekund, a <code>client_credentials</code> mieści się w nich bez przeglądarki.</p>
-      <pre><code><span class="c"># modules/claude-agent/agent/.mcp.json, jeden wpis na powierzchnię (dziewięć, jak w scripts/claude-mcp.sh)</span>
-{
-  <span class="s">"mcpServers"</span>: {
-    <span class="s">"tc-market"</span>: {
-      <span class="s">"type"</span>: <span class="s">"http"</span>,
-      <span class="s">"url"</span>: <span class="s">"https://${API_HOST}/market/mcp"</span>,
-      <span class="s">"headersHelper"</span>: <span class="s">"/opt/agent/bin/token.py --api workbench"</span>
-    },
-    <span class="s">"tc-trading"</span>: {
-      <span class="s">"type"</span>: <span class="s">"http"</span>,
-      <span class="s">"url"</span>: <span class="s">"https://${API_HOST}/trading/mcp"</span>,
-      <span class="s">"headersHelper"</span>: <span class="s">"/opt/agent/bin/token.py --api gateway"</span>
-    }
-  }
+      <p style="margin-top:20px">Helperem tokenu jest sam <code>scripts/mcp_token.py</code>: dostał <code>login --device-code</code> i <code>--cache</code>, a obraz zabiera go przy budowie. <code>.mcp.json</code> powstaje przy każdym starcie kontenera z konkretnymi wartościami:</p>
+      <pre><code><span class="c"># renderowane przez claude_agent/render.py, dziewięć wpisów jak w scripts/claude-mcp.sh</span>
+<span class="s">"tc-trading"</span>: {
+  <span class="s">"type"</span>: <span class="s">"http"</span>,
+  <span class="s">"url"</span>: <span class="s">"https://&lt;API_HOST&gt;/trading/mcp"</span>,
+  <span class="s">"headersHelper"</span>: <span class="s">"/opt/agent/venv/bin/python /opt/agent/bin/mcp_token.py headers --tenant … --client-id … --cache /home/agent/.claude/tc-token-cache.bin --api gateway"</span>
 }
 
-<span class="c"># token.py: POST https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token</span>
-<span class="c">#   grant_type=client_credentials  scope=api://tradingcenter-agent/.default  (lub ...-capital-gateway/.default)</span>
-<span class="c"># Sekret czytany z /run/secrets/agent_entra, nie ze zmiennej środowiskowej, którą widzi cała sesja.</span></code></pre>
-      <p>Sekret jako plik (<code>secrets:</code> w Compose), a w ustawieniach agenta <code>Read(/run/secrets/**)</code> w <code>deny</code>. Model nie ma <code>Bash</code>, więc i tak go nie wypisze, ale ta druga zapora nic nie kosztuje. Lepszy od sekretu byłby certyfikat. Proponuję go dopiero przy rotacji, bo sekret wystarczy na start.</p>
+<span class="c"># raz, na serwerze: kod do wpisania na dowolnym urządzeniu, potem token odświeżany po cichu</span>
+mcp_token.py login --device-code --tenant … --client-id &lt;AGENT_APPLICATION_ID&gt; --cache …</code></pre>
+      <p>Token odświeżania leży w wolumenie agenta (<code>0600</code>, użytkownik <code>agent</code>), a <code>Read(~/.claude/**)</code> jest w <code>deny</code>. Działa tylko dla aplikacji agenta i jej dwóch scope'ów. Odcinasz go zdjęciem agenta z listy wołających albo usunięciem rejestracji.</p>
     </section>
 
     <section>
@@ -414,11 +404,10 @@
       TZ: Europe/Warsaw
       API_HOST: ${API_HOST:?}
       ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:?}
-      AGENT_ENTRA_CLIENT_ID: ${AGENT_ENTRA_CLIENT_ID:?}
+      AGENT_ENTRA_CLIENT_ID: ${AGENT_APPLICATION_ID:?}
       CHANNELS: plugin:telegram@claude-plugins-official
       TELEGRAM_OWNER_CHAT_ID: ${AGENT_TELEGRAM_OWNER_CHAT_ID:?}
-    secrets: [agent_entra]
-    volumes: [claude-agent-home:/home/agent/.claude]   <span class="c"># login subskrypcji, token bota, parowanie, transkrypty</span>
+    volumes: [claude-agent-home:/home/agent/.claude]   <span class="c"># login subskrypcji, token bota, parowanie, token operatora, transkrypty</span>
     networks: [agent]         <span class="c"># zwykły bridge: Anthropic, Telegram, API_HOST. Nie edge, nie services, nie data.</span>
     <span class="c"># brak ports: — test_deploy_compose.py i tak by odmówił</span></code></pre>
       <div class="fails">
@@ -481,7 +470,7 @@
           <thead><tr><th>Etap</th><th>Zakres</th><th>Kto</th><th>Gotowe, gdy</th></tr></thead>
           <tbody>
             <tr><td><b>0. Decyzje</b></td><td>sekcja 10 (4 z 5 podjęte), potem <code>/opsx:propose</code></td><td>Ty + ja</td><td><code>openspec validate --strict</code> zielone</td></tr>
-            <tr><td><b>1. Tożsamość</b></td><td>rejestracja <code>app-tradingcenter-vps-agent</code>, rola <code>admin</code> z <code>"Application"</code>, przypisanie na workbench i gateway, sekret do środowiska <code>vps</code></td><td>ja: Terraform · <b>Ty: <code>apply</code></b></td><td>token <code>client_credentials</code> ma <code>roles: ["admin"]</code></td></tr>
+            <tr><td><b>1. Tożsamość</b></td><td>rejestracja <code>app-tradingcenter-vps-agent</code> (klient publiczny, kod urządzenia), pre-autoryzacja na workbench i gateway, <code>AGENT_APPLICATION_ID</code> w <code>vps</code></td><td>ja: Terraform · <b>Ty: <code>apply</code></b></td><td><code>mcp_token.py login --device-code</code> pokazuje <code>admin</code> na obu API</td></tr>
             <tr><td><b>2. Moduł</b></td><td><code>modules/claude-agent</code>: Dockerfile, entrypoint, watchdog, <code>token.py</code>, CLAUDE.md, skille, testy runtime jak w <code>infra/runtime/tests</code> AgenticEnglish</td><td>ja</td><td>testy zielone, obraz buduje się w CI</td></tr>
             <tr><td><b>3. Wdrożenie, odczyt</b></td><td>serwis w Compose, listy wywołujących, <code>env.required</code>, job w <code>checks.yml</code> i obraz w <code>deploy-vps.yml</code>; narzędzia rachunku w <code>deny</code></td><td>ja · Ty: bot, login, parowanie</td><td>„jakie mam pozycje” z telefonu dostaje odpowiedź</td></tr>
             <tr><td><b>4. Zapis na demo</b></td><td>narzędzia rachunku z <code>deny</code> na allowlistę, zasada potwierdzenia w CLAUDE.md, przegląd <code>trading_mcp.trace</code> po tygodniu</td><td>po Twojej ocenie etapu 3</td><td>zlecenie z czatu widoczne w trace z <code>azp</code> agenta</td></tr>

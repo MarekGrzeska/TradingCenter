@@ -106,12 +106,14 @@ the symptom is the operator asking about positions and the agent saying it canno
 Alerts have the same shape: with no rule in the terminal's Alerts tab (or no `ALERTS_DATABASE_URL`) the archives
 collect and read as usual and nobody is told. The archives only say what they read; **who is told is a rule, not a setting**.
 
-**Production's tool surfaces answer one outside client: the operator's Claude Code** (`operator-mcp-access`) — the
+**Production's tool surfaces answer two outside clients, both the operator: Claude Code at the desk and the agent on the
+server** (`operator-mcp-access`; `modules/claude-agent`, its own registration, delegated token) — the
 registration `app-tradingcenter-claude-code`, the `admin` role, and a token from `scripts/mcp_token.py` run as
 `headersHelper` (`scripts/claude-mcp.sh install`). The helper never signs in by itself (Claude Code gives it ten
 seconds); when it refuses, Claude Code says "Dynamic Client Registration rejected (HTTP 401)" — that is
 `mcp_token.py login`, not a dead server. Its writes to the account
-leave no trace in the conversation's database — only `trading_mcp.trace` log lines.
+leave no trace in the conversation's database — only `trading_mcp.trace` log lines. **The agent's Telegram bot is never
+registered in `/telegram`**: the workbench long-polls every bot it holds, and two pollers on one token each lose half.
 
 **`trading-mcp` will not start on a wish.** `CAPITAL_GATEWAY_API_KEY` must be the gateway's own
 `GATEWAY_API_KEY` — checked on every caller, loopback included — and it asks the gateway whether the

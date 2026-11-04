@@ -27,9 +27,9 @@
 
 ## 4. Dokumentacja
 
-- [ ] 4.1 CLAUDE.md: wiersz `modules/claude-agent`, pułapka „bot agenta nigdy w `/telegram`”; `scripts/tests/test_guide_ceiling.py` zielony
-- [ ] 4.2 `docs/architecture.md`: agent na liście procesów i granic
-- [ ] 4.3 `docs/agent-claude-code-telegram.html`: sekcja 04 zgodna z D1 (token delegowany)
+- [x] 4.1 CLAUDE.md: wiersz `modules/claude-agent`, pułapka „bot agenta nigdy w `/telegram`”; `scripts/tests/test_guide_ceiling.py` zielony
+- [x] 4.2 `docs/architecture.md`: agent na liście procesów i granic
+- [x] 4.3 `docs/agent-claude-code-telegram.html`: sekcja 04 zgodna z D1 (token delegowany)
 
 ## 5. Po wdrożeniu (operator + ja)
 
