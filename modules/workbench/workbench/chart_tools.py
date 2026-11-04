@@ -33,8 +33,8 @@ INSTRUCTIONS = (
 
 
 def build_chart_server(pool: asyncpg.Pool, archive: Any) -> FastMCP:
-    """`archive` is the conversation's own registry, the one a turn checks the symbol through: it answers
-    as a `ToolServer` does without being one, as `agent.surface.State` already types it."""
+    """`archive` is the market archive's tools as the conversation calls them, not the conversation's registry:
+    the registry routes a name only after a turn has listed its tools, and no turn runs here."""
     draw = DrawOnChartTool(pool, archive)
     listing = ListChartDrawingsTool(pool)
 
