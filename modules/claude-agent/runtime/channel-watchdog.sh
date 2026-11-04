@@ -6,6 +6,8 @@ set -euo pipefail
 CHANNELS=${CHANNELS:-}
 [ -n "$CHANNELS" ] || exit 0
 tmux has-session -t agent 2>/dev/null || exit 0
+# Not before the subscription login: typing into the onboarding would land in its code prompt.
+[ -s "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/.credentials.json" ] || exit 0
 
 created=$(tmux display-message -p -t agent '#{session_created}')
 [ $(( $(date +%s) - created )) -ge 30 ] || exit 0
