@@ -35,7 +35,7 @@ provider: any machine that takes cloud-init user-data and runs Ubuntu 24.04 will
 
 ## Claude Code on production's tools
 
-Every tool surface — the workbench's `/<package>/mcp`, `/team-tools/mcp` and trading-mcp's `/trading/mcp` — answers the
+Every tool surface — the workbench's `/<package>/mcp`, `/team-tools/mcp`, `/chart-tools/mcp` and trading-mcp's `/trading/mcp` — answers the
 operator's own Claude Code and nothing else outside (`openspec/changes/operator-mcp-access`). Once, in this order:
 
 1. `terraform apply` in `infra/` — it creates `app-tradingcenter-claude-code` and pre-authorizes it on both APIs. **Read

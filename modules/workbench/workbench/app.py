@@ -58,7 +58,7 @@ from teams.runtime import MIGRATIONS as TEAMS_MIGRATIONS
 from teams.scheduler import Clock
 from teams.tools import ToolServerRegistry as TeamsToolServerRegistry
 
-from . import model_successors
+from . import chart_tools, model_successors
 from .alert_tools import AlertTools
 from .assembly import mount_package
 from .config import Settings, alerts_enabled, strategies_enabled, youtube_enabled
@@ -218,6 +218,7 @@ async def lifespan(app: FastAPI):
             else nullcontext()
         ),
         team_tools_serving(team_tools_app, team_tools, settings),
+        chart_tools.serving(chart_tools_app, conversation_pool, conversation_tools, settings),
     ):
         # Every package is serving: what the alerts' clock reads can answer now.
         if alerts_app is not None and alerts_settings is not None:
@@ -468,6 +469,9 @@ else:
 # never passes this door, which has a caller record of its own like every package's.
 team_tools_app = create_surface()
 mount_package(app, "/team-tools", team_tools_app)
+# The conversation's drawings, for the same client and behind a record of their own: the root's routes never answer it.
+chart_tools_app = chart_tools.create_surface()
+mount_package(app, "/chart-tools", chart_tools_app)
 
 # After every mount, so the prefixes it lets through to each package's own record are all of them.
 app.add_middleware(

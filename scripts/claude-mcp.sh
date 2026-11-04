@@ -20,6 +20,7 @@ SURFACES=(
   "tc-alerts:/alerts/mcp:workbench"
   "tc-strategies:/strategies/mcp:workbench"
   "tc-team-tools:/team-tools/mcp:workbench"
+  "tc-chart-tools:/chart-tools/mcp:workbench"
   "tc-trading:/trading/mcp:gateway"
 )
 
