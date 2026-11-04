@@ -25,6 +25,7 @@ jobs:
     outputs:
       capital-gateway: ${{ steps.filter.outputs.capital-gateway }}
       trading-mcp: ${{ steps.filter.outputs.trading-mcp }}
+      claude-agent: ${{ steps.filter.outputs.claude-agent }}
       workbench: ${{ steps.filter.outputs.workbench }}
       terminal: ${{ steps.filter.outputs.terminal }}
       pocket: ${{ steps.filter.outputs.pocket }}
@@ -88,6 +89,8 @@ jobs:
           # schema, so `contract:check` there is the check for this seam exactly as it is for the terminal.
           PATTERNS[pocket]='^modules/pocket/|^modules/workbench/(polymarket_data|social_data)/(contract|openapi)\.py$|^modules/workbench/agent/'
           PATTERNS[trading-mcp]="^modules/trading-mcp/|^modules/capital-gateway/|$tc_mcp_kit|$tc_entra_auth"
+          # The agent on the server, and the token helper its image takes from `scripts/` (operator-agent-on-telegram).
+          PATTERNS[claude-agent]='^modules/claude-agent/|^scripts/mcp_token\.py$'
           # The archive-shape check, plus the script that is the shape. There used to be a third pairing above —
           # teams-mcp's snapshot of the teams document — gone with the module that kept it.
           PATTERNS[openspec]='^openspec/|^scripts/trim-openspec-archive\.sh$'
@@ -181,6 +184,24 @@ jobs:
       - run: uv run pyright
       # Nothing here reaches capital.com or a running gateway: every test doubles the upstream, which is the only
       # place the demo-only guard can be exercised without an account to refuse.
+      - run: uv run pytest -q
+
+  claude-agent:
+    name: claude-agent
+    needs: changes
+    if: needs.changes.outputs.claude-agent == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/claude-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv run ruff check .
+      - run: uv run pyright
+      # The entrypoint's tests run here and skip on Windows: they need bash, jq and coreutils' timeout, all on the runner.
       - run: uv run pytest -q
 
   packages:

@@ -15,7 +15,15 @@ import pathlib
 import re
 import sys
 
-OPTIONAL = ("TELEGRAM_API_ID", "TELEGRAM_API_HASH", "TELEGRAM_SESSION_KEY")
+OPTIONAL = (
+    "TELEGRAM_API_ID",
+    "TELEGRAM_API_HASH",
+    "TELEGRAM_SESSION_KEY",
+    # The agent on the server (operator-agent-on-telegram): each has a working default when absent.
+    "AGENT_TELEGRAM_OWNER_CHAT_ID",
+    "AGENT_ACCOUNT_WRITES",
+    "AGENT_CHECKINS",
+)
 URL_SAFE = re.compile(r"^[A-Za-z0-9._~-]{16,}$")
 
 

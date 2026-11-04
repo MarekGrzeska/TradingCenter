@@ -24,6 +24,7 @@ to need something a package cannot give it, the change is wrong, not the rule.
 | `modules/capital-gateway` | capital.com: trading, deep history, live stream. Demo only, and the only door to the provider. |
 | `modules/workbench` | one process, ten packages that never import each other: the conversation (`agent`), the teams (`teams`, `teams_tools`), three archives under `/market`, `/polymarket`, `/social`, the one door to Telegram under `/telegram`, the YouTube archive under `/youtube`, the rules that decide who is told what under `/alerts` and the strategy engine under `/strategies` (strategies as documents, backtests, never an order; a team gets only its three read tools, `strategy_signal` among them) — **those last three mounted only when `YOUTUBE_`/`ALERTS_`/`STRATEGIES_DATABASE_URL` is set**. Six schemas (nine with all), three OpenAI keys. What each package may write: `modules/workbench/README.md`. Every package's tools reach the conversation as functions, not over MCP; over MCP — every `/…/mcp`, `/team-tools/mcp` and `/chart-tools/mcp` — only the operator's Claude Code (`TOOL_CALLER_APPLICATION_IDS`). |
 | `modules/trading-mcp` | MCP tools over the gateway's demo account. Network transport only, two named callers: the workbench with the key, and the operator's Claude Code from outside under `/trading/mcp` with a *gateway* token. Demo checked against the gateway, not against a setting. |
+| `modules/claude-agent` | the operator's Claude Code in tmux on the server, reached from Telegram: the tool surfaces through Caddy like the desk client, as its own application with the operator's token; no port, no secret of the system, account writes off unless `AGENT_ACCOUNT_WRITES=on`. `modules/claude-agent/README.md`. |
 | `modules/terminal` | React+TS · the operator's screen. Consumes the others, publishes nothing. Call it the **terminal**, never a "console" or "dashboard". |
 | `modules/pocket` | React+TS · the archive on a phone, and a chat with the workbench beside it. A second consumer, sharing the terminal's generated contract and none of its code. |
 | `packages/tc-runtime` | database, migrations, schema check, the caller-access machinery, the OpenAPI response rule. |
@@ -105,12 +106,14 @@ the symptom is the operator asking about positions and the agent saying it canno
 Alerts have the same shape: with no rule in the terminal's Alerts tab (or no `ALERTS_DATABASE_URL`) the archives
 collect and read as usual and nobody is told. The archives only say what they read; **who is told is a rule, not a setting**.
 
-**Production's tool surfaces answer one outside client: the operator's Claude Code** (`operator-mcp-access`) — the
+**Production's tool surfaces answer two outside clients, both the operator: Claude Code at the desk and the agent on the
+server** (`operator-mcp-access`; `modules/claude-agent`, its own registration, delegated token) — the
 registration `app-tradingcenter-claude-code`, the `admin` role, and a token from `scripts/mcp_token.py` run as
 `headersHelper` (`scripts/claude-mcp.sh install`). The helper never signs in by itself (Claude Code gives it ten
 seconds); when it refuses, Claude Code says "Dynamic Client Registration rejected (HTTP 401)" — that is
 `mcp_token.py login`, not a dead server. Its writes to the account
-leave no trace in the conversation's database — only `trading_mcp.trace` log lines.
+leave no trace in the conversation's database — only `trading_mcp.trace` log lines. **The agent's Telegram bot is never
+registered in `/telegram`**: the workbench long-polls every bot it holds, and two pollers on one token each lose half.
 
 **`trading-mcp` will not start on a wish.** `CAPITAL_GATEWAY_API_KEY` must be the gateway's own
 `GATEWAY_API_KEY` — checked on every caller, loopback included — and it asks the gateway whether the

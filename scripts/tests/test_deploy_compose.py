@@ -47,19 +47,41 @@ def test_the_english_network_is_external_and_holds_only_caddy() -> None:
     assert on_english == {"caddy"}
 
 
-def test_the_tool_server_admits_from_outside_only_the_operators_client() -> None:
-    """operator-mcp-access: on the edge, with a gateway token of one named application; the workbench still reaches it
-    with the key on `services`."""
+OPERATOR_CLIENTS = "${CLAUDE_CODE_APPLICATION_ID:?},${AGENT_APPLICATION_ID:?}"
+
+
+def test_the_tool_server_admits_from_outside_only_the_operators_clients() -> None:
+    """operator-mcp-access: on the edge, with a gateway token of a named application — Claude Code at the desk and the
+    agent on the server (operator-agent-on-telegram); the workbench still reaches it with the key on `services`."""
     trading = SERVICES["trading-mcp"]
     assert trading["networks"] == ["edge", "services"]
     environment = trading["environment"]
-    assert environment["EXTERNAL_CALLER_APPLICATION_IDS"] == "${CLAUDE_CODE_APPLICATION_ID:?}"
+    assert environment["EXTERNAL_CALLER_APPLICATION_IDS"] == OPERATOR_CLIENTS
     assert environment["ENTRA_AUDIENCES"] == "${GATEWAY_ENTRA_AUDIENCES:?}"
 
 
-def test_the_tool_surfaces_answer_the_operators_client_and_no_browser() -> None:
+def test_the_tool_surfaces_answer_the_operators_clients_and_no_browser() -> None:
     callers = SERVICES["workbench"]["environment"]["TOOL_CALLER_APPLICATION_IDS"]
-    assert callers == "${CLAUDE_CODE_APPLICATION_ID:?}"
+    assert callers == OPERATOR_CLIENTS
+
+
+# Each would hand the agent a door the operator's desk client does not have (operator-agent-on-telegram).
+SYSTEM_SECRETS = re.compile(r"PASSWORD|API_KEY|OPENAI|SESSION_KEY|DATABASE_URL")
+
+
+def test_the_agent_has_its_own_network_and_no_secret_of_the_system() -> None:
+    """It reaches the system through the public address and Caddy, like the operator at the desk — never by name."""
+    agent = SERVICES["claude-agent"]
+    assert agent["networks"] == ["claude-agent"]
+    assert COMPOSE["networks"]["claude-agent"] == {}
+    others = {name for name, service in SERVICES.items() if "claude-agent" in service.get("networks", [])}
+    assert others == {"claude-agent"}
+    assert [name for name in agent["environment"] if SYSTEM_SECRETS.search(name)] == []
+    assert not any(SYSTEM_SECRETS.search(str(value)) for value in agent["environment"].values())
+
+
+def test_account_writes_are_off_unless_the_environment_says_otherwise() -> None:
+    assert SERVICES["claude-agent"]["environment"]["AGENT_ACCOUNT_WRITES"] == "${AGENT_ACCOUNT_WRITES:-off}"
 
 
 def test_no_service_takes_the_whole_environment_file() -> None:
@@ -76,7 +98,13 @@ def test_every_name_the_compose_file_demands_is_one_the_deploy_checks() -> None:
 def test_the_optional_names_are_blank_by_default_and_not_required() -> None:
     text = (DEPLOY / "docker-compose.yml").read_text(encoding="utf-8")
     optional = set(re.findall(r"\$\{([A-Z][A-Z0-9_]*):-\}", text))
-    assert optional == {"TELEGRAM_API_ID", "TELEGRAM_API_HASH", "TELEGRAM_SESSION_KEY"}
+    assert optional == {
+        "TELEGRAM_API_ID",
+        "TELEGRAM_API_HASH",
+        "TELEGRAM_SESSION_KEY",
+        "AGENT_TELEGRAM_OWNER_CHAT_ID",
+        "AGENT_CHECKINS",
+    }
     assert not optional & required_names()
 
 

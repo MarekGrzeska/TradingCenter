@@ -114,7 +114,9 @@ workbench_app="$(az ad app list --filter "identifierUris/any(u:u eq 'api://tradi
 gateway_app="$(az ad app list --filter "identifierUris/any(u:u eq 'api://tradingcenter-capital-gateway')" --query '[0].appId' -o tsv | tr -d '\r')"
 # The operator's own MCP client (operator-mcp-access): exists once `terraform apply` has created it.
 claude_code="$(az ad app list --filter "displayName eq 'app-tradingcenter-claude-code'" --query '[0].appId' -o tsv | tr -d '\r')"
-for v in tenant terminal pocket workbench_app gateway_app claude_code; do
+# The agent on the server (operator-agent-on-telegram): the same, once `apply` has created it.
+vps_agent="$(az ad app list --filter "displayName eq 'app-tradingcenter-vps-agent'" --query '[0].appId' -o tsv | tr -d '\r')"
+for v in tenant terminal pocket workbench_app gateway_app claude_code vps_agent; do
   [ -n "${!v}" ] || { echo "could not find $v" >&2; exit 1; }
 done
 
@@ -124,6 +126,7 @@ set_variable POCKET_ENTRA_CLIENT_ID "$pocket"
 set_variable TERMINAL_APPLICATION_ID "$terminal"
 set_variable POCKET_APPLICATION_ID "$pocket"
 set_variable CLAUDE_CODE_APPLICATION_ID "$claude_code"
+set_variable AGENT_APPLICATION_ID "$vps_agent"
 # Both spellings of each API: a v1 token carries the identifier URI, a v2 token the application's client id.
 set_variable WORKBENCH_ENTRA_AUDIENCES "api://tradingcenter-agent,$workbench_app"
 set_variable GATEWAY_ENTRA_AUDIENCES "api://tradingcenter-capital-gateway,$gateway_app"

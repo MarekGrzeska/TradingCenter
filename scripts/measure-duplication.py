@@ -23,6 +23,7 @@ REPO = pathlib.Path(__file__).resolve().parent.parent
 MODULES = {
     "capital-gateway": "capital-gateway/capital_gateway",
     "trading-mcp": "trading-mcp/trading_mcp",
+    "claude-agent": "claude-agent/claude_agent",
     "workbench:agent": "workbench/agent",
     "workbench:teams": "workbench/teams",
     "workbench:teams_tools": "workbench/teams_tools",

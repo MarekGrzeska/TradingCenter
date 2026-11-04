@@ -69,7 +69,7 @@ def test_the_checked_commit_is_the_one_built_never_the_branch_head() -> None:
 
 def test_every_image_is_tagged_with_the_commit_and_never_latest() -> None:
     builds = [s for s in load(DEPLOY)["jobs"]["deploy"]["steps"] if str(s.get("uses", "")).startswith("docker/build-push-action")]
-    assert len(builds) == 3
+    assert len(builds) == 4
     for step in builds:
         assert step["with"]["tags"].endswith(":${{ needs.gate.outputs.sha }}")
         assert "latest" not in step["with"]["tags"]

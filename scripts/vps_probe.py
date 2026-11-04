@@ -13,9 +13,14 @@ from dataclasses import dataclass
 
 import httpx
 
-SERVICES = ("capital-gateway", "trading-mcp", "workbench")
+SERVICES = ("capital-gateway", "trading-mcp", "workbench", "claude-agent")
 # The compose service names, which `status` prints, mapped to the image each runs.
-SERVICE_IMAGE = {"gateway": "capital-gateway", "trading-mcp": "trading-mcp", "workbench": "workbench"}
+SERVICE_IMAGE = {
+    "gateway": "capital-gateway",
+    "trading-mcp": "trading-mcp",
+    "workbench": "workbench",
+    "claude-agent": "claude-agent",
+}
 
 
 @dataclass(frozen=True)

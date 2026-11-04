@@ -5,7 +5,7 @@ provider: any machine that takes cloud-init user-data and runs Ubuntu 24.04 will
 
 | File | What it is |
 |---|---|
-| `docker-compose.yml` | caddy · gateway · trading-mcp · workbench · postgres · db-init. Only Caddy has `ports:`. |
+| `docker-compose.yml` | caddy · gateway · trading-mcp · workbench · claude-agent · postgres · db-init. Only Caddy has `ports:`. |
 | `Caddyfile` | TLS for five names (the fifth is AgenticEnglish's web app, over the network `agentic-english-edge`), the edge marker `X-TC-Edge`, CORS for the two front ends, the static files. |
 | `postgres/ensure-databases.sh` | eight roles, each the owner of its database, created or updated on every deploy. |
 | `env.required` | the names `.env` must hold. The deploy refuses to start if one is missing. |
@@ -45,6 +45,37 @@ operator's own Claude Code and nothing else outside (`openspec/changes/operator-
 3. After the deploy, on the operator's machine:
    `uv run --script scripts/mcp_token.py login --tenant <tenant> --client-id <id>` (a browser; it prints the roles each
    API sees), then `scripts/claude-mcp.sh install <API_HOST> <tenant> <id>` and `claude mcp list`.
+
+## The agent on the server
+
+`claude-agent` (`modules/claude-agent`, `openspec/changes/operator-agent-on-telegram`) is the operator's Claude Code in one
+tmux session, reached from Telegram. It calls `https://API_HOST/…/mcp` like the desk client, as its own application
+`app-tradingcenter-vps-agent` with the operator's delegated token. Healthy without any of the steps below, so the first
+deploy is not rolled back while they are pending. Before the merge:
+
+1. `terraform apply` creates the registration; `AGENT_APPLICATION_ID` (`terraform output -raw vps_agent_entra_client_id`)
+   as a variable of `vps` — `fill-github-environment.sh` sets it.
+2. A bot from @BotFather — **never one registered in `/telegram`**: the workbench long-polls every bot it holds and
+   Telegram allows one poller per token, so both would lose half the messages.
+
+After the deploy, on the server (`.local/vps/vps.sh run '…'`; the container is `tradingcenter-vps-claude-agent-1`):
+
+3. Subscription: `sudo docker exec -it <container> tmux attach -t agent`, then the onboarding → "Claude account with
+   subscription" → the URL → the code. The banner must name the subscription, never an API key. Detach: Ctrl-b d.
+4. Plugin and bot: `sudo docker exec <container> sh -c 'cd ~ && claude plugin install telegram@claude-plugins-official'`,
+   then the bot's token without putting it on a command line:
+   `printf 'TELEGRAM_BOT_TOKEN=%s\n' '<token>' | "$VPS" run "sudo docker exec -i <container> sh -c 'umask 077; cat > ~/.claude/channels/telegram/.env'"`.
+5. Pair: write to the bot, read the `senderId` under `pending` in `~/.claude/channels/telegram/access.json`, set
+   `allowFrom: ["<senderId>"]`, `dmPolicy: "allowlist"`, `pending: {}`, and
+   `echo <senderId> > ~/.claude/channels/telegram/approved/<senderId>`. Then `AGENT_TELEGRAM_OWNER_CHAT_ID=<senderId>` in `vps`.
+6. The operator's token, with a code on any device:
+   `sudo docker exec -it <container> /opt/agent/venv/bin/python /opt/agent/bin/mcp_token.py login --device-code --tenant <tenant> --client-id <AGENT_APPLICATION_ID> --cache /home/agent/.claude/tc-token-cache.bin`.
+   It prints the roles each API sees; both must say `admin`.
+7. Restart the session (`sudo docker restart <container>`) so it connects its servers with the token, and ask it from the
+   phone what is open on the account.
+
+Account writes stay denied until `AGENT_ACCOUNT_WRITES=on` in `vps` and a deploy — after a week of reads. Closing the
+agent out of everything without a new image: drop `AGENT_APPLICATION_ID` from the two caller lists.
 
 ## Backups
 
