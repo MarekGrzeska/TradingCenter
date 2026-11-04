@@ -15,4 +15,6 @@ openspec
 docs
 infra
 scripts
+# ...except the token helper the agent's image runs as Claude Code's headersHelper (operator-agent-on-telegram).
+!scripts/mcp_token.py
 .github
