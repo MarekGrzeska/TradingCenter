@@ -1,8 +1,9 @@
-# The only process listening on a public port. Four names, one certificate each, obtained and renewed by Caddy itself:
+# The only process listening on a public port. Five names, one certificate each, obtained and renewed by Caddy itself:
 #   API_HOST       the workbench (and with it every archive, under its prefix), and trading-mcp under `/trading`
 #   GATEWAY_HOST   capital-gateway, which the terminal reads the account from
 #   TERMINAL_HOST  the terminal's built files
 #   POCKET_HOST    the pocket's built files
+#   ENGLISH_HOST   AgenticEnglish's web app, a project of its own on this machine (owner-approved exception)
 #
 # What this file owes the applications (`vps-edge`): every request it forwards carries `X-TC-Edge`, written here and
 # overwriting whatever came in, and none carries a platform identity header. The applications read the marker as "this
@@ -111,6 +112,19 @@
 	# A single-page application: an address that is a tab's route belongs to the page, not to a file.
 	try_files {path} /index.html
 	file_server
+}
+
+# AgenticEnglish's web app: a project of its own on this machine (owner-approved; docs/tradingcenter-edge.md in its
+# repository). Its api checks the Entra ID token itself and serves the app's files; this only carries the traffic, over
+# the network agentic-english-edge, where only this Caddy and that api are.
+{$ENGLISH_HOST} {
+	import hardening
+
+	reverse_proxy agentic-english-web:8081 {
+		import edge_headers
+		# The tutor's replies stream (server-sent events); buffering them would hold the answer back until it ended.
+		flush_interval -1
+	}
 }
 
 {$POCKET_HOST} {

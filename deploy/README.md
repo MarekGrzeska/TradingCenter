@@ -6,7 +6,7 @@ provider: any machine that takes cloud-init user-data and runs Ubuntu 24.04 will
 | File | What it is |
 |---|---|
 | `docker-compose.yml` | caddy · gateway · trading-mcp · workbench · postgres · db-init. Only Caddy has `ports:`. |
-| `Caddyfile` | TLS for four names, the edge marker `X-TC-Edge`, CORS for the two front ends, the static files. |
+| `Caddyfile` | TLS for five names (the fifth is AgenticEnglish's web app, over the network `agentic-english-edge`), the edge marker `X-TC-Edge`, CORS for the two front ends, the static files. |
 | `postgres/ensure-databases.sh` | eight roles, each the owner of its database, created or updated on every deploy. |
 | `env.required` | the names `.env` must hold. The deploy refuses to start if one is missing. |
 | `cloud-init.yaml` · `ansible/` | the machine: users and SSH policy, then firewall, updates, log rotation, directories, the deploy key. |
