@@ -30,7 +30,7 @@ def test_only_trading_mcp_is_registered_for_the_gateways_api(tmp_path: Path) -> 
             registered[name] = json.loads(config)
     apis = {name: config["headersHelper"].rsplit("--api ", 1)[1] for name, config in registered.items()}
     assert apis.pop("tc-trading") == "gateway"
-    assert len(apis) == 8 and set(apis.values()) == {"workbench"}
+    assert len(apis) == 9 and set(apis.values()) == {"workbench"}
     assert registered["tc-trading"]["url"] == "https://api.example/trading/mcp"
 
 
@@ -55,3 +55,22 @@ def test_a_cached_token_is_handed_over() -> None:
 def test_without_a_usable_sign_in_it_refuses_and_names_login(accounts: list[dict], result: dict | None) -> None:
     with pytest.raises(mcp_token.Refused, match="login"):
         mcp_token.silent_token(_App(accounts, result), mcp_token.WORKBENCH_SCOPE)
+
+
+class _DeviceApp:
+    def __init__(self, flow: dict) -> None:
+        self._flow, self.waited = flow, False
+
+    def initiate_device_flow(self, scopes: list[str]) -> dict:
+        return self._flow
+
+    def acquire_token_by_device_flow(self, flow: dict) -> dict:
+        self.waited = True
+        return {"access_token": "t"}
+
+
+def test_a_device_code_the_tenant_refuses_is_named_and_not_waited_for() -> None:
+    app = _DeviceApp({"error": "invalid_client", "error_description": "public client flows are off"})
+    with pytest.raises(mcp_token.Refused, match="public client flows are off"):
+        mcp_token.device_code_sign_in(app)
+    assert not app.waited

@@ -20,7 +20,7 @@ async def server(app, pool):
     app.state.settings = rig.settings
     app.state.providers = rig.providers
     app.state.alerts = None
-    return app.state.mcp_server
+    return app.state.local_mcp_server
 
 
 async def test_both_registries_see_the_same_eight_tools_and_know_which_of_them_write(server) -> None:

@@ -37,7 +37,7 @@ async def tools(app, rig):
     app.state.settings = rig.settings
     app.state.providers = rig.providers
     app.state.alerts = None
-    return app.state.mcp_server
+    return app.state.local_mcp_server
 
 
 async def call(tools, name: str, **arguments):
@@ -67,6 +67,26 @@ async def test_the_surface_adds_and_never_removes(tools) -> None:
         assert (tool.annotations.readOnlyHint is False) == (tool.name in ADDS), tool.name
     forbidden = ("remove", "delete", "unfollow", "drop", "purge", "prompt")
     assert not [t.name for t in await tools.list_tools() if any(word in t.name for word in forbidden)]
+
+
+async def test_only_the_operators_surface_carries_the_prompts_words(tools, app) -> None:
+    """`/mcp` has one caller, the operator's own client; a model in this process that could rewrite a prompt could rewrite
+    what reaches the operator's phone."""
+    operators = {tool.name for tool in await app.state.mcp_server.list_tools()}
+
+    assert operators == EXPECTED_TOOLS | {"read_prompt", "edit_prompt"}
+
+
+async def test_the_operator_edits_a_prompt_by_name_and_is_handed_the_words_it_replaced(tools, app) -> None:
+    operators = app.state.mcp_server
+    before = await call(operators, "read_prompt", prompt="Rynkowy")
+
+    edited = await call(operators, "edit_prompt", prompt="Rynkowy", body="Trzy punkty, bez nagłówków.")
+    unknown = await call(operators, "edit_prompt", prompt="made up", body="Anything.")
+
+    assert edited["version"] == before["version"] + 1 and edited["body"] == "Trzy punkty, bez nagłówków."
+    assert edited["replaced"] == before["body"]
+    assert "no prompt" in unknown["refused"] and "youtube_archive_status" in unknown["do_first"]
 
 
 async def test_the_surface_stays_within_what_a_conversation_pays_for_it(tools) -> None:

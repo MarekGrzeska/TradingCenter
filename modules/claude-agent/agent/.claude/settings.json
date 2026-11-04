@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "model": "opus",
+  "effortLevel": "medium",
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "disableBypassPermissionsMode": "disable",
+    "allow": [
+      "Read(./**)",
+      "Glob",
+      "Grep",
+      "mcp__tc-market",
+      "mcp__tc-polymarket",
+      "mcp__tc-social",
+      "mcp__tc-youtube",
+      "mcp__tc-alerts",
+      "mcp__tc-strategies",
+      "mcp__tc-team-tools",
+      "mcp__tc-trading",
+      "mcp__tc-telegram__telegram_destinations",
+      "mcp__plugin_telegram_telegram"
+    ],
+    "deny": [
+      "Bash",
+      "Edit",
+      "Write",
+      "NotebookEdit",
+      "WebFetch",
+      "WebSearch",
+      "mcp__tc-telegram__send_telegram_message",
+      "mcp__claude_ai_Google_Drive",
+      "mcp__claude_ai_Claude_Docs",
+      "Read(~/.claude/**)",
+      "Read(/home/agent/.claude/**)",
+      "Read(/opt/**)",
+      "Read(/proc/**)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "date '+Now: %Y-%m-%d %H:%M %Z (%A)'"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "date '+Now: %Y-%m-%d %H:%M %Z (%A)'"
+          }
+        ]
+      }
+    ]
+  }
+}

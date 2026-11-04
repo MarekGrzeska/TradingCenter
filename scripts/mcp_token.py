@@ -6,6 +6,7 @@
 
     uv run --script scripts/mcp_token.py login   --tenant <id> --client-id <id>   # a browser, once
     uv run --script scripts/mcp_token.py headers --tenant <id> --client-id <id> --api workbench|gateway
+    ... login --device-code --cache <file>   # the agent on the server (`operator-agent-on-telegram`): no browser there
 
 `headers` is silent or it fails: Claude Code gives a helper ten seconds and no screen, so a sign-in it would need is a
 refusal naming `login`. `--api` is written into each server's registration by `claude-mcp.sh`: trading-mcp checks tokens
@@ -51,17 +52,17 @@ def silent_token(app: Any, scope: str) -> str:
     return result["access_token"]
 
 
-def _application(tenant: str, client_id: str) -> Any:
+def _application(tenant: str, client_id: str, cache: Path = CACHE) -> Any:
     import msal
     from msal_extensions import FilePersistence, PersistedTokenCache, build_encrypted_persistence
 
-    CACHE.parent.mkdir(parents=True, exist_ok=True)
+    cache.parent.mkdir(parents=True, exist_ok=True)
     try:
-        persistence = build_encrypted_persistence(str(CACHE))
+        persistence = build_encrypted_persistence(str(cache))
     except Exception:  # noqa: BLE001 - no keychain or keyring here: the file, readable by the operator alone
-        persistence = FilePersistence(str(CACHE))
-        CACHE.touch(mode=0o600, exist_ok=True)
-        os.chmod(CACHE, 0o600)
+        persistence = FilePersistence(str(cache))
+        cache.touch(mode=0o600, exist_ok=True)
+        os.chmod(cache, 0o600)
     return msal.PublicClientApplication(
         client_id,
         authority=f"https://login.microsoftonline.com/{tenant}",
@@ -75,8 +76,21 @@ def _claims(token: str) -> dict[str, Any]:
     return json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
 
 
-def login(app: Any) -> None:
-    result = app.acquire_token_interactive([WORKBENCH_SCOPE], prompt="select_account")
+def device_code_sign_in(app: Any) -> dict[str, Any]:
+    """The code and the address go to stderr for the operator to open on any device; this waits for them, up to the
+    code's own expiry. Never what `headers` does: Claude Code gives that ten seconds."""
+    flow = app.initiate_device_flow(scopes=[WORKBENCH_SCOPE])
+    if "user_code" not in flow:
+        raise Refused(f"no device code: {flow.get('error_description', flow.get('error'))}")
+    print(flow["message"], file=sys.stderr)
+    return app.acquire_token_by_device_flow(flow)
+
+
+def login(app: Any, *, device_code: bool = False) -> None:
+    if device_code:
+        result = device_code_sign_in(app)
+    else:
+        result = app.acquire_token_interactive([WORKBENCH_SCOPE], prompt="select_account")
     if "access_token" not in result:
         raise Refused(f"sign-in failed: {result.get('error_description', result.get('error'))}")
     for scope in (WORKBENCH_SCOPE, GATEWAY_SCOPE):
@@ -93,12 +107,14 @@ def main(argv: list[str] | None = None) -> int:
     # Named, not read off the server's address: a wrong guess is a 401 that Claude Code reports as a failed sign-in.
     parser.add_argument("--api", choices=sorted(SCOPES), default="workbench")
     parser.add_argument("--edge-marker", action="store_true", help="add X-TC-Edge for a local SERVER_MODE workbench")
+    parser.add_argument("--device-code", action="store_true", help="sign in with a code on another device (login only)")
+    parser.add_argument("--cache", type=Path, default=CACHE, help="the token cache file (default: per user)")
     args = parser.parse_args(argv)
 
     try:
-        app = _application(args.tenant, args.client_id)
+        app = _application(args.tenant, args.client_id, args.cache)
         if args.command == "login":
-            login(app)
+            login(app, device_code=args.device_code)
         elif args.command == "logout":
             for account in app.get_accounts():
                 app.remove_account(account)

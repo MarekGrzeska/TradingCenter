@@ -1,0 +1,34 @@
+[project]
+name = "claude-agent"
+version = "0.1.0"
+description = "The operator's Claude Code session on the server, reached from Telegram, acting on the tool surfaces over MCP"
+requires-python = ">=3.12"
+dependencies = [
+    # For `scripts/mcp_token.py`, which the image copies in and Claude Code runs as `headersHelper`; nothing in
+    # `claude_agent` imports them.
+    "msal>=1.31",
+    "msal-extensions>=1.2",
+    # The scheduler's zone, on a machine with no system time-zone database (Windows; the image has one too).
+    "tzdata>=2024.1",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+
+[tool.pyright]
+include = ["claude_agent"]
+typeCheckingMode = "basic"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pyright==1.1.411",
+    "pytest>=8.3",
+    "ruff==0.16.2",
+]

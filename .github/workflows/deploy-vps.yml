@@ -1,7 +1,7 @@
 name: deploy-vps
 
 # The server's deployment (move-from-azure-to-vps): after a green `checks` run of the same commit — gated by
-# `scripts/deploy_gate.py` — build the three images, build the two front ends, and hand the server what it needs over SSH.
+# `scripts/deploy_gate.py` — build the four images, build the two front ends, and hand the server what it needs over SSH.
 # The key it holds may run one command (`deploy/scripts/deploy.sh`, set by `deploy/ansible/site.yml`), so everything below is
 # a verb of that script and nothing is run on the server by this workflow's own words.
 #
@@ -45,12 +45,14 @@ jobs:
           GH_REPO: ${{ github.repository }}
           EVENT: ${{ github.event_name }}
           SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
-          # Everything the server runs: the three images' sources, the packages they bake in, the front ends, and the
+          # Everything the server runs: the four images' sources, the packages they bake in, the front ends, and the
           # server's own files. The Azure modules' list per image would be five gates for one machine.
           PATHS: |
             modules/capital-gateway
             modules/trading-mcp
             modules/workbench
+            modules/claude-agent
+            scripts/mcp_token.py
             modules/terminal
             modules/pocket
             packages
@@ -110,6 +112,14 @@ jobs:
           tags: ${{ steps.image.outputs.prefix }}/workbench:${{ needs.gate.outputs.sha }}
           cache-from: type=gha,scope=workbench
           cache-to: type=gha,scope=workbench,mode=max
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: modules/claude-agent/Dockerfile
+          push: true
+          tags: ${{ steps.image.outputs.prefix }}/claude-agent:${{ needs.gate.outputs.sha }}
+          cache-from: type=gha,scope=claude-agent
+          cache-to: type=gha,scope=claude-agent,mode=max
 
       - uses: pnpm/action-setup@v4
         with:
@@ -211,6 +221,8 @@ jobs:
           GATEWAY_HOST: ${{ vars.GATEWAY_HOST }}
           TERMINAL_HOST: ${{ vars.TERMINAL_HOST }}
           POCKET_HOST: ${{ vars.POCKET_HOST }}
+          # AgenticEnglish's web app (docs/tradingcenter-edge.md there). Not probed below: it answers 502 whenever that project is down.
+          ENGLISH_HOST: ${{ vars.ENGLISH_HOST }}
           ACME_EMAIL: ${{ vars.ACME_EMAIL }}
           IMAGE_PREFIX: ${{ vars.IMAGE_PREFIX }}
           ENTRA_TENANT_ID: ${{ vars.ENTRA_TENANT_ID }}
@@ -219,6 +231,10 @@ jobs:
           TERMINAL_APPLICATION_ID: ${{ vars.TERMINAL_APPLICATION_ID }}
           POCKET_APPLICATION_ID: ${{ vars.POCKET_APPLICATION_ID }}
           CLAUDE_CODE_APPLICATION_ID: ${{ vars.CLAUDE_CODE_APPLICATION_ID }}
+          AGENT_APPLICATION_ID: ${{ vars.AGENT_APPLICATION_ID }}
+          AGENT_TELEGRAM_OWNER_CHAT_ID: ${{ vars.AGENT_TELEGRAM_OWNER_CHAT_ID }}
+          AGENT_ACCOUNT_WRITES: ${{ vars.AGENT_ACCOUNT_WRITES }}
+          AGENT_CHECKINS: ${{ vars.AGENT_CHECKINS }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           AGENT_DB_PASSWORD: ${{ secrets.AGENT_DB_PASSWORD }}
           TEAMS_DB_PASSWORD: ${{ secrets.TEAMS_DB_PASSWORD }}

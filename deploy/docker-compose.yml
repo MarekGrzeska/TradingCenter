@@ -34,6 +34,7 @@ services:
       GATEWAY_HOST: ${GATEWAY_HOST:?}
       TERMINAL_HOST: ${TERMINAL_HOST:?}
       POCKET_HOST: ${POCKET_HOST:?}
+      ENGLISH_HOST: ${ENGLISH_HOST:?}
       ACME_EMAIL: ${ACME_EMAIL:?}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
@@ -42,7 +43,7 @@ services:
       - ./www:/srv/www:ro
       - caddy-data:/data
       - caddy-config:/config
-    networks: [edge]
+    networks: [edge, english]
     depends_on: [workbench, gateway, trading-mcp]
 
   gateway:
@@ -82,9 +83,9 @@ services:
       CAPITAL_GATEWAY_API_KEY: ${GATEWAY_API_KEY:?}
       SERVER_MODE: "true"
       REQUIRE_AUTHENTICATED_PRINCIPAL: "true"
-      # From outside, under `/trading/mcp` on the API host: the operator's own MCP client alone, with a token for the
-      # gateway's API — the right to move the account is the gateway's `admin` (operator-mcp-access).
-      EXTERNAL_CALLER_APPLICATION_IDS: ${CLAUDE_CODE_APPLICATION_ID:?}
+      # From outside, under `/trading/mcp` on the API host: the operator's own MCP client and the agent on this server
+      # (operator-agent-on-telegram), with a token for the gateway's API — moving the account is the gateway's `admin`.
+      EXTERNAL_CALLER_APPLICATION_IDS: ${CLAUDE_CODE_APPLICATION_ID:?},${AGENT_APPLICATION_ID:?}
       ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:?}
       ENTRA_AUDIENCES: ${GATEWAY_ENTRA_AUDIENCES:?}
     depends_on:
@@ -144,8 +145,9 @@ services:
       TEAMS_MODELS: ${TEAMS_MODELS:?}
       AGENT_DEFAULT_MODEL_ID: ${AGENT_DEFAULT_MODEL_ID:?}
 
-      # Every package's `/mcp` and `/team-tools/mcp`: the operator's own MCP client, nothing else (operator-mcp-access).
-      TOOL_CALLER_APPLICATION_IDS: ${CLAUDE_CODE_APPLICATION_ID:?}
+      # Every package's `/mcp` and `/team-tools/mcp`: the operator's own MCP client and the agent on this server, both as
+      # the operator, nothing else (operator-mcp-access, operator-agent-on-telegram).
+      TOOL_CALLER_APPLICATION_IDS: ${CLAUDE_CODE_APPLICATION_ID:?},${AGENT_APPLICATION_ID:?}
       REST_CALLER_APPLICATION_IDS: ${TERMINAL_APPLICATION_ID:?},${POCKET_APPLICATION_ID:?}
       # Admitted to `/telegram`'s account, bots, recipients and assignments alone: the operator's `az` (a public Microsoft
       # client id) and the terminal, which is where the account is logged in and the purposes are assigned.
@@ -191,6 +193,33 @@ services:
       retries: 5
       start_period: 1500s
     networks: [edge, services, data]
+
+  # The operator's Claude Code session, reached from Telegram (operator-agent-on-telegram). It reaches the system only the
+  # way the operator's desk client does — `https://API_HOST/…/mcp` through Caddy, with a token — so it has no port, no
+  # `edge`/`services`/`data` and no secret of the system. Its volume holds the subscription login, the bot and the token.
+  claude-agent:
+    image: ${IMAGE_PREFIX:?}/claude-agent:${CLAUDE_AGENT_TAG:?}
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 1536m
+    memswap_limit: 1536m
+    cpus: 1
+    pids_limit: 256
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      API_HOST: ${API_HOST:?}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:?}
+      AGENT_ENTRA_CLIENT_ID: ${AGENT_APPLICATION_ID:?}
+      CHANNELS: plugin:telegram@claude-plugins-official
+      # Absent is a working configuration: check-ins are printed in the session until the chat id is known.
+      AGENT_TELEGRAM_OWNER_CHAT_ID: ${AGENT_TELEGRAM_OWNER_CHAT_ID:-}
+      # "on" alone opens the six account-writing tools (demo only, trading-mcp's guard); anything else keeps them denied.
+      AGENT_ACCOUNT_WRITES: ${AGENT_ACCOUNT_WRITES:-off}
+      AGENT_CHECKINS: ${AGENT_CHECKINS:-}
+    volumes:
+      - claude-agent-home:/home/agent/.claude
+    networks: [claude-agent]
 
   postgres:
     image: postgres:17-alpine
@@ -254,9 +283,17 @@ networks:
   services: {}
   data:
     internal: true
+  # The agent's own: a way out to Anthropic, Telegram and the API host's public address, and to nothing of this project.
+  claude-agent: {}
+  # AgenticEnglish's web app: created by whichever deploy runs first (deploy.sh, and that project's own), never removed
+  # by `down`; internal, with only this Caddy and that project's api on it.
+  english:
+    external: true
+    name: agentic-english-edge
 
 volumes:
   pg-data:
     name: tradingcenter-pg-data
   caddy-data: {}
   caddy-config: {}
+  claude-agent-home: {}

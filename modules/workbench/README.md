@@ -14,7 +14,7 @@ is the same behaviour with one process, one image and one App Service under it
 
 | Package | What |
 |---|---|
-| `agent/` | the conversation: sessions, transcripts, streamed turns, the chart and drawing tools it owns, and every model call priced at the moment it happens |
+| `agent/` | the conversation: sessions, transcripts, streamed turns, the chart and drawing tools it owns (the drawing two also under `/chart-tools/mcp`, for the operator's Claude Code), and every model call priced at the moment it happens |
 | `teams/` | teams as **data** — a graph the operator composes, versioned append-only, its runs, their cost, and the clock that fires a schedule |
 | `teams_tools/` | the MCP tools that build and run a team by talking, reaching the teams routes in this same process — and, under `/team-tools/mcp`, the operator's own Claude Code, acting for the person on its token |
 | `market_data/` | the candle archive, under `/market`: what the gateway saw and does not keep, its indicators, the candle stream (the one WebSocket this process serves), the largest table here, and eleven read-only tools — its own README beside it |

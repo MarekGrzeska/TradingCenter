@@ -465,7 +465,7 @@ class DrawOnChartTool:
         self._pool = pool
         self._tool_server = tool_server
 
-    async def call(self, arguments: dict[str, Any], *, session_id: int) -> ToolOutcome:
+    async def call(self, arguments: dict[str, Any], *, session_id: int | None) -> ToolOutcome:
         elapsed = _clock()
 
         def refuse(sentence: str) -> ToolOutcome:

@@ -13,6 +13,7 @@ GOOD = (
     f"gateway {PREFIX}/capital-gateway:{SHA}\n"
     f"trading-mcp {PREFIX}/trading-mcp:{SHA}\n"
     f"workbench {PREFIX}/workbench:{SHA}\n"
+    f"claude-agent {PREFIX}/claude-agent:{SHA}\n"
     "NAME  IMAGE  COMMAND\n"
 )
 
@@ -28,7 +29,7 @@ def test_an_old_image_is_named_with_what_it_should_have_been() -> None:
 
 
 def test_a_module_that_is_not_running_is_a_problem() -> None:
-    assert len(wrong_images({}, PREFIX, SHA)) == 3
+    assert len(wrong_images({}, PREFIX, SHA)) == 4
 
 
 def fetch_with(answers: dict[str, tuple[int, str]]):

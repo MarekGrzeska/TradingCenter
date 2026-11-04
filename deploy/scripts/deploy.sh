@@ -19,7 +19,7 @@ cd "$APP_DIR"
 # Not `tradingcenter`, which is the name of the developer machine's `compose.yaml`: `--remove-orphans` below would take its database for one.
 PROJECT="${COMPOSE_PROJECT:-tradingcenter-vps}"
 COMPOSE="docker compose --project-name $PROJECT --env-file .env --env-file tags.env -f docker-compose.yml"
-SERVICES="gateway trading-mcp workbench"
+SERVICES="gateway trading-mcp workbench claude-agent"
 # How long a deploy waits for the new containers to be healthy. The workbench's first start migrates every database, and
 # the candle archive's index can outlast a start-up — the compose file's own grace period is 1500 s.
 HEALTH_WAIT_SECONDS="${HEALTH_WAIT_SECONDS:-1700}"
@@ -108,11 +108,19 @@ running_images() {
   done
 }
 
+# The network AgenticEnglish's api and Caddy share (docs/tradingcenter-edge.md in that repository); internal, created
+# once, never removed. Compose refuses to start a service on an external network that does not exist.
+ensure_english_network() {
+  docker network inspect agentic-english-edge >/dev/null 2>&1     || docker network create --internal agentic-english-edge >/dev/null
+}
+
 release() {
+  ensure_english_network
   sha="${arg:?release <sha>}"
   [ -f tags.env ] && cp tags.env tags.env.prev || : > tags.env.prev
-  printf 'GATEWAY_TAG=%s\nTRADING_MCP_TAG=%s\nWORKBENCH_TAG=%s\n' "$sha" "$sha" "$sha" > tags.env
-  $COMPOSE pull --quiet gateway trading-mcp workbench || { cp tags.env.prev tags.env; die "pull failed; nothing changed"; }
+  printf 'GATEWAY_TAG=%s\nTRADING_MCP_TAG=%s\nWORKBENCH_TAG=%s\nCLAUDE_AGENT_TAG=%s\n' "$sha" "$sha" "$sha" "$sha" > tags.env
+  # shellcheck disable=SC2086 # the list of service names, split on purpose
+  $COMPOSE pull --quiet $SERVICES || { cp tags.env.prev tags.env; die "pull failed; nothing changed"; }
   $COMPOSE up -d --remove-orphans
   # The Caddyfile is a bind mount that `sync` rewrote in place; Caddy reads it only when told. A refused config keeps the old.
   if $COMPOSE exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
@@ -131,13 +139,14 @@ release() {
 }
 
 rollback_to_previous() {
+  ensure_english_network
   if [ -s tags.env.prev ]; then
     cp tags.env.prev tags.env
     $COMPOSE up -d --remove-orphans
     wait_healthy || echo "rollback: the previous images are not healthy either" >&2
   else
     echo "rollback: no previous release recorded; stopping the applications" >&2
-    $COMPOSE stop workbench trading-mcp gateway
+    $COMPOSE stop claude-agent workbench trading-mcp gateway
   fi
 }
 

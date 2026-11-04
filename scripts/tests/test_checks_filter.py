@@ -147,6 +147,11 @@ class TestOneFileAtATime:
         assert decisions["capital-gateway"]
         assert decisions["trading-mcp"]
 
+    def test_the_token_helper_reaches_the_agent_whose_image_takes_it(self) -> None:
+        decisions = decide(["scripts/mcp_token.py"])
+        assert decisions["claude-agent"]
+        assert decisions["scripts"]
+
     def test_the_teams_surface_reaches_the_terminal(self) -> None:
         """`weekdays-on-the-shorter-rhythms` measured why the filter is the whole module: it touched only
         `recurrence.py`, whose docstring *is* a description in the schema."""

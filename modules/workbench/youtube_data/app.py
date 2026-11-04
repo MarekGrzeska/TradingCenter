@@ -125,6 +125,8 @@ def create_app() -> FastAPI:
 
     server, tool_app = mcp_app.build_mcp_app(app)
     app.state.mcp_server = server
+    # Not the mounted one: that one edits prompts, and no model in this process may.
+    app.state.local_mcp_server = mcp_app.build_server(app)
     app.mount(mcp_app.MOUNT_PATH, tool_app)
 
     # In front of the whole application, and in this order: the address fix runs before routing, and the caller record
