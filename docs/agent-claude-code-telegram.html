@@ -1,0 +1,529 @@
+<title>Agent Claude Code przez Telegram</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Propozycja · agent na serwerze</span>
+    <h1>Claude Code na serwerze, rozmowa przez Telegram</h1>
+    <p class="lede">Jedna stała sesja Claude Code w kontenerze na VPS, z którą rozmawiasz z telefonu przez <b>prywatnego bota Telegram</b>. Systemem steruje przez te same <b>dziewięć powierzchni MCP</b>, z których dziś korzysta Twój lokalny Claude Code. Wzorzec jest przeniesiony z AgenticEnglish, który tak działa od fazy 0. Nowa jest tylko tożsamość agenta: dostaje własną rejestrację Entra zamiast Twojego tokenu.</p>
+    <div class="strip">
+      <span>TradingCenter / propozycja przed zmianą OpenSpec</span>
+      <span>4 listopada 2026</span>
+      <span>wzorzec: <b>AgenticEnglish</b> · agent/ · infra/</span>
+      <span>stan: <b>decyzje podjęte</b> · 1 otwarta</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">1</div><div class="l">nowy kontener, bez portów i bez sieci <code>services</code>/<code>data</code></div></div>
+      <div class="cell"><div class="v">9</div><div class="l">serwerów MCP: te same, które ma lokalny Claude Code</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">kluczy API Anthropic: model działa na subskrypcji</div></div>
+      <div class="cell"><div class="v">2</div><div class="l">kanały: Telegram i Remote Control z aplikacji Claude</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Po co</div>
+      <h2>Terminal w kieszeni, który umie działać</h2>
+      <p class="intro">Pocket czyta archiwum i rozmawia z workbenchem. Agent na serwerze robi to, co dziś robisz z Claude Code przy biurku: czyta, porównuje, uruchamia i zmienia. Wystarczy jedno zdanie w Telegramie.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Piszesz w Telegramie</th><th>Agent woła</th><th>Rodzaj</th></tr></thead>
+          <tbody>
+            <tr><td>„Co mam otwarte i ile to kosztuje margin?”</td><td><code>tc-trading</code>: <code>get_positions</code>, <code>get_balance</code></td><td><span class="tag ok">odczyt</span></td></tr>
+            <tr><td>„Jak wygląda US100 na D1 względem wczorajszego poziomu?”</td><td><code>tc-market</code>: <code>get_candles</code>, <code>compute_indicators</code>, <code>levels_near_price</code></td><td><span class="tag ok">odczyt</span></td></tr>
+            <tr><td>„Puść backtest strategii kup-po-spadku na ostatnie 2 lata”</td><td><code>tc-strategies</code>: <code>run_backtest</code>, <code>read_backtest</code></td><td><span class="tag att">zapis badawczy</span></td></tr>
+            <tr><td>„Uruchom zespół intraday i streść, co postanowił”</td><td><code>tc-team-tools</code>: <code>run_team</code>, <code>read_run</code></td><td><span class="tag att">koszt OpenAI</span></td></tr>
+            <tr><td>„Dlaczego alert o Fedzie wczoraj nie przyszedł?”</td><td><code>tc-alerts</code>: <code>alert_fires</code></td><td><span class="tag ok">odczyt</span></td></tr>
+            <tr><td>„Przesuń SL na US100 na breakeven”</td><td><code>tc-trading</code>: <code>amend_stops</code></td><td><span class="tag stop">zapis na rachunku demo</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">To nie jest druga rozmowa obok workbencha. Rozmowa w terminalu działa na OpenAI, ma własną bazę i pamięta wątki. Agent na serwerze to Claude Code na Twojej subskrypcji: ma skille, pamięć w plikach i Remote Control. Systemu nie dotyka inaczej niż przez MCP.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Wzorzec</div>
+      <h2>Co dokładnie bierzemy z AgenticEnglish</h2>
+      <p>AgenticEnglish (<code>C:\Marek\Projekty\AgenticEnglish</code>) działa na tym samym VPS jako osobny projekt Compose. Jego agent „Alex” to jedna sesja Claude Code w tmux. Telegram obsługuje oficjalny plugin kanału. Danych dotyka wyłącznie przez MCP. Prawie wszystko da się przenieść jeden do jednego.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Element</th><th>AgenticEnglish (działa)</th><th>TradingCenter (propozycja)</th></tr></thead>
+          <tbody>
+            <tr><td><b>Proces</b></td><td><code>claude --channels plugin:telegram@claude-plugins-official</code> w tmux, pętla w <code>entrypoint.sh</code> pod <code>tini</code></td><td>to samo, obraz <code>claude-agent</code>, Claude Code przypięty do wersji w <code>Dockerfile</code></td></tr>
+            <tr><td><b>Model</b></td><td>subskrypcja właściciela, kontrola „zero API” przy starcie (brak <code>ANTHROPIC_API_KEY</code>, <code>apiKeyHelper</code>)</td><td>to samo, ten sam skrypt kontroli</td></tr>
+            <tr><td><b>Instrukcje</b></td><td><code>agent/CLAUDE.md</code> + skille, kopiowane z obrazu przy każdym starcie (zmiany w workdirze kasowane)</td><td><code>modules/claude-agent/agent/</code>: CLAUDE.md, skille „przegląd rana”, „pozycje”, „zespół”</td></tr>
+            <tr><td><b>Dane</b></td><td>jeden serwer MCP <code>tutor</code>, bearer z <code>.env</code>, po sieci wewnętrznej</td><td>dziewięć serwerów MCP przez <code>API_HOST</code>, token Entra z <code>headersHelper</code> (sekcja 04)</td></tr>
+            <tr><td><b>Uprawnienia</b></td><td><code>dontAsk</code>, allowlista MCP; <code>Bash</code>, <code>Edit</code>, <code>Write</code>, <code>WebFetch</code> zabronione</td><td>to samo, zapisy na rachunku osobno (sekcja 06)</td></tr>
+            <tr><td><b>Telegram</b></td><td>własny bot, parowanie, <code>access.json</code> z <code>allowFrom</code> = właściciel, <code>dmPolicy: allowlist</code></td><td>własny bot, <b>nigdy</b> nie wpisany do <code>/telegram</code> (sekcja 05)</td></tr>
+            <tr><td><b>Harmonogram</b></td><td><code>supercronic</code>: check-iny, <code>/end-of-day</code> 03:45, restart 04:00 na czysty kontekst</td><td>przegląd przed otwarciem rynku, podsumowanie wieczorne, restart nocny</td></tr>
+            <tr><td><b>Samonaprawa</b></td><td><code>channel-watchdog.sh</code> co minutę: brak procesu <code>bun server.ts</code> → <code>/mcp reconnect</code></td><td>przeniesione bez zmian, bo to obejście błędu Claude Code, nie projektu</td></tr>
+            <tr><td><b>Drugi kanał</b></td><td>Remote Control (<code>remoteControlAtStartup</code>), ta sama sesja z aplikacji Claude</td><td>to samo</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Czego <strong>nie</strong> bierzemy: bramki <code>apps/gateway</code> (czat webowy przez <code>claude -p</code>). TradingCenter ma już własny czat w terminalu i w pocket, więc trzeci by się dublował.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Architektura</div>
+      <h2>Agent puka do tych samych drzwi co Ty</h2>
+      <p class="intro">Kontener agenta nie ma przywileju z racji tego, że stoi na tej samej maszynie. Do workbencha i trading-mcp idzie <span class="hl">publicznym adresem przez Caddy</span>, z tokenem Entra, dokładnie tak jak Twój Claude Code z domu.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 380" role="img" aria-label="Telefon pisze do Telegrama; plugin kanału w kontenerze claude-agent odbiera wiadomość long-pollem; sesja Claude Code woła MCP publicznym adresem API_HOST przez Caddy, który dopisuje X-TC-Edge; workbench i trading-mcp sprawdzają token, rolę i aplikację; trading-mcp idzie do capital-gateway z kluczem i dalej do capital.com demo; model działa na subskrypcji Anthropic">
+            <defs>
+              <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+              <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#14306b"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <!-- outside -->
+              <rect x="12" y="40" width="130" height="52" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="77" y="63" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">telefon</text>
+              <text x="77" y="80" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">Telegram</text>
+
+              <rect x="190" y="40" width="150" height="52" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="265" y="63" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">api.telegram.org</text>
+              <text x="265" y="80" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">własny bot agenta</text>
+
+              <rect x="12" y="300" width="160" height="52" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="92" y="323" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Anthropic</text>
+              <text x="92" y="340" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">subskrypcja · RC</text>
+
+              <line x1="144" y1="66" x2="186" y2="66" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+
+              <!-- VPS frame -->
+              <rect x="210" y="120" width="758" height="250" fill="none" stroke="currentColor" stroke-width="1" opacity="0.35"></rect>
+              <text x="222" y="139" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.11em" fill="currentColor" opacity="0.5">VPS · COMPOSE tradingcenter-vps</text>
+
+              <!-- agent -->
+              <rect x="230" y="170" width="190" height="110" fill="#14306b" stroke="#14306b" stroke-width="1.4"></rect>
+              <text x="325" y="196" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">claude-agent</text>
+              <text x="325" y="216" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#f2c313">tmux · claude --channels</text>
+              <text x="325" y="234" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#d6dcec">plugin telegram (bun)</text>
+              <text x="325" y="252" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#d6dcec">headersHelper → token</text>
+              <text x="325" y="270" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#d6dcec">sieć: agent (tylko wyjście)</text>
+
+              <line x1="265" y1="166" x2="265" y2="96" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="272" y="150" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">getUpdates</text>
+              <line x1="230" y1="275" x2="140" y2="298" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+
+              <!-- caddy -->
+              <rect x="480" y="170" width="130" height="110" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="545" y="200" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Caddy</text>
+              <text x="545" y="220" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">API_HOST:443</text>
+              <rect x="492" y="240" width="106" height="20" fill="#f2c313"></rect>
+              <text x="545" y="254" text-anchor="middle" font-size="10" font-weight="700" font-family="Roboto Mono, monospace" fill="#14306b">X-TC-Edge: 1</text>
+
+              <line x1="422" y1="200" x2="476" y2="200" stroke="#14306b" stroke-width="1.8" marker-end="url(#a2)"></line>
+              <text x="449" y="190" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#14306b">HTTPS</text>
+              <text x="449" y="216" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#14306b">Bearer</text>
+
+              <!-- workbench + trading -->
+              <rect x="670" y="160" width="150" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="745" y="184" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">workbench</text>
+              <text x="745" y="202" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">8 × /…/mcp</text>
+
+              <rect x="670" y="240" width="150" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="745" y="264" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">trading-mcp</text>
+              <text x="745" y="282" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">/trading/mcp</text>
+
+              <line x1="612" y1="200" x2="666" y2="190" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <line x1="612" y1="250" x2="666" y2="266" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+
+              <rect x="850" y="240" width="108" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="904" y="264" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">gateway</text>
+              <text x="904" y="282" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">→ capital demo</text>
+              <line x1="822" y1="268" x2="846" y2="268" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+
+              <text x="745" y="330" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">token · rola admin · aplikacja z listy</text>
+              <text x="745" y="347" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.5">bez zmian w kodzie modułów</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b>: granatowy jest jedyny nowy proces. Pozostałe ramki działają dziś, a drzwi workbencha i trading-mcp pytają o te same trzy rzeczy co przy Twoim Claude Code. Ramki przerywane to usługi zewnętrzne.</figcaption>
+      </figure>
+      <p style="margin-top:20px">Dlaczego nie skrót przez sieć wewnętrzną? Bo go nie ma, i tak ma zostać. Workbench ma <code>service_key=None</code> (<code>modules/workbench/workbench/edge.py</code>): <em>„No service calls the workbench over the network, so no key opens it.”</em> Żądanie bez <code>X-TC-Edge</code> zostanie odrzucone. Do trading-mcp wewnątrz sieci wpuszcza tylko <code>GATEWAY_API_KEY</code>, a tego klucza nie dostaje proces, w którym decyzje podejmuje model (sekcja 04).</p>
+      <p>Zgodność z regułą „jeden proces na granicę bezpieczeństwa”: agent jest osobnym procesem, bo ma własną regułę zapisu. Trzyma login subskrypcji i token bota, a nie trzyma żadnego sekretu systemu. Do reszty sięga wyłącznie przez opublikowany kontrakt (MCP). Nie importuje żadnego pakietu i nie zna żadnej bazy.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Tożsamość</div>
+      <h2>Własna rejestracja, nie Twój token</h2>
+      <p class="intro">Twój Claude Code przedstawia się jako <code>app-tradingcenter-claude-code</code>: token delegowany, wydany na Ciebie, odświeżany w przeglądarce. Na serwerze nikt się nie zaloguje w przeglądarce, a <span class="hl">Twój refresh token w kontenerze byłby Twoją tożsamością w rękach modelu</span>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Opcja</th><th>Jak</th><th>Ocena</th></tr></thead>
+          <tbody>
+            <tr><td><b>A. Rejestracja agenta</b> (rekomendacja)</td><td>nowa aplikacja Entra <code>app-tradingcenter-vps-agent</code>, przepływ <code>client_credentials</code>, rola aplikacji <code>admin</code> przypisana jej service principalowi, <code>azp</code> na listach wywołujących</td><td><span class="tag ok">czysto</span> osobny <code>azp</code> w logach, odwołanie jednym usunięciem, nic osobistego na serwerze</td></tr>
+            <tr><td><b>B. Twój token skopiowany</b></td><td>cache MSAL z <code>mcp_token.py login</code> wgrany do wolumenu</td><td><span class="tag stop">odrzucone</span> agent działa jako osoba, wygasa po 90 dniach bezczynności, w logach go nie odróżnisz</td></tr>
+            <tr><td><b>C. Klucz współdzielony</b></td><td><code>GATEWAY_API_KEY</code> i nowy <code>service_key</code> workbencha</td><td><span class="tag stop">odrzucone</span> klucz otwiera REST bramki bez strażnika trading-mcp i łamie decyzję „nikt nie woła workbencha po sieci”</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h2 style="margin-top:34px; font-size:24px">Co zmienia się w <code>infra/</code> i w <code>deploy/</code></h2>
+      <div class="fails">
+        <div class="fail">
+          <h3>Rola dla aplikacji <span class="tag att">infra</span></h3>
+          <p><code>infra/modules/easy-auth-app/main.tf:49</code> ma dziś <code>allowed_member_types = ["User"]</code>. Token aplikacji (app-only) dostaje <code>roles</code> tylko z ról, które dopuszczają <code>"Application"</code>. Sprawdzone w kodzie: <code>RolePolicy</code> wpuszcza każdego, kto ma <code>admin</code>, i nie pyta, czy to osoba. Nie trzeba więc ruszać <code>tc-entra-auth</code>, wystarczy rozszerzyć rolę i przypisać ją SP agenta na obu API (workbench, gateway).</p>
+        </div>
+        <div class="fail">
+          <h3>Listy wywołujących <span class="tag att">deploy</span></h3>
+          <p><code>TOOL_CALLER_APPLICATION_IDS</code> (workbench) i <code>EXTERNAL_CALLER_APPLICATION_IDS</code> (trading-mcp) w <code>deploy/docker-compose.yml</code> są dziś jedną wartością <code>${CLAUDE_CODE_APPLICATION_ID}</code>. Trzeba je zamienić na listę obu id, plus nowa nazwa w <code>deploy/env.required</code> i w środowisku <code>vps</code>.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Kolejność: najpierw <code>apply</code> <span class="tag stop">fail-closed</span></h3>
+          <p>Jak przy rolach: Terraform <code>apply</code> robisz Ty, przed merge. Wdrożenie przed <code>apply</code> zostawi agenta z tokenem bez roli. Odmowa jest bezpieczna, ale wygląda jak martwy serwer MCP.</p>
+        </div>
+      </div>
+      <p style="margin-top:20px">Helper tokenu to mniejszy brat <code>scripts/mcp_token.py</code>. Pyta o token z sekretem aplikacji, trzyma go w pamięci do wygaśnięcia (~1 h) i wypisuje nagłówek. Claude Code daje helperowi 10 sekund, a <code>client_credentials</code> mieści się w nich bez przeglądarki.</p>
+      <pre><code><span class="c"># modules/claude-agent/agent/.mcp.json, jeden wpis na powierzchnię (dziewięć, jak w scripts/claude-mcp.sh)</span>
+{
+  <span class="s">"mcpServers"</span>: {
+    <span class="s">"tc-market"</span>: {
+      <span class="s">"type"</span>: <span class="s">"http"</span>,
+      <span class="s">"url"</span>: <span class="s">"https://${API_HOST}/market/mcp"</span>,
+      <span class="s">"headersHelper"</span>: <span class="s">"/opt/agent/bin/token.py --api workbench"</span>
+    },
+    <span class="s">"tc-trading"</span>: {
+      <span class="s">"type"</span>: <span class="s">"http"</span>,
+      <span class="s">"url"</span>: <span class="s">"https://${API_HOST}/trading/mcp"</span>,
+      <span class="s">"headersHelper"</span>: <span class="s">"/opt/agent/bin/token.py --api gateway"</span>
+    }
+  }
+}
+
+<span class="c"># token.py: POST https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token</span>
+<span class="c">#   grant_type=client_credentials  scope=api://tradingcenter-agent/.default  (lub ...-capital-gateway/.default)</span>
+<span class="c"># Sekret czytany z /run/secrets/agent_entra, nie ze zmiennej środowiskowej, którą widzi cała sesja.</span></code></pre>
+      <p>Sekret jako plik (<code>secrets:</code> w Compose), a w ustawieniach agenta <code>Read(/run/secrets/**)</code> w <code>deny</code>. Model nie ma <code>Bash</code>, więc i tak go nie wypisze, ale ta druga zapora nic nie kosztuje. Lepszy od sekretu byłby certyfikat. Proponuję go dopiero przy rotacji, bo sekret wystarczy na start.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Telegram</div>
+      <h2>Osobny bot, którego <code>/telegram</code> nie zna</h2>
+      <p class="intro">To najłatwiejsza pułapka całego projektu. <code>telegram_gateway</code> robi <span class="hl">long-poll <code>getUpdates</code> na każdym bocie, którego trzyma</span> (<code>binding.py</code>). Telegram pozwala na jednego odbiorcę aktualizacji na bota. Gdyby bot agenta trafił do <code>/telegram</code>, plugin kanału i workbench zaczęłyby sobie wyrywać wiadomości (409 Conflict) i obie strony gubiłyby połowę.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Bot</th><th>Kto odbiera</th><th>Do czego</th></tr></thead>
+          <tbody>
+            <tr><td><b>boty TradingCenter</b> (istniejące)</td><td><code>telegram_gateway</code>, long-poll</td><td>powiadomienia z alertów i zespołów, wiązanie odbiorców; wysyłka przez <code>send_telegram_message</code></td></tr>
+            <tr><td><b>bot agenta</b> (nowy, @BotFather)</td><td>plugin kanału w <code>claude-agent</code>, long-poll</td><td>rozmowa z Tobą; token bota w wolumenie <code>claude-home</code>, tak jak w AgenticEnglish</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px"><strong>Dostęp tylko dla Ciebie.</strong> Parowanie jak w <code>docs/runbook-phase-0.md</code> AgenticEnglish: piszesz do bota, dostajesz kod, a w <code>~/.claude/channels/telegram/access.json</code> ustawiasz <code>allowFrom: ["&lt;Twój senderId&gt;"]</code>, <code>dmPolicy: "allowlist"</code> i <code>pending: {}</code>. Grupy są ignorowane. Bot dostępny dla obcych oznaczałby obcego przy rachunku demo i przy Twoich limitach OpenAI.</p>
+      <p><strong>Format.</strong> Telegram nie renderuje Markdowna z Claude Code, gwiazdki widać dosłownie. W <code>CLAUDE.md</code> agenta obowiązuje więc czysty tekst, krótkie wiadomości i dzielenie powyżej ~3500 znaków. Tabele pozycji idą jako lista z myślnikami. Zasady przepisane z AgenticEnglish.</p>
+      <p><strong>Alerty zostają, gdzie są.</strong> Reguły w zakładce Alerts dalej wysyłają przez boty TradingCenter. Agent ich nie zastępuje. Może je czytać (<code>alert_fires</code>) i proponować zmianę (<code>propose_alert_change</code>), która niczego nie zapisuje.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Uprawnienia</div>
+      <h2>Co agent może zrobić sam, a co po Twoim „tak”</h2>
+      <p class="intro">Claude Code w tmux nie ma kogo zapytać o zgodę, więc działa w trybie <code>dontAsk</code>: albo coś jest na allowliście, albo nie istnieje. Prawdziwe zapory są dwie: <strong>allowlista</strong> i <strong>strażnik demo</strong> w trading-mcp. Instrukcja „zapytaj przed zleceniem” to zapora miękka. Model zwykle jej słucha, ale nic go do tego nie zmusza.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Grupa</th><th>Narzędzia</th><th>Etap 1</th><th>Etap 2</th></tr></thead>
+          <tbody>
+            <tr><td><b>Odczyt</b></td><td><code>tc-market</code>, <code>tc-social</code>, <code>tc-youtube</code> (odczyty), <code>get_*</code> / <code>list_*</code> / <code>read_*</code> wszędzie, <code>alert_fires</code></td><td><span class="tag ok">dozwolone</span></td><td><span class="tag ok">dozwolone</span></td></tr>
+            <tr><td><b>Zapis badawczy</b></td><td><code>run_backtest</code>, <code>draft_strategy</code>, <code>save_strategy</code>, <code>track_event</code>, grupy Polymarket</td><td><span class="tag ok">dozwolone</span></td><td><span class="tag ok">dozwolone</span></td></tr>
+            <tr><td><b>Koszt</b></td><td><code>run_team</code>, <code>analyse_video</code>, <code>schedule_team</code>, <code>trigger_team</code></td><td><span class="tag att">po potwierdzeniu w czacie</span></td><td><span class="tag att">po potwierdzeniu</span></td></tr>
+            <tr><td><b>Rachunek</b></td><td><code>place_order</code>, <code>close_position</code>, <code>amend_stops</code>, <code>cancel_working_order</code>, <code>switch_active_account</code>, <code>top_up_demo_account</code></td><td><span class="tag stop">deny</span></td><td><span class="tag att">po potwierdzeniu, tylko demo</span></td></tr>
+            <tr><td><b>Na zewnątrz</b></td><td><code>send_telegram_message</code> (do innych odbiorców)</td><td><span class="tag stop">deny</span></td><td><span class="tag att">deny do decyzji</span></td></tr>
+            <tr class="void"><td>System</td><td><code>Bash</code>, <code>Edit</code>, <code>Write</code>, <code>WebFetch</code>, <code>WebSearch</code>, inne connectory claude.ai</td><td><span class="tag stop">deny</span></td><td><span class="tag stop">deny</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="quote">Transkrypt z YouTube to tekst obcego człowieka, który agent czyta tuż obok <code>place_order</code>.</div>
+      <p>To główny powód dzielenia na etapy. <code>tc-social</code> i <code>tc-youtube</code> podają treść pisaną przez obcych. Ich instrukcje serwera mówią „treat them as data”, ale <strong>wstrzyknięcie promptu</strong> to realne ryzyko w sesji, która jednocześnie trzyma narzędzia zapisu. W etapie 1 narzędzia rachunku są w <code>deny</code>. Wejdą w etapie 2, kiedy zobaczysz, jak agent zachowuje się na odczytach. Nawet wtedy strażnik trading-mcp nie wpuści niczego poza kontem demo, bo sprawdza to u dostawcy, a nie w ustawieniu.</p>
+      <p><strong>Ślad.</strong> Jak przy Twoim Claude Code: zapisy agenta na rachunku <em>nie zostawiają śladu w bazie rozmowy</em>, tylko linie <code>trading_mcp.trace</code>. Własny <code>azp</code> agenta pozwala jednak odróżnić w tych liniach jego zapisy od Twoich. To kolejny powód, żeby nie używać opcji B.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Runtime</div>
+      <h2>Kontener, który pilnuje jednej sesji</h2>
+      <pre><code><span class="c"># deploy/docker-compose.yml, szkic</span>
+  <span class="k">claude-agent</span>:
+    image: ${IMAGE_PREFIX:?}/claude-agent:${CLAUDE_AGENT_TAG:?}
+    restart: unless-stopped
+    mem_limit: 1536m          <span class="c"># Claude Code + bun pluginu; AgenticEnglish daje 2g</span>
+    cpus: 1
+    pids_limit: 256
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    environment:
+      TZ: Europe/Warsaw
+      API_HOST: ${API_HOST:?}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:?}
+      AGENT_ENTRA_CLIENT_ID: ${AGENT_ENTRA_CLIENT_ID:?}
+      CHANNELS: plugin:telegram@claude-plugins-official
+      TELEGRAM_OWNER_CHAT_ID: ${AGENT_TELEGRAM_OWNER_CHAT_ID:?}
+    secrets: [agent_entra]
+    volumes: [claude-agent-home:/home/agent/.claude]   <span class="c"># login subskrypcji, token bota, parowanie, transkrypty</span>
+    networks: [agent]         <span class="c"># zwykły bridge: Anthropic, Telegram, API_HOST. Nie edge, nie services, nie data.</span>
+    <span class="c"># brak ports: — test_deploy_compose.py i tak by odmówił</span></code></pre>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>Pętla sesji <span class="tag ok">z AgenticEnglish</span></h3>
+          <p><code>entrypoint.sh</code>: kontrola zero-API, kopiowanie instrukcji z obrazu, zaufanie do workdiru i serwerów <code>.mcp.json</code> w <code>.claude.json</code> (inaczej dialog w tmux czeka w nieskończoność), <code>supercronic</code>, potem <code>claude --channels … [--continue]</code> w pętli. Po crashu sesja wznawia rozmowę, po nocnym restarcie zaczyna od czystego kontekstu.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Czekanie na workbench <span class="tag ok">z AgenticEnglish</span></h3>
+          <p>Claude Code łączy serwery MCP raz, przy starcie sesji, i nie ponawia. Po restarcie całego serwera <code>wait_for_api</code> czeka (do 2 min), aż <code>https://API_HOST/health</code> odpowie. Inaczej sesja wstałaby bez narzędzi i do nocnego restartu twierdziłaby, że nic nie widzi.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Harmonogram <span class="tag ok">nowe treści</span></h3>
+          <p>Zamiast check-inów tutora proponuję trzy wpisy, każdy jako komenda wstrzyknięta do sesji: <code>/przeglad-rana</code> przed otwarciem Europy (pozycje, kalendarz, co nowego w archiwach), <code>/podsumowanie-dnia</code> wieczorem, restart 04:00. Gdy pisałeś w ostatniej godzinie, check-in jest pomijany, jak w <code>checkin.mjs</code>.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Zdrowie <span class="tag ok">deploy.sh</span></h3>
+          <p><code>HEALTHCHECK</code>: sesja tmux istnieje i proces <code>claude</code> działa. <code>deploy.sh</code> czeka na zdrowe kontenery i sam cofa obraz, więc agent wchodzi w ten sam mechanizm co reszta. Agent bez loginu nie powinien blokować wdrożenia, dlatego zdrowie nie sprawdza samego loginu.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Co może zaskoczyć</div>
+      <h2>Rzeczy, które wyjdą dopiero na serwerze</h2>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Jedna subskrypcja, dwa konsumenty <span class="tag stop">limit</span></h3>
+          <p>Agent działa na tej samej subskrypcji co Twój Claude Code przy pracy nad repo. Długi przegląd rana albo pętla na backtestach zjada limit, który potem brakuje przy biurku, i odwrotnie. Warto ustawić <code>model</code> i <code>effortLevel</code> w <code>settings.json</code> agenta oszczędnie (AgenticEnglish: <code>opus</code>/<code>medium</code>).</p>
+        </div>
+        <div class="fail">
+          <h3>Plugin kanału „failed” przy starcie <span class="tag att">znany błąd</span></h3>
+          <p>Zmierzone w AgenticEnglish na Claude Code 2.1.304: serwer MCP pluginu bywa oznaczony jako nieudany, choć <code>/mcp reconnect</code> od razu go podnosi. Przenosimy <code>channel-watchdog.sh</code>. Kanały Telegram w Claude Code to wciąż research preview, więc wersję przypinamy w obrazie, a aktualizacja to świadomy rebuild.</p>
+        </div>
+        <div class="fail">
+          <h3>Hairpin do własnego adresu <span class="tag att">do sprawdzenia</span></h3>
+          <p>Kontener woła <code>https://API_HOST</code>, czyli publiczny adres tej samej maszyny. Z bridge'a Dockera zwykle działa (DNAT na hoście), ale na VPS-ie trzeba to zmierzyć jednym <code>curl</code>. Jeśli nie zadziała, <code>extra_hosts</code> na IP Caddy w sieci, do której agent dołączy wyłącznie z Caddy. Drzwi aplikacji i tak żądają tokenu, więc położenie w sieci nic agentowi nie daje.</p>
+        </div>
+        <div class="fail">
+          <h3>Login subskrypcji raz, ręcznie <span class="tag att">krok jednorazowy</span></h3>
+          <p>Login do claude.ai to OAuth w przeglądarce. Robi się go raz przez <code>docker exec -it … claude</code> i <code>/login</code> (u nas <code>.local/vps/vps.sh</code>), potem parowanie bota. Oba zostają w wolumenie i przeżywają wdrożenia. Tego wolumenu nie obejmuje nocny zrzut PostgreSQL, ale strata oznacza tylko ponowny login i parowanie.</p>
+        </div>
+        <div class="fail">
+          <h3>Pamięć VPS-a <span class="tag att">do sprawdzenia</span></h3>
+          <p>Na tej samej maszynie działają TradingCenter i AgenticEnglish (limit 6g w jego <code>compose-check</code>). Kolejne ~1,5 GB trzeba porównać z tym, co pokazuje <code>prod-health</code>. Do tego dochodzi miesięczny wynajem VPS-a, który warto mieć przed oczami przy dokładaniu usług.</p>
+        </div>
+        <div class="fail">
+          <h3>Wiadomość w trakcie restartu <span class="tag att">akceptowalne</span></h3>
+          <p>Plugin czyta <code>getUpdates</code> od ostatniego offsetu, więc wiadomość wysłana o 04:00 zwykle dochodzi po powrocie sesji. AgenticEnglish wpisał to jako wymaganie („nie może zginąć po cichu”). Tu proponuję to samo.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Droga</div>
+      <h2>To jest zmiana OpenSpec, i to od razu</h2>
+      <p>Test z <code>CLAUDE.md</code> jest mechaniczny: praca dotyka <code>infra/**</code> (rejestracja, rola dla aplikacji) i dokłada proces, czyli nową granicę bezpieczeństwa. Obie rzeczy wymagają zmiany OpenSpec. Robocza nazwa: <code>operator-agent-on-telegram</code>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Etap</th><th>Zakres</th><th>Kto</th><th>Gotowe, gdy</th></tr></thead>
+          <tbody>
+            <tr><td><b>0. Decyzje</b></td><td>sekcja 10 (4 z 5 podjęte), potem <code>/opsx:propose</code></td><td>Ty + ja</td><td><code>openspec validate --strict</code> zielone</td></tr>
+            <tr><td><b>1. Tożsamość</b></td><td>rejestracja <code>app-tradingcenter-vps-agent</code>, rola <code>admin</code> z <code>"Application"</code>, przypisanie na workbench i gateway, sekret do środowiska <code>vps</code></td><td>ja: Terraform · <b>Ty: <code>apply</code></b></td><td>token <code>client_credentials</code> ma <code>roles: ["admin"]</code></td></tr>
+            <tr><td><b>2. Moduł</b></td><td><code>modules/claude-agent</code>: Dockerfile, entrypoint, watchdog, <code>token.py</code>, CLAUDE.md, skille, testy runtime jak w <code>infra/runtime/tests</code> AgenticEnglish</td><td>ja</td><td>testy zielone, obraz buduje się w CI</td></tr>
+            <tr><td><b>3. Wdrożenie, odczyt</b></td><td>serwis w Compose, listy wywołujących, <code>env.required</code>, job w <code>checks.yml</code> i obraz w <code>deploy-vps.yml</code>; narzędzia rachunku w <code>deny</code></td><td>ja · Ty: bot, login, parowanie</td><td>„jakie mam pozycje” z telefonu dostaje odpowiedź</td></tr>
+            <tr><td><b>4. Zapis na demo</b></td><td>narzędzia rachunku z <code>deny</code> na allowlistę, zasada potwierdzenia w CLAUDE.md, przegląd <code>trading_mcp.trace</code> po tygodniu</td><td>po Twojej ocenie etapu 3</td><td>zlecenie z czatu widoczne w trace z <code>azp</code> agenta</td></tr>
+            <tr><td><b>5. Proaktywnie</b></td><td>przegląd rana i podsumowanie dnia w <code>supercronic</code>; opcjonalnie głosówki (AgenticEnglish ma whisper.cpp)</td><td>ja</td><td>pierwszy przegląd przyszedł sam</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">10 · Decyzje</div>
+      <h2>Cztery rozstrzygnięte, jedna otwarta</h2>
+      <p>Rozstrzygnięte 4 listopada 2026. Wchodzą do <code>proposal.md</code> zmiany jako założenia, nie jako pytania.</p>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>Rola: <code>admin</code> <span class="tag ok">postanowione</span></h3>
+          <p>Zero zmian w <code>tc-entra-auth</code>. Rola <code>admin</code> dostaje w <code>infra/</code> typ członka <code>"Application"</code> i jest przypisana SP agenta na workbenchu i na gatewayu. Zawężenie dostępu robi allowlista w <code>settings.json</code> agenta, nie rola.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Zapis na rachunku demo: tak <span class="tag ok">postanowione</span></h3>
+          <p>Etap 4 jest w zakresie zmiany, ale dalej po etapie 3. Najpierw tydzień samych odczytów na produkcji, potem narzędzia rachunku przechodzą z <code>deny</code> na allowlistę, z zasadą potwierdzenia w <code>CLAUDE.md</code>. Twardą zaporą zostaje strażnik demo w trading-mcp.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Moduł <code>modules/claude-agent</code> w tym repo <span class="tag ok">postanowione</span></h3>
+          <p>Ten sam Compose, ten sam <code>deploy.sh</code> z cofaniem obrazu, własny job w <code>checks.yml</code>. Kontraktem jest MCP, więc granica „jeden proces na granicę bezpieczeństwa” zostaje zachowana.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Model: <code>opus</code>, wysiłek <code>medium</code> <span class="tag ok">postanowione</span></h3>
+          <p>Jak w AgenticEnglish. Po tygodniu porównać zużycie limitu subskrypcji z tym, co zostaje na pracę przy repo.</p>
+        </div>
+        <div class="fail">
+          <h3>Wysyłka do innych przez <code>send_telegram_message</code> <span class="tag att">otwarte</span></h3>
+          <p>Bez rozstrzygnięcia. Do czasu decyzji narzędzie jest w <code>deny</code>: to jedyne, które robi coś widocznego na zewnątrz, bez kolejki i bez historii, a zdjęcie go z <code>deny</code> to jedna linia w <code>settings.json</code>. Rozmowa z Tobą działa bez niego, przez plugin kanału. Wróci, gdy pojawi się konkretny odbiorca i powód.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>TradingCenter · agent Claude Code na VPS przez Telegram · propozycja</span>
+    <span>wzorzec: AgenticEnglish agent/ · infra/runtime/ · 4.11.2026</span>
+  </div>
+</footer>
