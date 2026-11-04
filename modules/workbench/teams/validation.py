@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Collection
 
 from .contract import TeamDefinition
-from .tools import AnnouncedSnapshot, and_list
+from .tools import ACCOUNT_MOVING_TOOLS, AnnouncedSnapshot, and_list
 
 
 class DefinitionRefused(ValueError):
@@ -42,10 +42,6 @@ def _every_agent_names_a_known_model(
                 f"agent {agent.key!r} names model {agent.model_id!r}, which is not in this "
                 f"module's model catalogue ({sorted(known)})"
             )
-
-
-# trading-mcp's names. The first moves every caller naming no account; the second changes the experiment mid-run.
-ACCOUNT_MOVING_TOOLS = frozenset({"switch_active_account", "top_up_demo_account"})
 
 
 def _no_account_moving_tool_on_an_assigned_account(definition: TeamDefinition) -> None:

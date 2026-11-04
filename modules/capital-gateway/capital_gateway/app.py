@@ -283,7 +283,9 @@ class TopUp(BaseModel):
 
 
 @app.post("/accounts/top-up", tags=["accounts"], response_model=Account)
-async def top_up(body: TopUp, a: CapitalAdapter = Depends(account_adapter)):
+async def top_up(
+    body: TopUp, request: Request, a: CapitalAdapter = Depends(account_adapter)
+):
     """Move the demo account's balance, and answer with the account as it stands after.
 
     Acts on the account named in `X-Capital-Account`, or on the active one: capital.com adjusts
@@ -291,7 +293,12 @@ async def top_up(body: TopUp, a: CapitalAdapter = Depends(account_adapter)):
     """
     if body.amount == 0:
         raise HTTPException(422, detail="amount must not be zero")
-    return await a.top_up(body.amount)
+    account = await a.top_up(body.amount)
+    default: CapitalAdapter = request.app.state.pool.default
+    if a is default:
+        return account
+    # A named session's own account is "active" only to itself; the gateway's active one is the default's.
+    return account.model_copy(update={"active": account.id == await default.active_account_id()})
 
 
 

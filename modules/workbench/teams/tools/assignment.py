@@ -40,6 +40,15 @@ class AccountNotListed(ToolAccessError):
 
 
 ACCOUNT_ARGUMENT = "account_id"
+# trading-mcp's names. The first moves every caller naming no account; the second changes the experiment mid-run.
+# Its `account_id` is what it acts on, not where: switch_active_account's is the target, never injected.
+ACCOUNT_MOVING_TOOLS = frozenset({"switch_active_account", "top_up_demo_account"})
+_ACCOUNT_IS_THE_TARGET = frozenset({"switch_active_account"})
+
+
+class AccountMovingToolOnAnAccount(ToolAccessError):
+    """A revision trading on its own account assigns a tool that moves accounts. Refused at save, and again here,
+    so a revision that slipped past the save cannot have the switch's target overwritten with its own account."""
 
 
 class ToolNameCollision(ToolAccessError):
@@ -61,7 +70,7 @@ class ToolPlan:
     # are called with *who* is calling: a local source acts on this team's rows and needs the agent.
     local_by_name: dict[str, Any] = field(default_factory=dict)
     # The revision's account, and the tools it is put into. The model never sees the argument: the schema
-    # it is handed lost it, and `call` overwrites whatever it sent anyway.
+    # it is handed lost it, and `call` overwrites whatever it sent anyway — or drops it, with no account.
     account_id: str | None = None
     on_account: frozenset[str] = frozenset()
 
@@ -90,7 +99,9 @@ class ToolPlan:
         if local is not None:
             return await local.call(name, arguments, agent_key=agent_key)
         if name in self.on_account:
-            arguments = {**arguments, ACCOUNT_ARGUMENT: self.account_id}
+            arguments = {k: v for k, v in arguments.items() if k != ACCOUNT_ARGUMENT}
+            if self.account_id is not None:
+                arguments[ACCOUNT_ARGUMENT] = self.account_id
         server = self.server_by_name.get(name)
         if server is None:
             # Unreachable through a run, whose plan is built from the same definition it walks — but a name
@@ -220,9 +231,14 @@ async def plan_tools(
         and server_by_name[name].can_move_the_account
         and ACCOUNT_ARGUMENT in resolution.by_name[name][0][1].input_schema.get("properties", {})
     )
-    if account is None:
-        on_account = frozenset()
-    elif on_account:
+    if account is not None and (moving := sorted(on_account & ACCOUNT_MOVING_TOOLS)):
+        raise AccountMovingToolOnAnAccount(
+            f"this team trades on account {account} and is assigned {and_list(moving)}, "
+            "which would change the account for others, or the experiment while it runs"
+        )
+    # With no account the argument is still the plan's, not the model's: the order lands on the active one.
+    on_account -= _ACCOUNT_IS_THE_TARGET
+    if account is not None and on_account:
         await _check_listed(account, server_by_name[next(iter(on_account))])
     per_agent = {
         agent.key: tuple(
@@ -242,7 +258,7 @@ async def plan_tools(
         server_by_name,
         writes_by_name,
         local_by_name,
-        account_id=account if on_account else None,
+        account_id=account,
         on_account=on_account,
     )
 
@@ -263,12 +279,25 @@ async def _check_listed(account: str, server: ToolServer) -> None:
         raise ToolServerUnavailable(
             f"could not confirm that account {account} exists: {outcome.text}"
         )
-    listed = [row.get("id") for row in json.loads(outcome.text).get("result", [])]
+    listed = _listed_ids(outcome.text)
+    if listed is None:
+        raise ToolServerUnavailable(
+            f"could not confirm that account {account} exists: list_accounts answered "
+            f"{outcome.text[:200]!r}"
+        )
     if account not in listed:
         raise AccountNotListed(
             f"this team trades on account {account}, which capital-gateway does not list "
             f"({and_list(sorted(str(a) for a in listed))})"
         )
+
+
+def _listed_ids(text: str) -> list[str] | None:
+    try:
+        rows = json.loads(text).get("result")
+        return [str(row["id"]) for row in rows]
+    except (ValueError, AttributeError, KeyError, TypeError):
+        return None
 
 
 def _moves_the_account(server: ToolServer, tool: ToolDescriptor) -> bool:

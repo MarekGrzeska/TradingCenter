@@ -297,3 +297,51 @@ async def test_a_refused_restore_fails_the_call_instead_of_running_it_elsewhere(
     assert not orders.called
     assert not client.authenticated
     await client.aclose()
+
+
+@respx.mock
+async def test_a_login_body_naming_no_account_on_the_right_one_is_not_a_refusal() -> None:
+    client = on_account("other")
+    respx.post(SESSION).mock(
+        return_value=httpx.Response(200, headers={"CST": "c", "X-SECURITY-TOKEN": "t"}, json={})
+    )
+    respx.put(SESSION).mock(
+        return_value=httpx.Response(400, json={"errorCode": "error.not-different.accountId"})
+    )
+    respx.get(ACCOUNTS).mock(return_value=httpx.Response(200, json={"accounts": []}))
+
+    assert (await client.accounts()).status_code == 200
+    assert client.authenticated
+    await client.aclose()
+
+
+@respx.mock
+async def test_a_rate_limited_restore_waits_and_tries_once_more() -> None:
+    client = on_account("other")
+    respx.post(SESSION).mock(return_value=opened_on("preferred"))
+    switch = respx.put(SESSION).mock(
+        side_effect=[
+            httpx.Response(429, json={"errorCode": "error.too-many.requests"}),
+            httpx.Response(200, json={}),
+        ]
+    )
+    respx.get(ACCOUNTS).mock(return_value=httpx.Response(200, json={"accounts": []}))
+
+    assert (await client.accounts()).status_code == 200
+    assert switch.call_count == 2
+    await client.aclose()
+
+
+@respx.mock
+async def test_a_restore_still_rate_limited_reads_as_unavailable_not_refused() -> None:
+    client = on_account("other")
+    respx.post(SESSION).mock(return_value=opened_on("preferred"))
+    respx.put(SESSION).mock(
+        return_value=httpx.Response(429, json={"errorCode": "error.too-many.requests"})
+    )
+
+    with pytest.raises(GatewayError) as failed:
+        await client.accounts()
+
+    assert failed.value.status_code == 503
+    await client.aclose()

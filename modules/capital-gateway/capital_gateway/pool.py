@@ -35,6 +35,9 @@ class SessionPool:
     async def for_account(self, account_id: str) -> CapitalAdapter:
         """The session standing on `account_id`. An id the provider does not list is refused before any
         login: falling back to the active account would put the caller's order on somebody else's."""
+        # Outside the lock: a pooled account must not queue behind another account's first login.
+        if (adapter := self._by_account.get(account_id)) is not None:
+            return adapter
         async with self._lock:
             if (adapter := self._by_account.get(account_id)) is not None:
                 return adapter

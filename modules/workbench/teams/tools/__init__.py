@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 from .assignment import (
+    ACCOUNT_MOVING_TOOLS,
+    AccountMovingToolOnAnAccount,
     AccountNotListed,
     AnnouncedSnapshot,
     ToolNameCollision,
@@ -26,7 +28,9 @@ from .client import (
 from .memory import MEMORY_TOOL_NAMES, MemoryScope, MemoryToolSource
 
 __all__ = [
+    "ACCOUNT_MOVING_TOOLS",
     "MEMORY_TOOL_NAMES",
+    "AccountMovingToolOnAnAccount",
     "AccountNotListed",
     "AnnouncedSnapshot",
     "MemoryScope",

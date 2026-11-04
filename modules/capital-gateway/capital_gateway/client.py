@@ -104,19 +104,29 @@ class CapitalClient:
         is put back on its own before any waiter sees it — otherwise the retried order lands elsewhere."""
         if self._account_id is None or _opened_on(login) == self._account_id:
             return
-        switched = await self._send(
+        switched = await self._put_back()
+        if switched.status_code == 429:
+            # Session calls share the one-a-second limit with logins; a sibling session renewing beside this
+            # one is a wait, not a refusal.
+            await self._login_gate.acquire()
+            switched = await self._put_back()
+        # A login body without `currentAccountId` sends the switch blind; already there is success.
+        if switched.is_success or _NOT_DIFFERENT in switched.text:
+            return
+        self._cst = self._security_token = None
+        raise GatewayError(
+            f"capital.com renewed the session but did not put it back on account "
+            f"{self._account_id}: {switched.text[:200]}",
+            status_code=_restore_failure_status(switched.status_code),
+        )
+
+    async def _put_back(self) -> httpx.Response:
+        return await self._send(
             "PUT",
             f"{API_PREFIX}/session",
             headers=self._headers(),
             json={"accountId": self._account_id},
         )
-        if not switched.is_success:
-            self._cst = self._security_token = None
-            raise GatewayError(
-                f"capital.com renewed the session but refused to put it back on account "
-                f"{self._account_id}: {switched.text[:200]}",
-                status_code=400 if switched.status_code < 500 else 502,
-            )
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -207,6 +217,19 @@ class CapitalClient:
 
     async def confirm(self, deal_reference: str) -> httpx.Response:
         return await self.request("GET", f"{API_PREFIX}/confirms/{deal_reference}")
+
+
+_NOT_DIFFERENT = "error.not-different.accountId"
+
+
+def _restore_failure_status(provider_status: int) -> int:
+    """400 only for a refusal about the account itself; a rate limit or a provider fault says nothing
+    about the account, and reads as one so a caller can try again."""
+    if provider_status == 429:
+        return 503
+    if provider_status >= 500 or provider_status == 401:
+        return 502
+    return 400
 
 
 def _opened_on(login: httpx.Response) -> str | None:

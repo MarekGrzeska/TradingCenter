@@ -11,12 +11,17 @@ from tc_runtime.db import Conn, fetch_one
 
 from ..contract import TeamDefinition
 
-# `latest_revision` is derived rather than stored: the correlated subquery reads one row per team, and the
-# alternative is a denormalized column two writers could disagree about. The listing still loads no definition.
-_LATEST_REVISION = """
-    (SELECT max(r.version) FROM team_revisions r WHERE r.team_id = t.id) AS latest_revision,
-    (SELECT r.definition -> 'trading' ->> 'account_id' FROM team_revisions r
-      WHERE r.team_id = t.id ORDER BY r.version DESC LIMIT 1) AS account_id
+# `latest_revision` is derived rather than stored: one index lookup per team for the newest revision, and the
+# alternative is a denormalized column two writers could disagree about. Only its account leaves the definition.
+_LATEST_REVISION = "latest.version AS latest_revision, latest.account_id"
+_JOIN_LATEST_REVISION = """
+    LEFT JOIN LATERAL (
+        SELECT r.version, r.definition -> 'trading' ->> 'account_id' AS account_id
+          FROM team_revisions r
+         WHERE r.team_id = t.id
+         ORDER BY r.version DESC
+         LIMIT 1
+    ) latest ON true
 """
 
 _INSERT_TEAM = """
@@ -35,13 +40,13 @@ _INSERT_REVISION = """
 # a direct read the way a deleted one would, while its revisions stay readable further down.
 _SELECT_TEAM = f"""
     SELECT t.id, t.name, t.description, t.created_at, t.updated_at, {_LATEST_REVISION}
-      FROM teams t
+      FROM teams t {_JOIN_LATEST_REVISION}
      WHERE t.id = $1 AND t.owner_principal = $2 AND t.archived_at IS NULL
 """
 
 _SELECT_TEAMS_FOR_OWNER = f"""
     SELECT t.id, t.name, t.description, t.created_at, t.updated_at, {_LATEST_REVISION}
-      FROM teams t
+      FROM teams t {_JOIN_LATEST_REVISION}
      WHERE t.owner_principal = $1 AND t.archived_at IS NULL
      ORDER BY t.updated_at DESC, t.id DESC
 """
@@ -66,10 +71,14 @@ _TOUCH_TEAM = """
 
 # NULL keeps the column as it is, so a rename that names only the description leaves the name alone.
 _RENAME_TEAM = f"""
-    UPDATE teams t
-       SET name = coalesce($3, t.name), description = coalesce($4, t.description), updated_at = now()
-     WHERE t.id = $1 AND t.owner_principal = $2 AND t.archived_at IS NULL
-    RETURNING t.id, t.name, t.description, t.created_at, t.updated_at, {_LATEST_REVISION}
+    WITH t AS (
+        UPDATE teams
+           SET name = coalesce($3, name), description = coalesce($4, description), updated_at = now()
+         WHERE id = $1 AND owner_principal = $2 AND archived_at IS NULL
+        RETURNING id, name, description, created_at, updated_at
+    )
+    SELECT t.id, t.name, t.description, t.created_at, t.updated_at, {_LATEST_REVISION}
+      FROM t {_JOIN_LATEST_REVISION}
 """
 
 # Ownership through the join rather than through `archived_at`: a revision belongs to whoever owns the team,

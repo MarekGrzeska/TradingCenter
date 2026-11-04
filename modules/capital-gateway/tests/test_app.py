@@ -528,5 +528,6 @@ def test_a_top_up_lands_on_the_named_account(client: TestClient, provider: FakeP
 
     assert response.status_code == 200
     assert response.json()["id"] == "X"
+    assert response.json()["active"] is False
     assert provider.top_ups == [("X", 50)]
     assert [a["id"] for a in active] == ["a1"]

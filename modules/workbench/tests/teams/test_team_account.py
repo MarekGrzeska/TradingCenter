@@ -10,7 +10,13 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from teams.contract import AgentDefinition, TeamDefinition, TradingLimits
-from teams.tools import AccountNotListed, AnnouncedSnapshot, ToolServerRegistry, plan_tools
+from teams.tools import (
+    AccountMovingToolOnAnAccount,
+    AccountNotListed,
+    AnnouncedSnapshot,
+    ToolServerRegistry,
+    plan_tools,
+)
 from teams.validation import DefinitionRefused, check_definition
 
 from .mcp_stand_in import READ_ONLY, serving, settings_for
@@ -24,6 +30,10 @@ def trading_stand_in(mcp: FastMCP) -> None:
     @mcp.tool(name="place_order", annotations=WRITE)
     def place_order(symbol: str, account_id: str | None = None) -> str:
         return json.dumps({"symbol": symbol, "account_id": account_id})
+
+    @mcp.tool(name="switch_active_account", annotations=WRITE)
+    def switch_active_account(account_id: str) -> str:
+        return json.dumps({"account_id": account_id})
 
     @mcp.tool(name="list_accounts", annotations=READ_ONLY)
     def list_accounts() -> list[dict]:
@@ -45,13 +55,13 @@ def trader(account_id: str | None, tools: list[str] | None = None) -> TeamDefini
     )
 
 
-async def _planned(definition: TeamDefinition):
+async def _planned(definition: TeamDefinition, tool: str = "place_order", arguments=None):
     async with serving(build=trading_stand_in) as url:
         registry = ToolServerRegistry.from_settings(settings_for(url))
         try:
             plan = await plan_tools(definition, registry)
             outcome = await plan.call(
-                "place_order", {"symbol": "US100", "account_id": "Y"}, agent_key="trader"
+                tool, arguments or {"symbol": "US100", "account_id": "Y"}, agent_key="trader"
             )
         finally:
             await registry.aclose()
@@ -67,13 +77,29 @@ async def test_the_revisions_account_reaches_the_call_and_the_model_cannot_name_
     assert plan.account_for("place_order") == "X"
 
 
-async def test_a_revision_without_an_account_leaves_the_call_alone() -> None:
+async def test_a_revision_without_an_account_trades_on_the_active_one_whatever_the_model_names() -> None:
     # specs/teams-trading, "Rewizja bez konta"
     plan, sent = await _planned(trader(None))
 
+    assert sent["account_id"] is None
+    assert "account_id" not in plan.for_agent("trader")[0].input_schema["properties"]
+    assert plan.account_for("place_order") is None
+
+
+async def test_the_switch_keeps_its_target_on_a_revision_without_an_account() -> None:
+    plan, sent = await _planned(
+        trader(None, tools=["switch_active_account"]),
+        "switch_active_account",
+        {"account_id": "Y"},
+    )
+
     assert sent["account_id"] == "Y"
     assert "account_id" in plan.for_agent("trader")[0].input_schema["properties"]
-    assert plan.account_for("place_order") is None
+
+
+async def test_a_switch_that_slipped_past_the_save_refuses_the_run() -> None:
+    with pytest.raises(AccountMovingToolOnAnAccount, match="switch_active_account"):
+        await _planned(trader("X", tools=["place_order", "switch_active_account"]))
 
 
 async def test_an_account_the_gateway_does_not_list_refuses_the_run() -> None:

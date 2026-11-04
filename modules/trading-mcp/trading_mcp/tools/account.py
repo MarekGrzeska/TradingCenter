@@ -128,8 +128,8 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
 
     @mcp.tool(annotations=WRITE)
     async def top_up_demo_account(amount: float, account_id: AccountId = None) -> AccountOut:
-        """Move the active demo account's balance by `amount`, and answer with the account
-        as it stands afterwards. Negative takes funds away, which is as much a way of
+        """Move a demo account's balance by `amount` — the one `account_id` names, or the
+        active one — and answer with the account as it stands afterwards. Negative takes funds away, which is as much a way of
         setting up a test as adding them.
 
         Demo money only — this module never reaches a live account. The provider keeps its
