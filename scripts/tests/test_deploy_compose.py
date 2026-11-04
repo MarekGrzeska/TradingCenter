@@ -65,6 +65,25 @@ def test_the_tool_surfaces_answer_the_operators_clients_and_no_browser() -> None
     assert callers == OPERATOR_CLIENTS
 
 
+# Each would hand the agent a door the operator's desk client does not have (operator-agent-on-telegram).
+SYSTEM_SECRETS = re.compile(r"PASSWORD|API_KEY|OPENAI|SESSION_KEY|DATABASE_URL")
+
+
+def test_the_agent_has_its_own_network_and_no_secret_of_the_system() -> None:
+    """It reaches the system through the public address and Caddy, like the operator at the desk — never by name."""
+    agent = SERVICES["claude-agent"]
+    assert agent["networks"] == ["claude-agent"]
+    assert COMPOSE["networks"]["claude-agent"] == {}
+    others = {name for name, service in SERVICES.items() if "claude-agent" in service.get("networks", [])}
+    assert others == {"claude-agent"}
+    assert [name for name in agent["environment"] if SYSTEM_SECRETS.search(name)] == []
+    assert not any(SYSTEM_SECRETS.search(str(value)) for value in agent["environment"].values())
+
+
+def test_account_writes_are_off_unless_the_environment_says_otherwise() -> None:
+    assert SERVICES["claude-agent"]["environment"]["AGENT_ACCOUNT_WRITES"] == "${AGENT_ACCOUNT_WRITES:-off}"
+
+
 def test_no_service_takes_the_whole_environment_file() -> None:
     """Each gets the names it uses and no others: a compromised process learns its own secrets, not the system's."""
     assert [name for name, service in SERVICES.items() if "env_file" in service] == []
@@ -79,7 +98,13 @@ def test_every_name_the_compose_file_demands_is_one_the_deploy_checks() -> None:
 def test_the_optional_names_are_blank_by_default_and_not_required() -> None:
     text = (DEPLOY / "docker-compose.yml").read_text(encoding="utf-8")
     optional = set(re.findall(r"\$\{([A-Z][A-Z0-9_]*):-\}", text))
-    assert optional == {"TELEGRAM_API_ID", "TELEGRAM_API_HASH", "TELEGRAM_SESSION_KEY"}
+    assert optional == {
+        "TELEGRAM_API_ID",
+        "TELEGRAM_API_HASH",
+        "TELEGRAM_SESSION_KEY",
+        "AGENT_TELEGRAM_OWNER_CHAT_ID",
+        "AGENT_CHECKINS",
+    }
     assert not optional & required_names()
 
 

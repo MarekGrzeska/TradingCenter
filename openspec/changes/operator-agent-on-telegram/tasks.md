@@ -19,11 +19,11 @@
 
 ## 3. Wdrożenie
 
-- [ ] 3.1 `deploy/docker-compose.yml`: usługa `claude-agent` (sieć `claude-agent`, wolumen `claude-agent-home`, limity, `cap_drop`, `no-new-privileges`, bez portów)
-- [ ] 3.2 `scripts/tests/test_deploy_compose.py`: agent bez portów, tylko w sieci `claude-agent`, bez zmiennych z sekretami systemu; listy wołających mają oba id
-- [ ] 3.3 `.github/workflows/checks.yml`: job `claude-agent` i wzorzec w `changes` (z `scripts/mcp_token.py`)
-- [ ] 3.4 `.github/workflows/deploy-vps.yml` i `scripts/deploy_gate.py`: czwarty obraz, tag `CLAUDE_AGENT_TAG` w `tags.env`, wycofanie obejmuje agenta
-- [ ] 3.5 `deploy/README.md`: kroki jednorazowe na serwerze (login, kod urządzenia, bot, parowanie, `access.json`)
+- [x] 3.1 `deploy/docker-compose.yml`: usługa `claude-agent` (sieć `claude-agent`, wolumen `claude-agent-home`, limity, `cap_drop`, `no-new-privileges`, bez portów)
+- [x] 3.2 `scripts/tests/test_deploy_compose.py`: agent bez portów, tylko w sieci `claude-agent`, bez zmiennych z sekretami systemu; listy wołających mają oba id
+- [x] 3.3 `.github/workflows/checks.yml`: job `claude-agent` i wzorzec w `changes` (z `scripts/mcp_token.py`)
+- [x] 3.4 `.github/workflows/deploy-vps.yml` i `scripts/deploy_gate.py`: czwarty obraz, tag `CLAUDE_AGENT_TAG` w `tags.env`, wycofanie obejmuje agenta
+- [x] 3.5 `deploy/README.md`: kroki jednorazowe na serwerze (login, kod urządzenia, bot, parowanie, `access.json`)
 
 ## 4. Dokumentacja
 
