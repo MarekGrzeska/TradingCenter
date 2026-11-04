@@ -289,3 +289,60 @@ resource "azuread_application_pre_authorized" "gateway_claude_code" {
 output "claude_code_entra_client_id" {
   value = azuread_application.claude_code.client_id
 }
+
+
+# --- the operator's agent on the server, the second caller of every tool surface (`operator-agent-on-telegram`) ---------
+
+# Claude Code in the `claude-agent` container, signed in once with a device code, as the operator. Delegated rather than an
+# application token: the team tools own what they create by the token's `oid`, and an application's `oid` would give the
+# agent a catalogue of its own the terminal never shows. Its own registration, so every log and list names it apart.
+resource "azuread_application" "vps_agent" {
+  display_name = "app-tradingcenter-vps-agent"
+
+  # The device-code flow is a public-client flow; a server has no browser for the loopback redirect.
+  fallback_public_client_enabled = true
+
+  public_client {
+    redirect_uris = ["http://localhost"]
+  }
+
+  required_resource_access {
+    resource_app_id = module.workbench_easy_auth.client_id
+
+    resource_access {
+      id   = module.workbench_easy_auth.scope_id
+      type = "Scope"
+    }
+  }
+
+  required_resource_access {
+    resource_app_id = module.capital_gateway_easy_auth.client_id
+
+    resource_access {
+      id   = module.capital_gateway_easy_auth.scope_id
+      type = "Scope"
+    }
+  }
+}
+
+resource "azuread_service_principal" "vps_agent" {
+  client_id = azuread_application.vps_agent.client_id
+}
+
+# As for the operator's own client: no consent prompt, and no role assignment, because the role is the operator's.
+resource "azuread_application_pre_authorized" "workbench_vps_agent" {
+  application_id       = module.workbench_easy_auth.application_id
+  authorized_client_id = azuread_application.vps_agent.client_id
+  permission_ids       = [module.workbench_easy_auth.scope_id]
+}
+
+resource "azuread_application_pre_authorized" "gateway_vps_agent" {
+  application_id       = module.capital_gateway_easy_auth.application_id
+  authorized_client_id = azuread_application.vps_agent.client_id
+  permission_ids       = [module.capital_gateway_easy_auth.scope_id]
+}
+
+# `AGENT_APPLICATION_ID` in the environment `vps`; dropping it from there closes every surface to the agent.
+output "vps_agent_entra_client_id" {
+  value = azuread_application.vps_agent.client_id
+}

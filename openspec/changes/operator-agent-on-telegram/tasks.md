@@ -1,8 +1,8 @@
 ## 1. Tożsamość agenta
 
-- [ ] 1.1 `infra/entra.tf`: rejestracja `app-tradingcenter-vps-agent` (klient publiczny, `fallback_public_client_enabled`), service principal, pre-autoryzacja na scope'ach workbencha i bramy, output `vps_agent_entra_client_id`; `terraform plan` czysty poza nowymi zasobami
-- [ ] 1.2 `scripts/mcp_token.py`: `login --device-code` i `--cache <plik>` (domyślny cache bez zmian); testy w `scripts/tests`
-- [ ] 1.3 `deploy/docker-compose.yml`: `TOOL_CALLER_APPLICATION_IDS` i `EXTERNAL_CALLER_APPLICATION_IDS` jako lista `CLAUDE_CODE_APPLICATION_ID` + `AGENT_APPLICATION_ID`; `deploy/env.required`, `fill-github-environment.sh`
+- [x] 1.1 `infra/entra.tf`: rejestracja `app-tradingcenter-vps-agent` (klient publiczny, `fallback_public_client_enabled`), service principal, pre-autoryzacja na scope'ach workbencha i bramy, output `vps_agent_entra_client_id`; `terraform plan` czysty poza nowymi zasobami
+- [x] 1.2 `scripts/mcp_token.py`: `login --device-code` i `--cache <plik>` (domyślny cache bez zmian); testy w `scripts/tests`
+- [x] 1.3 `deploy/docker-compose.yml`: `TOOL_CALLER_APPLICATION_IDS` i `EXTERNAL_CALLER_APPLICATION_IDS` jako lista `CLAUDE_CODE_APPLICATION_ID` + `AGENT_APPLICATION_ID`; `deploy/env.required`, `fill-github-environment.sh`
 
 ## 2. Moduł `modules/claude-agent`
 

@@ -47,19 +47,22 @@ def test_the_english_network_is_external_and_holds_only_caddy() -> None:
     assert on_english == {"caddy"}
 
 
-def test_the_tool_server_admits_from_outside_only_the_operators_client() -> None:
-    """operator-mcp-access: on the edge, with a gateway token of one named application; the workbench still reaches it
-    with the key on `services`."""
+OPERATOR_CLIENTS = "${CLAUDE_CODE_APPLICATION_ID:?},${AGENT_APPLICATION_ID:?}"
+
+
+def test_the_tool_server_admits_from_outside_only_the_operators_clients() -> None:
+    """operator-mcp-access: on the edge, with a gateway token of a named application — Claude Code at the desk and the
+    agent on the server (operator-agent-on-telegram); the workbench still reaches it with the key on `services`."""
     trading = SERVICES["trading-mcp"]
     assert trading["networks"] == ["edge", "services"]
     environment = trading["environment"]
-    assert environment["EXTERNAL_CALLER_APPLICATION_IDS"] == "${CLAUDE_CODE_APPLICATION_ID:?}"
+    assert environment["EXTERNAL_CALLER_APPLICATION_IDS"] == OPERATOR_CLIENTS
     assert environment["ENTRA_AUDIENCES"] == "${GATEWAY_ENTRA_AUDIENCES:?}"
 
 
-def test_the_tool_surfaces_answer_the_operators_client_and_no_browser() -> None:
+def test_the_tool_surfaces_answer_the_operators_clients_and_no_browser() -> None:
     callers = SERVICES["workbench"]["environment"]["TOOL_CALLER_APPLICATION_IDS"]
-    assert callers == "${CLAUDE_CODE_APPLICATION_ID:?}"
+    assert callers == OPERATOR_CLIENTS
 
 
 def test_no_service_takes_the_whole_environment_file() -> None:

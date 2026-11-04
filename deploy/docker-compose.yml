@@ -85,7 +85,7 @@ services:
       REQUIRE_AUTHENTICATED_PRINCIPAL: "true"
       # From outside, under `/trading/mcp` on the API host: the operator's own MCP client alone, with a token for the
       # gateway's API — the right to move the account is the gateway's `admin` (operator-mcp-access).
-      EXTERNAL_CALLER_APPLICATION_IDS: ${CLAUDE_CODE_APPLICATION_ID:?}
+      EXTERNAL_CALLER_APPLICATION_IDS: ${CLAUDE_CODE_APPLICATION_ID:?},${AGENT_APPLICATION_ID:?}
       ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:?}
       ENTRA_AUDIENCES: ${GATEWAY_ENTRA_AUDIENCES:?}
     depends_on:
@@ -146,7 +146,7 @@ services:
       AGENT_DEFAULT_MODEL_ID: ${AGENT_DEFAULT_MODEL_ID:?}
 
       # Every package's `/mcp` and `/team-tools/mcp`: the operator's own MCP client, nothing else (operator-mcp-access).
-      TOOL_CALLER_APPLICATION_IDS: ${CLAUDE_CODE_APPLICATION_ID:?}
+      TOOL_CALLER_APPLICATION_IDS: ${CLAUDE_CODE_APPLICATION_ID:?},${AGENT_APPLICATION_ID:?}
       REST_CALLER_APPLICATION_IDS: ${TERMINAL_APPLICATION_ID:?},${POCKET_APPLICATION_ID:?}
       # Admitted to `/telegram`'s account, bots, recipients and assignments alone: the operator's `az` (a public Microsoft
       # client id) and the terminal, which is where the account is logged in and the purposes are assigned.
