@@ -30,7 +30,7 @@ def test_only_trading_mcp_is_registered_for_the_gateways_api(tmp_path: Path) -> 
             registered[name] = json.loads(config)
     apis = {name: config["headersHelper"].rsplit("--api ", 1)[1] for name, config in registered.items()}
     assert apis.pop("tc-trading") == "gateway"
-    assert len(apis) == 8 and set(apis.values()) == {"workbench"}
+    assert len(apis) == 9 and set(apis.values()) == {"workbench"}
     assert registered["tc-trading"]["url"] == "https://api.example/trading/mcp"
 
 

@@ -85,6 +85,7 @@ def _door() -> httpx.AsyncClient:
         ("POST", "/polymarket/mcp", 403),
         ("POST", "/strategies/mcp", 403),
         ("POST", "/team-tools/mcp", 403),
+        ("POST", "/chart-tools/mcp", 403),
     ],
 )
 async def test_a_viewer_reaches_the_two_archives_for_reading_and_no_other_door(method, path, status) -> None:
