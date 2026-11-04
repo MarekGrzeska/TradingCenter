@@ -1,4 +1,8 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { createAccountsApi, type AccountsApi, type DemoAccount } from "../accounts/accountsApi";
+import { resolveEndpoints } from "../data/config";
+import { gatewayIdentity } from "../data/marketData";
+import { useRead } from "../data/query";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { useAgentTurns } from "../agent/useAgentTurns";
 import { MemoryPanel } from "./MemoryPanel";
@@ -24,11 +28,26 @@ type Open =
  * The catalogue, one team open on the canvas, one run watched on it. The model catalogue is read here because
  * both children need it and a team cannot be opened without it — this terminal has no model id of its own.
  */
-export function TeamsView({ api = teamsApi }: { api?: TeamsApi } = {}) {
+export function TeamsView({
+  api = teamsApi,
+  accountsApi,
+}: { api?: TeamsApi; accountsApi?: AccountsApi } = {}) {
   const teams = useTeams(api);
   const models = useModels(api);
   const tools = useTools(api);
   const [open, setOpen] = useState<Open>({ kind: "catalogue" });
+  const gateway = useMemo(
+    () => accountsApi ?? createAccountsApi(resolveEndpoints().gatewayHttp, gatewayIdentity),
+    [accountsApi],
+  );
+  // Only while a team is open on the canvas: the catalogue has no use for the gateway's accounts.
+  const accounts = useRead<DemoAccount[]>({
+    key: ["gateway", "accounts"],
+    read: (signal) => gateway.listAccounts(signal),
+    initial: NO_ACCOUNTS,
+    fallbackMessage: "could not read the accounts",
+    enabled: open.kind === "team" || open.kind === "new",
+  });
 
   // A chat can create and revise teams, and that write never passes through this tab, so a team the model made
   // existed everywhere but on screen. Only the catalogue: a team open on the canvas is a draft being typed into.
@@ -133,6 +152,13 @@ export function TeamsView({ api = teamsApi }: { api?: TeamsApi } = {}) {
         if (open.kind !== "team") return;
         setOpen({ kind: "runs", teamId: open.id, teamName, runId });
       }}
+      accounts={accounts.value}
+      accountsNote={
+        accounts.error === null ? null : `the accounts could not be read — ${accounts.error}`
+      }
+      teams={teams.value}
     />
   );
 }
+
+const NO_ACCOUNTS: DemoAccount[] = [];

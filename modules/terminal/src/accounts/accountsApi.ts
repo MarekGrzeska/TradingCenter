@@ -73,20 +73,26 @@ function mapPosition(raw: RawPosition): AccountPosition {
 
 export interface AccountsApi {
   listAccounts(signal: AbortSignal): Promise<DemoAccount[]>;
-  /** Open positions on the **active** account — the provider ties them to the session, so there is no such
-   *  thing as "the positions of an account that is not active" to ask for. */
-  listPositions(signal: AbortSignal): Promise<AccountPosition[]>;
-  /** Makes another account active, and answers with it. Every later order acts on it, and
-   *  the provider ends the quote stream when this succeeds. */
+  /** Open positions on `accountId`, or on the active account when it is null. Naming one never makes it active:
+   *  the gateway keeps a session per account. */
+  listPositions(signal: AbortSignal, accountId?: string | null): Promise<AccountPosition[]>;
+  /** Makes another account active, and answers with it. Every later order naming no account acts on it. */
   switchAccount(accountId: string, signal: AbortSignal): Promise<DemoAccount>;
-  /** Moves the demo balance by `amount` — negative takes funds away — and answers with the account after.
-   *  A refusal carries the provider's own reason. */
-  topUp(amount: number, signal: AbortSignal): Promise<DemoAccount>;
+  /** Moves the balance of `accountId` (or of the active one) by `amount` — negative takes funds away — and answers
+   *  with the account after. A refusal carries the provider's own reason. */
+  topUp(amount: number, signal: AbortSignal, accountId?: string | null): Promise<DemoAccount>;
 }
 
 // 403: the gateway recognised this caller and this path is not the caller's, which for this screen means a
 // bug in it. 422: the module read the request and declined it, an amount of zero being the one it declines.
 const mapStatus = statusMapper({ 403: "refused", 404: "not-found", 422: "refused" });
+
+/** The gateway's name for "act on this account"; absent, it acts on the active one. */
+const ACCOUNT_HEADER = "X-Capital-Account";
+
+function onAccount(accountId: string | null | undefined): Record<string, string> {
+  return accountId ? { [ACCOUNT_HEADER]: accountId } : {};
+}
 
 export function createAccountsApi(
   httpBase: string,
@@ -100,8 +106,11 @@ export function createAccountsApi(
       return raw.map(mapAccount);
     },
 
-    async listPositions(signal) {
-      const raw = await http.json<RawPosition[]>(`${httpBase}/positions`, { signal });
+    async listPositions(signal, accountId) {
+      const raw = await http.json<RawPosition[]>(`${httpBase}/positions`, {
+        signal,
+        headers: onAccount(accountId),
+      });
       return raw.map(mapPosition);
     },
 
@@ -114,11 +123,12 @@ export function createAccountsApi(
       return mapAccount(raw);
     },
 
-    async topUp(amount, signal) {
+    async topUp(amount, signal, accountId) {
       const raw = await http.json<RawAccount>(`${httpBase}/accounts/top-up`, {
         method: "POST",
         body: { amount },
         signal,
+        headers: onAccount(accountId),
       });
       return mapAccount(raw);
     },

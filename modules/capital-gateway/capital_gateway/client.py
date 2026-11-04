@@ -8,21 +8,34 @@ import asyncio
 import httpx
 
 from .config import Settings
+from .errors import GatewayError
 from .rategate import RateGate
 
 API_PREFIX = "/api/v1"
 _TIMEOUT_SECONDS = 20.0
-_REQUESTS_PER_SECOND = 10
+REQUESTS_PER_SECOND = 10
 
 
 class CapitalClient:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        gate: RateGate | None = None,
+        login_gate: RateGate | None = None,
+        account_id: str | None = None,
+    ) -> None:
         self._s = settings
         self._http = httpx.AsyncClient(base_url=settings.capital_base_url, timeout=_TIMEOUT_SECONDS)
         self._cst: str | None = None
         self._security_token: str | None = None
         self._login_inflight: asyncio.Task[httpx.Response] | None = None
-        self._gate = RateGate(_REQUESTS_PER_SECOND)
+        # Shared by every session of one login: the provider counts the budget per login, not per session.
+        self._gate = gate or RateGate(REQUESTS_PER_SECOND)
+        # The provider takes one login per second per API key and answers a second with 429.
+        self._login_gate = login_gate or RateGate(1)
+        # The account this session must stand on; None takes whatever a fresh login opens on.
+        self._account_id = account_id
 
     async def aclose(self) -> None:
         await self._http.aclose()
@@ -30,6 +43,10 @@ class CapitalClient:
     @property
     def authenticated(self) -> bool:
         return bool(self._cst and self._security_token)
+
+    @property
+    def account_id(self) -> str | None:
+        return self._account_id
 
     @property
     def base_url(self) -> str:
@@ -65,6 +82,7 @@ class CapitalClient:
         return await self._http.request(method, path, **kwargs)
 
     async def _login(self) -> httpx.Response:
+        await self._login_gate.acquire()
         resp = await self._send(
             "POST",
             f"{API_PREFIX}/session",
@@ -78,7 +96,37 @@ class CapitalClient:
         if resp.status_code == 200:
             self._cst = resp.headers.get("CST")
             self._security_token = resp.headers.get("X-SECURITY-TOKEN")
+            await self._restore_account(resp)
         return resp
+
+    async def _restore_account(self, login: httpx.Response) -> None:
+        """A fresh login opens on the preferred account (measured 28 October 2026), so a renewed session
+        is put back on its own before any waiter sees it — otherwise the retried order lands elsewhere."""
+        if self._account_id is None or _opened_on(login) == self._account_id:
+            return
+        switched = await self._put_back()
+        if switched.status_code == 429:
+            # Session calls share the one-a-second limit with logins; a sibling session renewing beside this
+            # one is a wait, not a refusal.
+            await self._login_gate.acquire()
+            switched = await self._put_back()
+        # A login body without `currentAccountId` sends the switch blind; already there is success.
+        if switched.is_success or _NOT_DIFFERENT in switched.text:
+            return
+        self._cst = self._security_token = None
+        raise GatewayError(
+            f"capital.com renewed the session but did not put it back on account "
+            f"{self._account_id}: {switched.text[:200]}",
+            status_code=_restore_failure_status(switched.status_code),
+        )
+
+    async def _put_back(self) -> httpx.Response:
+        return await self._send(
+            "PUT",
+            f"{API_PREFIX}/session",
+            headers=self._headers(),
+            json={"accountId": self._account_id},
+        )
 
     def _headers(self) -> dict[str, str]:
         return {
@@ -105,14 +153,15 @@ class CapitalClient:
         return await self.request("GET", f"{API_PREFIX}/accounts")
 
     async def switch_account(self, account_id: str) -> httpx.Response:
-        return await self.request("PUT", f"{API_PREFIX}/session", json={"accountId": account_id})
+        resp = await self.request("PUT", f"{API_PREFIX}/session", json={"accountId": account_id})
+        if resp.is_success:
+            self._account_id = account_id
+        return resp
 
     async def top_up(self, amount: float) -> httpx.Response:
         """Moves the demo account's balance by `amount`, positive or negative. No account in the
         body: capital.com adjusts the session's active one, and a parameter would promise a choice."""
-        return await self.request(
-            "POST", f"{API_PREFIX}/accounts/topUp", json={"amount": amount}
-        )
+        return await self.request("POST", f"{API_PREFIX}/accounts/topUp", json={"amount": amount})
 
     async def search_markets(self, search_term: str) -> httpx.Response:
         return await self.request(
@@ -168,3 +217,23 @@ class CapitalClient:
 
     async def confirm(self, deal_reference: str) -> httpx.Response:
         return await self.request("GET", f"{API_PREFIX}/confirms/{deal_reference}")
+
+
+_NOT_DIFFERENT = "error.not-different.accountId"
+
+
+def _restore_failure_status(provider_status: int) -> int:
+    """400 only for a refusal about the account itself; a rate limit or a provider fault says nothing
+    about the account, and reads as one so a caller can try again."""
+    if provider_status == 429:
+        return 503
+    if provider_status >= 500 or provider_status == 401:
+        return 502
+    return 400
+
+
+def _opened_on(login: httpx.Response) -> str | None:
+    try:
+        return login.json().get("currentAccountId")
+    except ValueError:
+        return None

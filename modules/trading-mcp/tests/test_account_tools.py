@@ -222,14 +222,88 @@ async def test_switching_the_account_answers_with_the_one_now_active(server) -> 
     assert structured["active"] is True
 
 
-async def test_the_switch_tool_warns_that_it_drops_the_stream(server) -> None:
-    """specs/trading-mcp-tools: the gap this call leaves is in collected candles, not in
-    the conversation, so nothing the model sees afterwards would tell it."""
-    mcp = server
-    by_name = {t.name: t for t in await mcp.list_tools()}
-    description = (by_name["switch_active_account"].description or "").lower()
+TOOLS_ON_AN_ACCOUNT = [
+    ("get_positions", {}, "GET", "/positions", []),
+    ("get_working_orders", {}, "GET", "/working-orders", []),
+    ("close_position", {"position_id": "p1"}, "DELETE", "/positions/p1", {"status": "CLOSED"}),
+    (
+        "cancel_working_order",
+        {"order_id": "w1"},
+        "DELETE",
+        "/working-orders/w1",
+        {"status": "CANCELLED"},
+    ),
+    (
+        "place_order",
+        {"symbol": "US100", "direction": "BUY", "size": 1},
+        "POST",
+        "/orders",
+        {"status": "FILLED"},
+    ),
+    (
+        "amend_stops",
+        {"position_id": "p1", "stop_loss": 1.0},
+        "PUT",
+        "/positions/p1",
+        {"status": "UPDATED"},
+    ),
+    (
+        "top_up_demo_account",
+        {"amount": 5},
+        "POST",
+        "/accounts/top-up",
+        {**_ACCOUNTS[0], "active": False},
+    ),
+]
 
-    assert "stream" in description
+
+@pytest.mark.parametrize(("tool", "arguments", "method", "path", "answer"), TOOLS_ON_AN_ACCOUNT)
+@respx.mock
+async def test_a_named_account_travels_as_the_gateway_header_and_none_sends_none(
+    server, tool, arguments, method, path, answer
+) -> None:
+    """specs/trading-mcp-tools, "Zlecenie na wskazanym koncie": the account goes in the request, and is
+    never turned into a switch of the active one — which would move every other caller with it."""
+    route = respx.route(method=method, url=f"{BASE}{path}").mock(
+        return_value=httpx.Response(200, json=answer)
+    )
+    switch = respx.put(f"{BASE}/accounts/active")
+
+    await server.call_tool(tool, {**arguments, "account_id": "a2"})
+    await server.call_tool(tool, arguments)
+
+    assert route.calls[0].request.headers["X-Capital-Account"] == "a2"
+    assert "X-Capital-Account" not in route.calls[1].request.headers
+    assert not switch.called
+
+
+@respx.mock
+async def test_an_account_the_gateway_does_not_know_is_a_refusal_not_an_access_failure(
+    server,
+) -> None:
+    # specs/trading-mcp-tools, "Wskazane konto jest nieznane"
+    respx.post(f"{BASE}/orders").mock(
+        return_value=httpx.Response(400, json={"detail": "no such account: nope"})
+    )
+
+    with pytest.raises(ToolError) as refused:
+        await server.call_tool(
+            "place_order",
+            {"symbol": "US100", "direction": "BUY", "size": 1, "account_id": "nope"},
+        )
+
+    assert "refused" in str(refused.value)
+    assert "nope" in str(refused.value)
+    assert "access failure" not in str(refused.value)
+
+
+@respx.mock
+async def test_the_balance_of_a_named_account_is_that_account_not_the_active_one(server) -> None:
+    respx.get(f"{BASE}/accounts").mock(return_value=httpx.Response(200, json=_ACCOUNTS))
+
+    _content, structured = await server.call_tool("get_balance", {"account_id": "a1"})
+
+    assert structured["account_id"] == "a1"
 
 
 @respx.mock

@@ -70,14 +70,14 @@ class CapitalAdapter:
             ) from err
 
     async def list_accounts(self) -> list[Account]:
-        active = await self._active_account_id()
+        active = await self.active_account_id()
         data = self._json_ok(await self._c.accounts())
         return [
             mapping.account_from_raw(a, active=a.get("accountId") == active)
             for a in data.get("accounts", [])
         ]
 
-    async def _active_account_id(self) -> str | None:
+    async def active_account_id(self) -> str | None:
         r = await self._c.session_details()
         return r.json().get("accountId") if r.is_success else None
 
@@ -103,7 +103,7 @@ class CapitalAdapter:
                 status_code=400 if r.status_code < 500 else 502,
             )
         data = self._json_ok(await self._c.accounts())
-        active = await self._active_account_id()
+        active = await self.active_account_id()
         for acc in data.get("accounts", []):
             if acc.get("accountId") == active:
                 return mapping.account_from_raw(acc, active=True)

@@ -6,6 +6,7 @@ import { MarketDataError } from "../data/types";
 import { TeamsView } from "./TeamsView";
 import type { RunStreamEvent, TeamRun, TeamRunStep, TeamTrade } from "./runs";
 import type { TeamDefinition, TeamsApi, TeamSummary, TeamRevision } from "./teamsApi";
+import type { AccountsApi } from "../accounts/accountsApi";
 
 const MODELS = [
   {
@@ -172,8 +173,8 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
   };
 }
 
-async function openTheTeam(api: TeamsApi) {
-  render(<TeamsView api={api} />);
+async function openTheTeam(api: TeamsApi, accountsApi?: AccountsApi) {
+  render(<TeamsView api={api} accountsApi={accountsApi} />);
   // A click on the row, which is what opening a team is since the `Open` button was dropped
   // — it was one of five on a row where opening is the common case.
   await userEvent.click(await screen.findByText("Morning desk"));
@@ -327,6 +328,32 @@ describe("the agent settings dialog", () => {
 });
 
 describe("the trading limits", () => {
+  it("puts the team on an account the gateway lists, and says who else trades there", async () => {
+    // specs/terminal-teams, "Operator przypisuje konto" and "Konto jest już używane przez inny zespół"
+    const accounts: AccountsApi = {
+      listAccounts: vi.fn(async () => [
+        { id: "X", name: "random", currency: "USD", balance: 11221.86, available: 0, pnl: 0, active: false },
+      ]),
+      listPositions: vi.fn(async () => []),
+      switchAccount: vi.fn(),
+      topUp: vi.fn(),
+    };
+    const api = fakeApi({
+      listTeams: vi.fn(async () => [TEAM, { ...TEAM, id: 2, name: "Evening desk", accountId: "X" }]),
+    });
+    await openTheTeam(api, accounts);
+
+    const choice = await screen.findByLabelText("Account");
+    await screen.findByRole("option", { name: /random · USD 11221.86/ });
+    await userEvent.selectOptions(choice, "X");
+    expect(screen.getByText(/also traded by evening desk/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
+
+    await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
+    const [, saved] = (api.saveRevision as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect((saved as TeamDefinition).trading.accountId).toBe("X");
+  });
+
   it("sets them in the same view the team is composed in", async () => {
     // specs/terminal-teams, "Granice handlowe ustawia się w tym samym widoku co resztę
     // zespołu" — on the team rather than on any one agent, and needing no button to reach.

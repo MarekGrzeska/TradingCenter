@@ -49,9 +49,9 @@ function fakeApi() {
       if (state.accountsFailure) throw state.accountsFailure;
       return state.accounts;
     },
-    async listPositions() {
+    async listPositions(_signal, accountId) {
       if (state.positionsFailure) throw state.positionsFailure;
-      return state.positions;
+      return accountId === "a2" ? [position({ id: "p2", symbol: "GOLD" })] : state.positions;
     },
     async switchAccount(accountId) {
       if (state.switchFailure) throw state.switchFailure;
@@ -87,7 +87,7 @@ describe("AccountsView", () => {
     expect(screen.getByText("demo2")).toBeInTheDocument();
     expect(screen.getByText("active")).toBeInTheDocument();
     // The positions are named as the active account's, not as "everything open".
-    expect(screen.getByText(/on EUR, the account being traded/i)).toBeInTheDocument();
+    expect(screen.getByText(/on EUR, the active account/i)).toBeInTheDocument();
     expect(screen.getByText("US100")).toBeInTheDocument();
   });
 
@@ -178,9 +178,9 @@ describe("AccountsView", () => {
     expect(screen.getByText("51000.00")).toBeInTheDocument();
   });
 
-  it("warns that switching ends the quote stream before it switches", async () => {
-    // `terminal-accounts` spec, "Operator przełącza konto" — the cost lands in the
-    // archive, which this screen does not show.
+  it("says who a switch moves before it switches", async () => {
+    // `terminal-accounts` spec, "Operator przełącza konto" — the cost lands on callers
+    // this screen does not show.
     const user = userEvent.setup();
     const { api, state } = fakeApi();
     render(<AccountsView api={api} />);
@@ -188,13 +188,27 @@ describe("AccountsView", () => {
 
     await user.click(screen.getByRole("button", { name: /make active/i }));
 
-    expect(screen.getByText(/ends the provider's quote stream/i)).toBeInTheDocument();
+    expect(screen.getByText(/every order that names no account/i)).toBeInTheDocument();
     expect(state.switched).toEqual([]);
 
     await user.click(screen.getByRole("button", { name: "Switch" }));
 
     await waitFor(() => expect(state.switched).toEqual(["a2"]));
-    expect(await screen.findByText(/on demo2, the account being traded/i)).toBeInTheDocument();
+    expect(await screen.findByText(/on demo2, the active account/i)).toBeInTheDocument();
+  });
+
+  it("shows another account's positions without making it active", async () => {
+    // `terminal-accounts` spec, "Operator ogląda pozycje innego konta"
+    const user = userEvent.setup();
+    const { api, state } = fakeApi();
+    render(<AccountsView api={api} />);
+    await screen.findByText("demo2");
+
+    await user.click(screen.getByRole("button", { name: "demo2" }));
+
+    expect(await screen.findByText("GOLD")).toBeInTheDocument();
+    expect(screen.getByText(/on demo2, not the active account/i)).toBeInTheDocument();
+    expect(state.switched).toEqual([]);
   });
 
   it("leaves the active account alone when the switch is refused", async () => {
@@ -209,6 +223,6 @@ describe("AccountsView", () => {
     await user.click(screen.getByRole("button", { name: "Switch" }));
 
     expect(await screen.findByText(/would not switch/i)).toBeInTheDocument();
-    expect(screen.getByText(/on EUR, the account being traded/i)).toBeInTheDocument();
+    expect(screen.getByText(/on EUR, the active account/i)).toBeInTheDocument();
   });
 });

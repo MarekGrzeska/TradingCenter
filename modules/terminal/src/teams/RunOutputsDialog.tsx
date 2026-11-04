@@ -250,6 +250,7 @@ function Placed({ trades, runOver }: { trades: TeamTrade[]; runOver: boolean }) 
               {trade.direction && <span className="text-ink-faint"> {trade.direction}</span>}
               {trade.size && <span className="text-ink-faint"> ×{trade.size}</span>}
               {trade.level && <span className="text-ink-faint"> @{trade.level}</span>}
+              {trade.accountId && <span className="text-ink-faint"> on {trade.accountId}</span>}
             </span>
             <span className={outcome.known ? "text-ink-faint" : "text-warning"}>
               {outcome.text}

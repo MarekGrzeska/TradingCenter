@@ -36,7 +36,7 @@
 
 	handle @preflight {
 		header Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
-		header Access-Control-Allow-Headers "Authorization, Content-Type"
+		header Access-Control-Allow-Headers "Authorization, Content-Type, X-Capital-Account"
 		header Access-Control-Max-Age 600
 		respond 204
 	}

@@ -1003,7 +1003,7 @@
     },
     "/accounts/active": {
       "put": {
-        "description": "Switch the active account. Positions and orders act on it afterwards.\n\n**Switching drops the quote stream.** capital.com ends the streaming session when the\nfinancial account changes, so anything collecting candles through `/ws/quotes` sees a\ndisconnect and reconnects on its own — a gap of seconds, in data nobody is watching at\nthe moment of the switch. Said here because this route answers success while the\nconsequence lands somewhere else entirely.",
+        "description": "Switch the active account: the one every request naming no account acts on afterwards.\n\nA request naming an account in `X-Capital-Account` is not moved, and the stream rides a session\nof its own that is never switched.",
         "operationId": "set_active_account_accounts_active_put",
         "requestBody": {
           "content": {
@@ -1045,8 +1045,28 @@
     },
     "/accounts/top-up": {
       "post": {
-        "description": "Move the demo account's balance, and answer with the account as it stands after.\n\nActs on the **active** account — there is no account id to pass, because capital.com\nadjusts the session's own account and a parameter here would promise a choice that\ndoes not exist. Switch first if the money belongs somewhere else.",
+        "description": "Move the demo account's balance, and answer with the account as it stands after.\n\nActs on the account named in `X-Capital-Account`, or on the active one: capital.com adjusts\nthe session's own account, and each named account has a session of its own.",
         "operationId": "top_up_accounts_top_up_post",
+        "parameters": [
+          {
+            "description": "the account this request acts on; omitted, the active one. Naming an account never changes which one is active, and an account the provider does not list is a 400",
+            "in": "header",
+            "name": "X-Capital-Account",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the account this request acts on; omitted, the active one. Naming an account never changes which one is active, and an account the provider does not list is a 400",
+              "title": "X-Capital-Account"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1476,6 +1496,26 @@
       "post": {
         "description": "Place an order. MARKET fills now (FILLED); LIMIT and STOP rest (WORKING).\n\nThe answer is settled, not acknowledged. A deal the provider has not resolved comes\nback PENDING with its reference — never FILLED.",
         "operationId": "place_order_orders_post",
+        "parameters": [
+          {
+            "description": "the account this request acts on; omitted, the active one. Naming an account never changes which one is active, and an account the provider does not list is a 400",
+            "in": "header",
+            "name": "X-Capital-Account",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the account this request acts on; omitted, the active one. Naming an account never changes which one is active, and an account the provider does not list is a 400",
+              "title": "X-Capital-Account"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1517,6 +1557,26 @@
     "/positions": {
       "get": {
         "operationId": "positions_positions_get",
+        "parameters": [
+          {
+            "description": "the account this request acts on; omitted, the active one. Naming an account never changes which one is active, and an account the provider does not list is a 400",
+            "in": "header",
+            "name": "X-Capital-Account",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the account this request acts on; omitted, the active one. Naming an account never changes which one is active, and an account the provider does not list is a 400",
+              "title": "X-Capital-Account"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -1531,6 +1591,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Positions",
@@ -1550,6 +1620,24 @@
             "schema": {
               "title": "Position Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "the account this request acts on; omitted, the active one. Naming an account never changes which one is active, and an account the provider does not list is a 400",
+            "in": "header",
+            "name": "X-Capital-Account",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the account this request acts on; omitted, the active one. Naming an account never changes which one is active, and an account the provider does not list is a 400",
+              "title": "X-Capital-Account"
             }
           }
         ],
@@ -1591,6 +1679,24 @@
             "schema": {
               "title": "Position Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "the account this request acts on; omitted, the active one. Naming an account never changes which one is active, and an account the provider does not list is a 400",
+            "in": "header",
+            "name": "X-Capital-Account",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the account this request acts on; omitted, the active one. Naming an account never changes which one is active, and an account the provider does not list is a 400",
+              "title": "X-Capital-Account"
             }
           }
         ],
@@ -1634,8 +1740,28 @@
     },
     "/working-orders": {
       "get": {
-        "description": "Resting LIMIT and STOP orders on the active account.",
+        "description": "Resting LIMIT and STOP orders on the named account, or on the active one.",
         "operationId": "working_orders_working_orders_get",
+        "parameters": [
+          {
+            "description": "the account this request acts on; omitted, the active one. Naming an account never changes which one is active, and an account the provider does not list is a 400",
+            "in": "header",
+            "name": "X-Capital-Account",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the account this request acts on; omitted, the active one. Naming an account never changes which one is active, and an account the provider does not list is a 400",
+              "title": "X-Capital-Account"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -1650,6 +1776,16 @@
               }
             },
             "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
           }
         },
         "summary": "Working Orders",
@@ -1669,6 +1805,24 @@
             "schema": {
               "title": "Order Id",
               "type": "string"
+            }
+          },
+          {
+            "description": "the account this request acts on; omitted, the active one. Naming an account never changes which one is active, and an account the provider does not list is a 400",
+            "in": "header",
+            "name": "X-Capital-Account",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the account this request acts on; omitted, the active one. Naming an account never changes which one is active, and an account the provider does not list is a 400",
+              "title": "X-Capital-Account"
             }
           }
         ],

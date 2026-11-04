@@ -24,7 +24,10 @@ of this has anything to do with the capital.com credentials above it.
 - `dtos.py` — the contract: `Instrument`, `Candle`, `CandleHistory`, `Account`, `Position`,
   `Order`, `WorkingOrder`.
 - `config.py` — settings and the demo-only guard.
-- `client.py` — async REST, session renewal, one shared login, one retry on 401.
+- `client.py` — async REST, session renewal, one shared login, one retry on 401, and the account a
+  renewed session is put back on.
+- `pool.py` — one session per account a caller names in `X-Capital-Account`, the default one whose
+  account is "active", and the stream's own, which is never switched.
 - `rategate.py` — the sliding window that keeps every provider call under 10/s.
 - `mapping.py` — payload → DTO. Pure, testable against fixtures alone.
 - `adapter.py` — accounts, instruments, candles, trading, settlement.
@@ -82,7 +85,7 @@ HTTP, described by OpenAPI at `/docs`.
 | GET | `/instruments/{symbol}/history` | `CandleHistory` — paged, with its cost |
 | GET | `/instruments/{symbol}/history?before=` | the same, reaching back from a past instant instead of now |
 | GET | `/instruments/{symbol}/history?after=` | the same, stopping at an instant — a lower bound in time, which `bars` cannot express |
-| GET | `/positions` | `Position[]` |
+| GET | `/positions` | `Position[]` — like every trading route and the top-up, on the account in `X-Capital-Account`, or the active one |
 | POST | `/orders` | `Order` — MARKET fills, LIMIT/STOP rest |
 | DELETE | `/positions/{id}` | `Order` — close |
 | PUT | `/positions/{id}` | `Order` — set/remove SL/TP |
@@ -215,8 +218,9 @@ ten minutes, and snaps back to two on the first data. A shut market is silent by
 and can be shut all weekend; at the ceiling the 29 rooms this account runs cost about **0.05
 requests a second**, out of the ten per second the whole account shares.
 
-**Ten requests per second, per process.** The gate lives on the client, and the app owns one
-client — so two clients in one process would be two gates and twice the rate.
+**Ten requests per second, per process, and one login per second.** The gates live in the session
+pool (`pool.py`) and every session shares them — the provider counts both per login, not per session,
+and a second login inside a second is `429 error.too-many.requests`, measured 28 October 2026.
 
 **Nothing is stored.** This is a window onto capital.com, not an archive of it — `MINUTE_5`
 reaches back about two years and nothing recovers what is past that.
@@ -251,3 +255,17 @@ symptom (slowness, not 401s).
 Not measured: live accounts, and whether this behaviour is stable over time. A 401 storm
 was really observed on 9–10 August; `stream_tokens_for` in `capital_gateway/app.py` names
 what does explain it, which is a session going idle.
+
+## One session per account — measured 28 October 2026
+
+The account is state of the *session*, not of the login. Four sessions from one key stood on three
+accounts at once; a position opened on one was not in another's `GET /positions`; and a session
+switching accounts did not interrupt another session's stream. So a request naming an account in
+`X-Capital-Account` gets a session standing on that account, opened on first use and checked against
+`GET /accounts` first — an account the provider does not list is a `400`, never a fall-back to the
+active one. A request naming none uses the default session, which `PUT /accounts/active` switches.
+
+**A fresh login opens on the preferred account**, whatever the session stood on before. A renewed
+session is therefore put back on its account inside the login itself, before any waiter sees it, and
+a refused restore fails the call rather than running it elsewhere. `--run-live-trading` keeps all
+three measurements.

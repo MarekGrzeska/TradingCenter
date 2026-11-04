@@ -991,6 +991,8 @@ export interface components {
          *     at all, the same way agent's own `SessionOut` never carries one.
          */
         TeamOut: {
+            /** Account Id */
+            account_id: string | null;
             /**
              * Created At
              * Format: date-time
@@ -1072,6 +1074,8 @@ export interface components {
          *     saying `sent` after its run finished is an order whose fate this module does not know.
          */
         TradeOut: {
+            /** Account Id */
+            account_id: string | null;
             /** Agent Key */
             agent_key: string;
             /**
@@ -1108,10 +1112,15 @@ export interface components {
         };
         /**
          * TradingLimits
-         * @description What a revision allows its agents to do to the account: all three optional, an omitted one meaning no limit at
-         *     all. What is not negotiable lives a module away, in a `trading-mcp` that starts only against the demo account.
+         * @description What a revision allows its agents to do to the account, and which account: every field optional, an omitted limit
+         *     meaning no limit at all. What is not negotiable lives a module away, in a `trading-mcp` that starts only against demo.
          */
         TradingLimits: {
+            /**
+             * Account Id
+             * @description the demo account this team trades on, an id from the gateway's account list; null means the active one. Put into every account tool call by the run, never chosen by the model
+             */
+            account_id?: string | null;
             /**
              * Max Order Size
              * @description largest size one order may carry; null means no limit

@@ -10,6 +10,8 @@ export interface JsonRequest {
   signal: AbortSignal;
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
+  /** Extra request headers. Never a credential: that is attached below, from `identity`. */
+  headers?: Record<string, string>;
 }
 
 export type StatusMapper = (status: number, detail: string) => MarketDataError;
@@ -76,6 +78,7 @@ export function jsonClient(label: string, mapStatus: StatusMapper, identity: Ide
         headers: {
           ...(request.body === undefined ? {} : { "Content-Type": "application/json" }),
           ...(token === null ? {} : { Authorization: `Bearer ${token}` }),
+          ...request.headers,
         },
         ...(request.body === undefined ? {} : { body: JSON.stringify(request.body) }),
       });

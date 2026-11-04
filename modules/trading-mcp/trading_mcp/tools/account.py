@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from ..client import GatewayClient
 from ..errors import ToolRefusal
-from ._shared import READ_ONLY, WRITE, _read, _send_change
+from ._shared import READ_ONLY, WRITE, AccountId, _read, _send_change
 
 
 class PositionOut(BaseModel):
@@ -52,28 +52,28 @@ class BalanceOut(BaseModel):
 
 def register(mcp: FastMCP, gateway: GatewayClient) -> None:
     @mcp.tool(annotations=READ_ONLY)
-    async def get_positions() -> list[PositionOut]:
+    async def get_positions(account_id: AccountId = None) -> list[PositionOut]:
         """Open positions on the demo account — no price here, only what was already
         opened and its running result. An account with nothing open answers an empty
         list, not an error.
         """
-        rows = await _read(gateway, "/positions")
+        rows = await _read(gateway, "/positions", account_id)
         return [PositionOut.model_validate(row) for row in rows]
 
     @mcp.tool(annotations=READ_ONLY)
-    async def get_working_orders() -> list[WorkingOrderOut]:
+    async def get_working_orders(account_id: AccountId = None) -> list[WorkingOrderOut]:
         """Resting LIMIT and STOP orders on the demo account that have not filled
         yet."""
-        rows = await _read(gateway, "/working-orders")
+        rows = await _read(gateway, "/working-orders", account_id)
         return [WorkingOrderOut.model_validate(row) for row in rows]
 
     @mcp.tool(annotations=READ_ONLY)
-    async def get_balance() -> BalanceOut:
+    async def get_balance(account_id: AccountId = None) -> BalanceOut:
         """The demo account's balance, available funds and running profit or loss.
         Not a price and not a position — call `get_positions` for what is open."""
         rows = await _read(gateway, "/accounts")
         for row in rows:
-            if row.get("active"):
+            if (row["id"] == account_id) if account_id else row.get("active"):
                 return BalanceOut(
                     account_id=row["id"],
                     name=row["name"],
@@ -82,6 +82,8 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
                     available=row["available"],
                     pnl=row["pnl"],
                 )
+        if account_id:
+            raise ToolRefusal(f"refused: capital-gateway lists no account {account_id}")
         raise ToolRefusal("refused: capital-gateway did not name an active account")
 
     @mcp.tool(annotations=READ_ONLY)
@@ -105,12 +107,8 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
     @mcp.tool(annotations=WRITE)
     async def switch_active_account(account_id: str) -> AccountOut:
         """Make another demo account the one that orders and positions act on. Take the id
-        from `list_accounts`.
-
-        Switching drops the provider's quote stream: the archive that collects candles
-        loses its feed for a few seconds and reconnects on its own. That gap is in the
-        collected data, not in this conversation, so nothing here will show it to you —
-        do not switch accounts in the middle of asking about a live market.
+        from `list_accounts`. It moves every caller that names no account; to act on
+        another account once, pass its `account_id` to that tool instead.
         """
         payload = await _send_change(
             gateway,
@@ -129,9 +127,9 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
         )
 
     @mcp.tool(annotations=WRITE)
-    async def top_up_demo_account(amount: float) -> AccountOut:
-        """Move the active demo account's balance by `amount`, and answer with the account
-        as it stands afterwards. Negative takes funds away, which is as much a way of
+    async def top_up_demo_account(amount: float, account_id: AccountId = None) -> AccountOut:
+        """Move a demo account's balance by `amount` — the one `account_id` names, or the
+        active one — and answer with the account as it stands afterwards. Negative takes funds away, which is as much a way of
         setting up a test as adding them.
 
         Demo money only — this module never reaches a live account. The provider keeps its
@@ -144,6 +142,7 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
             "/accounts/top-up",
             json={"amount": amount},
             read_back="read the accounts",
+            account=account_id,
         )
         return AccountOut(
             id=payload["id"],

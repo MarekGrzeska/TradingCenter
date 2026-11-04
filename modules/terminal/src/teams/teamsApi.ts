@@ -51,6 +51,8 @@ export interface TeamSummary {
   name: string;
   description: string;
   latestRevision: number;
+  /** The latest revision's account — what lets the editor say which teams share one. */
+  accountId?: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -88,6 +90,8 @@ export interface TeamTradingLimits {
   maxOrderSize: string | null;
   ordersPerRun: number | null;
   ordersPerDay: number | null;
+  /** The demo account the team trades on; empty is the active one. The run, not the model, puts it into every call. */
+  accountId?: string | null;
 }
 
 export interface TeamDefinition {
@@ -373,6 +377,7 @@ function mapTeam(raw: RawTeam): TeamSummary {
     name: raw.name,
     description: raw.description,
     latestRevision: raw.latest_revision,
+    accountId: raw.account_id ?? null,
     createdAt: parseIsoToEpochSeconds(raw.created_at),
     updatedAt: parseIsoToEpochSeconds(raw.updated_at),
   };
@@ -405,6 +410,7 @@ function mapDefinition(raw: RawDefinition): TeamDefinition {
       maxOrderSize: raw.trading?.max_order_size ?? null,
       ordersPerRun: raw.trading?.orders_per_run ?? null,
       ordersPerDay: raw.trading?.orders_per_day ?? null,
+      accountId: raw.trading?.account_id ?? null,
     },
   };
 }
@@ -428,6 +434,7 @@ function definitionToWire(definition: TeamDefinition): RawDefinition {
       max_order_size: definition.trading.maxOrderSize,
       orders_per_run: definition.trading.ordersPerRun,
       orders_per_day: definition.trading.ordersPerDay,
+      account_id: definition.trading.accountId ?? null,
     },
   };
 }

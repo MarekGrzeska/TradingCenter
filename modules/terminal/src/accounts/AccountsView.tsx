@@ -8,8 +8,8 @@ import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 
 /**
- * The demo accounts and the money on them. Positions belong to the active account only — reading another's would mean
- * switching to it, which ends the quote stream and moves where the next order goes; never done to satisfy a read.
+ * The demo accounts and the money on them. Any account's positions can be looked at without making it active: the
+ * gateway keeps a session per account, and switching would move every caller that names none — never done for a read.
  */
 
 /** How often the screen re-asks. The provider counts ten requests a second per account against everything
@@ -30,15 +30,22 @@ export function AccountsView({ api }: { api?: AccountsApi } = {}) {
     pollMs: POLL_MS,
   });
 
+  // Null follows the active account, whichever that is by the next poll.
+  const [viewingId, setViewingId] = useState<string | null>(null);
+
   const positions = useRead({
-    key: ["gateway", "positions"],
-    read: (signal) => client.listPositions(signal),
+    key: ["gateway", "positions", viewingId ?? "active"],
+    read: (signal) => client.listPositions(signal, viewingId),
     initial: EMPTY_POSITIONS,
     fallbackMessage: "could not read the open positions",
     pollMs: POLL_MS,
   });
 
   const active = accounts.value.find((account) => account.active) ?? null;
+  const viewed =
+    viewingId === null
+      ? active
+      : (accounts.value.find((account) => account.id === viewingId) ?? null);
   const [pendingSwitch, setPendingSwitch] = useState<DemoAccount | null>(null);
   const [toppingUp, setToppingUp] = useState(false);
 
@@ -55,7 +62,7 @@ export function AccountsView({ api }: { api?: AccountsApi } = {}) {
           demo only · refreshed every {POLL_MS / 1000}s
         </span>
         <div className="ml-auto flex items-center gap-2">
-          <Button size="xs" onClick={() => setToppingUp(true)} disabled={active === null}>
+          <Button size="xs" onClick={() => setToppingUp(true)} disabled={viewed === null}>
             Add funds
           </Button>
           <Button size="xs" tone="muted" onClick={reloadBoth}>
@@ -87,8 +94,22 @@ export function AccountsView({ api }: { api?: AccountsApi } = {}) {
           </thead>
           <tbody>
             {accounts.value.map((account) => (
-              <tr key={account.id} className="border-b border-border last:border-b-0">
-                <td className="px-3 py-2 text-ink">{account.name}</td>
+              <tr
+                key={account.id}
+                className={`border-b border-border last:border-b-0 ${
+                  account.id === viewed?.id ? "bg-sunken" : ""
+                }`}
+              >
+                <td className="px-3 py-2 text-ink">
+                  <button
+                    type="button"
+                    className="hover:underline"
+                    aria-pressed={account.id === viewed?.id}
+                    onClick={() => setViewingId(account.active ? null : account.id)}
+                  >
+                    {account.name}
+                  </button>
+                </td>
                 <td className="px-3 py-2 text-ink-secondary">{account.currency}</td>
                 <td className="px-3 py-2 text-right font-mono text-ink">
                   {account.balance.toFixed(2)}
@@ -131,9 +152,11 @@ export function AccountsView({ api }: { api?: AccountsApi } = {}) {
         <h2 className="text-sm font-semibold text-ink">
           Open positions
           <span className="ml-2 text-xs font-normal text-ink-faint">
-            {active === null
+            {viewed === null
               ? "— no active account"
-              : `— on ${active.name}, the account being traded`}
+              : viewed.active
+                ? `— on ${viewed.name}, the active account`
+                : `— on ${viewed.name}, not the active account`}
           </span>
         </h2>
 
@@ -186,11 +209,11 @@ export function AccountsView({ api }: { api?: AccountsApi } = {}) {
         </div>
       </div>
 
-      {toppingUp && active !== null && (
+      {toppingUp && viewed !== null && (
         <TopUpDialog
-          account={active}
+          account={viewed}
           onConfirm={async (amount) => {
-            await client.topUp(amount, new AbortController().signal);
+            await client.topUp(amount, new AbortController().signal, viewingId);
             reloadBoth();
           }}
           onClose={() => setToppingUp(false)}
@@ -205,6 +228,7 @@ export function AccountsView({ api }: { api?: AccountsApi } = {}) {
           fallbackError="the account could not be switched"
           onConfirm={async () => {
             await client.switchAccount(pendingSwitch.id, new AbortController().signal);
+            setViewingId(null);
             reloadBoth();
           }}
           onClose={() => setPendingSwitch(null)}
@@ -212,12 +236,13 @@ export function AccountsView({ api }: { api?: AccountsApi } = {}) {
           {/* Said before, not after: the cost of this lands in a part of the system this screen does
               not show. */}
           <p className="text-sm text-ink-secondary">
-            Every order placed after this acts on <strong>{pendingSwitch.name}</strong>.
+            Every order that names no account acts on <strong>{pendingSwitch.name}</strong>{" "}
+            after this: the conversation, teams without an account of their own and the
+            operator's MCP client.
           </p>
           <p className="mt-2 text-sm text-ink-secondary">
-            Switching also ends the provider's quote stream: the archive stops receiving
-            candles for a few seconds and reconnects on its own. That gap is in the
-            collected data, not on this screen.
+            Teams with an account of their own keep trading where they were. To look at an
+            account's positions, click its name instead.
           </p>
         </ConfirmDialog>
       )}
