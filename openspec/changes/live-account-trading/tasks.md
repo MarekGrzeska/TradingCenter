@@ -33,8 +33,8 @@
 
 ## 5. Claude Code i agent z Telegrama
 
-- [ ] 5.1 `scripts/claude-mcp.sh`: serwer `tc-trading-live` pod `/trading-live/mcp`; README: nie dodawać jego narzędzi zapisujących do listy dozwolonych bez pytania
-- [ ] 5.2 `claude-agent`: serwer `tc-trading-live`, `AGENT_LIVE_ACCOUNT_WRITES` (domyślnie wyłączone, niezależne od `AGENT_ACCOUNT_WRITES`); `CLAUDE.md` agenta: potwierdzenie z kontem realnym, instrumentem, kierunkiem i wielkością; testy renderowania uprawnień
+- [x] 5.1 `scripts/claude-mcp.sh`: serwer `tc-trading-live` pod `/trading-live/mcp`; README: nie dodawać jego narzędzi zapisujących do listy dozwolonych bez pytania
+- [x] 5.2 `claude-agent`: serwer `tc-trading-live`, `AGENT_LIVE_ACCOUNT_WRITES` (domyślnie wyłączone, niezależne od `AGENT_ACCOUNT_WRITES`); `CLAUDE.md` agenta: potwierdzenie z kontem realnym, instrumentem, kierunkiem i wielkością; testy renderowania uprawnień
 
 ## 6. Wdrożenie
 

@@ -17,6 +17,7 @@
       "mcp__tc-strategies",
       "mcp__tc-team-tools",
       "mcp__tc-trading",
+      "mcp__tc-trading-live",
       "mcp__tc-telegram__telegram_destinations",
       "mcp__plugin_telegram_telegram"
     ],

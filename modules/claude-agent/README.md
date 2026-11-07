@@ -19,7 +19,8 @@ The entrypoint tests need bash, `jq` and coreutils' `timeout`, and skip without 
   operator's `admin` role, and its own application on the lists of callers.
 - **Its own application, the operator's person.** Signed in once with a device code as the operator, to the registration
   `app-tradingcenter-vps-agent`: teams it creates are the operator's, and every log names it apart from the desk client.
-- **Account writes off** unless `AGENT_ACCOUNT_WRITES=on`. `send_telegram_message`, the shell, file writes and the web are
+- **Account writes off** unless `AGENT_ACCOUNT_WRITES=on`; the live account's (`tc-trading-live`, `live-account-trading`)
+  off unless `AGENT_LIVE_ACCOUNT_WRITES=on`, a switch of its own that the demo one never opens. `send_telegram_message`, the shell, file writes and the web are
   denied either way (`agent/.claude/settings.json`, rendered by `claude_agent/render.py`).
 
 ## Layout

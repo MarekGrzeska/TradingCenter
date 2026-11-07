@@ -27,7 +27,8 @@ rm -rf "$WORKDIR/.claude" "$WORKDIR/CLAUDE.md" "$WORKDIR/.mcp.json"
 cp -r "$SRC/CLAUDE.md" "$SRC/.claude" "$WORKDIR/"
 "$PY" -m claude_agent.render settings "$SRC/.claude/settings.json" "$WORKDIR/.claude/settings.json"
 "$PY" -m claude_agent.render mcp "$WORKDIR/.mcp.json"
-[ "${AGENT_ACCOUNT_WRITES:-}" = on ] && log "account writes: ON (demo only)" || log "account writes: off"
+[ "${AGENT_ACCOUNT_WRITES:-}" = on ] && log "account writes: ON (demo)" || log "account writes: off"
+[ "${AGENT_LIVE_ACCOUNT_WRITES:-}" = on ] && log "LIVE account writes: ON (real money)" || log "live account writes: off"
 
 # New instructions (a deploy) start a fresh conversation rather than continue one held under the old ones.
 instructions=$(cd "$WORKDIR" && find CLAUDE.md .mcp.json .claude -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)

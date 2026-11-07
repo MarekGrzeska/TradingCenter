@@ -15,7 +15,7 @@ import mcp_token
 INSTALLER = Path(__file__).resolve().parents[1] / "claude-mcp.sh"
 
 
-def test_only_trading_mcp_is_registered_for_the_gateways_api(tmp_path: Path) -> None:
+def test_only_the_two_trading_mcps_are_registered_for_the_gateways_api(tmp_path: Path) -> None:
     calls = tmp_path / "calls"
     for tool in ("claude", "uv"):
         (tmp_path / tool).write_text(f'#!/bin/sh\necho "$@" >> {calls}\n')
@@ -30,6 +30,7 @@ def test_only_trading_mcp_is_registered_for_the_gateways_api(tmp_path: Path) -> 
             registered[name] = json.loads(config)
     apis = {name: config["headersHelper"].rsplit("--api ", 1)[1] for name, config in registered.items()}
     assert apis.pop("tc-trading") == "gateway"
+    assert apis.pop("tc-trading-live") == "gateway"
     assert len(apis) == 9 and set(apis.values()) == {"workbench"}
     assert registered["tc-trading"]["url"] == "https://api.example/trading/mcp"
 
