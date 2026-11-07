@@ -164,6 +164,7 @@ jobs:
           VITE_ARCHIVE_WS="wss://${{ vars.API_HOST }}/market/ws" \
           VITE_WORKBENCH_HTTP="$API" \
           VITE_GATEWAY_HTTP="https://${{ vars.GATEWAY_HOST }}" \
+          VITE_LIVE_GATEWAY_HTTP="${{ vars.LIVE_TRADING == 'on' && format('https://{0}/live', vars.GATEWAY_HOST) || '' }}" \
           VITE_POLYMARKET_HTTP="$API/polymarket" \
           VITE_SOCIAL_HTTP="$API/social" \
           VITE_YOUTUBE_HTTP="$API/youtube" \
@@ -235,6 +236,15 @@ jobs:
           AGENT_TELEGRAM_OWNER_CHAT_ID: ${{ vars.AGENT_TELEGRAM_OWNER_CHAT_ID }}
           AGENT_ACCOUNT_WRITES: ${{ vars.AGENT_ACCOUNT_WRITES }}
           AGENT_CHECKINS: ${{ vars.AGENT_CHECKINS }}
+          # The live account (live-account-trading): nothing of it reaches the server unless LIVE_TRADING is `on`.
+          LIVE_TRADING: ${{ vars.LIVE_TRADING }}
+          AGENT_LIVE_ACCOUNT_WRITES: ${{ vars.AGENT_LIVE_ACCOUNT_WRITES }}
+          LIVE_ACCOUNT_ID: ${{ vars.LIVE_ACCOUNT_ID }}
+          LIVE_ORDER_LIMITS: ${{ vars.LIVE_ORDER_LIMITS }}
+          LIVE_CAPITAL_API_KEY: ${{ secrets.LIVE_CAPITAL_API_KEY }}
+          LIVE_CAPITAL_IDENTIFIER: ${{ secrets.LIVE_CAPITAL_IDENTIFIER }}
+          LIVE_CAPITAL_PASSWORD: ${{ secrets.LIVE_CAPITAL_PASSWORD }}
+          LIVE_GATEWAY_API_KEY: ${{ secrets.LIVE_GATEWAY_API_KEY }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           AGENT_DB_PASSWORD: ${{ secrets.AGENT_DB_PASSWORD }}
           TEAMS_DB_PASSWORD: ${{ secrets.TEAMS_DB_PASSWORD }}

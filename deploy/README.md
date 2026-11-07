@@ -77,6 +77,17 @@ After the deploy, on the server (`.local/vps/vps.sh run '…'`; the container is
 Account writes stay denied until `AGENT_ACCOUNT_WRITES=on` in `vps` and a deploy — after a week of reads. Closing the
 agent out of everything without a new image: drop `AGENT_APPLICATION_ID` from the two caller lists.
 
+## The live account
+
+Off by default, and then nothing of it reaches the server (`live-account-trading`). To turn it on, in the environment
+`vps`: the secrets `LIVE_CAPITAL_API_KEY`, `LIVE_CAPITAL_IDENTIFIER`, `LIVE_CAPITAL_PASSWORD` (a key generated on the
+live account at capital.com, 2FA on, its own custom password) and `LIVE_GATEWAY_API_KEY` (any long random string, not
+`GATEWAY_API_KEY`); the variables `LIVE_ACCOUNT_ID`, `LIVE_ORDER_LIMITS` (`{"US100": "0.5"}` — the instruments and the
+largest size of one order) and `LIVE_TRADING=on`. The next deploy adds `COMPOSE_PROFILES=live`, starts `gateway-live`
+and `trading-mcp-live`, waits for both like for the rest, and builds the terminal with the live account's address.
+`AGENT_LIVE_ACCOUNT_WRITES=on` opens the agent's writes there; the demo switch never does. Turning `LIVE_TRADING` off
+and deploying again stops both. The stop that needs no deploy is pausing the key at capital.com.
+
 ## Backups
 
 The server dumps each database nightly and keeps 14 days; that protects against a bad migration, not against losing the

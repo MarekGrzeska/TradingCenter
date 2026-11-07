@@ -72,6 +72,14 @@
 		}
 	}
 
+	# The live account's trading-mcp (live-account-trading), when the profile `live` runs it; a 502 when it does not.
+	handle_path /trading-live/* {
+		reverse_proxy trading-mcp-live:80 {
+			import edge_headers
+			flush_interval -1
+		}
+	}
+
 	handle {
 		reverse_proxy workbench:80 {
 			import edge_headers
@@ -90,6 +98,14 @@
 	# does (the candle stream is the workbench's, with its own ticket). Not carried at the edge at all.
 	@stream path /ws/stream
 	respond @stream 404
+
+	# The live account's gateway, for the terminal: its account and close-everything (live-account-trading). It serves
+	# no stream, so there is nothing of one to keep off here.
+	handle_path /live/* {
+		reverse_proxy gateway-live:80 {
+			import edge_headers
+		}
+	}
 
 	reverse_proxy gateway:80 {
 		import edge_headers

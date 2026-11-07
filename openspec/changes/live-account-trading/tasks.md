@@ -38,10 +38,10 @@
 
 ## 6. Wdrożenie
 
-- [ ] 6.1 `docker-compose.yml`: `gateway-live` i `trading-mcp-live` w profilu `live`, sieci `live-core` i `live-tools` (workbench tylko w `live-tools`); test compose: żadna z nich nie ma `ports:`, workbench nie jest w `live-core`
-- [ ] 6.2 `Caddyfile`: `/trading-live/*` na hoście API, `/live/*` na hoście bramy (bez `/ws/stream`), nagłówki krawędzi
-- [ ] 6.3 `assemble_env.py` i `env.required`: przy `LIVE_TRADING=on` komplet sekretów realnych i `COMPOSE_PROFILES=live`, odmowa przy kluczu bramy realnej równym demo; bez `on` nic nie wymagane; testy
-- [ ] 6.4 `docs/architecture.md` („The order path”): druga para procesów; CLAUDE.md: wiersz o konto realnym w tabeli modułów i w „Things that will bite you”
+- [x] 6.1 `docker-compose.yml`: `gateway-live` i `trading-mcp-live` w profilu `live`, sieci `live-core` i `live-tools` (workbench tylko w `live-tools`); test compose: żadna z nich nie ma `ports:`, workbench nie jest w `live-core`
+- [x] 6.2 `Caddyfile`: `/trading-live/*` na hoście API, `/live/*` na hoście bramy (bez `/ws/stream`), nagłówki krawędzi
+- [x] 6.3 `assemble_env.py` i `env.required`: przy `LIVE_TRADING=on` komplet sekretów realnych i `COMPOSE_PROFILES=live`, odmowa przy kluczu bramy realnej równym demo; bez `on` nic nie wymagane; testy
+- [x] 6.4 `docs/architecture.md` („The order path”): druga para procesów; CLAUDE.md: wiersz o konto realnym w tabeli modułów i w „Things that will bite you”
 
 ## 7. Uruchomienie na serwerze (operator i próba)
 
