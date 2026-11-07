@@ -27,9 +27,9 @@
 
 ## 4. Terminal: konto realne
 
-- [ ] 4.1 `VITE_LIVE_GATEWAY_HTTP` (brak = brak sekcji), klient odczytu konta realnego, proxy w dev
-- [ ] 4.2 Sekcja konta realnego na ekranie rachunku: saldo, pozycje, zlecenia oczekujące, odświeżanie, błąd odczytu powiedziany wprost, wyraźne odróżnienie od demo
-- [ ] 4.3 „Zamknij wszystko” z potwierdzeniem (liczba pozycji i zleceń) i skutkiem per element; trzy testy widoku (zamknięcie, rezygnacja, częściowa odmowa)
+- [x] 4.1 `VITE_LIVE_GATEWAY_HTTP` (brak = brak sekcji), klient odczytu konta realnego; bez proxy w dev, bo konto realne działa tylko na serwerze
+- [x] 4.2 Sekcja konta realnego na ekranie rachunku: saldo, pozycje, zlecenia oczekujące, odświeżanie, błąd odczytu powiedziany wprost, wyraźne odróżnienie od demo
+- [x] 4.3 „Zamknij wszystko” z potwierdzeniem (liczba pozycji i zleceń) i skutkiem per element; trzy testy widoku (zamknięcie, rezygnacja, częściowa odmowa)
 
 ## 5. Claude Code i agent z Telegrama
 
