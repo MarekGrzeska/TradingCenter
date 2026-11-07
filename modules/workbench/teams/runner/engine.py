@@ -139,7 +139,8 @@ async def execute_run(
             # never touches a server, and one that does is refused here rather than three agents in.
             plan = await plan_tools(
                 definition,
-                tool_registry,
+                # Only the account servers of the environment this revision trades on (`teams-trading`).
+                tool_registry.for_environment(definition.trading.environment),
                 # Which team is remembering, on whose behalf, in which run — bound onto the in-process
                 # tools here, because this is the first point where all three are known together.
                 memory=MemoryScope(
@@ -360,6 +361,7 @@ class _StepRunner:
                 agent_key=self._agent.key,
                 tool_name=name,
                 account_id=run.plan.account_for(name),
+                environment=run.plan.environment,
                 symbol=_text_arg(arguments, "symbol"),
                 direction=_text_arg(arguments, "direction"),
                 size=_decimal_arg(arguments, "size"),

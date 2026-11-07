@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     # The gateway's own key, shown to trading-mcp on a server — where no managed identity can present a scope.
     trading_mcp_api_key: str | None = None
     trading_mcp_request_timeout_seconds: float = 35.0
+    # The live account's tool server (`live-account-trading`), handed to the teams surface alone: the conversation never
+    # reaches the live account, whatever this file holds (`agent-trading`).
+    live_trading_mcp_url: str | None = None
+    live_trading_mcp_api_key: str | None = None
     # Hosts on the container network of this machine, comma-separated: reached with the key alone, no token.
     private_hosts: str = ""
 
@@ -172,6 +176,8 @@ class Settings(BaseSettings):
         "gateway_scope",
         "entra_tenant_id",
         "trading_mcp_api_key",
+        "live_trading_mcp_url",
+        "live_trading_mcp_api_key",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -251,6 +257,9 @@ class Settings(BaseSettings):
             trading_mcp_scope=self.trading_mcp_scope,
             trading_mcp_api_key=self.trading_mcp_api_key,
             trading_mcp_request_timeout_seconds=self.trading_mcp_request_timeout_seconds,
+            live_trading_mcp_url=self.live_trading_mcp_url,
+            live_trading_mcp_api_key=self.live_trading_mcp_api_key,
+            live_trading_mcp_request_timeout_seconds=self.trading_mcp_request_timeout_seconds,
             run_timeout_seconds=self.run_timeout_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
             scheduler_enabled=self.scheduler_enabled,

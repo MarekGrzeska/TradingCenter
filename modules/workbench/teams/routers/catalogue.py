@@ -35,7 +35,9 @@ async def _check(request: Request, definition: TeamDefinition) -> None:
         check_definition(
             definition,
             model_ids=state.catalogue.ids(),
-            announced=await announced_snapshot(state.settings, state.tools.local),
+            announced=await announced_snapshot(
+                state.settings, state.tools.local, environment=definition.trading.environment
+            ),
         )
     except DefinitionRefused as err:
         raise HTTPException(422, detail=str(err)) from err

@@ -74,7 +74,7 @@ większa niż potrzeba, skoro sieć daje to samo.
 ### D6. Zespoły: środowisko w rewizji, te same nazwy narzędzi
 
 `trading.environment` obok `trading.account_id`; zespół realny dostaje narzędzia rachunku z drugiego klienta MCP
-(`TEAMS_LIVE_TRADING_MCP_URL`, `TEAMS_LIVE_TRADING_MCP_API_KEY`). Odrzucone: osobne nazwy (`place_order_live`) —
+(`LIVE_TRADING_MCP_URL`, `LIVE_TRADING_MCP_API_KEY`, czytane przez `workbench/config.py` i podawane wyłącznie powierzchni zespołów). Odrzucone: osobne nazwy (`place_order_live`) —
 przeniesienie zespołu z demo na konto realne wymagałoby przepisania list narzędzi i promptów, a porównanie tego samego
 zespołu na obu kontach przestałoby być porównaniem tego samego.
 

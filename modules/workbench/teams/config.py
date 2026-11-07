@@ -79,6 +79,12 @@ class Settings(BaseSettings):
     trading_mcp_api_key: str | None = None
     # Hosts on the container network of this machine (`PRIVATE_HOSTS`, comma-separated): reached with the key alone.
     private_hosts: str = ""
+    # The live account's tool server (`live-account-trading`): the second trading-mcp, in front of the live account's
+    # gateway. Unset is a working configuration — every live team is refused at run time, every demo team runs as before.
+    live_trading_mcp_url: str | None = None
+    live_trading_mcp_scope: str | None = None
+    live_trading_mcp_api_key: str | None = None
+    live_trading_mcp_request_timeout_seconds: float = 35.0
     # A little past trading-mcp's own ceiling on capital-gateway — a write that takes the gateway's full
     # worst case still has to read here as "slow", not as this module's own timeout firing first.
     trading_mcp_request_timeout_seconds: float = 35.0
@@ -113,6 +119,9 @@ class Settings(BaseSettings):
         "trading_mcp_url",
         "trading_mcp_scope",
         "trading_mcp_api_key",
+        "live_trading_mcp_url",
+        "live_trading_mcp_scope",
+        "live_trading_mcp_api_key",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -169,6 +178,13 @@ class Settings(BaseSettings):
             scope=self.trading_mcp_scope,
             env_prefix="TRADING_MCP",
             api_key=self.trading_mcp_api_key,
+            private_hosts=self.private_host_names,
+        )
+        self.live_trading_mcp_url = self._coherent_tool_server_url(
+            url=self.live_trading_mcp_url,
+            scope=self.live_trading_mcp_scope,
+            env_prefix="LIVE_TRADING_MCP",
+            api_key=self.live_trading_mcp_api_key,
             private_hosts=self.private_host_names,
         )
         return self

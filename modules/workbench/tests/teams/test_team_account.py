@@ -8,6 +8,7 @@ import json
 import pytest
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
+from pydantic import ValidationError
 
 from teams.contract import AgentDefinition, TeamDefinition, TradingLimits
 from teams.tools import (
@@ -15,6 +16,7 @@ from teams.tools import (
     AccountNotListed,
     AnnouncedSnapshot,
     ToolServerRegistry,
+    ToolServerUnavailable,
     plan_tools,
 )
 from teams.validation import DefinitionRefused, check_definition
@@ -124,3 +126,71 @@ def test_a_team_on_its_own_account_may_not_carry_the_switch() -> None:
 
     assert "trader" in str(refused.value)
     assert "switch_active_account" in str(refused.value)
+
+
+def live_stand_in(mcp: FastMCP) -> None:
+    """The live account's trading-mcp: the same names as the demo one, its own single account."""
+
+    @mcp.tool(name="place_order", annotations=WRITE)
+    def place_order(symbol: str, account_id: str | None = None) -> str:
+        return json.dumps({"symbol": symbol, "account_id": account_id, "live": True})
+
+    @mcp.tool(name="list_accounts", annotations=READ_ONLY)
+    def list_accounts() -> list[dict]:
+        return [{"id": "L1"}]
+
+
+def on(environment: str, account_id: str | None) -> TeamDefinition:
+    definition = trader(account_id)
+    return definition.model_copy(
+        update={"trading": TradingLimits(environment=environment, account_id=account_id)}  # type: ignore[arg-type]
+    )
+
+
+async def _with_both(definition: TeamDefinition):
+    async with serving(build=trading_stand_in) as demo, serving(build=live_stand_in) as live:
+        registry = ToolServerRegistry.from_settings(settings_for(demo, live_trading_mcp_url=live))
+        try:
+            plan = await plan_tools(definition, registry.for_environment(definition.trading.environment))
+            outcome = await plan.call("place_order", {"symbol": "US100"}, agent_key="trader")
+        finally:
+            await registry.aclose()
+    return plan, json.loads(json.loads(outcome.text)["result"])
+
+
+async def test_a_live_team_trades_through_the_live_tool_server_only() -> None:
+    # specs/teams-trading, "Zespół na koncie realnym idzie przez serwer narzędzi konta realnego"
+    plan, sent = await _with_both(on("live", "L1"))
+
+    assert sent == {"symbol": "US100", "account_id": "L1", "live": True}
+    assert plan.environment == "live"
+
+
+async def test_a_demo_team_beside_a_configured_live_server_stays_on_demo() -> None:
+    plan, sent = await _with_both(on("demo", "X"))
+
+    assert "live" not in sent
+    assert plan.environment == "demo"
+
+
+async def test_a_live_team_with_no_live_tool_server_is_refused_before_any_agent() -> None:
+    # specs/teams-trading, "Przebieg realny bez serwera narzędzi konta realnego" — even with no tool assigned
+    definition = on("live", "L1").model_copy(update={"agents": [trader("L1").agents[0].model_copy(update={"tools": []})]})
+    registry = ToolServerRegistry.from_settings(settings_for(None))
+
+    with pytest.raises(ToolServerUnavailable, match="LIVE_TRADING_MCP_URL"):
+        await plan_tools(definition, registry.for_environment("live"))
+
+
+def test_a_live_team_must_name_its_account() -> None:
+    # specs/teams-trading, "Rewizja realna bez konta"
+    with pytest.raises(ValidationError, match="account_id"):
+        TradingLimits(environment="live")
+
+
+def test_a_revision_from_before_the_environment_reads_as_demo() -> None:
+    # specs/teams-trading, "Rewizja sprzed zmiany"
+    stored = trader("X").model_dump()
+    del stored["trading"]["environment"]
+
+    assert TeamDefinition.model_validate(stored).trading.environment == "demo"

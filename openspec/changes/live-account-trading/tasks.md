@@ -18,12 +18,12 @@
 
 ## 3. Workbench: zespoły na koncie realnym
 
-- [ ] 3.1 `trading.environment` w kontrakcie rewizji (domyślnie `demo`, stare rewizje czytają się jako demo); walidacja: realna bez konta odrzucona, realna z narzędziem spoza instancji realnej odrzucona z nazwą narzędzia i agenta
-- [ ] 3.2 `TEAMS_LIVE_TRADING_MCP_URL` i `_API_KEY` w `teams/config.py` (+ `PRIVATE_HOSTS`, `.env.example`); drugi klient MCP; zespół realny bierze narzędzia rachunku tylko z niego
-- [ ] 3.3 Przebieg realny bez skonfigurowanego serwera odmówiony przed pierwszym agentem; konto rewizji sprawdzane na liście kont instancji realnej
-- [ ] 3.4 Środowisko w wierszu śladu wywołania zapisującego (migracja `teams`, jeśli kolumna) i w odczycie przebiegu
-- [ ] 3.5 Test warstw: pakiet `agent` nie czyta ustawień serwera konta realnego; test, że narzędzia rozmowy pochodzą wyłącznie z instancji demo
-- [ ] 3.6 `contract-sync` dla kontraktu zespołów; terminal: wybór środowiska w edytorze rewizji i środowisko w widoku przebiegu
+- [x] 3.1 `trading.environment` w kontrakcie rewizji (domyślnie `demo`, stare rewizje czytają się jako demo); walidacja: realna bez konta odrzucona, realna z narzędziem spoza instancji realnej odrzucona z nazwą narzędzia i agenta
+- [x] 3.2 `LIVE_TRADING_MCP_URL` i `_API_KEY` (workbench → tylko `teams/config.py`) (+ `PRIVATE_HOSTS`, `.env.example`); drugi klient MCP; zespół realny bierze narzędzia rachunku tylko z niego
+- [x] 3.3 Przebieg realny bez skonfigurowanego serwera odmówiony przed pierwszym agentem; konto rewizji sprawdzane na liście kont instancji realnej
+- [x] 3.4 Środowisko w wierszu śladu wywołania zapisującego (migracja `teams`, jeśli kolumna) i w odczycie przebiegu
+- [x] 3.5 Test warstw: pakiet `agent` nie czyta ustawień serwera konta realnego; test, że narzędzia rozmowy pochodzą wyłącznie z instancji demo
+- [x] 3.6 `contract-sync` dla kontraktu zespołów; terminal: wybór środowiska w edytorze rewizji i środowisko w widoku przebiegu
 
 ## 4. Terminal: konto realne
 

@@ -105,6 +105,8 @@ export interface TeamTrade {
   reference: string | null;
   /** The account the run put the order on; null is the active one. */
   accountId?: string | null;
+  /** Demo, or the live account — real money. */
+  environment?: "demo" | "live";
   createdAt: number;
   settledAt: number | null;
 }
@@ -175,6 +177,7 @@ export function mapTrade(raw: RawTrade): TeamTrade {
     providerOrderId: raw.provider_order_id,
     reference: raw.reference,
     accountId: raw.account_id ?? null,
+    environment: raw.environment ?? "demo",
     createdAt: parseIsoToEpochSeconds(raw.created_at),
     settledAt: epochOrNull(raw.settled_at),
   };

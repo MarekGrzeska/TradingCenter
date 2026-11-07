@@ -403,6 +403,8 @@ async def _evaluate_condition(
     # Which source owns the name is asked here rather than assumed: a trigger names one tool without saying
     # whose, and most of the tools a trigger reads are local sources, not servers with an address. The list is
     # cached, so this costs one round trip.
+    # A condition is read, never traded on: the demo view, so the live account's tools never answer one.
+    tool_registry = tool_registry.for_environment("demo")
     server = await _server_announcing(tool_registry.configured(), trigger["tool_name"])
     if server is None:
         if not tool_registry.remote():

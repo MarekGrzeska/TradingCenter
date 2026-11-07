@@ -73,6 +73,8 @@ class ToolPlan:
     # it is handed lost it, and `call` overwrites whatever it sent anyway — or drops it, with no account.
     account_id: str | None = None
     on_account: frozenset[str] = frozenset()
+    # Which account the writes land on, for the trade rows: demo, or the live account.
+    environment: str = "demo"
 
     def account_for(self, name: str) -> str | None:
         return self.account_id if name in self.on_account else None
@@ -177,10 +179,15 @@ async def plan_tools(
     """Resolve the definition's tool names against every source's announcements, raising one of three `ToolAccessError`s.
     `memory` is the run this plan belongs to; absent, the in-process memory tools resolve but have no run to act in."""
     assigned = {name for agent in definition.agents for name in agent.tools}
+    if definition.trading.environment == "live":
+        _live_server_is_configured(registry, definition.trading.account_id)
     if not assigned:
         # Nothing is contacted at all — a team whose agents carry no tools runs whether or not any server
         # is configured. Asking anyway would make an outage elsewhere stop a run that never needed it.
-        return ToolPlan({agent.key: () for agent in definition.agents})
+        return ToolPlan(
+            {agent.key: () for agent in definition.agents},
+            environment=definition.trading.environment,
+        )
 
     resolution = await _resolve_all(registry)
     _raise_for_collisions(resolution, assigned)
@@ -260,7 +267,17 @@ async def plan_tools(
         local_by_name,
         account_id=account,
         on_account=on_account,
+        environment=definition.trading.environment,
     )
+
+
+def _live_server_is_configured(registry: ToolServerRegistry, account: str | None) -> None:
+    """Before anything else, tools or none: a team written for the live account has nothing to do anywhere else."""
+    if not any(s.environment == "live" and s.configured for s in registry.servers.values()):
+        raise ToolServerUnavailable(
+            f"this team trades on the live account ({account}), and the live account's tool server is not "
+            "configured (LIVE_TRADING_MCP_URL is unset)"
+        )
 
 
 def _without_account(tool: ToolDescriptor) -> ToolDescriptor:
@@ -338,11 +355,13 @@ async def _close_remote(registry: ToolServerRegistry) -> None:
 
 
 async def announced_snapshot(
-    settings: Settings, local: Mapping[str, Any] | None = None
+    settings: Settings, local: Mapping[str, Any] | None = None, *, environment: str = "demo"
 ) -> AnnouncedSnapshot:
-    """The save path's view of every source: the servers it can reach, and the tools this process serves itself. Its own
-    sessions, opened and closed inside this call, because a session left open when its task returns corrupts the scope stack."""
-    registry = _announcing(settings, local)
+    """The save path's view of every source a team of `environment` would be given: the servers it can reach, and the
+    tools this process serves itself. Its own sessions, opened and closed inside this call, because a session left open
+    when its task returns corrupts the scope stack."""
+    everything = _announcing(settings, local)
+    registry = everything.for_environment(environment)
     try:
         resolution = await _resolve_all(registry)
         return AnnouncedSnapshot(
@@ -358,15 +377,17 @@ async def announced_snapshot(
             unconfigured=tuple(registry.unconfigured()),
         )
     finally:
-        await _close_remote(registry)
+        await _close_remote(everything)
 
 
 async def announced_tools_by_server(
     settings: Settings, local: Mapping[str, Any] | None = None
 ) -> list[ToolDescriptor]:
     """Every tool every configured server publishes right now — the shape `GET /tools` wants. Raises naming
-    whichever server could not be asked: a partial list is not the complete catalogue the picker needs."""
-    registry = _announcing(settings, local)
+    whichever server could not be asked: a partial list is not the complete catalogue the picker needs. The demo view:
+    the live account's tool server announces the same names, and a picker listing each twice says nothing more."""
+    everything = _announcing(settings, local)
+    registry = everything.for_environment("demo")
     try:
         resolution = await _resolve_all(registry)
         if resolution.failed:
@@ -375,7 +396,7 @@ async def announced_tools_by_server(
             raise ToolServerUnavailable(f"{names} could not be reached: {details}")
         return [tool for hits in resolution.by_name.values() for _label, tool in hits]
     finally:
-        await _close_remote(registry)
+        await _close_remote(everything)
 
 
 def _agents_wanting(definition: TeamDefinition, tools: list[str]) -> list[str]:
