@@ -3,6 +3,8 @@ on every request, loopback included. The token beside it follows the address; th
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -18,6 +20,10 @@ class Settings(BaseSettings):
     # Chosen against the gateway's ordinary worst case — one slow upstream call plus a prompt confirm
     # poll, about 22s — not its pathological one, where raising this buys precision in a failing gateway.
     capital_gateway_request_timeout_seconds: float = 30.0
+
+    # What this instance expects the gateway to be bound to (`live-account-trading`). An expectation, never the truth:
+    # the gateway's answer decides, and a live instance in front of a demo gateway does not start, nor the other way.
+    expected_environment: Literal["demo", "live"] = "demo"
 
     trading_mcp_port: int = 8060
     # Loopback by default; the container overrides it in its Dockerfile.

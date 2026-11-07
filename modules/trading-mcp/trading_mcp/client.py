@@ -1,4 +1,4 @@
-"""The one seam every call to `capital-gateway` passes through, and the demo-only guard in front of
+"""The one seam every call to `capital-gateway` passes through, and the environment guard in front of
 every write. Reads retry once on a 5xx; writes never — the gateway accepts no idempotency key."""
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from tc_mcp_kit.detail import detail
 from tc_mcp_kit.outbound_identity import ManagedIdentityAuth
 
 from .config import Settings
-from .errors import GatewayRefused, GatewayUnavailable, NotDemoEnvironment
+from .errors import GatewayRefused, GatewayUnavailable, UnexpectedEnvironment
 
 # Matches `capital_gateway/config.py`'s `API_KEY_HEADER`. Duplicated rather than imported: no shared
 # library between modules.
@@ -19,7 +19,6 @@ GATEWAY_KEY_HEADER = "X-Gateway-Key"
 # The gateway's own name for "act on this account"; omitted, it acts on the active one.
 ACCOUNT_HEADER = "X-Capital-Account"
 
-DEMO_ENVIRONMENT = "demo"
 
 log = logging.getLogger(__name__)
 
@@ -40,21 +39,22 @@ class GatewayClient:
             ),
         )
         self._timeout_seconds = settings.capital_gateway_request_timeout_seconds
+        self._expected = settings.expected_environment
 
     async def aclose(self) -> None:
         await self._http.aclose()
         if self._credential is not None:
             await self._credential.close()
 
-    async def ensure_demo_environment(self) -> None:
-        """Refuse to proceed unless the gateway confirms it is bound to the demo account. Asked once,
-        before the port opens, and not again: the re-check could only ever prove the gateway answered."""
+    async def ensure_expected_environment(self) -> None:
+        """Refuse to proceed unless the gateway confirms it is bound to the environment this instance expects — demo,
+        unless told live. Asked once, before the port opens: the re-check could only ever prove the gateway answered."""
         payload = await self.get("/capabilities")
         environment = payload.get("environment")
-        if environment != DEMO_ENVIRONMENT:
-            raise NotDemoEnvironment(
-                f"capital-gateway reports environment {environment!r}, not "
-                f"{DEMO_ENVIRONMENT!r} — this module never touches a live account."
+        if environment != self._expected:
+            raise UnexpectedEnvironment(
+                f"capital-gateway reports environment {environment!r}, not {self._expected!r} — this "
+                f"instance expects {self._expected!r} and does not start in front of anything else."
             )
 
     async def get(

@@ -26,6 +26,7 @@ def _no_ambient_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         "EXTERNAL_CALLER_APPLICATION_IDS",
         "ENTRA_TENANT_ID",
         "ENTRA_AUDIENCES",
+        "EXPECTED_ENVIRONMENT",
     ):
         monkeypatch.delenv(name, raising=False)
 

@@ -4,8 +4,13 @@ MCP tools over `capital-gateway`'s demo account — account reads and order writ
 so a `teams` zespół can act on what it decides rather than only recommend it. See
 `openspec/changes/add-trading-tools/` for the proposal this module was built from.
 
-**Every write tool is demo-only, checked against the gateway, not against this
-module's own configuration.** `market-mcp` stays read-only to the letter — this is a
+**Every write tool acts on the environment the gateway confirms, not on this module's own
+configuration** — demo, unless `EXPECTED_ENVIRONMENT=live` names the second instance, which
+then refuses to start in front of anything but a gateway on the live account; a demo instance
+in front of a live gateway does not start either (`live-account-trading`). The live instance
+leaves out `switch_active_account` and `top_up_demo_account`, and every one of its tools says
+"live account" where the demo instance says demo; its writes open with "LIVE ACCOUNT — REAL
+MONEY". `market-mcp` stays read-only to the letter — this is a
 sixth module, not a switch flipped on the fifth one (specs/market-mcp-tools).
 
 **One transport: streamable HTTP.** No `stdio` — a locally spawned process carries no
@@ -27,11 +32,11 @@ system keeps.
   `market-data`'s Easy Auth, which only gates a remote instance).
 - `client.py` — the one seam every call to the gateway passes through. Reads retry
   once on a `5xx`; writes never retry, because the gateway takes no idempotency key.
-  Also the demo-only guard: `ensure_demo_environment()` reads `GET /capabilities` and
-  refuses to proceed unless it names `"demo"`. Asked once, before the port opens — a
+  Also the environment guard: `ensure_expected_environment()` reads `GET /capabilities` and
+  refuses to proceed unless it names the environment this instance expects. Asked once, before the port opens — a
   process that never listens cannot be reached, and the gateway derives that field from
   the host it is bound to rather than declaring it.
-- `errors.py` — `GatewayUnavailable`, `GatewayRefused` and `NotDemoEnvironment`, the
+- `errors.py` — `GatewayUnavailable`, `GatewayRefused` and `UnexpectedEnvironment`, the
   three ways a call to the gateway can fail, kept apart because only one of them is
   worth retrying and only one of them is this module's own guard rather than the
   gateway's answer.
@@ -125,10 +130,11 @@ App Service that has to exist first:
    guess (specs/teams-tool-access).
 
 **What to check after the first deploy, and it is not the same as "the site answers".**
-This module refuses to start against anything but the demo account, checked against the
+This module refuses to start against anything but the environment it expects, checked against the
 gateway's own `GET /capabilities` rather than against its own configuration
 (specs/trading-mcp-upstream-access). A `/health` that answers is therefore already proof
-of two things: the gateway is reachable with the shared key, and it is a demo session.
+of two things: the gateway is reachable with the shared key, and it is bound where this
+instance expects — a demo session, or on the live instance the live account.
 
 **Rollback.** Clear `TRADING_MCP_URL` and `TRADING_MCP_SCOPE` on `teams` and restart it.
 The read tools stay exactly where they were, teams without write tools is the state it ran

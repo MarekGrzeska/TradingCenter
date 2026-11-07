@@ -12,9 +12,9 @@
 
 ## 2. trading-mcp: oczekiwane środowisko
 
-- [ ] 2.1 `EXPECTED_ENVIRONMENT` (`demo`|`live`, domyślnie `demo`), porównanie z `/capabilities` w obie strony przed portem; `test_demo_guard.py` rozszerzony, przypadek demo bez zmian
-- [ ] 2.2 Instancja `live` nie rejestruje `switch_active_account` ani `top_up_demo_account`; instrukcje serwera i opisy narzędzi zapisujących nazywają środowisko
-- [ ] 2.3 Odmowa granic z bramy jako odmowa narzędzia nazywająca granicę; sufit powierzchni narzędzi obejmuje oba warianty
+- [x] 2.1 `EXPECTED_ENVIRONMENT` (`demo`|`live`, domyślnie `demo`), porównanie z `/capabilities` w obie strony przed portem; `test_demo_guard.py` rozszerzony, przypadek demo bez zmian
+- [x] 2.2 Instancja `live` nie rejestruje `switch_active_account` ani `top_up_demo_account`; instrukcje serwera i opisy narzędzi zapisujących nazywają środowisko
+- [x] 2.3 Odmowa granic z bramy jako odmowa narzędzia nazywająca granicę; sufit powierzchni narzędzi obejmuje oba warianty
 
 ## 3. Workbench: zespoły na koncie realnym
 
