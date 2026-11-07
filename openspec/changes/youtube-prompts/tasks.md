@@ -35,4 +35,4 @@
 ## 5. Wydanie
 
 - [x] 5.1 `uv run pytest` (z `-m db`), `ruff check .`, `pyright` w workbenchu; `pnpm test`, `lint`, `typecheck`, `contract:check` w terminalu
-- [ ] 5.2 PR, merge, `deploy-watch`; po wdrożeniu poprawić regułę z 0.1, jeśli była
+- [x] 5.2 PR, merge, `deploy-watch`; po wdrożeniu poprawić regułę z 0.1, jeśli była — potwierdzone przez operatora 7.11.2026

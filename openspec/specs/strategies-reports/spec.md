@@ -84,8 +84,8 @@ zapisanego w raporcie.
 
 Raport MUST zapisywać: identyfikator strategii, rewizję i hash jej treści, użyte parametry, model kosztów,
 wymagany depozyt instrumentu, gdy wielkość pozycji od niego zależała, zakres, przeczytaną rozgrzewkę, wersję silnika,
-ziarno oraz dla każdej przeczytanej serii odcisk danych (liczbę punktów, pierwszą i ostatnią chwilę, hash wartości) i
-fragmenty zakresu, których archiwum nie potwierdziło.
+serię wykonania, ziarno oraz dla każdej przeczytanej serii odcisk danych (liczbę punktów, pierwszą i ostatnią chwilę,
+hash wartości) i fragmenty zakresu, których archiwum nie potwierdziło.
 
 #### Scenario: Dane zmieniły się między uruchomieniami
 
@@ -96,6 +96,11 @@ fragmenty zakresu, których archiwum nie potwierdziło.
 
 - **WHEN** uruchomienie strategii z `margin_fraction` liczyło wielkość z depozytu 0,05
 - **THEN** raport MUST zapisywać depozyt 0,05 wśród tego, z czego powstał
+
+#### Scenario: Seria wykonania w odczycie agenta
+
+- **WHEN** agent czyta przez `read_backtest` uruchomienie strategii bez poziomów na `MINUTE_5`
+- **THEN** odczyt MUST podawać serię wykonania `MINUTE_5`
 
 ### Requirement: Uruchomienia są trwałe i policzone
 
@@ -118,4 +123,20 @@ krzywej nie zapisywała, MUST mieć to pole puste.
 
 - **WHEN** z krzywej raportu liczy się największe obsunięcie w procentach
 - **THEN** wynik MUST być równy obsunięciu w procentach podanemu w raporcie
+
+### Requirement: Raport mówi, skąd są koszty
+
+Raport MUST podawać źródło kosztów uruchomienia: żądanie, profil od brokera (z chwilą pobrania), profil operatora albo
+„bez kosztów”. Uruchomienie bez kosztów MUST być w raporcie oznaczone jako takie, którego wynik pomija spread,
+poślizg i finansowanie. Oznaczenie MUST NOT być oceną strategii.
+
+#### Scenario: Raport uruchomienia bez kosztów
+
+- **WHEN** uruchomienie było bez kosztów
+- **THEN** raport MUST mieć oznaczenie „bez kosztów” i źródło kosztów „bez kosztów”
+
+#### Scenario: Raport z kosztami od brokera
+
+- **WHEN** uruchomienie korzystało z profilu pobranego od brokera
+- **THEN** raport MUST podawać źródło „broker” i chwilę pobrania profilu
 

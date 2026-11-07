@@ -3,21 +3,31 @@
 ## Purpose
 Kontrakt REST modułu: na jakie pytania o zebrane posty odpowiada terminalowi i pocketowi, w jakim
 kształcie, i dlaczego nie ma w nim ani jednej trasy zmieniającej stan.
-
 ## Requirements
-
 ### Requirement: Kontrakt wyłącznie czyta
 
-Kontrakt MUST NOT publikować trasy, która zbiera, wzbogaca, zmienia albo kasuje cokolwiek. Zbiór
-jest czynnością pętli modułu, a nie zdolnością klienta.
+Kontrakt MUST NOT publikować trasy, która zbiera, wzbogaca albo kasuje cokolwiek. Nie może też
+zmieniać niczego poza jednym wyjątkiem opisanym niżej. Zbiór jest czynnością pętli modułu,
+a nie zdolnością klienta.
 
 Odróżnia to ten moduł od `polymarket-data`, gdzie trasy zmieniające stan są, bo tam istnieje lista
 obserwacji, którą operator układa. Tutaj nie ma czego układać: źródło jest zbierane w całości.
 
+Jedynym wyjątkiem jest znacznik zachowania newsa (`social-data-news-ingest`). Kontrakt MAY
+publikować trasę, która stawia albo zdejmuje ten znacznik przy jednym newsie. Ta trasa MUST NOT
+zmieniać niczego innego: ani treści newsa, ani jego momentów, ani żadnego posta. Znacznik jest
+decyzją operatora o retencji, a nie edycją archiwum.
+
 #### Scenario: Klient szuka drogi do wymuszenia zbioru
 
 - **WHEN** klient przegląda dokument kontraktu
-- **THEN** MUST NOT znaleźć trasy zapisującej, kasującej ani wymuszającej pobranie ze źródła
+- **THEN** MUST NOT znaleźć trasy kasującej ani wymuszającej pobranie ze źródła
+- **AND** jedyną trasą zapisującą MUST być ta, która stawia albo zdejmuje znacznik zachowania newsa
+
+#### Scenario: Znacznik nie dotyka treści
+
+- **WHEN** klient stawia znacznik zachowania przy newsie
+- **THEN** tytuł, lead, adres i wszystkie momenty newsa MUST zostać bez zmian
 
 ### Requirement: Okno i zawężenia są jawne w zapytaniu
 
@@ -79,3 +89,4 @@ między wygenerowanym plikiem a modułem MUST wywracać CI.
 - **WHEN** moduł zmienia kształt odpowiedzi, a wygenerowany kontrakt w terminalu albo w pocket
   nie został odświeżony
 - **THEN** CI MUST odmówić przejścia
+

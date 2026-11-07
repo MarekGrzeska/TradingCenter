@@ -35,27 +35,22 @@ sieci nie opuszcza.
 
 ### Requirement: Moduł przedstawia się tożsamością, nie hasłem
 
-Wobec bazy zdalnej moduł MUST uwierzytelniać się poświadczeniem wystawianym dla jego
-tożsamości i pobieranym przy nawiązywaniu połączenia; trwałe hasło do bazy zdalnej MUST NOT
-być wymagane do pracy modułu ani przechowywane w jego konfiguracji. Tryb tożsamości wybiera
-skonfigurowana nazwa roli (`DATABASE_USER`); konfiguracja trybu tożsamości, której
-`DATABASE_URL` niesie własne poświadczenie, MUST być odrzucona przy starcie.
+Moduł MUST uwierzytelniać się wobec bazy hasłem **własnej** roli, która jest właścicielem bazy modułu
+od jej utworzenia. Hasło MUST pochodzić z pliku sekretów serwera albo ze środowiska procesu i MUST NOT
+występować w repozytorium. Dopóki system działa także w Azure, tryb tożsamości (poświadczenie
+pobierane dla tożsamości przy nawiązywaniu połączenia) MUST działać jak dotąd; konfiguracja trybu
+tożsamości, której adres bazy niesie własne poświadczenie, MUST być odrzucona przy starcie.
 
-#### Scenario: Poświadczenia nie da się uzyskać
+#### Scenario: Moduł na serwerze
 
-- **WHEN** moduł startuje w trybie tożsamości, a wystawca poświadczeń jest nieosiągalny lub
-  odmawia
-- **THEN** moduł odmawia startu z komunikatem wskazującym uzyskanie poświadczenia jako
-  przyczynę
-- **AND** MUST NOT sięgać po zapasowe hasło ani ponawiać w nieskończonej pętli bez zgłoszenia
-  błędu
+- **WHEN** moduł startuje w trybie serwera z hasłem swojej roli w adresie bazy
+- **THEN** łączy się jako ta rola
 
-#### Scenario: Poświadczenie w URL obok tożsamości
+#### Scenario: Poświadczenie w adresie obok tożsamości
 
-- **WHEN** moduł startuje w trybie tożsamości, a `DATABASE_URL` niesie nazwę użytkownika lub
-  hasło
+- **WHEN** moduł startuje w trybie tożsamości, a adres bazy niesie nazwę użytkownika lub hasło
 - **THEN** moduł odmawia startu
-- **AND** komunikat wskazuje, że poświadczenie z URL nie byłoby użyte
+- **AND** komunikat wskazuje, że poświadczenie z adresu nie byłoby użyte
 
 ### Requirement: Wygasające poświadczenie jest odnawiane
 
@@ -90,32 +85,32 @@ adres połączenia.
 
 ### Requirement: Praca bez tożsamości nie wychodzi poza maszynę
 
-Baza lokalna — w kontenerze na maszynie deweloperskiej — MAY być osiągana hasłem niesionym w
-`DATABASE_URL`. Ta furtka MUST być ograniczona do pętli zwrotnej: bez skonfigurowanej
-tożsamości moduł MUST NOT nawiązać połączenia z hostem innym niż pętla zwrotna i MUST odmówić
-startu z taką konfiguracją, wskazując brak tożsamości jako przyczynę. Chroni to przed dwiema
-pomyłkami naraz: lokalnym modułem piszącym do produkcji oraz poświadczeniem ambientowym
-maszyny (sesją operatora), które uwierzytelniłoby moduł jako kogoś, kim nie jest.
+Bez skonfigurowanej tożsamości moduł MAY łączyć się hasłem niesionym w adresie tylko z hostem na pętli
+zwrotnej albo z hostem wymienionym w ustawieniu prywatnych hostów sieci kontenerów tej samej maszyny.
+Z każdym innym hostem moduł MUST NOT nawiązać połączenia i MUST odmówić startu. Chroni to przed
+lokalnym modułem piszącym do produkcji i przed poświadczeniem ambientowym maszyny.
+
+#### Scenario: Baza w sieci kontenerów serwera
+
+- **WHEN** moduł startuje bez tożsamości, a adres wskazuje host wymieniony jako prywatny
+- **THEN** moduł startuje i łączy się z bazą
+
+#### Scenario: Host zdalny bez tożsamości
+
+- **WHEN** moduł startuje bez tożsamości, a adres wskazuje host spoza pętli zwrotnej i spoza listy prywatnych
+- **THEN** moduł odmawia startu
+- **AND** komunikat wskazuje, że praca bez tożsamości jest ograniczona do bazy lokalnej albo prywatnej
+
+#### Scenario: Narzędzie deweloperskie odmawia wcześniej
+
+- **WHEN** skrypt uruchamiający środowisko lokalne czyta konfigurację wskazującą hosta spoza pętli zwrotnej
+- **THEN** skrypt odmawia startu przed uruchomieniem czegokolwiek
 
 #### Scenario: Baza lokalna na haśle
 
 - **WHEN** moduł startuje bez `DATABASE_USER`, a `DATABASE_URL` wskazuje pętlę zwrotną i
   niesie hasło
 - **THEN** moduł łączy się z bazą używając URL dosłownie
-
-#### Scenario: Host zdalny bez tożsamości
-
-- **WHEN** moduł startuje bez `DATABASE_USER`, a `DATABASE_URL` wskazuje hosta spoza pętli
-  zwrotnej
-- **THEN** moduł odmawia startu
-- **AND** komunikat wskazuje, że praca bez tożsamości jest ograniczona do bazy lokalnej
-
-#### Scenario: Narzędzie deweloperskie odmawia wcześniej
-
-- **WHEN** skrypt uruchamiający środowisko lokalne czyta `.env` wskazujący hosta spoza pętli
-  zwrotnej
-- **THEN** skrypt odmawia startu przed uruchomieniem czegokolwiek
-- **AND** komunikat wskazuje `.env` i wymaganie bazy lokalnej
 
 ### Requirement: Moduł sam doprowadza bazę do rewizji, dla której powstał
 
@@ -251,3 +246,4 @@ Odmowa MUST nazwać obie rewizje: tę, której oczekuje obraz, i tę, na której
 - **WHEN** wdrożenie niesie migrację, która nie przechodzi
 - **THEN** nowa wersja nie zaczyna obsługiwać ruchu
 - **AND** wdrożenie kończy się niepowodzeniem, zamiast zgłosić powodzenie
+

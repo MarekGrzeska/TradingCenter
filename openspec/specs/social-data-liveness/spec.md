@@ -5,18 +5,18 @@
 Pozwala zauważyć, że pętla zbierania w module `social-data` przestała chodzić — awarię, której nie
 widać z zewnątrz, bo proces stoi, trasa dostępności odpowiada, a archiwum po prostu przestaje
 rosnąć.
-
 ## Requirements
-
-
 ### Requirement: Moduł publikuje wiek ostatniego ukończonego przebiegu pętli
 
-Pętla czyta feed i zapisuje to, czego jeszcze nie ma. Moduł MUST publikować, jak dawno ta pętla ostatnio **ukończyła** przebieg, i MUST
-mierzyć to w jej własnych interwałach, a nie w sekundach.
+Moduł ma dwie pętle. Jedna czyta feed postów i zapisuje to, czego jeszcze nie ma, druga robi to
+samo dla feedów newsów. Moduł MUST publikować dla **każdej** z nich osobno, jak dawno ostatnio
+**ukończyła** przebieg. MUST mierzyć to w jej własnych interwałach, a nie w sekundach, i MUST
+nazywać pętlę, której wartość dotyczy.
 
 Jednostka jest wymaganiem, nie szczegółem. Próbkowanie co minutę i zbieranie co pięć są oba
 zdrowe, a jeden próg wyrażony w sekundach byłby zły dla jednego z nich — ta sama decyzja,
-którą `market-data-monitoring` podjęło dla wieku świecy.
+którą `market-data-monitoring` podjęło dla wieku świecy. Osobna wartość na pętlę jest wymaganiem
+z tego samego powodu: stojąca pętla newsów nie może się schować za chodzącą pętlą postów.
 
 #### Scenario: Pętla chodzi
 
@@ -27,6 +27,7 @@ którą `market-data-monitoring` podjęło dla wieku świecy.
 
 - **WHEN** od ostatniego ukończonego przebiegu minęło więcej niż kilka interwałów pętli
 - **THEN** publikowana wartość rośnie dalej, aż operator ma o czym zostać powiadomiony
+- **AND** wartość drugiej pętli, jeśli ta chodzi, MUST NOT tego zasłaniać
 
 ### Requirement: Przebieg, który się nie udał, nie liczy się jako przebieg
 
@@ -58,3 +59,4 @@ człowiek, a nie prober.
 
 - **WHEN** pętla nie ukończyła przebiegu od wielu interwałów, a proces odpowiada
 - **THEN** trasa dostępności nadal potwierdza, że proces żyje, i nie niesie wieku przebiegu
+

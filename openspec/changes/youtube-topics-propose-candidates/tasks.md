@@ -1,6 +1,6 @@
 ## 0. Przed kodem
 
-- [ ] 0.1 Odczytać reguły alertów na produkcji (jeśli YouTube jest tam włączony). Każdą regułę filtrującą `youtube.film.read` po `topic` zapisać i pokazać operatorowi.
+- [x] 0.1 Odczytać reguły alertów na produkcji (jeśli YouTube jest tam włączony). Każdą regułę filtrującą `youtube.film.read` po `topic` zapisać i pokazać operatorowi. — potwierdzone przez operatora 7.11.2026
 
 ## 1. Baza
 
@@ -60,4 +60,4 @@
 ## 5. Wydanie
 
 - [x] 5.1 Workbench: `uv run pytest` (z `-m db`), `ruff check .`, `pyright`. Terminal: `pnpm test`, `lint`, `typecheck`, `contract:check`.
-- [ ] 5.2 PR, merge, `deploy-watch`. Po wdrożeniu przekazać operatorowi reguły z 0.1.
+- [x] 5.2 PR, merge, `deploy-watch`. Po wdrożeniu przekazać operatorowi reguły z 0.1. — potwierdzone przez operatora 7.11.2026

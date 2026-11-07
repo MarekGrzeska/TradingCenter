@@ -84,5 +84,5 @@ Przed przełączeniem producentów: reguły powstają z przypisań i reguł kana
 - [x] 11.1a Zakładka Telegram bez celów i przypisań, ostrzeżenie przy usuwaniu bota i adresata; zakładka YouTube bez reguły alertu; regeneracja kontraktów `telegram` i `youtube`
 - [x] 11.2 `ALERT_MIN_IMPACT_SCORE` w `RETIRED_SETTINGS`
 - [x] 11.3 `alerts/README.md`; aktualizacja README `telegram_gateway`, `modules/workbench/README.md`, tabeli w `CLAUDE.md` (dziewięć pakietów) i `docs/architecture.md`
-- [ ] 11.4 Po każdym wdrożeniu skill `deploy-watch`
-- [ ] 11.5 Osobny PR (`alerts/12-drop-old-data`), scalany po wdrożeniu #318 i sprawdzeniu, że konwersja zadziałała: migracje usuwające `purposes`, `assignments` (telegram), `alert_rule` (youtube) i `migrations_done` (alerts)
+- [x] 11.4 Po każdym wdrożeniu skill `deploy-watch` — potwierdzone przez operatora 7.11.2026
+- [x] 11.5 Osobny PR (`alerts/12-drop-old-data`), scalany po wdrożeniu #318 i sprawdzeniu, że konwersja zadziałała: migracje usuwające `purposes`, `assignments` (telegram), `alert_rule` (youtube) i `migrations_done` (alerts) — **niezrobione, wyjęte ze zmiany 7.11.2026:** gałąź `alerts/12-drop-old-data` (62573f83) bez PR; stare tabele zostają do osobnej zmiany

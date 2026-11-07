@@ -290,11 +290,12 @@ operator patrzący na jeden instrument pyta o jego historię, nie o cudzą.
 
 `capital-gateway` jest niepubliczny — jedynym wywołującym, jaki może mieć skonfigurowane do niego
 poświadczenie, jest proces po stronie serwera. Moduł MUST udostępniać wyszukiwanie instrumentów,
-listę klas aktywów i katalog instrumentów jako trasy proxujące do gatewaya, tak by `terminal` mógł
-osiągnąć te dane bez własnego, bezpośredniego połączenia z gatewayem.
+listę klas aktywów, katalog instrumentów **oraz warunki handlowe pojedynczego instrumentu** jako
+trasy proxujące do gatewaya, tak by `terminal` i pakiety tego procesu mogły osiągnąć te dane bez
+własnego, bezpośredniego połączenia z gatewayem.
 
 Odpowiedź MUST być tym samym kształtem danych, jaki zwraca gateway — moduł nie interpretuje ani nie
-wzbogaca katalogu, wyłącznie go przekazuje.
+wzbogaca katalogu ani warunków, wyłącznie je przekazuje.
 
 #### Scenario: Terminal wyszukuje instrument
 
@@ -306,6 +307,11 @@ wzbogaca katalogu, wyłącznie go przekazuje.
 - **WHEN** konsument prosi ten moduł o listę klas aktywów
 - **THEN** moduł zwraca listę otrzymaną od gatewaya
 
+#### Scenario: Pakiet pyta o warunki instrumentu
+
+- **WHEN** wołający prosi o warunki handlowe instrumentu
+- **THEN** moduł zwraca warunki otrzymane od gatewaya, z finansowaniem overnight, bez zmiany kształtu
+
 ### Requirement: Odmowa gatewaya jest przezroczysta dla konsumenta
 
 Gdy gateway odmawia lub jest nieosiągalny, moduł MUST NOT udawać pustego wyniku wyszukiwania —
@@ -315,3 +321,4 @@ odmowa i brak wyników muszą być rozróżnialne przez wywołującego proxy.
 
 - **WHEN** gateway odrzuca żądanie o katalog instrumentów
 - **THEN** moduł zwraca odpowiedź, którą konsument odróżni od pustego wyniku wyszukiwania
+
