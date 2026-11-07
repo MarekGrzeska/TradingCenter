@@ -3,50 +3,58 @@
 ## Purpose
 TBD - created by archiving change add-youtube-archive. Update Purpose after archive.
 ## Requirements
-### Requirement: Regułę alertu wybiera kanał i temat
+### Requirement: Znacznik po udanej wysyłce
 
-Każdy kanał i temat MUST nieść regułę alertu: zawsze, od progu wpływu albo nigdy. Reguła „od
-progu" MUST porównywać ocenę wpływu z progiem z ustawień. Film bez odczytu MUST NOT powiadamiać
-pod żadną regułą.
+Moduł MUST opublikować każdy odczytany film jako zdarzenie „film odczytany” z kluczem źródłowym
+równym identyfikatorowi filmu, na podstawie odczytu promptem filmu. Moduł MUST oznaczyć film jako opublikowany
+dopiero po odpowiedzi pakietu alertów oznaczającej przyjęcie i MUST NOT publikować ponownie filmu ze znacznikiem.
+Nieprzyjęta publikacja MUST zostać ponowiona w kolejnym przebiegu. Film bez odczytu promptem filmu MUST NOT być
+publikowany. Odczyt zamówiony innym promptem MUST NOT być publikowany.
 
-#### Scenario: Kanał z regułą „zawsze"
+#### Scenario: Pakiet alertów odmawia
 
-- **WHEN** film kanału z regułą „zawsze" zostaje odczytany z oceną 3
-- **THEN** moduł MUST wysłać o nim wiadomość
+- **WHEN** pakiet alertów odmawia przyjęcia zdarzenia
+- **THEN** film MUST NOT dostać znacznika, a następny przebieg MUST spróbować ponownie
 
 #### Scenario: Film bez odczytu
 
 - **WHEN** film jest przetranskrybowany, a model nie jest skonfigurowany
-- **THEN** moduł MUST NOT wysłać o nim niczego
+- **THEN** moduł MUST NOT opublikować o nim niczego
 
-### Requirement: Znacznik po udanej wysyłce
+#### Scenario: Film wskazany ręcznie
 
-Moduł MUST oznaczyć film jako powiadomiony dopiero po odpowiedzi bramy Telegrama oznaczającej
-powodzenie, i MUST NOT powiadamiać ponownie o filmie ze znacznikiem. Nieudana wysyłka MUST zostać
-ponowiona w kolejnym przebiegu.
+- **WHEN** film, który wskazał operator albo agent, zostaje odczytany, a jego jedynym źródłem jest wskazanie
+- **THEN** moduł MUST NOT go publikować, a film MUST zakończyć jako cichy
 
-#### Scenario: Brama odmawia
+#### Scenario: Dodatkowy odczyt innym promptem
 
-- **WHEN** brama odmawia wysłania
-- **THEN** film MUST NOT dostać znacznika, a następny przebieg MUST spróbować ponownie
+- **WHEN** operator zamawia odczyt opublikowanego już filmu innym promptem
+- **THEN** moduł MUST NOT publikować niczego
 
 ### Requirement: Wiadomość prowadzi do filmu
 
-Wiadomość MUST nieść tytuł, kanał, krótkie streszczenie, instrumenty z kierunkiem, ocenę wpływu i
-odnośnik do filmu na YouTube, i MUST mieścić się w limicie długości bramy.
+Moduł MUST ogłosić typ zdarzenia „film odczytany” z atrybutami: kanał, temat (gdy film przyszedł z
+tematu), tytuł, ocena wpływu, nazwa promptu, odnośnik do filmu na YouTube oraz gotowa treść powiadomienia.
+Zdarzenie MUST NOT nieść instrumentów. Treść MUST nieść tytuł, kanał, ocenę wpływu, pełny tekst odczytu
+promptem filmu i odnośnik, i MUST mieścić się w limicie treści zdarzenia.
 
-#### Scenario: Długie streszczenie
+#### Scenario: Odczyt z sekcjami
 
-- **WHEN** streszczenie przekracza miejsce w wiadomości
-- **THEN** moduł MUST je skrócić sam, zamiast wysłać treść, której brama odmówi
+- **WHEN** prompt kanału każe ułożyć odczyt w sekcje, a model tak go napisał
+- **THEN** treść powiadomienia MUST nieść ten tekst, a nie streszczenie
+
+#### Scenario: Odczyt dłuższy niż limit zdarzenia
+
+- **WHEN** tekst odczytu przekracza miejsce w treści zdarzenia
+- **THEN** moduł MUST go skrócić sam ze znakiem cięcia, a odnośnik do filmu MUST zostać na końcu treści
 
 ### Requirement: Brak adresata jest stanem wspieranym
 
-Gdy adresat alertów nie jest ustawiony, moduł MUST działać normalnie, MUST NOT wysyłać niczego i
-MUST mówić w trasie stanu, że nie powiadamia.
+Gdy pakiet alertów nie jest zamontowany w procesie, moduł MUST działać normalnie, MUST NOT publikować
+niczego, MUST NOT stawiać znaczników publikacji i MUST mówić w trasie stanu, że nie publikuje.
 
-#### Scenario: Adresat nieustawiony
+#### Scenario: Pakiet alertów nieobecny
 
-- **WHEN** film przekracza regułę, a adresat nie jest ustawiony
-- **THEN** film MUST zostać zapisany normalnie, bez błędu i bez wysyłki
+- **WHEN** film zostaje odczytany, a pakiet alertów nie jest zamontowany
+- **THEN** film MUST zostać zapisany normalnie, bez błędu i bez publikacji
 
