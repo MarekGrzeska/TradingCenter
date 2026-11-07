@@ -97,11 +97,14 @@ ponownie, gdy się zakończy; film o nieznanej długości MUST NOT być usuwany 
 
 ### Requirement: Film jest jeden, niezależnie od tego, skąd przyszedł
 
-Tożsamością filmu MUST być jego identyfikator YouTube. Film znaleziony przez kanał, przez temat
-i wskazany ręcznie MUST być jednym filmem w archiwum, a jego pochodzenie MUST być odnotowane.
+Tożsamością filmu MUST być jego identyfikator YouTube. Film znaleziony przez kanał i wskazany ręcznie, także z listy
+kandydatów, MUST być jednym filmem w archiwum, a jego pochodzenie MUST być odnotowane. Wyszukiwanie tematu MUST NOT
+dopisywać filmu do archiwum ani pochodzenia do filmu, który już w nim jest. Pochodzenie `topic:N` filmów zauważonych
+przed tą zmianą MUST zostać zachowane.
 
 #### Scenario: Film z obserwowanego kanału trafia też do tematu
 
-- **WHEN** ten sam film zostaje odkryty przez kanał i przez temat
-- **THEN** archiwum MUST mieć jeden film, a transkrypcja i odczyt MUST powstać raz
+- **WHEN** wyszukiwanie tematu zwraca film, który jest już w archiwum z obserwowanego kanału
+- **THEN** archiwum MUST mieć jeden film z niezmienionym pochodzeniem, a transkrypcja i odczyt MUST powstać raz
+- **AND** film MUST NOT stać się kandydatem
 

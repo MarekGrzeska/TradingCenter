@@ -7,28 +7,29 @@ token, który sam wytworzył, nigdy nie wychodzi na zewnątrz.
 ### Requirement: Brak sesji konta jest konfiguracją wspieraną
 
 Zakładanie bota wymaga rozmowy z botem-twórcą Telegrama, a taką rozmowę może prowadzić wyłącznie
-konto użytkownika. Moduł MUST startować i MUST wysyłać wiadomości bez skonfigurowanej sesji takiego
-konta. Bez niej trasa i narzędzie zakładające bota MUST odmówić, nazywając brakujące ustawienie, i
-MUST NOT odpowiadać błędem wewnętrznym.
+konto użytkownika, zalogowane przez `telegram-gateway-account`. Moduł MUST startować i MUST wysyłać
+wiadomości bez zalogowanego konta. Bez niego trasa zakładająca, kasująca i rotująca bota MUST
+odmówić, mówiąc, że konto nie jest zalogowane, i MUST NOT odpowiadać błędem wewnętrznym. Wklejenie
+tokenu bota MUST działać bez konta.
 
 Ten kształt jest ten sam co u nieobecnego adresu serwera narzędzi w workbenchu: nieobecność
-ustawienia jest stanem, przez który przechodzą testy, a nie awarią.
+konta jest stanem, przez który przechodzą testy, a nie awarią.
 
 #### Scenario: Wysyłka bez sesji
 
-- **WHEN** moduł nie ma skonfigurowanej sesji konta, a wywołujący prosi o wysłanie wiadomości
+- **WHEN** moduł nie ma zalogowanego konta, a wywołujący prosi o wysłanie wiadomości
 - **THEN** moduł MUST wysłać ją normalnie
 
 #### Scenario: Zakładanie bez sesji
 
-- **WHEN** moduł nie ma skonfigurowanej sesji konta, a ktoś prosi o założenie bota
-- **THEN** moduł MUST odmówić, nazywając ustawienie, którego brakuje
+- **WHEN** moduł nie ma zalogowanego konta, a ktoś prosi o założenie bota
+- **THEN** moduł MUST odmówić, mówiąc, że konto trzeba najpierw zalogować
 
 ### Requirement: Moduł zakłada bota wyłącznie na żądanie
 
-Moduł MUST NOT zakładać bota z własnej inicjatywy — ani przy starcie, ani gdy nie ma żadnego, ani
-gdy wysyłka się nie udała. Automatyzacja prywatnego konta jest dokładnie tym, za co Telegram konta
-ogranicza, więc każda rozmowa z botem-twórcą MUST wynikać z wyraźnego żądania.
+Moduł MUST NOT zakładać, kasować ani rotować bota z własnej inicjatywy — ani przy starcie, ani gdy
+nie ma żadnego, ani gdy wysyłka się nie udała. Automatyzacja konta jest dokładnie tym, za co
+Telegram konta ogranicza, więc każda rozmowa z botem-twórcą MUST wynikać z wyraźnego żądania.
 
 #### Scenario: Start bez botów
 
@@ -76,3 +77,20 @@ sekretem, którym każdy może pisać w imieniu tego systemu.
 
 - **WHEN** moduł kończy zakładanie bota
 - **THEN** odpowiedź MUST potwierdzić założenie bez podawania tokenu, a token MUST NOT trafić do logu
+
+### Requirement: Rotacja tokenu zachowuje wiązania
+
+Moduł MUST pozwolić operatorowi zrotować token bota, którego właścicielem jest zalogowane konto,
+rozmową z botem-twórcą. Nowy token MUST zastąpić stary w bazie, a adresaci tego bota MUST dalej
+odbierać bez ponownego tapnięcia. Stary token MUST przestać działać, zanim moduł potwierdzi rotację.
+
+#### Scenario: Rotacja przy związanym adresacie
+
+- **WHEN** operator rotuje token bota, który ma odbierającego adresata, a potem przychodzi wiadomość do tego adresata
+- **THEN** wiadomość MUST dojść wysłana nowym tokenem
+
+#### Scenario: Odpowiedź bez nowego tokenu
+
+- **WHEN** bot-twórca odpowiada na rotację treścią bez tokenu
+- **THEN** moduł MUST odmówić, oddać tę treść i MUST NOT zmienić tokenu w bazie
+

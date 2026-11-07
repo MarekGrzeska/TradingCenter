@@ -44,16 +44,22 @@ czy stawiać znacznik „już powiedziane".
 
 ### Requirement: Wiadomość jest adresowana nazwą
 
-Wywołujący MUST adresować wiadomość nazwą adresata, którą zna z konfiguracji lub z listy. Kontrakt
-MUST NOT przyjmować identyfikatora czatu ani nazwy bota od wywołującego.
+Wywołujący MUST adresować wiadomość nazwą adresata, którą zna z listy. Kontrakt MUST NOT przyjmować
+celu, identyfikatora czatu ani nazwy bota od wywołującego.
 
 Identyfikator czatu jest liczbą, którą każdy wywołujący musiałby skądś mieć i trzymać u siebie, a
-wymiana bota unieważniałaby wszystkie te kopie naraz.
+wymiana bota unieważniałaby wszystkie te kopie naraz. Kto słyszy jakie zdarzenie, decydują reguły
+pakietu alertów, które nazywają adresata.
 
 #### Scenario: Nieznany adresat
 
-- **WHEN** wywołujący adresuje wiadomość nazwą, której moduł nie zna
+- **WHEN** wywołujący adresuje wiadomość nazwą adresata, której moduł nie zna
 - **THEN** moduł MUST odmówić, wskazując nazwę, i MUST NOT wysłać niczego
+
+#### Scenario: Wiadomość z celem
+
+- **WHEN** wywołujący podaje cel zamiast nazwy adresata
+- **THEN** moduł MUST odmówić i MUST NOT wysłać niczego
 
 ### Requirement: Za długa treść jest odmową, nie ucięciem
 
@@ -66,3 +72,4 @@ w odpowiedzi oznaczającej powodzenie.
 
 - **WHEN** wywołujący prosi o wysłanie treści dłuższej niż dopuszcza Telegram
 - **THEN** moduł MUST odmówić, nazywając sufit i długość otrzymanej treści
+

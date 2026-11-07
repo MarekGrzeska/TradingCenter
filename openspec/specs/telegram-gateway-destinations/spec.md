@@ -48,3 +48,4 @@ nietknięty, bo może obsługiwać innych adresatów.
 
 - **WHEN** operator usuwa adresata
 - **THEN** bot MUST pozostać, a pozostali adresaci tego bota MUST dalej odbierać
+
