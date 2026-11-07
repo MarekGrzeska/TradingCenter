@@ -1,0 +1,233 @@
+<title>Top 10 spadków US100</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Strategie · US100 · D1</span>
+    <h1>Dziesięć najgorszych dni US100</h1>
+    <p class="lede">Ponad dziesięć lat świec dziennych, 2810 sesji. Tylko <b>siedem</b> z nich zamknęło się spadkiem o 5% lub więcej — a <b>dziewięć z dziesięciu</b> najgorszych dni kończyło się wzrostem już następnego dnia.</p>
+    <div class="strip">
+      <span>TradingCenter / docs / strategie</span>
+      <span>5 listopada 2026</span>
+      <span>źródło <b>archiwum market_data</b> · capital.com, bid</span>
+      <span>zakres <b>5 sty 2016 – 4 lis 2026</b></span>
+    </div>
+  </div>
+</header>
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">−10,98%</div><div class="l">najgorszy dzień · 12 mar 2020</div></div>
+      <div class="cell"><div class="v">4 z 10</div><div class="l">przypadły na luty–marzec 2020</div></div>
+      <div class="cell"><div class="v">9 z 10</div><div class="l">następna sesja na plusie · śr. +2,31%</div></div>
+      <div class="cell"><div class="v">1,38%</div><div class="l">odchylenie dnia · próg dziesiątki to −3,4σ</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Ranking</div>
+      <h2>Zamknięcie do zamknięcia</h2>
+      <p class="intro">Spadek liczony od zamknięcia poprzedniej sesji do zamknięcia danego dnia. Słupek pełny to wynik dnia, przerywany — najniższy punkt dnia względem poprzedniego zamknięcia.</p>
+      <figure>
+        <div class="scroll"><svg viewBox="0 0 820 392" role="img" aria-label="Wykres słupkowy dziesięciu największych dziennych spadków US100 od −10,98% do −4,70%, z zaznaczonym najniższym punktem dnia"><line x1="166.0" y1="12" x2="166.0" y2="364" stroke="currentColor" stroke-opacity="0.12"></line><text x="166.0" y="382" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">0%</text><line x1="263.4" y1="12" x2="263.4" y2="364" stroke="currentColor" stroke-opacity="0.12"></line><text x="263.4" y="382" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">−2%</text><line x1="360.8" y1="12" x2="360.8" y2="364" stroke="currentColor" stroke-opacity="0.12"></line><text x="360.8" y="382" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">−4%</text><line x1="458.2" y1="12" x2="458.2" y2="364" stroke="currentColor" stroke-opacity="0.12"></line><text x="458.2" y="382" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">−6%</text><line x1="555.6" y1="12" x2="555.6" y2="364" stroke="currentColor" stroke-opacity="0.12"></line><text x="555.6" y="382" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">−8%</text><line x1="653.0" y1="12" x2="653.0" y2="364" stroke="currentColor" stroke-opacity="0.12"></line><text x="653.0" y="382" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">−10%</text><text x="150" y="35" text-anchor="end" font-size="12.5" font-family="Roboto Mono, monospace" fill="currentColor">1. 12 mar 2020</text><rect x="166" y="20" width="567.9" height="22" fill="#fae7e4" stroke="#b8322a" stroke-width="1" stroke-dasharray="3 3"></rect><rect x="166" y="20" width="534.4" height="22" fill="#b8322a"></rect><text x="741.9" y="35" font-size="12.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#b8322a">−10,98%</text><text x="150" y="69" text-anchor="end" font-size="12.5" font-family="Roboto Mono, monospace" fill="currentColor">2. 16 mar 2020</text><rect x="166" y="54" width="562.3" height="22" fill="#fae7e4" stroke="#b8322a" stroke-width="1" stroke-dasharray="3 3"></rect><rect x="166" y="54" width="418.2" height="22" fill="#b8322a"></rect><text x="736.3" y="69" font-size="12.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#b8322a">−8,59%</text><text x="150" y="103" text-anchor="end" font-size="12.5" font-family="Roboto Mono, monospace" fill="currentColor">3. 3 wrz 2020</text><rect x="166" y="88" width="329.1" height="22" fill="#fae7e4" stroke="#b8322a" stroke-width="1" stroke-dasharray="3 3"></rect><rect x="166" y="88" width="321.8" height="22" fill="#b8322a"></rect><text x="503.1" y="103" font-size="12.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#b8322a">−6,61%</text><text x="150" y="137" text-anchor="end" font-size="12.5" font-family="Roboto Mono, monospace" fill="currentColor">4. 4 kwi 2025</text><rect x="166" y="122" width="329.4" height="22" fill="#fae7e4" stroke="#b8322a" stroke-width="1" stroke-dasharray="3 3"></rect><rect x="166" y="122" width="302.9" height="22" fill="#b8322a"></rect><text x="503.4" y="137" font-size="12.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#b8322a">−6,22%</text><text x="150" y="171" text-anchor="end" font-size="12.5" font-family="Roboto Mono, monospace" fill="currentColor">5. 5 sie 2019</text><rect x="166" y="156" width="304.6" height="22" fill="#fae7e4" stroke="#b8322a" stroke-width="1" stroke-dasharray="3 3"></rect><rect x="166" y="156" width="292.5" height="22" fill="#b8322a"></rect><text x="478.6" y="171" font-size="12.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#b8322a">−6,01%</text><text x="150" y="205" text-anchor="end" font-size="12.5" font-family="Roboto Mono, monospace" fill="currentColor">6. 18 maj 2022</text><rect x="166" y="190" width="288.8" height="22" fill="#fae7e4" stroke="#b8322a" stroke-width="1" stroke-dasharray="3 3"></rect><rect x="166" y="190" width="286.3" height="22" fill="#b8322a"></rect><text x="462.8" y="205" font-size="12.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#b8322a">−5,88%</text><text x="150" y="239" text-anchor="end" font-size="12.5" font-family="Roboto Mono, monospace" fill="currentColor">7. 13 wrz 2022</text><rect x="166" y="224" width="289.2" height="22" fill="#fae7e4" stroke="#b8322a" stroke-width="1" stroke-dasharray="3 3"></rect><rect x="166" y="224" width="268.0" height="22" fill="#b8322a"></rect><text x="463.2" y="239" font-size="12.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#b8322a">−5,50%</text><text x="150" y="273" text-anchor="end" font-size="12.5" font-family="Roboto Mono, monospace" fill="currentColor">8. 10 kwi 2025</text><rect x="166" y="258" width="352.4" height="22" fill="#fae7e4" stroke="#b8322a" stroke-width="1" stroke-dasharray="3 3"></rect><rect x="166" y="258" width="240.7" height="22" fill="#b8322a"></rect><text x="526.4" y="273" font-size="12.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#b8322a">−4,94%</text><text x="150" y="307" text-anchor="end" font-size="12.5" font-family="Roboto Mono, monospace" fill="currentColor">9. 27 lut 2020</text><rect x="166" y="292" width="286.0" height="22" fill="#fae7e4" stroke="#b8322a" stroke-width="1" stroke-dasharray="3 3"></rect><rect x="166" y="292" width="230.5" height="22" fill="#b8322a"></rect><text x="460.0" y="307" font-size="12.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#b8322a">−4,73%</text><text x="150" y="341" text-anchor="end" font-size="12.5" font-family="Roboto Mono, monospace" fill="currentColor">10. 5 cze 2026</text><rect x="166" y="326" width="236.7" height="22" fill="#fae7e4" stroke="#b8322a" stroke-width="1" stroke-dasharray="3 3"></rect><rect x="166" y="326" width="229.1" height="22" fill="#b8322a"></rect><text x="410.7" y="341" font-size="12.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#b8322a">−4,70%</text></svg></div>
+        <figcaption><b>Rys. 1</b> — dziesięć najgorszych sesji. Najdłuższy przerywany słupek ma 10 kwietnia 2025: −7,24% w dołku, −4,94% na zamknięciu.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Tabela</div>
+      <h2>Co było przed i co przyszło potem</h2>
+      <p><strong>Luka</strong> to otwarcie wobec poprzedniego zamknięcia, <strong>dołek</strong> — najniższy punkt dnia wobec poprzedniego zamknięcia, <strong>od szczytu</strong> — odległość zamknięcia od maksimum z 250 sesji. Kolumny +1, +5 i +20 to zmiana od zamknięcia dnia spadku po tylu sesjach.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th class="n">#</th><th>Dzień</th><th class="n">Poprz. zamkn.</th><th class="n">Zamknięcie</th><th class="n">Zmiana</th><th class="n">Luka</th><th class="n">Dołek</th><th class="n">Od szczytu</th><th class="n">+1 sesja</th><th class="n">+5 sesji</th><th class="n">+20 sesji</th></tr></thead>
+          <tbody><tr><td class="n"><b>1</b></td><td><b>12 mar 2020</b> <span style="color:var(--ink-3)">czw</span></td><td class="n">7 992,7</td><td class="n">7 115,5</td><td class="n"><b style="color:var(--red)">−10,98%</b></td><td class="n">+0,00%</td><td class="n">−11,66%</td><td class="n">−27,1%</td><td class="n" style="color:var(--green)">+9,97%</td><td class="n" style="color:var(--green)">+1,26%</td><td class="n" style="color:var(--green)">+15,84%</td></tr><tr><td class="n"><b>2</b></td><td><b>16 mar 2020</b> <span style="color:var(--ink-3)">pon</span></td><td class="n">7 824,6</td><td class="n">7 152,6</td><td class="n"><b style="color:var(--red)">−8,59%</b></td><td class="n">−8,16%</td><td class="n">−11,55%</td><td class="n">−26,7%</td><td class="n" style="color:var(--green)">+0,49%</td><td class="n" style="color:var(--red)">−0,85%</td><td class="n" style="color:var(--green)">+21,31%</td></tr><tr><td class="n"><b>3</b></td><td><b>3 wrz 2020</b> <span style="color:var(--ink-3)">czw</span></td><td class="n">12 423,1</td><td class="n">11 602,1</td><td class="n"><b style="color:var(--red)">−6,61%</b></td><td class="n">−0,00%</td><td class="n">−6,76%</td><td class="n">−6,9%</td><td class="n" style="color:var(--red)">−0,54%</td><td class="n" style="color:var(--red)">−3,43%</td><td class="n" style="color:var(--red)">−0,15%</td></tr><tr><td class="n"><b>4</b></td><td><b>4 kwi 2025</b> <span style="color:var(--ink-3)">pt</span></td><td class="n">18 496,5</td><td class="n">17 345,8</td><td class="n"><b style="color:var(--red)">−6,22%</b></td><td class="n">+0,00%</td><td class="n">−6,76%</td><td class="n">−22,0%</td><td class="n" style="color:var(--green)">+1,62%</td><td class="n" style="color:var(--green)">+7,70%</td><td class="n" style="color:var(--green)">+14,85%</td></tr><tr><td class="n"><b>5</b></td><td><b>5 sie 2019</b> <span style="color:var(--ink-3)">pon</span></td><td class="n">7 698,8</td><td class="n">7 236,3</td><td class="n"><b style="color:var(--red)">−6,01%</b></td><td class="n">−0,32%</td><td class="n">−6,26%</td><td class="n">−10,0%</td><td class="n" style="color:var(--green)">+3,54%</td><td class="n" style="color:var(--green)">+4,69%</td><td class="n" style="color:var(--green)">+5,31%</td></tr><tr><td class="n"><b>6</b></td><td><b>18 maj 2022</b> <span style="color:var(--ink-3)">śr</span></td><td class="n">12 563,1</td><td class="n">11 824,5</td><td class="n"><b style="color:var(--red)">−5,88%</b></td><td class="n">+0,00%</td><td class="n">−5,93%</td><td class="n">−29,5%</td><td class="n" style="color:var(--green)">+0,92%</td><td class="n" style="color:var(--green)">+0,58%</td><td class="n" style="color:var(--red)">−1,07%</td></tr><tr><td class="n"><b>7</b></td><td><b>13 wrz 2022</b> <span style="color:var(--ink-3)">wt</span></td><td class="n">12 768,3</td><td class="n">12 065,7</td><td class="n"><b style="color:var(--red)">−5,50%</b></td><td class="n">+0,00%</td><td class="n">−5,94%</td><td class="n">−28,1%</td><td class="n" style="color:var(--green)">+0,91%</td><td class="n" style="color:var(--red)">−1,71%</td><td class="n" style="color:var(--red)">−10,36%</td></tr><tr><td class="n"><b>8</b></td><td><b>10 kwi 2025</b> <span style="color:var(--ink-3)">czw</span></td><td class="n">19 164,4</td><td class="n">18 217,2</td><td class="n"><b style="color:var(--red)">−4,94%</b></td><td class="n">−0,03%</td><td class="n">−7,24%</td><td class="n">−18,1%</td><td class="n" style="color:var(--green)">+2,55%</td><td class="n" style="color:var(--green)">+0,46%</td><td class="n" style="color:var(--green)">+10,13%</td></tr><tr><td class="n"><b>9</b></td><td><b>27 lut 2020</b> <span style="color:var(--ink-3)">czw</span></td><td class="n">8 826,7</td><td class="n">8 408,9</td><td class="n"><b style="color:var(--red)">−4,73%</b></td><td class="n">+0,00%</td><td class="n">−5,87%</td><td class="n">−13,8%</td><td class="n" style="color:var(--green)">+1,58%</td><td class="n" style="color:var(--green)">+3,38%</td><td class="n" style="color:var(--red)">−6,24%</td></tr><tr><td class="n"><b>10</b></td><td><b>5 cze 2026</b> <span style="color:var(--ink-3)">pt</span></td><td class="n">30 202,9</td><td class="n">28 782,0</td><td class="n"><b style="color:var(--red)">−4,70%</b></td><td class="n">+0,00%</td><td class="n">−4,86%</td><td class="n">−6,4%</td><td class="n" style="color:var(--green)">+2,08%</td><td class="n" style="color:var(--green)">+3,02%</td><td class="n" style="color:var(--green)">+3,05%</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Kontekst</div>
+      <h2>Co się wtedy działo</h2>
+      <p>Przyczyny opisane z wiedzy ogólnej, nie z archiwów systemu. Wyjątkiem jest dzień #10 — kształt dnia odczytany ze świec godzinowych, przyczyny brak.</p>
+      <div class="fails"><div class="fail stop"><h3><span class="tag stop">#1 · −10,98%</span>COVID — „czarny czwartek”</h3><p><strong>12 mar 2020.</strong> Wieczorem 11 marca zakaz lotów z Europy do USA, WHO ogłasza pandemię. Na otwarciu sesji kasowej wyłącznik obrotu (circuit breaker). Najgorszy dzień w całej historii archiwum — a dzień później +9,97%.</p></div><div class="fail stop"><h3><span class="tag stop">#2 · −8,59%</span>COVID — Fed tnie do zera</h3><p><strong>16 mar 2020.</strong> W niedzielę 15 marca awaryjna obniżka stóp do 0–0,25% i QE. Rynek czyta to jako panikę: luka −8,16% na otwarciu poniedziałku, drugi wyłącznik w tygodniu. Prawie cały ruch to luka — w ciągu dnia świeca niemal płaska (−0,47%).</p></div><div class="fail att"><h3><span class="tag stop">#3 · −6,61%</span>Wyprzedaż technologii po letnim rajdzie</h3><p><strong>3 wrz 2020.</strong> Po sierpniowej hossie na Apple i Tesli (masowo kupowane opcje call, później przypisywane SoftBankowi) rynek pęka bez jednego newsu. Jeden z dwóch spadków z dziesiątki tuż przy szczycie — 6,9% od maksimum 52 tygodni.</p></div><div class="fail stop"><h3><span class="tag stop">#4 · −6,22%</span>Cła — odwet Chin</h3><p><strong>4 kwi 2025.</strong> Dwa dni po „Liberation Day” Chiny odpowiadają cłem 34% na wszystko z USA, Powell mówi o ryzyku wyższej inflacji i niższego wzrostu. W niedzielę wieczorem kolejna luka w dół.</p></div><div class="fail att"><h3><span class="tag stop">#5 · −6,01%</span>Wojna handlowa — juan powyżej 7</h3><p><strong>5 sie 2019.</strong> Chiny pozwalają juanowi spaść poniżej 7 za dolara, rynek wycenia eskalację. Uwaga na skalę: w świecy CFD jest też dalszy zjazd po zamknięciu sesji kasowej (20:00–24:00 UTC), więc spadek jest głębszy niż w indeksie kasowym NDX.</p></div><div class="fail att"><h3><span class="tag stop">#6 · −5,88%</span>Inflacja zjada marże — Target</h3><p><strong>18 maj 2022.</strong> Target po Walmarcie: wyniki pokazują, że koszty zjadają marże detalistów. Rynek w środku bessy 2022 (−29,5% od szczytu) dostaje kolejny dowód na stagflację.</p></div><div class="fail stop"><h3><span class="tag stop">#7 · −5,50%</span>CPI za sierpień wyższe niż oczekiwano</h3><p><strong>13 wrz 2022.</strong> Inflacja bazowa +0,6% m/m wobec 0,3% oczekiwanych — koniec nadziei na „pivot” Fed. Jedyny przypadek z dziesiątki, w którym 20 sesji później indeks był o ponad 10% niżej.</p></div><div class="fail att"><h3><span class="tag stop">#8 · −4,94%</span>Dzień po rajdzie 90-dniowej pauzy</h3><p><strong>10 kwi 2025.</strong> 9 kwietnia Trump zawiesza cła na 90 dni, US100 +13,7% w jeden dzień. Następnego dnia Biały Dom precyzuje, że cło na Chiny to łącznie 145% — rynek oddaje około jednej trzeciej rajdu, w dołku −7,24%.</p></div><div class="fail stop"><h3><span class="tag stop">#9 · −4,73%</span>COVID — wirus poza Chinami</h3><p><strong>27 lut 2020.</strong> Najgorszy tydzień od 2008: przypadki we Włoszech i Korei, pierwsze lokalne zakażenie w USA. Początek, nie koniec — w ciągu 20 sesji indeks zszedł jeszcze 20,6% poniżej tego zamknięcia.</p></div><div class="fail att"><h3><span class="tag stop">#10 · −4,70%</span>Pierwszy piątek czerwca — dzień NFP</h3><p><strong>5 cze 2026.</strong> Do 12:00 UTC rynek płaski, spadek zaczyna się z danymi z rynku pracy (12:30 UTC) i trwa nieprzerwanie do zamknięcia. Przyczyny nie znam, a archiwum social z tego dnia jest puste.</p></div></div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Wnioski</div>
+      <h2>Wielkie spadki przychodzą stadami</h2>
+      <p><span class="hl">Osiem z dziesięciu dni wypadło w trwającej przecenie</span> — zamknięcie od 10% do 29,5% pod szczytem 52 tygodni. Wyjątki to 3 września 2020 (−6,9% od szczytu) i 5 czerwca 2026 (−6,4%): spadki z wysokiego poziomu, bez wcześniejszej bessy.</p>
+      <p><strong>Następna sesja</strong> była dodatnia w dziewięciu przypadkach, średnio +2,31% — ale ta średnia stoi na jednym dniu: +9,97% po 12 marca 2020. Bez niego zostaje około +1,5%. <strong>Po 20 sesjach</strong> sześć z dziesięciu jest wyżej, mediana +4,2%, rozrzut od −10,4% do +21,3%.</p>
+      <p>Najgorsze zakończenia mają spadki z <strong>początku</strong> przeceny: 27 lutego 2020 (dołek 20,6% niżej w ciągu 20 sesji) i 13 września 2022 (−11,2%). Najlepsze — te z jej <strong>dna lub blisko</strong>: marzec 2020 i kwiecień 2025. Sama wielkość spadku tego nie rozróżnia; potrzeba innej informacji niż świeca.</p>
+      <div class="quote">Duży spadek mówi, że zmienność jest wysoka. Nie mówi, w którą stronę pójdzie dalej.</div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Metoda</div>
+      <h2>Czym ta świeca jest, a czym nie</h2>
+      <div class="fails">
+        <div class="fail"><h3>Dzień to doba UTC, nie sesja kasowa</h3><p>Świeca D1 z capital.com obejmuje 00:00–24:00 UTC, a CFD handluje się prawie całą dobę. Ruch po zamknięciu Nowego Jorku trafia do tej samej świecy, nie do następnej — dlatego ranking różni się od rankingu indeksu kasowego NDX. Przykład: „Liberation Day” (2 kwietnia 2025, ogłoszenie o 20:00 UTC) rozłożył się na świece 2 kwietnia (−3,93%) i 3 kwietnia (−1,11%), i żadna nie weszła do dziesiątki.</p></div>
+        <div class="fail"><h3>Niedziela pominięta</h3><p>Archiwum trzyma krótką niedzielną świecę (otwarcie wieczorem UTC). Liczę od piątkowego zamknięcia do poniedziałkowego, więc niedzielny ruch jest w poniedziałku — stąd luka 16 marca 2020.</p></div>
+        <div class="fail"><h3>Cena bid, CFD</h3><p>Poziomy to cena bid instrumentu US100 u dostawcy, nie wartość indeksu. Procenty są porównywalne, poziomy — nie dokładnie.</p></div>
+        <div class="fail ok"><h3>Bez dziur</h3><p>3339 świec D1 z tabeli <code>candles</code>, 2810 sesji po odjęciu niedziel i pierwszego dnia; żadnej przerwy dłuższej niż cztery dni.</p></div>
+      </div>
+    </section>
+  </div>
+</main>
+<footer>
+  <div class="inner">
+    <span>TradingCenter · docs/strategie · top 10 spadków US100 D1</span>
+    <span>dane do 4 listopada 2026 · nie jest to rekomendacja</span>
+  </div>
+</footer>

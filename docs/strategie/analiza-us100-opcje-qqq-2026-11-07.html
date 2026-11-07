@@ -1,0 +1,339 @@
+<title>US100 według opcji QQQ</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding-left: max(30px, env(safe-area-inset-left, 0px)); padding-right: max(30px, env(safe-area-inset-right, 0px)); }
+  @media (max-width: 620px) { .inner { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); } }
+  :root { color-scheme: light; }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+  .lvl { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sw { display: inline-block; width: 11px; height: 11px; margin-right: 7px; vertical-align: -1px; }
+  .grid3 { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); margin-top: 6px; }
+  .grid3 .fail ul { margin: 6px 0 0; padding-left: 18px; font-size: 15px; }
+  .grid3 .fail li { margin-bottom: 4px; }
+  .note { font-size: 13.5px; color: var(--ink-3); max-width: 74ch; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Analiza · Nasdaq 100 · opcje QQQ</span>
+    <h1>US100 po krachu: mapa z opcji</h1>
+    <p class="lede">Poziomy QQQ z analizy M. Bączkowskiego (Comparic, PSV, 7.11.2026) przeliczone z kontraktu NQ na <b>CFD US100 z capital.com</b> i naniesione na wykres terminala. Dealerzy w krótkiej gammie, <b>strefa 650–652 USD decyduje</b>.</p>
+    <div class="strip">
+      <span>TradingCenter / strategie</span>
+      <span>7 listopada 2026</span>
+      <span>CFD = NQ − <b>110</b> pkt</span>
+      <span>zamknięcie piątku CFD <b>27 005</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">−6,36%</div><div class="l">Nasdaq 100 w czwartek 5.11 — najgorsza sesja od kwietnia 2025</div></div>
+      <div class="cell"><div class="v">26 700</div><div class="l">dolna krawędź strefy decyzyjnej (QQQ 650) na CFD</div></div>
+      <div class="cell"><div class="v">27 320</div><div class="l">call wall QQQ 665 na CFD — piątkowy szczyt pod nim zawrócił</div></div>
+      <div class="cell"><div class="v">26 290</div><div class="l">put wall QQQ 640 na CFD — rejon nocnego dołka</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Tło</div>
+      <h2>Tydzień jak schody, które zamieniły się w zjeżdżalnię</h2>
+      <p class="intro">NQ zaczął tydzień przy 28 800, nie wrócił nad 28 900, po wynikach Apple zszedł pod 28 300, w noc wyborczą do 27 700, a w czwartek — na obawach o regulacje AI ze strony demokratycznego Kongresu — Nasdaq 100 stracił 6,36% i ok. 2,3 bln USD kapitalizacji.</p>
+      <p>W nocy na piątek NQ dotknął ok. 26 370, w piątek odbił do ok. 27 420 i wrócił w rejon 27 060. Na CFD US100 ten sam przebieg to dołek <span class="lvl">26 255</span> (5.11, 23:00 UTC), szczyt <span class="lvl">27 322</span> (6.11, 14:00 UTC) i zamknięcie tygodnia <span class="lvl">27 005</span>.</p>
+      <p>Autor podkreśla proces, nie poziomy: w czwartek miał dwie okazje pod longa, obie wymagały potwierdzenia, potwierdzenia nie było — więc nie było wejścia. <span class="hl">Sama strefa nie jest sygnałem transakcyjnym.</span></p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Przelicznik</div>
+      <h2>Z kontraktu NQ na CFD US100</h2>
+      <p>Autor podaje poziomy na QQQ i ich odpowiedniki na grudniowym kontrakcie NQ. CFD US100 na capital.com śledzi indeks kasowy, więc różni się od NQ o premię terminową (basis). Basis zmierzony na dwóch ekstremach, które autor podaje na NQ, a archiwum ma na CFD:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Punkt</th><th class="n">NQ (autor)</th><th class="n">US100 CFD (archiwum, bid)</th><th class="n">Różnica</th></tr></thead>
+          <tbody>
+            <tr><td>nocny dołek 5/6.11</td><td class="n">≈ 26 370</td><td class="n">26 255,2</td><td class="n">115</td></tr>
+            <tr><td>piątkowy szczyt 6.11 (QQQ 664,52)</td><td class="n">≈ 27 430</td><td class="n">27 322,5</td><td class="n">108</td></tr>
+            <tr><td><b>przyjęty basis</b></td><td class="n"></td><td class="n"></td><td class="n"><b>110</b></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:14px">Kontrola niezależna od NQ: stosunek CFD/QQQ na piątkowym szczycie to 27 322,5 / 664,52 = 41,12, co daje dla QQQ 665 → 27 342, 650 → 26 726, 640 → 26 314 — w granicach ±25 pkt od NQ − 110. Teoretyczna premia NQ grudzień przy ~6 tygodniach do wygaśnięcia (18.12) też wypada w okolicach 90–110 pkt.</p>
+      <p class="note">Uwagi: archiwum trzyma tylko stronę bid, więc spread doliczasz sam. Basis maleje do zera w dniu wygaśnięcia NQZ26 (ok. 2–3 pkt dziennie) — w tygodniu 20.11 warto go przeliczyć ponownie. Poprzednie rysunki na US100 (z 4.11) używały 127 pkt; zostały usunięte.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Poziomy</div>
+      <h2>Co stoi na wykresie US100</h2>
+      <p>Wszystkie wcześniejsze rysunki US100 (#58–#63) usunięte, naniesione dziewięć nowych. Poziomy QQQ 655 i 660 autor podaje bez odpowiednika na NQ — przeliczone proporcją 41,25 pkt NQ na 1 USD QQQ, wynikającą z jego pozostałych par.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Rysunek</th><th class="n">QQQ</th><th class="n">NQ</th><th class="n">US100 CFD</th><th>Znaczenie</th><th class="n">Od 27 005</th></tr></thead>
+          <tbody>
+            <tr><td><span class="sw" style="background:#7a52a8"></span>#66 strefa</td><td class="n">680–720</td><td class="n">28 050–29 700</td><td class="n"><b>27 940–29 590</b></td><td>Dark pool 30 dni — największe wolumeny, pozycje pod wodą, podaż na odbiciach</td><td class="n">+935</td></tr>
+            <tr><td><span class="sw" style="background:var(--green)"></span>#67 strefa</td><td class="n">670–675</td><td class="n">27 640–27 840</td><td class="n"><b>27 530–27 730</b></td><td>Cel scenariusza wzrostowego po wybiciu call walla</td><td class="n">+525</td></tr>
+            <tr><td><span class="sw" style="background:var(--green)"></span>#68 poziom</td><td class="n">665</td><td class="n">27 430</td><td class="n"><b>27 320</b></td><td>Call wall; piątkowy szczyt zatrzymał się dokładnie pod nim</td><td class="n">+315</td></tr>
+            <tr><td><span class="sw" style="background:#c08a0c"></span>#69 poziom</td><td class="n">660</td><td class="n">≈ 27 225</td><td class="n"><b>27 115</b></td><td>Dodatnie saldo premii ~23–24 mln USD — część rynku zakłada utrzymanie 655–660</td><td class="n">+110</td></tr>
+            <tr><td><span class="sw" style="background:#c08a0c"></span>#70 poziom</td><td class="n">655</td><td class="n">≈ 27 020</td><td class="n"><b>26 910</b></td><td>Jak wyżej; środek zakresu bazowego</td><td class="n">−95</td></tr>
+            <tr><td><span class="sw" style="background:#c08a0c"></span>#71 strefa</td><td class="n">650–652</td><td class="n">26 810–26 890</td><td class="n"><b>26 700–26 780</b></td><td>Strefa decyzyjna: największa kieszeń krótkiej gammy, saldo premii −61 mln USD, flip gammy (wolumen kierunkowy) ~652</td><td class="n">−225</td></tr>
+            <tr><td><span class="sw" style="background:var(--red)"></span>#72 poziom</td><td class="n">640</td><td class="n">26 400</td><td class="n"><b>26 290</b></td><td>Put wall; rejon nocnego dołka</td><td class="n">−715</td></tr>
+            <tr><td><span class="sw" style="background:var(--red)"></span>#73 poziom</td><td class="n">—</td><td class="n">26 283</td><td class="n"><b>26 173</b></td><td>Strefa z wykresu H4 autora</td><td class="n">−832</td></tr>
+            <tr><td><span class="sw" style="background:var(--red)"></span>#74 poziom</td><td class="n">636</td><td class="n">26 230</td><td class="n"><b>26 120</b></td><td>Drugi cel przy dalszej presji</td><td class="n">−885</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 900 540" role="img" aria-label="Drabina poziomów US100 od 26 000 do 28 100 z zamknięciem piątku 27 005 między poziomami 26 910 a 27 115">
+            <defs>
+              <marker id="ad" viewBox="0 0 10 10" refX="5" refY="10" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#b8322a"/></marker>
+              <marker id="au" viewBox="0 0 10 10" refX="5" refY="10" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#17734c"/></marker>
+            </defs>
+            <g font-family="Roboto Mono, monospace" font-size="12">
+              <line x1="100" x2="100" y1="20" y2="520" stroke="#ddd9cd"/>
+              <text x="12" y="24" fill="#85899a">28 100</text>
+              <text x="12" y="524" fill="#85899a">26 000</text>
+
+              <rect x="110" y="20" width="420" height="38" fill="#7a52a8" opacity="0.16"/>
+              <text x="540" y="44" fill="#7a52a8" font-weight="700">27 940+ dark pool (do 29 590) ↑</text>
+              <rect x="110" y="108" width="420" height="48" fill="#17734c" opacity="0.16"/>
+              <text x="540" y="136" fill="#17734c" font-weight="700">27 530–27 730 cel wybicia</text>
+              <line x1="110" x2="530" y1="206" y2="206" stroke="#17734c" stroke-width="2.5"/>
+              <text x="540" y="210" fill="#17734c" font-weight="700">27 320 call wall (665)</text>
+              <line x1="110" x2="530" y1="254" y2="254" stroke="#c08a0c" stroke-width="1.4" stroke-dasharray="5 4"/>
+              <text x="540" y="258" fill="#8a6708">27 115 (660)</text>
+              <line x1="110" x2="530" y1="303" y2="303" stroke="#c08a0c" stroke-width="1.4" stroke-dasharray="5 4"/>
+              <text x="540" y="307" fill="#8a6708">26 910 (655)</text>
+              <rect x="110" y="334" width="420" height="19" fill="#c08a0c" opacity="0.3"/>
+              <text x="540" y="348" fill="#8a6708" font-weight="700">26 700–26 780 strefa decyzyjna (650–652)</text>
+              <line x1="110" x2="530" y1="451" y2="451" stroke="#b8322a" stroke-width="2.5"/>
+              <text x="540" y="455" fill="#b8322a" font-weight="700">26 290 put wall (640)</text>
+              <line x1="110" x2="530" y1="479" y2="479" stroke="#b8322a" stroke-width="1.4" stroke-dasharray="5 4"/>
+              <text x="540" y="481" fill="#b8322a">26 173 strefa H4</text>
+              <line x1="110" x2="530" y1="491" y2="491" stroke="#b8322a" stroke-width="1.4"/>
+              <text x="540" y="501" fill="#b8322a">26 120 cel 2 (636)</text>
+
+              <line x1="90" x2="530" y1="281" y2="281" stroke="#14306b" stroke-width="2"/>
+              <circle cx="320" cy="281" r="6" fill="#14306b"/>
+              <text x="12" y="285" fill="#14306b" font-weight="700">27 005</text>
+              <text x="12" y="299" fill="#85899a" font-size="10">zamkn. pt</text>
+              <line x1="290" x2="290" y1="292" y2="440" stroke="#b8322a" stroke-width="1.6" marker-end="url(#ad)"/>
+              <line x1="350" x2="350" y1="270" y2="168" stroke="#17734c" stroke-width="1.6" marker-end="url(#au)"/>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> · Poziomy na CFD US100 w skali cen. Zakres bazowy autora to pas między strefą decyzyjną a call wallem (26 700–27 320); piątek zamknął się w jego środku. Czerwona strzałka — droga po utracie strefy decyzyjnej, zielona — po triggerze politycznym.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Opcje i zmienność</div>
+      <h2>Reżim pro-cykliczny: stres odpuszcza, ale nie zszedł</h2>
+      <div class="fails">
+        <div class="fail stop"><h3>Krótka gamma od tygodni <span class="tag stop">wzmacnia ruch</span></h3><p>Dzienna net gamma QQQ ujemna każdego dnia: −2,6 mln (30.10), −2 mln (czwartek), −1,38 mln (piątek, o ~30% mniej ujemna). Dealerzy hedgują w kierunku ceny — spadki i wzrosty dostają dodatkowego paliwa, poziomy łatwiej przestrzelić.</p></div>
+        <div class="fail stop"><h3>Premia na putach przeważa <span class="tag stop">ochrona</span></h3><p>W piątek puty 1,54 mld USD wobec calli 939 mln USD, saldo −60…−80 mln USD; premia netto na putach rosła w trakcie sesji. Odbicie o ~1,4% wygląda bardziej na zamykanie pozycji i dokupowanie ochrony niż na świeży popyt.</p></div>
+        <div class="fail"><h3>Vanna w obie strony <span class="tag att">zmienność decyduje</span></h3><p>Wzrost zmienności implikowanej zmusza dealerów do sprzedaży, spadek — do kupna. To mechanizm, który mógłby napędzić odbicie, jeśli zmienność zacznie spadać.</p></div>
+        <div class="fail"><h3>VIX/VXV 1,0423 <span class="tag att">powyżej 1</span></h3><p>Czwartek 1,1029 (najwyżej od wiosny), piątek −5,5%, w sesji nawet 0,9541, ale zamknięcie znów nad 1 i nad EMA20 0,939 oraz średnimi 50/200 (~0,885). Trwały powrót pod 1 = pierwszy sygnał normalizacji.</p></div>
+        <div class="fail stop"><h3>SKEW 153,55 i rośnie <span class="tag stop">do kapitulacji daleko</span></h3><p>+2,8% w piątek. Szczyt ~168 w połowie października (tuż po szczycie Nasdaqa), dołek ~126 na początku sierpnia (przy dołkach rynku). Rynek nadal kupuje ochronę przed skrajnym spadkiem.</p></div>
+        <div class="fail"><h3>Kalendarz wygasań <span class="tag att">magnesy</span></h3><p>Seria poniedziałkowa 0,04% gammy, tygodniowa 13.11 ~9%, miesięczna 20.11 ponad 22%. Im bliżej 20.11, tym mocniej strike'i 640 / 650 / 665 (CFD 26 290 / 26 700 / 27 320) mogą przyciągać cenę.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Scenariusze</div>
+      <h2>Trzy drogi na najbliższe 2–3 sesje</h2>
+      <p>Autor widzi <strong>lekką przewagę scenariusza spadkowego</strong>, ale nie jednostronną: piątek utrzymał cenę nad strefą 650–652.</p>
+      <div class="grid3">
+        <div class="fail"><h3>Bazowy: konsolidacja <span class="tag att">bazowy</span></h3>
+          <p>QQQ 650–665 → <b>CFD 26 700–27 320</b>.</p>
+          <ul>
+            <li>Kolejne testy dolnej krawędzi (26 700–26 780).</li>
+            <li>26 910 / 27 115 (655/660) jako środek pasa, gdzie część rynku stawia na utrzymanie ceny.</li>
+            <li>Call wall 27 320 jako sufit — bez akceptacji nad nim ruchy w górę gasną.</li>
+          </ul></div>
+        <div class="fail stop"><h3>Spadkowy: utrata strefy <span class="tag stop">lekka przewaga</span></h3>
+          <p>Trigger: akceptacja ceny poniżej <b>26 700</b>.</p>
+          <ul>
+            <li>Krótka gamma przyspiesza ruch do put walla <b>26 290</b> (−715 od zamknięcia).</li>
+            <li>Przy dalszej presji <b>26 120–26 173</b> (QQQ 636 i strefa H4; −830…−885).</li>
+            <li>Potwierdzenie: VIX/VXV w górę, SKEW rośnie, saldo premii na putach dalej ujemne.</li>
+          </ul></div>
+        <div class="fail ok"><h3>Wzrostowy: potrzebny trigger <span class="tag ok">warunkowy</span></h3>
+          <p>Trigger: jednoznaczna deklaracja, że regulacji AI nie będzie, albo deeskalacja — nie sam wykres.</p>
+          <ul>
+            <li>Spadek zmienności → dealerzy kupują przez vannę.</li>
+            <li>Wybicie i utrzymanie nad <b>27 320</b> otwiera <b>27 530–27 730</b> (+525…+725).</li>
+            <li>Od <b>27 940</b> podaż z dark poola — pozycje pod wodą wychodzą na swoich cenach.</li>
+          </ul></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Jak z tego korzystać</div>
+      <h2>Strefy do obserwacji, nie zlecenia</h2>
+      <p>Autor nie wskazuje dołka ani wejścia. Wyznacza obszary, w których rynek może zareagować, i czeka na potwierdzenie — w reżimie krótkiej gammy samo wejście w strefę bez potwierdzenia „mogło kosztować naprawdę dużo”.</p>
+      <div class="fails">
+        <div class="fail"><h3>Na co patrzeć w poniedziałek</h3><p>Reakcja na 26 700–26 780 (obrona czy akceptacja pod spodem), zachowanie przy 27 320, relacja VIX/VXV wobec 1, nagłówki o regulacjach AI i stanowisko Białego Domu.</p></div>
+        <div class="fail"><h3>Kiedy poziomy się dezaktualizują</h3><p>Po nowym rozkładzie open interest (seria tygodniowa 13.11, miesięczna 20.11), gdy net gamma zmieni znak na dodatni, oraz gdy basis NQ–CFD odjedzie od 110 pkt o więcej niż ~20.</p></div>
+      </div>
+      <p class="note" style="margin-top:22px">Źródło: Maksymilian Bączkowski, „Krach na Nasdaqu i 2,3 bln USD mniej. Co dalej z indeksem według opcji?”, Comparic.pl, 7.11.2026 (<a href="https://comparic.pl/krach-na-nasdaqu-i-23-bln-usd-mniej-co-dalej-z-indeksem-wedlug-opcji/">artykuł</a>), oraz „Strategia PSV: Z rynku wyparowało 2,3 bln dolarów. O odbiciu NQ zdecyduje Biały Dom?”, 6.11.2026. Ceny CFD: archiwum TradingCenter (US100, H1, bid). Materiał informacyjno-edukacyjny, nie rekomendacja inwestycyjna.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>TradingCenter / strategie · US100 według opcji QQQ</span>
+    <span>7 listopada 2026 · rysunki US100 #66–#74</span>
+  </div>
+</footer>
