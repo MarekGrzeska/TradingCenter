@@ -1,5 +1,8 @@
-## ADDED Requirements
+# youtube-data-settings Specification
 
+## Purpose
+TBD - created by archiving change youtube-loop-settings. Update Purpose after archive.
+## Requirements
 ### Requirement: Odstęp pętli i domyślne granice tematu są ustawieniami operatora
 
 Moduł MUST trzymać trzy wartości w bazie i MUST pozwalać operatorowi je odczytać i zmienić przez REST: odstęp między
@@ -53,3 +56,4 @@ operatora i przez agenta — i MUST NOT zmieniać tematów już na liście.
 
 - **WHEN** operator zmienia domyślny odstęp, a na liście jest temat z odstępem 360 minut
 - **THEN** temat MUST zachować 360 minut
+

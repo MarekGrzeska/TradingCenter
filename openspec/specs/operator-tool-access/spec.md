@@ -1,10 +1,8 @@
+# operator-tool-access Specification
+
 ## Purpose
-
-Kto i jak sięga po powierzchnie narzędziowe produkcji spoza systemu: które z nich niesie krawędź, czym wołający się
-przedstawia, która osoba i która aplikacja są wpuszczane, i jak operator dostaje token do swojego klienta MCP.
-
-## ADDED Requirements
-
+TBD - created by archiving change operator-mcp-access. Update Purpose after archive.
+## Requirements
 ### Requirement: Krawędź niesie powierzchnie narzędziowe hosta API, a nie bramy
 
 Krawędź MUST przepuszczać żądania do `/<pakiet>/mcp` każdego pakietu workbencha, który publikuje powierzchnię
@@ -74,3 +72,4 @@ MUST NOT być wpisana do repozytorium tak, żeby każda sesja pracująca nad kod
 
 - **WHEN** klient MCP uruchamia helper, a w pamięci podręcznej nie ma tokenu ani tokenu odświeżania
 - **THEN** helper kończy się błędem nazywającym komendę logowania i nie otwiera przeglądarki
+

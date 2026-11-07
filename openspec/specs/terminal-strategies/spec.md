@@ -120,7 +120,9 @@ pustymi kosztami i możliwością zapisania ich jako profil. Odmowa pakietu MUST
 ### Requirement: Lista uruchomień i ich stan
 
 Zakładka MUST wymieniać uruchomienia otwartej strategii ze wszystkich rewizji, od najnowszego. Każde MUST pokazywać stan,
-rewizję, zakres, zlecającego (operator albo agent) i główne metryki. Nieudane MUST pokazywać przyczynę. Dopóki
+rewizję, zakres, zlecającego (operator albo agent) i główne metryki, wśród nich zwrot całkowity i zwrot roczny.
+Lista MUST dawać się sortować po każdej metryce przy każdej szerokości panelu: jako tabela z nagłówkami, gdy panel jest
+szeroki, i wyborem sortowania nad kartami, gdy jest wąski. Nieudane MUST pokazywać przyczynę. Dopóki
 któreś uruchomienie czeka albo się liczy, zakładka MUST odświeżać ich stan, a gdy żadne nie czeka, MUST przestać.
 Uruchomienie czekające albo liczone MUST dać się anulować.
 
@@ -128,6 +130,16 @@ Uruchomienie czekające albo liczone MUST dać się anulować.
 
 - **WHEN** liczone uruchomienie się kończy, gdy zakładka jest otwarta
 - **THEN** jego stan i główne metryki MUST pojawić się bez przeładowania strony
+
+#### Scenario: Uruchomienia o różnych zakresach
+
+- **WHEN** lista zawiera uruchomienie z jedenastu lat i uruchomienie z niecałych trzech
+- **THEN** każde MUST pokazywać zwrot roczny obok całkowitego, a sortowanie po zwrocie rocznym MUST je porządkować według niego
+
+#### Scenario: Wąski panel
+
+- **WHEN** panel jest za wąski na tabelę i lista pokazuje karty
+- **THEN** nad kartami MUST stać wybór sortowania z tymi samymi metrykami co nagłówki tabeli
 
 ### Requirement: Raport z krzywą kapitału i transakcjami na wykresie
 
@@ -235,4 +247,41 @@ Odmowa pakietu MUST być pokazana słowami, bez usunięcia czegokolwiek.
 
 - **WHEN** pakiet odmawia usunięcia, bo jedno z uruchomień zaczęło się liczyć
 - **THEN** zakładka MUST pokazać odmowę nazywającą to uruchomienie, a lista MUST pozostać nietknięta
+
+### Requirement: Pobranie transakcji uruchomienia jako CSV
+
+Raport uruchomienia MUST oferować „Pobierz transakcje (CSV)”, które zapisuje na dysku operatora plik ze wszystkimi
+transakcjami uruchomienia, a nie tylko ze stroną widoczną w tabeli. Nazwa pliku MUST zawierać numer uruchomienia. Gdy
+pobranie się nie uda, raport MUST pokazać przyczynę słowami. Pobranie MUST nie zmieniać strony tabeli ani wyboru
+transakcji.
+
+#### Scenario: Pobranie przy stronicowanej tabeli
+
+- **WHEN** operator ogląda drugą stronę transakcji uruchomienia o 450 transakcjach i wybiera „Pobierz transakcje (CSV)”
+- **THEN** zapisany plik MUST zawierać wszystkie 450
+- **AND** tabela MUST nadal pokazywać drugą stronę
+
+#### Scenario: Nieudane pobranie
+
+- **WHEN** pakiet odpowiada na pobranie błędem
+- **THEN** raport MUST pokazać, że pobranie się nie udało, a tabela MUST pozostać nietknięta
+
+### Requirement: Backtesty mają własną zakładkę
+
+Formularz uruchomienia, lista uruchomień i raport MUST stać w osobnej zakładce Backtests, a nie w zakładce Strategies.
+Zakładka Backtests MUST pozwalać wybrać strategię albo pokazać uruchomienia wszystkich strategii. Lista wszystkich MUST
+nazywać strategię każdego uruchomienia. Formularz MUST być dostępny dla wybranej strategii. Raport MUST być rysowany na
+instrumencie i interwale rewizji, z której powstało uruchomienie. Zakładka Strategies MUST mieć przy otwartej strategii
+odnośnik, który otwiera Backtests z tą strategią wybraną. Po każdej turze agenta zakładka Backtests MUST na nowo
+przeczytać uruchomienia.
+
+#### Scenario: Uruchomienia dwóch strategii obok siebie
+
+- **WHEN** operator otwiera Backtests bez wybranej strategii
+- **THEN** lista MUST pokazywać uruchomienia wszystkich strategii, każde z nazwą swojej strategii
+
+#### Scenario: Z zakładki Strategies do backtestów
+
+- **WHEN** operator klika „Backtesty tej strategii” przy otwartej strategii
+- **THEN** zakładka Backtests MUST się otworzyć z tą strategią wybraną i jej formularzem uruchomienia
 
