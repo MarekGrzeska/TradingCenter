@@ -49,4 +49,4 @@
 
 - [x] 6.1 `openspec validate team-trades-on-its-own-account --strict`
 - [x] 6.2 Aktualizacja `docs/demo-wiele-kont-rownolegle.html` o stan po wdrożeniu
-- [ ] 6.3 Po wdrożeniu: dwa zespoły na random i devtest biegną jednocześnie, a każde konto pokazuje wyłącznie swoje pozycje
+- [x] 6.3 Po wdrożeniu: dwa zespoły na random i devtest biegną jednocześnie, a każde konto pokazuje wyłącznie swoje pozycje
