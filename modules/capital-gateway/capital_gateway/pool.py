@@ -9,7 +9,7 @@ import asyncio
 
 from .adapter import CapitalAdapter
 from .client import REQUESTS_PER_SECOND, CapitalClient
-from .config import Settings
+from .config import LIVE_ENVIRONMENT, Settings
 from .errors import GatewayError
 from .rategate import RateGate
 
@@ -20,7 +20,10 @@ class SessionPool:
         # One budget for the whole login: the provider counts it per login, not per session.
         self._gate = RateGate(REQUESTS_PER_SECOND)
         self._login_gate = RateGate(1)
-        self.default = CapitalAdapter(self._client())
+        # On the live account the default session is pinned to the one configured account, and is put back on it after
+        # every renewal; a fresh login opening on some other live account must not be where an order lands.
+        self._pinned = settings.live_account_id if settings.capital_environment == LIVE_ENVIRONMENT else None
+        self.default = CapitalAdapter(self._client(self._pinned))
         # Never switched, so nothing done to the active account can reach what the stream publishes.
         self.stream = self._client()
         self._by_account: dict[str, CapitalAdapter] = {}
@@ -35,6 +38,13 @@ class SessionPool:
     async def for_account(self, account_id: str) -> CapitalAdapter:
         """The session standing on `account_id`. An id the provider does not list is refused before any
         login: falling back to the active account would put the caller's order on somebody else's."""
+        if self._pinned is not None:
+            if account_id != self._pinned:
+                raise GatewayError(
+                    f"refused: this process trades only the live account {self._pinned}, not {account_id}",
+                    status_code=400,
+                )
+            return self.default
         # Outside the lock: a pooled account must not queue behind another account's first login.
         if (adapter := self._by_account.get(account_id)) is not None:
             return adapter

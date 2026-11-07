@@ -4,6 +4,7 @@ a Protocol constrains nothing unannotated, and these models are what the HTTP co
 from __future__ import annotations
 
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -188,6 +189,23 @@ class PlaceOrderRequest(BaseModel):
         if self.order_type in (OrderType.LIMIT, OrderType.STOP) and self.level is None:
             raise ValueError(f"{self.order_type.value} order requires a 'level'")
         return self
+
+
+class CloseAllItem(BaseModel):
+    """What became of one position or one working order in a close-all."""
+
+    kind: Literal["position", "working_order"]
+    id: str
+    symbol: str | None = None
+    status: OrderStatus
+    reason: str | None = None
+
+
+class CloseAllResult(BaseModel):
+    """Every position closed and every working order cancelled on the live account, each with its own outcome: one
+    that failed does not stop the others, and is named here rather than hidden in a total."""
+
+    items: list[CloseAllItem]
 
 
 class UpdatePositionRequest(BaseModel):

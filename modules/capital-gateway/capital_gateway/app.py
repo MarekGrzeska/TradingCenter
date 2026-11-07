@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hmac
 import logging
+from collections.abc import Awaitable
 from contextlib import asynccontextmanager
 from datetime import datetime
 
@@ -38,17 +39,19 @@ from .caller_access import (
     calling_application,
 )
 from .client import CapitalClient
-from .config import API_KEY_HEADER, Settings, is_production
+from .config import API_KEY_HEADER, LIVE_ENVIRONMENT, Settings, is_production
 from .dtos import (
     Account,
     AssetClass,
     Candle,
     CandleHistory,
     Capabilities,
+    CloseAllResult,
     Instrument,
     InstrumentPage,
     InstrumentTerms,
     Order,
+    OrderStatus,
     PlaceOrderRequest,
     Position,
     Resolution,
@@ -58,6 +61,7 @@ from .dtos import (
 from .edge import edge_config, edge_provider
 from .errors import GatewayError
 from .history import parse_candle_ts
+from .live import CLOSE_ALL_PATH, check_order, live_serves, trace
 from .pool import SessionPool
 from .stream.forming import Bar
 from .stream.hub import Hub
@@ -143,6 +147,13 @@ class GatewayDoor(BaseHTTPMiddleware):
             return await call_next(request)
 
         settings = request.app.state.settings
+        live = settings.capital_environment == LIVE_ENVIRONMENT
+        # Before the credential: a route this process does not serve is absent for everyone, not forbidden to some.
+        if (live and not live_serves(request.method, request.url.path)) or (
+            not live and request.url.path == CLOSE_ALL_PATH
+        ):
+            return JSONResponse(status_code=404, content={"detail": "Not Found"})
+
         provided = request.headers.get(API_KEY_HEADER, "")
         application = calling_application(request.headers.get(PRINCIPAL_HEADER))
 
@@ -187,7 +198,8 @@ app = FastAPI(
     title="TradingCenter · capital-gateway",
     description=(
         "capital.com gateway — trading, deep history and a live stream behind one "
-        "contract. Demo environment only. Endpoints return neutral DTOs; provider "
+        "contract. Demo unless CAPITAL_ENVIRONMENT=live, which serves the account alone, within "
+        "its limits. Endpoints return neutral DTOs; provider "
         "quirks (session tokens, the instrument tree, asynchronous settlement) stay "
         "inside the adapter. The WebSocket at /ws/stream is not described by this "
         "schema — see the module README."
@@ -231,6 +243,48 @@ async def account_adapter(
     if not account:
         return pool.default
     return await pool.for_account(account)
+
+
+def _is_live(request: Request) -> bool:
+    return request.app.state.settings.capital_environment == LIVE_ENVIRONMENT
+
+
+def _caller(request: Request) -> str:
+    return calling_application(request.headers.get(PRINCIPAL_HEADER)) or "unnamed"
+
+
+async def _traced(request: Request, kind: str, fields: dict, write: Awaitable[Order]) -> Order:
+    """A write on the live account, with a log line before it leaves and one with its outcome. On demo, the write."""
+    if not _is_live(request):
+        return await write
+    caller = _caller(request)
+    account = request.app.state.settings.live_account_id
+    described = " ".join(f"{name}={value}" for name, value in fields.items())
+    trace.info("live %s sending: caller=%s account=%s %s", kind, caller, account, described)
+    try:
+        order = await write
+    except GatewayError as err:
+        trace.warning(
+            "live %s refused: caller=%s account=%s %s reason=%s", kind, caller, account, described, err.message
+        )
+        raise
+    except Exception:
+        # Sent, and no answer: whether it reached the account is not known, which is not the same as "it failed".
+        trace.warning("live %s outcome unknown: caller=%s account=%s %s", kind, caller, account, described)
+        raise
+    outcome = {OrderStatus.PENDING: "unknown", OrderStatus.REJECTED: "refused"}.get(order.status, "settled")
+    trace.info(
+        "live %s %s: caller=%s account=%s %s status=%s id=%s reason=%s",
+        kind,
+        outcome,
+        caller,
+        account,
+        described,
+        order.status.value,
+        order.id,
+        order.reason,
+    )
+    return order
 
 
 def hub(websocket: WebSocket) -> Hub:
@@ -424,27 +478,75 @@ async def positions(a: CapitalAdapter = Depends(account_adapter)):
 
 
 @app.post("/orders", tags=["trading"], response_model=Order)
-async def place_order(req: PlaceOrderRequest, a: CapitalAdapter = Depends(account_adapter)):
+async def place_order(
+    req: PlaceOrderRequest, request: Request, a: CapitalAdapter = Depends(account_adapter)
+):
     """Place an order. MARKET fills now (FILLED); LIMIT and STOP rest (WORKING).
 
     The answer is settled, not acknowledged. A deal the provider has not resolved comes
-    back PENDING with its reference — never FILLED.
+    back PENDING with its reference — never FILLED. On the live account an order outside its
+    limits is a 422 and never reaches the provider.
     """
-    return await a.place_order(req)
+    fields = {
+        "symbol": req.symbol,
+        "direction": req.direction.value,
+        "size": req.size,
+        "type": req.order_type.value,
+    }
+    if _is_live(request):
+        try:
+            check_order(request.app.state.settings.live_order_limits, req)
+        except GatewayError as err:
+            trace.warning(
+                "live order refused by limits: caller=%s account=%s %s reason=%s",
+                _caller(request),
+                request.app.state.settings.live_account_id,
+                " ".join(f"{k}={v}" for k, v in fields.items()),
+                err.message,
+            )
+            raise
+    return await _traced(request, "order", fields, a.place_order(req))
 
 
 @app.delete("/positions/{position_id}", tags=["trading"], response_model=Order)
-async def close_position(position_id: str, a: CapitalAdapter = Depends(account_adapter)):
-    return await a.close_position(position_id)
+async def close_position(
+    position_id: str, request: Request, a: CapitalAdapter = Depends(account_adapter)
+):
+    return await _traced(request, "close", {"position": position_id}, a.close_position(position_id))
+
+
+@app.post(CLOSE_ALL_PATH, tags=["trading"], response_model=CloseAllResult)
+async def close_all(request: Request, a: CapitalAdapter = Depends(account_adapter)):
+    """Live account only: close every position and cancel every working order, each with its own outcome."""
+    caller = _caller(request)
+    account = request.app.state.settings.live_account_id
+    trace.info("live close-all sending: caller=%s account=%s", caller, account)
+    result = await a.close_all()
+    for item in result.items:
+        trace.info(
+            "live close-all %s %s: caller=%s account=%s symbol=%s status=%s reason=%s",
+            item.kind,
+            item.id,
+            caller,
+            account,
+            item.symbol,
+            item.status.value,
+            item.reason,
+        )
+    return result
 
 
 @app.put("/positions/{position_id}", tags=["trading"], response_model=Order)
 async def update_position(
-    position_id: str, req: UpdatePositionRequest, a: CapitalAdapter = Depends(account_adapter)
+    position_id: str,
+    req: UpdatePositionRequest,
+    request: Request,
+    a: CapitalAdapter = Depends(account_adapter),
 ):
     """Set or remove stops. A number sets, `null` removes, an omitted field is left
     alone — so amending one stop cannot clear the other."""
-    return await a.update_position(position_id, req)
+    fields = {"position": position_id, **req.model_dump(include=req.model_fields_set)}
+    return await _traced(request, "stops", fields, a.update_position(position_id, req))
 
 
 @app.get("/working-orders", tags=["trading"], response_model=list[WorkingOrder])
@@ -454,8 +556,12 @@ async def working_orders(a: CapitalAdapter = Depends(account_adapter)):
 
 
 @app.delete("/working-orders/{order_id}", tags=["trading"], response_model=Order)
-async def cancel_working_order(order_id: str, a: CapitalAdapter = Depends(account_adapter)):
-    return await a.cancel_working_order(order_id)
+async def cancel_working_order(
+    order_id: str, request: Request, a: CapitalAdapter = Depends(account_adapter)
+):
+    return await _traced(
+        request, "cancel", {"working_order": order_id}, a.cancel_working_order(order_id)
+    )
 
 
 # The stream is not described by the OpenAPI schema — OpenAPI has no vocabulary for WebSocket
@@ -466,6 +572,10 @@ async def cancel_working_order(order_id: str, a: CapitalAdapter = Depends(accoun
 async def stream(websocket: WebSocket, the_hub: Hub = Depends(hub)) -> None:
     """Live candles and quotes for one symbol at one resolution. Reads nothing: the subscription
     is the query string, so there is no client protocol to get wrong."""
+    if websocket.app.state.settings.capital_environment == LIVE_ENVIRONMENT:
+        # The live process serves no market; the middleware's 404 never sees a handshake.
+        await websocket.close(code=4404, reason="the live account process has no stream")
+        return
     # HTTP middleware never sees a WebSocket handshake, so the key is checked here, before
     # accept() — accepting and closing after would register the caller with the hub in between.
     expected: str = websocket.app.state.settings.gateway_api_key

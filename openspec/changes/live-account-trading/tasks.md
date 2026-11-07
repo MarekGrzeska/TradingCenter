@@ -1,14 +1,14 @@
 ## 1. Brama: tryb konta realnego
 
-- [ ] 1.1 `CAPITAL_ENVIRONMENT` (`demo`|`live`, domyślnie `demo`); walidator demo bez zmian, walidator `live`: dokładny host realny, `GATEWAY_ENV=production` i `SERVER_MODE`; `environment_of` zna host realny; testy odmów startu w obie strony
-- [ ] 1.2 `LIVE_ACCOUNT_ID` i `LIVE_ORDER_LIMITS` wymagane w `live`, odmowa startu z nazwą brakującej albo błędnej pozycji; testy
-- [ ] 1.3 Pula sesji w `live`: sesja domyślna na `LIVE_ACCOUNT_ID`, inne konto w `X-Capital-Account` to 400 przed dostawcą, konto nieznane dostawcy to odmowa każdego żądania rachunku
-- [ ] 1.4 Sprawdzenie granic na `POST /orders` (symbol z mapy, wielkość ≤ granica, wszystkie typy) przed dostawcą; zamknięcie, stopy i anulowanie bez granic; odmowa odróżnialna od odmowy dostawcy
-- [ ] 1.5 Trasy w `live`: tylko rachunek, wykonanie i warunki instrumentu; katalog, świece, historia, `/ws/stream`, `top-up`, `PUT /accounts/active` nieobecne (404); bez strumienia w lifespanie
-- [ ] 1.6 `POST /positions/close-all` tylko w `live`: każda pozycja i każde zlecenie oczekujące, skutek per element, niepowodzenie jednego nie zatrzymuje reszty
-- [ ] 1.7 Przeglądarka w `live`: odczyt rachunku i `close-all`, nic więcej; testy dostępu
-- [ ] 1.8 Ślad zapisów w `live`: wiersz przed i po (aplikacja wołającego, konto, rodzaj, symbol, kierunek, wielkość, typ, skutek; odmowa z nazwą granicy), bez poświadczeń; test, że klucze nie trafiają do logu
-- [ ] 1.9 `contract-sync`: migawka OpenAPI bramy w `trading-mcp` z nową trasą; README bramy (tryb realny, granice, wstrzymanie klucza u dostawcy)
+- [x] 1.1 `CAPITAL_ENVIRONMENT` (`demo`|`live`, domyślnie `demo`); walidator demo bez zmian, walidator `live`: dokładny host realny, `GATEWAY_ENV=production` i `SERVER_MODE`; `environment_of` zna host realny; testy odmów startu w obie strony
+- [x] 1.2 `LIVE_ACCOUNT_ID` i `LIVE_ORDER_LIMITS` wymagane w `live`, odmowa startu z nazwą brakującej albo błędnej pozycji; testy
+- [x] 1.3 Pula sesji w `live`: sesja domyślna na `LIVE_ACCOUNT_ID`, inne konto w `X-Capital-Account` to 400 przed dostawcą, konto nieznane dostawcy to odmowa każdego żądania rachunku
+- [x] 1.4 Sprawdzenie granic na `POST /orders` (symbol z mapy, wielkość ≤ granica, wszystkie typy) przed dostawcą; zamknięcie, stopy i anulowanie bez granic; odmowa odróżnialna od odmowy dostawcy
+- [x] 1.5 Trasy w `live`: tylko rachunek, wykonanie i warunki instrumentu; katalog, świece, historia, `/ws/stream`, `top-up`, `PUT /accounts/active` nieobecne (404); bez strumienia w lifespanie
+- [x] 1.6 `POST /positions/close-all` tylko w `live`: każda pozycja i każde zlecenie oczekujące, skutek per element, niepowodzenie jednego nie zatrzymuje reszty
+- [x] 1.7 Przeglądarka w `live`: odczyt rachunku i `close-all`, nic więcej; testy dostępu
+- [x] 1.8 Ślad zapisów w `live`: wiersz przed i po (aplikacja wołającego, konto, rodzaj, symbol, kierunek, wielkość, typ, skutek; odmowa z nazwą granicy), bez poświadczeń; test, że klucze nie trafiają do logu
+- [x] 1.9 `contract-sync`: migawka OpenAPI bramy w `trading-mcp` z nową trasą; README bramy (tryb realny, granice, wstrzymanie klucza u dostawcy)
 
 ## 2. trading-mcp: oczekiwane środowisko
 
