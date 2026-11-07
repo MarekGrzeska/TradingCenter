@@ -205,10 +205,13 @@ dostawcy.
 Wyliczenie kont MUST oznaczać, które konto jest aktywne: „ile mam" i „gdzie składam zlecenie"
 MUST NOT móc dotyczyć dwóch różnych rachunków.
 
-Opis narzędzia przełączającego konto MUST mówić, że przełączenie zrywa strumień notowań, i że
-przerwa dotyczy zbierania danych, a nie tej rozmowy. Model, który tego nie wie, przełącza
-konto w środku zbierania świec i nie ma jak zauważyć skutku — strumień jest po drugiej
-stronie systemu, a narzędzie odpowiada mu sukcesem.
+Każde narzędzie, które czyta albo zmienia rachunek — pozycje, zlecenia oczekujące, saldo,
+składanie, zamykanie, zmiana stopów, anulowanie i korekta salda — MUST przyjmować opcjonalny
+identyfikator konta i działać na tym koncie. Bez identyfikatora narzędzie MUST działać na
+koncie aktywnym. Identyfikator MUST trafić do bramki w żądaniu, a MUST NOT zostać zamieniony
+na przełączenie konta aktywnego: przełączenie dotyczy wszystkich wołających naraz, a wskazanie
+konta tylko tego jednego wywołania. Wiersz śladu każdego wywołania zapisującego MUST nazywać
+konto, na które poszło.
 
 Korekta salda MUST przyjmować kwotę ujemną tak samo jak dodatnią. Odmowa dostawcy — sufit
 salda, zakres kwoty, wyczerpany limit dobowy — MUST dotrzeć jako odmowa nazywająca powód,
@@ -224,7 +227,18 @@ odróżnialna od awarii dostępu, tak jak każda inna odmowa w tym zestawie.
 
 - **WHEN** model przełącza aktywne konto na znany identyfikator
 - **THEN** narzędzie potwierdza, które konto jest teraz aktywne
-- **AND** jego opis mówi, że przełączenie zrywa strumień notowań
+
+#### Scenario: Zlecenie na wskazanym koncie
+
+- **WHEN** wołający składa zlecenie, podając identyfikator konta innego niż aktywne
+- **THEN** zlecenie trafia na wskazane konto
+- **AND** konto aktywne pozostaje tym, którym było
+
+#### Scenario: Wskazane konto jest nieznane
+
+- **WHEN** wołający podaje identyfikator konta, którego bramka nie zna
+- **THEN** narzędzie odpowiada odmową nazywającą konto
+- **AND** nic nie trafia na żadne konto
 
 #### Scenario: Model koryguje saldo konta demo
 
