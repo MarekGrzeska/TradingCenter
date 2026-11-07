@@ -188,3 +188,36 @@ co reszta tras pakietu.
 - **WHEN** operator prosi o CSV uruchomienia, którego nie ma
 - **THEN** odpowiedź MUST mieć kod 404 z numerem uruchomienia
 
+### Requirement: Koszty od brokera przez archiwum w procesie
+
+Pakiet MUST publikować `POST /costs/{symbol}/from-broker`, które pobiera profil kosztów od brokera i zapisuje go w
+miejsce dotychczasowego, oraz MUST podawać w każdym odczycie profilu jego źródło, chwilę ustalenia i surowe wartości
+brokera. Pakiet MUST czytać warunki i ceny instrumentu wyłącznie przez REST archiwum `/market` w tym procesie, a wymaganie
+„Pakiet nie ma drogi do rachunku” zostaje w mocy.
+
+#### Scenario: Odświeżenie profilu z brokera
+
+- **WHEN** operator prosi o profil instrumentu od brokera
+- **THEN** profil MUST zostać zastąpiony wartościami brokera ze źródłem „broker” i chwilą pobrania
+
+#### Scenario: Broker nie odpowiada
+
+- **WHEN** archiwum nie może zapytać brokera
+- **THEN** odpowiedź MUST być odmową nazywającą przyczynę, a dotychczasowy profil MUST pozostać bez zmian
+
+### Requirement: Odczyt rewizji podaje serię wykonania
+
+Każdy odczyt rewizji i odpowiedź `POST /validate` dla poprawnego dokumentu MUST podawać serię wykonania, na której
+dokument się wykona: interwał decyzji albo `MINUTE`. Sufit długości zakresu w odpowiedzi stanu pakietu MUST być liczbą
+świec serii wykonania i MUST mieć tę nazwę w kontrakcie, a nie nazwę liczby minut.
+
+#### Scenario: Rewizja bez poziomów
+
+- **WHEN** operator czyta rewizję strategii na `MINUTE_5`, która wchodzi zleceniem rynkowym i wychodzi tylko przez `when`
+- **THEN** odpowiedź MUST podawać serię wykonania `MINUTE_5`
+
+#### Scenario: Rewizja ze stopem
+
+- **WHEN** operator czyta rewizję tej samej strategii z dodanym stopem
+- **THEN** odpowiedź MUST podawać serię wykonania `MINUTE`
+

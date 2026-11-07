@@ -8,13 +8,28 @@ kosztuje transakcja, jak rozstrzyga niejasne minuty i jak uruchomienie żyje jak
 
 Silnik MUST liczyć formuły strategii na zamknięciu każdej świecy interwału decyzji, wyłącznie na danych
 dostępnych w tej chwili. Zlecenie powstałe w tej decyzji MUST być aktywne najwcześniej od pierwszej minuty po
-zamknięciu świecy, a jego wypełnienie MUST być rozstrzygane na serii `MINUTE` instrumentu handlowanego.
-Świeca jeszcze się formująca MUST NOT brać udziału w żadnej decyzji.
+zamknięciu świecy, a jego wypełnienie MUST być rozstrzygane na serii wykonania instrumentu handlowanego. Seria wykonania
+MUST być serią interwału decyzji, gdy dokument nie ma stopu, celu, trailingu ani wejścia zleceniem `limit` lub `stop`.
+W każdym innym przypadku MUST być serią `MINUTE`. Na serii decyzji otwarcie pierwszej świecy po decyzji MUST być ceną
+pierwszej minuty po decyzji. Świeca jeszcze się formująca MUST NOT brać udziału w żadnej decyzji.
 
 #### Scenario: Zlecenie rynkowe z sygnału
 
 - **WHEN** warunek wejścia jest prawdziwy na świecy H1 zamkniętej o 10:00 UTC
 - **THEN** zlecenie rynkowe MUST wypełnić się na otwarciu minuty 10:00–10:01 UTC, z kosztami
+
+#### Scenario: Strategia bez poziomów nie czyta minut
+
+- **WHEN** strategia na `MINUTE_5` wchodzi zleceniem rynkowym, wychodzi tylko przez `when` i biegnie od 1 stycznia
+  2026, a archiwum ma świece M5 od 2016 roku i minuty dopiero od 11 sierpnia 2026
+- **THEN** uruchomienie MUST NOT czytać serii `MINUTE`
+- **AND** wejście z sygnału 2 stycznia MUST wypełnić się na otwarciu następnej świecy M5 tego dnia
+
+#### Scenario: Ta sama strategia na obu seriach
+
+- **WHEN** strategia bez poziomów biegnie na zakresie, w którym pod każdą świecą decyzji są minuty
+- **THEN** jej transakcje MUST być co do czasu i ceny wejścia i wyjścia takie same, jak gdyby wykonywała się na
+  `MINUTE`
 
 ### Requirement: Wynik nie zależy od danych po chwili decyzji
 
@@ -126,15 +141,30 @@ kapitał w chwili wejścia. Kapitał MUST startować od kapitału nominalnego po
 
 ### Requirement: Model kosztów jest obowiązkowy
 
-Uruchomienie MUST podawać model kosztów: spread (jedna wartość albo profil 24 godzin UTC), poślizg na stronę,
-stawki finansowania overnight dla longa i shorta (ułamek wartości pozycji za noc) i godzinę rozliczenia doby.
-Uruchomienie bez modelu kosztów MUST zostać odrzucone. Zera MUST być przyjęte tylko wtedy, gdy podano je jawnie.
-Finansowanie MUST być naliczane za każde przekroczenie godziny rozliczenia przy otwartej pozycji, także w dni
-bez handlu.
+Każde uruchomienie MUST być liczone z modelem kosztów, w którym są: spread (jedna wartość albo profil 24 godzin UTC),
+poślizg na stronę, stawki finansowania overnight dla longa i shorta (ułamek wartości pozycji za noc) i godzina
+rozliczenia doby. Model MUST pochodzić z jednego z trzech źródeł, a uruchomienie MUST zapisywać, z którego:
+1. modelu podanego w żądaniu;
+2. profilu kosztów instrumentu, gdy żądanie modelu nie podaje;
+3. jawnego wyboru „bez kosztów” (`without_costs`), który daje model z samych zer.
+
+Żądanie z modelem kosztów i jednocześnie z „bez kosztów” MUST zostać odrzucone. Zera podane w modelu MUST być przyjęte
+jako zwykły model kosztów. Finansowanie MUST być naliczane za każde przekroczenie godziny rozliczenia przy otwartej
+pozycji, także w dni bez handlu.
 
 #### Scenario: Brak modelu kosztów
 
-- **WHEN** żądanie uruchomienia nie zawiera modelu kosztów
+- **WHEN** żądanie uruchomienia nie zawiera modelu kosztów ani wyboru „bez kosztów”
+- **THEN** uruchomienie MUST być liczone z profilu kosztów instrumentu, a jego źródłem MUST być profil
+
+#### Scenario: Uruchomienie bez kosztów
+
+- **WHEN** żądanie wybiera „bez kosztów”
+- **THEN** uruchomienie MUST być liczone z zerowym modelem i MUST zapisywać, że było bez kosztów
+
+#### Scenario: Koszty i „bez kosztów” naraz
+
+- **WHEN** żądanie podaje model kosztów i wybiera „bez kosztów”
 - **THEN** uruchomienie MUST zostać odrzucone przed zakolejkowaniem
 
 #### Scenario: Pozycja przez weekend
@@ -147,7 +177,7 @@ bez handlu.
 Żądanie uruchomienia MUST być przyjmowane od razu jako zakolejkowane, z parametrami w zakresach dokumentu.
 Wartość poza zakresem MUST być odmową. Uruchomienia MUST wykonywać się w tle, w liczbie nie większej niż
 ustawiony limit, i MUST NOT wstrzymywać obsługi innych tras procesu. Zakres przekraczający limit liczby świec
-`MINUTE` MUST być odrzucony przed startem, a uruchomienie przekraczające limit czasu MUST skończyć się
+serii wykonania MUST być odrzucony przed startem, a uruchomienie przekraczające limit czasu MUST skończyć się
 niepowodzeniem z nazwaną przyczyną. Uruchomienie MUST dać się anulować. Uruchomienie przerwane restartem
 procesu MUST zostać oznaczone jako przerwane, a nie pozostać „w toku”.
 
@@ -158,8 +188,14 @@ procesu MUST zostać oznaczone jako przerwane, a nie pozostać „w toku”.
 
 #### Scenario: Za długi zakres
 
-- **WHEN** zakres wymaga więcej świec `MINUTE`, niż pozwala limit
+- **WHEN** zakres wymaga więcej świec serii wykonania, niż pozwala limit
 - **THEN** uruchomienie MUST zostać odrzucone przed zakolejkowaniem, z limitem i wymaganą liczbą w komunikacie
+
+#### Scenario: Długi zakres strategii bez poziomów
+
+- **WHEN** strategia bez poziomów na `MINUTE_5` biegnie przez dziesięć lat, czyli więcej minut, niż pozwala limit,
+  ale mniej świec M5
+- **THEN** uruchomienie MUST zostać zakolejkowane
 
 ### Requirement: Ten sam wkład daje ten sam wynik
 
@@ -172,23 +208,6 @@ któregokolwiek uruchomienia, MUST podnosić wersję silnika zapisywaną w rapor
 - **WHEN** zmiana w silniku zmienia wynik dokumentu referencyjnego na zamrożonych danych, a wersja silnika
   pozostaje ta sama
 - **THEN** sprawdzenie w CI MUST zakończyć się niepowodzeniem
-
-### Requirement: Profil kosztów instrumentu ustawia operator
-
-Pakiet MUST przechowywać co najwyżej jeden profil kosztów na instrument, o tym samym kształcie i z tym samym sprawdzeniem
-co model kosztów uruchomienia. Profil ustawia i zmienia operator przez REST. Uruchomienie korzystające z profilu MUST
-zapisywać wartości kosztów, a nie odwołanie do profilu. Zmiana profilu MUST NOT zmieniać żadnego wcześniej zapisanego
-uruchomienia.
-
-#### Scenario: Zmiana profilu po uruchomieniu
-
-- **WHEN** operator zmienia spread w profilu instrumentu, który ma już zakończone uruchomienie
-- **THEN** koszty zapisane w tamtym uruchomieniu MUST pozostać takie, jakie były
-
-#### Scenario: Profil z niepełnym profilem spreadu
-
-- **WHEN** operator zapisuje profil, którego godzinowy profil spreadu ma 23 wartości
-- **THEN** zapis MUST zostać odrzucony z tym samym problemem, jaki dostałby model kosztów uruchomienia
 
 ### Requirement: Uruchomienie pamięta, kto o nie poprosił
 
@@ -278,4 +297,63 @@ zostać usunięte żadne.
 - **WHEN** uruchomienie kończy się dokładnie wtedy, gdy ktoś prosi o jego usunięcie
 - **THEN** wynik MUST być albo odmową „liczy się”, albo usunięciem z doliczoną próbą, a MUST NOT być usunięciem bez
   doliczenia
+
+### Requirement: Profil kosztów instrumentu pochodzi od brokera
+
+Pakiet MUST przechowywać co najwyżej jeden profil kosztów na instrument, o tym samym kształcie i z tym samym sprawdzeniem
+co model kosztów uruchomienia. Gdy uruchomienie potrzebuje profilu, a instrument go nie ma, pakiet MUST pobrać go sam od
+brokera przez archiwum w tym procesie, bez kroku operatora i niezależnie od tego, kto prosi o uruchomienie. Wartości są
+wtedy takie:
+- spread to różnica bieżących ask i bid;
+- poślizg to zero;
+- stawki finansowania pochodzą z warunków instrumentu, przeliczone na ułamek wartości pozycji za noc, ze znakiem
+  „dodatnie = opłata”;
+- godzina rozliczenia to godzina UTC chwili naliczenia podanej przez brokera.
+
+Profil MUST zapisywać swoje źródło (broker albo operator), chwilę ustalenia i surowe wartości brokera, z których
+powstał. Operator MAY profil zmienić albo kazać pobrać go od brokera od nowa. Profil MUST NOT odświeżać się sam przy
+kolejnych uruchomieniach. Gdy broker nie podaje którejś wartości albo nie odpowiada, pakiet MUST odmówić uruchomienia,
+nazwać brakującą wartość i niczego nie zapisać. MUST NOT podstawiać wartości domyślnej.
+
+Uruchomienie korzystające z profilu MUST zapisywać wartości kosztów, a nie odwołanie do profilu. Zmiana profilu MUST
+NOT zmieniać żadnego wcześniej zapisanego uruchomienia.
+
+#### Scenario: Pierwsze uruchomienie instrumentu bez profilu
+
+- **WHEN** uruchomienie bez modelu kosztów dotyczy instrumentu, który nie ma profilu
+- **THEN** pakiet MUST pobrać profil od brokera, zapisać go ze źródłem „broker” i policzyć z nim uruchomienie
+
+#### Scenario: Broker nie podaje finansowania
+
+- **WHEN** warunki instrumentu nie niosą stawki finansowania
+- **THEN** uruchomienie MUST zostać odrzucone z nazwą brakującej wartości, a profil MUST NOT powstać
+
+#### Scenario: Zmiana profilu po uruchomieniu
+
+- **WHEN** operator zmienia spread w profilu instrumentu, który ma już zakończone uruchomienie
+- **THEN** koszty zapisane w tamtym uruchomieniu MUST pozostać takie, jakie były
+
+#### Scenario: Profil z niepełnym profilem spreadu
+
+- **WHEN** operator zapisuje profil, którego godzinowy profil spreadu ma 23 wartości
+- **THEN** zapis MUST zostać odrzucony z tym samym problemem, jaki dostałby model kosztów uruchomienia
+
+### Requirement: Brak minut pod strategią z poziomami jest niepowodzeniem
+
+Gdy seria wykonania to `MINUTE`, a pod którąkolwiek świecą decyzji w zakresie nie ma żadnej minuty, uruchomienie MUST
+skończyć się niepowodzeniem, zanim cokolwiek policzy. Przyczyna MUST podawać liczbę takich świec, co najwyżej trzy
+pierwsze luki i pierwszą minutę, jaką archiwum ma w zakresie. Silnik MUST NOT przenosić zlecenia ani wyjścia przez
+świecę decyzji bez minut. Uruchomienie z serią wykonania równą serii decyzji MUST NOT podlegać temu sprawdzeniu.
+
+#### Scenario: Strategia ze stopem przed początkiem minut
+
+- **WHEN** strategia na `MINUTE_5` ze stopem biegnie od 1 stycznia 2026, a pierwsza ciągła minuta US100 w archiwum jest
+  z 11 sierpnia 2026
+- **THEN** uruchomienie MUST skończyć się niepowodzeniem bez żadnej transakcji
+- **AND** przyczyna MUST nazywać liczbę świec M5 bez minut i pierwszą minutę w archiwum
+
+#### Scenario: Pojedyncza brakująca minuta
+
+- **WHEN** pod świecą M5 brakuje jednej minuty z pięciu
+- **THEN** uruchomienie MUST NOT skończyć się niepowodzeniem z tego powodu
 

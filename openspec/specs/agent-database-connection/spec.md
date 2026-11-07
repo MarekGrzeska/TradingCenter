@@ -5,39 +5,25 @@
 Opisuje, na jakich warunkach moduł agenta łączy się ze swoją bazą: czym się przedstawia
 wobec bazy zdalnej, kiedy wolno mu użyć hasła, i kiedy MUST odmówić pracy zamiast działać
 w konfiguracji, która wygląda na działającą.
-
 ## Requirements
-
 ### Requirement: Moduł przedstawia się tożsamością, nie hasłem
 
-Wobec bazy zdalnej moduł MUST uwierzytelniać się poświadczeniem wystawianym dla jego
-tożsamości i pobieranym przy nawiązywaniu połączenia; trwałe hasło do bazy zdalnej MUST NOT
-być wymagane do pracy modułu ani przechowywane w jego konfiguracji. Tryb tożsamości wybiera
-skonfigurowana nazwa roli; konfiguracja trybu tożsamości, której adres bazy niesie własne
-poświadczenie, MUST być odrzucona przy starcie.
+Moduł MUST uwierzytelniać się wobec bazy hasłem **własnej** roli, która jest właścicielem bazy modułu
+od jej utworzenia. Hasło MUST pochodzić z pliku sekretów serwera albo ze środowiska procesu i MUST NOT
+występować w repozytorium. Dopóki system działa także w Azure, tryb tożsamości (poświadczenie
+pobierane dla tożsamości przy nawiązywaniu połączenia) MUST działać jak dotąd; konfiguracja trybu
+tożsamości, której adres bazy niesie własne poświadczenie, MUST być odrzucona przy starcie.
 
-Poświadczenie ma ważność krótszą niż czas pracy modułu i MUST być odnawiane tak, by
-połączenie nawiązywane po jego wygaśnięciu zestawiało się poprawnie.
+#### Scenario: Moduł na serwerze
 
-#### Scenario: Poświadczenia nie da się uzyskać
-
-- **WHEN** moduł startuje w trybie tożsamości, a wystawca poświadczeń jest nieosiągalny lub
-  odmawia
-- **THEN** moduł odmawia startu, wskazując uzyskanie poświadczenia jako przyczynę
-- **AND** MUST NOT sięgać po zapasowe hasło
+- **WHEN** moduł startuje w trybie serwera z hasłem swojej roli w adresie bazy
+- **THEN** łączy się jako ta rola
 
 #### Scenario: Poświadczenie w adresie obok tożsamości
 
-- **WHEN** moduł startuje w trybie tożsamości, a adres bazy niesie nazwę użytkownika lub
-  hasło
+- **WHEN** moduł startuje w trybie tożsamości, a adres bazy niesie nazwę użytkownika lub hasło
 - **THEN** moduł odmawia startu
 - **AND** komunikat wskazuje, że poświadczenie z adresu nie byłoby użyte
-
-#### Scenario: Nowe połączenie po wygaśnięciu poświadczenia
-
-- **WHEN** moduł pracuje dłużej niż okres ważności poświadczenia i potrzebuje nowego
-  połączenia
-- **THEN** połączenie zestawia się na odnowionym poświadczeniu
 
 ### Requirement: Połączenie z bazą zdalną jest szyfrowane
 
@@ -62,23 +48,25 @@ maszyny MAY być osiągana bez szyfrowania.
 
 ### Requirement: Praca bez tożsamości nie wychodzi poza maszynę
 
-Baza lokalna — w kontenerze na maszynie deweloperskiej — MAY być osiągana hasłem niesionym
-w adresie. Ta furtka MUST być ograniczona do pętli zwrotnej: bez skonfigurowanej tożsamości
-moduł MUST NOT nawiązać połączenia z hostem innym niż pętla zwrotna i MUST odmówić startu z
-taką konfiguracją. Chroni to przed lokalnym modułem piszącym do produkcji i przed
-poświadczeniem ambientowym maszyny, które uwierzytelniłoby moduł jako kogoś, kim nie jest.
+Bez skonfigurowanej tożsamości moduł MAY łączyć się hasłem niesionym w adresie tylko z hostem na pętli
+zwrotnej albo z hostem wymienionym w ustawieniu prywatnych hostów sieci kontenerów tej samej maszyny.
+Z każdym innym hostem moduł MUST NOT nawiązać połączenia i MUST odmówić startu. Chroni to przed
+lokalnym modułem piszącym do produkcji i przed poświadczeniem ambientowym maszyny.
+
+#### Scenario: Baza w sieci kontenerów serwera
+
+- **WHEN** moduł startuje bez tożsamości, a adres wskazuje host wymieniony jako prywatny
+- **THEN** moduł startuje i łączy się z bazą
 
 #### Scenario: Host zdalny bez tożsamości
 
-- **WHEN** moduł startuje bez skonfigurowanej roli, a adres wskazuje hosta spoza pętli
-  zwrotnej
+- **WHEN** moduł startuje bez tożsamości, a adres wskazuje host spoza pętli zwrotnej i spoza listy prywatnych
 - **THEN** moduł odmawia startu
-- **AND** komunikat wskazuje, że praca bez tożsamości jest ograniczona do bazy lokalnej
+- **AND** komunikat wskazuje, że praca bez tożsamości jest ograniczona do bazy lokalnej albo prywatnej
 
 #### Scenario: Narzędzie deweloperskie odmawia wcześniej
 
-- **WHEN** skrypt uruchamiający środowisko lokalne czyta konfigurację wskazującą hosta spoza
-  pętli zwrotnej
+- **WHEN** skrypt uruchamiający środowisko lokalne czyta konfigurację wskazującą hosta spoza pętli zwrotnej
 - **THEN** skrypt odmawia startu przed uruchomieniem czegokolwiek
 
 ### Requirement: Moduł nie dzieli bazy z innym modułem
@@ -228,3 +216,4 @@ Odmowa MUST nazwać obie rewizje: tę, której oczekuje obraz, i tę, na której
 - **WHEN** wdrożenie niesie migrację, która nie przechodzi
 - **THEN** nowa wersja nie zaczyna obsługiwać ruchu
 - **AND** wdrożenie kończy się niepowodzeniem, zamiast zgłosić powodzenie
+

@@ -104,18 +104,29 @@ strategii, MUST zostać otwarta.
 Formularz uruchomienia MUST przyjmować zakres w dniach strefy polskiej, parametry z wartościami domyślnymi i
 zadeklarowanymi zakresami, model kosztów, kapitał i ziarno. Model kosztów MUST być wypełniony z profilu kosztów
 instrumentu. Zmiana w formularzu MUST dotyczyć tylko tego uruchomienia, a profil zmienia się osobno. Przed wysłaniem
-formularz MUST pokazywać, ile minut obejmie zakres, wobec sufitu pakietu. Instrument bez profilu MUST dawać formularz z
-pustymi kosztami i możliwością zapisania ich jako profil. Odmowa pakietu MUST pojawić się przy polu, którego dotyczy.
+formularz MUST pokazywać, ile świec serii wykonania rewizji obejmie zakres, z nazwą tej serii, wobec sufitu pakietu.
+Instrument bez profilu MUST dawać formularz z pustymi kosztami i możliwością zapisania ich jako profil. Odmowa pakietu
+MUST pojawić się przy polu, którego dotyczy.
 
 #### Scenario: Zakres ponad sufit
 
-- **WHEN** operator wybiera zakres, który obejmuje więcej minut, niż pakiet przyjmuje
+- **WHEN** operator wybiera zakres, który obejmuje więcej świec serii wykonania, niż pakiet przyjmuje
 - **THEN** formularz MUST to powiedzieć przed wysłaniem i nazwać sufit
 
 #### Scenario: Instrument bez profilu kosztów
 
 - **WHEN** operator otwiera formularz dla instrumentu bez profilu
 - **THEN** koszty MUST być puste, a formularz MUST pozwalać zapisać wpisane koszty jako profil instrumentu
+
+#### Scenario: Długi zakres strategii na M5
+
+- **WHEN** operator wybiera dziesięć lat dla rewizji z serią wykonania `MINUTE_5`
+- **THEN** formularz MUST liczyć świece M5, a nie minuty, i MUST NOT blokować wysłania z powodu sufitu
+
+#### Scenario: Backtest bez kosztów
+
+- **WHEN** operator wybiera „bez kosztów” i uruchamia backtest
+- **THEN** uruchomienie MUST być wysłane bez kosztów, a jego raport i pozycja na liście MUST być tak oznaczone
 
 ### Requirement: Lista uruchomień i ich stan
 
@@ -284,4 +295,30 @@ przeczytać uruchomienia.
 
 - **WHEN** operator klika „Backtesty tej strategii” przy otwartej strategii
 - **THEN** zakładka Backtests MUST się otworzyć z tą strategią wybraną i jej formularzem uruchomienia
+
+### Requirement: Okno tworzenia strategii ma własny czat z agentem
+
+Obok edytora otwartej strategii MUST stać czat z agentem, osobny od panelu agenta terminala i widoczny bez rozwijania
+czegokolwiek, tak jak pole „opisz zdaniem” w zakładce Alerty. Każda strategia MUST mieć swoją rozmowę: otwarcie
+strategii MUST wczytać jej rozmowę, a nowa strategia MUST zaczynać od pustej. Rozmowa utworzona przy nowej strategii MUST
+zostać przypisana strategii, którą agent w niej zapisał. Każda tura z tego czatu MUST nieść kontekst otwartej strategii
+(identyfikator, rewizję bazową i niezapisany tekst edytora). Po każdej turze zakładka MUST czytać strategię od nowa tak,
+jak po turze panelu. Panel agenta terminala MUST działać jak dotąd, a czat strategii MUST NOT zmieniać jego otwartej
+rozmowy ani stanu zwinięcia.
+
+#### Scenario: Nowa strategia z opisu w oknie tworzenia
+
+- **WHEN** operator klika „Nowa…” i opisuje strategię w czacie okna tworzenia
+- **THEN** odpowiedź agenta MUST pojawić się w tym czacie, a po zapisie przez agenta okno MUST pokazać nową strategię
+- **AND** ta rozmowa MUST zostać przypisana tej strategii
+
+#### Scenario: Powrót do strategii
+
+- **WHEN** operator otwiera strategię, o której rozmawiał wcześniej, także na innym urządzeniu
+- **THEN** czat okna tworzenia MUST pokazać tamtą rozmowę
+
+#### Scenario: Panel agenta obok
+
+- **WHEN** operator pisze w czacie strategii, a w panelu agenta ma otwartą inną rozmowę
+- **THEN** panel MUST dalej pokazywać swoją rozmowę i swój stan zwinięcia
 
