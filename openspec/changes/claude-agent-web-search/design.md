@@ -20,7 +20,7 @@ operator nie chce prowadzić.
 
 **D2. Granica wstrzyknięcia w instrukcjach i w przełącznikach, nie w sieci.** Treść z sieci to dane; zapis na rachunku
 i narzędzia zespołów tylko na prośbę operatora w tej samej rozmowie. Twardą granicą zostają przełączniki
-`AGENT_ACCOUNT_WRITES` i `AGENT_LIVE_ACCOUNT_WRITES` (dziś oba wyłączone) oraz strażnik `LIVE_ORDER_LIMITS`.
+`AGENT_ACCOUNT_WRITES` i `AGENT_LIVE_ACCOUNT_WRITES` (9 listopada: demo `off`, konto realne `on`) oraz strażnik `LIVE_ORDER_LIMITS`.
 
 **D3. Zapis tylko do `out/`, ścieżką bezwzględną.** `Edit(//home/agent/work/out/**)` w `allow` (reguła `Edit` obejmuje
 każde narzędzie zapisu plików); zakazy wprost dla `.claude/`, `CLAUDE.md`, `.mcp.json`, `owner-channel.md` w katalogu
@@ -38,6 +38,8 @@ Wysyłka pliku idzie narzędziem `reply` kanału Telegram (`files`), które pisz
   zespoły). Akceptowane przez operatora jak przy biurku; instrukcja zabrania wysyłania danych systemu w adresach.
 - [Wstrzyknięcie każe uruchomić albo zaplanować zespół — koszt modeli] → narzędzia zespołów tylko na prośbę operatora;
   limity kosztu zespołów (`daily_limit`) ograniczają szkodę.
-- [Włączenie zapisu na rachunku przy otwartej sieci] → ryzyko rośnie; przy włączaniu `AGENT_ACCOUNT_WRITES` operator
-  decyduje świadomie, zapis wymaga potwierdzenia w rozmowie, demo i realne mają osobne przełączniki.
+- [Zapis na koncie realnym jest włączony (`AGENT_LIVE_ACCOUNT_WRITES=on`) przy otwartej sieci] → strona może próbować
+  nakłonić agenta do zlecenia; granicą jest wymóg „KONTO REALNE” i jawnego „tak” operatora w rozmowie oraz
+  `LIVE_ORDER_LIMITS` (US100 do 1.0) w bramie; operator może wyłączyć przełącznik bez zmiany kodu. Przy włączaniu
+  `AGENT_ACCOUNT_WRITES` operator decyduje świadomie, zapis wymaga potwierdzenia w rozmowie, demo i realne mają osobne przełączniki.
 - [Zużycie subskrypcji przez długie wyszukiwania] → przegląd zużycia po tygodniu, jak przy wdrożeniu agenta.
