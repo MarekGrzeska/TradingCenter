@@ -40,6 +40,7 @@ async def start_run_on_revision(
     # midnight UTC, because a limit moving with the operator's timezone is a different limit in summer.
     daily_limit = limit_from(definition.limits.daily_limit)
     daily_orders = definition.trading.orders_per_day
+    agents_held: DailyCostLimitReached | None = None
     if daily_limit is not None or daily_orders is not None:
         midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
         async with pool.acquire() as conn:
@@ -51,7 +52,9 @@ async def start_run_on_revision(
                     since=midnight,
                 )
                 if spent >= daily_limit:
-                    raise DailyCostLimitReached(spent, daily_limit)
+                    if not definition.steps:
+                        raise DailyCostLimitReached(spent, daily_limit)
+                    agents_held = DailyCostLimitReached(spent, daily_limit, steps_ran=True)
             if daily_orders is not None:
                 # The same midnight as the cost ceiling, checked in the same place for the same reason: a
                 # ceiling the clock does not read is one that holds only while the operator is watching.
@@ -86,6 +89,7 @@ async def start_run_on_revision(
             catalogue=catalogue,
             settings=settings,
             registry=registry,
+            agents_held=agents_held,
         )
     )
     registry.register(run["id"], task)

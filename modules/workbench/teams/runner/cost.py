@@ -22,10 +22,11 @@ class RunCostLimitReached(CostLimitReached):
 
 
 class DailyCostLimitReached(CostLimitReached):
-    def __init__(self, spent: Decimal, limit: Decimal) -> None:
+    def __init__(self, spent: Decimal, limit: Decimal, *, steps_ran: bool = False) -> None:
+        # A revision with steps still runs them, since a step calls no model (`teams-usage`); only its agents are held.
+        tail = "The run's steps ran; no agent called its model." if steps_ran else "No run was started."
         super().__init__(
-            f"this team's daily cost limit is used up: {spent} spent today of {limit} "
-            "allowed. No run was started."
+            f"this team's daily cost limit is used up: {spent} spent today of {limit} allowed. {tail}"
         )
         self.spent = spent
         self.limit = limit

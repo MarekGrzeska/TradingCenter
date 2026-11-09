@@ -7,7 +7,7 @@ import asyncio
 import json
 import logging
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
@@ -28,6 +28,7 @@ from ..tools import (
     ToolServerRegistry,
     plan_tools,
 )
+from ..validation import NOTICE_TOOL
 from .cost import CostGuard, CostLimitReached, limit_from
 from .graph import AgentFailed, compile_team
 from .loop import RecordedCall, briefing_for, run_agent
@@ -126,6 +127,7 @@ async def execute_run(
     catalogue: ModelCatalogue,
     settings: Settings,
     registry: RunRegistry,
+    agents_held: CostLimitReached | None = None,
 ) -> None:
     """The whole of a run, from `pending` to one of `completed`, `failed`, `cancelled`. Never raises for
     anything the run itself did. `CancelledError` goes back out after the status is written."""
@@ -169,6 +171,7 @@ async def execute_run(
             trades=trades,
             team_id=team_id,
             owner_principal=owner_principal,
+            agents_held=agents_held,
         )
         graph = compile_team(definition, run.run_agent_step, run.run_step_node)
         try:
@@ -196,6 +199,10 @@ async def execute_run(
             # still leaves a trace and a reason rather than a task that vanished.
             log.exception("run %s failed outside an agent's own work", run_id)
             status, reason = "failed", f"the run failed: {err}"
+            return
+        if run.held_agents:
+            # The steps ran and an agent did not: failed, naming the limit, with everything the steps did written.
+            status, reason = "failed", str(agents_held)
             return
         status, reason = "completed", None
     except asyncio.CancelledError:
@@ -245,6 +252,9 @@ class _Run:
     trades: TradeGuard
     team_id: int = 0
     owner_principal: str = ""
+    # Set when the daily cost limit was used up before a revision with steps started: its agents call no model.
+    agents_held: CostLimitReached | None = None
+    held_agents: list[str] = field(default_factory=list)
 
     async def run_agent_step(
         self, agent: AgentDefinition, given: Sequence[tuple[str, str]]
@@ -353,7 +363,65 @@ class _StepRunner(_NodeTrace):
         run = self._run
         agent = self._agent
         await self._start()
-        work = await run_agent(
+        if run.agents_held is not None:
+            # Not raised: a step working beside this agent must not be cancelled over a model call nobody made.
+            run.held_agents.append(agent.key)
+            await self._send_fallback(given, str(run.agents_held), rounds=0)
+            await self._finish(output=None, rounds=0)
+            return ""
+        try:
+            work = await self._work(given)
+        except CostLimitReached as err:
+            await self._send_fallback(given, str(err), rounds=0)
+            raise
+        if work.failed:
+            await self._send_fallback(given, "the model call failed", rounds=work.rounds)
+
+        await self._finish(output=None if work.failed else work.text, rounds=work.rounds)
+        if work.failed:
+            raise AgentFailed(agent.key, "the model call failed")
+
+        if work.ceiling_reached:
+            log.info(
+                "agent %s in run %s reached the round ceiling and answered without tools",
+                agent.key,
+                run.run_id,
+            )
+        return work.text
+
+    async def _send_fallback(self, given: Sequence[tuple[str, str]], why: str, *, rounds: int) -> None:
+        """The fixed message an agent with a fallback notice leaves when it cannot answer (`teams-steps`). Best effort: a
+        notice that fails is in the trace, and never turns into a second failure of the run."""
+        notice = self._agent.fallback_notice
+        if notice is None:
+            return
+        lines = [notice.prefix.strip()] if notice.prefix.strip() else []
+        lines += [summary for _key, output in given if (summary := _summary_of(output))]
+        lines.append(f"{self._agent.key}: the model did not answer: {why}")
+        arguments: dict[str, Any] = {"destination": notice.destination, "text": "\n".join(lines)}
+        if notice.bot is not None:
+            arguments["bot"] = notice.bot
+        try:
+            outcome = await self._call_tool(NOTICE_TOOL, arguments)
+        except Exception as err:
+            log.exception("the fallback notice of agent %s could not be sent", self._agent.key)
+            outcome = ToolOutcome(ToolOutcomeKind.UNAVAILABLE, f"the notice could not be sent: {err}", 0)
+        await self._on_tool_call(
+            RecordedCall(
+                round_index=rounds,
+                position=0,
+                name=NOTICE_TOOL,
+                arguments=arguments,
+                outcome=str(outcome.kind),
+                text=outcome.text,
+                duration_ms=outcome.duration_ms,
+            )
+        )
+
+    async def _work(self, given: Sequence[tuple[str, str]]):
+        run = self._run
+        agent = self._agent
+        return await run_agent(
             agent,
             model=self._entry.model,
             briefing=briefing_for(agent, given),
@@ -368,18 +436,6 @@ class _StepRunner(_NodeTrace):
             before_write_call=self._before_write_call,
             moves_the_account=run.plan.moves_the_account,
         )
-
-        await self._finish(output=None if work.failed else work.text, rounds=work.rounds)
-        if work.failed:
-            raise AgentFailed(agent.key, "the model call failed")
-
-        if work.ceiling_reached:
-            log.info(
-                "agent %s in run %s reached the round ceiling and answered without tools",
-                agent.key,
-                run.run_id,
-            )
-        return work.text
 
     async def _call_tool(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
         return await self._run.plan.call(name, arguments, agent_key=self._agent.key)
@@ -473,6 +529,16 @@ class _StepNodeRunner(_NodeTrace):
                 conn, team_id=self._run.team_id, owner_principal=self._run.owner_principal, symbol=symbol
             )
         return [dict(row) for row in rows]
+
+
+def _summary_of(output: str) -> str | None:
+    """A step's one-line summary out of its JSON result; an agent's prose has none."""
+    try:
+        data = json.loads(output)
+    except (TypeError, ValueError):
+        return None
+    summary = data.get("summary") if isinstance(data, dict) else None
+    return summary if isinstance(summary, str) and summary else None
 
 
 # Best effort by design, and the trace is why: `tool_calls` already holds the arguments and the reply

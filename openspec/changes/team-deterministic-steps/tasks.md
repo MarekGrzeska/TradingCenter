@@ -28,8 +28,8 @@
 
 ## 5. Powiadomienie zapasowe i granica kosztu
 
-- [ ] 5.1 Węzeł agenta z `fallback_notice`: przy błędzie modelu albo granicy kosztu jedna wiadomość (prefiks, `summary` kroków-poprzedników, powód) przez jego `send_telegram_message`, w jego śladzie; status przebiegu bez zmian
-- [ ] 5.2 `start_run_on_revision`: rewizja z krokami przy wyczerpanej granicy dobowej rusza, agenci dostają wyczerpany `CostGuard` z powodem dobowym; rewizja bez kroków odmawiana jak dziś; testy obu
+- [x] 5.1 Węzeł agenta z `fallback_notice`: przy błędzie modelu albo granicy kosztu jedna wiadomość (prefiks, `summary` kroków-poprzedników, powód) przez jego `send_telegram_message`, w jego śladzie; status przebiegu bez zmian
+- [x] 5.2 `start_run_on_revision`: rewizja z krokami przy wyczerpanej granicy dobowej rusza, agenci dostają wyczerpany `CostGuard` z powodem dobowym; rewizja bez kroków odmawiana jak dziś; testy obu
 
 ## 6. tc-team-tools
 
