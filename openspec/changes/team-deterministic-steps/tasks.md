@@ -8,8 +8,8 @@
 
 ## 2. Baza
 
-- [ ] 2.1 Migracja łańcucha `teams`: `trades.attempt_key text` i częściowy indeks unikalny `WHERE attempt_key IS NOT NULL`; `record_trade` z kluczem, konflikt jako osobny wynik
-- [ ] 2.2 Odczyt własnych wierszy `place_order` zespołu (zespół, właściciel, symbol, rozliczone), na potrzeby przepisu; `db-cost-check` dla tego zapytania i dla czekania na świecę
+- [x] 2.1 Migracja łańcucha `teams`: `trades.attempt_key text` i częściowy indeks unikalny `WHERE attempt_key IS NOT NULL`; `record_trade` z kluczem, konflikt jako osobny wynik
+- [x] 2.2 Odczyt własnych wierszy `place_order` zespołu (zespół, właściciel, symbol, rozliczone), na potrzeby przepisu; `db-cost-check` dla tego zapytania i dla czekania na świecę
 
 ## 3. Przebieg: węzeł kroku
 
