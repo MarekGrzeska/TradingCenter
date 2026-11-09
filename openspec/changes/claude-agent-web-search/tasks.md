@@ -13,6 +13,6 @@
 
 ## 3. Wdrożenie i próba
 
-- [ ] 3.1 Merge, `deploy-watch`; po restarcie sesji ustawienia w kontenerze mają sieć i `out/` w `allow`; próba `claude -p` w kontenerze: zapis do `out/` przechodzi, do `.claude/` jest odrzucony
+- [x] 3.1 Merge, `deploy-watch`; po restarcie sesji ustawienia w kontenerze mają sieć i `out/` w `allow`; próba `claude -p` w kontenerze: zapis do `out/` przechodzi, do `.claude/` jest odrzucony
 - [ ] 3.2 Operator z Telegrama: artykuł na temat spoza archiwum, ze źródłami, jako plik HTML w czacie
 - [ ] 3.3 `review.md`; archiwizacja
