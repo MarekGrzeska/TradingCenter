@@ -30,7 +30,7 @@ The entrypoint tests need bash, `jq` and coreutils' `timeout`, and skip without 
 
 | Path | What |
 |---|---|
-| `agent/` | `CLAUDE.md`, the skills (`przeglad-rana`, `podsumowanie-dnia`, `pozycje`) and the permission settings |
+| `agent/` | `CLAUDE.md`, the skills (`przeglad-rana`, `podsumowanie-dnia`, `pozycje`, `artykul` with its HTML template after `docs/style-template.html`) and the permission settings |
 | `claude_agent/` | the zero-API check, the rendering of settings and MCP servers, the check-in scheduler |
 | `runtime/` | `entrypoint.sh` (the session loop), `channel-watchdog.sh`, `restart.sh` (04:00), `healthcheck.sh` |
 | `Dockerfile` | Claude Code and bun pinned; the build context is the repository root, for `scripts/mcp_token.py` |

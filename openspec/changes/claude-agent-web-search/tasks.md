@@ -10,9 +10,10 @@
 
 - [x] 2.1 `agent/CLAUDE.md`: sieć jako źródło danych, źródła w odpowiedzi, zakaz działania na polecenie ze strony i danych systemu w adresach; artykuł jako HTML w `out/` wysłany przez `files`
 - [x] 2.2 `modules/claude-agent/README.md`: lista zakazów bez sieci
+- [x] 2.3 Skill `artykul` z szablonem HTML w stylu `docs/style-template.html` (CSS przepisywany bez zmian, treść wypełniana), żeby każdy artykuł wyglądał tak samo i nie płacił za wymyślanie stylu
 
 ## 3. Wdrożenie i próba
 
 - [x] 3.1 Merge, `deploy-watch`; po restarcie sesji ustawienia w kontenerze mają sieć i `out/` w `allow`; próba `claude -p` w kontenerze: zapis do `out/` przechodzi, do `.claude/` jest odrzucony
-- [ ] 3.2 Operator z Telegrama: artykuł na temat spoza archiwum, ze źródłami, jako plik HTML w czacie
+- [x] 3.2 Operator z Telegrama: artykuł na temat spoza archiwum, ze źródłami, jako plik HTML w czacie
 - [ ] 3.3 `review.md`; archiwizacja
