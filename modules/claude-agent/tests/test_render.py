@@ -15,11 +15,17 @@ IMAGE = json.loads(
 )
 NEVER = (
     "Bash",
-    "Edit",
-    "Write",
-    "WebFetch",
-    "WebSearch",
+    "NotebookEdit",
     "mcp__tc-telegram__send_telegram_message",
+)
+OUT = "Edit(//home/agent/work/out/**)"
+# What the session itself reads: writing there would let a page it fetched widen its own permissions.
+WHAT_THE_SESSION_READS = (
+    "Edit(//home/agent/work/.claude/**)",
+    "Edit(//home/agent/work/CLAUDE.md)",
+    "Edit(//home/agent/work/.mcp.json)",
+    "Edit(//home/agent/work/owner-channel.md)",
+    "Edit(//home/agent/.claude/**)",
 )
 
 
@@ -43,6 +49,16 @@ def test_what_nobody_may_call_stays_denied(writes: bool) -> None:
     rendered = render.settings(IMAGE, writes=writes)
     assert set(NEVER) <= set(rendered["permissions"]["deny"])
     assert rendered["permissions"]["defaultMode"] == "dontAsk"
+
+
+@pytest.mark.parametrize("writes", [False, True])
+def test_the_web_is_open_and_files_are_written_only_to_out(writes: bool) -> None:
+    # claude-agent-access, "Artykuł na temat", "Dowolna domena", "Artykuł jako plik HTML"
+    permissions = render.settings(IMAGE, writes=writes, live_writes=writes)["permissions"]
+    assert {"WebSearch", "WebFetch", OUT} <= set(permissions["allow"])
+    assert not {rule for rule in permissions["allow"] if rule.startswith(("Edit", "Write"))} - {OUT}
+    assert not {"Edit", "Write", "WebSearch", "WebFetch"} & set(permissions["deny"])
+    assert set(WHAT_THE_SESSION_READS) <= set(permissions["deny"])
 
 
 def test_the_servers_are_the_ten_surfaces_with_their_api() -> None:

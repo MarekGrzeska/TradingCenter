@@ -66,3 +66,15 @@ def test_the_image_puts_back_what_the_session_reads(tmp_path: Path) -> None:
     assert (work / ".mcp.json").exists()
     assert "instructions changed" in result.stdout
     assert "starting session (fresh)" in result.stdout
+
+
+def test_what_the_agent_wrote_for_the_operator_lives_a_week(tmp_path: Path) -> None:
+    out = tmp_path / "work" / "out"
+    out.mkdir(parents=True)
+    (out / "old.html").write_text("<p>old</p>")
+    (out / "new.html").write_text("<p>new</p>")
+    month_ago = (out / "old.html").stat().st_mtime - 30 * 24 * 3600
+    os.utime(out / "old.html", (month_ago, month_ago))
+    _start(tmp_path)
+    assert not (out / "old.html").exists()
+    assert (out / "new.html").exists()

@@ -20,8 +20,11 @@ The entrypoint tests need bash, `jq` and coreutils' `timeout`, and skip without 
 - **Its own application, the operator's person.** Signed in once with a device code as the operator, to the registration
   `app-tradingcenter-vps-agent`: teams it creates are the operator's, and every log names it apart from the desk client.
 - **Account writes off** unless `AGENT_ACCOUNT_WRITES=on`; the live account's (`tc-trading-live`, `live-account-trading`)
-  off unless `AGENT_LIVE_ACCOUNT_WRITES=on`, a switch of its own that the demo one never opens. `send_telegram_message`, the shell, file writes and the web are
+  off unless `AGENT_LIVE_ACCOUNT_WRITES=on`, a switch of its own that the demo one never opens. `send_telegram_message`, the shell and file writes outside `out/` are
   denied either way (`agent/.claude/settings.json`, rendered by `claude_agent/render.py`).
+- **The web is open, files only in `out/`** (`claude-agent-web-search`): `WebSearch` and `WebFetch` on any site, as at the
+  desk; the session writes only `/home/agent/work/out/` (an article as HTML, sent with the Telegram reply's `files`),
+  never what it reads itself (`.claude/`, `CLAUDE.md`, `.mcp.json`). The entrypoint deletes files there older than a week.
 
 ## Layout
 
