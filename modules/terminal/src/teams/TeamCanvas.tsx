@@ -9,11 +9,12 @@ import {
 import "@xyflow/react/dist/style.css";
 import { AgentNode, type AgentFlowNode } from "./AgentNode";
 import { DependencyEdge, type DependencyFlowEdge } from "./DependencyEdge";
+import { StepNode, type StepFlowNode } from "./StepNode";
 import { layout } from "./teamDraft";
 import type { TeamDefinition, TeamDependency, TeamLayout, TeamsModel } from "./teamsApi";
 import type { Refusal } from "./refusal";
 
-const NODE_TYPES = { agent: AgentNode };
+const NODE_TYPES = { agent: AgentNode, step: StepNode };
 const EDGE_TYPES = { dependency: DependencyEdge };
 
 /**
@@ -69,9 +70,22 @@ export function TeamCanvas({
     [refusal],
   );
 
-  const nodes: AgentFlowNode[] = useMemo(() => {
+  const nodes: (AgentFlowNode | StepFlowNode)[] = useMemo(() => {
     const computed = layout(definition);
-    return definition.agents.map((agent) => ({
+    const steps: StepFlowNode[] = (definition.steps ?? []).map((step) => ({
+      id: step.key,
+      type: "step" as const,
+      position: places?.get(step.key) ?? computed.get(step.key) ?? { x: 0, y: 0 },
+      selected: step.key === selectedKey,
+      data: {
+        recipe: step.recipe,
+        deposit: typeof step.params.deposit_fraction === "string" ? step.params.deposit_fraction : null,
+        refused: refusedAgents.has(step.key),
+        runStatus: runStatuses?.get(step.key),
+        onOpenSettings: onOpenSettings ? () => onOpenSettings(step.key) : undefined,
+      },
+    }));
+    const agents: AgentFlowNode[] = definition.agents.map((agent) => ({
       id: agent.key,
       type: "agent" as const,
       position: places?.get(agent.key) ?? computed.get(agent.key) ?? { x: 0, y: 0 },
@@ -85,6 +99,7 @@ export function TeamCanvas({
         onOpenSettings: onOpenSettings ? () => onOpenSettings(agent.key) : undefined,
       },
     }));
+    return [...agents, ...steps];
   }, [definition, modelLabels, onOpenSettings, places, refusedAgents, runStatuses, selectedKey]);
 
   const edges: DependencyFlowEdge[] = useMemo(

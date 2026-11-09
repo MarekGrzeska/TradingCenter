@@ -138,3 +138,24 @@ async def test_predecessors_arrive_in_the_definitions_own_order() -> None:
     await compile_team(definition, recorder).ainvoke({"outputs": {}})
 
     assert [key for key, _ in recorder.given["judge"]] == ["b", "a"]
+
+
+async def test_a_step_runs_before_the_agent_it_leads_to_and_hands_it_its_result() -> None:
+    """specs/teams-steps, "Następnik czyta wynik kroku"."""
+    from teams.contract import StepDefinition
+
+    definition = TeamDefinition(
+        agents=[an_agent("reporter")],
+        steps=[StepDefinition(key="execute", recipe="strategy_execute", params={})],
+        edges=[TeamEdge(from_="execute", to="reporter")],
+    )
+    recorder = Recorder()
+
+    async def step(node: StepDefinition, given: Sequence[tuple[str, str]]) -> str:
+        recorder.order.append(node.key)
+        return '{"decision": "entered"}'
+
+    await compile_team(definition, recorder, step).ainvoke({"outputs": {}})
+
+    assert recorder.order == ["execute", "reporter"]
+    assert recorder.given["reporter"] == [("execute", '{"decision": "entered"}')]

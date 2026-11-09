@@ -335,3 +335,77 @@ async def test_rename_team_sends_only_what_was_named(server) -> None:
     assert json.loads(renamed.calls.last.request.read()) == {"name": None, "description": "new"}
     assert structured["description"] == "new"
     await teams.aclose()
+
+
+# Steps and the team's account (specs/workbench-team-tools, "Zestaw składa zespoły z krokami").
+
+_STEP = {"key": "execute", "recipe": "strategy_execute", "params": {"strategy_id": 5, "revision": 1, "symbol": "US100"}}
+
+
+@respx.mock
+async def test_create_team_with_a_step_and_a_demo_account(server) -> None:
+    mcp, teams = server
+    created = respx.post(f"{BASE}/teams").mock(
+        return_value=httpx.Response(
+            201,
+            json={"id": 1, "name": "desk", "description": "", "latest_revision": 1,
+                  "created_at": "2026-08-17T00:00:00Z", "updated_at": "2026-08-17T00:00:00Z"},
+        )
+    )
+    revision = _revision()
+    revision["definition"]["steps"] = [_STEP]
+    respx.get(f"{BASE}/teams/1/revisions/latest").mock(return_value=httpx.Response(200, json=revision))
+
+    _content, structured = await mcp.call_tool(
+        "create_team",
+        {
+            "name": "desk",
+            "agents": [_AGENT],
+            "steps": [_STEP],
+            "edges": [{"from": "execute", "to": "scout"}],
+            "trading": {"account_id": "demo-3", "orders_per_day": 2},
+        },
+    )
+
+    definition = json.loads(created.calls.last.request.read())["definition"]
+    assert definition["steps"] == [_STEP]
+    assert definition["trading"]["account_id"] == "demo-3"
+    assert definition["trading"]["environment"] == "demo"
+    assert structured["steps"] == ["execute"]
+    await teams.aclose()
+
+
+@respx.mock
+async def test_the_live_account_cannot_be_set_from_a_chat(server) -> None:
+    mcp, teams = server
+    created = respx.post(f"{BASE}/teams")
+
+    with pytest.raises(ToolError, match="terminal"):
+        await mcp.call_tool(
+            "create_team",
+            {"name": "desk", "steps": [_STEP], "trading": {"environment": "live", "account_id": "real-1"}},
+        )
+
+    assert not created.called
+    await teams.aclose()
+
+
+@respx.mock
+async def test_revising_a_live_team_keeps_its_trading_and_refuses_to_change_it(server) -> None:
+    mcp, teams = server
+    live = _revision()
+    live["definition"]["steps"] = [_STEP]
+    live["definition"]["trading"] = {"environment": "live", "account_id": "real-1"}
+    respx.get(f"{BASE}/teams/1/revisions/latest").mock(return_value=httpx.Response(200, json=live))
+    saved = respx.post(f"{BASE}/teams/1/revisions").mock(return_value=httpx.Response(201, json=live))
+
+    changed = {**_STEP, "params": {**_STEP["params"], "deposit_fraction": "0.3"}}
+    await mcp.call_tool("revise_team", {"team_id": 1, "replace_steps": [changed]})
+    body = json.loads(saved.calls.last.request.read())["definition"]
+    assert body["trading"] == {"environment": "live", "account_id": "real-1"}
+    assert body["steps"][0]["params"]["deposit_fraction"] == "0.3"
+    assert body["agents"] == [_AGENT]
+
+    with pytest.raises(ToolError, match="terminal"):
+        await mcp.call_tool("revise_team", {"team_id": 1, "trading": {"account_id": "demo-3"}})
+    await teams.aclose()

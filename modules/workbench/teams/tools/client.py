@@ -80,6 +80,12 @@ class ToolOutcome:
     def ok(self) -> bool:
         return self.kind is ToolOutcomeKind.OK
 
+    @property
+    def settles_as_refused(self) -> bool:
+        """A write refused before it touched anything. `trading-mcp` names its access-failure refusals as such, and those
+        leave the account's state unknown."""
+        return self.kind is ToolOutcomeKind.REFUSED and "access failure" not in self.text
+
 
 
 class ToolServer:

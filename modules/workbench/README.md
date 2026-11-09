@@ -117,6 +117,24 @@ way to wipe its own mistake out of the record. Three ceilings live in the code b
 notes returned per read, notes written per run — because they bound the shape in which this
 module hands anything to a model, and that is not the operator's budget to move.
 
+## Steps beside agents
+
+A revision may carry `steps` beside `agents`: nodes of the same graph that run a **recipe** from a closed catalogue in
+`teams/steps/` instead of a model (`openspec/changes/team-deterministic-steps`, `docs/zespoly-kroki-deterministyczne.html`).
+A step calls its recipe's tools through the run's own plan, so the account in every call, the trading limits, the trade
+row written before an order and the `tool_calls` trace are the agents' machinery, not a second copy; it writes no usage
+row. Its result is JSON (`decision`, `reason`, `summary`, …) that its successors read as a predecessor's work.
+
+The one recipe, `strategy_execute`, keeps the team's own position in line with `strategy_signal`: `decide()` is its whole
+judgement, a pure function tested as a table. An order carries `trades.attempt_key` under a partial unique index, so one
+signal bar is acted on at most once even by two runs at once. Its own position is the one a `place_order` row of the team
+opened — `provider_order_id` is the position's id on capital.com (checked on the live account, 9 November 2026).
+
+An agent may carry a `fallback_notice`: when its model fails or a cost limit stops it, the run sends one fixed message
+through the agent's own `send_telegram_message`. A used-up daily cost limit holds back the agents of a revision with
+steps, not the run: steps cost nothing, and an exit must not wait for tomorrow's budget. The catalogue is
+`GET /teams/step-recipes`; the team tools may set a team's demo account, never the live one.
+
 ## Who may reach what
 
 `GET /me` answers any verified token with the person's roles. The door (`tc-entra-auth`, `workbench/edge.py`) refuses a
@@ -130,7 +148,7 @@ token; this process holds no credential that writes the directory.
 
 Every path is where it was, except the two that collided. `GET /models` and `GET /usage`
 existed on both surfaces with different answers, so the teams ones are `/teams/models` and
-`/teams/usage`, registered before `/teams/{team_id}` — a path parameter matches a segment
+`/teams/usage` — and `/teams/step-recipes` beside them — registered before `/teams/{team_id}` — a path parameter matches a segment
 before FastAPI reads it as an `int`, so order decides, and `tests/test_route_collisions.py`
 asserts the behaviour rather than the order.
 

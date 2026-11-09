@@ -6,6 +6,9 @@ import { MessageBody } from "../agent/MessageBody";
 import { useRead } from "../data/query";
 import { formatInstant } from "../ui/formatTime";
 import { RunOutputsDialog } from "./RunOutputsDialog";
+import { StepOutput } from "./StepOutput";
+import { readStepOutput } from "./stepResult";
+import { nodeLabel } from "./teamDraft";
 import { TeamCanvas } from "./TeamCanvas";
 import { outcomeOf, stopCause, type TeamRun, type TeamRunStep, type TeamRunToolCall, type TeamTrade } from "./runs";
 import type { TeamDefinition, TeamLayout, TeamsApi, TeamsModel } from "./teamsApi";
@@ -174,7 +177,7 @@ export function RunMonitor({
           {selectedStep ? (
             <AgentWork
               step={selectedStep}
-              role={definition?.agents.find((agent) => agent.key === selectedKey)?.role ?? null}
+              role={definition && selectedKey ? nodeLabel(definition, selectedKey) : null}
               calls={callsByAgent.get(selectedStep.agentKey) ?? []}
               trades={tradesByAgent.get(selectedStep.agentKey) ?? []}
               runOver={run !== null && !working}
@@ -195,9 +198,7 @@ export function RunMonitor({
         <RunOutputsDialog
           runId={runId}
           steps={steps}
-          roleOf={(agentKey) =>
-            definition?.agents.find((agent) => agent.key === agentKey)?.role ?? null
-          }
+          roleOf={(agentKey) => (definition ? nodeLabel(definition, agentKey) : null)}
           callsByAgent={callsByAgent}
           tradesByAgent={tradesByAgent}
           runOver={run !== null && !working}
@@ -224,6 +225,7 @@ function AgentWork({
   trades: TeamTrade[];
   runOver: boolean;
 }) {
+  const stepResult = readStepOutput(step.output);
   return (
     <>
       <div>
@@ -240,7 +242,9 @@ function AgentWork({
           underneath it. The column scrolls; the sections inside it keep their height. */}
       <section className="flex flex-col gap-1">
         <h4 className="text-xs uppercase tracking-wide text-ink-faint">Output</h4>
-        {step.output ? (
+        {stepResult ? (
+          <StepOutput result={stepResult} />
+        ) : step.output ? (
           // The same renderer the chat uses, for the same reason: this is model prose, and as raw text it
           // reads as `**` and `-`. The full-width version is `RunOutputsDialog`.
           <div className="text-xs text-ink">

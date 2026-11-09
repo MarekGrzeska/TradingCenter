@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 import agent.surface
 import teams.surface
 import teams_tools
-from teams.routers import catalogue, memory, models, runs, schedules, tools, usage
+from teams.routers import catalogue, memory, models, recipes, runs, schedules, tools, usage
 
 
 class _Catalogue:
@@ -89,7 +89,7 @@ def test_every_path_the_team_tools_call_is_a_teams_route(surfaces: TestClient) -
     app = surfaces.app
     teams_endpoints = {
         route.endpoint
-        for module in (catalogue, memory, models, runs, schedules, tools, usage)
+        for module in (catalogue, memory, models, recipes, runs, schedules, tools, usage)
         for route in module.router.routes
         if isinstance(route, APIRoute)
     }

@@ -3,6 +3,8 @@ import { MessageBody } from "../agent/MessageBody";
 import { ModalShell } from "../ui/ModalShell";
 import { formatInstant } from "../ui/formatTime";
 import { outcomeOf, type TeamRunStep, type TeamRunToolCall, type TeamTrade } from "./runs";
+import { StepOutput } from "./StepOutput";
+import { readStepOutput } from "./stepResult";
 import { Button } from "../ui/Button";
 
 /**
@@ -131,6 +133,7 @@ function PickerButton({
 /** One agent's output through `MessageBody`, the renderer the chat uses, which inherits the reason it is safe:
  *  no `rehype-raw`, so raw HTML is never rendered. Capped at `max-w-4xl` — 90rem of line is as unreadable as 20. */
 function OneOutput({ step, role }: { step: TeamRunStep; role: string }) {
+  const stepResult = readStepOutput(step.output);
   return (
     <section className="flex flex-col gap-1">
       <h3 className="flex items-baseline gap-2 text-sm text-ink">
@@ -140,7 +143,9 @@ function OneOutput({ step, role }: { step: TeamRunStep; role: string }) {
           {step.finishedAt !== null && ` · finished ${formatInstant(step.finishedAt)}`}
         </span>
       </h3>
-      {step.output ? (
+      {stepResult ? (
+        <StepOutput result={stepResult} />
+      ) : step.output ? (
         <div className="max-w-4xl text-sm leading-relaxed text-ink">
           <MessageBody text={step.output} />
         </div>

@@ -93,4 +93,6 @@ async def test_the_signal_reads_the_archive_and_writes_nothing(pool) -> None:
 
     assert {s.action for s in found} == {"enter"} and found[0].bar_closed_at == "2026-03-02T10:00:00Z"
     assert found[0].sizing == {"mode": "fixed_units", "value": 1.0} and found[0].costs_source == "none"
+    # Named even on an entry, which carries no position: a team follows only what it can execute.
+    assert found[0].exits == ["stop"] and found[0].position is None
     assert runs_after == 0

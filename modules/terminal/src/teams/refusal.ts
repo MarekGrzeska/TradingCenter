@@ -1,3 +1,4 @@
+import { nodeKeys } from "./teamDraft";
 import type { TeamDefinition, TeamDependency } from "./teamsApi";
 
 /**
@@ -8,7 +9,7 @@ import type { TeamDefinition, TeamDependency } from "./teamsApi";
 export interface Refusal {
   /** The module's own message, unchanged. */
   message: string;
-  /** Keys of the agents it names, in the draft's own order. */
+  /** Keys of the agents and steps it names, in the draft's own order. */
   agents: string[];
   /** Dependencies both of whose ends it names — a cycle's edges, chiefly. */
   dependencies: TeamDependency[];
@@ -19,9 +20,7 @@ function namesKey(message: string, key: string): boolean {
 }
 
 export function locateRefusal(message: string, definition: TeamDefinition): Refusal {
-  const agents = definition.agents
-    .map((agent) => agent.key)
-    .filter((key) => namesKey(message, key));
+  const agents = nodeKeys(definition).filter((key) => namesKey(message, key));
   const named = new Set(agents);
 
   // Both ends, not either: an edge sharing one end with a named agent is the neighbour of the problem. A

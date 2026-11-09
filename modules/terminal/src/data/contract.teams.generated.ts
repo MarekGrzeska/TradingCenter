@@ -303,6 +303,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams/step-recipes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Step Recipes */
+        get: operations["list_step_recipes_teams_step_recipes_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams/usage": {
         parameters: {
             query?: never;
@@ -643,6 +660,7 @@ export interface components {
          *     tools it may reach for.
          */
         AgentDefinition: {
+            fallback_notice?: components["schemas"]["FallbackNotice"] | null;
             /**
              * Guidance
              * @default
@@ -699,6 +717,21 @@ export interface components {
             description: string;
             /** Name */
             name: string;
+        };
+        /**
+         * FallbackNotice
+         * @description Where a fixed message goes when this agent cannot answer: the operator still hears what the steps before it did.
+         */
+        FallbackNotice: {
+            /** Bot */
+            bot?: string | null;
+            /** Destination */
+            destination: string;
+            /**
+             * Prefix
+             * @default
+             */
+            prefix: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -942,16 +975,63 @@ export interface components {
             updated_at: string;
         };
         /**
+         * StepDefinition
+         * @description A node of the team's graph that runs a recipe from this module's catalogue instead of a model. `params` are
+         *     checked against the recipe at save time (`validation.py`), not here: the catalogue is code, this is shape.
+         */
+        StepDefinition: {
+            /** Key */
+            key: string;
+            /** Params */
+            params?: {
+                [key: string]: unknown;
+            };
+            /** Recipe */
+            recipe: string;
+        };
+        /** StepParamOut */
+        StepParamOut: {
+            /** Default */
+            default: number | string | null;
+            /** Description */
+            description: string;
+            /** Name */
+            name: string;
+            /** Required */
+            required: boolean;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "integer" | "decimal" | "text";
+        };
+        /**
+         * StepRecipeOut
+         * @description One recipe of the catalogue a step may run — what the terminal's form and the team tools are built from.
+         */
+        StepRecipeOut: {
+            /** Description */
+            description: string;
+            /** Name */
+            name: string;
+            /** Params */
+            params: components["schemas"]["StepParamOut"][];
+            /** Tools */
+            tools: string[];
+        };
+        /**
          * TeamDefinition
          * @description The whole of what a team revision carries, as one immutable blob. `trading` defaults to an empty `TradingLimits`,
          *     which is what every revision saved before that field existed reads back as, and it means the same thing: no limit.
          */
         TeamDefinition: {
             /** Agents */
-            agents: components["schemas"]["AgentDefinition"][];
+            agents?: components["schemas"]["AgentDefinition"][];
             /** Edges */
             edges?: components["schemas"]["TeamEdge"][];
             limits?: components["schemas"]["CostLimits"];
+            /** Steps */
+            steps?: components["schemas"]["StepDefinition"][];
             trading?: components["schemas"]["TradingLimits"];
         };
         /**
@@ -1833,6 +1913,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelOut"][];
+                };
+            };
+        };
+    };
+    list_step_recipes_teams_step_recipes_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StepRecipeOut"][];
                 };
             };
         };

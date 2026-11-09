@@ -62,6 +62,54 @@ class ToolOut(BaseModel):
     read_only: bool | None = None
 
 
+class StepParamOut(BaseModel):
+    name: str
+    type: Literal["integer", "decimal", "text"]
+    required: bool
+    description: str
+    default: int | str | None = None
+
+
+class StepRecipeOut(BaseModel):
+    """One recipe of the catalogue a step may run — what the terminal's form and the team tools are built from."""
+
+    name: str
+    description: str
+    params: list[StepParamOut]
+    tools: list[str]
+
+
+class FallbackNotice(BaseModel):
+    """Where a fixed message goes when this agent cannot answer: the operator still hears what the steps before it did."""
+
+    destination: str
+    bot: str | None = None
+    prefix: str = ""
+
+    @field_validator("destination")
+    @classmethod
+    def _destination_named(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("fallback_notice.destination must not be blank")
+        return value.strip()
+
+
+class StepDefinition(BaseModel):
+    """A node of the team's graph that runs a recipe from this module's catalogue instead of a model. `params` are
+    checked against the recipe at save time (`validation.py`), not here: the catalogue is code, this is shape."""
+
+    key: str
+    recipe: str
+    params: dict[str, Any] = Field(default_factory=dict)
+
+    @field_validator("key", "recipe")
+    @classmethod
+    def _not_blank(cls, value: str, info: ValidationInfo) -> str:
+        if not value.strip():
+            raise ValueError(f"step {info.field_name} must not be blank")
+        return value.strip()
+
+
 class AgentDefinition(BaseModel):
     """One role inside a team: what it is told, which model answers for it, and which
     tools it may reach for."""
@@ -76,6 +124,8 @@ class AgentDefinition(BaseModel):
     guidance: str = ""
     model_id: str
     tools: list[str] = Field(default_factory=list)
+    # Sent by the run itself when this agent's model fails or a cost limit refuses it (`teams-steps`).
+    fallback_notice: FallbackNotice | None = None
 
     @field_validator("key", "role", "prompt", "model_id")
     @classmethod
@@ -195,7 +245,8 @@ class TeamDefinition(BaseModel):
     """The whole of what a team revision carries, as one immutable blob. `trading` defaults to an empty `TradingLimits`,
     which is what every revision saved before that field existed reads back as, and it means the same thing: no limit."""
 
-    agents: list[AgentDefinition]
+    agents: list[AgentDefinition] = Field(default_factory=list)
+    steps: list[StepDefinition] = Field(default_factory=list)
     edges: list[TeamEdge] = Field(default_factory=list)
     limits: CostLimits = Field(default_factory=CostLimits)
     trading: TradingLimits = Field(default_factory=TradingLimits)
@@ -223,21 +274,22 @@ class TeamDefinition(BaseModel):
             )
         return data
 
-    @field_validator("agents")
-    @classmethod
-    def _at_least_one_agent_with_unique_keys(
-        cls, value: list[AgentDefinition]
-    ) -> list[AgentDefinition]:
-        if not value:
-            raise ValueError("a team needs at least one agent")
-        keys = [agent.key for agent in value]
+    def node_keys(self) -> list[str]:
+        """Every node of the graph, agents first and steps after, each in its definition's own order."""
+        return [agent.key for agent in self.agents] + [step.key for step in self.steps]
+
+    @model_validator(mode="after")
+    def _at_least_one_node_with_unique_keys(self) -> TeamDefinition:
+        keys = self.node_keys()
+        if not keys:
+            raise ValueError("a team needs at least one agent or step")
         if len(keys) != len(set(keys)):
-            raise ValueError(f"duplicate agent keys: {keys}")
-        return value
+            raise ValueError(f"duplicate agent keys (agents and steps share one set of keys): {keys}")
+        return self
 
     @model_validator(mode="after")
     def _edges_name_real_agents(self) -> TeamDefinition:
-        keys = {agent.key for agent in self.agents}
+        keys = set(self.node_keys())
         for edge in self.edges:
             if edge.from_ not in keys:
                 raise ValueError(f"edge names unknown agent {edge.from_!r} as its source")
@@ -257,15 +309,15 @@ class TeamDefinition(BaseModel):
         if not self.edges:
             return self
         touched = {edge.from_ for edge in self.edges} | {edge.to for edge in self.edges}
-        isolated = sorted(agent.key for agent in self.agents if agent.key not in touched)
+        isolated = sorted(key for key in self.node_keys() if key not in touched)
         if isolated:
             raise ValueError(f"agent(s) with no dependency in either direction: {isolated}")
         return self
 
     @model_validator(mode="after")
     def _no_dependency_cycle(self) -> TeamDefinition:
-        forward: dict[str, list[str]] = {agent.key: [] for agent in self.agents}
-        incoming: dict[str, int] = {agent.key: 0 for agent in self.agents}
+        forward: dict[str, list[str]] = {key: [] for key in self.node_keys()}
+        incoming: dict[str, int] = {key: 0 for key in self.node_keys()}
         for edge in self.edges:
             forward[edge.from_].append(edge.to)
             incoming[edge.to] += 1
@@ -282,7 +334,7 @@ class TeamDefinition(BaseModel):
                 remaining[target] -= 1
                 if remaining[target] == 0:
                     frontier.append(target)
-        if resolved != len(self.agents):
+        if resolved != len(forward):
             cyclic = sorted(key for key, count in remaining.items() if count > 0)
             raise ValueError(f"dependency cycle involving: {cyclic}")
         return self

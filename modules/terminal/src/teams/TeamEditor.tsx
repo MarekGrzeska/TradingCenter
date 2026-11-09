@@ -4,6 +4,7 @@ import { Button } from "../ui/Button";
 import { BackButton } from "../ui/BackButton";
 import { MarketDataError } from "../data/types";
 import { AgentSettingsDialog } from "./AgentSettingsDialog";
+import { StepSettingsDialog } from "./StepSettingsDialog";
 import { TeamCanvas } from "./TeamCanvas";
 import { TeamRunsStrip } from "./TeamRunsStrip";
 import { TeamPanel } from "./TeamPanel";
@@ -12,14 +13,17 @@ import { locateRefusal, type Refusal } from "./refusal";
 import {
   addAgent,
   addDependency,
+  addStep,
   emptyDefinition,
   hasChanges,
   removeAgent,
   removeDependency,
   setTradingLimit,
   updateAgent,
+  updateStep,
 } from "./teamDraft";
 import type {
+  StepRecipe,
   TeamDefinition,
   TeamDependency,
   TeamLayout,
@@ -90,6 +94,14 @@ export function TeamEditor({
   // What one step back restores, deepest last. Emptied when another team is opened: this
   // is the history of what the operator did to *this* draft.
   const [history, setHistory] = useState<EditHistory>(NO_HISTORY);
+  // The module's recipe catalogue, read once: a step is chosen from it, never from a list kept here.
+  const [recipes, setRecipes] = useState<StepRecipe[]>([]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    api.listStepRecipes(controller.signal).then(setRecipes).catch(() => setRecipes([]));
+    return () => controller.abort();
+  }, [api]);
 
   useEffect(() => {
     if (teamId === null) {
@@ -242,6 +254,7 @@ export function TeamEditor({
   // Looked up in the draft rather than trusted from state: an agent removed by `Undo` takes its open
   // dialog with it, instead of leaving fields that edit an agent the definition no longer has.
   const settingsAgent = draft.agents.find((agent) => agent.key === settingsKey) ?? null;
+  const settingsStep = (draft.steps ?? []).find((step) => step.key === settingsKey) ?? null;
   const dirty = saved === null || hasChanges(draft, saved);
 
   return (
@@ -290,6 +303,24 @@ export function TeamEditor({
         <Button onClick={() => edit(addAgent(draft, defaultModelId))}>
           Add agent
         </Button>
+        {recipes.length > 0 && (
+          <select
+            aria-label="Add step"
+            value=""
+            onChange={(event) => {
+              const recipe = recipes.find((candidate) => candidate.name === event.target.value);
+              if (recipe) edit(addStep(draft, recipe));
+            }}
+            className="rounded border border-border bg-panel px-2 py-1 text-xs text-ink"
+          >
+            <option value="">Add step…</option>
+            {recipes.map((recipe) => (
+              <option key={recipe.name} value={recipe.name}>
+                {recipe.name}
+              </option>
+            ))}
+          </select>
+        )}
         <Button
           tone="primary"
           size="md"
@@ -364,6 +395,20 @@ export function TeamEditor({
           }}
           onConnect={(edge) => edit(addDependency(draft, edge))}
           onDisconnect={(edge) => edit(removeDependency(draft, edge))}
+        />
+      )}
+      {settingsStep && (
+        <StepSettingsDialog
+          step={settingsStep}
+          recipe={recipes.find((recipe) => recipe.name === settingsStep.recipe)}
+          refusal={refusal}
+          onChange={(params) => edit(updateStep(draft, settingsStep.key, params), `step:${settingsStep.key}`)}
+          onClose={() => setSettingsKey(null)}
+          onRemove={() => {
+            edit(removeAgent(draft, settingsStep.key));
+            setSettingsKey(null);
+            if (selectedKey === settingsStep.key) setSelectedKey(null);
+          }}
         />
       )}
     </div>

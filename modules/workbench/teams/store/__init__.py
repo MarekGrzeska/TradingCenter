@@ -57,7 +57,14 @@ from .schedules import (
     set_schedule_enabled,
     update_schedule,
 )
-from .trades import get_run_trades, record_trade, settle_trade, team_trades_since
+from .trades import (
+    AttemptAlreadyMade,
+    get_run_trades,
+    record_trade,
+    settle_trade,
+    team_placed_orders,
+    team_trades_since,
+)
 from .triggers import (
     claim_trigger_for_check,
     create_trigger,
@@ -81,6 +88,7 @@ from .usage import (
 )
 
 __all__ = [
+    "AttemptAlreadyMade",
     "add_memory",
     "archive_team",
     "claim_due_schedule",
@@ -141,6 +149,7 @@ __all__ = [
     "settle_trade",
     "start_step",
     "team_cost_since",
+    "team_placed_orders",
     "team_trades_since",
     "update_schedule",
     "update_trigger",

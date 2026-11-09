@@ -29,6 +29,8 @@ type RawTeam = Wire["TeamOut"];
 type RawRevision = Wire["TeamRevisionOut"];
 type RawDefinition = Wire["TeamDefinition"];
 type RawAgent = Wire["AgentDefinition"];
+type RawStepDefinition = Wire["StepDefinition"];
+type RawRecipe = Wire["StepRecipeOut"];
 type RawModel = Wire["ModelOut"];
 type RawTool = Wire["ToolOut"];
 type RawLayout = Wire["TeamLayoutOut"];
@@ -66,6 +68,29 @@ export interface TeamAgent {
   guidance: string;
   modelId: string;
   tools: string[];
+  /** Sent by the run itself, without a model, when this agent cannot answer (`teams-steps`). */
+  fallbackNotice?: FallbackNotice | null;
+}
+
+export interface FallbackNotice {
+  destination: string;
+  bot: string | null;
+  prefix: string;
+}
+
+/** A node that runs a recipe from the module's catalogue instead of a model. Shares its key space with agents. */
+export interface TeamStep {
+  key: string;
+  recipe: string;
+  params: Record<string, unknown>;
+}
+
+/** One recipe of the module's catalogue, with the parameters the step form is drawn from. */
+export interface StepRecipe {
+  name: string;
+  description: string;
+  params: { name: string; type: "integer" | "decimal" | "text"; required: boolean; description: string }[];
+  tools: string[];
 }
 
 /** One dependency, in the direction work flows: `to` waits for `from` and is shown what
@@ -98,6 +123,8 @@ export interface TeamTradingLimits {
 
 export interface TeamDefinition {
   agents: TeamAgent[];
+  /** Optional so a definition built before steps existed still type-checks; absent reads as none. */
+  steps?: TeamStep[];
   dependencies: TeamDependency[];
   limits: TeamLimits;
   trading: TeamTradingLimits;
@@ -270,6 +297,8 @@ export interface TeamsApi {
    *  answer — no tool server configured, or one announcing nothing — and the picker says
    *  so rather than offering names this terminal invented. */
   listTools(signal: AbortSignal): Promise<TeamsTool[]>;
+  /** The recipes a step may run. A module from before steps answers 404, read as an empty catalogue. */
+  listStepRecipes(signal: AbortSignal): Promise<StepRecipe[]>;
   listTeams(signal: AbortSignal): Promise<TeamSummary[]>;
   createTeam(
     name: string,
@@ -395,12 +424,38 @@ function mapAgent(raw: RawAgent): TeamAgent {
     // Optional on the wire (it has a default), always a list here: a picker mapping over
     // `undefined` is a blank panel rather than an agent with no tools.
     tools: raw.tools ?? [],
+    fallbackNotice: raw.fallback_notice
+      ? {
+          destination: raw.fallback_notice.destination,
+          bot: raw.fallback_notice.bot ?? null,
+          prefix: raw.fallback_notice.prefix ?? "",
+        }
+      : null,
+  };
+}
+
+function mapStep(raw: RawStepDefinition): TeamStep {
+  return { key: raw.key, recipe: raw.recipe, params: raw.params ?? {} };
+}
+
+function mapRecipe(raw: RawRecipe): StepRecipe {
+  return {
+    name: raw.name,
+    description: raw.description,
+    params: raw.params.map((param) => ({
+      name: param.name,
+      type: param.type,
+      required: param.required,
+      description: param.description,
+    })),
+    tools: raw.tools,
   };
 }
 
 function mapDefinition(raw: RawDefinition): TeamDefinition {
   return {
-    agents: raw.agents.map(mapAgent),
+    agents: (raw.agents ?? []).map(mapAgent),
+    steps: (raw.steps ?? []).map(mapStep),
     dependencies: (raw.edges ?? []).map((edge) => ({ from: edge.from, to: edge.to })),
     limits: {
       runLimit: raw.limits?.run_limit ?? null,
@@ -427,7 +482,16 @@ function definitionToWire(definition: TeamDefinition): RawDefinition {
       guidance: agent.guidance,
       model_id: agent.modelId,
       tools: agent.tools,
+      fallback_notice: agent.fallbackNotice
+        ? {
+            destination: agent.fallbackNotice.destination,
+            bot: agent.fallbackNotice.bot,
+            prefix: agent.fallbackNotice.prefix,
+          }
+        : null,
     })),
+    // Carried whole: a revision saved here must keep the steps it was opened with, edited or not.
+    steps: (definition.steps ?? []).map((step) => ({ key: step.key, recipe: step.recipe, params: step.params })),
     edges: definition.dependencies.map((edge) => ({ from: edge.from, to: edge.to })),
     limits: {
       run_limit: definition.limits.runLimit,
@@ -600,6 +664,16 @@ export function createTeamsApi(httpBase: string, identity: Identity = noIdentity
       } catch (cause) {
         // A module deployed before this route existed answers 404, which reads as "nothing announced" rather
         // than a failure. A configured but unreachable tool server answers 503 — a different fact, said differently.
+        if (cause instanceof MarketDataError && cause.kind === "not-found") return [];
+        throw cause;
+      }
+    },
+
+    async listStepRecipes(signal) {
+      try {
+        const raw = await http.json<RawRecipe[]>(`${httpBase}/teams/step-recipes`, { signal });
+        return raw.map(mapRecipe);
+      } catch (cause) {
         if (cause instanceof MarketDataError && cause.kind === "not-found") return [];
         throw cause;
       }
