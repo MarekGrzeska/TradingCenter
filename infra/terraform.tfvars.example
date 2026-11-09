@@ -31,5 +31,5 @@ youtube_enabled = false
 telegram_alert_destination = ""
 
 # `operator_object_id` is made an admin on both APIs. Apply BEFORE merging the code that reads roles
-# (openspec/changes/admin-panel-users-and-roles). Others who use the terminal today, if any:
+# (openspec/changes/archive/2026-11-09-admin-panel-users-and-roles). Others who use the terminal today, if any:
 # admin_user_object_ids = []

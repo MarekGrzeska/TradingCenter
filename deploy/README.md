@@ -48,7 +48,7 @@ operator's own Claude Code and nothing else outside (`openspec/changes/operator-
 
 ## The agent on the server
 
-`claude-agent` (`modules/claude-agent`, `openspec/changes/operator-agent-on-telegram`) is the operator's Claude Code in one
+`claude-agent` (`modules/claude-agent`, `openspec/changes/archive/2026-11-09-operator-agent-on-telegram`) is the operator's Claude Code in one
 tmux session, reached from Telegram. It calls `https://API_HOST/…/mcp` like the desk client, as its own application
 `app-tradingcenter-vps-agent` with the operator's delegated token. Healthy without any of the steps below, so the first
 deploy is not rolled back while they are pending. Before the merge:

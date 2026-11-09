@@ -375,11 +375,11 @@ a token whose application is on the list. A person with no role is refused on ev
 under `/social` and `/polymarket` and nothing else — the conversation's tools reach the account, so the agent is closed to them
 whole. The roles are managed in the directory through Microsoft Graph by the terminal's Users tab, with the admin's own
 delegated token: no process of this system holds a credential that writes the directory, which is what keeps this from being a
-new security boundary. A role change reaches a person when their token next renews. (`openspec/changes/admin-panel-users-and-roles`.)
+new security boundary. A role change reaches a person when their token next renews. (`openspec/changes/archive/2026-11-09-admin-panel-users-and-roles`.)
 
 ## The agent on the server
 
-`claude-agent` is the fourth process (`openspec/changes/operator-agent-on-telegram`): the operator's Claude Code in one tmux
+`claude-agent` is the fourth process (`openspec/changes/archive/2026-11-09-operator-agent-on-telegram`): the operator's Claude Code in one tmux
 session, on the subscription, reached from a phone through a Telegram bot of its own. It is a process because its rule is
 the opposite of the others' — it holds a subscription login and a bot token and **no secret of the system** — and it reaches
 the system exactly the way the operator's Claude Code at the desk does: `https://API_HOST/…/mcp` through Caddy, with an Entra

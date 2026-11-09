@@ -1,6 +1,6 @@
 # claude-agent
 
-The operator's Claude Code session on the server (`openspec/changes/operator-agent-on-telegram`): one session in tmux,
+The operator's Claude Code session on the server (`openspec/changes/archive/2026-11-09-operator-agent-on-telegram`): one session in tmux,
 reached from a phone through a private Telegram bot and from the Claude app through Remote Control, acting on the
 system **only** through the nine production tool surfaces — the same ones the operator's Claude Code reaches at the desk
 (`scripts/claude-mcp.sh`). After AgenticEnglish's `agent/` and `infra/runtime/`, which ran this shape first.

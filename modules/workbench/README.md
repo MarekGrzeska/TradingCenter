@@ -120,7 +120,7 @@ module hands anything to a model, and that is not the operator's budget to move.
 ## Steps beside agents
 
 A revision may carry `steps` beside `agents`: nodes of the same graph that run a **recipe** from a closed catalogue in
-`teams/steps/` instead of a model (`openspec/changes/team-deterministic-steps`, `docs/zespoly-kroki-deterministyczne.html`).
+`teams/steps/` instead of a model (`openspec/changes/archive/2026-11-09-team-deterministic-steps`, `docs/zespoly-kroki-deterministyczne.html`).
 A step calls its recipe's tools through the run's own plan, so the account in every call, the trading limits, the trade
 row written before an order and the `tool_calls` trace are the agents' machinery, not a second copy; it writes no usage
 row. Its result is JSON (`decision`, `reason`, `summary`, …) that its successors read as a predecessor's work.
