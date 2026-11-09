@@ -35,8 +35,9 @@ zapisu ani uruchomienia wyłącznie z powodu pominiętej granicy.
 Granice są narzędziem operatora, nie zgodą, której moduł mu udziela. Zespół, któremu
 operator świadomie pozwala handlować całym kapitałem, MUST dać się w tym module zapisać i
 uruchomić — a sufit wpisany na sztywno byłby dokładnie tą decyzją podjętą za operatora,
-której ten moduł podejmować nie ma prawa. Ochroną przed nieodwracalnym skutkiem jest tu
-konto demonstracyjne wymuszone u gatewaya (`trading-mcp-upstream-access`), a nie liczba,
+której ten moduł podejmować nie ma prawa. Ochroną przed nieodwracalnym skutkiem jest tu,
+na koncie demo, konto demonstracyjne wymuszone u gatewaya (`trading-mcp-upstream-access`), a na koncie realnym granice
+egzekwowane przez proces konta realnego (`capital-live-account`) — w obu przypadkach poza tym modułem, a nie liczba,
 której nie da się zmienić.
 
 #### Scenario: Zespół bez żadnej granicy handlowej
@@ -133,11 +134,11 @@ złożone mimo braku odpowiedzi.
 
 ### Requirement: Rewizja może przypisać zespołowi konto
 
-Definicja zespołu MUST móc nieść identyfikator konta demo, na którym zespół handluje. Konto
-MUST być częścią rewizji, tak jak granice handlowe: dwa warianty strategii na dwóch kontach to
-dwa eksperymenty, a ich porównanie wymaga, żeby każdy przebieg był opisany kontem, na którym
-biegł. Konto MUST być pomijalne, a rewizja bez konta MUST działać na koncie aktywnym, tak jak
-przed tą zmianą.
+Definicja zespołu MUST móc nieść środowisko — demo albo realne, demo, gdy pominięte — oraz identyfikator konta w tym
+środowisku, na którym zespół handluje. Środowisko i konto MUST być częścią rewizji, tak jak granice handlowe: dwa
+warianty strategii na dwóch kontach to dwa eksperymenty, a ich porównanie wymaga, żeby każdy przebieg był opisany
+środowiskiem i kontem, na którym biegł. Na demo konto MUST być pomijalne, a rewizja bez konta MUST działać na koncie
+aktywnym, tak jak przed tą zmianą. Rewizje zapisane przed tą zmianą MUST czytać się jako rewizje demo.
 
 Gdy rewizja niesie konto, moduł MUST wskazywać je w każdym wywołaniu narzędzia czytającego
 albo zmieniającego rachunek, a wartość podana przez model MUST NOT tego zmienić. Model MUST NOT
@@ -183,6 +184,40 @@ pierwszego agenta, z nazwą konta jako przyczyną.
 
 #### Scenario: Rewizja bez konta
 
-- **WHEN** biegnie rewizja, która nie niesie konta
+- **WHEN** biegnie rewizja demo, która nie niesie konta
 - **THEN** wywołania narzędzi rachunku działają na koncie aktywnym
+
+#### Scenario: Rewizja sprzed zmiany
+
+- **WHEN** operator odczytuje rewizję zapisaną, zanim definicja mogła nieść środowisko
+- **THEN** rewizja czyta się jako rewizja demo, z tym samym kontem co przedtem
+
+### Requirement: Zespół na koncie realnym idzie przez serwer narzędzi konta realnego
+
+Rewizja ze środowiskiem realnym MUST nieść konto; zapis takiej rewizji bez konta MUST zostać odrzucony z nazwą
+brakującego pola. Narzędzia rachunku zespołu ze środowiskiem realnym MUST pochodzić wyłącznie z serwera narzędzi konta
+realnego, a zespołu demo — wyłącznie z instancji demo; nazwy narzędzi w rewizji MUST znaczyć to samo w obu środowiskach.
+Rewizja realna przypisująca agentowi narzędzie, którego instancja realna nie wystawia, MUST zostać odrzucona z nazwą
+narzędzia i agenta.
+
+Gdy serwer narzędzi konta realnego nie jest skonfigurowany, przebieg rewizji realnej MUST zostać odmówiony przed
+wywołaniem pierwszego agenta, z tą przyczyną nazwaną — tak jak dziś zespół z przypisanymi narzędziami rachunku bez
+serwera narzędzi. Każdy wiersz śladu wywołania zapisującego MUST nazywać środowisko obok konta.
+
+#### Scenario: Rewizja realna bez konta
+
+- **WHEN** operator zapisuje rewizję ze środowiskiem realnym, która nie niesie konta
+- **THEN** zapis zostaje odrzucony z nazwą brakującego konta
+
+#### Scenario: Przebieg realny bez serwera narzędzi konta realnego
+
+- **WHEN** biegnie rewizja ze środowiskiem realnym, a serwer narzędzi konta realnego nie jest skonfigurowany
+- **THEN** moduł odmawia uruchomienia, nazywając brak serwera jako przyczynę
+- **AND** żaden agent nie zostaje wywołany
+
+#### Scenario: Zespół realny składa zlecenie ponad granicę bramy
+
+- **WHEN** agent zespołu realnego składa zlecenie większe niż granica bramy konta realnego
+- **THEN** agent dostaje odmowę nazywającą granicę
+- **AND** wiersz śladu nazywa środowisko realne, konto i odmowę
 

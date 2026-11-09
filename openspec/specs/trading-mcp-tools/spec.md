@@ -197,10 +197,11 @@ co sam schemat już mówi.
 
 ### Requirement: Zestaw obejmuje wybór konta i jego zasilenie
 
-Zestaw MUST pozwalać wyliczyć konta osiągalne poświadczeniami modułu, przełączyć aktywne oraz
+Zestaw instancji demo MUST pozwalać wyliczyć konta osiągalne poświadczeniami modułu, przełączyć aktywne oraz
 skorygować saldo konta demo. Rachunek, na którym agent handluje, jest warunkiem eksperymentu —
 i był dotąd jedyną rzeczą w nim, której nie dało się ustawić inaczej niż ręką na stronie
-dostawcy.
+dostawcy. Zestaw instancji realnej MUST NOT zawierać narzędzia przełączającego konto aktywne ani korygującego saldo:
+proces konta realnego stoi na jednym koncie i nie ma salda do korygowania (`capital-live-account`).
 
 Wyliczenie kont MUST oznaczać, które konto jest aktywne: „ile mam" i „gdzie składam zlecenie"
 MUST NOT móc dotyczyć dwóch różnych rachunków.
@@ -225,7 +226,7 @@ odróżnialna od awarii dostępu, tak jak każda inna odmowa w tym zestawie.
 
 #### Scenario: Model przełącza konto
 
-- **WHEN** model przełącza aktywne konto na znany identyfikator
+- **WHEN** model przełącza aktywne konto na znany identyfikator na instancji demo
 - **THEN** narzędzie potwierdza, które konto jest teraz aktywne
 
 #### Scenario: Zlecenie na wskazanym koncie
@@ -250,4 +251,27 @@ odróżnialna od awarii dostępu, tak jak każda inna odmowa w tym zestawie.
 - **WHEN** dostawca odrzuca korektę salda
 - **THEN** narzędzie odpowiada odmową nazywającą powód
 - **AND** odmowa MUST NOT być podana jako awaria dostępu do modułu
+
+#### Scenario: Instancja realna nie wylicza przełączenia ani zasilenia
+
+- **WHEN** wołający wylicza narzędzia instancji realnej
+- **THEN** na liście nie ma narzędzia przełączającego konto aktywne ani korygującego saldo
+
+### Requirement: Zestaw nazywa środowisko, na którym działa
+
+Instrukcje serwera i opis każdego narzędzia zapisującego MUST nazywać środowisko, które gateway potwierdził przy starcie:
+konto demonstracyjne albo konto realne z prawdziwymi pieniędzmi. Na instancji realnej opis MUST mówić, że zlecenie poza
+granicami bramy jest odmową, a nie zleceniem przyciętym. Odmowa z powodu granic MUST dotrzeć do wołającego jako odmowa
+nazywająca granicę, odróżnialna od awarii dostępu.
+
+#### Scenario: Wołający czyta instrukcje instancji realnej
+
+- **WHEN** klient MCP łączy się z instancją realną
+- **THEN** instrukcje serwera mówią, że to konto realne
+- **AND** opis narzędzia składającego zlecenie mówi to samo
+
+#### Scenario: Zlecenie ponad granicę na instancji realnej
+
+- **WHEN** wołający składa przez instancję realną zlecenie ponad granicę bramy
+- **THEN** narzędzie odpowiada odmową nazywającą granicę
 

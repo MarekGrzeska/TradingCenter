@@ -3,9 +3,7 @@
 Wszystko, co rusza pieniądze: otwieranie i zamykanie pozycji, zlecenia oczekujące, dołączone
 stopy oraz zamiana asynchronicznego potwierdzenia providera w wynik, na którym wywołujący może
 polegać.
-
 ## Requirements
-
 ### Requirement: Otwarte pozycje są czytelne
 
 Moduł MUST publikować otwarte pozycje aktywnego konta, każdą z identyfikatorem, symbolem,
@@ -109,12 +107,19 @@ Moduł MUST publikować zlecenia oczekujące aktywnego konta i anulować wskazan
 - **THEN** moduł zwraca rozliczony wynik raportujący je jako anulowane
 - **AND** nie pojawia się ono już wśród zleceń oczekujących
 
-### Requirement: Handel dotyka wyłącznie konta demo
+### Requirement: Handel na koncie realnym jest osiągalny tylko w procesie konta realnego
 
-Składanie zleceń, zamykanie pozycji, zmiana i anulowanie MUST być osiągalne tylko wtedy, gdy moduł
-jest związany ze środowiskiem demo.
+Składanie zleceń, zamykanie pozycji, zmiana i anulowanie MUST działać w procesie demo wyłącznie na koncie demo, a na
+koncie realnym wyłącznie w procesie, którego konfiguracja jawnie wybrała środowisko realne, i tylko w granicach, które
+ta konfiguracja niesie (`capital-live-account`). Jeden proces MUST NOT obsługiwać obu środowisk naraz.
 
 #### Scenario: Próba handlu poza demo
 
-- **WHEN** moduł jest skonfigurowany na środowisko inne niż demo
+- **WHEN** moduł jest skonfigurowany na host inny niż demo bez jawnego wyboru środowiska realnego
 - **THEN** nie startuje, więc żadna operacja handlowa nie jest osiągalna
+
+#### Scenario: Proces konta realnego handluje w granicach
+
+- **WHEN** proces z jawnie wybranym środowiskiem realnym przyjmuje zlecenie
+- **THEN** zlecenie trafia do dostawcy tylko wtedy, gdy mieści się w granicach z jego konfiguracji
+
