@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kroki deterministyczne w zespołach</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 16px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 58ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 22ch; text-wrap: balance;
+  }
+  h3.sub {
+    font-family: var(--head); font-weight: 700; font-size: 21px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 34px 0 10px;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 62ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+  ul.plain { margin: 0 0 16px; padding-left: 20px; max-width: 68ch; }
+  ul.plain li { margin-bottom: 6px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; min-width: 640px; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 20px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+  tr.pick td { background: var(--green-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 32ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0 0 8px; font-size: 15px; max-width: 74ch; }
+  .fail p:last-child { margin-bottom: 0; }
+
+  ol.sources { font-size: 14px; padding-left: 22px; max-width: 80ch; }
+  ol.sources li { margin-bottom: 6px; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Burza mózgów · przed propozycją OpenSpec</span>
+    <h1>Zespół, który nie myśli tam, gdzie liczy</h1>
+    <p class="lede">Dziś od zamknięcia świecy sygnałowej do zlecenia minęło <b>98 sekund</b>. Same narzędzia zajęły z tego około dwóch. Ten dokument proponuje, żeby zespół składał się nie tylko z agentów, ale też z <b>kroków deterministycznych</b>, a model zostawał tam, gdzie coś trzeba ocenić albo opowiedzieć.</p>
+    <div class="strip">
+      <span>TradingCenter / workbench · teams</span>
+      <span>9 listopada 2026</span>
+      <span>na podstawie przebiegów <b>337</b> i <b>338</b></span>
+      <span>status: <b>do dyskusji</b>, jeszcze nie zmiana</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">98 s</div><div class="l">od zamknięcia świecy 14:35:00 do wysłania zlecenia</div></div>
+      <div class="cell"><div class="v">63 s</div><div class="l">czekania na harmonogram (cron :36 i zegar co 15 s)</div></div>
+      <div class="cell"><div class="v">≈33 s</div><div class="l">myślenia modeli, zanim padło zlecenie</div></div>
+      <div class="cell"><div class="v">≈2 s</div><div class="l">czasu samych narzędzi na tej ścieżce</div></div>
+      <div class="cell"><div class="v">≈66 pkt</div><div class="l">dzisiejszy poślizg względem otwarcia z backtestu</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Co się dziś stało</div>
+      <h2>Sekunda po sekundzie, przebieg 338 (konto realne)</h2>
+      <p class="intro">Strategia 5 wchodzi po zamknięciu pierwszej świecy M5 sesji nowojorskiej. Backtest zakłada wypełnienie po cenie otwarcia następnej minuty, czyli o 14:35:00. Dziś zlecenie wyszło o 14:36:38.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 940 250" role="img" aria-label="Oś czasu przebiegu 338: 63 sekundy czekania na harmonogram, potem agent sygnału, wykonawca ze zleceniem w 98. sekundzie i agent telegramu. Pod spodem szacunek kroku deterministycznego: zlecenie po około 5 sekundach.">
+            <defs>
+              <pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <line x1="0" y1="0" x2="0" y2="6" stroke="#85899a" stroke-width="1.4"></line>
+              </pattern>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <text x="40" y="22" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.11em" fill="currentColor" opacity="0.6">DZIŚ — TRZY AGENTY, HARMONOGRAM 9:36 ET</text>
+
+              <rect x="40" y="34" width="438" height="22" fill="url(#hatch)" stroke="#85899a" stroke-width="1"></rect>
+              <text x="259" y="49" text-anchor="middle" font-size="12" font-weight="700" fill="#16181d">czeka na cron :36 + tyk zegara (63 s)</text>
+
+              <rect x="491" y="64" width="128" height="22" fill="#1d4291"></rect>
+              <text x="555" y="79" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">signal · 18 s</text>
+
+              <rect x="619" y="94" width="181" height="22" fill="#14306b"></rect>
+              <text x="672" y="109" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">executor · 26 s</text>
+              <rect x="726" y="88" width="5" height="34" fill="#f2c313"></rect>
+              <text x="736" y="138" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#b8322a">place_order 14:36:38</text>
+
+              <rect x="800" y="124" width="90" height="22" fill="#4f535e"></rect>
+              <text x="845" y="139" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">telegram</text>
+
+              <text x="40" y="170" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.11em" fill="#17734c">SZACUNEK — KROK DETERMINISTYCZNY, START 9:35 ET</text>
+              <rect x="40" y="178" width="35" height="22" fill="#17734c"></rect>
+              <text x="84" y="194" font-size="12" font-weight="700" fill="#17734c">≈5 s: zlecenie (opóźnienie archiwum + ≈2 s narzędzi); raport modelu może iść potem, bez pośpiechu</text>
+
+              <line x1="40" y1="216" x2="900" y2="216" stroke="currentColor" stroke-width="1"></line>
+              <g font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75" text-anchor="middle">
+                <line x1="40" y1="212" x2="40" y2="220" stroke="currentColor"></line><text x="40" y="236">14:35:00</text>
+                <line x1="145" y1="212" x2="145" y2="220" stroke="currentColor"></line><text x="145" y="236">+15</text>
+                <line x1="250" y1="212" x2="250" y2="220" stroke="currentColor"></line><text x="250" y="236">+30</text>
+                <line x1="355" y1="212" x2="355" y2="220" stroke="currentColor"></line><text x="355" y="236">+45</text>
+                <line x1="460" y1="212" x2="460" y2="220" stroke="currentColor"></line><text x="460" y="236">14:36:00</text>
+                <line x1="565" y1="212" x2="565" y2="220" stroke="currentColor"></line><text x="565" y="236">+75</text>
+                <line x1="670" y1="212" x2="670" y2="220" stroke="currentColor"></line><text x="670" y="236">+90</text>
+                <line x1="775" y1="212" x2="775" y2="220" stroke="currentColor"></line><text x="775" y="236">+105</text>
+                <line x1="880" y1="212" x2="880" y2="220" stroke="currentColor"></line><text x="880" y="236">14:37:00</text>
+              </g>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — czasy z tabel <code>run_steps</code> i <code>tool_calls</code> na produkcji. Pas kreskowany to czas, w którym nic nie pracowało. Zespół demo (przebieg 337) miał ten sam kształt: zlecenie o 14:36:4x, wypełnione po tej samej cenie 27 426,5.</figcaption>
+      </figure>
+
+      <h3 class="sub">Gdzie poszedł czas</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Odcinek</th><th class="n">Od</th><th class="n">Do</th><th class="n">Trwał</th><th>Co tam się działo</th></tr></thead>
+          <tbody>
+            <tr><td><b>Harmonogram</b></td><td class="n">14:35:00.0</td><td class="n">14:36:02.6</td><td class="n">62,6 s</td><td>Cron ustawiony na 9:36 ET, bo o 9:35 świeca mogła jeszcze nie leżeć w archiwum. Zegar zespołów budzi się co 15 s, więc start wypada od 0 do 14 s po pełnej minucie (tak wyglądają ostatnie 40 przebiegów teamu 8).</td></tr>
+            <tr><td><b>Agent sygnału</b></td><td class="n">14:36:04.4</td><td class="n">14:36:22.7</td><td class="n">18,3 s</td><td>5,5 s do pierwszego wywołania, siedem odczytów w 0,8 s, potem 12 s pisania raportu, którego wykonawca z założenia nie bierze pod uwagę.</td></tr>
+            <tr><td><b>Wykonawca do zlecenia</b></td><td class="n">14:36:22.7</td><td class="n">14:36:38.3</td><td class="n">15,6 s</td><td>Te same odczyty jeszcze raz, potem pięć rund modelu: rozmiar, ponowne sprawdzenie konta, zapis ATTEMPT w pamięci i dopiero zlecenie. Każda runda to 2,5–4 s myślenia i 0,1 s narzędzi.</td></tr>
+            <tr><td><b>place_order</b></td><td class="n">14:36:38.3</td><td class="n">14:36:39.3</td><td class="n">1,0 s</td><td>Brama konta realnego i capital.com. Najdłuższe pojedyncze narzędzie i jedyne, którego nie da się skrócić.</td></tr>
+            <tr><td><b>Po zleceniu</b></td><td class="n">14:36:39.3</td><td class="n">14:37:01.4</td><td class="n">22 s</td><td>Potwierdzenie pozycji, zapis OPEN, agent telegramu. Ten odcinek nikomu nie szkodzi, bo pozycja już jest.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Cena: minuta 14:35 otworzyła się po 27 359,0 (bid). Wypełnienie przyszło po 27 426,5 (ask), czyli po odjęciu spreadu <strong>około 66 punktów wyżej</strong>. Na koncie realnym (0,137 jednostki) to około 9 USD, na demo (16,885 jednostki) około 1 100 USD.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Czy to typowe</div>
+      <h2>Szybkość to nie główny zysk. Zgodność z backtestem tak</h2>
+      <p class="intro">Sprawdziłem wejścia strategii 5 z backtestu, dla których archiwum ma świece minutowe: 55 transakcji od lutego do października 2026. Dla każdej porównałem otwarcie minuty wejścia z ceną po 60, 120 i 180 sekundach, licząc ruch w kierunku pozycji.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Opóźnienie wejścia</th><th class="n">Średni koszt</th><th class="n">Mediana</th><th class="n">Średni |ruch|</th><th class="n">Kiedy kosztowało</th></tr></thead>
+          <tbody>
+            <tr><td>60 s</td><td class="n">−2,5 pkt</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+            <tr><td><b>120 s</b> (mniej więcej dzisiejsze)</td><td class="n">−3,7 pkt</td><td class="n">−8,2 pkt</td><td class="n">23,5 pkt</td><td class="n">42% transakcji</td></tr>
+            <tr><td>180 s</td><td class="n">−1,8 pkt</td><td class="n">—</td><td class="n">—</td><td class="n">—</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Wartość ujemna oznacza, że cena po pierwszej świecy częściej <em>cofała się</em>, więc spóźnione wejście średnio wychodziło odrobinę lepiej. <span class="hl">Na tej próbie opóźnienie nie zjada przewagi systematycznie.</span> Dzisiejsze 66 punktów to ogon rozkładu: mocny ruch na otwarciu, który nie wrócił.</p>
+      <p>Opóźnienie jest jednak <strong>szumem rzędu 24 punktów na transakcję</strong> przy średnim wyniku transakcji w backteście około 29 punktów. To znaczy, że wynik na koncie odjeżdża od backtestu o prawie tyle, ile wynosi sama przewaga. Ten rozjazd nie bierze się ze strategii, tylko z tego, kto i jak ją wykonuje.</p>
+      <div class="quote">Nie kupujemy szybkości. Kupujemy to, że na koncie dzieje się dokładnie to, co było testowane.</div>
+      <p>Zastrzeżenie: archiwum ma świece minutowe tylko dla 55 ze 175 wejść od lutego (luki w zbieraniu minut), a transakcje pochodzą ze starego przebiegu backtestu nr 12. Liczby pokazują rząd wielkości, nie ostateczny wynik.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Co dziś robi model</div>
+      <h2>Wykonawca to procedura zapisana prozą</h2>
+      <p class="intro">Prompt wykonawcy teamu 11 ma około 4 600 znaków. Prawie każde zdanie opisuje warunek, który kod sprawdziłby w jednej linii. Model niczego tam nie ocenia: sprawdza warunki, liczy rozmiar i pilnuje, żeby nie zlecić dwa razy.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Co robi wykonawca</th><th>Jak w kodzie</th><th>Czy potrzebny model</th></tr></thead>
+          <tbody>
+            <tr><td><code>action=enter</code>, <code>bar_age ≤ 300</code>, <code>price_age ≤ 120</code></td><td>trzy porównania</td><td><span class="tag stop">nie</span></td></tr>
+            <tr><td>brak pozycji i zleceń US100, brak próby tej sesji</td><td>odczyt plus unikalny klucz w tabeli <code>trades</code></td><td><span class="tag stop">nie</span></td></tr>
+            <tr><td>equity = balance + pnl, depozyt = 0,35 × equity</td><td>jedno mnożenie na <code>Decimal</code></td><td><span class="tag stop">nie</span></td></tr>
+            <tr><td><code>size_for_margin</code> → <code>place_order</code></td><td>dwa wywołania narzędzi</td><td><span class="tag stop">nie</span></td></tr>
+            <tr><td>ATTEMPT / OPEN / UNKNOWN w pamięci</td><td>wiersz śladu z kluczem idempotencji</td><td><span class="tag stop">nie</span></td></tr>
+            <tr><td>wyjście od 14:00 ET własnej pozycji</td><td>sygnał <code>exit</code> albo zegar plus id pozycji z tabeli</td><td><span class="tag stop">nie</span></td></tr>
+            <tr><td>wiadomość do operatora</td><td>szablon albo model</td><td><span class="tag att">opcjonalnie</span></td></tr>
+            <tr><td>wyjaśnienie odmowy, poślizgu, dziwnego stanu konta</td><td>—</td><td><span class="tag ok">tak</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Prompty noszą też ślady wcześniejszych wpadek: <em>„brak pola equity NIE jest powodem do STOP”</em>, <em>„brak innego zegara NIE jest powodem do STOP”</em>, <em>„raport agenta sygnału NIE wiąże Cię”</em>. Każde takie zdanie dopisano po przebiegu, w którym model zrobił coś, czego kod by nie zrobił. Dziś agent sygnału sam zauważył rozbieżność: strategia zapisuje depozyt 20%, a prompt każe 35%. W kodzie to byłoby jedno pole z jedną wartością.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Jak to robią inni</div>
+      <h2>Szkielet deterministyczny, model w wyznaczonych miejscach</h2>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>Anthropic: workflow i agent to dwie różne rzeczy</h3>
+          <p>„Building effective agents” rozróżnia <em>workflow</em> (model i narzędzia spięte z góry ustalonymi ścieżkami kodu) od <em>agenta</em> (model sam prowadzi swój proces). Workflow jest do zadań dobrze zdefiniowanych, gdzie liczy się przewidywalność. Agent jest dla zadań, które wymagają elastyczności, i płaci za nią czasem oraz kosztem. Wykonanie strategii z dokumentu to podręcznikowy workflow.</p>
+        </div>
+        <div class="fail ok">
+          <h3>LangGraph, czyli silnik, na którym już stoimy</h3>
+          <p>Dokumentacja LangGraph wprost opisuje mieszanie ręcznie pisanych kroków z krokami prowadzonymi przez model w jednym grafie. Węzeł może być zwykłą funkcją, wywołaniem modelu albo całym agentem z narzędziami. Nasz <code>teams/runner/graph.py</code> kompiluje już zespół do <code>StateGraph</code>, w którym węzeł to po prostu <code>async def node(state)</code>. Krok deterministyczny to inna funkcja w tym samym miejscu.</p>
+        </div>
+        <div class="fail ok">
+          <h3>n8n: najpierw kod, model tylko do niejasnego</h3>
+          <p>Praktycy n8n zalecają hybrydę: walidacja, rozgałęzienia i przekształcenia w węzłach kodu, model tylko do klasyfikacji, ekstrakcji i streszczeń. Ktoś zbudował ten sam workflow na dwa sposoby i wersja agentowa przegrała, bo trudniej było ją debugować. Węzeł IF albo zadziała, albo nie. Zgadnięta przez model wartość potrafi przejść niezauważona.</p>
+        </div>
+        <div class="fail">
+          <h3>Systemy handlowe z modelem: szybka ścieżka deterministyczna, wolna rozumująca</h3>
+          <p>Powtarza się ten sam układ. Model proponuje intencję, a kod z twardymi regułami ją sprawdza i wykonuje. Szybka ścieżka (kontrola ryzyka, zlecenie) jest deterministyczna, wolna (analiza, scenariusze) ma ścisłe limity czasu. Kill switch nigdy nie pyta modelu. Klucz idempotencji liczy się z parametrów decyzji przed wywołaniem API, żeby ponowienie nie dało drugiego zlecenia. Jeden z tekstów modeluje poślizg jako zmienność na sekundę razy sekundy namysłu modelu, czyli dokładnie nasz rys. 1.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Programmatic tool calling, czyli code mode</h3>
+          <p>Model pisze program, który woła narzędzia w piaskownicy, zamiast robić jedną rundę na każde wywołanie. Ścina rundy i tokeny, ale <strong>program powstaje od nowa przy każdym przebiegu</strong>, więc dwa przebiegi tej samej rewizji mogą zrobić co innego. Do eksploracji to dobry pomysł, do pieniędzy na koncie realnym nie.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Opcje</div>
+      <h2>Sześć sposobów, jeden rekomendowany</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Opcja</th><th class="n">Do zlecenia</th><th>Deterministyczne</th><th>Zakres</th><th>Ocena</th></tr></thead>
+          <tbody>
+            <tr><td><b>0. Cron 9:35 zamiast 9:36</b>, bez kodu</td><td class="n">≈ 35–45 s</td><td>nie</td><td>edycja harmonogramu</td><td><span class="tag att">eksperyment na demo</span></td></tr>
+            <tr><td><b>A. Makro-narzędzie</b> <code>execute_strategy_signal</code> dla agenta</td><td class="n">≈ 8–12 s</td><td>mechanika tak, decyzja „czy wołać” nie</td><td>jedno narzędzie w procesie</td><td><span class="tag att">krok pośredni</span></td></tr>
+            <tr class="pick"><td><b>B. Węzeł „krok” z katalogiem przepisów</b></td><td class="n">≈ 3–5 s</td><td>tak</td><td>definicja zespołu, runner, terminal</td><td><span class="tag ok">rekomendacja</span></td></tr>
+            <tr><td><b>C. Ogólny potok narzędzi</b> (mini-język: wywołania, warunki, szablony argumentów)</td><td class="n">≈ 3–5 s</td><td>tak</td><td>duży: język, walidator, edytor</td><td><span class="tag att">za wcześnie</span></td></tr>
+            <tr class="void"><td><b>D. Kod pisany przez model</b> (code mode)</td><td class="n">≈ 10 s</td><td>nie</td><td>piaskownica</td><td><span class="tag stop">odrzucone</span></td></tr>
+            <tr class="void"><td><b>E. Silnik strategii składa zlecenia sam</b></td><td class="n">≈ 2 s</td><td>tak</td><td>strategies dostaje narzędzia konta</td><td><span class="tag stop">łamie granicę</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="fails">
+        <div class="fail">
+          <h3>0 · Cron 9:35 <span class="tag att">dziś, bez wdrożenia</span></h3>
+          <p>Przesunąć harmonogram wejścia teamu 8 (demo) na 9:35. Zegar ruszy przebieg 0–15 s po pełnej minucie, a agent i tak potrzebuje ~5 s do pierwszego narzędzia. Prompt już każe ponowić <code>strategy_signal</code>, gdy świecy jeszcze nie ma. Zysk to około 60 s. Ryzyko: jeśli archiwum spóźni się bardziej niż dwie rundy, sesja przepada. Dobry pomiar opóźnienia archiwum przed etapem 1.</p>
+        </div>
+        <div class="fail">
+          <h3>A · Makro-narzędzie <span class="tag att">krok pośredni</span></h3>
+          <p>Nowe narzędzie w procesie (jak <code>memory_*</code>), które w jednym wywołaniu robi sygnał, kontrole, rozmiar, zlecenie i zapis. Agent ma jedną rundę: zawołać i opowiedzieć. Mała zmiana kontraktu i brak zmian w grafie. Model nadal jednak decyduje, <em>czy</em> zawołać i z jakimi argumentami. To połowa problemu, który chcemy usunąć.</p>
+        </div>
+        <div class="fail ok">
+          <h3>B · Krok w grafie zespołu <span class="tag ok">rekomendacja</span></h3>
+          <p>Definicja rewizji dostaje obok <code>agents</code> listę <code>steps</code>. Krok ma klucz, nazwę przepisu z <strong>zamkniętego katalogu</strong> i parametry. Krawędzie łączą kroki i agentów tak samo jak dziś agentów między sobą. Krok jest węzłem LangGraph, który woła narzędzia przez ten sam <code>ToolPlan</code>, więc dostaje za darmo <code>TradeGuard</code>, wstrzykiwanie <code>account_id</code>, wiersze <code>tool_calls</code> i <code>trades</code> oraz granice konta realnego. Wynik kroku to JSON, który następnik (agent raportujący) dostaje jako „wypowiedź poprzednika”.</p>
+          <p>Przepis to kod w pakiecie <code>teams</code>, przetestowany raz. Rewizja tylko go parametryzuje. Nowy przepis to nowa wersja workbencha, nie nowy prompt.</p>
+        </div>
+        <div class="fail">
+          <h3>C · Ogólny potok <span class="tag att">może kiedyś</span></h3>
+          <p>Lista wywołań z argumentami typu <code>$.signal.order.side</code> i warunkami. Elastyczne, ale to język programowania edytowany w formularzu: walidacja, testy per zespół, debugowanie w terminalu. Warto, gdy katalog z B urośnie do kilkunastu przepisów różniących się tylko kolejnością wywołań. Dziś mamy jeden.</p>
+        </div>
+        <div class="fail stop">
+          <h3>E · Strategia handluje sama <span class="tag stop">nie</span></h3>
+          <p>Najkrótsza droga, ale <code>strategies</code> ma w swojej definicji „research only, never an order” i nie ma narzędzi konta. Dać mu je to przesunąć granicę bezpieczeństwa, którą CLAUDE.md nazywa nośną. Krok w zespole woła <code>strategy_signal</code> tak jak dziś agent. Strategia mówi, co zrobić, a zespół to robi.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Jak wyglądałby team 11</div>
+      <h2>Jeden krok, jeden reporter</h2>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 940 150" role="img" aria-label="Harmonogram 9:35 ET uruchamia krok strategy_execute, który woła strategy_signal, size_for_margin i place_order, a jego wynik czyta agent reporter i wysyła wiadomość na Telegram.">
+            <defs>
+              <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="12" y="44" width="160" height="60" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="92" y="70" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">harmonogram</text>
+              <text x="92" y="88" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.65">9:35 ET · 14:00 ET</text>
+
+              <rect x="232" y="30" width="270" height="88" fill="#17734c" stroke="#17734c"></rect>
+              <text x="367" y="56" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">KROK · strategy_execute</text>
+              <text x="367" y="76" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#e0f0e8">strategy_signal → kontrole →</text>
+              <text x="367" y="92" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#e0f0e8">size_for_margin → place_order</text>
+              <text x="367" y="108" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#f2c313">≈2 s · 0 tokenów</text>
+
+              <rect x="562" y="44" width="190" height="60" fill="#14306b" stroke="#14306b"></rect>
+              <text x="657" y="70" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">AGENT · reporter</text>
+              <text x="657" y="88" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#f2c313">czyta JSON, bez narzędzi konta</text>
+
+              <rect x="812" y="44" width="116" height="60" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="870" y="78" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">Telegram</text>
+
+              <line x1="174" y1="74" x2="228" y2="74" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <line x1="504" y1="74" x2="558" y2="74" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <line x1="754" y1="74" x2="808" y2="74" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="531" y="66" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">wynik</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 2</b> — model wychodzi z drogi zlecenia. Zostaje za nią: czyta, co się stało, i mówi to człowiekowi. Jego spóźnienie kosztuje najwyżej spóźnioną wiadomość.</figcaption>
+      </figure>
+
+      <h3 class="sub">Definicja rewizji (szkic)</h3>
+<pre><code>{
+  <span class="s">"steps"</span>: [{
+    <span class="s">"key"</span>: <span class="s">"execute"</span>,
+    <span class="s">"recipe"</span>: <span class="s">"strategy_execute"</span>,
+    <span class="s">"params"</span>: {
+      <span class="s">"strategy_id"</span>: 5, <span class="s">"revision"</span>: 1,
+      <span class="s">"sizing"</span>: { <span class="s">"mode"</span>: <span class="s">"margin_fraction"</span>, <span class="s">"value"</span>: <span class="s">"0.35"</span> },  <span class="c">// albo null = z dokumentu strategii</span>
+      <span class="s">"wait_for_bar_seconds"</span>: 45,     <span class="c">// ile czekać, aż świeca sygnałowa trafi do archiwum</span>
+      <span class="s">"max_bar_age_seconds"</span>: 60,      <span class="c">// później = sesja przepada, nie nadrabiamy</span>
+      <span class="s">"symbol"</span>: <span class="s">"US100"</span>
+    }
+  }],
+  <span class="s">"agents"</span>: [{ <span class="s">"key"</span>: <span class="s">"reporter"</span>, <span class="s">"model_id"</span>: <span class="s">"gpt-6-luna"</span>,
+               <span class="s">"tools"</span>: [<span class="s">"telegram_destinations"</span>, <span class="s">"send_telegram_message"</span>], ... }],
+  <span class="s">"edges"</span>: [{ <span class="s">"from"</span>: <span class="s">"execute"</span>, <span class="s">"to"</span>: <span class="s">"reporter"</span> }],
+  <span class="s">"trading"</span>: { <span class="s">"environment"</span>: <span class="s">"live"</span>, <span class="s">"account_id"</span>: <span class="s">"325778178549306564"</span> }
+}</code></pre>
+
+      <h3 class="sub">Co krok oddaje reporterowi</h3>
+<pre><code>{
+  <span class="s">"decision"</span>: <span class="s">"entered"</span>,            <span class="c">// entered · exited · no_signal · skipped · refused · unknown</span>
+  <span class="s">"reason"</span>: <span class="k">null</span>,                  <span class="c">// przy skipped/refused: który warunek i jaka wartość</span>
+  <span class="s">"signal"</span>: { <span class="s">"action"</span>: <span class="s">"enter"</span>, <span class="s">"side"</span>: <span class="s">"long"</span>, <span class="s">"bar_closed_at"</span>: <span class="s">"14:35:00Z"</span> },
+  <span class="s">"sizing"</span>: { <span class="s">"equity"</span>: <span class="s">"540.03"</span>, <span class="s">"fraction"</span>: <span class="s">"0.35"</span>, <span class="s">"source"</span>: <span class="s">"team"</span>, <span class="s">"size"</span>: <span class="s">"0.137"</span> },
+  <span class="s">"order"</span>: { <span class="s">"direction"</span>: <span class="s">"BUY"</span>, <span class="s">"status"</span>: <span class="s">"FILLED"</span>, <span class="s">"level"</span>: <span class="s">"27362.9"</span>, <span class="s">"position_id"</span>: <span class="s">"0038…1f1c"</span> },
+  <span class="s">"timing"</span>: { <span class="s">"bar_closed"</span>: <span class="s">"14:35:00.0"</span>, <span class="s">"bar_seen"</span>: <span class="s">"14:35:01.4"</span>, <span class="s">"order_sent"</span>: <span class="s">"14:35:03.2"</span>, <span class="s">"filled"</span>: <span class="s">"14:35:04.1"</span> },
+  <span class="s">"vs_backtest"</span>: { <span class="s">"assumed_open"</span>: <span class="s">"27359.0"</span>, <span class="s">"slippage_points"</span>: <span class="s">"2.1"</span> }
+}</code></pre>
+      <p>Wartości są zmyślone i pokazują tylko kształt. Pole <code>vs_backtest</code> to rzecz, której dziś nikt nie mierzy, a która mówi najwięcej: <span class="hl">o ile wykonanie odjechało od założenia backtestu, przy każdej transakcji</span>.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Przepis strategy_execute</div>
+      <h2>Co musi umieć, żeby zastąpić wykonawcę</h2>
+      <ul class="plain">
+        <li><strong>Czekanie na świecę.</strong> Woła <code>strategy_signal</code>, aż <code>bar_closed_at</code> będzie świecą, na którą czeka, najwyżej <code>wait_for_bar_seconds</code>, co sekundę. Dziś to robi model, ponawiając „w kolejnej rundzie”.</li>
+        <li><strong>Wejście.</strong> Tylko przy <code>action=enter</code>, świeżej świecy i braku pozycji oraz zleceń na symbolu. Rozmiar z <code>size_for_margin</code>. Zlecenie MARKET bez poziomów, jeśli dokument ich nie ma.</li>
+        <li><strong>Wyjście.</strong> Przy <code>action=exit</code> zamyka <em>własną</em> pozycję, czyli id zapisane przez wcześniejszy krok w tabeli <code>trades</code>, a nie znalezione przez zgadywanie. Cudzych i ręcznych pozycji nie dotyka.</li>
+        <li><strong>Jedna próba na sesję.</strong> Klucz idempotencji (zespół, rewizja, strategia, świeca sygnałowa) z ograniczeniem unikalności w bazie zamiast notatki ATTEMPT w pamięci. Drugi przebieg tej samej sesji kończy się wynikiem <code>skipped</code>, nie drugim zleceniem.</li>
+        <li><strong>Nieznany wynik.</strong> Timeout albo zerwanie po <code>place_order</code> daje <code>unknown</code>: bez ponawiania, odczyt pozycji, wynik dla reportera z prośbą o ręczną kontrolę. Tak samo jak dziś, ale w kodzie, który ktoś przetestował.</li>
+        <li><strong>Odmowa bramy.</strong> 422 spoza <code>LIVE_ORDER_LIMITS</code> przechodzi dosłownie jako <code>refused</code>. Zlecenie nie jest dzielone ani zmniejszane.</li>
+        <li><strong>Pomiar.</strong> Każdy wynik niesie znaczniki czasu i poślizg względem otwarcia minuty, które przyjąłby backtest.</li>
+      </ul>
+      <p>Czego krok <strong>nie</strong> robi: nie liczy wskaźników i nie ocenia rynku. Spec <code>teams-triggers</code> wymaga, żeby zespoły czytały rynek wyłącznie narzędziami, i krok to spełnia, bo cała decyzja przychodzi z <code>strategy_signal</code>. Krok niczego nie wymyśla, tylko wykonuje.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Start bez minuty zapasu</div>
+      <h2>Harmonogram też musi przyspieszyć</h2>
+      <p>Krok trwający 2 s nic nie da, jeśli przebieg wystartuje minutę po świecy. Są trzy dźwignie, od najtańszej:</p>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>Cron 9:35 plus czekanie w kroku</h3>
+          <p>Przebieg startuje razem ze świecą, a krok czeka na nią w archiwum. Zostaje opóźnienie zegara (0–15 s) i archiwum (do zmierzenia).</p>
+        </div>
+        <div class="fail ok">
+          <h3>Zegar budzi się na czas, a nie co 15 s</h3>
+          <p>Dziś <code>scheduler_poll_interval_seconds = 15</code>. Zamiast częściej odpytywać bazę, zegar może policzyć najbliższy termin i spać dokładnie do niego. Tańsze dla bazy i co do sekundy. Przed zmianą: <code>db-cost-check</code>.</p>
+        </div>
+        <div class="fail">
+          <h3>Wyzwalacz „świeca zamknięta”</h3>
+          <p>Archiwum już rozsyła zamknięte świece przez swój hub (to samo, co widzi wykres w terminalu). Nowy rodzaj wyzwalacza mógłby subskrybować to zdarzenie przez opublikowany kontrakt archiwum, bo pakiety nie importują siebie nawzajem, i ruszać przebieg w chwili zamknięcia. Najszybsze, ale to nowy kontrakt między pakietami, więc etap 3, nie 1.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Gdzie model zostaje</div>
+      <h2>Model jako obserwator, nie jako ręka</h2>
+      <ul class="plain">
+        <li><strong>Raport na Telegram</strong> z wyniku kroku. Przy budżecie wyczerpanym albo awarii modelu przydałby się szablon awaryjny, żeby wiadomość o zleceniu na koncie realnym nie zależała od modelu.</li>
+        <li><strong>Wyjaśnienie</strong>, gdy wynik nie jest zwykły: odmowa bramy, <code>unknown</code>, poślizg ponad próg, pozycja na koncie, której zespół nie zna.</li>
+        <li><strong>Przegląd tygodniowy</strong>: osobny zespół czyta wiersze <code>vs_backtest</code> z tygodnia i mówi, czy rozjazd z backtestem rośnie. Na tym model zna się lepiej niż przy liczeniu depozytu.</li>
+        <li><strong>Nie</strong> jako weto przed zleceniem. Dodaje 5–15 s i jest regułą, której backtest nie zna. Jeśli jakiś filtr ma sens, należy do dokumentu strategii, gdzie da się go przetestować.</li>
+      </ul>
+    </section>
+
+    <section>
+      <div class="eyebrow">10 · Do decyzji</div>
+      <h2>Pytania przed propozycją</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Pytanie</th><th>Moja propozycja</th></tr></thead>
+          <tbody>
+            <tr><td><b>Skąd rozmiar?</b> Dokument strategii mówi 20%, team 11 chce 35%.</td><td>Domyślnie z dokumentu, z jawnym nadpisaniem w parametrach kroku, widocznym w terminalu. Dziś ta rozbieżność siedzi w prozie.</td></tr>
+            <tr><td><b>Model czy szablon</b> do wiadomości?</td><td>Model, jak chcesz, a szablon jako zapas, gdy model nie odpowie albo budżet się skończy.</td></tr>
+            <tr><td><b>Spóźniona świeca.</b> Wejść później czy odpuścić sesję?</td><td>Odpuścić po <code>max_bar_age_seconds</code>. Spóźnione wejście to transakcja, której backtest nie zna.</td></tr>
+            <tr><td><b>Wyjście o 14:00</b> też krokiem?</td><td>Tak, ten sam przepis. Wyjście jest jeszcze prostsze niż wejście, a wpadka kosztuje więcej, bo pozycja zostaje na noc.</td></tr>
+            <tr><td><b>Zespół mieszany czy osobny rodzaj</b> „zespół-automat”?</td><td>Mieszany: kroki i agenci w jednym grafie. Jeden mechanizm przebiegu, śladu, limitów i harmonogramów.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">11 · Etapy</div>
+      <h2>Od eksperymentu bez kodu do zdarzenia z archiwum</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Etap</th><th>Co</th><th>Zmiana OpenSpec?</th></tr></thead>
+          <tbody>
+            <tr><td><b>0</b></td><td>Team 8 (demo) na cron 9:35 przez tydzień. Pomiar, kiedy świeca 9:30 pojawia się w archiwum (czas pierwszej udanej odpowiedzi <code>strategy_signal</code>).</td><td>nie</td></tr>
+            <tr><td><b>1</b></td><td><code>steps</code> w definicji rewizji, węzeł kroku w runnerze, przepis <code>strategy_execute</code> (wejście i wyjście), klucz idempotencji w <code>trades</code>, wynik JSON, widok kroku w zakładce Teams. Team 8 przepisany na krok + reportera i równolegle porównany z dzisiejszym na demo.</td><td>tak: <code>teams-runs</code>, <code>teams-trading</code>, kontrakt teams i terminala</td></tr>
+            <tr><td><b>2</b></td><td>Zegar budzący się na termin. Pole <code>vs_backtest</code> w śladzie i kolumna poślizgu w terminalu.</td><td>tak: <code>teams-schedules</code></td></tr>
+            <tr><td><b>3</b></td><td>Wyzwalacz „świeca zamknięta” z archiwum. Ewentualnie drugi przepis, jeśli pojawi się strategia z inną mechaniką (zlecenie z limitem, stop).</td><td>tak: <code>teams-triggers</code>, kontrakt archiwum</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Team 11 (konto realne) przechodzi na krok dopiero po tym, jak team 8 przejdzie na nim tydzień na demo bez rozbieżności.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">Źródła</div>
+      <h2>Skąd to wiem</h2>
+      <p><strong>Z produkcji:</strong> tabele <code>runs</code>, <code>run_steps</code>, <code>tool_calls</code> (baza <code>teams</code>, przebiegi 337, 338 i ostatnie 40 teamu 8). Świece minutowe US100 z <code>market_data</code>. Transakcje backtestu nr 12 strategii 5 z <code>strategies.run_trades</code>. Kod: <code>teams/runner/graph.py</code>, <code>engine.py</code>, <code>scheduler/clock.py</code>, <code>teams/contract.py</code>, <code>strategies/engine.py</code>, spec <code>teams-triggers</code>.</p>
+      <ol class="sources">
+        <li><a href="https://www.anthropic.com/engineering/building-effective-agents">Anthropic — Building effective agents</a> (workflow a agent)</li>
+        <li><a href="https://docs.langchain.com/oss/python/langgraph/overview">LangGraph — overview</a> i <a href="https://docs.langchain.com/oss/python/langchain/multi-agent/custom-workflow">custom workflow</a> (węzły: funkcja, model, agent)</li>
+        <li><a href="https://blog.n8n.io/production-ai-playbook-deterministic-steps-ai-steps">n8n — production AI playbook: deterministic steps, AI steps</a></li>
+        <li><a href="https://community.n8n.io/t/agentic-vs-deterministic-i-built-the-same-n8n-workflow-both-ways-the-agent-lost/291065">n8n community — agentic vs deterministic, the agent lost</a></li>
+        <li><a href="https://www.oreilly.com/radar/the-missing-layer-in-agentic-ai/">O’Reilly Radar — The missing layer in agentic AI</a> (deterministyczna granica wykonania)</li>
+        <li><a href="https://gravitee.io/corpus/gen-1134/electronic-trading/llm-assisted-trading-agents.html">Gravitee — LLM-assisted trading agents</a> (szybka i wolna ścieżka)</li>
+        <li><a href="https://www.interactivebrokers.com/campus/ibkr-quant-news/auditing-llm-trading-bridging-theory-and-market-reality-with-the-gt-table-in-r/">IBKR Quant — Auditing LLM trading</a> (poślizg z czasu namysłu)</li>
+        <li><a href="https://arxiv.org/pdf/2605.12532">AgenticAITA</a> (deterministyczna bramka ryzyka z wetem)</li>
+        <li><a href="https://platform.claude.com/docs/agents-and-tools/tool-use/programmatic-tool-calling">Claude — programmatic tool calling</a> i <a href="https://arize.com/blog/code-mode/">Arize — code mode</a></li>
+      </ol>
+      <p>Źródła zewnętrzne to w większości blogi i dokumentacje dostawców. Biorę z nich wzorce, nie liczby. Liczby w tym dokumencie pochodzą z naszej produkcji.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>TradingCenter · burza mózgów przed zmianą OpenSpec</span>
+    <span>docs/zespoly-kroki-deterministyczne.html</span>
+  </div>
+</footer>
+</body>
+</html>
