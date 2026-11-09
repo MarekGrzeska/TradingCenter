@@ -22,6 +22,7 @@ RECIPE_TOOLS = (
     "size_for_margin",
     "place_order",
     "close_position",
+    "get_last_price",
     "get_candles",
 )
 

@@ -69,7 +69,7 @@ async def start_run_on_revision(
             conn,
             team_revision_id=revision["id"],
             owner_principal=owner_principal,
-            agent_keys=[agent.key for agent in definition.agents],
+            agent_keys=definition.node_keys(),
         )
 
     task = asyncio.create_task(

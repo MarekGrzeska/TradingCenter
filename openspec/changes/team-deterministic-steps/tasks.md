@@ -13,10 +13,10 @@
 
 ## 3. Przebieg: węzeł kroku
 
-- [ ] 3.1 Wydzielić z `_StepRunner` wspólną ścieżkę wywołań węzła (`run_steps`, `tool_calls`, `TradeGuard`, wiersz `trades` przed wysłaniem, rozliczenie); agent bez zmian w zachowaniu, testy agenta zielone
-- [ ] 3.2 `plan_tools`: narzędzia przepisu pod kluczem kroku; `create_run` z kluczami agentów i kroków
-- [ ] 3.3 `compile_team`: węzeł kroku obok węzła agenta, wynik kroku (JSON) jako praca poprzednika; zdarzenia postępu dla kroku
-- [ ] 3.4 Krok: wynik przewidziany przez przepis kończy krok jako zakończony; nieprzewidziany wyjątek kończy go błędem i zatrzymuje przebieg
+- [x] 3.1 Wydzielić z `_StepRunner` wspólną ścieżkę wywołań węzła (`run_steps`, `tool_calls`, `TradeGuard`, wiersz `trades` przed wysłaniem, rozliczenie); agent bez zmian w zachowaniu, testy agenta zielone
+- [x] 3.2 `plan_tools`: narzędzia przepisu pod kluczem kroku; `create_run` z kluczami agentów i kroków
+- [x] 3.3 `compile_team`: węzeł kroku obok węzła agenta, wynik kroku (JSON) jako praca poprzednika; zdarzenia postępu dla kroku
+- [x] 3.4 Krok: wynik przewidziany przez przepis kończy krok jako zakończony; nieprzewidziany wyjątek kończy go błędem i zatrzymuje przebieg
 
 ## 4. Przepis strategy_execute
 

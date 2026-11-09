@@ -15,9 +15,10 @@ import asyncpg
 
 from .. import store
 from ..config import Settings
-from ..contract import AgentDefinition, TeamDefinition
+from ..contract import AgentDefinition, StepDefinition, TeamDefinition
 from ..models_catalogue import ModelCatalogue
 from ..provider import ModelProvider
+from ..steps.runtime import run_recipe
 from ..tools import (
     MemoryScope,
     ToolAccessError,
@@ -166,8 +167,10 @@ async def execute_run(
             registry=registry,
             guard=guard,
             trades=trades,
+            team_id=team_id,
+            owner_principal=owner_principal,
         )
-        graph = compile_team(definition, run.run_agent_step)
+        graph = compile_team(definition, run.run_agent_step, run.run_step_node)
         try:
             await asyncio.wait_for(
                 graph.ainvoke({"outputs": {}}), timeout=settings.run_timeout_seconds
@@ -240,79 +243,41 @@ class _Run:
     registry: RunRegistry
     guard: CostGuard
     trades: TradeGuard
+    team_id: int = 0
+    owner_principal: str = ""
 
     async def run_agent_step(
         self, agent: AgentDefinition, given: Sequence[tuple[str, str]]
     ) -> str:
         return await _StepRunner(self, agent).run(given)
 
+    async def run_step_node(self, step: StepDefinition, given: Sequence[tuple[str, str]]) -> str:
+        return await _StepNodeRunner(self, step).run(given)
 
-class _StepRunner:
-    """One agent's step: the row it writes, the guards it asks, and the trade it holds while waiting. `pending_trade` was
-    a `nonlocal` between two closures; one instance per agent per run is what makes a plain field correct."""
 
-    def __init__(self, run: _Run, agent: AgentDefinition) -> None:
+class _NodeTrace:
+    """What every node of a run writes as it calls tools, agent or step alike: its `run_steps` row, one `tool_calls` row per
+    call, and the `trades` row written before an order goes out and settled when it comes back (`teams-steps`)."""
+
+    def __init__(self, run: _Run, key: str) -> None:
         self._run = run
-        self._agent = agent
-        self._entry = run.catalogue.get(agent.model_id)
+        self._key = key
         self._pending_trade: int | None = None
 
-    async def run(self, given: Sequence[tuple[str, str]]) -> str:
-        run = self._run
-        agent = self._agent
-        async with run.pool.acquire() as conn:
-            self._step = await store.start_step(conn, run_id=run.run_id, agent_key=agent.key)
-        run.registry.publish(run.run_id, StepStarted(agent_key=agent.key))
+    async def _start(self) -> None:
+        async with self._run.pool.acquire() as conn:
+            self._step = await store.start_step(conn, run_id=self._run.run_id, agent_key=self._key)
+        self._run.registry.publish(self._run.run_id, StepStarted(agent_key=self._key))
 
-        work = await run_agent(
-            agent,
-            model=self._entry.model,
-            briefing=briefing_for(agent, given),
-            provider=run.provider,
-            tools=run.plan.for_agent(agent.key),
-            # Bound to this agent, so the plan can refuse a name this agent was not assigned — being
-            # offered a narrower list is not the same as being held to it.
-            call_tool=self._call_tool,
-            on_tool_call=self._on_tool_call,
-            before_model_call=self._before_model_call,
-            on_model_call=self._on_model_call,
-            before_write_call=self._before_write_call,
-            moves_the_account=run.plan.moves_the_account,
-        )
-
-        async with run.pool.acquire() as conn:
-            if work.failed:
-                await store.finish_step(
-                    conn, step_id=self._step["id"], status="failed", output=None, rounds=work.rounds
-                )
-            else:
-                await store.finish_step(
-                    conn,
-                    step_id=self._step["id"],
-                    status="completed",
-                    output=work.text,
-                    rounds=work.rounds,
-                )
-
-        if work.failed:
-            run.registry.publish(
-                run.run_id, StepFinished(agent_key=agent.key, status="failed", output=None)
+    async def _finish(self, *, output: str | None, rounds: int) -> None:
+        status = "failed" if output is None else "completed"
+        async with self._run.pool.acquire() as conn:
+            await store.finish_step(
+                conn, step_id=self._step["id"], status=status, output=output, rounds=rounds
             )
-            raise AgentFailed(agent.key, "the model call failed")
-
-        run.registry.publish(
-            run.run_id, StepFinished(agent_key=agent.key, status="completed", output=work.text)
+        self._run.registry.publish(
+            self._run.run_id, StepFinished(agent_key=self._key, status=status, output=output)
         )
-        if work.ceiling_reached:
-            log.info(
-                "agent %s in run %s reached the round ceiling and answered without tools",
-                agent.key,
-                run.run_id,
-            )
-        return work.text
-
-    async def _call_tool(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
-        return await self._run.plan.call(name, arguments, agent_key=self._agent.key)
 
     async def _on_tool_call(self, call: RecordedCall) -> None:
         run = self._run
@@ -340,17 +305,19 @@ class _StepRunner:
                     reference=settlement.reference,
                 )
                 self._pending_trade = None
-        run.registry.publish(run.run_id, ToolCalled(agent_key=self._agent.key, call=call))
+        run.registry.publish(run.run_id, ToolCalled(agent_key=self._key, call=call))
 
-    async def _before_write_call(self, name: str, arguments: dict) -> str | None:
+    async def _before_write_call(
+        self, name: str, arguments: dict, attempt_key: str | None = None
+    ) -> str | None:
         """The order ceiling, and the row that outlives whatever happens next. Order matters twice: the
-        guard is asked first, so a refused call leaves no row; and the row is written before the call goes out."""
+        guard is asked first, so a refused call leaves no row; and the row is written before the call goes out.
+        A used `attempt_key` raises `store.AttemptAlreadyMade` and nothing is written or counted."""
         run = self._run
         try:
             run.trades.check(arguments)
         except OrderTooLarge as err:
-            # Refused to the model as this one call; the run goes on, because a size is
-            # something the agent can correct.
+            # Refused as this one call; the run goes on, because a size is something an agent can correct.
             return str(err)
 
         async with run.pool.acquire() as conn:
@@ -358,7 +325,7 @@ class _StepRunner:
                 conn,
                 run_id=run.run_id,
                 run_step_id=self._step["id"],
-                agent_key=self._agent.key,
+                agent_key=self._key,
                 tool_name=name,
                 account_id=run.plan.account_for(name),
                 environment=run.plan.environment,
@@ -366,10 +333,56 @@ class _StepRunner:
                 direction=_text_arg(arguments, "direction"),
                 size=_decimal_arg(arguments, "size"),
                 level=_decimal_arg(arguments, "level"),
+                attempt_key=attempt_key,
             )
         self._pending_trade = row["id"]
         run.trades.placing()
         return None
+
+
+class _StepRunner(_NodeTrace):
+    """One agent's step: the model and its usage on top of the node's trace. One instance per agent per run is what
+    makes the pending trade a plain field rather than a `nonlocal` between two closures."""
+
+    def __init__(self, run: _Run, agent: AgentDefinition) -> None:
+        super().__init__(run, agent.key)
+        self._agent = agent
+        self._entry = run.catalogue.get(agent.model_id)
+
+    async def run(self, given: Sequence[tuple[str, str]]) -> str:
+        run = self._run
+        agent = self._agent
+        await self._start()
+        work = await run_agent(
+            agent,
+            model=self._entry.model,
+            briefing=briefing_for(agent, given),
+            provider=run.provider,
+            tools=run.plan.for_agent(agent.key),
+            # Bound to this agent, so the plan can refuse a name this agent was not assigned — being
+            # offered a narrower list is not the same as being held to it.
+            call_tool=self._call_tool,
+            on_tool_call=self._on_tool_call,
+            before_model_call=self._before_model_call,
+            on_model_call=self._on_model_call,
+            before_write_call=self._before_write_call,
+            moves_the_account=run.plan.moves_the_account,
+        )
+
+        await self._finish(output=None if work.failed else work.text, rounds=work.rounds)
+        if work.failed:
+            raise AgentFailed(agent.key, "the model call failed")
+
+        if work.ceiling_reached:
+            log.info(
+                "agent %s in run %s reached the round ceiling and answered without tools",
+                agent.key,
+                run.run_id,
+            )
+        return work.text
+
+    async def _call_tool(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
+        return await self._run.plan.call(name, arguments, agent_key=self._agent.key)
 
     async def _before_model_call(self) -> None:
         self._run.guard.check()
@@ -392,6 +405,74 @@ class _StepRunner:
                 output_rate_per_1m=self._entry.output_rate_per_1m,
             )
         run.guard.add(row["cost"])
+
+
+class _StepNodeRunner(_NodeTrace):
+    """A step: its recipe, calling tools through the same trace an agent's calls go through, and no model at all."""
+
+    def __init__(self, run: _Run, step: StepDefinition) -> None:
+        super().__init__(run, step.key)
+        self._definition = step
+        self._position = 0
+
+    async def run(self, given: Sequence[tuple[str, str]]) -> str:
+        await self._start()
+        try:
+            result = await run_recipe(self._definition, self)
+        except (TradeLimitReached, CostLimitReached, asyncio.CancelledError):
+            await asyncio.shield(self._finish(output=None, rounds=0))
+            raise
+        except Exception as err:
+            log.exception("step %s in run %s failed outside its recipe's outcomes", self._key, self._run.run_id)
+            await self._finish(output=None, rounds=0)
+            raise AgentFailed(self._key, f"the step failed: {err}") from err
+        output = json.dumps(result, ensure_ascii=False, default=str)
+        await self._finish(output=output, rounds=0)
+        return output
+
+    # What a recipe sees of the run: `steps.runtime.StepContext`.
+
+    @property
+    def key(self) -> str:
+        return self._key
+
+    @property
+    def team_id(self) -> int:
+        return self._run.team_id
+
+    @property
+    def owner_principal(self) -> str:
+        return self._run.owner_principal
+
+    async def call(
+        self, name: str, arguments: dict[str, Any], *, attempt_key: str | None = None
+    ) -> ToolOutcome:
+        writes = self._run.plan.moves_the_account(name)
+        refusal = await self._before_write_call(name, arguments, attempt_key) if writes else None
+        if refusal is not None:
+            outcome = ToolOutcome(ToolOutcomeKind.REFUSED, refusal, 0)
+        else:
+            outcome = await self._run.plan.call(name, arguments, agent_key=self._key)
+        call = RecordedCall(
+            round_index=0,
+            position=self._position,
+            name=name,
+            arguments=arguments,
+            outcome=str(outcome.kind),
+            text=outcome.text,
+            duration_ms=outcome.duration_ms,
+            writes=writes,
+        )
+        self._position += 1
+        await self._on_tool_call(call)
+        return outcome
+
+    async def placed_orders(self, symbol: str) -> list[dict[str, Any]]:
+        async with self._run.pool.acquire() as conn:
+            rows = await store.team_placed_orders(
+                conn, team_id=self._run.team_id, owner_principal=self._run.owner_principal, symbol=symbol
+            )
+        return [dict(row) for row in rows]
 
 
 # Best effort by design, and the trace is why: `tool_calls` already holds the arguments and the reply

@@ -11,6 +11,7 @@ from typing import Any
 
 from ..config import Settings
 from ..contract import TeamDefinition
+from ..steps import RECIPES
 from .client import (
     ToolAccessError,
     ToolDescriptor,
@@ -178,14 +179,15 @@ async def plan_tools(
 ) -> ToolPlan:
     """Resolve the definition's tool names against every source's announcements, raising one of three `ToolAccessError`s.
     `memory` is the run this plan belongs to; absent, the in-process memory tools resolve but have no run to act in."""
-    assigned = {name for agent in definition.agents for name in agent.tools}
+    units = _units(definition)
+    assigned = {name for _key, tools in units for name in tools}
     if definition.trading.environment == "live":
         _live_server_is_configured(registry, definition.trading.account_id)
     if not assigned:
         # Nothing is contacted at all — a team whose agents carry no tools runs whether or not any server
         # is configured. Asking anyway would make an outage elsewhere stop a run that never needed it.
         return ToolPlan(
-            {agent.key: () for agent in definition.agents},
+            {key: () for key, _tools in units},
             environment=definition.trading.environment,
         )
 
@@ -248,13 +250,13 @@ async def plan_tools(
     if account is not None and on_account:
         await _check_listed(account, server_by_name[next(iter(on_account))])
     per_agent = {
-        agent.key: tuple(
+        key: tuple(
             _without_account(resolution.by_name[name][0][1])
             if name in on_account
             else resolution.by_name[name][0][1]
-            for name in agent.tools
+            for name in tools
         )
-        for agent in definition.agents
+        for key, tools in units
     }
     writes_by_name = {
         name: _moves_the_account(source_by_name[name], hits[0][1])
@@ -399,11 +401,20 @@ async def announced_tools_by_server(
         await _close_remote(everything)
 
 
+def _units(definition: TeamDefinition) -> list[tuple[str, tuple[str, ...]]]:
+    """Every node and the tools it may call: an agent's own assignment, a step's recipe's. A step naming no known
+    recipe is refused at save and at start; here it simply has nothing to resolve."""
+    units = [(agent.key, tuple(agent.tools)) for agent in definition.agents]
+    units += [
+        (step.key, RECIPES[step.recipe].tools if step.recipe in RECIPES else ())
+        for step in definition.steps
+    ]
+    return units
+
+
 def _agents_wanting(definition: TeamDefinition, tools: list[str]) -> list[str]:
     wanted = set(tools)
-    return sorted(
-        agent.key for agent in definition.agents if wanted.intersection(agent.tools)
-    )
+    return sorted(key for key, assigned in _units(definition) if wanted.intersection(assigned))
 
 
 def and_list(names: list[str]) -> str:
