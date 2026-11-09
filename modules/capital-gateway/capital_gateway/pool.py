@@ -9,7 +9,7 @@ import asyncio
 
 from .adapter import CapitalAdapter
 from .client import REQUESTS_PER_SECOND, CapitalClient
-from .config import LIVE_ENVIRONMENT, Settings
+from .config import Settings
 from .errors import GatewayError
 from .rategate import RateGate
 
@@ -22,7 +22,7 @@ class SessionPool:
         self._login_gate = RateGate(1)
         # On the live account the default session is pinned to the one configured account, and is put back on it after
         # every renewal; a fresh login opening on some other live account must not be where an order lands.
-        self._pinned = settings.live_account_id if settings.capital_environment == LIVE_ENVIRONMENT else None
+        self._pinned = settings.live_account_id if settings.is_live else None
         self.default = CapitalAdapter(self._client(self._pinned))
         # Never switched, so nothing done to the active account can reach what the stream publishes.
         self.stream = self._client()

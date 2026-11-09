@@ -286,18 +286,20 @@ class CapitalAdapter:
         cancelled = self._write_json(await self._c.delete_working_order(order_id))
         return await self._settle(cancelled, accepted=OrderStatus.CANCELLED)
 
-    async def close_all(self) -> CloseAllResult:
-        """Every position closed and every working order cancelled, one by one. A failure is that item's outcome, not
-        the call's: the operator pressing this wants out of the market, and one refusal must not keep the rest in."""
+    async def close_all(self, report: Callable[[CloseAllItem], None] = lambda _: None) -> CloseAllResult:
+        """Working orders cancelled, then positions closed, each failure that item's outcome rather than the call's.
+        Orders first: one filling after the positions closed would open a position nothing closes."""
         items: list[CloseAllItem] = []
-        for position in await self.list_positions():
-            items.append(
-                await _outcome("position", position.id, position.symbol, self.close_position(position.id))
-            )
         for order in await self.list_working_orders():
             items.append(
                 await _outcome("working_order", order.id, order.symbol, self.cancel_working_order(order.id))
             )
+            report(items[-1])
+        for position in await self.list_positions():
+            items.append(
+                await _outcome("position", position.id, position.symbol, self.close_position(position.id))
+            )
+            report(items[-1])
         return CloseAllResult(items=items)
 
     async def _settle(self, created: dict, accepted: OrderStatus = OrderStatus.FILLED) -> Order:

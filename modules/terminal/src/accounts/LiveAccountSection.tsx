@@ -58,7 +58,8 @@ export function LiveAccountSection({ api, pollMs }: { api: LiveAccountApi; pollM
             size="xs"
             tone="critical"
             onClick={() => setConfirming(true)}
-            disabled={error !== null || open === 0}
+            // A failed read is no proof the account is flat: the way out stays open when the screen cannot see.
+            disabled={error === null && open === 0}
           >
             Close everything
           </Button>

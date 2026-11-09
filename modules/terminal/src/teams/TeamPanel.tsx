@@ -58,7 +58,10 @@ export function TeamPanel({
             className="w-full rounded border border-border bg-panel px-2 py-1 text-sm text-ink"
           >
             <option value="demo">demo</option>
-            <option value="live">live account — real money</option>
+            {/* Offered only when the live gateway answered with its account; otherwise every save would be refused. */}
+            {(live || liveAccounts.length > 0) && (
+              <option value="live">live account — real money</option>
+            )}
           </select>
         </Field>
         {live && (

@@ -258,6 +258,14 @@ def test_another_account_is_refused_before_the_provider(live: TestClient) -> Non
 
 
 @respx.mock
+def test_the_accounts_list_is_the_one_account_this_process_trades(live: TestClient) -> None:
+    _logged_in()
+    accounts = [{"accountId": ACCOUNT, "accountName": "USD"}, {"accountId": "L2", "accountName": "PLN"}]
+    respx.get(f"{API}/accounts").mock(return_value=httpx.Response(200, json={"accounts": accounts}))
+    assert [a["id"] for a in live.get("/accounts", headers=KEY).json()] == [ACCOUNT]
+
+
+@respx.mock
 def test_close_all_names_the_outcome_of_each(live: TestClient) -> None:
     _logged_in()
     positions = [
@@ -306,12 +314,34 @@ def test_close_all_names_the_outcome_of_each(live: TestClient) -> None:
 
     items = live.post("/positions/close-all", headers=KEY).json()["items"]
 
+    # Orders first: one filling after the positions closed would open a position nothing closes.
     assert [(i["id"], i["status"]) for i in items] == [
+        ("w1", "CANCELLED"),
         ("p1", "CLOSED"),
         ("p2", "REJECTED"),
-        ("w1", "CANCELLED"),
     ]
-    assert "error.market.closed" in items[1]["reason"]
+    assert "error.market.closed" in items[2]["reason"]
+
+
+@respx.mock
+def test_close_all_that_fails_half_way_still_traces_what_it_did(
+    live: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    _logged_in()
+    order = {"dealId": "w1", "epic": "US100", "direction": "BUY", "orderSize": 0.1, "orderType": "LIMIT", "orderLevel": 1}
+    respx.get(f"{API}/workingorders").mock(
+        return_value=httpx.Response(200, json={"workingOrders": [{"workingOrderData": order}]})
+    )
+    respx.delete(f"{API}/workingorders/w1").mock(return_value=httpx.Response(200, json={"dealReference": "c3"}))
+    respx.get(f"{API}/confirms/c3").mock(return_value=httpx.Response(200, json={"dealStatus": "ACCEPTED"}))
+    respx.get(f"{API}/positions").mock(side_effect=httpx.ConnectTimeout("no answer"))
+
+    with caplog.at_level(logging.INFO, logger="capital_gateway.live_trace"), pytest.raises(httpx.ConnectTimeout):
+        live.post("/positions/close-all", headers=KEY)
+
+    lines = [r.getMessage() for r in caplog.records if r.name == "capital_gateway.live_trace"]
+    assert any("working_order w1" in line and "CANCELLED" in line for line in lines)
+    assert any("stopped" in line for line in lines)
 
 
 @respx.mock

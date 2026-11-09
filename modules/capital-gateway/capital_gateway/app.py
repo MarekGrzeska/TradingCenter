@@ -39,13 +39,14 @@ from .caller_access import (
     calling_application,
 )
 from .client import CapitalClient
-from .config import API_KEY_HEADER, LIVE_ENVIRONMENT, Settings, is_production
+from .config import API_KEY_HEADER, Settings, is_production
 from .dtos import (
     Account,
     AssetClass,
     Candle,
     CandleHistory,
     Capabilities,
+    CloseAllItem,
     CloseAllResult,
     Instrument,
     InstrumentPage,
@@ -147,7 +148,7 @@ class GatewayDoor(BaseHTTPMiddleware):
             return await call_next(request)
 
         settings = request.app.state.settings
-        live = settings.capital_environment == LIVE_ENVIRONMENT
+        live = settings.is_live
         # Before the credential: a route this process does not serve is absent for everyone, not forbidden to some.
         if (live and not live_serves(request.method, request.url.path)) or (
             not live and request.url.path == CLOSE_ALL_PATH
@@ -246,7 +247,7 @@ async def account_adapter(
 
 
 def _is_live(request: Request) -> bool:
-    return request.app.state.settings.capital_environment == LIVE_ENVIRONMENT
+    return request.app.state.settings.is_live
 
 
 def _caller(request: Request) -> str:
@@ -307,8 +308,13 @@ async def capabilities(a: CapitalAdapter = Depends(adapter)):
 
 
 @app.get("/accounts", tags=["accounts"], response_model=list[Account])
-async def accounts(a: CapitalAdapter = Depends(adapter)):
-    return await a.list_accounts()
+async def accounts(request: Request, a: CapitalAdapter = Depends(adapter)):
+    every = await a.list_accounts()
+    if not _is_live(request):
+        return every
+    # The live login reaches more accounts than this process trades; a screen or a team offered another would fail later.
+    pinned = request.app.state.settings.live_account_id
+    return [account for account in every if account.id == pinned]
 
 
 class SetActiveAccount(BaseModel):
@@ -521,8 +527,8 @@ async def close_all(request: Request, a: CapitalAdapter = Depends(account_adapte
     caller = _caller(request)
     account = request.app.state.settings.live_account_id
     trace.info("live close-all sending: caller=%s account=%s", caller, account)
-    result = await a.close_all()
-    for item in result.items:
+
+    def report(item: CloseAllItem) -> None:
         trace.info(
             "live close-all %s %s: caller=%s account=%s symbol=%s status=%s reason=%s",
             item.kind,
@@ -533,7 +539,12 @@ async def close_all(request: Request, a: CapitalAdapter = Depends(account_adapte
             item.status.value,
             item.reason,
         )
-    return result
+
+    try:
+        return await a.close_all(report)
+    except Exception:
+        trace.exception("live close-all stopped: caller=%s account=%s; the items above are all that was done", caller, account)
+        raise
 
 
 @app.put("/positions/{position_id}", tags=["trading"], response_model=Order)
@@ -572,7 +583,7 @@ async def cancel_working_order(
 async def stream(websocket: WebSocket, the_hub: Hub = Depends(hub)) -> None:
     """Live candles and quotes for one symbol at one resolution. Reads nothing: the subscription
     is the query string, so there is no client protocol to get wrong."""
-    if websocket.app.state.settings.capital_environment == LIVE_ENVIRONMENT:
+    if websocket.app.state.settings.is_live:
         # The live process serves no market; the middleware's 404 never sees a handshake.
         await websocket.close(code=4404, reason="the live account process has no stream")
         return

@@ -199,9 +199,8 @@ services:
     # live-tools reaches the live account's tool server and nothing behind it: the live gateway is on live-core only.
     networks: [edge, services, data, live-tools]
 
-  # The live account (live-account-trading): the gateway and trading-mcp images a second time, started only by the profile
-  # `live` (assemble_env.py writes it when LIVE_TRADING=on). Blank values are refused by the processes themselves; the
-  # deploy refuses them before that. The gateway is reachable by its tool server and the proxy, nothing else.
+  # The live account (live-account-trading): the same two images again, only under the profile `live` that assemble_env.py
+  # writes for LIVE_TRADING=on. Its gateway is reachable by its tool server and the proxy, nothing else.
   gateway-live:
     image: ${IMAGE_PREFIX:?}/capital-gateway:${GATEWAY_TAG:?}
     profiles: [live]

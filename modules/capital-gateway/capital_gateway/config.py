@@ -123,6 +123,10 @@ class Settings(BaseSettings):
         return self
 
     @property
+    def is_live(self) -> bool:
+        return self.capital_environment == LIVE_ENVIRONMENT
+
+    @property
     def audiences(self) -> list[str]:
         return [part.strip() for part in self.entra_audiences.split(",") if part.strip()]
 
