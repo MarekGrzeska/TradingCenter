@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TYTUŁ</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Karla:wght@400;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+:root{--paper:#fcfbf7;--card:#fff;--band:#14306b;--line:#ddd9cd;--soft:#ebe8de;--ink:#16181d;--ink2:#4f535e;--ink3:#85899a;--navy:#14306b;--navys:#e6ebf5;--yel:#f2c313;--yels:#fdf3d0;--grn:#17734c;--grns:#e0f0e8;--red:#b8322a;--reds:#fae7e4;--head:"Bricolage Grotesque",system-ui,sans-serif;--body:"Karla",system-ui,sans-serif;--mono:"Roboto Mono",ui-monospace,monospace}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink2);font:16.5px/1.62 var(--body)}
+.in{max-width:860px;margin:0 auto;padding:0 18px}
+header{background:var(--band);color:#fff;padding:40px 0 38px}
+.kick{display:inline-block;font:700 10.5px var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--band);background:var(--yel);padding:5px 10px;margin-bottom:18px}
+h1{font:800 clamp(32px,7vw,58px)/1 var(--head);letter-spacing:-.035em;color:#fff;margin:0 0 14px;text-wrap:balance}
+.lede{font-size:19px;line-height:1.48;color:#d6dcec;margin:0}.lede b{color:#fff}
+.strip{display:flex;flex-wrap:wrap;gap:6px 24px;margin-top:22px;padding-top:16px;border-top:1px solid rgba(255,255,255,.22);font:11px var(--mono);letter-spacing:.07em;color:#a9b5d2}.strip b{color:var(--yel)}
+.rail{background:var(--card);border:1px solid var(--line);margin-top:-22px;position:relative;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+.cell{padding:14px 16px;border-right:1px solid var(--soft)}.cell:last-child{border-right:0}
+.v{font:800 32px/.95 var(--head);letter-spacing:-.04em;color:var(--navy)}.l{font-size:13px;color:var(--ink3);margin-top:7px;line-height:1.35}
+section{padding-top:44px}
+.eye{font:700 10.5px var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--navy);margin-bottom:8px;display:flex;align-items:center;gap:10px}.eye::after{content:"";flex:1;height:3px;background:var(--yel)}
+h2{font:700 clamp(24px,4.5vw,34px)/1.08 var(--head);letter-spacing:-.028em;color:var(--ink);margin:0 0 14px}
+p{margin:0 0 14px}p.intro{font-size:18px;color:var(--ink)}strong{color:var(--ink)}a{color:var(--navy)}
+.hl{background-image:linear-gradient(transparent 58%,var(--yels) 58%)}
+ul{padding-left:20px}li{margin-bottom:6px}
+.tw{background:var(--card);border:1px solid var(--line);overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14.5px}
+th{text-align:left;font:700 10px var(--mono);letter-spacing:.12em;text-transform:uppercase;color:#fff;background:var(--navy);padding:9px 12px}
+td{padding:9px 12px;border-bottom:1px solid var(--soft)}tr:last-child td{border-bottom:0}.n{font-family:var(--mono);text-align:right}
+.quote{background:var(--yel);color:var(--ink);padding:20px 22px;margin:24px 0;font:700 clamp(19px,3.4vw,25px)/1.18 var(--head);letter-spacing:-.02em}
+.box{background:var(--card);border:1px solid var(--line);border-left:6px solid var(--yel);padding:13px 16px;margin:10px 0}.box.ok{border-left-color:var(--grn)}.box.stop{border-left-color:var(--red)}
+.box h3{font:700 18px var(--head);color:var(--ink);margin:0 0 4px}.box p{margin:0;font-size:15px}
+.tag{display:inline-block;font:700 10px var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:3px 7px}.tag.ok{background:var(--grns);color:var(--grn)}.tag.att{background:var(--yels);color:#8a6708}.tag.stop{background:var(--reds);color:var(--red)}
+.src{font-size:14px}.src li{word-break:break-word}
+footer{background:var(--band);color:#a9b5d2;margin-top:56px;padding:18px 0;font:11px var(--mono);letter-spacing:.07em}
+</style>
+</head>
+<body>
+<header><div class="in">
+<span class="kick">KATEGORIA</span>
+<h1>TYTUŁ</h1>
+<p class="lede">LEAD — jedno, dwa zdania; <b>najważniejsza liczba</b> wytłuszczona.</p>
+<div class="strip"><span>DATA</span><span>źródeł: <b>N</b></span><span>agent TradingCenter</span></div>
+</div></header>
+<main><div class="in">
+<div class="rail">
+<div class="cell"><div class="v">80%</div><div class="l">OPIS LICZBY</div></div>
+<div class="cell"><div class="v">4,25%</div><div class="l">OPIS LICZBY</div></div>
+</div>
+<section>
+<div class="eye">01 · NAZWA</div>
+<h2>NAGŁÓWEK SEKCJI</h2>
+<p class="intro">Pierwszy akapit sekcji.</p>
+<p>Akapit. <span class="hl">Najważniejsze zdanie sekcji.</span></p>
+</section>
+<section>
+<div class="eye">02 · NAZWA</div>
+<h2>NAGŁÓWEK SEKCJI</h2>
+<div class="tw"><table><thead><tr><th>Kolumna</th><th class="n">Wartość</th></tr></thead><tbody><tr><td>Wiersz</td><td class="n">1,0</td></tr></tbody></table></div>
+<div class="box ok"><h3>Scenariusz <span class="tag ok">bazowy</span></h3><p>Opis.</p></div>
+<div class="quote">Jedno zdanie, które warto zapamiętać.</div>
+</section>
+<section>
+<div class="eye">Źródła</div>
+<ol class="src"><li><a href="https://example.com">Tytuł strony — wydawca, data</a></li></ol>
+</section>
+</div></main>
+<footer><div class="in">TradingCenter · agent operatora · DATA</div></footer>
+</body>
+</html>
