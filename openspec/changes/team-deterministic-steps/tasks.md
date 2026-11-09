@@ -33,9 +33,9 @@
 
 ## 6. tc-team-tools
 
-- [ ] 6.1 `create_team` z `steps` i `trading`; `revise_team` z `replace_steps`, `remove_step_keys` i `trading`; `read_team` zwraca `steps`
-- [ ] 6.2 `trading` z czatu: tylko `environment=demo`; zmiana sekcji `trading` rewizji na koncie realnym odmówiona z odesłaniem do terminala; przeniesienie bez zmian, gdy nie nazwana
-- [ ] 6.3 `list_step_recipes` (odczyt); opisy narzędzi: krok nie woła modelu, wynik czyta następnik; sufit powierzchni podniesiony świadomie o zmierzoną wartość
+- [x] 6.1 `create_team` z `steps` i `trading`; `revise_team` z `replace_steps`, `remove_step_keys` i `trading`; `read_team` zwraca `steps`
+- [x] 6.2 `trading` z czatu: tylko `environment=demo`; zmiana sekcji `trading` rewizji na koncie realnym odmówiona z odesłaniem do terminala; przeniesienie bez zmian, gdy nie nazwana
+- [x] 6.3 `list_step_recipes` (odczyt); opisy narzędzi: krok nie woła modelu, wynik czyta następnik; sufit powierzchni podniesiony świadomie o zmierzoną wartość
 
 ## 7. Terminal
 
