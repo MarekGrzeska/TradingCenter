@@ -32,6 +32,7 @@ def _params(**overrides: Any) -> StrategyExecuteParams:
 def _signal(action: str = "enter", *, side: str = "long", engine: str | None = None, age: int = 3, **extra) -> dict:
     position = None if engine is None else {"side": engine, "stop": None, "target": None}
     return {
+        "symbol": "US100",
         "action": action,
         "bar_closed_at": BAR,
         "bar_age_seconds": age,
@@ -39,12 +40,13 @@ def _signal(action: str = "enter", *, side: str = "long", engine: str | None = N
         "position": position,
         "window_from": WINDOW,
         "sizing": {"mode": "margin_fraction", "value": 0.2},
+        "exits": [],
         **extra,
     }
 
 
 def _own(side: str = "long", *, placed_at: datetime = NOW) -> Own:
-    return Own(position_id="deal-1", side=side, size=0.1, placed_at=placed_at)
+    return Own(position_id="deal-1", side=side, placed_at=placed_at)
 
 
 @pytest.mark.parametrize(
@@ -72,8 +74,22 @@ def _own(side: str = "long", *, placed_at: datetime = NOW) -> Own:
             "none", "unknown", id="own position older than the engine's window",
         ),
         pytest.param(
-            Seen(_signal(position={"side": "long", "stop": 100.0, "target": None}), _params(), 0, 0, None),
-            "none", "unsupported", id="strategy with a stop",
+            Seen(_signal(exits=["stop"]), _params(), 0, 0, None), "none", "unsupported", id="strategy with a stop"
+        ),
+        pytest.param(
+            Seen(_signal("exit", engine="long", exits=["stop"]), _params(), 1, 0, _own()),
+            "close", "exited", id="an own position still follows a strategy with a stop out",
+        ),
+        pytest.param(
+            Seen(_signal(symbol="GOLD"), _params(), 0, 0, None), "none", "unsupported", id="another symbol's strategy"
+        ),
+        pytest.param(
+            Seen(_signal("enter", side="long"), _params(), 1, 0, _own("long")),
+            "none", "skipped", id="second run inside the signal bar, after the entry",
+        ),
+        pytest.param(
+            Seen(_signal("enter", side="short"), _params(), 1, 0, _own("long")),
+            "close", "exited", id="engine entering the opposite side",
         ),
         pytest.param(
             Seen(_signal(order={"side": "long", "kind": "limit", "price": 1.0}), _params(), 0, 0, None),
@@ -195,6 +211,48 @@ async def test_a_bar_that_never_comes_ends_skipped_with_the_engine_s_words() -> 
     assert not any(name == "place_order" for name, _, _ in ctx.calls)
 
 
+async def test_a_strategies_tool_that_does_not_answer_is_unknown_not_a_skip() -> None:
+    down = ToolOutcome(ToolOutcomeKind.UNAVAILABLE, "strategies is not configured", 1)
+    ctx = FakeContext(_replies(strategy_signal=[down]))
+
+    result = await execute(_step(), ctx, now=Clock(), sleep=Clock().sleep)
+
+    assert result["decision"] == "unknown"
+    assert [name for name, _, _ in ctx.calls] == ["strategy_signal"]
+
+
+async def test_a_refusal_is_asked_again_backing_off_not_every_second() -> None:
+    late = ToolOutcome(ToolOutcomeKind.REFUSED, "the archive has no MINUTE_5 bar", 1)
+    ctx = FakeContext(_replies(strategy_signal=[late]))
+    clock = Clock()
+
+    await execute(_step(wait_for_bar_seconds=30), ctx, now=clock, sleep=clock.sleep)
+
+    assert [name for name, _, _ in ctx.calls].count("strategy_signal") <= 9
+
+
+async def test_an_entry_taken_but_not_settled_is_unknown() -> None:
+    pending = ok({"outcome": "unsettled", "status": "PENDING", "id": None, "reference": "ref-9", "level": None})
+    ctx = FakeContext(_replies(place_order=[pending]))
+
+    result = await execute(_step(), ctx, now=Clock(), sleep=Clock().sleep)
+
+    assert result["decision"] == "unknown"
+    assert "filled" not in result["summary"]
+
+
+async def test_an_own_order_that_never_named_its_position_beside_an_unclaimed_one_is_unknown() -> None:
+    positions = ok({"result": [{"id": "deal-7", "symbol": "US100", "direction": "BUY", "size": 0.1}]})
+    placed = [{"status": "unsettled", "provider_order_id": None, "reference": "ref-7", "created_at": NOW}]
+    ctx = FakeContext(_replies(strategy_signal=[ok(_signal("none"))], get_positions=[positions]), placed)
+
+    result = await execute(_step(), ctx, now=Clock(), sleep=Clock().sleep)
+
+    assert result["decision"] == "unknown"
+    assert "ref-7" in result["reason"]
+    assert not any(call[0] in ("place_order", "close_position") for call in ctx.calls)
+
+
 async def test_an_order_with_no_known_outcome_is_not_sent_again() -> None:
     lost = ToolOutcome(ToolOutcomeKind.UNAVAILABLE, "timed out", 1)
     ctx = FakeContext(_replies(place_order=[lost]))
@@ -218,7 +276,9 @@ async def test_a_gateway_refusal_is_reported_as_it_came_and_not_resized() -> Non
 
 async def test_the_team_s_own_position_is_closed_when_the_engine_is_flat() -> None:
     positions = ok({"result": [{"id": "deal-1", "symbol": "US100", "direction": "BUY", "size": 0.1}]})
-    placed = [{"provider_order_id": "deal-1", "reference": "ref-1", "created_at": NOW - timedelta(hours=4)}]
+    placed = [
+        {"status": "settled", "provider_order_id": "deal-1", "reference": "ref-1", "created_at": NOW - timedelta(hours=4)}
+    ]
     ctx = FakeContext(_replies(strategy_signal=[ok(_signal("none"))], get_positions=[positions]), placed)
 
     result = await execute(_step(), ctx, now=Clock(), sleep=Clock().sleep)

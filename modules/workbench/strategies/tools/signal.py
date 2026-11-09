@@ -21,7 +21,8 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         closed long ago is not this bar's decision. `position` is the engine's own, not the account's — compare it with
         the account. Size the order from the account's balance and `sizing` (e.g. size_for_margin), never invent one.
         Also: `order` (side, kind, price), `position` (side, entered_at, entry_price, stop, target), `exit_reason`,
-        `window_from` (an engine position opened before it is not seen), `params`, `costs_source`."""
+        `exits` (the document's stop, target, trail), `window_from` (an engine position opened before it is not
+        seen), `params`, `costs_source`."""
         async with ctx.state.pool.acquire() as conn:
             try:
                 # A dict, as read_backtest's report is: a typed answer is its whole schema in every turn.

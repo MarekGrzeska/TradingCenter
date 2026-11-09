@@ -631,6 +631,24 @@ describe("steps", () => {
     expect(saved.steps).toEqual([{ key: "step-1", recipe: "strategy_execute", params: { strategy_id: 5 } }]);
   });
 
+  it("lets an agent wait for a step, named by its recipe", async () => {
+    const api = fakeApi({
+      listStepRecipes: vi.fn(async () => [RECIPE]),
+      latestRevision: vi.fn(async () => revision(WITH_STEP)),
+    });
+    await openTheTeam(api);
+    await screen.findByTestId("step-node-strategy_execute");
+
+    const scout = await openAgentSettings("Scout");
+    expect(within(scout).getByText("waits for step · strategy_execute")).toBeInTheDocument();
+    await closeAgentSettings();
+
+    const judge = await openAgentSettings("Judge");
+    await userEvent.selectOptions(within(judge).getByLabelText("Waits for"), "step-1");
+    await userEvent.click(within(judge).getByRole("button", { name: "Add" }));
+    expect(within(judge).getByText("waits for step · strategy_execute")).toBeInTheDocument();
+  });
+
   it("shows a refusal naming the step at the step", async () => {
     const api = fakeApi({
       listStepRecipes: vi.fn(async () => [RECIPE]),

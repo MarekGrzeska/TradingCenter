@@ -278,9 +278,6 @@ class TeamDefinition(BaseModel):
         """Every node of the graph, agents first and steps after, each in its definition's own order."""
         return [agent.key for agent in self.agents] + [step.key for step in self.steps]
 
-    def step(self, key: str) -> StepDefinition | None:
-        return next((step for step in self.steps if step.key == key), None)
-
     @model_validator(mode="after")
     def _at_least_one_node_with_unique_keys(self) -> TeamDefinition:
         keys = self.node_keys()

@@ -9,6 +9,8 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from ..contract import TeamDefinition
+
 ParamType = Literal["integer", "decimal", "text"]
 
 
@@ -51,13 +53,17 @@ class StrategyExecuteParams(BaseModel):
             raise ValueError("symbol must not be blank")
         return value.strip()
 
-    @field_validator("deposit_fraction")
+    # Before, because a client reading the catalogue's "decimal" sends a JSON number, which a str field refuses.
+    @field_validator("deposit_fraction", mode="before")
     @classmethod
-    def _fraction(cls, value: str | None) -> str | None:
+    def _fraction(cls, value: object) -> str | None:
         if value is None:
             return None
+        if isinstance(value, bool) or not isinstance(value, str | int | float):
+            # ValueError, not TypeError: only the former becomes Pydantic's refusal naming the parameter.
+            raise ValueError(f"deposit_fraction is not a number: {value!r}")  # noqa: TRY004
         try:
-            parsed = Decimal(value)
+            parsed = Decimal(str(value))
         except InvalidOperation as err:
             raise ValueError(f"deposit_fraction is not a number: {value!r}") from err
         if not Decimal(0) < parsed <= Decimal(1):
@@ -71,7 +77,8 @@ STRATEGY_EXECUTE = Recipe(
         "Keeps this team's own position in line with a strategy's engine (strategy_signal): enters on a fresh "
         "`enter` with a market order sized from the deposit, closes its own position on `exit` or when the engine "
         "holds none, never catches up a stale entry and never reverses in one run. One attempt per signal bar. "
-        "Market orders without stop or target only; any other strategy ends as unsupported."
+        "Market orders without stop, target or trail, on the strategy's own symbol, only; any other strategy ends as "
+        "unsupported."
     ),
     params_model=StrategyExecuteParams,
     params=(
@@ -108,6 +115,16 @@ STRATEGY_EXECUTE = Recipe(
 )
 
 RECIPES: dict[str, Recipe] = {recipe.name: recipe for recipe in (STRATEGY_EXECUTE,)}
+
+
+def node_tools(definition: TeamDefinition) -> list[tuple[str, str, tuple[str, ...]]]:
+    """Every node as (`agent` or `step`, key, the tools it may call): an agent's own assignment, a step's recipe's. A step
+    naming no recipe this module knows is refused at save and at start, and has none here."""
+    nodes = [("agent", agent.key, tuple(agent.tools)) for agent in definition.agents]
+    nodes += [
+        ("step", step.key, RECIPES[step.recipe].tools if step.recipe in RECIPES else ()) for step in definition.steps
+    ]
+    return nodes
 
 
 class RecipeRefused(ValueError):

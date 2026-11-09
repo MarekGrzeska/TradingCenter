@@ -204,11 +204,25 @@ wywołania zapisującego.
 Wywołanie zapisujące, którego skutek pozostał nieznany, MUST NOT być ponawiane. Krok MUST zakończyć się wynikiem
 nieznanym z tym, co odczytał po wywołaniu.
 
+Gdy zespół ma już własną pozycję po stronie sygnału wejścia z tej samej świecy, przepis MUST zakończyć się
+pominięciem nazywającym tę pozycję. Silnik wypełnia swoje wejście dopiero na otwarciu następnej świecy, więc do tego
+czasu nie pokazuje pozycji, a jej brak MUST NOT być czytany jako wyjście.
+
+Zlecenie przyjęte, ale nierozliczone, MUST kończyć krok wynikiem nieznanym. Własne zlecenie zespołu, które nie
+wskazało swojej pozycji (bez odpowiedzi, nierozliczone albo bez identyfikatora), złożone w oknie silnika, obok pozycji
+na symbolu, której żadne zlecenie zespołu nie wskazuje, MUST kończyć krok wynikiem nieznanym, bez zlecenia.
+
 #### Scenario: Dwa przebiegi tej samej sesji
 
 - **WHEN** dwa przebiegi zespołu startują po tej samej świecy sygnałowej z sygnałem wejścia
 - **THEN** zlecenie składa najwyżej jeden z nich
 - **AND** drugi kończy się pominięciem nazywającym wcześniejszą próbę
+
+#### Scenario: Drugi przebieg po wejściu, przed następną świecą
+
+- **WHEN** przebieg wszedł na sygnale świecy, a kolejny przebieg startuje, zanim zamknie się następna świeca
+- **THEN** przepis nie zamyka pozycji zespołu
+- **AND** kończy się pominięciem nazywającym wcześniejsze wejście
 
 #### Scenario: Odpowiedź na zlecenie nie wraca
 
@@ -220,15 +234,24 @@ nieznanym z tym, co odczytał po wywołaniu.
 
 `strategy_execute` MUST zakończyć się wynikiem „strategia nieobsługiwana”, bez zlecenia, gdy:
 - sygnał niesie zlecenie inne niż rynkowe;
-- strategia niesie stop, cel albo stop kroczący.
+- strategia niesie stop, cel albo stop kroczący;
+- strategia handluje innym symbolem niż ustawiony w kroku.
 
-Przepis MUST NOT przybliżać takiej strategii zleceniem rynkowym bez poziomów.
+Stop, cel i stop kroczący przepis MUST czytać z dokumentu strategii, który sygnał nazywa, a nie z pozycji silnika,
+bo sygnał wejścia nie niesie pozycji. Przepis MUST NOT przybliżać takiej strategii zleceniem rynkowym bez poziomów.
+Własną pozycję zespołu, już otwartą, przepis MUST zamykać za silnikiem także wtedy.
 
 #### Scenario: Strategia ze stopem
 
 - **WHEN** krok wykonuje strategię, której dokument ma stop
 - **THEN** przepis nie składa zlecenia
 - **AND** wynik nazywa stop jako to, czego przepis nie wykonuje
+
+#### Scenario: Strategia innego symbolu
+
+- **WHEN** krok ustawiony na US100 wykonuje strategię, której dokument handluje GOLD
+- **THEN** przepis nie składa zlecenia
+- **AND** kończy się wynikiem „strategia nieobsługiwana” nazywającym oba symbole
 
 ### Requirement: Agent może nieść powiadomienie zapasowe
 
@@ -240,11 +263,20 @@ wiadomość: prefiks, streszczenia kroków, które ten agent dostał, i powód, 
 Wysłanie MUST trafić do śladu przy tym agencie i MUST NOT zmieniać statusu przebiegu, który nadal nazywa pierwotną
 przyczynę. Powiadomienie zapasowe MUST NOT być wysyłane, gdy agent skończył pracę.
 
+W rewizji z krokami błąd modelu, granica kosztu albo granica zleceń agenta MUST NOT przerywać kroku pracującego obok.
+Przebieg kończy się wtedy, gdy kroki skończą, statusem nazywającym pierwszą przyczynę.
+
 #### Scenario: Model reportera nie odpowiada
 
 - **WHEN** krok złożył zlecenie, a model agenta z powiadomieniem zapasowym zwraca błąd
 - **THEN** operator dostaje wiadomość z prefiksem, streszczeniem kroku i powodem
 - **AND** przebieg kończy się statusem nazywającym błąd modelu
+
+#### Scenario: Agent zawodzi obok kroku w trakcie zlecenia
+
+- **WHEN** model agenta pracującego równolegle z krokiem zawodzi, gdy zlecenie kroku czeka na odpowiedź
+- **THEN** krok kończy pracę, a wiersz zlecenia niesie odpowiedź
+- **AND** przebieg kończy się statusem nazywającym błąd modelu agenta
 
 #### Scenario: Agent kończy pracę normalnie
 

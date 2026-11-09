@@ -9,10 +9,11 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
-from typing import Any, Literal
+from typing import Any, Literal, TypeGuard
 
 from ..contract import StepDefinition
 from ..store import AttemptAlreadyMade
+from ..tools import ToolOutcomeKind
 from .catalogue import StrategyExecuteParams
 from .runtime_types import StepContext
 
@@ -22,6 +23,8 @@ Decision = Literal["entered", "exited", "no_action", "skipped", "refused", "unkn
 _DIRECTION = {"long": "BUY", "short": "SELL"}
 _SIDE = {"BUY": "long", "SELL": "short"}
 _POLL_SECONDS = 1.0
+# Each ask reads a week of the archive; doubling to this keeps a 30 s wait to about eight of them.
+_POLL_CEILING_SECONDS = 5.0
 
 
 @dataclass(frozen=True)
@@ -30,7 +33,6 @@ class Own:
 
     position_id: str
     side: str
-    size: float
     placed_at: datetime
 
 
@@ -43,7 +45,7 @@ class Seen:
     symbol_positions: int
     symbol_orders: int
     own: Own | None
-    # Own orders whose position the account no longer shows, or a placed order nobody can match: neither is a guess.
+    # More than one own position, or an own order that never named its position beside one nobody claims: no guess.
     own_unclear: str | None = None
 
 
@@ -68,12 +70,14 @@ def decide(seen: Seen) -> Action:
     engine = signal.get("position")
     action = signal.get("action")
 
+    if signal.get("symbol") != seen.params.symbol:
+        return Action(
+            "none",
+            "unsupported",
+            f"the strategy trades {signal.get('symbol')!r} and this step is set to {seen.params.symbol!r}",
+        )
     if seen.own_unclear is not None:
         return Action("none", "unknown", seen.own_unclear)
-
-    unsupported = _unsupported(signal)
-    if unsupported is not None:
-        return Action("none", "unsupported", unsupported)
 
     if seen.own is not None:
         window_from = signal.get("window_from")
@@ -84,18 +88,29 @@ def decide(seen: Seen) -> Action:
                 f"this team's position {seen.own.position_id} opened before the engine's window "
                 f"({window_from}); the engine cannot see it, so the operator decides",
             )
-        engine_side = engine.get("side") if isinstance(engine, dict) else None
-        if action == "exit" or engine_side is None or engine_side != seen.own.side:
-            why = (
-                "the engine signals exit"
-                if action == "exit"
-                else "the engine holds no position"
-                if engine_side is None
-                else f"the engine holds the opposite side ({engine_side})"
+        if action == "enter" and order.get("side") == seen.own.side:
+            # The engine fills its own entry at the next bar's open; until then this team's position is that entry.
+            return Action(
+                "none",
+                "skipped",
+                f"the entry on this signal bar was already made: this team's position {seen.own.position_id}",
             )
+        engine_side = engine.get("side") if isinstance(engine, dict) else None
+        if action == "exit" or engine_side != seen.own.side:
+            if action == "exit":
+                why = "the engine signals exit"
+            elif engine_side is not None:
+                why = f"the engine holds the opposite side ({engine_side})"
+            elif action == "enter":
+                why = f"the engine is entering the opposite side ({order.get('side')})"
+            else:
+                why = "the engine holds no position"
             return Action("close", "exited", why, side=seen.own.side, position_id=seen.own.position_id)
         return Action("none", "no_action", "this team's position matches the engine's")
 
+    unsupported = _unsupported(signal)
+    if unsupported is not None:
+        return Action("none", "unsupported", unsupported)
     if action != "enter":
         return Action("none", "no_action", f"the engine's action is {action!r}")
     side = order.get("side")
@@ -116,13 +131,16 @@ def decide(seen: Seen) -> Action:
 
 
 def _unsupported(signal: dict[str, Any]) -> str | None:
+    """What keeps this recipe from entering, read off the document rather than the engine's position, which an entry
+    never has. A position it could not protect is never opened; one already open is still closed when the engine leaves."""
     order = signal.get("order") or {}
     if order and order.get("kind") not in (None, "market"):
         return f"the signal's order is {order.get('kind')!r}; this recipe places market orders only"
-    position = signal.get("position") or {}
-    levels = [name for name in ("stop", "target") if position.get(name) is not None]
-    if levels:
-        return f"the strategy carries {' and '.join(levels)}, which this recipe does not execute"
+    exits = signal.get("exits")
+    if not isinstance(exits, list):
+        return "the signal does not say which exits the strategy carries"
+    if exits:
+        return f"the strategy carries {', '.join(map(str, exits))}, which this recipe does not execute"
     return None
 
 
@@ -174,8 +192,9 @@ async def execute(
     label = f"{params.symbol} strategy {params.strategy_id}/{params.revision}"
 
     signal = await _signal(ctx, params, result, now=now, sleep=sleep)
-    if isinstance(signal, str):
-        return result.out("skipped", signal, f"{label}: no signal — {signal}")
+    if isinstance(signal, tuple):
+        decision, why = signal
+        return result.out(decision, why, f"{label}: no signal — {why}")
     result.mark("signal_seen", now())
     result.extra["signal"] = {
         key: signal.get(key) for key in ("action", "bar_closed_at", "bar_age_seconds", "order", "position", "exit_reason")
@@ -192,7 +211,7 @@ async def execute(
             return result.out("unknown", f"{name} did not answer: {outcome.text}", f"{label}: account unreadable")
     position_rows = [row for row in _payload(positions.text) or [] if row.get("symbol") == params.symbol]
     order_rows = [row for row in _payload(orders.text) or [] if row.get("symbol") == params.symbol]
-    own, unclear = _own_position(position_rows, placed)
+    own, unclear = _own_position(position_rows, placed, signal.get("window_from"))
 
     action = decide(
         Seen(
@@ -214,10 +233,11 @@ async def execute(
     return await _enter(ctx, params, signal, _payload(balance.text), action, f"{base_key}:enter", result, label, now=now)
 
 
-async def _signal(ctx, params, result, *, now, sleep) -> dict[str, Any] | str:
-    """The engine's answer, asked again every second while it refuses, until the wait is over. The refusal's words belong
-    to `strategies`, so any refusal is retried and the last one is the reason given."""
+async def _signal(ctx, params, result, *, now, sleep) -> dict[str, Any] | tuple[Decision, str]:
+    """The engine's answer. A refusal is the engine's own words, most often the archive behind on the bar, so it is asked
+    again, backing off, until the wait is over; a tool that did not answer, or an answer this cannot read, is `unknown`."""
     deadline = result.started_at.timestamp() + params.wait_for_bar_seconds
+    pause = _POLL_SECONDS
     while True:
         outcome = await ctx.call(
             "strategy_signal", {"strategy_id": params.strategy_id, "revision": params.revision}
@@ -226,34 +246,53 @@ async def _signal(ctx, params, result, *, now, sleep) -> dict[str, Any] | str:
             data = _payload(outcome.text)
             if isinstance(data, dict):
                 return data
-            return f"strategy_signal answered something unreadable: {outcome.text[:200]}"
-        if now().timestamp() >= deadline:
-            return outcome.text
-        await sleep(_POLL_SECONDS)
+            return "unknown", f"strategy_signal answered something unreadable: {outcome.text[:200]}"
+        if outcome.kind is not ToolOutcomeKind.REFUSED:
+            return "unknown", f"strategy_signal did not answer: {outcome.text}"
+        remaining = deadline - now().timestamp()
+        if remaining <= 0:
+            return "skipped", outcome.text
+        await sleep(min(pause, remaining))
+        pause = min(pause * 2, _POLL_CEILING_SECONDS)
 
 
 def _own_position(
-    positions: list[dict[str, Any]], placed: list[dict[str, Any]]
+    positions: list[dict[str, Any]], placed: list[dict[str, Any]], window_from: str | None
 ) -> tuple[Own | None, str | None]:
-    """The position one of this team's own taken orders opened, still on the account. More than one is not a state this
-    recipe creates, so it is reported rather than resolved."""
+    """The position one of this team's own orders opened, still on the account. Two own positions are not a state this
+    recipe creates, and an own order that never named its position, beside a position no order claims, may have opened
+    it: both are reported rather than resolved."""
     by_id = {str(row.get("id")): row for row in positions}
-    mine = []
+    mine: list[tuple[dict[str, Any], dict[str, Any]]] = []
+    nameless: list[dict[str, Any]] = []
     for order in placed:
-        for candidate in (order.get("provider_order_id"), order.get("reference")):
-            if candidate is not None and str(candidate) in by_id:
-                mine.append((by_id[str(candidate)], order))
-                break
+        candidates = [str(c) for c in (order.get("provider_order_id"), order.get("reference")) if c is not None]
+        hit = next((by_id[c] for c in candidates if c in by_id), None)
+        if hit is not None:
+            mine.append((hit, order))
+        elif order.get("status") != "settled" or order.get("provider_order_id") is None:
+            nameless.append(order)
+
+    claimed = {str(row["id"]) for row, _order in mine}
+    unclaimed = [row for row in positions if str(row.get("id")) not in claimed]
+    since = _iso(window_from) if window_from is not None else None
+    recent = [order for order in nameless if since is None or order["created_at"] >= since]
+    if unclaimed and recent:
+        order = recent[0]
+        return None, (
+            f"this team's order {order.get('reference') or order.get('id')} ({order.get('status')}, placed "
+            f"{order['created_at']}) never named the position it opened, and the account holds {len(unclaimed)} "
+            "position(s) on the symbol no order of this team claims; the operator decides"
+        )
     if not mine:
         return None, None
-    if len({row["id"] for row, _order in mine}) > 1:
-        ids = sorted({str(row["id"]) for row, _order in mine})
-        return None, f"this team holds more than one position on the symbol ({ids}); the operator decides"
+    if len(claimed) > 1:
+        return None, f"this team holds more than one position on the symbol ({sorted(claimed)}); the operator decides"
     row, order = mine[0]
     side = _SIDE.get(str(row.get("direction")))
     if side is None:
         return None, f"position {row['id']} has direction {row.get('direction')!r}"
-    return Own(position_id=str(row["id"]), side=side, size=float(row.get("size") or 0), placed_at=order["created_at"]), None
+    return Own(position_id=str(row["id"]), side=side, placed_at=order["created_at"]), None
 
 
 async def _close(ctx, action: Action, attempt_key: str, result: _Result, label: str, *, now) -> dict[str, Any]:
@@ -263,15 +302,21 @@ async def _close(ctx, action: Action, attempt_key: str, result: _Result, label: 
     except AttemptAlreadyMade:
         return result.out("skipped", "an exit on this signal bar was already attempted", f"{label}: exit already attempted")
     result.mark("order_answered", now())
-    result.extra["order"] = _payload(outcome.text) if outcome.ok else outcome.text
+    reply = _payload(outcome.text) if outcome.ok else None
+    result.extra["order"] = reply if outcome.ok else outcome.text
     result.extra["position_id"] = action.position_id
-    if outcome.ok:
+    if _settled(reply):
         return result.out("exited", action.reason, f"{label}: closed {action.side} position {action.position_id} — {action.reason}")
-    if outcome.kind == "refused" and "access failure" not in outcome.text:
+    if outcome.settles_as_refused:
         return result.out("refused", outcome.text, f"{label}: close of {action.position_id} refused — {outcome.text}")
     return result.out(
         "unknown", outcome.text, f"{label}: close of {action.position_id} has no known outcome — check the account"
     )
+
+
+def _settled(reply: Any) -> TypeGuard[dict[str, Any]]:
+    """A write the provider confirmed. `unsettled` is a PENDING the account may still turn into anything."""
+    return isinstance(reply, dict) and reply.get("outcome") == "settled"
 
 
 async def _enter(
@@ -307,14 +352,13 @@ async def _enter(
     except AttemptAlreadyMade:
         return result.out("skipped", "an entry on this signal bar was already attempted", f"{label}: entry already attempted")
     result.mark("order_answered", now())
-    if not outcome.ok:
-        if outcome.kind == "refused" and "access failure" not in outcome.text:
-            return result.out("refused", outcome.text, f"{label}: {direction} {size} refused — {outcome.text}")
-        result.extra["order"] = outcome.text
+    if outcome.settles_as_refused:
+        return result.out("refused", outcome.text, f"{label}: {direction} {size} refused — {outcome.text}")
+    order = _payload(outcome.text) if outcome.ok else None
+    result.extra["order"] = order if outcome.ok else outcome.text
+    if not _settled(order) or order.get("id") is None:
         return result.out("unknown", outcome.text, f"{label}: {direction} {size} has no known outcome — check the account")
 
-    order = _payload(outcome.text) or {}
-    result.extra["order"] = order
     level = order.get("level")
     assumed = await _assumed_open(ctx, params.symbol, signal.get("bar_closed_at"))
     if assumed is not None and isinstance(level, int | float):

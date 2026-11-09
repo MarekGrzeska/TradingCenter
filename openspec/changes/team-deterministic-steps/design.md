@@ -12,7 +12,9 @@ zaczyna się projekt:
 - **Narzędzia.** `ToolPlan` rozwiązuje je raz na przebieg i wkleja konto rewizji. Tylko on wie, które wywołanie
   zmienia rachunek.
 - **Sygnał.** `strategy_signal` (pakiet `strategies`, źródło w procesie) zwraca `action`, `order`, pozycję silnika,
-  `sizing` dokumentu, `bar_closed_at` i `window_from`. Odmawia, gdy archiwum nie ma jeszcze ostatniej świecy.
+  `sizing` dokumentu, `bar_closed_at` i `window_from`. Odmawia, gdy archiwum nie ma jeszcze ostatniej świecy. Ta zmiana
+  dokłada `exits`: stop, cel i stop kroczący z dokumentu. Sygnał wejścia nie niesie pozycji, więc z pozycji przepis by
+  ich nie zobaczył.
 - **Zapis.** `place_order` w `trading-mcp` zwraca `outcome`, `status`, `id` i `reference`. `size_for_margin` przelicza
   depozyt na wielkość.
 - **Zestaw narzędzi.** `teams_tools` (`tc-team-tools`) zakłada i poprawia agentów. Sekcję `trading` przenosi bez
@@ -80,11 +82,12 @@ wywołanie nie wychodzi. Rozważone: osobna tabela prób (drugi zapis i druga tr
 blokada doradcza na czas przebiegu, która nie chroni przed przebiegiem następnym. Wiersz pominiętej próby nie
 powstaje, więc dobowy licznik zleceń liczy dalej tylko wysłane.
 
-**7. Czekanie na świecę: ponawianie każdej odmowy sygnału co 1 s do terminu.**
+**7. Czekanie na świecę: ponawianie każdej odmowy sygnału, z przerwą od 1 s podwajaną do 5 s, do terminu.**
 Domyślny termin to 30 s. Przepis nie rozróżnia treści odmowy, bo tekst należy do `strategies` i wiązanie się z nim
 byłoby sprzężeniem przez komunikat. Odmowa trwała, na przykład nieistniejąca rewizja, kończy się więc pominięciem po
-30 s z ostatnią treścią odmowy jako powodem. Koszt dla bazy to najwyżej 30 wywołań po około 130 ms, dwa razy dziennie
-na zespół, klasa C0/C1. Przed scaleniem trzeba to potwierdzić skillem `db-cost-check`.
+30 s z ostatnią treścią odmowy jako powodem. Narzędzie, które nie odpowiada, kończy krok od razu wynikiem nieznanym.
+Każde pytanie czyta tydzień archiwum, więc przerwa rośnie: najwyżej 9 wywołań na 30 s zamiast 30, dwa razy dziennie na
+zespół, klasa C0/C1. Przed scaleniem trzeba to potwierdzić skillem `db-cost-check`.
 
 **8. Wyjście idzie za silnikiem, nie za zegarem.**
 Przepis nie ma parametru „zamknij o 14:00”. Zamyka własną pozycję, gdy silnik mówi `exit`, nie ma pozycji albo ma

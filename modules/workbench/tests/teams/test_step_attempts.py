@@ -57,7 +57,7 @@ async def test_an_attempt_key_is_used_once_and_the_second_write_leaves_no_row(po
     assert len(rows) == 3
 
 
-async def test_the_team_placed_orders_are_its_own_taken_orders_on_the_symbol(pool: asyncpg.Pool) -> None:
+async def test_the_team_placed_orders_are_its_own_unrefused_orders_on_the_symbol(pool: asyncpg.Pool) -> None:
     async with pool.acquire() as conn:
         team_id, run_id, step_id = await _step_row(conn)
         taken = await _order(conn, run_id, step_id, key=None)
@@ -75,9 +75,11 @@ async def test_the_team_placed_orders_are_its_own_taken_orders_on_the_symbol(poo
             conn, trade_id=other_symbol["id"], status="settled", result_status="ACCEPTED",
             provider_order_id="deal-2", reference=None,
         )
+        # Sent with no reply yet: it may have opened a position, so the recipe must see it.
+        await _order(conn, run_id, step_id, key=None)
         mine = await store.team_placed_orders(conn, team_id=team_id, owner_principal=OWNER, symbol="US100")
         theirs = await store.team_placed_orders(
             conn, team_id=team_id, owner_principal="somebody-else", symbol="US100"
         )
-    assert [row["provider_order_id"] for row in mine] == ["deal-1"]
+    assert [(row["status"], row["provider_order_id"]) for row in mine] == [("sent", None), ("settled", "deal-1")]
     assert theirs == []

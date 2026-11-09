@@ -3,6 +3,7 @@ holds agents back while steps still run (`teams-usage`)."""
 
 from __future__ import annotations
 
+import asyncio
 import json
 from decimal import Decimal
 
@@ -123,6 +124,55 @@ async def test_a_reporter_whose_model_fails_leaves_the_fixed_message(pool: async
     row = await _run_row(pool, run_id)
     assert row["status"] == "failed"
     assert "reporter" in row["stopped_reason"]
+
+
+async def test_a_notice_the_trace_cannot_record_leaves_the_model_failure_as_the_reason(
+    pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    recorded = store.record_tool_call
+
+    async def failing_for_the_notice(conn, **kwargs):
+        if kwargs["tool_name"] == "send_telegram_message":
+            raise asyncpg.PostgresConnectionError("connection lost")
+        return await recorded(conn, **kwargs)
+
+    monkeypatch.setattr(store, "record_tool_call", failing_for_the_notice)
+    server = DeskServer()
+    run_id = await _run(pool, _desk(), ScriptedProvider(default=breaks()), server)
+
+    assert len(server.sent) == 1
+    row = await _run_row(pool, run_id)
+    assert row["status"] == "failed"
+    assert "reporter" in row["stopped_reason"] and "model call failed" in row["stopped_reason"]
+
+
+class SlowAccount(DeskServer):
+    """An order that takes a while to come back, so an agent beside the step fails while it is in flight."""
+
+    async def call(self, name: str, arguments: dict) -> ToolOutcome:
+        if name == "place_order":
+            await asyncio.sleep(0.3)
+        return await super().call(name, arguments)
+
+
+async def test_an_agent_failing_beside_a_step_does_not_cancel_the_order_in_flight(pool: asyncpg.Pool) -> None:
+    beside = TeamDefinition(
+        steps=_desk().steps,
+        agents=[AgentDefinition(key="news", role="news", prompt="read the news", model_id="gpt-6-luna")],
+    )
+
+    run_id = await _run(pool, beside, ScriptedProvider(default=breaks()), SlowAccount())
+
+    async with pool.acquire() as conn:
+        trades = await store.get_run_trades(conn, run_id=run_id)
+        output = await conn.fetchval(
+            "SELECT output FROM run_steps WHERE run_id = $1 AND agent_key = 'execute'", run_id
+        )
+    assert [trade["status"] for trade in trades] == ["settled"]
+    assert json.loads(output)["decision"] == "entered"
+    row = await _run_row(pool, run_id)
+    assert row["status"] == "failed"
+    assert "news" in row["stopped_reason"]
 
 
 async def test_a_reporter_that_answers_sends_no_notice(pool: asyncpg.Pool) -> None:

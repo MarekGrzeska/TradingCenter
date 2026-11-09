@@ -11,7 +11,7 @@ from typing import Any
 
 from ..config import Settings
 from ..contract import TeamDefinition
-from ..steps import RECIPES
+from ..steps import node_tools
 from .client import (
     ToolAccessError,
     ToolDescriptor,
@@ -402,14 +402,7 @@ async def announced_tools_by_server(
 
 
 def _units(definition: TeamDefinition) -> list[tuple[str, tuple[str, ...]]]:
-    """Every node and the tools it may call: an agent's own assignment, a step's recipe's. A step naming no known
-    recipe is refused at save and at start; here it simply has nothing to resolve."""
-    units = [(agent.key, tuple(agent.tools)) for agent in definition.agents]
-    units += [
-        (step.key, RECIPES[step.recipe].tools if step.recipe in RECIPES else ())
-        for step in definition.steps
-    ]
-    return units
+    return [(key, tools) for _kind, key, tools in node_tools(definition)]
 
 
 def _agents_wanting(definition: TeamDefinition, tools: list[str]) -> list[str]:

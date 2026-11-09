@@ -172,6 +172,7 @@ async def execute_run(
             team_id=team_id,
             owner_principal=owner_principal,
             agents_held=agents_held,
+            has_steps=bool(definition.steps),
         )
         graph = compile_team(definition, run.run_agent_step, run.run_step_node)
         try:
@@ -200,9 +201,9 @@ async def execute_run(
             log.exception("run %s failed outside an agent's own work", run_id)
             status, reason = "failed", f"the run failed: {err}"
             return
-        if run.held_agents:
-            # The steps ran and an agent did not: failed, naming the limit, with everything the steps did written.
-            status, reason = "failed", str(agents_held)
+        if run.failures:
+            # The steps ran and an agent did not: failed, naming the first cause, with everything the steps did written.
+            status, reason = "failed", str(run.failures[0])
             return
         status, reason = "completed", None
     except asyncio.CancelledError:
@@ -240,7 +241,7 @@ async def _close(
 @dataclass(frozen=True)
 class _Run:
     """What every agent in one run shares: the pool, the plan, the two guards, and the id everything points
-    at. Frozen because none of it changes during a run; what does belongs to one step."""
+    at. Frozen because none of it changes during a run but `failures`, which only grows."""
 
     pool: asyncpg.Pool
     run_id: int
@@ -254,7 +255,16 @@ class _Run:
     owner_principal: str = ""
     # Set when the daily cost limit was used up before a revision with steps started: its agents call no model.
     agents_held: CostLimitReached | None = None
-    held_agents: list[str] = field(default_factory=list)
+    has_steps: bool = False
+    failures: list[Exception] = field(default_factory=list)
+
+    def stop_agent(self, err: Exception) -> str:
+        """An agent that cannot finish. Raised where the run is agents alone; kept for the run's reason where a step may be
+        working beside it, because raising out of a node makes LangGraph cancel its siblings, an order in flight too."""
+        if not self.has_steps:
+            raise err
+        self.failures.append(err)
+        return ""
 
     async def run_agent_step(
         self, agent: AgentDefinition, given: Sequence[tuple[str, str]]
@@ -320,9 +330,8 @@ class _NodeTrace:
     async def _before_write_call(
         self, name: str, arguments: dict, attempt_key: str | None = None
     ) -> str | None:
-        """The order ceiling, and the row that outlives whatever happens next. Order matters twice: the
-        guard is asked first, so a refused call leaves no row; and the row is written before the call goes out.
-        A used `attempt_key` raises `store.AttemptAlreadyMade` and nothing is written or counted."""
+        """The guard first, so a refused call leaves no row; then the row, before the call goes out, so it outlives
+        whatever happens next. A used `attempt_key` raises `store.AttemptAlreadyMade`: nothing written or counted."""
         run = self._run
         try:
             run.trades.check(arguments)
@@ -364,22 +373,24 @@ class _StepRunner(_NodeTrace):
         agent = self._agent
         await self._start()
         if run.agents_held is not None:
-            # Not raised: a step working beside this agent must not be cancelled over a model call nobody made.
-            run.held_agents.append(agent.key)
             await self._send_fallback(given, str(run.agents_held), rounds=0)
             await self._finish(output=None, rounds=0)
-            return ""
+            return run.stop_agent(run.agents_held)
         try:
             work = await self._work(given)
         except CostLimitReached as err:
             await self._send_fallback(given, str(err), rounds=0)
-            raise
+            await self._finish(output=None, rounds=0)
+            return run.stop_agent(err)
+        except TradeLimitReached as err:
+            await self._finish(output=None, rounds=0)
+            return run.stop_agent(err)
         if work.failed:
             await self._send_fallback(given, "the model call failed", rounds=work.rounds)
 
         await self._finish(output=None if work.failed else work.text, rounds=work.rounds)
         if work.failed:
-            raise AgentFailed(agent.key, "the model call failed")
+            return run.stop_agent(AgentFailed(agent.key, "the model call failed"))
 
         if work.ceiling_reached:
             log.info(
@@ -406,17 +417,20 @@ class _StepRunner(_NodeTrace):
         except Exception as err:
             log.exception("the fallback notice of agent %s could not be sent", self._agent.key)
             outcome = ToolOutcome(ToolOutcomeKind.UNAVAILABLE, f"the notice could not be sent: {err}", 0)
-        await self._on_tool_call(
-            RecordedCall(
-                round_index=rounds,
-                position=0,
-                name=NOTICE_TOOL,
-                arguments=arguments,
-                outcome=str(outcome.kind),
-                text=outcome.text,
-                duration_ms=outcome.duration_ms,
+        try:
+            await self._on_tool_call(
+                RecordedCall(
+                    round_index=rounds,
+                    position=0,
+                    name=NOTICE_TOOL,
+                    arguments=arguments,
+                    outcome=str(outcome.kind),
+                    text=outcome.text,
+                    duration_ms=outcome.duration_ms,
+                )
             )
-        )
+        except Exception:
+            log.exception("the fallback notice of agent %s could not be written to the trace", self._agent.key)
 
     async def _work(self, given: Sequence[tuple[str, str]]):
         run = self._run
@@ -561,11 +575,9 @@ def _read_settlement(call: RecordedCall) -> _Settlement:
         # case the whole "row before the call" arrangement exists for.
         return _Settlement("unknown")
     if call.outcome == str(ToolOutcomeKind.REFUSED):
-        # The server answered no. `trading-mcp` refuses before touching the account for a bad request and
-        # turns a provider REJECTED into a refusal too. Its access-failure refusals say so themselves.
-        if "access failure" in call.text:
-            return _Settlement("unknown")
-        return _Settlement("refused")
+        # `trading-mcp` refuses a bad request before touching the account and turns a provider REJECTED into one too.
+        refused = ToolOutcome(ToolOutcomeKind.REFUSED, call.text, call.duration_ms).settles_as_refused
+        return _Settlement("refused" if refused else "unknown")
 
     try:
         payload = json.loads(call.text)

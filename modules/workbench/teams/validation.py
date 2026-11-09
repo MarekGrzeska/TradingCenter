@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Collection
 
 from .contract import TeamDefinition
-from .steps import RECIPES, RecipeRefused, parse_params
+from .steps import RecipeRefused, node_tools, parse_params
 from .tools import ACCOUNT_MOVING_TOOLS, AnnouncedSnapshot, and_list
 
 # The one tool a fallback notice is sent with; the agent carrying the notice must be assigned it.
@@ -58,13 +58,7 @@ def _every_fallback_notice_has_its_tool(definition: TeamDefinition) -> None:
 
 def _assignments(definition: TeamDefinition) -> list[tuple[str, list[str]]]:
     """Who is assigned which tools, named the way a refusal names them: an agent's own list, a step's recipe's."""
-    units = [(f"agent {agent.key!r}", list(agent.tools)) for agent in definition.agents]
-    units += [
-        (f"step {step.key!r}", list(RECIPES[step.recipe].tools))
-        for step in definition.steps
-        if step.recipe in RECIPES
-    ]
-    return units
+    return [(f"{kind} {key!r}", list(tools)) for kind, key, tools in node_tools(definition)]
 
 
 def _every_agent_names_a_known_model(

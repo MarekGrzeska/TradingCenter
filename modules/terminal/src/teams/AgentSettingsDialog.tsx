@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ModalShell } from "../ui/ModalShell";
 import type { Refusal } from "./refusal";
+import { nodeKeys, nodeLabel } from "./teamDraft";
 import type { TeamAgent, TeamDefinition, TeamDependency, TeamsModel, TeamsTool } from "./teamsApi";
 import { Button } from "../ui/Button";
 
@@ -40,12 +41,11 @@ export function AgentSettingsDialog({
   const outgoing = definition.dependencies.filter((edge) => edge.from === agent.key);
   // Itself excluded, and so is anything it already waits for. An agent it hands to is left in: the module
   // refuses a cycle by name, and hiding the option would replace that refusal with a list quietly lacking one.
-  const available = definition.agents.filter(
-    (candidate) =>
-      candidate.key !== agent.key && !incoming.some((edge) => edge.from === candidate.key),
+  // Steps are nodes too (`teams-steps`): an agent may wait for one, typically a reporter for the step it reports on.
+  const available = nodeKeys(definition).filter(
+    (key) => key !== agent.key && !incoming.some((edge) => edge.from === key),
   );
-  const roleOf = (key: string) =>
-    definition.agents.find((candidate) => candidate.key === key)?.role ?? key;
+  const roleOf = (key: string) => nodeLabel(definition, key) ?? key;
   const refusedHere = refusal?.agents.includes(agent.key) ?? false;
   // A model that was in the catalogue when the revision was saved and is not now still has to appear —
   // otherwise selecting nothing silently rewrites the agent onto whatever sits first in the list.
@@ -194,9 +194,9 @@ export function AgentSettingsDialog({
                   className="min-w-0 flex-1 rounded border border-border bg-panel px-2 py-1 text-xs text-ink"
                 >
                   <option value="">waits for…</option>
-                  {available.map((candidate) => (
-                    <option key={candidate.key} value={candidate.key}>
-                      {candidate.role}
+                  {available.map((key) => (
+                    <option key={key} value={key}>
+                      {roleOf(key)}
                     </option>
                   ))}
                 </select>

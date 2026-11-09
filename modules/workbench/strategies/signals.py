@@ -62,6 +62,7 @@ class Signal(BaseModel):
     position: Position | None = Field(default=None, description="the engine's own position in the window, not the account's")
     exit_reason: str | None = None
     sizing: dict[str, Any] = Field(description="the document's rule; units come from the account's own balance")
+    exits: list[str] = Field(description="the document's exits settled inside a bar: stop, target, trail")
     params: dict[str, float]
     window_from: str
     costs_source: str
@@ -141,7 +142,8 @@ async def signal(conn: Conn, archive: Archive, strategy_id: int, revision: int, 
     return Signal(
         strategy_id=strategy_id, revision=found.n, symbol=d.symbol, timeframe=d.timeframe,
         bar_closed_at=_iso(closed_at), bar_age_seconds=now - closed_at, action=action, order=order,
-        position=position, exit_reason=exit_reason, sizing=d.sizing.model_dump(), params=params,
+        position=position, exit_reason=exit_reason, sizing=d.sizing.model_dump(),
+        exits=[name for name in ("stop", "target", "trail") if getattr(d.exits, name) is not None], params=params,
         window_from=_iso(start), costs_source=costs_source,
     )
 

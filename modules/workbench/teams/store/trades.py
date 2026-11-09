@@ -44,12 +44,12 @@ _TEAM_TRADES_SINCE = """
 # The orders this team placed on a symbol that the provider took, newest first — what a step reads to tell its own
 # position from anybody else's. A team's trades are a few a day; the join walks `runs` by its primary key.
 _TEAM_PLACED_ORDERS = """
-    SELECT t.id, t.agent_key, t.direction, t.size, t.level, t.provider_order_id, t.reference, t.created_at
+    SELECT t.id, t.agent_key, t.direction, t.size, t.level, t.status, t.provider_order_id, t.reference, t.created_at
       FROM trades t
       JOIN runs r ON r.id = t.run_id
       JOIN team_revisions v ON v.id = r.team_revision_id
      WHERE v.team_id = $1 AND r.owner_principal = $2 AND t.tool_name = 'place_order' AND t.symbol = $3
-       AND t.status IN ('settled', 'unsettled')
+       AND t.status <> 'refused'
      ORDER BY t.id DESC
      LIMIT $4
 """
@@ -83,20 +83,12 @@ async def record_trade(
     leaves a row saying an order was sent and its fate unknown, which is true — where no row reads as no order.
     Raises `AttemptAlreadyMade` when `attempt_key` was used before, and then nothing is written."""
     try:
-        return await _insert_trade(
-            conn, run_id, run_step_id, agent_key, tool_name, symbol, direction, size, level, account_id,
-            environment, attempt_key,
+        return await fetch_one(
+            conn, _INSERT_TRADE, run_id, run_step_id, agent_key, tool_name, symbol, direction, size, level,
+            account_id, environment, attempt_key,
         )
     except asyncpg.UniqueViolationError as err:
         raise AttemptAlreadyMade(attempt_key) from err
-
-
-async def _insert_trade(conn: Conn, *values: object) -> asyncpg.Record:
-    return await fetch_one(
-        conn,
-        _INSERT_TRADE,
-        *values,
-    )
 
 
 class AttemptAlreadyMade(Exception):

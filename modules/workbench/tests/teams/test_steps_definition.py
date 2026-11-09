@@ -10,6 +10,7 @@ from pydantic import ValidationError
 
 from teams.contract import TeamDefinition
 from teams.routers import recipes
+from teams.steps import parse_params
 from teams.tools import AnnouncedSnapshot
 from teams.validation import DefinitionRefused, check_definition
 
@@ -83,12 +84,20 @@ def test_shape_refusals(definition: dict, message: str) -> None:
         pytest.param(_step(colour="red"), "parameter 'colour'", id="extra param"),
         pytest.param({"key": "execute", "recipe": "strategy_execute", "params": {}}, "parameter", id="missing"),
         pytest.param(_step(deposit_fraction="1.5"), "deposit_fraction", id="fraction over one"),
+        pytest.param(_step(deposit_fraction=True), "deposit_fraction", id="fraction not a number"),
     ],
 )
 def test_a_step_that_does_not_fit_its_recipe_is_refused_naming_the_step(step: dict, message: str) -> None:
     definition = TeamDefinition.model_validate({"steps": [step]})
     with pytest.raises(DefinitionRefused, match=f"step 'execute'.*{message}"):
         check_definition(definition, model_ids=MODELS, announced=_announced())
+
+
+@pytest.mark.parametrize("fraction", ["0.35", 0.35])
+def test_a_deposit_fraction_is_taken_as_text_or_as_the_number_the_catalogue_calls_decimal(fraction) -> None:
+    definition = TeamDefinition.model_validate({"steps": [_step(deposit_fraction=fraction)]})
+    check_definition(definition, model_ids=MODELS, announced=_announced())
+    assert parse_params("strategy_execute", definition.steps[0].params).deposit_fraction == "0.35"  # type: ignore[attr-defined]
 
 
 def test_a_recipe_tool_nobody_announces_is_refused_naming_the_step() -> None:
