@@ -20,11 +20,11 @@
 
 ## 4. Przepis strategy_execute
 
-- [ ] 4.1 `decide(...)` jako czysta funkcja: wejście, zamknięcie, pominięcie, odmowa, wynik nieznany, strategia nieobsługiwana; tabela przypadków ze specyfikacji (świeża i stara świeca, brak `max_bar_age_seconds`, pozycja ręczna, pozycja własna i silnik płaski albo przeciwny, pozycja starsza niż okno, stop w dokumencie)
-- [ ] 4.2 Odczyty: `strategy_signal` z ponawianiem co 1 s do terminu, potem równolegle konto, pozycje, zlecenia, saldo i własne wiersze zespołu
-- [ ] 4.3 Zapis: `size_for_margin` z depozytem z dokumentu albo kroku, `place_order` rynkowe z kluczem próby, `close_position` dla własnej pozycji, potwierdzenie `get_positions`; bez ponowień przy wyniku nieznanym
-- [ ] 4.4 Wynik: decyzja, powód, `summary`, rozmiar i źródło, zlecenie, znaczniki czasu, poślizg względem otwarcia minuty przyjętego przez backtest
-- [ ] 4.5 Jeden test na przebieg: krok na fałszywych narzędziach składa zlecenie, wiersz `trades` z kluczem i `tool_calls` przy kroku, zero wierszy zużycia; drugi przebieg tej samej świecy kończy się pominięciem
+- [x] 4.1 `decide(...)` jako czysta funkcja: wejście, zamknięcie, pominięcie, odmowa, wynik nieznany, strategia nieobsługiwana; tabela przypadków ze specyfikacji (świeża i stara świeca, brak `max_bar_age_seconds`, pozycja ręczna, pozycja własna i silnik płaski albo przeciwny, pozycja starsza niż okno, stop w dokumencie)
+- [x] 4.2 Odczyty: `strategy_signal` z ponawianiem co 1 s do terminu, potem równolegle konto, pozycje, zlecenia, saldo i własne wiersze zespołu
+- [x] 4.3 Zapis: `size_for_margin` z depozytem z dokumentu albo kroku, `place_order` rynkowe z kluczem próby, `close_position` dla własnej pozycji, potwierdzenie `get_positions`; bez ponowień przy wyniku nieznanym
+- [x] 4.4 Wynik: decyzja, powód, `summary`, rozmiar i źródło, zlecenie, znaczniki czasu, poślizg względem otwarcia minuty przyjętego przez backtest
+- [x] 4.5 Jeden test na przebieg: krok na fałszywych narzędziach składa zlecenie, wiersz `trades` z kluczem i `tool_calls` przy kroku, zero wierszy zużycia; drugi przebieg tej samej świecy kończy się pominięciem
 
 ## 5. Powiadomienie zapasowe i granica kosztu
 
