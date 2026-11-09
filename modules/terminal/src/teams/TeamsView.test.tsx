@@ -117,6 +117,7 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
     listTools: vi.fn(async () => [
       { name: "get_candles", description: "candles from the archive", readOnly: true },
     ]),
+    listStepRecipes: vi.fn(async () => []),
     listTeams: vi.fn(async () => [TEAM]),
     createTeam: vi.fn(async () => TEAM),
     getTeam: vi.fn(async () => TEAM),
@@ -588,5 +589,83 @@ describe("watching a run", () => {
 
     expect(within(dialog).getByText(/have not been read yet/)).toBeInTheDocument();
     expect(within(dialog).queryByText("arguments")).not.toBeInTheDocument();
+  });
+});
+
+describe("steps", () => {
+  // specs/terminal-teams, "Krok widać na obrazie zespołu" and "Przebieg pokazuje stan i wynik kroku".
+  const RECIPE = {
+    name: "strategy_execute",
+    description: "follows the strategy engine",
+    params: [
+      { name: "strategy_id", type: "integer" as const, required: true, description: "" },
+      { name: "deposit_fraction", type: "decimal" as const, required: false, description: "" },
+    ],
+    tools: ["place_order"],
+  };
+  const WITH_STEP: TeamDefinition = {
+    ...DEFINITION,
+    steps: [{ key: "step-1", recipe: "strategy_execute", params: { strategy_id: 5, deposit_fraction: "0.35" } }],
+    dependencies: [...DEFINITION.dependencies, { from: "step-1", to: "agent-1" }],
+  };
+
+  it("draws a step apart from the agents, with its recipe and its deposit, and saves it whole", async () => {
+    const api = fakeApi({
+      listStepRecipes: vi.fn(async () => [RECIPE]),
+      latestRevision: vi.fn(async () => revision(WITH_STEP)),
+    });
+    await openTheTeam(api);
+
+    const node = await screen.findByTestId("step-node-strategy_execute");
+    expect(within(node).getByText(/deposit: 0.35/)).toBeInTheDocument();
+
+    fireEvent.click(within(node).getByLabelText("Settings for step strategy_execute"));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.clear(within(dialog).getByLabelText(/deposit_fraction/));
+    expect(within(dialog).getByPlaceholderText("from the strategy document")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Done" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
+
+    await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
+    const saved = vi.mocked(api.saveRevision).mock.calls[0][1];
+    expect(saved.steps).toEqual([{ key: "step-1", recipe: "strategy_execute", params: { strategy_id: 5 } }]);
+  });
+
+  it("shows a refusal naming the step at the step", async () => {
+    const api = fakeApi({
+      listStepRecipes: vi.fn(async () => [RECIPE]),
+      latestRevision: vi.fn(async () => revision(WITH_STEP)),
+      saveRevision: vi.fn(async () => {
+        throw new MarketDataError("refused", "step 'step-1': parameter 'strategy_id': Field required");
+      }),
+    });
+    await openTheTeam(api);
+    await screen.findByTestId("step-node-strategy_execute");
+    await openAgentSettings("Scout");
+    await userEvent.type(within(screen.getByRole("dialog")).getByLabelText("Role"), "!");
+    await closeAgentSettings();
+    await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/Step: strategy_execute/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/parameter 'strategy_id'/)).toBeInTheDocument();
+  });
+
+  it("shows a step's decision and summary in the run", async () => {
+    const output = JSON.stringify({ decision: "entered", summary: "US100: BUY 0.137 filled at 27362" });
+    const steps: TeamRunStep[] = [step(1, "step-1", "completed", output), step(2, "agent-1", "running")];
+    const api = fakeApi({
+      revisionById: vi.fn(async () => ({ ...revision(WITH_STEP), id: RUN.teamRevisionId })),
+      watchRun: vi.fn(async () => streamOf([{ kind: "snapshot", run: RUN, steps }])),
+    });
+    render(<TeamsView api={api} />);
+    await screen.findByText("Morning desk");
+    await userEvent.click(screen.getByRole("button", { name: "Runs" }));
+
+    const node = await screen.findByTestId("step-node-strategy_execute");
+    expect(within(node).getByText("done")).toBeInTheDocument();
+    fireEvent.click(node);
+    expect(await screen.findByText("US100: BUY 0.137 filled at 27362")).toBeInTheDocument();
+    expect(within(screen.getByTestId("step-output")).getByText("entered")).toBeInTheDocument();
   });
 });

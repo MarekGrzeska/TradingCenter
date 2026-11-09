@@ -1,7 +1,9 @@
 import type {
+  StepRecipe,
   TeamAgent,
   TeamDefinition,
   TeamDependency,
+  TeamStep,
   TeamTradingLimits,
 } from "./teamsApi";
 
@@ -14,12 +16,44 @@ export const NEW_AGENT_ROLE = "New role";
 
 /** A key nothing in this draft uses. `agent-1`, `agent-2`, … — an identifier, never
  *  shown to the operator, who reads the role instead. */
-export function nextAgentKey(definition: TeamDefinition): string {
-  const taken = new Set(definition.agents.map((agent) => agent.key));
+export function nextAgentKey(definition: TeamDefinition, prefix = "agent"): string {
+  const taken = new Set(nodeKeys(definition));
   for (let n = 1; ; n += 1) {
-    const candidate = `agent-${n}`;
+    const candidate = `${prefix}-${n}`;
     if (!taken.has(candidate)) return candidate;
   }
+}
+
+/** Every node of the graph, agents first: agents and steps share one set of keys (`teams-steps`). */
+export function nodeKeys(definition: TeamDefinition): string[] {
+  return [
+    ...definition.agents.map((agent) => agent.key),
+    ...(definition.steps ?? []).map((step) => step.key),
+  ];
+}
+
+/** What a node is called on screen: an agent by its role, a step by its recipe. */
+export function nodeLabel(definition: TeamDefinition, key: string): string | null {
+  const agent = definition.agents.find((candidate) => candidate.key === key);
+  if (agent) return agent.role;
+  const step = (definition.steps ?? []).find((candidate) => candidate.key === key);
+  return step ? `step · ${step.recipe}` : null;
+}
+
+export function addStep(definition: TeamDefinition, recipe: StepRecipe): TeamDefinition {
+  const step: TeamStep = { key: nextAgentKey(definition, "step"), recipe: recipe.name, params: {} };
+  return { ...definition, steps: [...(definition.steps ?? []), step] };
+}
+
+export function updateStep(
+  definition: TeamDefinition,
+  key: string,
+  params: Record<string, unknown>,
+): TeamDefinition {
+  return {
+    ...definition,
+    steps: (definition.steps ?? []).map((step) => (step.key === key ? { ...step, params } : step)),
+  };
 }
 
 /**
@@ -55,6 +89,7 @@ export function removeAgent(definition: TeamDefinition, key: string): TeamDefini
   return {
     ...definition,
     agents: definition.agents.filter((agent) => agent.key !== key),
+    steps: (definition.steps ?? []).filter((step) => step.key !== key),
     dependencies: definition.dependencies.filter(
       (edge) => edge.from !== key && edge.to !== key,
     ),
@@ -124,12 +159,13 @@ export function hasChanges(draft: TeamDefinition, saved: TeamDefinition): boolea
  * make depth infinite, so the walk stops at the first repeat and leaves the rest where they last landed.
  */
 export function layout(definition: TeamDefinition): Map<string, { x: number; y: number }> {
+  const keys = nodeKeys(definition);
   const depth = new Map<string, number>();
-  for (const agent of definition.agents) depth.set(agent.key, 0);
+  for (const key of keys) depth.set(key, 0);
 
-  // One pass per agent is enough for the longest acyclic path; a draft still carrying a cycle simply stops
+  // One pass per node is enough for the longest acyclic path; a draft still carrying a cycle simply stops
   // improving after that, which is the "leaves the rest where they are" case above.
-  for (let pass = 0; pass < definition.agents.length; pass += 1) {
+  for (let pass = 0; pass < keys.length; pass += 1) {
     let moved = false;
     for (const edge of definition.dependencies) {
       const from = depth.get(edge.from);
@@ -145,11 +181,11 @@ export function layout(definition: TeamDefinition): Map<string, { x: number; y: 
 
   const perColumn = new Map<number, number>();
   const positions = new Map<string, { x: number; y: number }>();
-  for (const agent of definition.agents) {
-    const column = depth.get(agent.key) ?? 0;
+  for (const key of keys) {
+    const column = depth.get(key) ?? 0;
     const row = perColumn.get(column) ?? 0;
     perColumn.set(column, row + 1);
-    positions.set(agent.key, { x: column * 280, y: row * 160 });
+    positions.set(key, { x: column * 280, y: row * 160 });
   }
   return positions;
 }

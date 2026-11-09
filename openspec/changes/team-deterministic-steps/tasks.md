@@ -39,9 +39,9 @@
 
 ## 7. Terminal
 
-- [ ] 7.1 Krok na obrazie zespołu odróżniony od agenta, z nazwą przepisu i rozmiarem przy węźle; rozmieszczenie zapisywane jak dla agenta
-- [ ] 7.2 Dodanie kroku z wyborem przepisu z katalogu, formularz parametrów z katalogu, „z dokumentu strategii” przy pustym rozmiarze, usuwanie, zależności; `fallback_notice` w panelu agenta; odmowa przy kroku
-- [ ] 7.3 Przebieg: stan kroku, decyzja i `summary` nad pełnym wynikiem, wywołania i zlecenia przy kroku, powiadomienie zapasowe przy agencie; trzy testy widoku (zespół z krokiem, odmowa zapisu przy kroku, przebieg z wynikiem kroku)
+- [x] 7.1 Krok na obrazie zespołu odróżniony od agenta, z nazwą przepisu i rozmiarem przy węźle; rozmieszczenie zapisywane jak dla agenta
+- [x] 7.2 Dodanie kroku z wyborem przepisu z katalogu, formularz parametrów z katalogu, „z dokumentu strategii” przy pustym rozmiarze, usuwanie, zależności; `fallback_notice` w panelu agenta; odmowa przy kroku
+- [x] 7.3 Przebieg: stan kroku, decyzja i `summary` nad pełnym wynikiem, wywołania i zlecenia przy kroku, powiadomienie zapasowe przy agencie; trzy testy widoku (zespół z krokiem, odmowa zapisu przy kroku, przebieg z wynikiem kroku)
 
 ## 8. Dokumentacja i próba
 

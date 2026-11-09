@@ -92,6 +92,7 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
     listTools: vi.fn(async () => [
       { name: "read_indicators", description: "reads indicators", readOnly: true },
     ]),
+    listStepRecipes: vi.fn(async () => []),
     listTeams: vi.fn(async () => []),
     createTeam: vi.fn(async () => {
       throw new Error("not stubbed");

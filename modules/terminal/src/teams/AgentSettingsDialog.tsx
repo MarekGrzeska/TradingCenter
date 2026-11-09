@@ -157,6 +157,8 @@ export function AgentSettingsDialog({
               ))}
           </fieldset>
 
+          <FallbackNoticeFields agent={agent} onChange={onChange} />
+
           <section className="flex flex-col gap-1">
             <h4 className="text-xs uppercase tracking-wide text-ink-faint">Dependencies</h4>
             {incoming.length === 0 && outgoing.length === 0 && (
@@ -257,6 +259,64 @@ function ToolMark({ readOnly }: { readOnly: boolean | null }) {
     </span>
   ) : (
     <span className="ml-1 text-[0.65rem] uppercase text-ink-faint">unannotated</span>
+  );
+}
+
+/** The message the run sends by itself when this agent's model cannot answer (`teams-steps`). The module refuses
+ *  it without `send_telegram_message` among the agent's tools, and says so by name. */
+function FallbackNoticeFields({
+  agent,
+  onChange,
+}: {
+  agent: TeamAgent;
+  onChange(patch: Partial<Omit<TeamAgent, "key">>): void;
+}) {
+  const notice = agent.fallbackNotice ?? null;
+  const patch = (next: Partial<NonNullable<TeamAgent["fallbackNotice"]>>) =>
+    onChange({
+      fallbackNotice: { destination: "", bot: null, prefix: "", ...(notice ?? {}), ...next },
+    });
+  return (
+    <fieldset className="flex flex-col gap-1">
+      <legend className="text-xs uppercase tracking-wide text-ink-faint">Fallback notice</legend>
+      <label className="flex items-center gap-2 text-xs text-ink">
+        <input
+          type="checkbox"
+          checked={notice !== null}
+          onChange={(event) =>
+            onChange({
+              fallbackNotice: event.target.checked ? { destination: "", bot: null, prefix: "" } : null,
+            })
+          }
+        />
+        send a fixed message when the model cannot answer
+      </label>
+      {notice && (
+        <>
+          <input
+            aria-label="Fallback destination"
+            placeholder="destination"
+            value={notice.destination}
+            onChange={(event) => patch({ destination: event.target.value })}
+            className="w-full rounded border border-border bg-panel px-2 py-1 text-xs text-ink"
+          />
+          <input
+            aria-label="Fallback bot"
+            placeholder="bot (optional)"
+            value={notice.bot ?? ""}
+            onChange={(event) => patch({ bot: event.target.value.trim() === "" ? null : event.target.value })}
+            className="w-full rounded border border-border bg-panel px-2 py-1 text-xs text-ink"
+          />
+          <input
+            aria-label="Fallback prefix"
+            placeholder="prefix, e.g. KONTO REALNE"
+            value={notice.prefix}
+            onChange={(event) => patch({ prefix: event.target.value })}
+            className="w-full rounded border border-border bg-panel px-2 py-1 text-xs text-ink"
+          />
+        </>
+      )}
+    </fieldset>
   );
 }
 
