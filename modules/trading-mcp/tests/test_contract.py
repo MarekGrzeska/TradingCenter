@@ -27,7 +27,7 @@ def _response_schema(schema: dict, path: str, model: str) -> dict:
 
 
 def test_capabilities_carries_environment(schema: dict) -> None:
-    """`ensure_demo_environment()`'s whole check reads one field off this response —
+    """`ensure_expected_environment()`'s whole check reads one field off this response —
     if the gateway ever stops publishing it, this must fail before that guard does."""
     model = _response_schema(schema, "/capabilities", "Capabilities")
     assert "environment" in model["properties"]

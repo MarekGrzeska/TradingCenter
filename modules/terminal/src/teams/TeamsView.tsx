@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { createAccountsApi, type AccountsApi, type DemoAccount } from "../accounts/accountsApi";
-import { resolveEndpoints } from "../data/config";
+import { createLiveAccountApi } from "../accounts/liveAccountApi";
+import { resolveEndpoints, resolveLiveGatewayHttp } from "../data/config";
 import { gatewayIdentity } from "../data/marketData";
 import { useRead } from "../data/query";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
@@ -47,6 +48,19 @@ export function TeamsView({
     initial: NO_ACCOUNTS,
     fallbackMessage: "could not read the accounts",
     enabled: open.kind === "team" || open.kind === "new",
+  });
+
+  // The live account's own gateway, for a team on the live account; absent unless the terminal was built with its address.
+  const liveGateway = useMemo(() => {
+    const base = resolveLiveGatewayHttp();
+    return base === null ? null : createLiveAccountApi(base, gatewayIdentity);
+  }, []);
+  const liveAccounts = useRead<DemoAccount[]>({
+    key: ["live-gateway", "accounts"],
+    read: (signal) => (liveGateway === null ? Promise.resolve(NO_ACCOUNTS) : liveGateway.listAccounts(signal)),
+    initial: NO_ACCOUNTS,
+    fallbackMessage: "could not read the live account",
+    enabled: liveGateway !== null && (open.kind === "team" || open.kind === "new"),
   });
 
   // A chat can create and revise teams, and that write never passes through this tab, so a team the model made
@@ -153,6 +167,7 @@ export function TeamsView({
         setOpen({ kind: "runs", teamId: open.id, teamName, runId });
       }}
       accounts={accounts.value}
+      liveAccounts={liveAccounts.value}
       accountsNote={
         accounts.error === null ? null : `the accounts could not be read — ${accounts.error}`
       }

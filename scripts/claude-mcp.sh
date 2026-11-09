@@ -22,6 +22,9 @@ SURFACES=(
   "tc-team-tools:/team-tools/mcp:workbench"
   "tc-chart-tools:/chart-tools/mcp:workbench"
   "tc-trading:/trading/mcp:gateway"
+  # The live account (live-account-trading): real money. Its writes stay out of `permissions.allow` — let Claude Code ask
+  # every time. Where the server runs no live account it shows as failed, which is that state and not a fault.
+  "tc-trading-live:/trading-live/mcp:gateway"
 )
 
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

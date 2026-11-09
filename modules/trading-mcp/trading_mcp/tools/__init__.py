@@ -8,7 +8,7 @@ from ..client import GatewayClient
 from . import account, instruments, orders
 
 
-def register(mcp: FastMCP, gateway: GatewayClient) -> None:
-    account.register(mcp, gateway)
+def register(mcp: FastMCP, gateway: GatewayClient, *, live: bool = False) -> None:
+    account.register(mcp, gateway, live=live)
     instruments.register(mcp, gateway)
     orders.register(mcp, gateway)

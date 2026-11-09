@@ -17,7 +17,7 @@ async def _serve() -> None:
     settings = Settings()  # type: ignore[call-arg]
     gateway = GatewayClient(settings)
     try:
-        await gateway.ensure_demo_environment()
+        await gateway.ensure_expected_environment()
         app = build_http_app(settings, gateway)
         config = uvicorn.Config(app, host=settings.trading_mcp_host, port=settings.trading_mcp_port)
         await uvicorn.Server(config).serve()

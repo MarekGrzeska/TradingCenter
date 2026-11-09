@@ -130,7 +130,16 @@ class CostLimits(BaseModel):
 
 class TradingLimits(BaseModel):
     """What a revision allows its agents to do to the account, and which account: every field optional, an omitted limit
-    meaning no limit at all. What is not negotiable lives a module away, in a `trading-mcp` that starts only against demo."""
+    meaning no limit at all. What is not negotiable lives a module away — on demo, a `trading-mcp` that starts only against
+    demo; on the live account, the limits its gateway holds every order to (`capital-live-account`)."""
+
+    environment: Literal["demo", "live"] = Field(
+        default="demo",
+        description=(
+            "which account the team trades: demo, or the live account with real money. A live team must name "
+            "account_id, and its account tools come from the live account's tool server only"
+        ),
+    )
 
     max_order_size: str | None = Field(
         default=None, description="largest size one order may carry; null means no limit"
@@ -145,8 +154,9 @@ class TradingLimits(BaseModel):
     account_id: str | None = Field(
         default=None,
         description=(
-            "the demo account this team trades on, an id from the gateway's account list; null means the "
-            "active one. Put into every account tool call by the run, never chosen by the model"
+            "the account this team trades on, an id from that environment's account list; null means the "
+            "active demo one, and is refused on live. Put into every account tool call by the run, never "
+            "chosen by the model"
         ),
     )
 
@@ -171,6 +181,14 @@ class TradingLimits(BaseModel):
         if value is not None and value <= 0:
             raise ValueError(f"{info.field_name} must be positive, got {value}")
         return value
+
+    @model_validator(mode="after")
+    def _live_names_its_account(self) -> TradingLimits:
+        # The live process stands on one account and has no "active" one to fall back to; a live team saying none
+        # would be a team whose orders go wherever the server happens to be.
+        if self.environment == "live" and self.account_id is None:
+            raise ValueError("a team on the live account must name account_id")
+        return self
 
 
 class TeamDefinition(BaseModel):
@@ -505,6 +523,7 @@ class TradeOut(BaseModel):
     tool_name: str
     # Null is the active account: the revision named none, or the trade predates the column.
     account_id: str | None = None
+    environment: Literal["demo", "live"] = "demo"
     symbol: str | None
     direction: str | None
     size: str | None
@@ -527,6 +546,7 @@ class TradeOut(BaseModel):
             agent_key=row["agent_key"],
             tool_name=row["tool_name"],
             account_id=row.get("account_id"),
+            environment=row.get("environment") or "demo",
             symbol=row["symbol"],
             direction=row["direction"],
             size=None if size is None else str(size),

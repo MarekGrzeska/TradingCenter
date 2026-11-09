@@ -32,9 +32,9 @@ class GatewayRefused(GatewayError):
 _COULD_NOT_ASK = frozenset({401, 403, 408, 429})
 
 
-class NotDemoEnvironment(GatewayError):
-    """The gateway answered, but named an environment other than `"demo"`. Distinct from a refusal:
-    the gateway did nothing wrong, this module's own guard did."""
+class UnexpectedEnvironment(GatewayError):
+    """The gateway answered, but named an environment other than the one this instance expects. Distinct from a
+    refusal: the gateway did nothing wrong, this module's own guard did."""
 
 
 class ToolRefusal(Exception):

@@ -85,6 +85,7 @@ export interface EnvVars {
   VITE_ARCHIVE_WS?: string;
   VITE_WORKBENCH_HTTP?: string;
   VITE_GATEWAY_HTTP?: string;
+  VITE_LIVE_GATEWAY_HTTP?: string;
   VITE_POLYMARKET_HTTP?: string;
   VITE_SOCIAL_HTTP?: string;
   VITE_YOUTUBE_HTTP?: string;
@@ -156,6 +157,14 @@ export function resolveEntra(env: EnvVars = import.meta.env): EntraConfig | null
       alerts: env.VITE_ENTRA_SCOPE_ALERTS?.trim() || null,
     },
   };
+}
+
+/** The live account's gateway (`live-account-trading`), or null: unset is the usual state, and then the terminal shows
+ *  no live account at all. No default and no dev proxy — the live account runs on the server only. Asked with the same
+ *  scope as the demo gateway, whose API audience it shares. */
+export function resolveLiveGatewayHttp(env: EnvVars = import.meta.env): string | null {
+  const raw = env.VITE_LIVE_GATEWAY_HTTP?.trim();
+  return raw ? resolveHttpBase(raw) : null;
 }
 
 export function resolveEndpoints(

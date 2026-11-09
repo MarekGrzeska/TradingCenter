@@ -11,7 +11,7 @@ import respx
 import uvicorn
 
 from trading_mcp import __main__ as entrypoint
-from trading_mcp.errors import GatewayUnavailable, NotDemoEnvironment
+from trading_mcp.errors import GatewayUnavailable, UnexpectedEnvironment
 
 BASE = "http://127.0.0.1:8010"
 
@@ -51,7 +51,7 @@ async def test_the_process_does_not_listen_when_the_account_is_not_demo(
 
     monkeypatch.setattr(uvicorn.Server, "serve", _serve_called)
 
-    with pytest.raises(NotDemoEnvironment):
+    with pytest.raises(UnexpectedEnvironment):
         await entrypoint._serve()
 
     assert served is False

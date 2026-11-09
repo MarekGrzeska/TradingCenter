@@ -23,12 +23,15 @@ APPLICATION_CLAIMS = (
 
 # Every path a browser-authenticated caller may reach: the account, and nothing else. Orders,
 # the catalogue and the stream are absent on purpose — the screen moves demo money, it does not trade.
+# Close-all exists only on the live process, which serves neither the top-up nor the switch: there the
+# screen reads the account and can take it out of the market, and that is all (`capital-live-account`).
 BROWSER_PATHS = frozenset(
     {
         "/accounts",
         "/accounts/active",
         "/accounts/top-up",
         "/positions",
+        "/positions/close-all",
         "/working-orders",
     }
 )

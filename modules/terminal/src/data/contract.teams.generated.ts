@@ -1085,6 +1085,12 @@ export interface components {
             created_at: string;
             /** Direction */
             direction: string | null;
+            /**
+             * Environment
+             * @default demo
+             * @enum {string}
+             */
+            environment: "demo" | "live";
             /** Id */
             id: number;
             /** Level */
@@ -1113,14 +1119,22 @@ export interface components {
         /**
          * TradingLimits
          * @description What a revision allows its agents to do to the account, and which account: every field optional, an omitted limit
-         *     meaning no limit at all. What is not negotiable lives a module away, in a `trading-mcp` that starts only against demo.
+         *     meaning no limit at all. What is not negotiable lives a module away — on demo, a `trading-mcp` that starts only against
+         *     demo; on the live account, the limits its gateway holds every order to (`capital-live-account`).
          */
         TradingLimits: {
             /**
              * Account Id
-             * @description the demo account this team trades on, an id from the gateway's account list; null means the active one. Put into every account tool call by the run, never chosen by the model
+             * @description the account this team trades on, an id from that environment's account list; null means the active demo one, and is refused on live. Put into every account tool call by the run, never chosen by the model
              */
             account_id?: string | null;
+            /**
+             * Environment
+             * @description which account the team trades: demo, or the live account with real money. A live team must name account_id, and its account tools come from the live account's tool server only
+             * @default demo
+             * @enum {string}
+             */
+            environment: "demo" | "live";
             /**
              * Max Order Size
              * @description largest size one order may carry; null means no limit

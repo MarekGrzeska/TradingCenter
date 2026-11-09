@@ -421,6 +421,15 @@ list — `EXTERNAL_CALLER_APPLICATION_IDS`, checked by the door (`EdgeConfig.tok
 comes with the key over the internal network. What the outside caller does not get is the conversation's trace in a
 database: its writes are two log lines each in `trading_mcp.trace`, before and after.
 
+Since 7 November 2026 (`live-account-trading`) the path exists twice: the same two images run a second time as
+`gateway-live` and `trading-mcp-live`, in the Compose profile `live`. The gateway is told `CAPITAL_ENVIRONMENT=live`
+rather than left to infer it from an address, runs only on the server, stands on one account and refuses an order
+outside its per-symbol size limits before the provider sees it; the tool server expects `live` and does not start in
+front of anything else. Callers: the operator's Claude Code and the agent under `/trading-live/mcp`, the teams whose
+revision says `trading.environment: live`, and the terminal for reading and closing everything (`/live/*` on the gateway
+host). The conversation is none of them. On the network the workbench reaches the live tool server (`live-tools`) and
+never the live gateway (`live-core`), because the tool server shows its callers the same key it shows the gateway.
+
 A module of its own rather than a switch on something that reads. The archive's tools stay
 read-only to the letter, and the tool server that writes is a separate deployable with a
 separate identity, so "which module may move the account" is answered by a list of callers

@@ -90,8 +90,10 @@ export interface TeamTradingLimits {
   maxOrderSize: string | null;
   ordersPerRun: number | null;
   ordersPerDay: number | null;
-  /** The demo account the team trades on; empty is the active one. The run, not the model, puts it into every call. */
+  /** The account the team trades on; empty is the active demo one. The run, not the model, puts it into every call. */
   accountId?: string | null;
+  /** Demo, or the live account with real money — where a live team must name its account (specs/teams-trading). */
+  environment?: "demo" | "live";
 }
 
 export interface TeamDefinition {
@@ -411,6 +413,7 @@ function mapDefinition(raw: RawDefinition): TeamDefinition {
       ordersPerRun: raw.trading?.orders_per_run ?? null,
       ordersPerDay: raw.trading?.orders_per_day ?? null,
       accountId: raw.trading?.account_id ?? null,
+      environment: raw.trading?.environment ?? "demo",
     },
   };
 }
@@ -435,6 +438,7 @@ function definitionToWire(definition: TeamDefinition): RawDefinition {
       orders_per_run: definition.trading.ordersPerRun,
       orders_per_day: definition.trading.ordersPerDay,
       account_id: definition.trading.accountId ?? null,
+      environment: definition.trading.environment ?? "demo",
     },
   };
 }

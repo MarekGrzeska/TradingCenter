@@ -43,7 +43,8 @@ services:
       - ./www:/srv/www:ro
       - caddy-data:/data
       - caddy-config:/config
-    networks: [edge, english]
+    # live-core: the live account's gateway and tool server, which this proxy publishes when the profile `live` runs them.
+    networks: [edge, english, live-core]
     depends_on: [workbench, gateway, trading-mcp]
 
   gateway:
@@ -110,7 +111,7 @@ services:
       ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:?}
       ENTRA_AUDIENCES: ${WORKBENCH_ENTRA_AUDIENCES:?}
       # Hosts that are this machine's own network: the database and the tool server, reached without a platform identity.
-      PRIVATE_HOSTS: postgres,trading-mcp
+      PRIVATE_HOSTS: postgres,trading-mcp,trading-mcp-live
 
       AGENT_DATABASE_URL: postgresql://agent:${AGENT_DB_PASSWORD:?}@postgres:5432/agent
       TEAMS_DATABASE_URL: postgresql://teams:${TEAMS_DB_PASSWORD:?}@postgres:5432/teams
@@ -135,6 +136,9 @@ services:
       GATEWAY_API_KEY: ${GATEWAY_API_KEY:?}
       TRADING_MCP_URL: http://trading-mcp:80
       TRADING_MCP_API_KEY: ${GATEWAY_API_KEY:?}
+      # The live account's tool server, for the teams surface alone (live-account-trading); blank unless it runs.
+      LIVE_TRADING_MCP_URL: ${LIVE_TRADING_MCP_URL:-}
+      LIVE_TRADING_MCP_API_KEY: ${LIVE_GATEWAY_API_KEY:-}
 
       AGENT_OPENAI_API_KEY: ${AGENT_OPENAI_API_KEY:?}
       TEAMS_OPENAI_API_KEY: ${TEAMS_OPENAI_API_KEY:?}
@@ -192,7 +196,67 @@ services:
       timeout: 5s
       retries: 5
       start_period: 1500s
-    networks: [edge, services, data]
+    # live-tools reaches the live account's tool server and nothing behind it: the live gateway is on live-core only.
+    networks: [edge, services, data, live-tools]
+
+  # The live account (live-account-trading): the same two images again, only under the profile `live` that assemble_env.py
+  # writes for LIVE_TRADING=on. Its gateway is reachable by its tool server and the proxy, nothing else.
+  gateway-live:
+    image: ${IMAGE_PREFIX:?}/capital-gateway:${GATEWAY_TAG:?}
+    profiles: [live]
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 256m
+    environment:
+      GATEWAY_ENV: production
+      SERVER_MODE: "true"
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:?}
+      ENTRA_AUDIENCES: ${GATEWAY_ENTRA_AUDIENCES:?}
+      CAPITAL_ENVIRONMENT: live
+      CAPITAL_BASE_URL: https://api-capital.backend-capital.com
+      GATEWAY_API_KEY: ${LIVE_GATEWAY_API_KEY:-}
+      CAPITAL_API_KEY: ${LIVE_CAPITAL_API_KEY:-}
+      CAPITAL_IDENTIFIER: ${LIVE_CAPITAL_IDENTIFIER:-}
+      CAPITAL_PASSWORD: ${LIVE_CAPITAL_PASSWORD:-}
+      LIVE_ACCOUNT_ID: ${LIVE_ACCOUNT_ID:-}
+      LIVE_ORDER_LIMITS: ${LIVE_ORDER_LIMITS:-}
+      # The terminal reads the live account and may close everything on it; nothing else is a browser here.
+      BROWSER_CALLER_APPLICATION_IDS: '["${TERMINAL_APPLICATION_ID:?}"]'
+      MODULE_CALLER_APPLICATION_IDS: "[]"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:80/', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+    networks: [live-core]
+
+  trading-mcp-live:
+    image: ${IMAGE_PREFIX:?}/trading-mcp:${TRADING_MCP_TAG:?}
+    profiles: [live]
+    restart: unless-stopped
+    logging: *logging
+    mem_limit: 256m
+    environment:
+      CAPITAL_GATEWAY_URL: http://gateway-live:80
+      CAPITAL_GATEWAY_API_KEY: ${LIVE_GATEWAY_API_KEY:-}
+      EXPECTED_ENVIRONMENT: live
+      SERVER_MODE: "true"
+      REQUIRE_AUTHENTICATED_PRINCIPAL: "true"
+      # Under `/trading-live/mcp` on the API host: the operator's own MCP client and the agent on this server.
+      EXTERNAL_CALLER_APPLICATION_IDS: ${CLAUDE_CODE_APPLICATION_ID:?},${AGENT_APPLICATION_ID:?}
+      ENTRA_TENANT_ID: ${ENTRA_TENANT_ID:?}
+      ENTRA_AUDIENCES: ${GATEWAY_ENTRA_AUDIENCES:?}
+    depends_on:
+      gateway-live:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://127.0.0.1:80/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+      start_period: 20s
+    networks: [live-core, live-tools]
 
   # The operator's Claude Code session, reached from Telegram (operator-agent-on-telegram). It reaches the system only the
   # way the operator's desk client does — `https://API_HOST/…/mcp` through Caddy, with a token — so it has no port, no
@@ -216,6 +280,8 @@ services:
       AGENT_TELEGRAM_OWNER_CHAT_ID: ${AGENT_TELEGRAM_OWNER_CHAT_ID:-}
       # "on" alone opens the six account-writing tools (demo only, trading-mcp's guard); anything else keeps them denied.
       AGENT_ACCOUNT_WRITES: ${AGENT_ACCOUNT_WRITES:-off}
+      # The live account's writes have a switch of their own, which the line above never opens (live-account-trading).
+      AGENT_LIVE_ACCOUNT_WRITES: ${AGENT_LIVE_ACCOUNT_WRITES:-off}
       AGENT_CHECKINS: ${AGENT_CHECKINS:-}
     volumes:
       - claude-agent-home:/home/agent/.claude
@@ -283,6 +349,10 @@ networks:
   services: {}
   data:
     internal: true
+  # The live account (live-account-trading): its gateway with its tool server and the proxy; its tool server with the
+  # workbench. Two networks so the workbench, holding the tool server's key, still has no route to the gateway behind it.
+  live-core: {}
+  live-tools: {}
   # The agent's own: a way out to Anthropic, Telegram and the API host's public address, and to nothing of this project.
   claude-agent: {}
   # AgenticEnglish's web app: created by whichever deploy runs first (deploy.sh, and that project's own), never removed

@@ -1,7 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
 import { createAccountsApi, type AccountsApi, type DemoAccount } from "./accountsApi";
+import { LiveAccountSection } from "./LiveAccountSection";
+import { createLiveAccountApi, type LiveAccountApi } from "./liveAccountApi";
 import { gatewayIdentity } from "../data/marketData";
-import { resolveEndpoints } from "../data/config";
+import { resolveEndpoints, resolveLiveGatewayHttp } from "../data/config";
 import { useRead } from "../data/query";
 import { Button } from "../ui/Button";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
@@ -16,11 +18,20 @@ import { UnreachableNotice } from "../ui/UnreachableNotice";
  *  this system does, and five seconds is faster than an operator can act on. */
 const POLL_MS = 5000;
 
-export function AccountsView({ api }: { api?: AccountsApi } = {}) {
+export function AccountsView({
+  api,
+  liveApi,
+}: { api?: AccountsApi; liveApi?: LiveAccountApi | null } = {}) {
   const client = useMemo(
     () => api ?? createAccountsApi(resolveEndpoints().gatewayHttp, gatewayIdentity),
     [api],
   );
+  // Absent unless the terminal was built with the live account's address (`terminal-accounts`).
+  const live = useMemo(() => {
+    if (liveApi !== undefined) return liveApi;
+    const base = resolveLiveGatewayHttp();
+    return base === null ? null : createLiveAccountApi(base, gatewayIdentity);
+  }, [liveApi]);
 
   const accounts = useRead<DemoAccount[]>({
     key: ["gateway", "accounts"],
@@ -70,6 +81,8 @@ export function AccountsView({ api }: { api?: AccountsApi } = {}) {
           </Button>
         </div>
       </header>
+
+      {live !== null && <LiveAccountSection api={live} pollMs={POLL_MS} />}
 
       {/* Said once, above both tables: a failed read leaves the rows it already had on screen, and
           without this line those rows would read as current. */}

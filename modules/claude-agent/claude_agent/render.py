@@ -1,5 +1,6 @@
 """What the session reads, rendered from the image on every start (`claude-agent-access`): the permission settings, with
-the account-writing tools allowed only when `AGENT_ACCOUNT_WRITES=on`, and the MCP servers with their token helper.
+the account-writing tools allowed only when `AGENT_ACCOUNT_WRITES=on` — the live account's only when
+`AGENT_LIVE_ACCOUNT_WRITES=on`, a switch of its own — and the MCP servers with their token helper.
 
     python -m claude_agent.render settings <image settings.json> <out>
     python -m claude_agent.render mcp <out>
@@ -26,7 +27,14 @@ ACCOUNT_WRITES = tuple(
     )
 )
 
-# name, path on the API host, the API its token is for — the same nine as `scripts/claude-mcp.sh`.
+# The live account's writes (`live-account-trading`): no switch and no top-up exist there. Opening the demo account's
+# writes never opens these.
+LIVE_ACCOUNT_WRITES = tuple(
+    f"mcp__tc-trading-live__{tool}"
+    for tool in ("place_order", "close_position", "amend_stops", "cancel_working_order")
+)
+
+# name, path on the API host, the API its token is for — the same ten as `scripts/claude-mcp.sh`.
 SURFACES = (
     ("tc-market", "/market/mcp", "workbench"),
     ("tc-polymarket", "/polymarket/mcp", "workbench"),
@@ -37,6 +45,7 @@ SURFACES = (
     ("tc-strategies", "/strategies/mcp", "workbench"),
     ("tc-team-tools", "/team-tools/mcp", "workbench"),
     ("tc-trading", "/trading/mcp", "gateway"),
+    ("tc-trading-live", "/trading-live/mcp", "gateway"),
 )
 
 HELPER = "/opt/agent/venv/bin/python /opt/agent/bin/mcp_token.py"
@@ -47,15 +56,18 @@ def account_writes_on(env: Mapping[str, str]) -> bool:
     return env.get("AGENT_ACCOUNT_WRITES", "") == "on"
 
 
-def settings(image: dict[str, Any], *, writes: bool) -> dict[str, Any]:
+def live_account_writes_on(env: Mapping[str, str]) -> bool:
+    return env.get("AGENT_LIVE_ACCOUNT_WRITES", "") == "on"
+
+
+def settings(image: dict[str, Any], *, writes: bool, live_writes: bool = False) -> dict[str, Any]:
     rendered = json.loads(json.dumps(image))
     permissions = rendered.setdefault("permissions", {})
-    deny = [rule for rule in permissions.get("deny", []) if rule not in ACCOUNT_WRITES]
-    allow = [rule for rule in permissions.get("allow", []) if rule not in ACCOUNT_WRITES]
-    if writes:
-        allow.extend(ACCOUNT_WRITES)
-    else:
-        deny.extend(ACCOUNT_WRITES)
+    every_write = (*ACCOUNT_WRITES, *LIVE_ACCOUNT_WRITES)
+    deny = [rule for rule in permissions.get("deny", []) if rule not in every_write]
+    allow = [rule for rule in permissions.get("allow", []) if rule not in every_write]
+    for switched_on, rules in ((writes, ACCOUNT_WRITES), (live_writes, LIVE_ACCOUNT_WRITES)):
+        (allow if switched_on else deny).extend(rules)
     permissions["allow"], permissions["deny"] = allow, deny
     rendered["enabledMcpjsonServers"] = [name for name, _, _ in SURFACES]
     return rendered
@@ -81,7 +93,11 @@ def main(argv: list[str]) -> int:
     match argv:
         case ["settings", source, out]:
             image = json.loads(Path(source).read_text(encoding="utf-8"))
-            document = settings(image, writes=account_writes_on(os.environ))
+            document = settings(
+                image,
+                writes=account_writes_on(os.environ),
+                live_writes=live_account_writes_on(os.environ),
+            )
         case ["mcp", out]:
             document = mcp_servers(os.environ)
         case _:

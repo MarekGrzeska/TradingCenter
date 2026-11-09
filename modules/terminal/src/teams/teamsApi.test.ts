@@ -34,7 +34,7 @@ const wireRevision = {
     ],
     edges: [{ from: "agent-1", to: "agent-2" }],
     limits: { run_limit: "0.5", daily_limit: null },
-    trading: { max_order_size: "2", orders_per_run: 3, orders_per_day: null, account_id: "X" },
+    trading: { max_order_size: "2", orders_per_run: 3, orders_per_day: null, account_id: "X", environment: "live" },
   },
 };
 
@@ -52,7 +52,7 @@ const definition: TeamDefinition = {
   ],
   dependencies: [{ from: "agent-1", to: "agent-2" }],
   limits: { runLimit: "0.5", dailyLimit: null },
-  trading: { maxOrderSize: "2", ordersPerRun: 3, ordersPerDay: null, accountId: "X" },
+  trading: { maxOrderSize: "2", ordersPerRun: 3, ordersPerDay: null, accountId: "X", environment: "live" },
 };
 
 describe("listTeams", () => {
@@ -129,7 +129,7 @@ describe("a revision, both ways", () => {
         ],
         edges: [{ from: "agent-1", to: "agent-2" }],
         limits: { run_limit: "0.5", daily_limit: null },
-        trading: { max_order_size: "2", orders_per_run: 3, orders_per_day: null, account_id: "X" },
+        trading: { max_order_size: "2", orders_per_run: 3, orders_per_day: null, account_id: "X", environment: "live" },
       },
     });
   });
@@ -400,6 +400,7 @@ describe("runs", () => {
             provider_order_id: "o-1",
             reference: "r-1",
             account_id: "X",
+            environment: "live",
             created_at: "2026-08-16T10:01:00Z",
             settled_at: "2026-08-16T10:01:02Z",
           },
@@ -422,6 +423,7 @@ describe("runs", () => {
         providerOrderId: "o-1",
         reference: "r-1",
         accountId: "X",
+        environment: "live",
         createdAt: Date.parse("2026-08-16T10:01:00Z") / 1000,
         settledAt: Date.parse("2026-08-16T10:01:02Z") / 1000,
       },

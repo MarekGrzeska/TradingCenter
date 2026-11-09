@@ -119,3 +119,37 @@ def test_from_env_reads_the_environment_it_was_given() -> None:
     )
     assert result.returncode == 0, result.stderr
     assert "GATEWAY_API_KEY='x'\n" in result.stdout
+
+
+LIVE = {
+    "LIVE_TRADING": "on",
+    "LIVE_CAPITAL_API_KEY": "live-key",
+    "LIVE_CAPITAL_IDENTIFIER": "me@example.com",
+    "LIVE_CAPITAL_PASSWORD": "live-password",
+    "LIVE_GATEWAY_API_KEY": "another-key",
+    "LIVE_ACCOUNT_ID": "L1",
+    "LIVE_ORDER_LIMITS": '{"US100": "0.5"}',
+}
+
+
+def test_the_live_account_on_writes_its_names_its_profile_and_its_tool_server() -> None:
+    text = assemble_env.assemble(NAMES, full(**LIVE))
+    assert "COMPOSE_PROFILES='live'\n" in text
+    assert "LIVE_TRADING_MCP_URL='http://trading-mcp-live:80'\n" in text
+    assert "LIVE_ORDER_LIMITS='{\"US100\": \"0.5\"}'\n" in text
+
+
+def test_the_live_account_on_with_a_name_missing_is_refused_by_name() -> None:
+    with pytest.raises(assemble_env.Refused, match="LIVE_ACCOUNT_ID"):
+        assemble_env.assemble(NAMES, full(**{**LIVE, "LIVE_ACCOUNT_ID": ""}))
+
+
+def test_the_live_gateway_key_may_not_be_the_demo_one() -> None:
+    # capital-live-account, "Ten sam klucz dla demo i konta realnego"
+    with pytest.raises(assemble_env.Refused, match="LIVE_GATEWAY_API_KEY must differ"):
+        assemble_env.assemble(NAMES, full(**{**LIVE, "LIVE_GATEWAY_API_KEY": "x"}))
+
+
+def test_the_live_account_off_sends_none_of_its_secrets() -> None:
+    text = assemble_env.assemble(NAMES, full(**{**LIVE, "LIVE_TRADING": ""}))
+    assert "LIVE_CAPITAL" not in text and "COMPOSE_PROFILES" not in text

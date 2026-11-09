@@ -35,9 +35,23 @@ def test_the_database_is_on_a_network_with_no_way_in_or_out() -> None:
 
 
 def test_the_proxy_reaches_only_the_applications_it_publishes() -> None:
-    assert SERVICES["caddy"]["networks"] == ["edge", "english"]
+    assert SERVICES["caddy"]["networks"] == ["edge", "english", "live-core"]
     on_edge = {name for name, service in SERVICES.items() if "edge" in service.get("networks", [])}
     assert on_edge == {"caddy", "gateway", "workbench", "trading-mcp"}
+
+
+def test_the_live_account_runs_only_in_its_profile_and_the_workbench_never_reaches_its_gateway() -> None:
+    """capital-live-account, "Workbench próbuje sięgnąć bramy konta realnego": the gateway is on live-core with its tool
+    server and the proxy; the workbench, which holds the tool server's key, is on live-tools only."""
+    for name in ("gateway-live", "trading-mcp-live"):
+        assert SERVICES[name]["profiles"] == ["live"]
+    on_core = {name for name, service in SERVICES.items() if "live-core" in service.get("networks", [])}
+    on_tools = {name for name, service in SERVICES.items() if "live-tools" in service.get("networks", [])}
+    assert on_core == {"caddy", "gateway-live", "trading-mcp-live"}
+    assert on_tools == {"workbench", "trading-mcp-live"}
+    assert SERVICES["gateway-live"]["networks"] == ["live-core"]
+    assert SERVICES["gateway-live"]["environment"]["CAPITAL_ENVIRONMENT"] == "live"
+    assert SERVICES["trading-mcp-live"]["environment"]["EXPECTED_ENVIRONMENT"] == "live"
 
 
 def test_the_english_network_is_external_and_holds_only_caddy() -> None:
@@ -82,6 +96,7 @@ def test_the_agent_has_its_own_network_and_no_secret_of_the_system() -> None:
 
 def test_account_writes_are_off_unless_the_environment_says_otherwise() -> None:
     assert SERVICES["claude-agent"]["environment"]["AGENT_ACCOUNT_WRITES"] == "${AGENT_ACCOUNT_WRITES:-off}"
+    assert SERVICES["claude-agent"]["environment"]["AGENT_LIVE_ACCOUNT_WRITES"] == "${AGENT_LIVE_ACCOUNT_WRITES:-off}"
 
 
 def test_no_service_takes_the_whole_environment_file() -> None:
@@ -104,6 +119,13 @@ def test_the_optional_names_are_blank_by_default_and_not_required() -> None:
         "TELEGRAM_SESSION_KEY",
         "AGENT_TELEGRAM_OWNER_CHAT_ID",
         "AGENT_CHECKINS",
+        "LIVE_TRADING_MCP_URL",
+        "LIVE_GATEWAY_API_KEY",
+        "LIVE_CAPITAL_API_KEY",
+        "LIVE_CAPITAL_IDENTIFIER",
+        "LIVE_CAPITAL_PASSWORD",
+        "LIVE_ACCOUNT_ID",
+        "LIVE_ORDER_LIMITS",
     }
     assert not optional & required_names()
 
@@ -134,7 +156,8 @@ def _reverse_proxy_blocks() -> list[str]:
 
 def test_every_proxied_request_is_marked_as_coming_from_outside() -> None:
     blocks = _reverse_proxy_blocks()
-    assert len(blocks) == 4  # gateway, workbench, trading-mcp, AgenticEnglish's web app
+    # gateway, workbench, trading-mcp, AgenticEnglish's web app, and the live account's gateway and trading-mcp
+    assert len(blocks) == 6
     assert all("import edge_headers" in block for block in blocks)
 
 

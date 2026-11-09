@@ -238,6 +238,72 @@
         "title": "Capabilities",
         "type": "object"
       },
+      "CloseAllItem": {
+        "description": "What became of one position or one working order in a close-all.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "position",
+              "working_order"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "status": {
+            "$ref": "#/components/schemas/OrderStatus"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          }
+        },
+        "required": [
+          "kind",
+          "id",
+          "status"
+        ],
+        "title": "CloseAllItem",
+        "type": "object"
+      },
+      "CloseAllResult": {
+        "description": "Every position closed and every working order cancelled on the live account, each with its own outcome: one\nthat failed does not stop the others, and is named here rather than hidden in a total.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CloseAllItem"
+            },
+            "title": "Items",
+            "type": "array"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "CloseAllResult",
+        "type": "object"
+      },
       "Direction": {
         "enum": [
           "BUY",
@@ -946,7 +1012,7 @@
     }
   },
   "info": {
-    "description": "capital.com gateway — trading, deep history and a live stream behind one contract. Demo environment only. Endpoints return neutral DTOs; provider quirks (session tokens, the instrument tree, asynchronous settlement) stay inside the adapter. The WebSocket at /ws/stream is not described by this schema — see the module README.",
+    "description": "capital.com gateway — trading, deep history and a live stream behind one contract. Demo unless CAPITAL_ENVIRONMENT=live, which serves the account alone, within its limits. Endpoints return neutral DTOs; provider quirks (session tokens, the instrument tree, asynchronous settlement) stay inside the adapter. The WebSocket at /ws/stream is not described by this schema — see the module README.",
     "title": "TradingCenter · capital-gateway",
     "version": "0.1.0"
   },
@@ -1494,7 +1560,7 @@
     },
     "/orders": {
       "post": {
-        "description": "Place an order. MARKET fills now (FILLED); LIMIT and STOP rest (WORKING).\n\nThe answer is settled, not acknowledged. A deal the provider has not resolved comes\nback PENDING with its reference — never FILLED.",
+        "description": "Place an order. MARKET fills now (FILLED); LIMIT and STOP rest (WORKING).\n\nThe answer is settled, not acknowledged. A deal the provider has not resolved comes\nback PENDING with its reference — never FILLED. On the live account an order outside its\nlimits is a 422 and never reaches the provider.",
         "operationId": "place_order_orders_post",
         "parameters": [
           {
@@ -1604,6 +1670,58 @@
           }
         },
         "summary": "Positions",
+        "tags": [
+          "trading"
+        ]
+      }
+    },
+    "/positions/close-all": {
+      "post": {
+        "description": "Live account only: close every position and cancel every working order, each with its own outcome.",
+        "operationId": "close_all_positions_close_all_post",
+        "parameters": [
+          {
+            "description": "the account this request acts on; omitted, the active one. Naming an account never changes which one is active, and an account the provider does not list is a 400",
+            "in": "header",
+            "name": "X-Capital-Account",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "the account this request acts on; omitted, the active one. Naming an account never changes which one is active, and an account the provider does not list is a 400",
+              "title": "X-Capital-Account"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CloseAllResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Close All",
         "tags": [
           "trading"
         ]

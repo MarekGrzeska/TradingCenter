@@ -1,4 +1,4 @@
-"""`ensure_demo_environment()`: refuse anything but the demo account, before the port opens. The
+"""`ensure_expected_environment()`: refuse anything but the demo account, before the port opens. The
 three-state cache this used to test could not detect what it defended against, and is gone."""
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ import respx
 
 from trading_mcp.client import GatewayClient
 from trading_mcp.config import Settings
-from trading_mcp.errors import GatewayRefused, GatewayUnavailable, NotDemoEnvironment
+from trading_mcp.errors import GatewayRefused, GatewayUnavailable, UnexpectedEnvironment
 
 BASE = "http://127.0.0.1:8010"
 
@@ -25,7 +25,7 @@ async def test_demo_environment_is_accepted(client: GatewayClient) -> None:
         return_value=httpx.Response(200, json={"environment": "demo"})
     )
 
-    await client.ensure_demo_environment()
+    await client.ensure_expected_environment()
     await client.aclose()
 
 
@@ -35,8 +35,8 @@ async def test_non_demo_environment_is_refused(client: GatewayClient) -> None:
         return_value=httpx.Response(200, json={"environment": "live"})
     )
 
-    with pytest.raises(NotDemoEnvironment, match="live"):
-        await client.ensure_demo_environment()
+    with pytest.raises(UnexpectedEnvironment, match="live"):
+        await client.ensure_expected_environment()
     await client.aclose()
 
 
@@ -45,8 +45,8 @@ async def test_a_missing_environment_field_is_refused_too(client: GatewayClient)
     """An answer that does not name the environment is not an answer that it is demo."""
     respx.get(f"{BASE}/capabilities").mock(return_value=httpx.Response(200, json={}))
 
-    with pytest.raises(NotDemoEnvironment):
-        await client.ensure_demo_environment()
+    with pytest.raises(UnexpectedEnvironment):
+        await client.ensure_expected_environment()
     await client.aclose()
 
 
@@ -57,7 +57,7 @@ async def test_an_unreachable_gateway_stops_the_start(client: GatewayClient) -> 
     respx.get(f"{BASE}/capabilities").mock(side_effect=httpx.ConnectError("dropped"))
 
     with pytest.raises(GatewayUnavailable):
-        await client.ensure_demo_environment()
+        await client.ensure_expected_environment()
     await client.aclose()
 
 
@@ -68,7 +68,7 @@ async def test_a_gateway_refusal_stops_the_start(client: GatewayClient) -> None:
     )
 
     with pytest.raises(GatewayRefused):
-        await client.ensure_demo_environment()
+        await client.ensure_expected_environment()
     await client.aclose()
 
 
@@ -80,8 +80,8 @@ async def test_nothing_is_remembered_between_asks(client: GatewayClient) -> None
         return_value=httpx.Response(200, json={"environment": "demo"})
     )
 
-    await client.ensure_demo_environment()
-    await client.ensure_demo_environment()
+    await client.ensure_expected_environment()
+    await client.ensure_expected_environment()
 
     assert route.call_count == 2
     await client.aclose()
@@ -94,7 +94,7 @@ async def test_an_error_on_another_call_costs_nothing_later(client: GatewayClien
     respx.get(f"{BASE}/capabilities").mock(
         return_value=httpx.Response(200, json={"environment": "demo"})
     )
-    await client.ensure_demo_environment()
+    await client.ensure_expected_environment()
 
     respx.get(f"{BASE}/positions").mock(return_value=httpx.Response(503, json={"detail": "down"}))
     with pytest.raises(GatewayRefused):

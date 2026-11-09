@@ -6,6 +6,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from typing import Literal
 
 import httpx
 
@@ -18,6 +19,8 @@ from .dtos import (
     Candle,
     CandleHistory,
     Capabilities,
+    CloseAllItem,
+    CloseAllResult,
     Instrument,
     InstrumentPage,
     InstrumentTerms,
@@ -283,6 +286,22 @@ class CapitalAdapter:
         cancelled = self._write_json(await self._c.delete_working_order(order_id))
         return await self._settle(cancelled, accepted=OrderStatus.CANCELLED)
 
+    async def close_all(self, report: Callable[[CloseAllItem], None] = lambda _: None) -> CloseAllResult:
+        """Working orders cancelled, then positions closed, each failure that item's outcome rather than the call's.
+        Orders first: one filling after the positions closed would open a position nothing closes."""
+        items: list[CloseAllItem] = []
+        for order in await self.list_working_orders():
+            items.append(
+                await _outcome("working_order", order.id, order.symbol, self.cancel_working_order(order.id))
+            )
+            report(items[-1])
+        for position in await self.list_positions():
+            items.append(
+                await _outcome("position", position.id, position.symbol, self.close_position(position.id))
+            )
+            report(items[-1])
+        return CloseAllResult(items=items)
+
     async def _settle(self, created: dict, accepted: OrderStatus = OrderStatus.FILLED) -> Order:
         """capital.com acknowledges a write with a ``dealReference`` and settles it separately,
         so it is polled. Running out gives PENDING: FILLED would claim a position that may not exist."""
@@ -306,7 +325,22 @@ class CapitalAdapter:
             provider="capital.com",
             environment=environment_of(self._c.base_url),
             has_positions=True,
-            has_streaming=True,
+            # The live process serves the account and nothing of the market (`capital-live-account`).
+            has_streaming=environment_of(self._c.base_url) == "demo",
             has_working_orders=True,
             order_types=["MARKET", "LIMIT", "STOP"],
         )
+
+
+async def _outcome(
+    kind: Literal["position", "working_order"], item_id: str, symbol: str, write: Awaitable[Order]
+) -> CloseAllItem:
+    try:
+        order = await write
+    except GatewayError as err:
+        return CloseAllItem(kind=kind, id=item_id, symbol=symbol, status=OrderStatus.REJECTED, reason=err.message)
+    except httpx.HTTPError as err:
+        # Sent, and no answer: PENDING, as `_settle` names a deal it could not confirm — never REJECTED.
+        reason = f"no answer from capital.com ({type(err).__name__}); the outcome is unknown"
+        return CloseAllItem(kind=kind, id=item_id, symbol=symbol, status=OrderStatus.PENDING, reason=reason)
+    return CloseAllItem(kind=kind, id=item_id, symbol=symbol, status=order.status, reason=order.reason)

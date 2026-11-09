@@ -94,9 +94,12 @@ class ToolServer:
         # the process since `one-process-per-security-boundary`, the door to Telegram last of all.
         prefix: str = "trading_mcp",
         can_move_the_account: bool = False,
+        environment: str | None = None,
     ) -> None:
         self.label = prefix.replace("_", "-")
         self.can_move_the_account = can_move_the_account
+        # Which account this server's writes land on, for a server that can move one; `None` for everything else.
+        self.environment = environment
         self._env_prefix = prefix.upper()
         self._url: str | None = getattr(settings, f"{prefix}_url")
         self._scope: str | None = getattr(settings, f"{prefix}_scope")
@@ -338,7 +341,15 @@ class ToolServerRegistry:
                 # No market server: the candle archive is a package of this process, and its tools reach
                 # a run through `local` like the two archives'.
                 "trading-mcp": ToolServer(
-                    settings, prefix="trading_mcp", can_move_the_account=True
+                    settings, prefix="trading_mcp", can_move_the_account=True, environment="demo"
+                ),
+                # The live account's tool server. It announces the same names as the demo one, so a run never sees
+                # both: `for_environment` keeps only the one the revision trades on.
+                "live-trading-mcp": ToolServer(
+                    settings,
+                    prefix="live_trading_mcp",
+                    can_move_the_account=True,
+                    environment="live",
                 ),
                 # No polymarket and no social server: both archives are packages of this process, and the
                 # assembly adds their tools to `local` — no address, no identity, no session.
@@ -346,6 +357,18 @@ class ToolServerRegistry:
                 # assembly adds its two tools to `local` — sending, and seeing who there is to send to.
             },
             {MEMORY_LABEL: MemoryToolSource(pool)},
+        )
+
+    def for_environment(self, environment: str) -> ToolServerRegistry:
+        """The same sessions, without the account servers of the other environment. A demo team never reaches the live
+        account, a live one never the demo account, and neither sees the shared tool names twice."""
+        return ToolServerRegistry(
+            {
+                label: server
+                for label, server in self.servers.items()
+                if server.environment in (None, environment)
+            },
+            self.local,
         )
 
     def configured(self) -> list[Any]:

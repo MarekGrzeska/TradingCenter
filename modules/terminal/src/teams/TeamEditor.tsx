@@ -43,6 +43,7 @@ export function TeamEditor({
   onCreated,
   onRuns,
   accounts = [],
+  liveAccounts = [],
   accountsNote = null,
   teams = [],
 }: {
@@ -61,6 +62,8 @@ export function TeamEditor({
   onRuns(runId: number | null, teamName: string): void;
   /** The gateway's accounts, for the team's own. */
   accounts?: DemoAccount[];
+  /** The live account's gateway's, for a team on the live account. */
+  liveAccounts?: DemoAccount[];
   accountsNote?: string | null;
   /** The catalogue, read for which other teams already trade on the chosen account. */
   teams?: TeamSummary[];
@@ -325,6 +328,7 @@ export function TeamEditor({
         <TeamPanel
           trading={draft.trading}
           accounts={accounts}
+          liveAccounts={liveAccounts}
           accountsNote={accountsNote}
           sharedWith={teams
             .filter(

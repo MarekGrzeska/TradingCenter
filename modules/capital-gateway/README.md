@@ -5,8 +5,10 @@ in one request**, and **watch a live feed**. Every provider quirk — session to
 instrument tree, asynchronous `dealReference → confirms` settlement, the candle that only
 arrives when it closes — stays inside the module.
 
-**Demo only.** Any endpoint other than the demo host is refused at startup, so this cannot
-place an order with real money.
+**Demo unless told otherwise in so many words.** Without `CAPITAL_ENVIRONMENT=live` any endpoint
+other than the demo host is refused at startup, so the demo process cannot place an order with real
+money. The live account is a **second process** from the same image (`live-account-trading`), and
+what it adds is in "The live account" below.
 
 **Every call needs a credential, and which one depends on where the module stands.** Locally
 it is this module's own caller key, sent as `X-Gateway-Key` — a header missing or a value that
@@ -23,7 +25,8 @@ of this has anything to do with the capital.com credentials above it.
 
 - `dtos.py` — the contract: `Instrument`, `Candle`, `CandleHistory`, `Account`, `Position`,
   `Order`, `WorkingOrder`.
-- `config.py` — settings and the demo-only guard.
+- `config.py` — settings, the demo guard, and what the live account needs before it starts.
+- `live.py` — the live process's routes, its order limits and the trace of every write.
 - `client.py` — async REST, session renewal, one shared login, one retry on 401, and the account a
   renewed session is put back on.
 - `pool.py` — one session per account a caller names in `X-Capital-Account`, the default one whose
@@ -227,6 +230,30 @@ reaches back about two years and nothing recovers what is past that.
 
 **A demo fill proves the contract, not the execution.** Fills are simulated and demo
 liquidity is not real liquidity.
+
+## The live account
+
+`CAPITAL_ENVIRONMENT=live` turns this image into the door to real money, and only on the server
+(`GATEWAY_ENV=production` and `SERVER_MODE=true`; the dev stack and the tests never hold it). It
+refuses to start without:
+
+- `CAPITAL_BASE_URL=https://api-capital.backend-capital.com` — exactly; an unset URL is not live.
+- `LIVE_ACCOUNT_ID` — the one account it stands on. An `X-Capital-Account` naming any other is a
+  `400` before the provider; a provider that does not list it refuses every account request.
+- `LIVE_ORDER_LIMITS='{"US100": "0.5"}'` — the instruments it may trade at all (the keys) and the
+  largest size of one order in the instrument's units. An order outside them is a `422` that never
+  leaves the process, and is never trimmed to fit. Closing, amending stops and cancelling are never
+  held to the limits.
+
+It serves the account and nothing of the market: no catalogue, candles, history, stream, top-up or
+account switch (`404`). It adds `POST /positions/close-all`, the terminal's way out, which exists on
+no demo process. Every write leaves two lines in `capital_gateway.live_trace` — before it is sent
+and with its outcome (settled, refused, unknown) — naming the calling application and the account,
+never a credential.
+
+The provider's API key for this process is its own (2FA on the account, a custom password, one year
+by default): pausing it under Settings → API integrations at capital.com is the stop that needs no
+deploy.
 
 ## Sessions coexist — measured, not assumed
 

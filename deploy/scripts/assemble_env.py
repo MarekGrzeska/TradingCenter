@@ -23,7 +23,28 @@ OPTIONAL = (
     "AGENT_TELEGRAM_OWNER_CHAT_ID",
     "AGENT_ACCOUNT_WRITES",
     "AGENT_CHECKINS",
+    # The live account (live-account-trading): off, the usual state, unless LIVE_TRADING says `on` — then every one of
+    # LIVE_REQUIRED must be there, and the switch for the agent's writes on it keeps its own default.
+    "LIVE_TRADING",
+    "AGENT_LIVE_ACCOUNT_WRITES",
+    "LIVE_CAPITAL_API_KEY",
+    "LIVE_CAPITAL_IDENTIFIER",
+    "LIVE_CAPITAL_PASSWORD",
+    "LIVE_GATEWAY_API_KEY",
+    "LIVE_ACCOUNT_ID",
+    "LIVE_ORDER_LIMITS",
 )
+LIVE_REQUIRED = (
+    "LIVE_CAPITAL_API_KEY",
+    "LIVE_CAPITAL_IDENTIFIER",
+    "LIVE_CAPITAL_PASSWORD",
+    "LIVE_GATEWAY_API_KEY",
+    "LIVE_ACCOUNT_ID",
+    "LIVE_ORDER_LIMITS",
+)
+# What the deploy adds itself when the live account is on: where the teams reach its tool server, and the profile that
+# starts the two services at all.
+LIVE_DERIVED = {"LIVE_TRADING_MCP_URL": "http://trading-mcp-live:80", "COMPOSE_PROFILES": "live"}
 URL_SAFE = re.compile(r"^[A-Za-z0-9._~-]{16,}$")
 
 
@@ -40,6 +61,17 @@ def assemble(names: list[str], available: dict[str, str]) -> str:
     missing = [name for name in names if not available.get(name, "").strip()]
     if missing:
         raise Refused(f"missing from the environment's secrets and variables: {', '.join(missing)}")
+    live = available.get("LIVE_TRADING", "").strip() == "on"
+    if live:
+        missing = [name for name in LIVE_REQUIRED if not available.get(name, "").strip()]
+        if missing:
+            raise Refused(f"LIVE_TRADING=on, and missing: {', '.join(missing)}")
+        if available["LIVE_GATEWAY_API_KEY"] == available.get("GATEWAY_API_KEY"):
+            # The live gateway's key opens real money; the demo one is held by more of the system than that should be.
+            raise Refused("LIVE_GATEWAY_API_KEY must differ from GATEWAY_API_KEY")
+    else:
+        # Off means off: no live secret reaches the server, whatever the store still holds.
+        available = {name: value for name, value in available.items() if name not in LIVE_REQUIRED}
     lines = []
     for name in [*names, *(n for n in OPTIONAL if available.get(n, "").strip())]:
         value = available[name]
@@ -48,6 +80,8 @@ def assemble(names: list[str], available: dict[str, str]) -> str:
         if name.endswith("_DB_PASSWORD") and not URL_SAFE.match(value):
             raise Refused(f"{name} must be at least 16 characters of A-Z a-z 0-9 . _ ~ - (it sits in a URL)")
         lines.append(f"{name}='{value}'")
+    if live:
+        lines.extend(f"{name}='{value}'" for name, value in LIVE_DERIVED.items())
     return "\n".join(lines) + "\n"
 
 

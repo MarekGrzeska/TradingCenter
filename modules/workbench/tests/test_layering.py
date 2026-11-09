@@ -59,3 +59,17 @@ def test_the_assembly_is_the_one_place_that_knows_every_package() -> None:
     for path in _sources(ASSEMBLY):
         imported |= _imported_top_level_packages(ast.parse(path.read_text(encoding="utf-8")))
     assert set(PACKAGES) <= imported
+
+
+def test_the_conversation_never_reads_the_live_accounts_tool_server() -> None:
+    """specs/agent-trading, "Rozmowa nie sięga konta realnego": the setting exists in this process for the teams surface,
+    and nothing of the conversation's names it — neither a field of its settings nor a line of its source."""
+    from agent.config import Settings as ConversationSettings
+
+    assert not [name for name in ConversationSettings.model_fields if "live" in name]
+    offences = [
+        str(path.relative_to(MODULE_ROOT))
+        for path in _sources("agent")
+        if "live_trading_mcp" in path.read_text(encoding="utf-8").lower()
+    ]
+    assert not offences

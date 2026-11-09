@@ -50,7 +50,7 @@ class BalanceOut(BaseModel):
     pnl: float
 
 
-def register(mcp: FastMCP, gateway: GatewayClient) -> None:
+def register(mcp: FastMCP, gateway: GatewayClient, *, live: bool = False) -> None:
     @mcp.tool(annotations=READ_ONLY)
     async def get_positions(account_id: AccountId = None) -> list[PositionOut]:
         """Open positions on the demo account — no price here, only what was already
@@ -103,6 +103,10 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
             )
             for row in rows
         ]
+
+    if live:
+        # The live process stands on one account and has no balance to adjust (`capital-live-account`).
+        return
 
     @mcp.tool(annotations=WRITE)
     async def switch_active_account(account_id: str) -> AccountOut:

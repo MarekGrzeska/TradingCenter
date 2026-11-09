@@ -20,6 +20,14 @@ cd "$APP_DIR"
 PROJECT="${COMPOSE_PROJECT:-tradingcenter-vps}"
 COMPOSE="docker compose --project-name $PROJECT --env-file .env --env-file tags.env -f docker-compose.yml"
 SERVICES="gateway trading-mcp workbench claude-agent"
+LIVE_SERVICES="gateway-live trading-mcp-live"
+# The live account runs only when the operator turned it on (live-account-trading); assemble_env.py writes the profile.
+LIVE=""
+if [ -f .env ] && grep -q "^COMPOSE_PROFILES='live'" .env; then
+  LIVE=1
+  COMPOSE="$COMPOSE --profile live"
+  SERVICES="$SERVICES $LIVE_SERVICES"
+fi
 # How long a deploy waits for the new containers to be healthy. The workbench's first start migrates every database, and
 # the candle archive's index can outlast a start-up — the compose file's own grace period is 1500 s.
 HEALTH_WAIT_SECONDS="${HEALTH_WAIT_SECONDS:-1700}"
@@ -122,6 +130,9 @@ release() {
   # shellcheck disable=SC2086 # the list of service names, split on purpose
   $COMPOSE pull --quiet $SERVICES || { cp tags.env.prev tags.env; die "pull failed; nothing changed"; }
   $COMPOSE up -d --remove-orphans
+  # A service of a profile that is off is not an orphan to Compose, so turning the live account off has to stop it here.
+  # shellcheck disable=SC2086
+  [ -n "$LIVE" ] || $COMPOSE --profile live rm -sf $LIVE_SERVICES >/dev/null 2>&1 || :
   # The Caddyfile is a bind mount that `sync` rewrote in place; Caddy reads it only when told. A refused config keeps the old.
   if $COMPOSE exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile >/dev/null 2>&1; then
     echo "caddy: reloaded"
@@ -146,7 +157,8 @@ rollback_to_previous() {
     wait_healthy || echo "rollback: the previous images are not healthy either" >&2
   else
     echo "rollback: no previous release recorded; stopping the applications" >&2
-    $COMPOSE stop claude-agent workbench trading-mcp gateway
+    # shellcheck disable=SC2086
+    $COMPOSE stop claude-agent workbench trading-mcp gateway ${LIVE:+$LIVE_SERVICES}
   fi
 }
 

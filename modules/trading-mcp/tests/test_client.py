@@ -217,7 +217,7 @@ async def test_a_token_that_cannot_be_had_leaves_the_key_to_do_the_work(
         return_value=httpx.Response(200, json={"environment": "demo"})
     )
 
-    await client.ensure_demo_environment()
+    await client.ensure_expected_environment()
 
     assert "Authorization" not in route.calls.last.request.headers
     await client.aclose()
@@ -233,7 +233,7 @@ async def test_a_gateway_that_refuses_the_demo_check_stops_the_port_opening(
     respx.get(f"{BASE}/capabilities").mock(return_value=httpx.Response(401))
 
     with pytest.raises(GatewayRefused):
-        await client.ensure_demo_environment()
+        await client.ensure_expected_environment()
 
     await client.aclose()
 

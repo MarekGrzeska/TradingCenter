@@ -11,10 +11,11 @@ from tc_runtime.db import Conn, fetch_one
 
 _INSERT_TRADE = """
     INSERT INTO trades (
-        run_id, run_step_id, agent_key, tool_name, symbol, direction, size, level, account_id
+        run_id, run_step_id, agent_key, tool_name, symbol, direction, size, level, account_id,
+        environment
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-    RETURNING id, run_id, run_step_id, agent_key, tool_name, account_id, symbol, direction, size,
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    RETURNING id, run_id, run_step_id, agent_key, tool_name, account_id, environment, symbol, direction, size,
               level, status, result_status, provider_order_id, reference, created_at,
               settled_at
 """
@@ -27,7 +28,7 @@ _SETTLE_TRADE = """
            reference = $5,
            settled_at = now()
      WHERE id = $1
-    RETURNING id, run_id, run_step_id, agent_key, tool_name, account_id, symbol, direction, size,
+    RETURNING id, run_id, run_step_id, agent_key, tool_name, account_id, environment, symbol, direction, size,
               level, status, result_status, provider_order_id, reference, created_at,
               settled_at
 """
@@ -41,7 +42,8 @@ _TEAM_TRADES_SINCE = """
 """
 
 _RUN_TRADES = """
-    SELECT id, run_id, run_step_id, agent_key, tool_name, account_id, symbol, direction, size, level,
+    SELECT id, run_id, run_step_id, agent_key, tool_name, account_id, environment, symbol, direction,
+           size, level,
            status, result_status, provider_order_id, reference, created_at, settled_at
       FROM trades
      WHERE run_id = $1
@@ -57,6 +59,7 @@ async def record_trade(
     agent_key: str,
     tool_name: str,
     account_id: str | None = None,
+    environment: str = "demo",
     symbol: str | None,
     direction: str | None,
     size: Decimal | None,
@@ -76,6 +79,7 @@ async def record_trade(
         size,
         level,
         account_id,
+        environment,
     )
 
 

@@ -551,3 +551,22 @@ async def test_a_trade_row_names_the_account_the_revision_put_the_order_on(
 
     assert [row["account_id"] for row in trades] == ["X"]
     assert [call["account_id"] for call in server.sent] == ["X"]
+
+
+async def test_a_trade_row_names_the_environment_beside_the_account(pool: asyncpg.Pool) -> None:
+    # specs/teams-trading, "Zespół na koncie realnym idzie przez serwer narzędzi konta realnego" — the trace row
+    server = AccountWriteServer()
+    server.environment = "live"
+    definition = TeamDefinition(
+        agents=[a_trader()], trading=TradingLimits(environment="live", account_id="X")
+    )
+
+    run_id = await _run(
+        pool,
+        definition,
+        ScriptedProvider(default=places_orders(1, {"symbol": "GOLD", "direction": "BUY", "size": 1})),
+        server=server,
+    )
+    trades = await _trades(pool, run_id)
+
+    assert [(row["environment"], row["account_id"]) for row in trades] == [("live", "X")]

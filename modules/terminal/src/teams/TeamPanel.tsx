@@ -8,6 +8,7 @@ import type { TeamTradingLimits } from "./teamsApi";
 export function TeamPanel({
   trading,
   accounts,
+  liveAccounts = [],
   accountsNote,
   sharedWith,
   onChange,
@@ -15,15 +16,19 @@ export function TeamPanel({
   trading: TeamTradingLimits;
   /** What the gateway lists; the choice is never typed in. */
   accounts: DemoAccount[];
+  /** What the live account's gateway lists — one account, or none when the terminal has no address for it. */
+  liveAccounts?: DemoAccount[];
   /** Why the list is empty, when it is — a failed read, rather than an account-less login. */
   accountsNote: string | null;
   /** Names of the other teams whose latest revision trades on the chosen account. */
   sharedWith: string[];
   onChange(patch: Partial<TeamTradingLimits>, kind: string): void;
 }) {
+  const live = trading.environment === "live";
+  const listed = live ? liveAccounts : accounts;
   const chosen = trading.accountId ?? "";
   // A revision can name an account the gateway no longer lists; kept as an option so the select does not lie.
-  const unlisted = chosen !== "" && !accounts.some((account) => account.id === chosen);
+  const unlisted = chosen !== "" && !listed.some((account) => account.id === chosen);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto border-l border-border p-3">
@@ -39,6 +44,33 @@ export function TeamPanel({
           the account.
         </p>
 
+        <Field id="trading-environment" label="Environment">
+          <select
+            id="trading-environment"
+            value={live ? "live" : "demo"}
+            onChange={(event) =>
+              onChange(
+                // The account belongs to the environment it was chosen in; switching drops it.
+                { environment: event.target.value === "live" ? "live" : "demo", accountId: null },
+                "select:trading:environment",
+              )
+            }
+            className="w-full rounded border border-border bg-panel px-2 py-1 text-sm text-ink"
+          >
+            <option value="demo">demo</option>
+            {/* Offered only when the live gateway answered with its account; otherwise every save would be refused. */}
+            {(live || liveAccounts.length > 0) && (
+              <option value="live">live account — real money</option>
+            )}
+          </select>
+        </Field>
+        {live && (
+          <p className="text-xs font-semibold text-critical">
+            This team trades real money. The live gateway holds every order to its limits; the
+            account below is required.
+          </p>
+        )}
+
         <Field id="trading-account" label="Account">
           <select
             id="trading-account"
@@ -51,8 +83,8 @@ export function TeamPanel({
             }
             className="w-full rounded border border-border bg-panel px-2 py-1 text-sm text-ink"
           >
-            <option value="">the active account</option>
-            {accounts.map((account) => (
+            <option value="">{live ? "choose the live account" : "the active account"}</option>
+            {listed.map((account) => (
               <option key={account.id} value={account.id}>
                 {account.name} · {account.currency} {account.balance.toFixed(2)}
               </option>
