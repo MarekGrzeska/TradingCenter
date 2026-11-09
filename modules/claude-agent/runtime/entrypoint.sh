@@ -27,6 +27,9 @@ rm -rf "$WORKDIR/.claude" "$WORKDIR/CLAUDE.md" "$WORKDIR/.mcp.json"
 cp -r "$SRC/CLAUDE.md" "$SRC/.claude" "$WORKDIR/"
 "$PY" -m claude_agent.render settings "$SRC/.claude/settings.json" "$WORKDIR/.claude/settings.json"
 "$PY" -m claude_agent.render mcp "$WORKDIR/.mcp.json"
+# What the agent writes for the operator (an article as HTML, sent on Telegram) lives a week.
+mkdir -p "$WORKDIR/out"
+find "$WORKDIR/out" -type f -mtime +7 -delete
 [ "${AGENT_ACCOUNT_WRITES:-}" = on ] && log "account writes: ON (demo)" || log "account writes: off"
 [ "${AGENT_LIVE_ACCOUNT_WRITES:-}" = on ] && log "LIVE account writes: ON (real money)" || log "live account writes: off"
 
