@@ -400,7 +400,7 @@ function mapAgent(raw: RawAgent): TeamAgent {
 
 function mapDefinition(raw: RawDefinition): TeamDefinition {
   return {
-    agents: raw.agents.map(mapAgent),
+    agents: (raw.agents ?? []).map(mapAgent),
     dependencies: (raw.edges ?? []).map((edge) => ({ from: edge.from, to: edge.to })),
     limits: {
       runLimit: raw.limits?.run_limit ?? null,

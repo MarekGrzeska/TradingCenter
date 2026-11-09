@@ -6,7 +6,11 @@ from __future__ import annotations
 from collections.abc import Collection
 
 from .contract import TeamDefinition
+from .steps import RECIPES, RecipeRefused, parse_params
 from .tools import ACCOUNT_MOVING_TOOLS, AnnouncedSnapshot, and_list
+
+# The one tool a fallback notice is sent with; the agent carrying the notice must be assigned it.
+NOTICE_TOOL = "send_telegram_message"
 
 
 class DefinitionRefused(ValueError):
@@ -22,6 +26,8 @@ def check_definition(
     """Raises `DefinitionRefused` naming the agent at fault, or returns. Note the asymmetry with a run: a team whose
     agents carry no tools saves and runs with no server at all, and only an assigned tool needs an announcement."""
     _every_agent_names_a_known_model(definition, model_ids)
+    _every_step_names_a_recipe_it_fits(definition)
+    _every_fallback_notice_has_its_tool(definition)
     _no_account_moving_tool_on_an_assigned_account(definition)
     _every_assigned_tool_is_announced(definition, announced)
 
@@ -30,6 +36,35 @@ def check_runnable(definition: TeamDefinition, *, model_ids: Collection[str]) ->
     """The same model check, at the moment a saved revision is about to run. Not redundant: a revision saved
     a month ago names whatever the catalogue held then, and only starting a new run is refused."""
     _every_agent_names_a_known_model(definition, model_ids)
+    _every_step_names_a_recipe_it_fits(definition)
+
+
+def _every_step_names_a_recipe_it_fits(definition: TeamDefinition) -> None:
+    for step in definition.steps:
+        try:
+            parse_params(step.recipe, step.params)
+        except RecipeRefused as err:
+            raise DefinitionRefused(f"step {step.key!r}: {err}") from None
+
+
+def _every_fallback_notice_has_its_tool(definition: TeamDefinition) -> None:
+    for agent in definition.agents:
+        if agent.fallback_notice is not None and NOTICE_TOOL not in agent.tools:
+            raise DefinitionRefused(
+                f"agent {agent.key!r} carries a fallback notice but is not assigned {NOTICE_TOOL!r}, "
+                "which the notice is sent with"
+            )
+
+
+def _assignments(definition: TeamDefinition) -> list[tuple[str, list[str]]]:
+    """Who is assigned which tools, named the way a refusal names them: an agent's own list, a step's recipe's."""
+    units = [(f"agent {agent.key!r}", list(agent.tools)) for agent in definition.agents]
+    units += [
+        (f"step {step.key!r}", list(RECIPES[step.recipe].tools))
+        for step in definition.steps
+        if step.recipe in RECIPES
+    ]
+    return units
 
 
 def _every_agent_names_a_known_model(
@@ -61,13 +96,13 @@ def _no_account_moving_tool_on_an_assigned_account(definition: TeamDefinition) -
 def _every_assigned_tool_is_announced(
     definition: TeamDefinition, announced: AnnouncedSnapshot
 ) -> None:
-    assigning = [agent for agent in definition.agents if agent.tools]
+    assigning = [(who, tools) for who, tools in _assignments(definition) if tools]
     if not assigning:
         return
 
-    for agent in assigning:
+    for who, tools in assigning:
         collided = sorted(
-            tool for tool in agent.tools if len(announced.by_name.get(tool, [])) > 1
+            tool for tool in tools if len(announced.by_name.get(tool, [])) > 1
         )
         if collided:
             tool = collided[0]
@@ -75,19 +110,19 @@ def _every_assigned_tool_is_announced(
             # to unconfigure one and meet this same refusal again.
             servers = and_list(announced.by_name[tool])
             raise DefinitionRefused(
-                f"agent {agent.key!r} is assigned tool {tool!r}, which more than one "
+                f"{who} is assigned tool {tool!r}, which more than one "
                 f"tool server announces ({servers}) — this module cannot tell which "
                 "was meant"
             )
 
     known = set(announced.by_name)
-    for agent in assigning:
-        unknown = sorted(tool for tool in agent.tools if tool not in known)
+    for who, tools in assigning:
+        unknown = sorted(tool for tool in tools if tool not in known)
         if not unknown:
             continue
         if announced.unreachable:
             raise DefinitionRefused(
-                f"agent {agent.key!r} is assigned tool(s) {unknown}, but "
+                f"{who} is assigned tool(s) {unknown}, but "
                 f"{' and '.join(announced.unreachable)} could not be reached to "
                 "confirm them"
             )
@@ -95,7 +130,7 @@ def _every_assigned_tool_is_announced(
             # A server with no address at all, worth keeping apart from "answered and does not have it":
             # the operator's next move is a setting rather than a different tool.
             raise DefinitionRefused(
-                f"agent {agent.key!r} is assigned tool(s) {unknown}, and "
+                f"{who} is assigned tool(s) {unknown}, and "
                 f"{' and '.join(announced.unconfigured)} "
                 f"{'has' if len(announced.unconfigured) == 1 else 'have'} no address "
                 f"configured to check them against — set {_url_settings(announced.unconfigured)}, "
@@ -105,7 +140,7 @@ def _every_assigned_tool_is_announced(
         # Phase 2's wording: there can be two servers now, so the refusal says "no
         # configured tool server" rather than naming the one there used to be.
         raise DefinitionRefused(
-            f"agent {agent.key!r} is assigned tool(s) {unknown}, which no configured "
+            f"{who} is assigned tool(s) {unknown}, which no configured "
             f"tool server announces ({sorted(known)})"
         )
 

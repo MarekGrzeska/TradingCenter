@@ -1,10 +1,10 @@
 ## 1. Kontrakt i walidacja definicji
 
-- [ ] 1.1 `StepDefinition` (`key`, `recipe`, `params`) i `steps: list = []` w `TeamDefinition`; walidatory grafu na sumie kluczy agentów i kroków, „co najmniej jeden węzeł”; test, że rewizja bez `steps` czyta się bez zmian
-- [ ] 1.2 `fallback_notice` (`destination`, `bot`, `prefix`) w `AgentDefinition`, opcjonalne
-- [ ] 1.3 Katalog przepisów (`teams/steps/`): model parametrów, narzędzia, opis; `strategy_execute` z parametrami `strategy_id`, `revision`, `symbol`, `sizing` (opcjonalne), `wait_for_bar_seconds` (opcjonalne, 30), `max_bar_age_seconds` (opcjonalne)
-- [ ] 1.4 `check_definition`: nieznany przepis, złe parametry, nieogłaszane narzędzie przepisu, zakaz narzędzi przełączających konto, `fallback_notice` bez `send_telegram_message`; każda odmowa nazywa krok albo agenta
-- [ ] 1.5 `GET /teams/step-recipes` (nazwa, opis, parametry z typem i wymaganiem, narzędzia); `contract-sync` dla terminala
+- [x] 1.1 `StepDefinition` (`key`, `recipe`, `params`) i `steps: list = []` w `TeamDefinition`; walidatory grafu na sumie kluczy agentów i kroków, „co najmniej jeden węzeł”; test, że rewizja bez `steps` czyta się bez zmian
+- [x] 1.2 `fallback_notice` (`destination`, `bot`, `prefix`) w `AgentDefinition`, opcjonalne
+- [x] 1.3 Katalog przepisów (`teams/steps/`): model parametrów, narzędzia, opis; `strategy_execute` z parametrami `strategy_id`, `revision`, `symbol`, `sizing` (opcjonalne), `wait_for_bar_seconds` (opcjonalne, 30), `max_bar_age_seconds` (opcjonalne)
+- [x] 1.4 `check_definition`: nieznany przepis, złe parametry, nieogłaszane narzędzie przepisu, zakaz narzędzi przełączających konto, `fallback_notice` bez `send_telegram_message`; każda odmowa nazywa krok albo agenta
+- [x] 1.5 `GET /teams/step-recipes` (nazwa, opis, parametry z typem i wymaganiem, narzędzia); `contract-sync` dla terminala
 
 ## 2. Baza
 
