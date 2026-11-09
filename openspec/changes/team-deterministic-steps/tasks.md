@@ -45,7 +45,7 @@
 
 ## 8. Dokumentacja i próba
 
-- [ ] 8.1 `modules/workbench/README.md` (kroki w `teams`), `docs/zespoly-kroki-deterministyczne.html` odsyła do tej zmiany
-- [ ] 8.2 Na demo przed pierwszym zespołem: `id` z `place_order` porównany z id pozycji w `get_positions` (decyzja 5 projektu)
+- [x] 8.1 `modules/workbench/README.md` (kroki w `teams`), `docs/zespoly-kroki-deterministyczne.html` odsyła do tej zmiany
+- [x] 8.2 `id` z `place_order` porównany z id pozycji w `get_positions` (decyzja 5 projektu): zgodne na koncie realnym, przebieg 338, 9 listopada
 - [ ] 8.3 Operator: zespół demo z krokiem i reporterem założony z Telegrama, na innym koncie demo niż team 8, harmonogramy 9:35, 14:00 i 14:10 ET; tydzień porównania z teamem 8
 - [ ] 8.4 `review.md`; archiwizacja
