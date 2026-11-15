@@ -290,6 +290,50 @@ async def test_the_team_s_own_position_is_closed_when_the_engine_is_flat() -> No
     assert not any(call[0] == "place_order" for call in ctx.calls)
 
 
+def _closing(*balances: float) -> FakeContext:
+    row = {"id": "deal-1", "symbol": "US100", "direction": "BUY", "size": 0.1, "open_level": 27300.0, "pnl": 4.9}
+    placed = [
+        {"status": "settled", "provider_order_id": "deal-1", "reference": "ref-1", "created_at": NOW - timedelta(hours=4)}
+    ]
+    return FakeContext(
+        _replies(
+            strategy_signal=[ok(_signal("exit", engine="long"))],
+            get_positions=[ok({"result": [row]})],
+            get_balance=[ok({"balance": b, "pnl": 0.0, "currency": "USD"}) for b in balances],
+            close_position=[ok({**FILLED, "status": "CLOSED", "level": 27350.0})],
+        ),
+        placed,
+    )
+
+
+async def test_an_exit_carries_both_prices_and_the_money_the_balance_booked() -> None:
+    clock = Clock()
+    result = await execute(_step(), _closing(540.0, 540.0, 545.0), now=clock, sleep=clock.sleep)
+
+    assert result["decision"] == "exited"
+    assert result["trade"] == {
+        "side": "long", "size": 0.1, "open_price": 27300.0, "close_price": 27350.0, "points": 50.0,
+        "pnl": 5.0, "pnl_approximate": False, "currency": "USD",
+    }
+
+
+async def test_an_exit_whose_balance_has_not_moved_gives_the_last_unrealised_result_marked() -> None:
+    clock = Clock()
+    result = await execute(_step(), _closing(540.0), now=clock, sleep=clock.sleep)
+
+    assert (result["trade"]["pnl"], result["trade"]["pnl_approximate"]) == (4.9, True)
+
+
+async def test_an_entry_confirmed_without_a_level_takes_the_price_off_the_position() -> None:
+    no_level = ok({**FILLED, "level": None})
+    opened = ok({"result": [{"id": "deal-9", "symbol": "US100", "direction": "BUY", "size": 0.137, "open_level": 27361.5}]})
+    ctx = FakeContext(_replies(place_order=[no_level], get_positions=[ok({"result": []}), opened]))
+
+    result = await execute(_step(), ctx, now=Clock(), sleep=Clock().sleep)
+
+    assert result["trade"]["fill_price"] == 27361.5
+
+
 # One run against the database: the order, its key and the trace, through the engine.
 
 

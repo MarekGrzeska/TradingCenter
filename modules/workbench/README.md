@@ -125,10 +125,14 @@ A step calls its recipe's tools through the run's own plan, so the account in ev
 row written before an order and the `tool_calls` trace are the agents' machinery, not a second copy; it writes no usage
 row. Its result is JSON (`decision`, `reason`, `summary`, …) that its successors read as a predecessor's work.
 
-The one recipe, `strategy_execute`, keeps the team's own position in line with `strategy_signal`: `decide()` is its whole
+Two recipes. `strategy_execute` keeps the team's own position in line with `strategy_signal`: `decide()` is its whole
 judgement, a pure function tested as a table. An order carries `trades.attempt_key` under a partial unique index, so one
 signal bar is acted on at most once even by two runs at once. Its own position is the one a `place_order` row of the team
-opened — `provider_order_id` is the position's id on capital.com (checked on the live account, 9 November 2026).
+opened — `provider_order_id` is the position's id on capital.com (checked on the live account, 9 November 2026). Its
+result carries `trade`: the fill price on entry, both prices and the money on exit — the balance's change, or the last
+unrealised result marked `pnl_approximate` when the balance has not moved within three reads.
+`telegram_report` tells that result on Telegram in one fixed shape, by no model (`compose()`, a table too), silent on
+`no_action` and on a repeat of the same bar (`openspec/changes/step-telegram-report`).
 
 An agent may carry a `fallback_notice`: when its model fails or a cost limit stops it, the run sends one fixed message
 through the agent's own `send_telegram_message`. A used-up daily cost limit holds back the agents of a revision with

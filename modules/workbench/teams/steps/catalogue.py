@@ -114,7 +114,39 @@ STRATEGY_EXECUTE = Recipe(
     ),
 )
 
-RECIPES: dict[str, Recipe] = {recipe.name: recipe for recipe in (STRATEGY_EXECUTE,)}
+class TelegramReportParams(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    destination: str
+    bot: str | None = None
+    prefix: str | None = None
+
+    @field_validator("destination")
+    @classmethod
+    def _destination_named(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("destination must not be blank")
+        return value.strip()
+
+
+TELEGRAM_REPORT = Recipe(
+    name="telegram_report",
+    description=(
+        "Tells the result of the strategy_execute step before it on Telegram, in one fixed message and by no model: "
+        "entry with its fill price, exit with open and close price and the result in the account's currency, refusal, "
+        "unknown outcome, unsupported strategy, or a skip that is not a repeat of the same signal bar. Silent on "
+        "no_action. A field the result does not carry is written as unavailable, never estimated."
+    ),
+    params_model=TelegramReportParams,
+    params=(
+        ParamSpec("destination", "text", True, "the Telegram destination, e.g. operator"),
+        ParamSpec("bot", "text", False, "the bot that sends it; empty means the destination's default"),
+        ParamSpec("prefix", "text", False, "the first line of every message, e.g. the team's short name"),
+    ),
+    tools=("send_telegram_message",),
+)
+
+RECIPES: dict[str, Recipe] = {recipe.name: recipe for recipe in (STRATEGY_EXECUTE, TELEGRAM_REPORT)}
 
 
 def node_tools(definition: TeamDefinition) -> list[tuple[str, str, tuple[str, ...]]]:

@@ -1,0 +1,371 @@
+<title>Strategia 68 — pięć nóg</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Strategia 68 · US100 M5 · demo</span>
+    <h1>Pięć nóg na US100</h1>
+    <p class="lede">Pięć prostych reguł dnia, każda w <b>swojej godzinie</b>. Najwyżej jedna pozycja naraz, bez stop-lossa,
+      wyjście o ustalonej porze. Na demo wykonuje ją krok bez modelu, a każde wejście i wyjście przychodzi na Telegram z ceną i wynikiem.</p>
+    <div class="strip">
+      <span>TradingCenter / strategie</span>
+      <span>15 listopada 2026 · strategia <b>68</b> rewizja <b>2</b></span>
+      <span>backtest <b>#171</b> (2024-01-01 – 2026-10-27)</span>
+      <span>rachunek <b>demo</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">743</div><div class="l">transakcje w backteście, ok. 5 na tydzień</div></div>
+      <div class="cell"><div class="v">56%</div><div class="l">transakcji zyskownych</div></div>
+      <div class="cell"><div class="v">1,49</div><div class="l">profit factor: zysk ÷ strata</div></div>
+      <div class="cell"><div class="v">2,71</div><div class="l">Sharpe</div></div>
+      <div class="cell"><div class="v">−52%</div><div class="l">największe obsunięcie kapitału</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · W jednym akapicie</div>
+      <h2>Co ta strategia robi</h2>
+      <p class="intro">Strategia patrzy na US100 co pięć minut, ale gra tylko w kilku konkretnych momentach dnia:
+        na otwarciu Londynu w poniedziałek, na otwarciu Nowego Jorku, pół godziny po nim, pół godziny przed
+        zamknięciem i godzinę po zamknięciu. W każdym z tych momentów zadaje jedno pytanie o to, jak rynek się zachował, i
+        wchodzi albo nie.</p>
+      <p>Każda pozycja ma <strong>z góry znaną godzinę wyjścia</strong>. Nie ma stop-lossa ani take-profitu, więc pozycja
+        nie zamknie się sama przy dużym ruchu. Zamyka ją dopiero zegar. W jednym czasie jest otwarta
+        <span class="hl">najwyżej jedna pozycja</span>: jeśli wcześniejsza noga jeszcze trwa, późniejsza czeka do następnego dnia.</p>
+      <p>Wielkość pozycji: <strong>depozyt = 35% kapitału</strong>. Przy depozycie US100 równym 5% wartości pozycji daje to
+        pozycję wartą ok. 7× kapitał. Stąd i duże zyski w backteście, i obsunięcie −52%.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Pięć nóg</div>
+      <h2>Kiedy wchodzi i kiedy wychodzi</h2>
+      <p>Godziny polskie podane są dla zwykłego tygodnia. Strategia liczy czas zegarem Londynu i Nowego Jorku, więc gdy jedno
+        miasto przestawi zegar wcześniej niż Polska, godziny polskie przesuwają się o godzinę. ATR to średni dzienny zakres
+        ruchu US100 z 14 dni i służy za miarę „dużego” ruchu.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Noga</th><th>Dni</th><th>Wejście</th><th>Warunek</th><th>Wyjście</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><b>1 · Londyn</b></td><td>pon.</td><td>9:05<br><small>1. świeca Londynu</small></td>
+              <td><span class="tag ok">LONG</span> zawsze</td>
+              <td>21:55<br><small>5 min przed zamknięciem NY</small></td>
+            </tr>
+            <tr>
+              <td><b>2 · Otwarcie NY</b></td><td>wt.–pt.</td><td>15:35<br><small>1. świeca NY</small></td>
+              <td><span class="tag ok">LONG</span> gdy cena jest wyraźnie nad EMA12 (o więcej niż 0,075 ATR).<br>
+                <span class="tag stop">SHORT</span> gdy jest wyraźnie pod EMA12, a poprzednia sesja skończyła się wzrostem.</td>
+              <td>20:00<br><small>2 h przed zamknięciem NY</small></td>
+            </tr>
+            <tr>
+              <td><b>3 · Poranek Europy</b></td><td>wt.–pt.</td><td>16:00<br><small>6. świeca NY</small></td>
+              <td>Tylko gdy dziś nie było jeszcze transakcji. Porównuje cenę z ceną z 8:00:<br>
+                wzrost o ponad 0,5 ATR → <span class="tag ok">LONG</span>, spadek o ponad 0,5 ATR → <span class="tag stop">SHORT</span>.</td>
+              <td>21:55</td>
+            </tr>
+            <tr>
+              <td><b>4 · Odwrócenie końca dnia</b></td><td>wt.–czw.</td><td>21:30<br><small>pół godziny przed zamknięciem</small></td>
+              <td>Gra przeciw ruchowi dnia: wzrost od wczorajszego zamknięcia o ponad 0,2 ATR → <span class="tag stop">SHORT</span>,
+                spadek o ponad 0,2 ATR → <span class="tag ok">LONG</span>.</td>
+              <td>21:55–22:00<br><small>zamknięcie NY</small></td>
+            </tr>
+            <tr>
+              <td><b>5 · Noc po słabym dniu</b></td><td>pon., wt.</td><td>23:00<br><small>godzinę po zamknięciu</small></td>
+              <td><span class="tag ok">LONG</span> gdy sesja zamknęła się w dolnej połowie dnia (IBS &lt; 0,5), a cena jest pod
+                średnią 50-dniową.</td>
+              <td>15:25 następnego dnia<br><small>tuż przed otwarciem NY</small></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Wszystkie decyzje zapadają na zamknięciu świecy 5-minutowej. Zlecenie jest rynkowe i idzie
+        zaraz po tej świecy.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Jeden tydzień</div>
+      <h2>Jak to wygląda w kalendarzu</h2>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 300" role="img" aria-label="Tydzień: poniedziałek noga 1 od 9:05 do 21:55 i noga 5 w nocy; wtorek do piątku nogi 2 lub 3 po południu, noga 4 wieczorem od wtorku do czwartku, noga 5 w nocy z poniedziałku i wtorku.">
+            <style>
+              .ax { font: 12px var(--mono); fill: #85899a; }
+              .dl { font: 700 13px var(--body); fill: #16181d; }
+              .bl { font: 700 11px var(--mono); fill: #ffffff; }
+            </style>
+            <!-- hours 8..24 and 0..16 next day mapped: x = 90 + (h-8)*50, 16h -> 890 at 24 -->
+            <g class="ax">
+              <text x="90" y="20" text-anchor="middle">8:00</text>
+              <text x="290" y="20" text-anchor="middle">12:00</text>
+              <text x="465" y="20" text-anchor="middle">15:30</text>
+              <text x="690" y="20" text-anchor="middle">20:00</text>
+              <text x="790" y="20" text-anchor="middle">22:00</text>
+              <text x="890" y="20" text-anchor="middle">24:00</text>
+            </g>
+            <g stroke="#ebe8de">
+              <line x1="90" y1="28" x2="90" y2="290"/><line x1="290" y1="28" x2="290" y2="290"/>
+              <line x1="465" y1="28" x2="465" y2="290"/><line x1="690" y1="28" x2="690" y2="290"/>
+              <line x1="790" y1="28" x2="790" y2="290"/><line x1="890" y1="28" x2="890" y2="290"/>
+            </g>
+            <rect x="465" y="28" width="325" height="262" fill="#e6ebf5" opacity="0.55"/>
+            <g class="dl">
+              <text x="10" y="62">pon.</text><text x="10" y="114">wt.</text><text x="10" y="166">śr.</text>
+              <text x="10" y="218">czw.</text><text x="10" y="270">pt.</text>
+            </g>
+            <!-- Monday: leg 1 9:05-21:55, leg 5 23:00-> -->
+            <rect x="144" y="44" width="643" height="28" fill="#14306b"/><text class="bl" x="160" y="63">1 · Londyn LONG</text>
+            <rect x="840" y="44" width="50" height="28" fill="#17734c"/><text class="bl" x="848" y="63">5</text>
+            <!-- Tue..Fri: leg 2 15:35-20:00 or leg 3 16:00-21:55 -->
+            <g>
+              <rect x="469" y="96" width="221" height="28" fill="#1d4291"/><text class="bl" x="478" y="115">2 · otwarcie NY</text>
+              <rect x="765" y="96" width="25" height="28" fill="#b8322a"/><text class="bl" x="773" y="115">4</text>
+              <rect x="840" y="96" width="50" height="28" fill="#17734c"/><text class="bl" x="848" y="115">5</text>
+              <rect x="90" y="96" width="373" height="28" fill="#17734c" opacity="0.45"/><text class="bl" x="100" y="115" style="fill:#16181d">5 z poniedziałku, do 15:25</text>
+              <rect x="490" y="148" width="297" height="28" fill="#f2c313"/><text class="bl" x="500" y="167" style="fill:#16181d">3 · poranek Europy (gdy 2 nie weszła)</text>
+              <rect x="90" y="148" width="373" height="28" fill="#17734c" opacity="0.45"/><text class="bl" x="100" y="167" style="fill:#16181d">5 z wtorku, do 15:25</text>
+              <rect x="469" y="200" width="221" height="28" fill="#1d4291"/><text class="bl" x="478" y="219">2 · otwarcie NY</text>
+              <rect x="765" y="200" width="25" height="28" fill="#b8322a"/><text class="bl" x="773" y="219">4</text>
+              <rect x="469" y="252" width="221" height="28" fill="#1d4291"/><text class="bl" x="478" y="271">2 · otwarcie NY</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Przykładowy tydzień</b> — tło niebieskie to sesja w Nowym Jorku. Na dany dzień rysuje tylko jedną
+          z możliwych nóg: noga 2 i 3 wykluczają się, a noga 4 wchodzi wyłącznie, gdy wcześniejsza pozycja jest już zamknięta.
+          W wielu dniach któraś noga nie wchodzi, bo jej warunek nie jest spełniony.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Wyniki backtestu #171</div>
+      <h2>Co pokazała historia</h2>
+      <p>Okres 1.01.2024 – 27.10.2026, kapitał startowy 10&nbsp;000 USD, koszty z capital.com (spread 1,8 pkt, finansowanie
+        nocne). Zysk w każdym z trzech lat jest podobny, więc wynik nie bierze się z jednego szczęśliwego okresu.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Rok</th><th class="n">Transakcje</th><th class="n">Wynik roku</th></tr></thead>
+          <tbody>
+            <tr><td><b>2024</b></td><td class="n">244</td><td class="n">+234%</td></tr>
+            <tr><td><b>2025</b></td><td class="n">260</td><td class="n">+242%</td></tr>
+            <tr><td><b>2026</b> (do 27.10)</td><td class="n">239</td><td class="n">+227%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="fails" style="margin-top:20px">
+        <div class="fail stop">
+          <h3>Obsunięcie −52% <span class="tag stop">ryzyko</span></h3>
+          <p>W historii był moment, w którym połowa kapitału zniknęła, zanim wrócił zysk. Przy pozycji wartej ok. 7× kapitał
+            i bez stop-lossa jedna transakcja potrafiła w backteście pójść przeciw pozycji o 28% kapitału, zanim się zamknęła.</p>
+        </div>
+        <div class="fail">
+          <h3>Procent składany robi większość wyniku <span class="tag att">czytaj ostrożnie</span></h3>
+          <p>+38&nbsp;768% na końcu bierze się z tego, że każda pozycja to 35% <em>bieżącego</em> kapitału. Średnia transakcja daje
+            ok. +0,95% kapitału. Na prawdziwym rachunku płynność i limity brokera zatrzymają ten wzrost dużo wcześniej.</p>
+        </div>
+        <div class="fail">
+          <h3>Bez świąt giełdowych <span class="tag att">ograniczenie silnika</span></h3>
+          <p>Silnik nie zna świąt ani skróconych sesji w USA. W taki dzień noga może wejść o godzinie, w której giełda nie
+            pracuje. Demo pokaże, jak często to się zdarza.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Wykonanie na demo</div>
+      <h2>Jak system ją gra</h2>
+      <p class="intro">Bez modelu językowego. Zespół ma dwa kroki deterministyczne: najpierw krok wykonania, potem krok powiadomienia.</p>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>Harmonogram</h3>
+          <p>Zespół uruchamia się w chwilach, w których którakolwiek noga może wejść albo wyjść: pon.–pt. o 9:25, 9:30, 9:35,
+            10:00, 14:00, 15:30, 15:55, 16:00 i 17:00 czasu nowojorskiego oraz w poniedziałek o 8:05 czasu londyńskiego.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Krok <code>strategy_execute</code></h3>
+          <p>Pyta silnik backtestu, co zrobiłby na świecy, która właśnie się zamknęła, czyli sygnał liczony tymi samymi regułami co
+            backtest. Wchodzi tylko na świeży sygnał (świeca młodsza niż 5 min) i tylko wtedy, gdy na US100 nie ma żadnej innej pozycji.
+            Zamyka własną pozycję, gdy silnik wychodzi. Na jedną świecę przypada najwyżej jedna próba, nawet jeśli zespół
+            uruchomi się dwa razy.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Krok <code>telegram_report</code></h3>
+          <p>Jedna wiadomość o stałym formacie. Przy wejściu: kierunek, cena wykonania, wielkość i poślizg wobec backtestu.
+            Przy wyjściu: cena otwarcia, cena zamknięcia, różnica w punktach i wynik w USD (zmiana salda rachunku).
+            Gdy nic się nie dzieje, krok milczy. Gdy jakiejś wartości nie ma, wiadomość pisze „niedostępne” i niczego nie zgaduje.</p>
+        </div>
+      </div>
+<pre><code><span class="c">Przykład wiadomości po wyjściu</span>
+DEMO — US100 5 nóg
+WYJŚCIE · US100 · LONG
+Cena otwarcia: 25012.4
+Cena zamknięcia: 25087.9 (+75.50 pkt)
+Wielkość: 1.4 · pozycja 0000A1B2…
+Wynik: +105.70 USD
+Powód: the engine signals exit
+Świeca sygnału: 17.11 20:00 (Warszawa), wiek 6 s</code></pre>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Strategia 68 rew. 2 · backtest #171 · rachunek demo</span>
+    <span>docs/strategie/strategia-68-piec-nog.html</span>
+  </div>
+</footer>
