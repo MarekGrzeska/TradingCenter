@@ -174,7 +174,7 @@
     <div class="rail">
       <div class="cell"><div class="v">743</div><div class="l">transakcje w backteście, ok. 5 na tydzień</div></div>
       <div class="cell"><div class="v">56%</div><div class="l">transakcji zyskownych</div></div>
-      <div class="cell"><div class="v">1,49</div><div class="l">profit factor: zysk ÷ strata</div></div>
+      <div class="cell"><div class="v">1,49</div><div class="l">profit factor w USD: zysk ÷ strata</div></div>
       <div class="cell"><div class="v">2,71</div><div class="l">Sharpe</div></div>
       <div class="cell"><div class="v">−52%</div><div class="l">największe obsunięcie kapitału</div></div>
     </div>
@@ -293,41 +293,99 @@
     </section>
 
     <section>
-      <div class="eyebrow">04 · Wyniki backtestu #171</div>
-      <h2>Co pokazała historia</h2>
-      <p>Okres 1.01.2024 – 27.10.2026, kapitał startowy 10&nbsp;000 USD, koszty z capital.com (spread 1,8 pkt, finansowanie
-        nocne). Zysk w każdym z trzech lat jest podobny, więc wynik nie bierze się z jednego szczęśliwego okresu.</p>
-      <div class="table-wrap">
+      <div class="eyebrow">04 · Kwartał po kwartale</div>
+      <h2>Wszystkie 12 kwartałów na plusie</h2>
+      <p class="intro">Okres 1.01.2024 – 27.10.2026 (backtest #172 na rewizji 2, ten sam wynik co #171), kapitał startowy
+        10&nbsp;000 USD, koszty z capital.com. <strong>Żaden kwartał nie skończył się stratą</strong>, ale ich wyniki bardzo się
+        różnią, a w środku prawie każdego kwartału było głębokie obsunięcie.</p>
+      <figure>
+        <div class="scroll"><svg viewBox="0 0 980 300" role="img" aria-label="Wynik każdego kwartału od I kw. 2024 do IV kw. 2026: wszystkie dodatnie, od +13% do +130% kapitału."><style>.ax{font:12px var(--mono);fill:#85899a}.vl{font:700 12px var(--mono);fill:#16181d}</style><line x1="50" y1="240" x2="970" y2="240" stroke="#16181d"/><rect x="68" y="208" width="59" height="32" fill="#1d4291"/><text x="98" y="202" text-anchor="middle" class="vl">+20%</text><text x="98" y="258" text-anchor="middle" class="ax">24·Q1</text><rect x="143" y="191" width="59" height="49" fill="#1d4291"/><text x="172" y="185" text-anchor="middle" class="vl">+30%</text><text x="172" y="258" text-anchor="middle" class="ax">24·Q2</text><rect x="218" y="34" width="59" height="206" fill="#1d4291"/><text x="248" y="28" text-anchor="middle" class="vl">+127%</text><text x="248" y="258" text-anchor="middle" class="ax">24·Q3</text><rect x="293" y="147" width="59" height="93" fill="#1d4291"/><text x="322" y="141" text-anchor="middle" class="vl">+57%</text><text x="322" y="258" text-anchor="middle" class="ax">24·Q4</text><rect x="368" y="175" width="59" height="65" fill="#1d4291"/><text x="398" y="169" text-anchor="middle" class="vl">+40%</text><text x="398" y="258" text-anchor="middle" class="ax">25·Q1</text><rect x="443" y="30" width="59" height="210" fill="#1d4291"/><text x="472" y="24" text-anchor="middle" class="vl">+130%</text><text x="472" y="258" text-anchor="middle" class="ax">25·Q2</text><rect x="518" y="192" width="59" height="48" fill="#1d4291"/><text x="548" y="186" text-anchor="middle" class="vl">+30%</text><text x="548" y="258" text-anchor="middle" class="ax">25·Q3</text><rect x="593" y="171" width="59" height="69" fill="#1d4291"/><text x="622" y="165" text-anchor="middle" class="vl">+43%</text><text x="622" y="258" text-anchor="middle" class="ax">25·Q4</text><rect x="668" y="51" width="59" height="189" fill="#1d4291"/><text x="698" y="45" text-anchor="middle" class="vl">+117%</text><text x="698" y="258" text-anchor="middle" class="ax">26·Q1</text><rect x="743" y="119" width="59" height="121" fill="#1d4291"/><text x="772" y="113" text-anchor="middle" class="vl">+75%</text><text x="772" y="258" text-anchor="middle" class="ax">26·Q2</text><rect x="818" y="202" width="59" height="38" fill="#1d4291"/><text x="848" y="196" text-anchor="middle" class="vl">+23%</text><text x="848" y="258" text-anchor="middle" class="ax">26·Q3</text><rect x="893" y="219" width="59" height="21" fill="#85899a"/><text x="922" y="213" text-anchor="middle" class="vl">+13%</text><text x="922" y="258" text-anchor="middle" class="ax">26·Q4</text></svg></div>
+        <figcaption><b>Suma wyników transakcji w kwartale</b> — w procentach kapitału, bez procentu składanego, żeby kwartały
+          dało się porównać. Szary słupek to niepełny IV kw. 2026 (17 transakcji).</figcaption>
+      </figure>
+      <div class="table-wrap" style="margin-top:20px">
         <table>
-          <thead><tr><th>Rok</th><th class="n">Transakcje</th><th class="n">Wynik roku</th></tr></thead>
-          <tbody>
-            <tr><td><b>2024</b></td><td class="n">244</td><td class="n">+234%</td></tr>
-            <tr><td><b>2025</b></td><td class="n">260</td><td class="n">+242%</td></tr>
-            <tr><td><b>2026</b> (do 27.10)</td><td class="n">239</td><td class="n">+227%</td></tr>
-          </tbody>
+          <thead><tr><th>Kwartał</th><th class="n">Transakcje</th><th class="n">Zyskowne</th><th class="n">Suma wyników</th>
+            <th class="n">Kapitał w kwartale</th><th class="n">Profit factor</th><th class="n">Najgłębszy dołek</th></tr></thead>
+          <tbody><tr><td><b>2024 Q1</b></td><td class="n">59</td><td class="n">46%</td><td class="n">+20,0%</td><td class="n">+18,3%</td><td class="n">1,38</td><td class="n">−21,9%</td></tr><tr><td><b>2024 Q2</b></td><td class="n">58</td><td class="n">57%</td><td class="n">+30,4%</td><td class="n">+30,0%</td><td class="n">1,53</td><td class="n">−18,9%</td></tr><tr><td><b>2024 Q3</b></td><td class="n">61</td><td class="n">62%</td><td class="n">+126,9%</td><td class="n">+221,6%</td><td class="n">3,04</td><td class="n">−14,5%</td></tr><tr><td><b>2024 Q4</b></td><td class="n">66</td><td class="n">59%</td><td class="n">+57,1%</td><td class="n">+69,7%</td><td class="n">1,96</td><td class="n">−8,9%</td></tr><tr><td><b>2025 Q1</b></td><td class="n">67</td><td class="n">63%</td><td class="n">+40,3%</td><td class="n">+31,0%</td><td class="n">1,34</td><td class="n">−49,8%</td></tr><tr><td><b>2025 Q2</b></td><td class="n">59</td><td class="n">56%</td><td class="n">+129,5%</td><td class="n">+156,8%</td><td class="n">2,07</td><td class="n">−30,2%</td></tr><tr><td><b>2025 Q3</b></td><td class="n">69</td><td class="n">58%</td><td class="n">+29,6%</td><td class="n">+30,5%</td><td class="n">1,51</td><td class="n">−10,8%</td></tr><tr><td><b>2025 Q4</b></td><td class="n">65</td><td class="n">60%</td><td class="n">+42,5%</td><td class="n">+43,9%</td><td class="n">1,57</td><td class="n">−25,8%</td></tr><tr><td><b>2026 Q1</b></td><td class="n">79</td><td class="n">58%</td><td class="n">+116,8%</td><td class="n">+185,3%</td><td class="n">2,18</td><td class="n">−20,8%</td></tr><tr><td><b>2026 Q2</b></td><td class="n">69</td><td class="n">54%</td><td class="n">+74,7%</td><td class="n">+97,0%</td><td class="n">2,00</td><td class="n">−27,2%</td></tr><tr><td><b>2026 Q3</b></td><td class="n">74</td><td class="n">50%</td><td class="n">+23,2%</td><td class="n">+17,5%</td><td class="n">1,22</td><td class="n">−40,3%</td></tr><tr><td><b>2026 Q4</b> <small>(do 27.10)</small></td><td class="n">17</td><td class="n">47%</td><td class="n">+12,8%</td><td class="n">+11,0%</td><td class="n">1,48</td><td class="n">−16,7%</td></tr></tbody>
         </table>
       </div>
-      <div class="fails" style="margin-top:20px">
-        <div class="fail stop">
-          <h3>Obsunięcie −52% <span class="tag stop">ryzyko</span></h3>
-          <p>W historii był moment, w którym połowa kapitału zniknęła, zanim wrócił zysk. Przy pozycji wartej ok. 7× kapitał
-            i bez stop-lossa jedna transakcja potrafiła w backteście pójść przeciw pozycji o 28% kapitału, zanim się zamknęła.</p>
-        </div>
-        <div class="fail">
-          <h3>Procent składany robi większość wyniku <span class="tag att">czytaj ostrożnie</span></h3>
-          <p>+38&nbsp;768% na końcu bierze się z tego, że każda pozycja to 35% <em>bieżącego</em> kapitału. Średnia transakcja daje
-            ok. +0,95% kapitału. Na prawdziwym rachunku płynność i limity brokera zatrzymają ten wzrost dużo wcześniej.</p>
-        </div>
-        <div class="fail">
-          <h3>Bez świąt giełdowych <span class="tag att">ograniczenie silnika</span></h3>
-          <p>Silnik nie zna świąt ani skróconych sesji w USA. W taki dzień noga może wejść o godzinie, w której giełda nie
-            pracuje. Demo pokaże, jak często to się zdarza.</p>
-        </div>
-      </div>
+      <p style="margin-top:16px"><strong>Jak czytać:</strong> „suma wyników” to dodane do siebie wyniki transakcji (każda w %
+        kapitału w chwili wejścia). „Kapitał w kwartale” to ile urósł rachunek od początku do końca kwartału, z procentem
+        składanym. „Najgłębszy dołek” to największy spadek kapitału od szczytu w trakcie kwartału. Najgorszy był
+        I kw. 2025: <span class="hl">rachunek stracił po drodze połowę</span>, a mimo to kwartał zamknął się na plusie.</p>
     </section>
 
     <section>
-      <div class="eyebrow">05 · Wykonanie na demo</div>
+      <div class="eyebrow">05 · Która noga zarabia</div>
+      <h2>Zysk robią dwie nogi z pięciu</h2>
+      <p class="intro">Ten sam backtest rozbity na nogi według godziny wejścia. Liczba t mówi, jak daleko średni wynik
+        jest od zera w porównaniu z rozrzutem. Powyżej ok. 2 trudno to wytłumaczyć przypadkiem, poniżej 1 to szum.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Noga</th><th class="n">Transakcje</th><th class="n">Zyskowne</th><th class="n">Średnio</th>
+            <th class="n">Suma</th><th class="n">2024 / 2025 / 2026</th><th class="n">t</th><th>Ocena</th></tr></thead>
+          <tbody><tr><td><b>1 Londyn</b></td><td class="n">147</td><td class="n">60%</td><td class="n">+1,64%</td><td class="n">+241%</td><td class="n">+28% / +102% / +111%</td><td class="n">2,69</td><td><span class="tag att">tylko LONG</span> zarabia, gdy rynek rośnie; słaba w 2024</td></tr><tr><td><b>2 Otwarcie NY</b></td><td class="n">209</td><td class="n">63%</td><td class="n">+1,48%</td><td class="n">+310%</td><td class="n">+105% / +103% / +101%</td><td class="n">3,18</td><td><span class="tag ok">najmocniejsza</span> ok. +100% w każdym roku</td></tr><tr><td><b>3 Poranek Europy</b></td><td class="n">70</td><td class="n">54%</td><td class="n">+0,94%</td><td class="n">+66%</td><td class="n">+49% / +11% / +6%</td><td class="n">1,29</td><td><span class="tag att">słaba</span> dobra w 2024, potem na granicy zera</td></tr><tr><td><b>4 Koniec dnia</b></td><td class="n">274</td><td class="n">50%</td><td class="n">+0,06%</td><td class="n">+17%</td><td class="n">+12% / +14% / −8%</td><td class="n">0,54</td><td><span class="tag stop">szum</span> wynik bliski zera, w 2026 strata</td></tr><tr><td><b>5 Noc</b></td><td class="n">43</td><td class="n">56%</td><td class="n">+1,63%</td><td class="n">+70%</td><td class="n">+41% / +12% / +18%</td><td class="n">1,90</td><td><span class="tag att">mała próba</span> tylko 43 transakcje</td></tr></tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Otwarcie NY i Londyn w poniedziałek dają razem ok. <strong>78%
+        sumy wyników</strong>. Koniec dnia to najczęstsza noga (274 transakcji), ale
+        przez trzy lata zarobiła prawie nic, a w 2026 traci. Płaci spread i blokuje miejsce na inne pozycje.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Powtarzalność czy przypadek</div>
+      <h2>Ile w tym wyniku jest szczęścia</h2>
+      <p class="intro">Pięć testów na tych samych 743 transakcjach. Każdy zadaje inne pytanie, które dałoby się zbyć
+        słowem „przypadek”.</p>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>Czy średnia transakcja jest naprawdę dodatnia? <span class="tag ok">tak</span></h3>
+          <p>Średnio +0,95% kapitału na transakcję, t = 4,67. Losowanie transakcji ze zwracaniem
+            (bootstrap, 20&nbsp;000 razy) daje 95% przedział średniej od +0,57% do
+            +1,35%. Żadne z 20&nbsp;000 losowań nie dało średniej poniżej zera.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Czy kierunek ma znaczenie, czy wystarczy pora? <span class="tag ok">kierunek ma znaczenie</span></h3>
+          <p>Te same wejścia i wyjścia, ale z kierunkiem losowanym rzutem monetą: średnio −43%, a 95%
+            losowań poniżej +208%. Strategia zrobiła +704%. Żadne z 20&nbsp;000 losowań
+            jej nie dogoniło. Nie wszędzie: na otwarciu NY, gdzie strategia naprawdę wybiera kierunek, p = 0,0002, na końcu
+            dnia p = 0,16, czyli kierunek wybrany na końcu dnia nie jest lepszy od monety.</p>
+        </div>
+        <div class="fail">
+          <h3>Ile daje sam wzrost rynku? <span class="tag att">ponad połowę</span></h3>
+          <p>US100 urósł w tym okresie o ok. 75% (z 16 828 do 29 377 pkt). Gdyby w tych samych chwilach zawsze kupować, suma wyników wyniosłaby
+            +390%, a zawsze sprzedawać −475%. Strategia ma
+            +704%: ok. połowę daje to, że gra głównie LONG w rosnącym rynku, a drugą połowę wybór kierunku na
+            otwarciu NY. Noga Londyn i noga Noc są tylko LONG, więc na bessie będą tracić.</p>
+        </div>
+        <div class="fail">
+          <h3>Czy wynik robi kilka szczęśliwych dni? <span class="tag att">częściowo</span></h3>
+          <p>10 najlepszych transakcji (1,3% wszystkich) daje 35% sumy. Bez 5 najlepszych suma
+            spada z +704% do +535%, bez 20 do +327%. Strategia dalej zarabia, ale o
+            wyniku sporo decyduje kilka dużych dni.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Jak głęboko może spaść? <span class="tag stop">bardzo</span></h3>
+          <p>Te same transakcje w losowej kolejności (5000 razy): typowe największe obsunięcie to −44%, a w co
+            dwudziestym przypadku −59% lub gorzej. Rzeczywiste −52% to nie pech, tylko normalna cena tej
+            wielkości pozycji. Losowanie 743 transakcji ze zwracaniem: w 5% przypadków kapitał kończy na
+            +3821%, w połowie na +39152%.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Czego te testy nie łapią <span class="tag stop">dopasowanie</span></h3>
+          <p>Wszystkie testy zakładają, że reguły ustalono przed obejrzeniem danych. Tak nie było: strategia 68 to kolejna
+            wersja #58, #34 i wcześniejszych, a progi (0,075, 0,2, 0,5) i nogi wybrano, oglądając wyniki na tym samym okresie
+            2024–2026. Część przewagi to więc dopasowanie do historii, i żaden test na tych samych danych go nie zmierzy.
+            Rozstrzygnie dopiero okres, którego strategia nie widziała: demo od listopada 2026.</p>
+        </div>
+      </div>
+      <div class="quote">Przewaga jest prawdziwa na otwarciu NY i w poniedziałek rano. Reszta to wzrost rynku, szum i
+        dopasowanie. Rozmiar −52% to cena dźwigni, nie pech.</div>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Wykonanie na demo</div>
       <h2>Jak system ją gra</h2>
       <p class="intro">Bez modelu językowego. Zespół ma dwa kroki deterministyczne: najpierw krok wykonania, potem krok powiadomienia.</p>
       <div class="fails">
@@ -348,6 +406,14 @@
           <p>Jedna wiadomość o stałym formacie. Przy wejściu: kierunek, cena wykonania, wielkość i poślizg wobec backtestu.
             Przy wyjściu: cena otwarcia, cena zamknięcia, różnica w punktach i wynik w USD (zmiana salda rachunku).
             Gdy nic się nie dzieje, krok milczy. Gdy jakiejś wartości nie ma, wiadomość pisze „niedostępne” i niczego nie zgaduje.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Noga 5 (noc) na demo nie wejdzie <span class="tag stop">znane ograniczenie</span></h3>
+          <p>Sygnał nocny pada o 17:00 w Nowym Jorku, na początku godzinnej przerwy w handlu US100. Backtest wypełnia go o
+            18:00, na pierwszej świecy po przerwie. Krok o 17:00 najpewniej dostanie od brokera odmowę (rynek zamknięty). O 18:05 silnik
+            już „trzyma” pozycję, a krok nie nadrabia wejść, więc nic nie zrobi. Noga 5 to 43 transakcje i ok. 10% sumy
+            wyników. Na Telegram przyjdzie wtedy „ODRZUCONE” z powodem od brokera. Żeby ją grać, przepis musiałby umieć wejść na
+            pierwszej świecy po przerwie. To osobna zmiana.</p>
         </div>
       </div>
 <pre><code><span class="c">Przykład wiadomości po wyjściu</span>
