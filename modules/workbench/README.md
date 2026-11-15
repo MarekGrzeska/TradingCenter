@@ -132,7 +132,7 @@ opened — `provider_order_id` is the position's id on capital.com (checked on t
 result carries `trade`: the fill price on entry, both prices and the money on exit — the balance's change, or the last
 unrealised result marked `pnl_approximate` when the balance has not moved within three reads.
 `telegram_report` tells that result on Telegram in one fixed shape, by no model (`compose()`, a table too), silent on
-`no_action` and on a repeat of the same bar (`openspec/changes/step-telegram-report`).
+`no_action` and on a repeat of the same bar (`openspec/changes/archive/2026-11-15-step-telegram-report`).
 
 An agent may carry a `fallback_notice`: when its model fails or a cost limit stops it, the run sends one fixed message
 through the agent's own `send_telegram_message`. A used-up daily cost limit holds back the agents of a revision with
