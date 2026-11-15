@@ -56,6 +56,8 @@ class Action:
     reason: str | None = None
     side: str | None = None
     position_id: str | None = None
+    # A skip because this signal bar was already acted on: a repeat, not news for whoever reports the step.
+    same_bar: bool = False
 
 
 def _iso(value: str) -> datetime:
@@ -94,6 +96,7 @@ def decide(seen: Seen) -> Action:
                 "none",
                 "skipped",
                 f"the entry on this signal bar was already made: this team's position {seen.own.position_id}",
+                same_bar=True,
             )
         engine_side = engine.get("side") if isinstance(engine, dict) else None
         if action == "exit" or engine_side != seen.own.side:
@@ -189,6 +192,7 @@ async def execute(
 ) -> dict[str, Any]:
     params = StrategyExecuteParams.model_validate(step.params)
     result = _Result(started_at=now())
+    result.extra["symbol"] = params.symbol
     label = f"{params.symbol} strategy {params.strategy_id}/{params.revision}"
 
     signal = await _signal(ctx, params, result, now=now, sleep=sleep)
@@ -224,12 +228,17 @@ async def execute(
         )
     )
     if action.kind == "none":
+        if action.same_bar:
+            result.extra["same_bar"] = True
         return result.out(action.decision, action.reason, f"{label}: {action.decision} — {action.reason}")
 
     bar = signal.get("bar_closed_at")
     base_key = f"{ctx.team_id}:{ctx.key}:{params.strategy_id}:{params.revision}:{bar}"
     if action.kind == "close":
-        return await _close(ctx, action, f"{base_key}:exit", result, label, now=now)
+        row = next((r for r in position_rows if str(r.get("id")) == action.position_id), {})
+        return await _close(
+            ctx, action, row, _payload(balance.text), f"{base_key}:exit", result, label, now=now, sleep=sleep
+        )
     return await _enter(ctx, params, signal, _payload(balance.text), action, f"{base_key}:enter", result, label, now=now)
 
 
@@ -295,23 +304,92 @@ def _own_position(
     return Own(position_id=str(row["id"]), side=side, placed_at=order["created_at"]), None
 
 
-async def _close(ctx, action: Action, attempt_key: str, result: _Result, label: str, *, now) -> dict[str, Any]:
+async def _close(
+    ctx, action: Action, row: dict[str, Any], balance: Any, attempt_key: str, result: _Result, label: str, *, now, sleep
+) -> dict[str, Any]:
     result.mark("order_sent", now())
     try:
         outcome = await ctx.call("close_position", {"position_id": action.position_id}, attempt_key=attempt_key)
     except AttemptAlreadyMade:
+        result.extra["same_bar"] = True
         return result.out("skipped", "an exit on this signal bar was already attempted", f"{label}: exit already attempted")
     result.mark("order_answered", now())
     reply = _payload(outcome.text) if outcome.ok else None
     result.extra["order"] = reply if outcome.ok else outcome.text
     result.extra["position_id"] = action.position_id
     if _settled(reply):
-        return result.out("exited", action.reason, f"{label}: closed {action.side} position {action.position_id} — {action.reason}")
+        trade = await _closed_trade(ctx, action, row, balance, reply, sleep=sleep)
+        result.extra["trade"] = trade
+        if trade["pnl"] is None:
+            money = "result unknown"
+        else:
+            money = f"result {'~' if trade['pnl_approximate'] else ''}{trade['pnl']} {trade['currency'] or ''}".strip()
+        return result.out(
+            "exited",
+            action.reason,
+            f"{label}: closed {action.side} position {action.position_id} "
+            f"{trade['open_price']} -> {trade['close_price']}, {money} — {action.reason}",
+        )
     if outcome.settles_as_refused:
         return result.out("refused", outcome.text, f"{label}: close of {action.position_id} refused — {outcome.text}")
     return result.out(
         "unknown", outcome.text, f"{label}: close of {action.position_id} has no known outcome — check the account"
     )
+
+
+# A closed position's money reaches the balance a moment after the confirmation; this many reads, then the last unrealised figure.
+_BALANCE_SETTLE_READS = 3
+
+
+def _number(value: Any) -> Decimal | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        return Decimal(str(value))
+    except InvalidOperation:
+        return None
+
+
+def _float(value: Decimal | None) -> float | None:
+    return None if value is None else float(value)
+
+
+async def _closed_trade(
+    ctx, action: Action, row: dict[str, Any], balance: Any, reply: dict[str, Any], *, sleep
+) -> dict[str, Any]:
+    """Prices and money of the position just closed. The money is the balance's change, what the account booked: the
+    broker's own profit figure would be a change of the gateway's contract for the same number."""
+    open_price = _number(row.get("open_level"))
+    close_price = _number(reply.get("level"))
+    size = _number(row.get("size")) or _number(reply.get("size"))
+    points = None
+    if open_price is not None and close_price is not None:
+        points = (close_price - open_price) * (1 if action.side == "long" else -1)
+    account = balance if isinstance(balance, dict) else {}
+    before = _number(account.get("balance"))
+    pnl: Decimal | None = None
+    if before is not None:
+        for read in range(_BALANCE_SETTLE_READS):
+            if read:
+                await sleep(1.0)
+            after = await ctx.call("get_balance", {})
+            current = _number((_payload(after.text) or {}).get("balance")) if after.ok else None
+            if current is not None and current != before:
+                pnl = current - before
+                break
+    approximate = pnl is None and _number(row.get("pnl")) is not None
+    if approximate:
+        pnl = _number(row.get("pnl"))
+    return {
+        "side": action.side,
+        "size": _float(size),
+        "open_price": _float(open_price),
+        "close_price": _float(close_price),
+        "points": _float(points),
+        "pnl": None if pnl is None else float(round(pnl, 2)),
+        "pnl_approximate": approximate,
+        "currency": account.get("currency") or row.get("currency"),
+    }
 
 
 def _settled(reply: Any) -> TypeGuard[dict[str, Any]]:
@@ -350,6 +428,7 @@ async def _enter(
     try:
         outcome = await ctx.call("place_order", arguments, attempt_key=attempt_key)
     except AttemptAlreadyMade:
+        result.extra["same_bar"] = True
         return result.out("skipped", "an entry on this signal bar was already attempted", f"{label}: entry already attempted")
     result.mark("order_answered", now())
     if outcome.settles_as_refused:
@@ -360,6 +439,9 @@ async def _enter(
         return result.out("unknown", outcome.text, f"{label}: {direction} {size} has no known outcome — check the account")
 
     level = order.get("level")
+    if not isinstance(level, int | float):
+        level = await _open_level(ctx, str(order["id"]))
+    result.extra["trade"] = {"side": action.side, "size": size, "fill_price": level, "position_id": order.get("id")}
     assumed = await _assumed_open(ctx, params.symbol, signal.get("bar_closed_at"))
     if assumed is not None and isinstance(level, int | float):
         sign = 1 if direction == "BUY" else -1
@@ -372,6 +454,15 @@ async def _enter(
         None,
         f"{label}: {direction} {size} filled at {level}, position {order.get('id')} ({source} deposit {fraction})",
     )
+
+
+async def _open_level(ctx, position_id: str) -> float | None:
+    """The fill price off the account when the confirmation carried none: the position the order opened."""
+    outcome = await ctx.call("get_positions", {})
+    rows = _payload(outcome.text) if outcome.ok else None
+    row = next((r for r in rows or [] if isinstance(r, dict) and str(r.get("id")) == position_id), None)
+    level = row.get("open_level") if row else None
+    return float(level) if isinstance(level, int | float) else None
 
 
 def _fraction(params: StrategyExecuteParams, signal: dict[str, Any]) -> tuple[Decimal | None, str]:

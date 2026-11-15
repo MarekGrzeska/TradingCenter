@@ -488,7 +488,7 @@ class _StepNodeRunner(_NodeTrace):
     async def run(self, given: Sequence[tuple[str, str]]) -> str:
         await self._start()
         try:
-            result = await run_recipe(self._definition, self)
+            result = await run_recipe(self._definition, self, given)
         except (TradeLimitReached, CostLimitReached, asyncio.CancelledError):
             await asyncio.shield(self._finish(output=None, rounds=0))
             raise
