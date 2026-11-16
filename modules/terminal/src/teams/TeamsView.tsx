@@ -7,6 +7,7 @@ import { useRead } from "../data/query";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { useAgentTurns } from "../agent/useAgentTurns";
 import { MemoryPanel } from "./MemoryPanel";
+import { RetiredTeams } from "./RetiredTeams";
 import { SchedulesPanel } from "./SchedulesPanel";
 import { TeamCatalogue } from "./TeamCatalogue";
 import { TeamEditor } from "./TeamEditor";
@@ -18,6 +19,7 @@ type Open =
   | { kind: "catalogue" }
   | { kind: "team"; id: number }
   | { kind: "new" }
+  | { kind: "retired" }
   /** A team's runs, with one of them open underneath the list. `runId` is set when the
    *  operator arrived by starting a run or by following one from a schedule's history;
    *  `null` lets the view open the newest, which is what "show me the runs" means. */
@@ -93,10 +95,21 @@ export function TeamsView({
         }
         onRuns={(teamId, teamName) => setOpen({ kind: "runs", teamId, teamName, runId: null })}
         onNew={() => setOpen({ kind: "new" })}
+        onRetired={() => setOpen({ kind: "retired" })}
         onSchedules={(id, name) => setOpen({ kind: "schedules", teamId: id, teamName: name })}
         onMemory={(id, name) => setOpen({ kind: "memory", teamId: id, teamName: name })}
         onChanged={teams.reload}
         onReload={teams.reload}
+      />
+    );
+  }
+
+  if (open.kind === "retired") {
+    return (
+      <RetiredTeams
+        api={api}
+        onClose={() => setOpen({ kind: "catalogue" })}
+        onRestored={teams.reload}
       />
     );
   }

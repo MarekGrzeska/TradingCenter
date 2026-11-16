@@ -161,6 +161,23 @@ def test_a_retired_team_leaves_the_catalogue_but_keeps_its_revisions(client: Tes
     assert kept.json()["version"] == 1
 
 
+def test_a_retired_team_is_listed_apart_and_can_be_restored(client: TestClient) -> None:
+    team_id = _create(client).json()["id"]
+    client.delete(f"/teams/{team_id}", headers=OWNER)
+
+    retired = client.get("/teams", params={"archived": "true"}, headers=OWNER).json()
+    assert [team["id"] for team in retired] == [team_id]
+    assert retired[0]["archived_at"] is not None
+    assert client.get("/teams", params={"archived": "true"}, headers=STRANGER).json() == []
+    assert client.post(f"/teams/{team_id}/restore", headers=STRANGER).status_code == 404
+
+    restored = client.post(f"/teams/{team_id}/restore", headers=OWNER)
+
+    assert restored.status_code == 200
+    assert restored.json()["archived_at"] is None
+    assert [team["id"] for team in client.get("/teams", headers=OWNER).json()] == [team_id]
+
+
 def test_a_rename_changes_the_label_and_appends_no_revision(client: TestClient) -> None:
     team_id = _create(client).json()["id"]
 

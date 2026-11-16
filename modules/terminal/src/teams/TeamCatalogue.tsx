@@ -18,6 +18,7 @@ export function TeamCatalogue({
   onWatch,
   onRuns,
   onNew,
+  onRetired,
   onSchedules,
   onMemory,
   onChanged,
@@ -33,6 +34,8 @@ export function TeamCatalogue({
   /** The team's runs, as a view of their own. */
   onRuns(id: number, name: string): void;
   onNew(): void;
+  /** The teams taken out of the catalogue, and the way back for each. */
+  onRetired(): void;
   onSchedules(id: number, name: string): void;
   onMemory(id: number, name: string): void;
   onChanged(): void;
@@ -69,6 +72,7 @@ export function TeamCatalogue({
         >
           New team
         </Button>
+        <Button onClick={onRetired}>Retired</Button>
       </div>
 
       {status === "loading" && <p className="text-sm text-ink-muted">Reading the catalogue…</p>}
@@ -173,8 +177,9 @@ export function TeamCatalogue({
           onClose={() => setRetiring(null)}
         >
           <p className="text-sm text-ink">
-            It leaves the catalogue. Its revisions and every run recorded against them stay
-            readable — this is not a delete.
+            It leaves the catalogue and its schedules and triggers are switched off, so it starts
+            nothing by itself. Its revisions and every run recorded against them stay readable — this
+            is not a delete, and it can be restored from Retired.
           </p>
         </ConfirmDialog>
       )}

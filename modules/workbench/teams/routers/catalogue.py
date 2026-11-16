@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from .. import store
 from ..auth import current_principal
@@ -60,10 +60,17 @@ async def create_team(
 
 
 @router.get("/teams")
-async def list_teams(request: Request, owner: str = Depends(current_principal)) -> list[TeamOut]:
+async def list_teams(
+    request: Request,
+    archived: bool = Query(False, description="list only the retired teams, each with `archived_at`"),
+    owner: str = Depends(current_principal),
+) -> list[TeamOut]:
     """The whole of what a picker needs, and no definition — see `store.catalogue._LATEST_REVISION`."""
     async with request.app.state.teams.pool.acquire() as conn:
-        rows = await store.list_teams(conn, owner_principal=owner)
+        if archived:
+            rows = await store.list_retired_teams(conn, owner_principal=owner)
+        else:
+            rows = await store.list_teams(conn, owner_principal=owner)
     # `dict(row)`, here and below: asyncpg's Record forwards mapping access at
     # runtime but is not a Mapping to a type checker, and `from_row` takes one.
     return [TeamOut.from_row(dict(row)) for row in rows]
@@ -198,9 +205,21 @@ async def save_layout(
 async def archive_team(
     team_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> None:
-    """Retires the team from the catalogue. Its runs and the revisions they name stay —
-    see `store.catalogue._ARCHIVE_TEAM`."""
+    """Retires the team from the catalogue and switches off its schedules and triggers. Its runs and the revisions
+    they name stay — see `store.catalogue._ARCHIVE_TEAM`."""
     async with request.app.state.teams.pool.acquire() as conn:
         retired = await store.archive_team(conn, team_id=team_id, owner_principal=owner)
     if not retired:
         raise HTTPException(404, detail="no such team")
+
+
+@router.post("/teams/{team_id}/restore")
+async def restore_team(
+    team_id: int, request: Request, owner: str = Depends(current_principal)
+) -> TeamOut:
+    """Back into the catalogue. Its schedules and triggers stay switched off: the operator turns each on again."""
+    async with request.app.state.teams.pool.acquire() as conn:
+        row = await store.restore_team(conn, team_id=team_id, owner_principal=owner)
+    if row is None:
+        raise HTTPException(404, detail="no such retired team")
+    return TeamOut.from_row(dict(row))

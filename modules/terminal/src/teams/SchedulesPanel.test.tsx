@@ -105,6 +105,10 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
     revisionById: vi.fn(async () => REVISION),
     saveRevision: vi.fn(async () => REVISION),
     archiveTeam: vi.fn(async () => {}),
+    listRetiredTeams: vi.fn(async () => []),
+    restoreTeam: vi.fn(async () => {
+      throw new Error("not stubbed");
+    }),
     memory: vi.fn(async () => ({ entries: [], total: 0 })),
     deleteMemory: vi.fn(async () => {}),
     layout: vi.fn(async () => new Map()),

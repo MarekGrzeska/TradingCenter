@@ -4,15 +4,18 @@ The owner filter is part of every statement rather than of the routes, so a stra
 from __future__ import annotations
 
 from .catalogue import (
+    RETIRED_REASON,
     archive_team,
     create_team,
     get_latest_revision,
     get_revision,
     get_revision_by_id,
     get_team,
+    list_retired_teams,
     list_teams,
     move_revisions_to_successors,
     rename_team,
+    restore_team,
     save_revision,
 )
 from .fires import (
@@ -88,6 +91,7 @@ from .usage import (
 )
 
 __all__ = [
+    "RETIRED_REASON",
     "AttemptAlreadyMade",
     "add_memory",
     "archive_team",
@@ -128,6 +132,7 @@ __all__ = [
     "list_fires_for_schedule",
     "list_fires_for_trigger",
     "list_memories",
+    "list_retired_teams",
     "list_runs_for_team",
     "list_schedules_for_team",
     "list_teams",
@@ -142,6 +147,7 @@ __all__ = [
     "rename_team",
     "reset_schedule_failures",
     "reset_trigger_failures",
+    "restore_team",
     "save_layout",
     "save_revision",
     "set_schedule_enabled",

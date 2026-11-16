@@ -421,6 +421,8 @@ class TeamOut(BaseModel):
     account_id: str | None = None
     created_at: datetime
     updated_at: datetime
+    # Set only on the retired list (`GET /teams?archived=true`); an active team has none.
+    archived_at: datetime | None = None
 
     @classmethod
     def from_row(cls, row: Mapping[str, Any]) -> TeamOut:
@@ -432,6 +434,7 @@ class TeamOut(BaseModel):
             account_id=row.get("account_id"),
             created_at=row["created_at"],
             updated_at=row["updated_at"],
+            archived_at=row.get("archived_at"),
         )
 
 
