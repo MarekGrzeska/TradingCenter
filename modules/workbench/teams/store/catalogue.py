@@ -51,6 +51,14 @@ _SELECT_TEAMS_FOR_OWNER = f"""
      ORDER BY t.updated_at DESC, t.id DESC
 """
 
+# The other side of the same catalogue: only what was retired, newest retirement first, with the moment it happened.
+_SELECT_RETIRED_TEAMS_FOR_OWNER = f"""
+    SELECT t.id, t.name, t.description, t.created_at, t.updated_at, t.archived_at, {_LATEST_REVISION}
+      FROM teams t {_JOIN_LATEST_REVISION}
+     WHERE t.owner_principal = $1 AND t.archived_at IS NOT NULL
+     ORDER BY t.archived_at DESC, t.id DESC
+"""
+
 # `FOR UPDATE` on the team row, not on `team_revisions`: two saves arriving together would otherwise both
 # read the same `max(version)` and one would lose to the unique constraint.
 _LOCK_TEAM_FOR_WRITE = """
@@ -116,6 +124,30 @@ _ARCHIVE_TEAM = """
     RETURNING id
 """
 
+# What retiring means to the operator: the team does nothing any more. Its clock and its trip-wires are switched
+# off with it, in the same transaction, so a retired team on the live account cannot place an order at 09:35.
+RETIRED_REASON = "zespół wycofany z katalogu"
+_DISABLE_TEAM_SCHEDULES = """
+    UPDATE schedules SET enabled = false, disabled_reason = $2, updated_at = now()
+     WHERE team_id = $1 AND enabled
+"""
+_DISABLE_TEAM_TRIGGERS = """
+    UPDATE triggers SET enabled = false, disabled_reason = $2, updated_at = now()
+     WHERE team_id = $1 AND enabled
+"""
+
+# Restoring brings the team back to the catalogue and nothing else: its schedules and triggers stay off until the
+# operator switches each one on — a restored team on the live account must not resume trading by itself.
+_RESTORE_TEAM = f"""
+    WITH t AS (
+        UPDATE teams SET archived_at = NULL, updated_at = now()
+         WHERE id = $1 AND owner_principal = $2 AND archived_at IS NOT NULL
+        RETURNING id, name, description, created_at, updated_at
+    )
+    SELECT t.id, t.name, t.description, t.created_at, t.updated_at, {_LATEST_REVISION}
+      FROM t {_JOIN_LATEST_REVISION}
+"""
+
 
 def _as_jsonb(definition: TeamDefinition) -> str:
     """`by_alias=True` is load-bearing: `TeamEdge.from_` is written `from` on the wire and MUST be written
@@ -170,6 +202,10 @@ async def list_teams(conn: Conn, *, owner_principal: str) -> list[asyncpg.Record
     return list(await conn.fetch(_SELECT_TEAMS_FOR_OWNER, owner_principal))
 
 
+async def list_retired_teams(conn: Conn, *, owner_principal: str) -> list[asyncpg.Record]:
+    return list(await conn.fetch(_SELECT_RETIRED_TEAMS_FOR_OWNER, owner_principal))
+
+
 async def get_revision(
     conn: Conn, *, team_id: int, owner_principal: str, version: int
 ) -> asyncpg.Record | None:
@@ -192,10 +228,21 @@ async def get_latest_revision(
 
 
 async def archive_team(conn: Conn, *, team_id: int, owner_principal: str) -> bool:
-    """Retires a team from the catalogue. Its revisions and every run that pointed at
-    them stay exactly where they were — see `_ARCHIVE_TEAM`."""
-    row = await conn.fetchrow(_ARCHIVE_TEAM, team_id, owner_principal)
-    return row is not None
+    """Retires a team from the catalogue and switches off its schedules and triggers. Its revisions and every run
+    that pointed at them stay exactly where they were — see `_ARCHIVE_TEAM`."""
+    async with conn.transaction():
+        row = await conn.fetchrow(_ARCHIVE_TEAM, team_id, owner_principal)
+        if row is None:
+            return False
+        await conn.execute(_DISABLE_TEAM_SCHEDULES, team_id, RETIRED_REASON)
+        await conn.execute(_DISABLE_TEAM_TRIGGERS, team_id, RETIRED_REASON)
+    return True
+
+
+async def restore_team(conn: Conn, *, team_id: int, owner_principal: str) -> asyncpg.Record | None:
+    """Back into the catalogue, or `None` for a team that is not retired, not there, or somebody else's. Its
+    schedules and triggers are left switched off — see `_RESTORE_TEAM`."""
+    return await conn.fetchrow(_RESTORE_TEAM, team_id, owner_principal)
 
 
 async def move_revisions_to_successors(conn: Conn, successors: Mapping[str, str]) -> int:

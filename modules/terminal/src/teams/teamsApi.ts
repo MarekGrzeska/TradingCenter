@@ -57,6 +57,8 @@ export interface TeamSummary {
   accountId?: string | null;
   createdAt: number;
   updatedAt: number;
+  /** When it was retired — set only on the retired list. */
+  archivedAt?: number | null;
 }
 
 export interface TeamAgent {
@@ -325,6 +327,10 @@ export interface TeamsApi {
   /** Retires a team from the catalogue. Its runs and revisions stay readable — this is
    *  not a delete, whatever the verb says. */
   archiveTeam(id: number, signal: AbortSignal): Promise<void>;
+  /** The retired teams, newest retirement first, each with `archivedAt`. */
+  listRetiredTeams(signal: AbortSignal): Promise<TeamSummary[]>;
+  /** Back into the catalogue. Its schedules and triggers stay switched off — the operator turns each on again. */
+  restoreTeam(id: number, signal: AbortSignal): Promise<TeamSummary>;
 
   /** Where the operator left each agent. A team nobody has arranged answers with an empty
    *  layout, which is not an error: the canvas then places every agent from the
@@ -411,6 +417,7 @@ function mapTeam(raw: RawTeam): TeamSummary {
     accountId: raw.account_id ?? null,
     createdAt: parseIsoToEpochSeconds(raw.created_at),
     updatedAt: parseIsoToEpochSeconds(raw.updated_at),
+    archivedAt: raw.archived_at ? parseIsoToEpochSeconds(raw.archived_at) : null,
   };
 }
 
@@ -728,6 +735,19 @@ export function createTeamsApi(httpBase: string, identity: Identity = noIdentity
 
     async archiveTeam(id, signal) {
       await http.send(`${httpBase}/teams/${id}`, { method: "DELETE", signal });
+    },
+
+    async listRetiredTeams(signal) {
+      const raw = await http.json<RawTeam[]>(`${httpBase}/teams?archived=true`, { signal });
+      return raw.map(mapTeam);
+    },
+
+    async restoreTeam(id, signal) {
+      const raw = await http.json<RawTeam>(`${httpBase}/teams/${id}/restore`, {
+        method: "POST",
+        signal,
+      });
+      return mapTeam(raw);
     },
 
     async layout(id, signal) {

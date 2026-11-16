@@ -354,8 +354,8 @@ export interface paths {
         post?: never;
         /**
          * Archive Team
-         * @description Retires the team from the catalogue. Its runs and the revisions they name stay —
-         *     see `store.catalogue._ARCHIVE_TEAM`.
+         * @description Retires the team from the catalogue and switches off its schedules and triggers. Its runs and the revisions
+         *     they name stay — see `store.catalogue._ARCHIVE_TEAM`.
          */
         delete: operations["archive_team_teams__team_id__delete"];
         options?: never;
@@ -427,6 +427,26 @@ export interface paths {
          *     deleting the note does not make it untrue that the run had it.
          */
         delete: operations["delete_memory_teams__team_id__memory__entry_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{team_id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore Team
+         * @description Back into the catalogue. Its schedules and triggers stay switched off: the operator turns each on again.
+         */
+        post: operations["restore_team_teams__team_id__restore_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -1073,6 +1093,8 @@ export interface components {
         TeamOut: {
             /** Account Id */
             account_id: string | null;
+            /** Archived At */
+            archived_at: string | null;
             /**
              * Created At
              * Format: date-time
@@ -1846,7 +1868,10 @@ export interface operations {
     };
     list_teams_teams_get: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description list only the retired teams, each with `archived_at` */
+                archived?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1860,6 +1885,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TeamOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -2179,6 +2213,37 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    restore_team_teams__team_id__restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamOut"];
+                };
             };
             /** @description Validation Error */
             422: {

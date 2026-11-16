@@ -392,3 +392,55 @@ async def test_a_collapsed_fire_carries_how_many_were_skipped(db: asyncpg.Connec
     )
 
     assert fire["skipped_count"] == 5
+
+
+async def test_retiring_a_team_switches_off_its_schedules_and_triggers(db: asyncpg.Connection) -> None:
+    # specs/teams-catalogue, "Wycofanie zespołu z włączonymi harmonogramami".
+    team, revision = await _team_and_revision(db)
+    schedule = await _schedule(db, team_id=team["id"], revision_id=revision["id"], next_fire_at=PAST)
+    trigger = await _trigger(db, team_id=team["id"], revision_id=revision["id"], next_check_at=PAST)
+    other = await _schedule(db, next_fire_at=PAST)
+
+    assert await store.archive_team(db, team_id=team["id"], owner_principal=OWNER) is True
+
+    off = await store.get_schedule(db, schedule_id=schedule["id"], owner_principal=OWNER)
+    tripwire = await store.get_trigger(db, trigger_id=trigger["id"], owner_principal=OWNER)
+    assert off is not None and tripwire is not None
+    assert (off["enabled"], off["disabled_reason"]) == (False, store.RETIRED_REASON)
+    assert (tripwire["enabled"], tripwire["disabled_reason"]) == (False, store.RETIRED_REASON)
+    # Another team's clock is not this team's business.
+    untouched = await store.get_schedule(db, schedule_id=other["id"], owner_principal=OWNER)
+    assert untouched is not None and untouched["enabled"] is True
+
+
+async def test_the_clock_never_claims_a_retired_teams_row_even_switched_on(db: asyncpg.Connection) -> None:
+    # specs/teams-schedules, "Włączony harmonogram wycofanego zespołu".
+    team, revision = await _team_and_revision(db)
+    schedule = await _schedule(db, team_id=team["id"], revision_id=revision["id"], next_fire_at=PAST)
+    trigger = await _trigger(db, team_id=team["id"], revision_id=revision["id"], next_check_at=PAST)
+    await store.archive_team(db, team_id=team["id"], owner_principal=OWNER)
+    await store.set_schedule_enabled(db, schedule_id=schedule["id"], owner_principal=OWNER, enabled=True)
+    await store.set_trigger_enabled(db, trigger_id=trigger["id"], owner_principal=OWNER, enabled=True)
+
+    assert [row["id"] for row in await store.list_due_schedules(db)] == []
+    assert [row["id"] for row in await store.list_due_triggers(db)] == []
+    assert await store.claim_due_schedule(db, schedule_id=schedule["id"], next_fire_at=FUTURE) is None
+
+
+async def test_restoring_a_team_brings_it_back_with_its_clock_still_off(db: asyncpg.Connection) -> None:
+    # specs/teams-catalogue, "Przywrócenie pomyłkowo wycofanego zespołu".
+    team, revision = await _team_and_revision(db)
+    schedule = await _schedule(db, team_id=team["id"], revision_id=revision["id"], next_fire_at=PAST)
+    await store.archive_team(db, team_id=team["id"], owner_principal=OWNER)
+    assert [row["id"] for row in await store.list_retired_teams(db, owner_principal=OWNER)] == [team["id"]]
+
+    assert await store.restore_team(db, team_id=team["id"], owner_principal=STRANGER) is None
+    restored = await store.restore_team(db, team_id=team["id"], owner_principal=OWNER)
+
+    assert restored is not None and restored["latest_revision"] == 1
+    assert [row["id"] for row in await store.list_teams(db, owner_principal=OWNER)] == [team["id"]]
+    assert await store.list_retired_teams(db, owner_principal=OWNER) == []
+    still_off = await store.get_schedule(db, schedule_id=schedule["id"], owner_principal=OWNER)
+    assert still_off is not None and still_off["enabled"] is False
+    # Restoring an active team is restoring nothing.
+    assert await store.restore_team(db, team_id=team["id"], owner_principal=OWNER) is None

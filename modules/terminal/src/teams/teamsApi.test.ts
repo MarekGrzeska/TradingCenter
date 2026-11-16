@@ -83,8 +83,33 @@ describe("listTeams", () => {
         accountId: null,
         createdAt: Date.parse("2026-08-15T08:00:00Z") / 1000,
         updatedAt: Date.parse("2026-08-16T09:30:00Z") / 1000,
+        archivedAt: null,
       },
     ]);
+  });
+
+  it("asks for the retired ones apart, each with the moment it was retired", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/teams`, ({ request }) =>
+        new URL(request.url).searchParams.get("archived") === "true"
+          ? HttpResponse.json([
+              {
+                id: 7,
+                name: "Old desk",
+                description: "",
+                latest_revision: 1,
+                created_at: "2026-08-15T08:00:00Z",
+                updated_at: "2026-08-16T09:30:00Z",
+                archived_at: "2026-11-16T06:05:53Z",
+              },
+            ])
+          : HttpResponse.json([]),
+      ),
+    );
+
+    const [retired] = await api().listRetiredTeams(new AbortController().signal);
+
+    expect(retired?.archivedAt).toBe(Date.parse("2026-11-16T06:05:53Z") / 1000);
   });
 });
 

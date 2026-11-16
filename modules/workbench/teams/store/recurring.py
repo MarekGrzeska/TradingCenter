@@ -58,16 +58,20 @@ class _Recurring:
             RETURNING {columns}
         """
 
+        # A retired team's row is never claimed, even when something switched it back on: retiring switches it
+        # off, and this is the line that holds whether or not every write path remembered to (specs/teams-schedules).
+        active_team = "team_id IN (SELECT id FROM teams WHERE archived_at IS NULL)"
+
         self.claim_due = f"""
             UPDATE {table} SET {due_column} = $2, updated_at = now()
-             WHERE id = $1 AND enabled AND {due_column} <= now()
+             WHERE id = $1 AND enabled AND {due_column} <= now() AND {active_team}
             RETURNING {columns}
         """
 
         # No owner filter — the clock works across every operator's rows at once, the one place that
         # legitimately does. `enabled` rides in the WHERE so the partial index answers this, not a scan.
         self.select_due = f"""
-            SELECT {columns} FROM {table} WHERE enabled AND {due_column} <= now()
+            SELECT {columns} FROM {table} WHERE enabled AND {due_column} <= now() AND {active_team}
         """
 
         self.select_fires = f"""

@@ -126,6 +126,10 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
     revisionById: vi.fn(async () => ({ ...revision(TRIO), id: RUN.teamRevisionId })),
     saveRevision: vi.fn(async () => revision()),
     archiveTeam: vi.fn(async () => {}),
+    listRetiredTeams: vi.fn(async () => []),
+    restoreTeam: vi.fn(async () => {
+      throw new Error("not stubbed");
+    }),
     memory: vi.fn(async () => ({ entries: [], total: 0 })),
     deleteMemory: vi.fn(async () => {}),
     layout: vi.fn(async () => new Map<string, { x: number; y: number }>()),
@@ -234,6 +238,49 @@ describe("the catalogue", () => {
     agentActivity.turnFinished();
 
     expect(await screen.findByText("Built from the chat")).toBeInTheDocument();
+  });
+});
+
+describe("retired teams", () => {
+  const RETIRED: TeamSummary = { ...TEAM, id: 7, name: "Old desk", archivedAt: 1_760_100_000 };
+
+  it("lists the retired teams and restores one back into the catalogue", async () => {
+    const listTeams = vi.fn(async () => [TEAM]);
+    const restoreTeam = vi.fn(async () => ({ ...RETIRED, archivedAt: null }));
+    const api = fakeApi({
+      listTeams,
+      listRetiredTeams: vi.fn(async () => [RETIRED]),
+      restoreTeam,
+    });
+    render(<TeamsView api={api} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Retired" }));
+    expect(await screen.findByText("Old desk")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Restore" }));
+    const dialog = await screen.findByRole("dialog");
+    // The consent says what restoring does not do.
+    expect(within(dialog).getByText(/schedules and triggers stay\s+switched off/)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Restore" }));
+
+    await waitFor(() => expect(restoreTeam).toHaveBeenCalledWith(7, expect.anything()));
+    await waitFor(() => expect(listTeams.mock.calls.length).toBeGreaterThan(1));
+  });
+
+  it("keeps the dialog open with the module's refusal when the restore fails", async () => {
+    const api = fakeApi({
+      listRetiredTeams: vi.fn(async () => [RETIRED]),
+      restoreTeam: vi.fn(async () => {
+        throw new MarketDataError("not-found", "no such retired team");
+      }),
+    });
+    render(<TeamsView api={api} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Retired" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Restore" }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Restore" }));
+
+    expect(await within(dialog).findByText(/no such retired team/)).toBeInTheDocument();
   });
 });
 
