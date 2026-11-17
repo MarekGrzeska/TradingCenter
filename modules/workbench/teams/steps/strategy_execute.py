@@ -25,6 +25,8 @@ _SIDE = {"BUY": "long", "SELL": "short"}
 _POLL_SECONDS = 1.0
 # Each ask reads a week of the archive; doubling to this keeps a 30 s wait to about eight of them.
 _POLL_CEILING_SECONDS = 5.0
+# How far past the signal bar's close the backtest's fill minute is looked for: longer than any daily break.
+_FILL_LOOKAHEAD = timedelta(minutes=15)
 
 
 @dataclass(frozen=True)
@@ -233,13 +235,25 @@ async def execute(
         return result.out(action.decision, action.reason, f"{label}: {action.decision} — {action.reason}")
 
     bar = signal.get("bar_closed_at")
+    deadline = result.started_at.timestamp() + params.wait_for_bar_seconds
+    priced, price = await _priced_since(ctx, params.symbol, bar, deadline, now=now, sleep=sleep)
+    if not priced:
+        why = (
+            f"the market has not priced {params.symbol} since the signal bar closed at {bar} "
+            f"(waited until {params.wait_for_bar_seconds}s after the start); no order sent"
+        )
+        return result.out("skipped", why, f"{label}: market shut — {why}")
+    result.mark("market_priced", now())
+
     base_key = f"{ctx.team_id}:{ctx.key}:{params.strategy_id}:{params.revision}:{bar}"
     if action.kind == "close":
         row = next((r for r in position_rows if str(r.get("id")) == action.position_id), {})
         return await _close(
             ctx, action, row, _payload(balance.text), f"{base_key}:exit", result, label, now=now, sleep=sleep
         )
-    return await _enter(ctx, params, signal, _payload(balance.text), action, f"{base_key}:enter", result, label, now=now)
+    return await _enter(
+        ctx, params, signal, _payload(balance.text), action, f"{base_key}:enter", result, label, price=price, now=now
+    )
 
 
 async def _signal(ctx, params, result, *, now, sleep) -> dict[str, Any] | tuple[Decision, str]:
@@ -261,6 +275,37 @@ async def _signal(ctx, params, result, *, now, sleep) -> dict[str, Any] | tuple[
         remaining = deadline - now().timestamp()
         if remaining <= 0:
             return "skipped", outcome.text
+        await sleep(min(pause, remaining))
+        pause = min(pause * 2, _POLL_CEILING_SECONDS)
+
+
+def _moment(value: Any) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+async def _priced_since(ctx, symbol: str, bar_closed_at: Any, deadline: float, *, now, sleep) -> tuple[bool, float | None]:
+    """Whether a price has been quoted since the signal bar closed, waited for until `deadline`, and the last one. A bar
+    right before the venue's daily break is decided on while nothing trades: the backtest fills it at the reopen, and an
+    order sent into the break would be refused. An answer this cannot read lets the order go; the gateway says the rest."""
+    since = _moment(bar_closed_at)
+    pause = _POLL_SECONDS
+    while True:
+        outcome = await ctx.call("get_last_price", {"symbol": symbol, "resolution": "MINUTE"})
+        data = _payload(outcome.text) if outcome.ok else None
+        data = data if isinstance(data, dict) else {}
+        close = data.get("close")
+        price = float(close) if isinstance(close, int | float) and not isinstance(close, bool) else None
+        at = _moment(data.get("time"))
+        if since is None or at is None or at >= since:
+            return True, price
+        remaining = deadline - now().timestamp()
+        if remaining <= 0:
+            return False, price
         await sleep(min(pause, remaining))
         pause = min(pause * 2, _POLL_CEILING_SECONDS)
 
@@ -398,7 +443,17 @@ def _settled(reply: Any) -> TypeGuard[dict[str, Any]]:
 
 
 async def _enter(
-    ctx, params: StrategyExecuteParams, signal, balance, action: Action, attempt_key: str, result: _Result, label: str, *, now
+    ctx,
+    params: StrategyExecuteParams,
+    signal,
+    balance,
+    action: Action,
+    attempt_key: str,
+    result: _Result,
+    label: str,
+    *,
+    price: float | None,
+    now,
 ) -> dict[str, Any]:
     fraction, source = _fraction(params, signal)
     if fraction is None:
@@ -411,7 +466,8 @@ async def _enter(
     sizing: dict[str, Any] = {"equity": str(equity), "fraction": str(fraction), "source": source, "deposit": str(deposit)}
     result.extra["sizing"] = sizing
 
-    price = await _price(ctx, params.symbol)
+    if price is None:
+        price = await _price(ctx, params.symbol)
     if price is None:
         return result.out("unknown", "no last price for the size", f"{label}: no price to size from")
     sized = await ctx.call("size_for_margin", {"symbol": params.symbol, "margin": float(deposit), "price": price})
@@ -483,7 +539,8 @@ async def _price(ctx, symbol: str) -> float | None:
 
 
 async def _assumed_open(ctx, symbol: str, bar_closed_at: str | None) -> float | None:
-    """The open of the minute the backtest would have filled in — the one starting when the signal bar closed."""
+    """The open of the minute the backtest would have filled in: the first one from when the signal bar closed, which
+    after a bar right before the daily break is the reopen, not the minute the bar closed on."""
     if bar_closed_at is None:
         return None
     start = _iso(bar_closed_at)
@@ -493,9 +550,9 @@ async def _assumed_open(ctx, symbol: str, bar_closed_at: str | None) -> float | 
             "symbol": symbol,
             "resolution": "MINUTE",
             "from_iso": start.isoformat(),
-            "to_iso": (start + timedelta(minutes=1)).isoformat(),
+            "to_iso": (start + _FILL_LOOKAHEAD).isoformat(),
         },
     )
     candles = (_payload(outcome.text) or {}).get("candles") if outcome.ok else None
-    first = next((c for c in candles or [] if _iso(str(c.get("time"))) == start), None)
-    return float(first["open"]) if first is not None else None
+    after = sorted((c for c in candles or [] if _iso(str(c.get("time"))) >= start), key=lambda c: _iso(str(c["time"])))
+    return float(after[0]["open"]) if after else None

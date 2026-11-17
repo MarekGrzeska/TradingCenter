@@ -324,6 +324,63 @@ async def test_an_exit_whose_balance_has_not_moved_gives_the_last_unrealised_res
     assert (result["trade"]["pnl"], result["trade"]["pnl_approximate"]) == (4.9, True)
 
 
+# A signal bar right before the venue's daily break (US100, 22:00-22:05 UTC): the last price is still the minute before
+# the bar closed until the market reopens.
+SHUT = ok({"time": "2026-11-09T14:34:00Z", "close": 27300.0, "forming": False})
+REOPENED = ok({"time": "2026-11-09T14:40:00Z", "close": 27280.0, "forming": True})
+
+
+async def test_an_entry_on_the_bar_before_the_break_waits_for_the_reopen_and_sizes_from_it() -> None:
+    ctx = FakeContext(
+        _replies(
+            get_last_price=[SHUT, SHUT, REOPENED],
+            get_candles=[ok({"candles": [{"time": "2026-11-09T14:40:00Z", "open": 27281.0}]})],
+        )
+    )
+    clock = Clock()
+
+    result = await execute(_step(wait_for_bar_seconds=420), ctx, now=clock, sleep=clock.sleep)
+
+    assert result["decision"] == "entered"
+    names = [name for name, _, _ in ctx.calls]
+    assert names.count("get_last_price") == 3
+    assert names.index("place_order") > max(i for i, name in enumerate(names) if name == "get_last_price")
+    size_call = next(args for name, args, _ in ctx.calls if name == "size_for_margin")
+    assert size_call["price"] == 27280.0
+    assert result["vs_backtest"]["assumed_open"] == 27281.0
+    assert "market_priced" in result["timing"]
+
+
+async def test_a_market_that_does_not_reopen_within_the_wait_ends_skipped_without_an_order() -> None:
+    ctx = FakeContext(_replies(get_last_price=[SHUT]))
+    clock = Clock()
+
+    result = await execute(_step(wait_for_bar_seconds=60), ctx, now=clock, sleep=clock.sleep)
+
+    assert result["decision"] == "skipped"
+    assert "has not priced US100" in result["reason"]
+    assert not any(name in ("place_order", "size_for_margin") for name, _, _ in ctx.calls)
+    assert clock.at - NOW <= timedelta(seconds=60)
+
+
+async def test_a_close_into_the_break_waits_for_the_reopen_too() -> None:
+    ctx = _closing(540.0, 545.0)
+    ctx._replies["get_last_price"] = [SHUT, REOPENED]
+    clock = Clock()
+
+    result = await execute(_step(wait_for_bar_seconds=420), ctx, now=clock, sleep=clock.sleep)
+
+    assert result["decision"] == "exited"
+    names = [name for name, _, _ in ctx.calls]
+    assert names.index("close_position") > names.index("get_last_price") + 1
+
+
+def test_the_wait_reaches_ten_minutes_and_no_further() -> None:
+    assert _params(wait_for_bar_seconds=600).wait_for_bar_seconds == 600
+    with pytest.raises(ValueError, match="600"):
+        _params(wait_for_bar_seconds=601)
+
+
 async def test_an_entry_confirmed_without_a_level_takes_the_price_off_the_position() -> None:
     no_level = ok({**FILLED, "level": None})
     opened = ok({"result": [{"id": "deal-9", "symbol": "US100", "direction": "BUY", "size": 0.137, "open_level": 27361.5}]})

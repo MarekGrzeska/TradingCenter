@@ -43,7 +43,9 @@ class StrategyExecuteParams(BaseModel):
     symbol: str
     # A decimal string, as every number this module compares rather than computes; None means the document's own rule.
     deposit_fraction: str | None = None
-    wait_for_bar_seconds: int = Field(default=30, ge=0, le=120)
+    # Up to ten minutes: a signal bar right before the venue's daily break is sealed only ~2 min into it, and the
+    # order then waits for the reopen (US100: 22:00-22:05 UTC in winter).
+    wait_for_bar_seconds: int = Field(default=30, ge=0, le=600)
     max_bar_age_seconds: int | None = Field(default=None, gt=0)
 
     @field_validator("symbol")
@@ -92,7 +94,12 @@ STRATEGY_EXECUTE = Recipe(
             "deposit per position as a fraction of equity, e.g. 0.35; empty means the strategy document's sizing",
         ),
         ParamSpec(
-            "wait_for_bar_seconds", "integer", False, "how long to wait for the signal bar in the archive", 30
+            "wait_for_bar_seconds",
+            "integer",
+            False,
+            "how long to wait for the signal bar in the archive and, after it, for the market's first price; "
+            "at most 600",
+            30,
         ),
         ParamSpec(
             "max_bar_age_seconds",

@@ -115,7 +115,7 @@ Przepis `strategy_execute` MUST przyjmować:
 - strategię i jej rewizję (wymagane);
 - symbol (wymagany);
 - rozmiar (opcjonalny);
-- czas czekania na świecę w archiwum (opcjonalny);
+- czas czekania na świecę w archiwum i na pierwszą cenę rynku po niej (opcjonalny, najwyżej dziesięć minut);
 - największy dopuszczalny wiek świecy sygnałowej (opcjonalny).
 
 Decyzję MUST brać wyłącznie z sygnału silnika strategii i MUST NOT liczyć wskaźników ani warunków samodzielnie.
@@ -132,6 +132,13 @@ rachunku. Przepis MUST NOT nadrabiać wejścia, którego świeca jest za stara.
 
 Gdy archiwum jeszcze nie ma świecy sygnałowej, przepis MUST ponawiać pytanie o sygnał najwyżej przez ustawiony czas
 czekania. Po jego upływie MUST zakończyć się pominięciem z powodem nazywającym brak świecy.
+
+Zlecenie (wejście albo zamknięcie) przepis MUST złożyć dopiero wtedy, gdy rynek podał cenę po zamknięciu świecy
+sygnałowej, bo backtest wykonuje decyzję na otwarciu następnej świecy. Świeca tuż przed codzienną przerwą rynku
+zamyka się, gdy nic nie jest notowane; przepis MUST wtedy czekać na wznowienie notowań w tym samym czasie czekania,
+liczonym od startu kroku, i MUST NOT wysyłać zlecenia w przerwę. Gdy rynek nie poda ceny przed upływem czasu
+czekania, przepis MUST zakończyć się pominięciem bez zlecenia, z powodem nazywającym brak notowań. Odpowiedź o cenie,
+której przepis nie umie odczytać, MUST NOT blokować zlecenia — o reszcie mówi brama.
 
 Własną pozycję zespołu przepis MUST zamknąć, gdy zachodzi jedno z trzech:
 - sygnał mówi „wyjście”;
@@ -175,6 +182,18 @@ Gdy tego nie da się jednoznacznie ustalić, przepis MUST zakończyć się wynik
 - **WHEN** na koncie zespołu stoi pozycja, której żadne zlecenie zespołu nie założyło
 - **THEN** przepis jej nie zamyka
 - **AND** nie wchodzi, bo konto ma pozycję na symbolu
+
+#### Scenario: Świeca sygnałowa tuż przed codzienną przerwą
+
+- **WHEN** krok startuje o zamknięciu świecy, po którym rynek ma codzienną przerwę, a świeca trafia do archiwum
+  i rynek wznawia notowania przed upływem czasu czekania
+- **THEN** przepis działa na tej świecy i składa zlecenie dopiero po pierwszej cenie po przerwie
+- **AND** wielkość liczy z tej ceny
+
+#### Scenario: Rynek nie wznawia notowań w czasie czekania
+
+- **WHEN** świeca sygnałowa jest w archiwum, ale do upływu czasu czekania rynek nie podał ceny po jej zamknięciu
+- **THEN** przepis nie składa zlecenia i kończy się pominięciem z brakiem notowań jako powodem
 
 ### Requirement: Rozmiar pozycji jest zapisany w rewizji, nie w prozie
 
