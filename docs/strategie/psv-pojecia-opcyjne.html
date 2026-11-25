@@ -1,0 +1,456 @@
+<title>Opcje po ludzku</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding-left: max(30px, env(safe-area-inset-left, 0px)); padding-right: max(30px, env(safe-area-inset-right, 0px)); }
+  @media (max-width: 620px) { .inner { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); } }
+  :root { color-scheme: light; }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+  .lvl { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sw { display: inline-block; width: 11px; height: 11px; margin-right: 7px; vertical-align: -1px; }
+  .grid3 { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); margin-top: 6px; }
+  .grid3 .fail ul { margin: 6px 0 0; padding-left: 18px; font-size: 15px; }
+  .grid3 .fail li { margin-bottom: 4px; }
+  .note { font-size: 13.5px; color: var(--ink-3); max-width: 74ch; }
+</style>
+
+<style>td.n { white-space: nowrap; }</style>
+<style>
+  .chain { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0 6px; }
+  .chain .step { background: var(--card); border: 1px solid var(--line); padding: 9px 13px; font-size: 14.5px; color: var(--ink); }
+  .chain .step.up { border-left: 5px solid var(--green); }
+  .chain .step.down { border-left: 5px solid var(--red); }
+  .chain .arr { font-family: var(--mono); color: var(--ink-3); font-weight: 700; }
+  .box { background: var(--navy-soft); border-left: 6px solid var(--navy); padding: 14px 18px; margin: 18px 0; max-width: 72ch; }
+  .box p { margin: 0 0 8px; }
+  .box p:last-child { margin: 0; }
+  .box .t { font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: var(--navy); margin-bottom: 6px; display: block; }
+  .art { background: var(--yellow-soft); border-left: 6px solid var(--yellow); padding: 14px 18px; margin: 18px 0; max-width: 72ch; }
+  .art p { margin: 0; }
+  .art .t { font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #8a6708; margin-bottom: 6px; display: block; }
+  details { background: var(--card); border: 1px solid var(--line); padding: 12px 16px; margin-bottom: 10px; max-width: 76ch; }
+  summary { cursor: pointer; color: var(--ink); font-weight: 700; }
+  details p { margin: 10px 0 0; }
+  .toc { columns: 2 260px; padding-left: 20px; margin: 10px 0 0; }
+  .toc li { margin-bottom: 4px; }
+</style>
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Ściąga · Opcje · do analiz PSV</span>
+    <h1>Opcje po ludzku</h1>
+    <p class="lede">Gamma, vanna, charm, IV, implied move, dark pool — pojęcia, na których stoi każda analiza „Strategia PSV”, wytłumaczone <b>od zera, na przykładach z artykułu z 23.11.2026</b>. Bez wzorów, za to z jednym bohaterem: <b>dealerem, który nie chce zgadywać kierunku</b>.</p>
+    <div class="strip">
+      <span>TradingCenter / strategie</span>
+      <span>23 listopada 2026</span>
+      <span>do: <a href="analiza-us100-psv-2026-11-23.html" style="color:var(--yellow)">US100: odbicie pod kluczem D1</a></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">delta</div><div class="l">ile opcja „waży” w akcjach — tyle dealer musi kupić lub sprzedać, żeby nie ryzykować</div></div>
+      <div class="cell"><div class="v">gamma</div><div class="l">jak szybko delta się zmienia, gdy rusza cena — czyli jak nerwowo dealer musi handlować</div></div>
+      <div class="cell"><div class="v">vanna</div><div class="l">jak delta zmienia się, gdy rośnie lub spada IV — strach</div></div>
+      <div class="cell"><div class="v">charm</div><div class="l">jak delta zmienia się z upływem czasu — tykanie zegara do wygaśnięcia</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">00 · Mapa</div>
+      <h2>O czym jest ta ściąga</h2>
+      <p class="intro">Autor PSV czyta rynek opcji na <strong>QQQ</strong> (fundusz ETF naśladujący Nasdaq 100), a potem przekłada poziomy na kontrakt <strong>NQ</strong>. Cała ta część analizy sprowadza się do jednego pytania: <span class="hl">czy duzi gracze, którzy sprzedali opcje, będą musieli kupować, czy sprzedawać — i przy jakiej cenie</span>.</p>
+      <ol class="toc">
+        <li>Opcja, call, put, strike, premia</li>
+        <li>Dealer i hedging — bohater całej historii</li>
+        <li>Delta i DEX</li>
+        <li>Gamma, GEX, krótka gamma</li>
+        <li>Skupiska gammy na strike'ach</li>
+        <li>Zmienność: IV, IV30, IV rank, skew</li>
+        <li>Vanna</li>
+        <li>Charm i pin zone</li>
+        <li>Implied move</li>
+        <li>Premia w putach i callach</li>
+        <li>OPEX — wygaśnięcie</li>
+        <li>Dark pool</li>
+        <li>Spoza opcji: CVD, NQ↔QQQ↔CFD, M5 vs D1</li>
+        <li>Ściąga w tabeli i sprawdzian</li>
+      </ol>
+    </section>
+
+    <section>
+      <div class="eyebrow">01 · Podstawy</div>
+      <h2>Opcja to polisa ubezpieczeniowa</h2>
+      <p>Opcja to umowa, która daje <strong>prawo</strong> (nie obowiązek) kupić albo sprzedać coś po ustalonej cenie do ustalonego dnia.</p>
+      <div class="fails">
+        <div class="fail ok"><h3>Call <span class="tag ok">zakład na wzrost</span></h3><p>Prawo <b>kupić</b> po ustalonej cenie. Jak bilet na koncert kupiony po starej cenie — jeśli bilety podrożeją, twój jest wart więcej.</p></div>
+        <div class="fail stop"><h3>Put <span class="tag stop">ubezpieczenie od spadku</span></h3><p>Prawo <b>sprzedać</b> po ustalonej cenie. Jak polisa na samochód: płacisz składkę, a jeśli „wypadek” (krach) nastąpi, polisa wypłaca.</p></div>
+        <div class="fail"><h3>Strike <span class="tag att">cena wykonania</span></h3><p>Ta ustalona cena. „Strike 640 na QQQ” to opcje, których próg leży przy QQQ = 640, co autor przelicza na ok. 26 400 pkt NQ.</p></div>
+        <div class="fail"><h3>Premia <span class="tag att">cena opcji</span></h3><p>To, ile kosztuje sama opcja — składka za polisę. Im większy strach, tym droższe polisy.</p></div>
+      </div>
+      <div class="box"><span class="t">Przykład szkolny</span><p>QQQ kosztuje 630 USD. Kupujesz puta ze strike'em 620 za 5 USD. Jeśli do wygaśnięcia QQQ spadnie do 600, możesz sprzedać po 620 — zarabiasz 20 − 5 = 15 USD na akcji. Jeśli QQQ zostanie nad 620, tracisz tylko 5 USD składki. Polisa nie była potrzebna — ale spałeś spokojnie.</p></div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Bohater</div>
+      <h2>Dealer nie gra na kierunek</h2>
+      <p>Po drugiej stronie twojej opcji zwykle stoi <strong>dealer</strong> (market maker) — firma, która wystawia opcje każdemu, kto chce kupić. Dealer zarabia na różnicy między ceną kupna a sprzedaży, <span class="hl">nie na tym, czy rynek pójdzie w górę czy w dół</span>. Dlatego każde ryzyko kierunku natychmiast <strong>zabezpiecza</strong> (hedguje): kupuje albo sprzedaje akcje, ETF lub kontrakty.</p>
+      <p>To jest klucz do całej analizy opcyjnej: <strong>dealerzy muszą handlować mechanicznie</strong>, niezależnie od swoich poglądów. Jeśli wiemy, jakie opcje mają w portfelu, możemy przewidzieć, kiedy będą musieli kupować, a kiedy sprzedawać.</p>
+      <div class="art"><span class="t">Ważne założenie</span><p>Serwisy z danymi (w artykule „UW” — najpewniej Unusual Whales) <b>szacują</b> pozycje dealerów, zakładając typowy układ: klienci kupują puty (ubezpieczenie) i sprzedają calle, więc dealer jest po przeciwnej stronie. To estymacja, nie wyciąg z ich kont.</p></div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Delta i DEX</div>
+      <h2>Delta: ile opcja „waży” w akcjach</h2>
+      <p><strong>Delta</strong> mówi, o ile zmieni się cena opcji, gdy instrument podrożeje o 1 USD. Delta 0,30 oznacza: opcja zachowuje się jak 30% akcji. Kontrakt opcyjny na QQQ obejmuje 100 akcji, więc delta 0,30 = „30 akcji ryzyka”.</p>
+      <p>Dealer, który sprzedał komuś puta z deltą −0,30, ma po swojej stronie ryzyko jak <b>+30 akcji</b> (zarabia, gdy rynek rośnie). Żeby być neutralnym, <b>sprzedaje 30 akcji</b> QQQ. To jest hedging delta.</p>
+      <div class="box"><span class="t">DEX — suma delty dealerów</span><p><strong>DEX</strong> (delta exposure) to suma tej delty u wszystkich dealerów, w dolarach. W analizie z 20.11 DEX zmalał z −154 do −87 mln USD: mniej sprzedaży „wiszącej” na rynku, dealerzy przestali dociskać spadki. Autor zaznaczył przy tym, że to wskazówka do obserwacji, a nie samodzielny sygnał.</p></div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Gamma</div>
+      <h2>Gamma: amortyzator albo pedał gazu</h2>
+      <p>Delta nie jest stała. Gdy cena zbliża się do strike'u, opcja „waży” coraz więcej. <strong>Gamma</strong> mówi, <span class="hl">jak szybko zmienia się delta</span>. Jeśli delta to prędkość, gamma to przyspieszenie. Najwyższa jest przy strike'u i tuż przed wygaśnięciem.</p>
+      <p>Każda zmiana delty zmusza dealera do ponownego zabezpieczenia. I tu jest najważniejsza rzecz w całej ściądze — kierunek tego handlu zależy od tego, czy dealer ma gammę <strong>dodatnią</strong> czy <strong>ujemną</strong>:</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 650 270" role="img" aria-label="Długa gamma tłumi wahania, krótka gamma je wzmacnia">
+<g font-family="Karla, sans-serif" font-size="13">
+<rect x="20" y="20" width="290" height="200" fill="none" stroke="#ddd9cd"/>
+<rect x="340" y="20" width="290" height="200" fill="none" stroke="#ddd9cd"/>
+<line x1="20" x2="310" y1="120" y2="120" stroke="#ddd9cd" stroke-dasharray="4 4"/>
+<line x1="340" x2="630" y1="120" y2="120" stroke="#ddd9cd" stroke-dasharray="4 4"/>
+<path d="M30.0,120.0 L31.7,128.5 L33.4,136.6 L35.1,144.2 L36.8,151.2 L38.4,157.4 L40.1,162.9 L41.8,167.6 L43.5,171.5 L45.2,174.5 L46.9,176.6 L48.6,177.9 L50.2,178.3 L51.9,177.9 L53.6,176.7 L55.3,174.8 L57.0,172.1 L58.7,168.9 L60.4,165.1 L62.1,160.7 L63.8,156.0 L65.4,151.0 L67.1,145.6 L68.8,140.2 L70.5,134.6 L72.2,129.1 L73.9,123.6 L75.6,118.2 L77.2,113.1 L78.9,108.3 L80.6,103.8 L82.3,99.6 L84.0,96.0 L85.7,92.7 L87.4,90.0 L89.1,87.8 L90.8,86.1 L92.4,84.9 L94.1,84.3 L95.8,84.2 L97.5,84.5 L99.2,85.4 L100.9,86.7 L102.6,88.5 L104.2,90.6 L105.9,93.0 L107.6,95.7 L109.3,98.7 L111.0,101.9 L112.7,105.2 L114.4,108.6 L116.1,112.1 L117.8,115.5 L119.4,118.9 L121.1,122.2 L122.8,125.3 L124.5,128.3 L126.2,131.0 L127.9,133.6 L129.6,135.8 L131.2,137.7 L132.9,139.4 L134.6,140.7 L136.3,141.7 L138.0,142.3 L139.7,142.6 L141.4,142.6 L143.1,142.3 L144.8,141.7 L146.4,140.8 L148.1,139.6 L149.8,138.3 L151.5,136.7 L153.2,134.9 L154.9,132.9 L156.6,130.9 L158.2,128.8 L159.9,126.6 L161.6,124.4 L163.3,122.2 L165.0,120.0 L166.7,117.9 L168.4,115.9 L170.1,114.0 L171.8,112.3 L173.4,110.7 L175.1,109.3 L176.8,108.0 L178.5,107.0 L180.2,106.2 L181.9,105.6 L183.6,105.2 L185.2,105.1 L186.9,105.1 L188.6,105.4 L190.3,105.8 L192.0,106.4 L193.7,107.2 L195.4,108.2 L197.1,109.3 L198.8,110.5 L200.4,111.8 L202.1,113.2 L203.8,114.6 L205.5,116.1 L207.2,117.5 L208.9,119.0 L210.6,120.5 L212.2,121.9 L213.9,123.2 L215.6,124.5 L217.3,125.7 L219.0,126.7 L220.7,127.7 L222.4,128.5 L224.1,129.2 L225.8,129.7 L227.4,130.1 L229.1,130.3 L230.8,130.4 L232.5,130.4 L234.2,130.2 L235.9,129.8 L237.6,129.4 L239.2,128.8 L240.9,128.1 L242.6,127.3 L244.3,126.5 L246.0,125.5 L247.7,124.5 L249.4,123.5 L251.1,122.5 L252.8,121.4 L254.4,120.3 L256.1,119.3 L257.8,118.3 L259.5,117.3 L261.2,116.4 L262.9,115.6 L264.6,114.8 L266.2,114.2 L267.9,113.6 L269.6,113.1 L271.3,112.7 L273.0,112.5 L274.7,112.3 L276.4,112.2 L278.1,112.3 L279.8,112.5 L281.4,112.7 L283.1,113.1 L284.8,113.5 L286.5,114.1 L288.2,114.7 L289.9,115.3 L291.6,116.0 L293.2,116.8 L294.9,117.6 L296.6,118.4 L298.3,119.2 L300.0,120.0" fill="none" stroke="#17734c" stroke-width="2.4"/>
+<path d="M350.0,120.0 L351.7,121.7 L353.4,123.4 L355.1,125.0 L356.8,126.7 L358.4,128.3 L360.1,129.8 L361.8,131.2 L363.5,132.5 L365.2,133.7 L366.9,134.7 L368.6,135.5 L370.2,136.1 L371.9,136.5 L373.6,136.6 L375.3,136.6 L377.0,136.3 L378.7,135.7 L380.4,134.9 L382.1,133.9 L383.8,132.7 L385.4,131.3 L387.1,129.6 L388.8,127.8 L390.5,125.8 L392.2,123.7 L393.9,121.5 L395.6,119.2 L397.2,116.9 L398.9,114.5 L400.6,112.2 L402.3,109.9 L404.0,107.7 L405.7,105.6 L407.4,103.7 L409.1,102.0 L410.8,100.4 L412.4,99.1 L414.1,98.1 L415.8,97.4 L417.5,96.9 L419.2,96.8 L420.9,97.0 L422.6,97.5 L424.2,98.4 L425.9,99.6 L427.6,101.1 L429.3,102.9 L431.0,105.0 L432.7,107.4 L434.4,110.0 L436.1,112.8 L437.8,115.8 L439.4,118.9 L441.1,122.2 L442.8,125.4 L444.5,128.7 L446.2,132.0 L447.9,135.1 L449.6,138.1 L451.2,141.0 L452.9,143.6 L454.6,145.9 L456.3,147.9 L458.0,149.6 L459.7,150.9 L461.4,151.8 L463.1,152.3 L464.8,152.4 L466.4,151.9 L468.1,151.0 L469.8,149.7 L471.5,147.9 L473.2,145.6 L474.9,142.9 L476.6,139.9 L478.2,136.4 L479.9,132.7 L481.6,128.7 L483.3,124.4 L485.0,120.0 L486.7,115.5 L488.4,110.9 L490.1,106.3 L491.8,101.8 L493.4,97.5 L495.1,93.4 L496.8,89.5 L498.5,86.0 L500.2,82.8 L501.9,80.2 L503.6,78.0 L505.2,76.3 L506.9,75.3 L508.6,74.8 L510.3,75.0 L512.0,75.8 L513.7,77.3 L515.4,79.4 L517.1,82.1 L518.8,85.4 L520.4,89.4 L522.1,93.8 L523.8,98.8 L525.5,104.1 L527.2,109.9 L528.9,115.9 L530.6,122.1 L532.2,128.4 L533.9,134.8 L535.6,141.2 L537.3,147.4 L539.0,153.4 L540.7,159.0 L542.4,164.3 L544.1,169.0 L545.8,173.2 L547.4,176.7 L549.1,179.5 L550.8,181.5 L552.5,182.7 L554.2,183.1 L555.9,182.6 L557.6,181.1 L559.2,178.8 L560.9,175.5 L562.6,171.4 L564.3,166.5 L566.0,160.8 L567.7,154.3 L569.4,147.2 L571.1,139.5 L572.8,131.4 L574.4,122.9 L576.1,114.1 L577.8,105.2 L579.5,96.3 L581.2,87.5 L582.9,78.9 L584.6,70.7 L586.2,63.0 L587.9,55.9 L589.6,49.6 L591.3,44.0 L593.0,39.5 L594.7,35.9 L596.4,33.4 L598.1,32.1 L599.8,32.1 L601.4,33.2 L603.1,35.7 L604.8,39.3 L606.5,44.3 L608.2,50.4 L609.9,57.7 L611.6,66.0 L613.2,75.3 L614.9,85.5 L616.6,96.4 L618.3,108.0 L620.0,120.0" fill="none" stroke="#b8322a" stroke-width="2.4"/>
+<text x="165" y="246" text-anchor="middle" fill="#17734c" font-weight="700">Długa gamma: dealer kupuje spadki</text>
+<text x="165" y="262" text-anchor="middle" fill="#85899a">wahania gasną — amortyzator</text>
+<text x="485" y="246" text-anchor="middle" fill="#b8322a" font-weight="700">Krótka gamma: dealer sprzedaje w spadek</text>
+<text x="485" y="262" text-anchor="middle" fill="#85899a">wahania rosną — pedał gazu</text>
+<text x="28" y="38" fill="#85899a" font-family="Roboto Mono, monospace" font-size="10">cena</text>
+<text x="348" y="38" fill="#85899a" font-family="Roboto Mono, monospace" font-size="10">cena</text>
+</g></svg>
+        </div>
+        <figcaption><b>Rys. 1</b> · Ten sam początkowy impuls na rynku. Gdy dealerzy mają <b>długą (dodatnią) gammę</b>, kupują spadki i sprzedają wzrosty — wahania gasną. Gdy mają <b>krótką (ujemną) gammę</b>, sprzedają w spadek i kupują we wzrost — wahania rosną. Rysunek poglądowy, nie dane.</figcaption>
+      </figure>
+      <div class="fails" style="margin-top:18px">
+        <div class="fail ok"><h3>Długa gamma dealerów <span class="tag ok">amortyzator</span></h3><p>Cena spada → dealer musi <b>kupić</b>. Cena rośnie → musi <b>sprzedać</b>. Handluje przeciw ruchowi, więc rynek się uspokaja i „chodzi w kanale”.</p></div>
+        <div class="fail stop"><h3>Krótka gamma dealerów <span class="tag stop">pedał gazu</span></h3><p>Cena spada → dealer musi <b>sprzedać</b>. Cena rośnie → musi <b>kupić</b>. Handluje z ruchem, więc ruchy są większe i gwałtowniejsze — w obie strony.</p></div>
+      </div>
+      <div class="box"><span class="t">Przykład krok po kroku</span><p>Dealer sprzedał puta 640 z deltą −0,30, więc trzyma short 30 akcji jako zabezpieczenie. QQQ spada w stronę 640, delta puta rośnie do −0,50. Teraz dealer potrzebuje shortu 50 akcji — <b>musi dosprzedać 20 akcji w spadającym rynku</b>. To właśnie krótka gamma: sprzedający puty dealer dokłada do spadków.</p></div>
+      <div class="art"><span class="t">W artykule z 23.11</span><p><b>Net GEX</b> (gamma exposure — suma gammy dealerów) spadł do <b>−1,67 mln</b> z −434 tys. Minus = krótka gamma, większa liczba = mocniej. Wniosek autora: „dealerzy mogą wzmacniać ruchy cenowe w obu kierunkach”. Autor nie podaje jednostki — liczy się znak i skala zmiany.</p></div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Strike'i</div>
+      <h2>Skupisko gammy działa jak magnes</h2>
+      <p>Gamma nie rozkłada się równo — gromadzi się na strike'ach, na których otwarto najwięcej opcji (<strong>open interest</strong>). Taki strike to poziom, przy którym hedging dealerów jest najbardziej intensywny.</p>
+      <div class="chain">
+        <span class="step up">cena rośnie w stronę 640</span><span class="arr">→</span>
+        <span class="step">delta opcji przy 640 szybko się zmienia</span><span class="arr">→</span>
+        <span class="step">dealerzy z krótką gammą muszą dokupić</span><span class="arr">→</span>
+        <span class="step up">ich kupno pcha cenę dalej</span>
+      </div>
+      <div class="art"><span class="t">W artykule z 23.11</span><p>Największe skupisko: <b>strike 640, gamma −224 tys.</b> ≈ 26 400 NQ (na CFD 26 335). Autor: zbliżanie się do tego strike'u „może wymuszać na dealerach podążanie za ruchem wzrostowym” — stąd jego cel odbicia 26 450. Kolejne skupiska: <b>630</b> ≈ 25 990 NQ (tam stała cena) i <b>650</b> ≈ 26 810 NQ.</p></div>
+      <div class="box"><span class="t">Ściana putów</span><p>Strike, na którym otwarto najwięcej putów. Kto je wystawił (zwykle dealer), broni tego poziomu hedgingiem, a kupujący puty traktują go jako „podłogę” swojej ochrony — dlatego cena często się tam zatrzymuje. Gdy jednak ściana pęknie, ten sam hedging zaczyna spadek przyspieszać. 24.11: <b>ściana putów na 640</b> ≈ 26 375 NQ (CFD 26 300), razem z krótką gammą −77 tys. i dołem dziennego implied move.</p></div>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Zmienność</div>
+      <h2>IV, czyli cena strachu</h2>
+      <div class="fails">
+        <div class="fail"><h3>IV — zmienność implikowana <span class="tag att">oczekiwana</span></h3><p>Jak bardzo rynek <b>spodziewa się</b> wahań w przyszłości, wyczytane z cen opcji. Drogie opcje = wysoka IV = dużo strachu. To jak cena polisy przeciwpowodziowej w trakcie ulewy.</p></div>
+        <div class="fail"><h3>IV30 <span class="tag att">na 30 dni</span></h3><p>IV opcji wygasających za ok. 30 dni, w skali roku. 23.11: <b>IV30 +9,2 pkt do 41,8%</b> — nowy roczny szczyt. Polisy są najdroższe od roku.</p></div>
+        <div class="fail"><h3>IV rank <span class="tag att">gdzie na tle roku</span></h3><p>Gdzie leży dzisiejsza IV między rocznym minimum (0) a maksimum (100). Na 20.11 było 93 — prawie najdrożej w roku.</p></div>
+        <div class="fail"><h3>Skew <span class="tag att">puty droższe od calli</span></h3><p>O ile ubezpieczenie od spadku jest droższe niż zakład na wzrost przy tej samej odległości od ceny. 23.11: skew po stronie putów <b>+14,0 pkt</b> — rynek płaci ekstra za ochronę.</p></div>
+        <div class="fail"><h3>Struktura terminowa <span class="tag att">krótko vs długo</span></h3><p>Normalnie dalsze opcje mają wyższą IV (więcej czasu = więcej niepewności). Gdy IV30 jest nad IV90 (20.11), struktura jest <b>odwrócona</b> — strach jest „tu i teraz”.</p></div>
+        <div class="fail"><h3>Zmienność zrealizowana <span class="tag att">faktyczna</span></h3><p>Jak mocno cena <b>naprawdę</b> się ruszała w ostatnich dniach, policzone z samych notowań, w tej samej skali co IV. IV to prognoza pogody, zmienność zrealizowana to deszcz, który już spadł. Gdy zrealizowana jest wyraźnie nad IV, opcje są „za tanie” na to, co dzieje się na rynku. 25.11: <b>47,2% wobec IV30 32,6%</b> — rynek rusza się o 14,6 pkt mocniej, niż wyceniają opcje.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Vanna</div>
+      <h2>Vanna: gdy strach maleje, dealerzy kupują</h2>
+      <p><strong>Vanna</strong> mówi, jak zmienia się delta, gdy zmienia się IV. Puty poniżej ceny przy wysokiej IV „ważą” więcej (rynek uważa krach za bardziej prawdopodobny). Gdy IV spada, te same puty ważą mniej — i dealer ma nagle za dużo zabezpieczenia.</p>
+      <div class="chain">
+        <span class="step up">IV spada (strach maleje)</span><span class="arr">→</span>
+        <span class="step">delta putów maleje</span><span class="arr">→</span>
+        <span class="step">dealer ma za duży short zabezpieczający</span><span class="arr">→</span>
+        <span class="step up">odkupuje → kupno na rynku</span>
+      </div>
+      <div class="chain">
+        <span class="step down">IV rośnie (strach rośnie)</span><span class="arr">→</span>
+        <span class="step">delta putów rośnie</span><span class="arr">→</span>
+        <span class="step">dealer ma za mały short</span><span class="arr">→</span>
+        <span class="step down">dosprzedaje → presja podaży</span>
+      </div>
+      <div class="art"><span class="t">W artykule z 23.11</span><p>Vanna jest „silnie procykliczna i bardzo duża”: <b>każdy punkt IV to ok. 36 mln USD</b> handlu dealerów — spadek IV o 1 pkt ≈ 36 mln zakupów, wzrost ≈ 36 mln sprzedaży. Po skoku IV do rocznego szczytu jest dużo miejsca na spadek, więc autor widzi w tym paliwo odbicia. Ale ostrzega: jeśli IV znów wzrośnie, ten sam mechanizm da równie mocną sprzedaż.</p></div>
+      <div class="box"><span class="t">Dlaczego 20.11 było „odwrotnie”</span><p>W analizie z 20.11 vanna miała inny znak: wzrost IV oznaczał kupno (ok. 3,4 mln USD na punkt). Znak zależy od tego, jakie opcje dealerzy akurat trzymają — po piątkowym wygaśnięciu portfel się zmienił, więc zmieniła się i vanna. Dlatego tych liczb nie przenosi się z dnia na dzień.</p></div>
+      <div class="box"><span class="t">24.11: paliwo zużyte</span><p>Mechanizm zadziałał jak w podręczniku: IV30 spadła o 10 pkt do 31,8%, a przy 36 mln USD na punkt dało to potężne zakupy dealerów — Nasdaq 100 zyskał prawie 7%. Ale po takim spadku IV vanna jest już <b>krótka i mała: 0,25 mln USD na punkt</b>. Bak jest pusty — dalszy wzrost musi przyjść od prawdziwych kupujących, nie od hedgingu.</p></div>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Charm</div>
+      <h2>Charm: zegar też przesuwa rynek</h2>
+      <p><strong>Charm</strong> mówi, jak zmienia się delta z <b>upływem czasu</b>, nawet gdy cena stoi w miejscu. Opcja daleko od ceny z każdym dniem traci szansę, że „wejdzie w grę”, więc jej delta maleje — dealer stopniowo zdejmuje zabezpieczenie. Ten przepływ jest najsilniejszy w ostatnich godzinach sesji i przed wygaśnięciem.</p>
+      <div class="box"><span class="t">Pin zone</span><p>Gdy przy jednym strike'u jest dużo opcji tuż przed wygaśnięciem, hedging dealerów ma tendencję do „przyklejania” ceny do tego strike'u — rynek kręci się wokół niego. To <b>pin zone</b>. 23.11 autor wskazuje <b>strike 625</b> (≈ 25 780–25 840 NQ) jako pin zone charmu według UW — i tam szuka pierwszego podparcia przy cofnięciu.</p></div>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Implied move</div>
+      <h2>Implied move: wyceniony zasięg dnia</h2>
+      <p>Z cen opcji da się policzyć, jak duży ruch rynek „wycenia” na dany dzień. Mówiąc szkolnie: to granice, w których cena powinna zostać w ok. 2 przypadkach na 3 (jedno odchylenie standardowe).</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 650 270" role="img" aria-label="Rozkład oczekiwanego ruchu QQQ z granicami ±3,1% i ceną nad górną granicą">
+<g font-family="Roboto Mono, monospace" font-size="11">
+<path d="M230.0,210 L230.0,113.0 L231.9,111.0 L233.8,109.1 L235.7,107.1 L237.6,105.2 L239.5,103.3 L241.4,101.4 L243.3,99.5 L245.2,97.6 L247.1,95.7 L249.0,93.8 L250.9,92.0 L252.8,90.1 L254.7,88.3 L256.6,86.5 L258.5,84.8 L260.4,83.0 L262.3,81.3 L264.2,79.6 L266.1,78.0 L268.0,76.4 L269.9,74.8 L271.8,73.2 L273.7,71.7 L275.6,70.2 L277.5,68.8 L279.4,67.4 L281.3,66.1 L283.2,64.8 L285.1,63.5 L287.0,62.3 L288.9,61.1 L290.8,60.0 L292.7,59.0 L294.6,58.0 L296.5,57.0 L298.4,56.2 L300.3,55.3 L302.2,54.5 L304.1,53.8 L306.0,53.2 L307.9,52.6 L309.8,52.0 L311.7,51.6 L313.6,51.1 L315.5,50.8 L317.4,50.5 L319.3,50.3 L321.2,50.1 L323.1,50.0 L325.0,50.0 L326.9,50.0 L328.8,50.1 L330.7,50.3 L332.6,50.5 L334.5,50.8 L336.4,51.1 L338.3,51.6 L340.2,52.0 L342.1,52.6 L344.0,53.2 L345.9,53.8 L347.8,54.5 L349.7,55.3 L351.6,56.2 L353.5,57.0 L355.4,58.0 L357.3,59.0 L359.2,60.0 L361.1,61.1 L363.0,62.3 L364.9,63.5 L366.8,64.8 L368.7,66.1 L370.6,67.4 L372.5,68.8 L374.4,70.2 L376.3,71.7 L378.2,73.2 L380.1,74.8 L382.0,76.4 L383.9,78.0 L385.8,79.6 L387.7,81.3 L389.6,83.0 L391.5,84.8 L393.4,86.5 L395.3,88.3 L397.2,90.1 L399.1,92.0 L401.0,93.8 L402.9,95.7 L404.8,97.6 L406.7,99.5 L408.6,101.4 L410.5,103.3 L412.4,105.2 L414.3,107.1 L416.2,109.1 L418.1,111.0 L420.0,113.0 L420.0,210 Z" fill="#14306b" opacity="0.12"/>
+<path d="M40.0,208.2 L42.9,208.1 L45.7,207.9 L48.5,207.7 L51.4,207.5 L54.2,207.2 L57.1,207.0 L60.0,206.7 L62.8,206.5 L65.7,206.1 L68.5,205.8 L71.3,205.5 L74.2,205.1 L77.0,204.7 L79.9,204.3 L82.8,203.8 L85.6,203.3 L88.5,202.8 L91.3,202.2 L94.2,201.6 L97.0,201.0 L99.8,200.4 L102.7,199.6 L105.5,198.9 L108.4,198.1 L111.2,197.3 L114.1,196.4 L117.0,195.5 L119.8,194.5 L122.7,193.4 L125.5,192.4 L128.3,191.2 L131.2,190.0 L134.1,188.8 L136.9,187.5 L139.8,186.1 L142.6,184.7 L145.4,183.2 L148.3,181.6 L151.2,180.0 L154.0,178.3 L156.8,176.6 L159.7,174.8 L162.6,172.9 L165.4,171.0 L168.2,169.0 L171.1,166.9 L173.9,164.8 L176.8,162.6 L179.7,160.4 L182.5,158.1 L185.3,155.7 L188.2,153.3 L191.1,150.8 L193.9,148.3 L196.8,145.7 L199.6,143.0 L202.4,140.4 L205.3,137.7 L208.2,134.9 L211.0,132.1 L213.8,129.3 L216.7,126.5 L219.6,123.6 L222.4,120.7 L225.2,117.8 L228.1,114.9 L230.9,112.0 L233.8,109.1 L236.7,106.2 L239.5,103.3 L242.3,100.4 L245.2,97.6 L248.1,94.7 L250.9,92.0 L253.8,89.2 L256.6,86.5 L259.4,83.9 L262.3,81.3 L265.1,78.8 L268.0,76.4 L270.9,74.0 L273.7,71.7 L276.6,69.5 L279.4,67.4 L282.2,65.4 L285.1,63.5 L287.9,61.7 L290.8,60.0 L293.6,58.5 L296.5,57.0 L299.4,55.7 L302.2,54.5 L305.1,53.5 L307.9,52.6 L310.8,51.8 L313.6,51.1 L316.4,50.6 L319.3,50.3 L322.1,50.1 L325.0,50.0 L327.9,50.1 L330.7,50.3 L333.6,50.6 L336.4,51.1 L339.2,51.8 L342.1,52.6 L344.9,53.5 L347.8,54.5 L350.6,55.7 L353.5,57.0 L356.4,58.5 L359.2,60.0 L362.1,61.7 L364.9,63.5 L367.8,65.4 L370.6,67.4 L373.4,69.5 L376.3,71.7 L379.1,74.0 L382.0,76.4 L384.9,78.8 L387.7,81.3 L390.6,83.9 L393.4,86.5 L396.2,89.2 L399.1,92.0 L401.9,94.7 L404.8,97.6 L407.6,100.4 L410.5,103.3 L413.4,106.2 L416.2,109.1 L419.1,112.0 L421.9,114.9 L424.8,117.8 L427.6,120.7 L430.4,123.6 L433.3,126.5 L436.1,129.3 L439.0,132.1 L441.9,134.9 L444.7,137.7 L447.6,140.4 L450.4,143.0 L453.2,145.7 L456.1,148.3 L458.9,150.8 L461.8,153.3 L464.6,155.7 L467.5,158.1 L470.4,160.4 L473.2,162.6 L476.1,164.8 L478.9,166.9 L481.8,169.0 L484.6,171.0 L487.4,172.9 L490.3,174.8 L493.1,176.6 L496.0,178.3 L498.9,180.0 L501.7,181.6 L504.6,183.2 L507.4,184.7 L510.2,186.1 L513.1,187.5 L516.0,188.8 L518.8,190.0 L521.6,191.2 L524.5,192.4 L527.4,193.4 L530.2,194.5 L533.0,195.5 L535.9,196.4 L538.8,197.3 L541.6,198.1 L544.5,198.9 L547.3,199.6 L550.1,200.4 L553.0,201.0 L555.9,201.6 L558.7,202.2 L561.5,202.8 L564.4,203.3 L567.2,203.8 L570.1,204.3 L573.0,204.7 L575.8,205.1 L578.6,205.5 L581.5,205.8 L584.4,206.1 L587.2,206.5 L590.0,206.7 L592.9,207.0 L595.8,207.2 L598.6,207.5 L601.5,207.7 L604.3,207.9 L607.1,208.1 L610.0,208.2" fill="none" stroke="#14306b" stroke-width="2"/>
+<line x1="40" x2="610" y1="210" y2="210" stroke="#ddd9cd"/>
+<line x1="230.0" x2="230.0" y1="40" y2="210" stroke="#8f5ada" stroke-width="1.5" stroke-dasharray="6 4"/>
+<line x1="420.0" x2="420.0" y1="40" y2="210" stroke="#8f5ada" stroke-width="1.5" stroke-dasharray="6 4"/>
+<line x1="325.0" x2="325.0" y1="210" y2="216" stroke="#85899a"/>
+<text x="325.0" y="230" text-anchor="middle" fill="#85899a">zamknięcie piątku</text>
+<text x="230.0" y="230" text-anchor="middle" fill="#8f5ada" font-weight="700">−3,1%</text>
+<text x="420.0" y="230" text-anchor="middle" fill="#8f5ada" font-weight="700">+3,1%</text>
+<text x="420.0" y="246" text-anchor="middle" fill="#8f5ada">≈ 25 876 NQ</text>
+<text x="325.0" y="120" text-anchor="middle" fill="#14306b" font-weight="700">ok. 2 na 3 dni</text>
+<text x="325.0" y="136" text-anchor="middle" fill="#14306b">kończą się w środku</text>
+<line x1="458.0" x2="458.0" y1="70" y2="210" stroke="#b8322a" stroke-width="2.4"/>
+<circle cx="458.0" cy="70" r="5" fill="#b8322a"/>
+<text x="468.0" y="66" fill="#b8322a" font-weight="700">QQQ w pre-markecie</text>
+<text x="468.0" y="81" fill="#b8322a">już ponad granicą</text>
+</g></svg>
+        </div>
+        <figcaption><b>Rys. 2</b> · Implied move 23.11: QQQ ±3,1%, górna granica ≈ 25 876 NQ (na CFD 25 811). W pre-markecie QQQ był już nad nią — odbicie większe, niż zakładał rynek opcji. Krzywa poglądowa.</figcaption>
+      </figure>
+      <div class="box"><span class="t">Policz sam: z IV30 na zasięg dnia</span><p>IV jest podawana w skali roku, a rok giełdowy ma ok. 252 sesje. Zasięg jednego dnia to IV podzielona przez pierwiastek z 252 (≈ 15,9). 25.11: 32,6% ÷ 15,9 ≈ <b>2,05%</b>, a 2,05% z 25 750 NQ to <b>ok. ±530 pkt</b> — stąd przedział autora 25 220–26 280. Gdy zmienność zrealizowana jest nad IV (patrz sekcja 06), autor traktuje taki przedział raczej jako minimum ruchu niż jego granicę.</p></div>
+      <p style="margin-top:16px">Wyjście poza implied move nie jest sygnałem samym w sobie. Mówi tylko, że dzieje się coś, czego rynek opcji rano nie przewidział — a dealerzy z krótką gammą mogą ten ruch dalej wzmacniać.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">10 · Premia</div>
+      <h2>Ile zapłacono za polisy</h2>
+      <p>Suma pieniędzy wydanych na puty i na calle w danym dniu pokazuje, czego ludzie się boją. 23.11 (za piątek): <b>puty 5,63 mld USD wobec 2,32 mld w callach</b> — ponad dwa razy więcej na ochronę niż na zakłady na wzrost.</p>
+      <p>Paradoks, który wykorzystuje autor: <span class="hl">dużo kupionych polis to dużo „paliwa” do odbicia</span>. Gdy panika mija, ochrona jest zdejmowana, IV spada, a vanna zamienia to na zakupy dealerów.</p>
+      <div class="box"><span class="t">Przepływ netto i open interest</span><p><b>Przepływ netto</b> w callach to pieniądze wydane na kupno calli minus te z ich sprzedaży — dodatni znaczy, że ktoś aktywnie stawia na wzrost. <b>Open interest (OI)</b> to liczba opcji, które wciąż są otwarte; jego przyrost na jednym strike'u pokazuje, gdzie budują się nowe pozycje. 24.11: <b>calle +114 mln USD netto</b>, największy zakup na 660 (+25 mln), a w grudniowej serii <b>OI +47 tys. kontraktów na 680</b>.</p></div>
+    </section>
+
+    <section>
+      <div class="eyebrow">11 · OPEX</div>
+      <h2>Wygaśnięcie zeruje układ</h2>
+      <p><strong>OPEX</strong> (options expiration) to dzień wygaśnięcia serii opcji — w USA miesięczna seria wygasa w trzeci piątek miesiąca. Wygasłe opcje znikają z portfeli dealerów razem z całą ich gammą, vanną i charmem. Układ sił buduje się od nowa.</p>
+      <div class="art"><span class="t">Na przykładzie</span><p>20.11 wygasło <b>2,34 mln kontraktów i 44% gammy</b>. Autor nie przywiązywał się wtedy do odczytów przed poniedziałkiem. I rzeczywiście: 23.11 Net GEX z −434 tys. skoczył do −1,67 mln, a vanna zmieniła znak.</p></div>
+    </section>
+
+    <section>
+      <div class="eyebrow">12 · Dark pool</div>
+      <h2>Dark pool: gdzie handlowali najwięksi</h2>
+      <p><strong>Dark pool</strong> to platformy poza giełdą, na których instytucje kupują i sprzedają duże pakiety, nie pokazując zleceń publicznie. Transakcje są raportowane z opóźnieniem, więc widać, <b>przy jakich cenach</b> przeszedł duży wolumen.</p>
+      <p>Tam, gdzie duzi gracze dużo kupili lub sprzedali, mają swoje pozycje — i często ich bronią albo na nich wychodzą „na zero”. Dlatego skupiska wolumenu działają jak wsparcie lub opór.</p>
+      <div class="art"><span class="t">W artykule z 23.11</span><p>Nad ceną do strike'u 645 w dark poolu prawie nie handlowano. Większe skupiska zaczynają się w <b>645–657</b> ≈ 26 600–27 100 NQ i pokrywają się z kluczowym dla autora 26 550 — to ściana podaży nad odbiciem.</p></div>
+    </section>
+
+    <section>
+      <div class="eyebrow">13 · Spoza opcji</div>
+      <h2>Cztery pojęcia, które padają obok</h2>
+      <div class="fails">
+        <div class="fail"><h3>CVD <span class="tag att">cumulative volume delta</span></h3><p>Narastająca różnica między wolumenem kupna „po rynku” a sprzedaży „po rynku”. Rosnące CVD = kupujący są agresywni, sami podnoszą ofertę. 23.11 na M5: CVD rośnie od otwarcia, więc według autora za odbiciem stoi realny popyt, „a nie wyłącznie chwilowy brak podaży”.</p></div>
+        <div class="fail"><h3>Absorpcja <span class="tag att">CVD w dół, cena stoi</span></h3><p>Sprzedający walą „po rynku”, CVD mocno spada, a cena prawie się nie rusza — bo ktoś cierpliwie stoi z dużymi zleceniami kupna i wszystko „wchłania”. Jak gąbka: leje się woda, a podłoga sucha. 24.11 na M5: CVD z ok. +5 000 do −6 000 przy cenie wciąż wysoko — autor czyta to jako absorpcję po stronie kupujących.</p></div>
+        <div class="fail"><h3>QQQ → NQ → US100 CFD <span class="tag att">trzy instrumenty</span></h3><p>Opcje są na QQQ (ETF), autor gra NQ (kontrakt terminowy), terminal pokazuje CFD US100 (śledzi indeks kasowy). QQQ × ok. 41,2 ≈ NQ. NQ − basis ≈ CFD — basis to premia kontraktu terminowego, maleje do zera przy jego wygaśnięciu, ale z dnia na dzień potrafi skoczyć (23.11: 65 pkt, 24.11: 75 pkt), więc mierzy się go za każdym razem.</p></div>
+        <div class="fail"><h3>M1–M5 vs H4–D1 <span class="tag att">dwa światy</span></h3><p>Na wykresach minutowych gra się krótki setup na kilkadziesiąt punktów, na godzinowych i dziennych — kierunek na dni i tygodnie. 23.11 jedno nie przeczy drugiemu: odbicie na M5 jest okazją, a D1 pod 26 550 nadal faworyzuje shorty.</p></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">14 · Ściąga</div>
+      <h2>Wszystko na jednej stronie</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Pojęcie</th><th>Jednym zdaniem</th><th>Na co patrzeć</th><th>23.11</th></tr></thead>
+          <tbody>
+            <tr><td><b>Delta / DEX</b></td><td>ile opcje dealerów „ważą” w akcjach</td><td>maleje = mniej mechanicznej sprzedaży</td><td>—</td></tr>
+            <tr><td><b>Gamma / GEX</b></td><td>jak szybko trzeba przehedgować przy ruchu ceny</td><td>minus = ruchy wzmacniane, plus = tłumione</td><td>−1,67 mln (z −434 tys.)</td></tr>
+            <tr><td><b>Skupisko gammy</b></td><td>strike z największym hedgingiem</td><td>magnes / przyspieszenie przy zbliżaniu</td><td>640 (−224 tys.) ≈ 26 400 NQ</td></tr>
+            <tr><td><b>IV / IV30</b></td><td>cena strachu</td><td>wysoka i spada = paliwo dla wzrostów</td><td>41,8%, roczny szczyt</td></tr>
+            <tr><td><b>Skew</b></td><td>o ile puty droższe od calli</td><td>wysoki = rynek mocno się zabezpiecza</td><td>+14,0 pkt</td></tr>
+            <tr><td><b>Vanna</b></td><td>handel dealerów przy zmianie IV</td><td>kierunek IV</td><td>±36 mln USD / pkt IV</td></tr>
+            <tr><td><b>Charm / pin</b></td><td>handel dealerów z upływem czasu</td><td>końcówka sesji, strike z dużym OI</td><td>pin zone 625 ≈ 25 780–25 840 NQ</td></tr>
+            <tr><td><b>Implied move</b></td><td>wyceniony zasięg dnia</td><td>wyjście poza = ruch ponad oczekiwania</td><td>±3,1%, góra ≈ 25 876 NQ — przekroczona</td></tr>
+            <tr><td><b>Premia put/call</b></td><td>ile wydano na ochronę vs wzrost</td><td>dużo putów = paliwo po zdjęciu ochrony</td><td>5,63 vs 2,32 mld USD</td></tr>
+            <tr><td><b>OPEX</b></td><td>wygaśnięcie serii</td><td>po nim odczyty od nowa</td><td>20.11: 44% gammy</td></tr>
+            <tr><td><b>Dark pool</b></td><td>gdzie przeszły duże pakiety</td><td>skupiska = wsparcie / opór</td><td>645–657 ≈ 26 600–27 100 NQ</td></tr>
+            <tr><td><b>Zmienność zrealizowana</b></td><td>jak mocno cena faktycznie się rusza</td><td>nad IV = opcje nie doceniają ruchu</td><td>25.11: 47,2% vs IV30 32,6%</td></tr>
+            <tr><td><b>Ściana putów</b></td><td>strike z największą liczbą putów</td><td>podłoga, dopóki nie pęknie</td><td>24.11: 640 ≈ 26 375 NQ</td></tr>
+            <tr><td><b>Absorpcja</b></td><td>agresywna sprzedaż bez spadku ceny</td><td>CVD w dół, cena stoi = ktoś duży kupuje</td><td>24.11: CVD +5 000 → −6 000</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">15 · Sprawdzian</div>
+      <h2>Pięć pytań</h2>
+      <details><summary>1. Dealerzy mają krótką gammę, a cena gwałtownie spada. Co robią?</summary><p><b>Sprzedają</b> — muszą dosprzedawać zabezpieczenie, więc dokładają do spadku. Krótka gamma = pedał gazu w obie strony.</p></details>
+      <details><summary>2. IV spada z rocznego szczytu. Dlaczego może to pomóc kupującym?</summary><p>Puty „ważą” mniej, dealerzy mają za duży short zabezpieczający i go <b>odkupują</b> (vanna). 23.11 to ok. 36 mln USD na każdy punkt spadku IV.</p></details>
+      <details><summary>3. Dlaczego autor celuje akurat w 26 450 NQ?</summary><p>Bo przy strike'u 640 (≈ 26 400 NQ) jest największe skupisko krótkiej gammy (−224 tys.) — zbliżanie się do niego może zmusić dealerów do kupowania za ceną.</p></details>
+      <details><summary>4. Czemu poniedziałkowe odczyty opcji tak różnią się od piątkowych?</summary><p>Bo w piątek był OPEX — wygasło 44% gammy. Portfele dealerów zbudowały się od nowa, razem ze znakiem vanny.</p></details>
+      <details><summary>5. QQQ w pre-markecie jest nad górną granicą implied move. To sygnał kupna?</summary><p><b>Nie sam w sobie.</b> To informacja, że ruch jest większy niż wyceniał rynek opcji. Autor i tak traktuje odbicie tylko jako setup na M1–M5, dopóki NQ jest pod 26 550.</p></details>
+      <p class="note" style="margin-top:22px">Przykłady liczbowe: M. Bączkowski, „Strategia PSV: Wall Street zaliczyła potężną przecenę. Teraz NQ rusza w górę”, Comparic.pl, 23.11.2026 (<a href="https://comparic.pl/strategia-psv-wall-street-zaliczyla-potezna-przecene-teraz-nq-rusza-w-gore/">artykuł</a>), oraz „Strategia PSV” z 20.11.2026 (DEX, IV rank, struktura terminowa, OPEX). Autor odsyła też do własnego <a href="https://comparic.pl/faq-dla-traderow-pojecia-efekty-i-techniki-w-praktyce-z-psv-oraz-gold-flow/">FAQ pojęć PSV</a>. Analiza poziomów na CFD: <a href="analiza-us100-psv-2026-11-23.html">23.11.2026</a>. Materiał edukacyjny, nie rekomendacja inwestycyjna.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>TradingCenter / strategie · Opcje po ludzku</span>
+    <span>23 listopada 2026 · ściąga do analiz PSV</span>
+  </div>
+</footer>

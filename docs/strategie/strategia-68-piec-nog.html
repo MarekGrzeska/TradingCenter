@@ -397,7 +397,7 @@
         <div class="fail ok">
           <h3>Krok <code>strategy_execute</code></h3>
           <p>Pyta silnik backtestu, co zrobiłby na świecy, która właśnie się zamknęła, czyli sygnał liczony tymi samymi regułami co
-            backtest. Wchodzi tylko na świeży sygnał (świeca młodsza niż 5 min) i tylko wtedy, gdy na US100 nie ma żadnej innej pozycji.
+            backtest. Wchodzi tylko na świeży sygnał (świeca młodsza niż 10 min) i tylko wtedy, gdy na US100 nie ma żadnej innej pozycji.
             Zamyka własną pozycję, gdy silnik wychodzi. Na jedną świecę przypada najwyżej jedna próba, nawet jeśli zespół
             uruchomi się dwa razy.</p>
         </div>
@@ -407,13 +407,16 @@
             Przy wyjściu: cena otwarcia, cena zamknięcia, różnica w punktach i wynik w USD (zmiana salda rachunku).
             Gdy nic się nie dzieje, krok milczy. Gdy jakiejś wartości nie ma, wiadomość pisze „niedostępne” i niczego nie zgaduje.</p>
         </div>
-        <div class="fail stop">
-          <h3>Noga 5 (noc) na demo nie wejdzie <span class="tag stop">znane ograniczenie</span></h3>
-          <p>Sygnał nocny pada o 17:00 w Nowym Jorku, na początku godzinnej przerwy w handlu US100. Backtest wypełnia go o
-            18:00, na pierwszej świecy po przerwie. Krok o 17:00 najpewniej dostanie od brokera odmowę (rynek zamknięty). O 18:05 silnik
-            już „trzyma” pozycję, a krok nie nadrabia wejść, więc nic nie zrobi. Noga 5 to 43 transakcje i ok. 10% sumy
-            wyników. Na Telegram przyjdzie wtedy „ODRZUCONE” z powodem od brokera. Żeby ją grać, przepis musiałby umieć wejść na
-            pierwszej świecy po przerwie. To osobna zmiana.</p>
+        <div class="fail ok">
+          <h3>Noga 5 (noc) wchodzi po przerwie <span class="tag ok">od 25.11</span></h3>
+          <p>Sygnał nocny pada na świecy zamykającej się o 17:00 w Nowym Jorku (23:00 w Polsce), tuż przed przerwą w handlu
+            US100 (22:00–22:05 UTC). Ta świeca trafia do archiwum dopiero ok. 2–4 min po przerwie, a backtest wypełnia sygnał
+            na otwarciu po przerwie. Krok czeka więc do 10 min: najpierw na świecę, potem na pierwszą cenę po niej, i dopiero
+            wtedy wysyła zlecenie — ok. 22:05 UTC, tak jak backtest.</p>
+          <p style="margin-top:8px">Do 25.11 noga nie weszła ani razu: poprawka czekania (17.11) trafiła do nowej rewizji
+            zespołu, ale harmonogramy zostały przypięte do starej, z czekaniem 60 s, i każda próba o 23:00 kończyła się
+            „POMINIĘTE”. Przegapiona została jedna transakcja silnika: 16.11 (long 22:05 → 17.11 14:25). Od rewizji 30
+            harmonogramy wskazują poprawioną wersję, a <code>revise_team</code> mówi, które harmonogramy zostają na starej.</p>
         </div>
       </div>
 <pre><code><span class="c">Przykład wiadomości po wyjściu</span>
