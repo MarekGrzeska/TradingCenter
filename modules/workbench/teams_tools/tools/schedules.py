@@ -275,6 +275,7 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         comparison: Literal["gt", "gte", "lt", "lte", "eq"] | None = None,
         cooldown_seconds: int | None = None,
         poll_interval_seconds: int | None = None,
+        pinned_revision_id: int | None = None,
     ) -> SavedTrigger:
         """Change an existing trigger's condition or its pacing, keeping the trigger.
 
@@ -287,7 +288,9 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         current = await _call(teams, context, "GET", f"/triggers/{trigger_id}")
         body = {
             "revision_mode": current["revision_mode"],
-            "pinned_revision_id": current["pinned_revision_id"],
+            "pinned_revision_id": pinned_revision_id
+            if pinned_revision_id is not None
+            else current["pinned_revision_id"],
             "tool_name": current["tool_name"],
             "arguments": current["arguments"],
             "field_path": current["field_path"],
