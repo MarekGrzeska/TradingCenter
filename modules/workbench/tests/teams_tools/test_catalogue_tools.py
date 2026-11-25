@@ -40,6 +40,12 @@ def _revision(agents=None, edges=None, version=1, revision_id=9):
     }
 
 
+def _pins(schedules=(), triggers=()):
+    """The schedules and triggers `revise_team` reads after saving, to name the ones left on an older revision."""
+    respx.get(f"{BASE}/teams/1/schedules").mock(return_value=httpx.Response(200, json=list(schedules)))
+    respx.get(f"{BASE}/teams/1/triggers").mock(return_value=httpx.Response(200, json=list(triggers)))
+
+
 @respx.mock
 async def test_list_teams_answers_the_operators_own_catalogue(server) -> None:
     mcp, teams = server
@@ -144,6 +150,7 @@ async def test_create_team_refusal_names_the_agent_teams_named(server) -> None:
 @respx.mock
 async def test_revise_team_replaces_one_role_and_keeps_the_rest(server) -> None:
     mcp, teams = server
+    _pins()
     respx.get(f"{BASE}/teams/1/revisions/latest").mock(
         return_value=httpx.Response(200, json=_revision(agents=[_AGENT, _JUDGE]))
     )
@@ -178,6 +185,7 @@ async def test_revise_team_replaces_one_role_and_keeps_the_rest(server) -> None:
 @respx.mock
 async def test_revise_team_keeps_limits_that_were_not_named(server) -> None:
     mcp, teams = server
+    _pins()
     respx.get(f"{BASE}/teams/1/revisions/latest").mock(
         return_value=httpx.Response(200, json=_revision())
     )
@@ -199,6 +207,7 @@ async def test_revise_team_keeps_limits_that_were_not_named(server) -> None:
 @respx.mock
 async def test_revise_team_adds_an_agent_whose_key_is_new(server) -> None:
     mcp, teams = server
+    _pins()
     respx.get(f"{BASE}/teams/1/revisions/latest").mock(
         return_value=httpx.Response(200, json=_revision())
     )
@@ -210,6 +219,37 @@ async def test_revise_team_adds_an_agent_whose_key_is_new(server) -> None:
 
     body = saved.calls.last.request.read().decode()
     assert "scout" in body and "judge" in body
+    await teams.aclose()
+
+
+@respx.mock
+async def test_revise_team_names_the_schedules_still_pinned_to_an_older_revision(server) -> None:
+    mcp, teams = server
+    _pins(
+        schedules=[
+            {"id": 24, "revision_mode": "pinned", "pinned_revision_id": 9},
+            {"id": 25, "revision_mode": "pinned", "pinned_revision_id": 10},
+            {"id": 26, "revision_mode": "latest", "pinned_revision_id": None},
+        ],
+        triggers=[{"id": 3, "revision_mode": "pinned", "pinned_revision_id": 9}],
+    )
+    respx.get(f"{BASE}/teams/1/revisions/latest").mock(
+        return_value=httpx.Response(200, json=_revision())
+    )
+    respx.post(f"{BASE}/teams/1/revisions").mock(
+        return_value=httpx.Response(201, json=_revision(version=2, revision_id=10))
+    )
+
+    _content, structured = await mcp.call_tool(
+        "revise_team", {"team_id": 1, "replace_agents": [{**_AGENT, "prompt": "new"}]}
+    )
+
+    # A correction that no schedule runs is the failure: the night leg missed a week behind one.
+    assert "schedule 24 (revision 9)" in structured["note"]
+    assert "trigger 3 (revision 9)" in structured["note"]
+    assert "schedule 25" not in structured["note"]
+    assert "schedule 26" not in structured["note"]
+    assert "pinned_revision_id=10" in structured["note"]
     await teams.aclose()
 
 
@@ -393,6 +433,7 @@ async def test_the_live_account_cannot_be_set_from_a_chat(server) -> None:
 @respx.mock
 async def test_revising_a_live_team_keeps_its_trading_and_refuses_to_change_it(server) -> None:
     mcp, teams = server
+    _pins()
     live = _revision()
     live["definition"]["steps"] = [_STEP]
     live["definition"]["trading"] = {"environment": "live", "account_id": "real-1"}

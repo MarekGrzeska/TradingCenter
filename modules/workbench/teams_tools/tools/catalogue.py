@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Literal
 
 from mcp.server.fastmcp import Context, FastMCP
@@ -129,6 +130,30 @@ def _demo_trading(trading: TradingIn) -> dict[str, Any]:
 
 def _keys(definition: dict[str, Any], section: str) -> list[str]:
     return [node["key"] for node in definition.get(section, [])]
+
+
+async def _left_behind(teams: TeamsClient, context: Context, team_id: int, revision_id: int) -> str | None:
+    """Which schedules and triggers will keep running an older revision. A pin is deliberate, but a correction
+    nobody re-pins never runs: strategy 68's night leg missed every night for a week behind one."""
+    try:
+        schedules, triggers = await asyncio.gather(
+            _call(teams, context, "GET", f"/teams/{team_id}/schedules"),
+            _call(teams, context, "GET", f"/teams/{team_id}/triggers"),
+        )
+    except ToolRefusal as err:
+        return f"saved, but the schedules could not be read to see which still run an older revision: {err}"
+    behind = [
+        f"{kind} {row['id']} (revision {row['pinned_revision_id']})"
+        for kind, rows in (("schedule", schedules), ("trigger", triggers))
+        for row in rows
+        if row["revision_mode"] == "pinned" and row["pinned_revision_id"] != revision_id
+    ]
+    if not behind:
+        return None
+    return (
+        f"still pinned to an older revision, so they will not run this one: {', '.join(behind)}. "
+        f"Move each with edit_schedule or edit_trigger, pinned_revision_id={revision_id}."
+    )
 
 
 def _patched(
@@ -291,6 +316,9 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         This appends a revision; the previous one is untouched and every run already
         pointing at it still means what it meant. Nothing is ever overwritten, so a
         correction that turns out worse is undone by revising back.
+
+        A schedule or trigger stays pinned to the revision it names: `note` lists those
+        that will keep running an older one, and `edit_schedule` moves them.
         """
         if not any(
             [replace_agents, remove_agent_keys, replace_steps, remove_step_keys, edges, limits, trading]
@@ -333,6 +361,7 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
             version=revision["version"],
             agents=_keys(revision["definition"], "agents"),
             steps=_keys(revision["definition"], "steps"),
+            note=await _left_behind(teams, context, team_id, revision["id"]),
         )
 
     @mcp.tool(annotations=READ_ONLY)

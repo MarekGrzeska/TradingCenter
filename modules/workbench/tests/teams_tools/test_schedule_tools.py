@@ -291,6 +291,20 @@ async def test_editing_a_trigger_changes_only_what_was_named(server) -> None:
 
 
 @respx.mock
+async def test_a_trigger_is_moved_to_the_revision_named(server) -> None:
+    mcp, teams = server
+    respx.get(f"{BASE}/triggers/21").mock(return_value=httpx.Response(200, json=_trigger()))
+    saved = respx.put(f"{BASE}/triggers/21").mock(return_value=httpx.Response(200, json=_trigger()))
+
+    await mcp.call_tool("edit_trigger", {"trigger_id": 21, "pinned_revision_id": 12})
+
+    body = json.loads(saved.calls.last.request.read())
+    assert body["pinned_revision_id"] == 12
+    assert body["threshold"] == _trigger()["threshold"]
+    await teams.aclose()
+
+
+@respx.mock
 async def test_a_zero_cooldown_travels_instead_of_being_swallowed(server) -> None:
     """`cooldown_seconds=0` is falsy, and `or` read that as "not given" — so the tool kept the old value and
     answered with a success naming it. Whether zero is allowed is teams' question, not this module's."""
