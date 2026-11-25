@@ -317,8 +317,7 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         pointing at it still means what it meant. Nothing is ever overwritten, so a
         correction that turns out worse is undone by revising back.
 
-        A schedule or trigger stays pinned to the revision it names: `note` lists those
-        that will keep running an older one, and `edit_schedule` moves them.
+        `note` names the schedules left pinned to an older revision.
         """
         if not any(
             [replace_agents, remove_agent_keys, replace_steps, remove_step_keys, edges, limits, trading]

@@ -277,8 +277,7 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         poll_interval_seconds: int | None = None,
         pinned_revision_id: int | None = None,
     ) -> SavedTrigger:
-        """Change an existing trigger's condition, its pacing or the revision it runs,
-        keeping the trigger.
+        """Change an existing trigger's condition or its pacing, keeping the trigger.
 
         Every argument left out stays as it is — the condition's tool and field are not
         editable here on purpose: a trigger watching a different number is a different
